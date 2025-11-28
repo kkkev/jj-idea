@@ -1,0 +1,137 @@
+# GitLab CI/CD Configuration for Jujutsu IntelliJ Plugin
+
+image: eclipse-temurin:21-jdk
+
+# Cache Gradle dependencies between builds
+cache:
+  key: "${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .gradle/wrapper
+    - .gradle/caches
+
+# Define pipeline stages
+stages:
+  - build
+  - test
+  - verify
+  - package
+
+# Variables
+variables:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  GRADLE_USER_HOME: "${CI_PROJECT_DIR}/.gradle"
+
+# Run before every job
+before_script:
+  - export GRADLE_USER_HOME=`pwd`/.gradle
+  - chmod +x ./gradlew
+
+# Build the plugin
+build:
+  stage: build
+  script:
+    - ./gradlew assemble --build-cache
+  artifacts:
+    paths:
+      - build/libs/*.jar
+    expire_in: 1 week
+  only:
+    - main
+    - merge_requests
+    - tags
+
+# Run simple unit tests (no IntelliJ Platform required)
+test:simple:
+  stage: test
+  script:
+    - ./gradlew simpleTest --build-cache
+  artifacts:
+    when: always
+    reports:
+      junit: build/test-results/simpleTest/TEST-*.xml
+    paths:
+      - build/reports/tests/simpleTest/
+    expire_in: 1 week
+  only:
+    - main
+    - merge_requests
+
+# Run full test suite (requires IntelliJ Platform)
+test:full:
+  stage: test
+  script:
+    - ./gradlew test --build-cache
+  artifacts:
+    when: always
+    reports:
+      junit: build/test-results/test/TEST-*.xml
+    paths:
+      - build/reports/tests/test/
+    expire_in: 1 week
+  only:
+    - main
+    - merge_requests
+  allow_failure: true  # Allow failure until IntelliJ test setup is complete
+
+# Code quality and verification
+verify:
+  stage: verify
+  script:
+    - ./gradlew check --build-cache
+  artifacts:
+    paths:
+      - build/reports/
+    expire_in: 1 week
+  only:
+    - main
+    - merge_requests
+
+# Verify plugin.xml and plugin structure
+verify:plugin:
+  stage: verify
+  script:
+    - ./gradlew verifyPlugin --build-cache
+  only:
+    - main
+    - merge_requests
+
+# Build distributable plugin zip
+package:
+  stage: package
+  script:
+    - ./gradlew buildPlugin --build-cache
+  artifacts:
+    paths:
+      - build/distributions/*.zip
+    expire_in: 1 month
+  only:
+    - main
+    - tags
+
+# Build and publish plugin on tags (releases)
+release:
+  stage: package
+  script:
+    - ./gradlew buildPlugin --build-cache
+    # Uncomment when ready to publish to JetBrains Marketplace
+    # - ./gradlew publishPlugin -Ppublish.token=$JETBRAINS_MARKETPLACE_TOKEN
+  artifacts:
+    paths:
+      - build/distributions/*.zip
+  only:
+    - tags
+  when: manual
+
+# Generate code coverage report (future enhancement)
+# coverage:
+#   stage: verify
+#   script:
+#     - ./gradlew jacocoTestReport
+#   coverage: '/Total.*?([0-9]{1,3})%/'
+#   artifacts:
+#     paths:
+#       - build/reports/jacoco/
+#     expire_in: 1 week
+#   only:
+#     - main
+#     - merge_requests
