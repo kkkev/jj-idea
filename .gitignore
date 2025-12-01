@@ -16,3 +16,7 @@ out/
 
 # Build outputs
 dist/
+
+# Others
+hs_err_pid*.log
+.kotlin/
