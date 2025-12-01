@@ -1,7 +1,5 @@
 package `in`.kkkev.jjidea.diff
 
-import `in`.kkkev.jjidea.JujutsuVcs
-import `in`.kkkev.jjidea.changes.JujutsuContentRevision
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
@@ -10,6 +8,8 @@ import com.intellij.openapi.vcs.diff.DiffProvider
 import com.intellij.openapi.vcs.diff.ItemLatestState
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.vcsUtil.VcsUtil
+import `in`.kkkev.jjidea.JujutsuVcs
 import `in`.kkkev.jjidea.changes.JujutsuRevisionNumber
 
 /**
@@ -25,26 +25,18 @@ class JujutsuDiffProvider(
     override fun getLastRevision(file: VirtualFile): ItemLatestState? {
         log.debug("Getting last revision for VirtualFile: ${file.path}")
 
-        val filePath = com.intellij.vcsUtil.VcsUtil.getFilePath(file)
-        val revision = createRevision(filePath, "@-")
+        val filePath = VcsUtil.getFilePath(file)
+        val revision = vcs.createRevision(filePath, "@-")
 
-        return ItemLatestState(
-            revision?.revisionNumber,
-            revision != null,
-            true
-        )
+        return ItemLatestState(revision.revisionNumber, true, true)
     }
 
     override fun getLastRevision(filePath: FilePath): ItemLatestState? {
         log.debug("Getting last revision for FilePath: ${filePath.path}")
 
-        val revision = createRevision(filePath, "@-")
+        val revision = vcs.createRevision(filePath, "@-")
 
-        return ItemLatestState(
-            revision?.revisionNumber,
-            revision != null,
-            true
-        )
+        return ItemLatestState(revision.revisionNumber, true, true)
     }
 
     override fun createFileContent(
@@ -53,29 +45,11 @@ class JujutsuDiffProvider(
     ): ContentRevision? {
         if (revisionNumber == null) return null
 
-        val filePath = com.intellij.vcsUtil.VcsUtil.getFilePath(file)
-        return createRevision(filePath, revisionNumber.asString())
+        val filePath = VcsUtil.getFilePath(file)
+        return vcs.createRevision(filePath, revisionNumber.asString())
     }
 
-    override fun getCurrentRevision(file: VirtualFile): VcsRevisionNumber? {
-        return JujutsuRevisionNumber("@")
-    }
+    override fun getCurrentRevision(file: VirtualFile) = JujutsuRevisionNumber("@")
 
-    override fun getLatestCommittedRevision(file: VirtualFile): VcsRevisionNumber? {
-        return JujutsuRevisionNumber("@-")
-    }
-
-    private fun createRevision(filePath: FilePath, revision: String): ContentRevision? {
-        return try {
-            JujutsuContentRevision.createRevision(
-                filePath,
-                revision,
-                project,
-                vcs
-            )
-        } catch (e: Exception) {
-            log.error("Failed to create revision for ${filePath.path} at $revision", e)
-            null
-        }
-    }
+    override fun getLatestCommittedRevision(file: VirtualFile) = JujutsuRevisionNumber("@-")
 }

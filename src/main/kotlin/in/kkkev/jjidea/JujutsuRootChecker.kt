@@ -24,10 +24,5 @@ class JujutsuRootChecker : VcsRootChecker() {
          * Check if the given directory is a jujutsu repository root
          */
         fun isJujutsuRoot(dir: VirtualFile) = dir.findChild(".jj")?.isDirectory ?: false
-
-        /**
-         * Check if the given path is a jujutsu repository root
-         */
-        fun isJujutsuRoot(path: Path) = path.resolve(".jj").exists()
     }
 }

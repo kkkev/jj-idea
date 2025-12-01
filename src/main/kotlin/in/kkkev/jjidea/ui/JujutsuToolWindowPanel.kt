@@ -1,17 +1,20 @@
 package `in`.kkkev.jjidea.ui
 
-import `in`.kkkev.jjidea.JujutsuVcs
+import com.intellij.diff.DiffContentFactory
+import com.intellij.diff.DiffManager
+import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -20,6 +23,8 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
+import `in`.kkkev.jjidea.JujutsuVcs
+import `in`.kkkev.jjidea.root
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
@@ -29,14 +34,12 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
-import javax.swing.tree.TreePath
 
 /**
  * Main panel for the Jujutsu tool window
  * Implements JJ's "describe-first" workflow with a tree view of changes
  */
 class JujutsuToolWindowPanel(private val project: Project) : Disposable {
-
     private val panel = JPanel(BorderLayout())
     private val descriptionArea = JBTextArea(3, 50)
     private val currentChangeLabel = JBLabel("Working Copy (@)")
@@ -48,11 +51,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     // Grouping state
     private var groupByDirectory = true
 
-    private val vcs: JujutsuVcs? get() {
-        val root = project.baseDir ?: return null
-        val vcsManager = ProjectLevelVcsManager.getInstance(project)
-        return vcsManager.getVcsFor(root) as? JujutsuVcs
-    }
+    private val vcs get() = JujutsuVcs.find(project)
 
     init {
         // Create the changes tree
@@ -159,7 +158,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         group.addSeparator()
 
         // Group by directory toggle
-        group.add(object : ToggleAction("Group By Directory", "Group changes by directory", AllIcons.Actions.GroupByPackage) {
+        group.add(object :
+            ToggleAction("Group By Directory", "Group changes by directory", AllIcons.Actions.GroupByPackage) {
             override fun isSelected(e: AnActionEvent): Boolean = groupByDirectory
 
             override fun setSelected(e: AnActionEvent, state: Boolean) {
@@ -282,10 +282,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         }
 
         val vcsInstance = vcs ?: return
-        val root = project.baseDir ?: return
+        val root = project.root ?: return
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = vcsInstance.commandExecutor.describe(root, description)
+            val result = vcsInstance.commandExecutor.describe(description)
 
             ApplicationManager.getApplication().invokeLater {
                 if (result.isSuccess) {
@@ -304,10 +304,9 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private fun createNewChange() {
         val vcsInstance = vcs ?: return
-        val root = project.baseDir ?: return
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = vcsInstance.commandExecutor.new(root)
+            val result = vcsInstance.commandExecutor.new()
 
             ApplicationManager.getApplication().invokeLater {
                 if (result.isSuccess) {
@@ -355,7 +354,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         ApplicationManager.getApplication().executeOnPooledThread {
             // Get change ID and description for working copy
             val template = "change_id ++ \"|\" ++ description"
-            val result = vcsInstance.commandExecutor.log(root, "@", template)
+            val result = vcsInstance.commandExecutor.log("@", template)
 
             ApplicationManager.getApplication().invokeLater {
                 if (result.isSuccess) {
@@ -374,7 +373,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         val formattedChangeId = JujutsuCommitFormatter.formatChangeId(changeId, shortPrefix)
 
                         // Create HTML to show bold short prefix
-                        val labelText = "<html><b>${formattedChangeId.shortPart}</b>${formattedChangeId.restPart} @ - Working Copy</html>"
+                        val labelText =
+                            "<html><font color=#f010f0><b>${formattedChangeId.shortPart}</b></font><font color=#808080>${formattedChangeId.restPart}</font> @ - Working Copy</html>"
                         currentChangeLabel.text = labelText
                     } else {
                         descriptionArea.text = output
@@ -385,7 +385,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun getWorkingCopyChanges(): List<Change> {
-        val changeListManager = com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
+        val changeListManager = ChangeListManager.getInstance(project)
         return changeListManager.allChanges.toList()
     }
 
@@ -403,11 +403,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
             // Load content in background
             val beforeContent = change.beforeRevision?.content ?: ""
-            val afterVirtualFile = if (afterPath != null) {
-                LocalFileSystem.getInstance().findFileByPath(afterPath.path)
-            } else {
-                null
-            }
+            val afterVirtualFile = afterPath?.let { LocalFileSystem.getInstance().findFileByPath(it.path) }
             val afterContent = if (afterVirtualFile == null) {
                 change.afterRevision?.content ?: ""
             } else {
@@ -416,8 +412,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
             // Now show diff on EDT with loaded content
             ApplicationManager.getApplication().invokeLater {
-                val contentFactory = com.intellij.diff.DiffContentFactory.getInstance()
-                val diffManager = com.intellij.diff.DiffManager.getInstance()
+                val contentFactory = DiffContentFactory.getInstance()
+                val diffManager = DiffManager.getInstance()
 
                 // Create diff content - use string content only, not FilePath, to avoid re-reading
                 val content1 = if (beforePath != null && beforeContent.isNotEmpty()) {
@@ -438,12 +434,12 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     contentFactory.createEmpty()
                 }
 
-                val diffRequest = com.intellij.diff.requests.SimpleDiffRequest(
+                val diffRequest = SimpleDiffRequest(
                     fileName,
                     content1,
                     content2,
                     "${beforePath?.name ?: "Before"} (@-)",
-                    "${afterPath?.name ?: "After"} (Working Copy)"
+                    "${afterPath?.name ?: "After"} (@)"
                 )
 
                 diffManager.showDiff(project, diffRequest)
@@ -479,7 +475,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
         // Add common VCS actions with keyboard shortcuts displayed
         val showDiffAction = object : DumbAwareAction("Show Diff (Click)") {
-            override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
+            override fun actionPerformed(e: AnActionEvent) {
                 showDiff(selectedChange)
             }
         }
@@ -493,7 +489,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     KeyboardShortcut(KeyStroke.getKeyStroke("ENTER"), null)
                 )
             }
-            override fun actionPerformed(e: com.intellij.openapi.actionSystem.AnActionEvent) {
+
+            override fun actionPerformed(e: AnActionEvent) {
                 openFilePermanent(selectedChange)
             }
         }

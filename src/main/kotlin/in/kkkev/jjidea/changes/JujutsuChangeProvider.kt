@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.changes
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
@@ -13,7 +12,7 @@ import `in`.kkkev.jjidea.JujutsuVcs
 /**
  * Provides change information for jujutsu working copy
  */
-class JujutsuChangeProvider(private val project: Project, private val vcs: JujutsuVcs) : ChangeProvider {
+class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     private val log = Logger.getInstance(JujutsuChangeProvider::class.java)
 
     override fun getChanges(
@@ -27,7 +26,7 @@ class JujutsuChangeProvider(private val project: Project, private val vcs: Jujut
         val vcsRoot = getVcsRoot(dirtyScope) ?: return
 
         try {
-            val result = vcs.commandExecutor.status(vcsRoot)
+            val result = vcs.commandExecutor.status()
 
             if (!result.isSuccess) {
                 log.warn("Failed to get jj status: ${result.stderr}")
@@ -40,7 +39,7 @@ class JujutsuChangeProvider(private val project: Project, private val vcs: Jujut
         }
     }
 
-    override fun isModifiedDocumentTrackingRequired(): Boolean = true
+    override fun isModifiedDocumentTrackingRequired() = true
 
     private fun getVcsRoot(dirtyScope: VcsDirtyScope): VirtualFile? {
         return dirtyScope.affectedContentRoots.firstOrNull()
@@ -93,20 +92,20 @@ class JujutsuChangeProvider(private val project: Project, private val vcs: Jujut
         if (filePath.isEmpty()) return
 
         val file = root.findFileByRelativePath(filePath)
-        val path = VcsUtil.getFilePath(root.path + "/" + filePath)
+        val path = VcsUtil.getFilePath(root.path + "/" + filePath, false)
 
         when (status) {
             'M' -> {
                 // Modified file
                 if (file != null) {
-                    addModifiedChange(path, file, builder)
+                    addModifiedChange(path, builder)
                 }
             }
 
             'A' -> {
                 // Added file
                 if (file != null) {
-                    addAddedChange(path, file, builder)
+                    addAddedChange(path, builder)
                 }
             }
 
@@ -126,13 +125,8 @@ class JujutsuChangeProvider(private val project: Project, private val vcs: Jujut
         }
     }
 
-    private fun addModifiedChange(path: FilePath, file: VirtualFile, builder: ChangelistBuilder) {
-        val beforeRevision = JujutsuContentRevision.createRevision(
-            path,
-            "@-", // Parent of working copy
-            project,
-            vcs
-        )
+    private fun addModifiedChange(path: FilePath, builder: ChangelistBuilder) {
+        val beforeRevision = vcs.createRevision(path, "@-") // Parent commit
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -141,7 +135,7 @@ class JujutsuChangeProvider(private val project: Project, private val vcs: Jujut
         )
     }
 
-    private fun addAddedChange(path: FilePath, file: VirtualFile, builder: ChangelistBuilder) {
+    private fun addAddedChange(path: FilePath, builder: ChangelistBuilder) {
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -151,12 +145,7 @@ class JujutsuChangeProvider(private val project: Project, private val vcs: Jujut
     }
 
     private fun addDeletedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = JujutsuContentRevision.createRevision(
-            path,
-            "@-",
-            project,
-            vcs
-        )
+        val beforeRevision = vcs.createRevision(path, "@-")
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),

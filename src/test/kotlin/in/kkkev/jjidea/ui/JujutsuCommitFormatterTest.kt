@@ -58,15 +58,4 @@ class JujutsuCommitFormatterTest {
         formatted shouldContain "@"
         formatted shouldContain "(empty)"
     }
-
-    @Test
-    fun `parse short prefix from full change ID`() {
-        // When jj log outputs like "qp" for qpvuntsm, we should extract "qp"
-        val fullId = "qpvuntsm"
-        val displayedShort = "qp"
-
-        val result = JujutsuCommitFormatter.extractShortPrefix(fullId, displayedShort)
-
-        result shouldBe "qp"
-    }
 }

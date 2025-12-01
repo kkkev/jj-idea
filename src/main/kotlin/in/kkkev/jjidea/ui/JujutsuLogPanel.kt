@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui
 
-import `in`.kkkev.jjidea.JujutsuVcs
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
@@ -14,6 +13,7 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.JPanel
@@ -32,11 +32,7 @@ class JujutsuLogPanel(private val project: Project) : Disposable {
     private val tableModel: DefaultTableModel
     private var logEntries: List<JujutsuLogEntry> = emptyList()
 
-    private val vcs: JujutsuVcs? get() {
-        val root = project.baseDir ?: return null
-        val vcsManager = ProjectLevelVcsManager.getInstance(project)
-        return vcsManager.getVcsFor(root) as? JujutsuVcs
-    }
+    private val vcs get() = JujutsuVcs.find(project)
 
     init {
         // Create table model with columns
@@ -131,42 +127,42 @@ class JujutsuLogPanel(private val project: Project) : Disposable {
             // Show user-friendly message in table
             ApplicationManager.getApplication().invokeLater {
                 tableModel.rowCount = 0
-                tableModel.addRow(arrayOf(
-                    "Waiting for VCS...",
-                    "",
-                    "Go to Settings → Version Control to enable Jujutsu VCS, then click Refresh",
-                    ""
-                ))
+                tableModel.addRow(
+                    arrayOf(
+                        "Waiting for VCS...",
+                        "",
+                        "Go to Settings → Version Control to enable Jujutsu VCS, then click Refresh",
+                        ""
+                    )
+                )
             }
             return
         }
 
-        val root = project.baseDir
-        if (root == null) {
-            log.warn("Project base directory is null")
-            return
-        }
-
-        log.info("Project root: ${root.path}")
-
         ApplicationManager.getApplication().executeOnPooledThread {
+            // TODO Tidy this up: keep template and parser together
+
             // Create template to extract all needed information
-            // Format: changeId|commitId|description|bookmarks|isWorkingCopy|hasConflict|isEmpty
+            // Use null byte separator to avoid conflicts with pipe characters in descriptions
+            // Format: changeId\0shortChangeId\0commitId\0description\0bookmarks\0isWorkingCopy\0hasConflict\0isEmpty\0
+            // Note: Using ++ concatenation instead of separate() because separate() skips empty values
+            // IMPORTANT: Must end with "\0" to separate entries (8 fields per entry, trailing \0 creates separator)
             val template = """
-                change_id ++ "|" ++
-                commit_id ++ "|" ++
-                description ++ "|" ++
-                bookmarks ++ "|" ++
-                if(current_working_copy, "true", "false") ++ "|" ++
-                if(conflict, "true", "false") ++ "|" ++
-                if(empty, "true", "false")
+                change_id.short(8) ++ "\0" ++
+                change_id.shortest() ++ "\0" ++
+                commit_id ++ "\0" ++
+                description ++ "\0" ++
+                bookmarks ++ "\0" ++
+                if(current_working_copy, "true", "false") ++ "\0" ++
+                if(conflict, "true", "false") ++ "\0" ++
+                if(empty, "true", "false") ++ "\0"
             """.trimIndent().replace("\n", " ")
 
             log.info("Executing jj log command with revset: all()")
             log.debug("Template: $template")
 
             // Show all commits in the log (like jj log)
-            val result = vcsInstance.commandExecutor.log(root, "all()", template)
+            val result = vcsInstance.commandExecutor.log("all()", template)
 
             log.info("JJ log command completed. Exit code: ${result.exitCode}")
             log.debug("Stdout length: ${result.stdout.length}")
@@ -252,7 +248,8 @@ class JujutsuLogPanel(private val project: Project) : Disposable {
 
                 val workingCopyMarker = if (entry.isWorkingCopy) " <b>@</b>" else ""
 
-                label.text = "<html><b>${formatted.shortPart}</b>${formatted.restPart}$workingCopyMarker$markerStr</html>"
+                label.text =
+                    "<html><b>${formatted.shortPart}</b>${formatted.restPart}$workingCopyMarker$markerStr</html>"
             } else {
                 label.text = text
             }

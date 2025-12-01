@@ -10,10 +10,7 @@ object JujutsuCommitFormatter {
     /**
      * Represents a formatted change ID with its parts separated
      */
-    data class FormattedChangeId(
-        val shortPart: String,
-        val restPart: String
-    ) {
+    data class FormattedChangeId(val shortPart: String, val restPart: String) {
         val full: String get() = shortPart + restPart
     }
 
@@ -41,21 +38,9 @@ object JujutsuCommitFormatter {
      */
     fun formatWorkingCopy(changeId: String, shortPrefix: String, description: String): String {
         val formatted = formatChangeId(changeId, shortPrefix)
-        val desc = if (description.isEmpty()) "(empty)" else description
+        val desc = description.ifEmpty { "(empty)" }
 
         return "${formatted.full} @ - $desc"
     }
 
-    /**
-     * Extract the short prefix that was used in display
-     * @param fullId The full change ID
-     * @param displayedShort The short form that was displayed
-     * @return The short prefix
-     */
-    fun extractShortPrefix(fullId: String, displayedShort: String): String {
-        require(fullId.startsWith(displayedShort)) {
-            "Full ID '$fullId' must start with displayed short '$displayedShort'"
-        }
-        return displayedShort
-    }
 }

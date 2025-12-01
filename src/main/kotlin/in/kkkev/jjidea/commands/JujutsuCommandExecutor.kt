@@ -20,27 +20,24 @@ interface JujutsuCommandExecutor {
 
     /**
      * Get the status of the working copy
-     * @param root The VCS root directory
      * @return List of file statuses
      */
-    fun status(root: VirtualFile): CommandResult
+    fun status(): CommandResult
 
     /**
      * Get the diff for a specific file
-     * @param root The VCS root directory
      * @param filePath Path relative to root
      * @return Diff output
      */
-    fun diff(root: VirtualFile, filePath: String): CommandResult
+    fun diff(filePath: String): CommandResult
 
     /**
      * Get the content of a file at a specific revision
-     * @param root The VCS root directory
      * @param filePath Path relative to root
      * @param revision Revision identifier (e.g., "@", "@-", commit hash)
      * @return File content
      */
-    fun show(root: VirtualFile, filePath: String, revision: String): CommandResult
+    fun show(filePath: String, revision: String): CommandResult
 
     /**
      * Check if jujutsu is available and working
@@ -56,27 +53,24 @@ interface JujutsuCommandExecutor {
 
     /**
      * Set the description for a commit (default: working copy @)
-     * @param root The VCS root directory
      * @param message The description message
      * @param revision The revision to describe (default: "@")
      * @return Command result
      */
-    fun describe(root: VirtualFile, message: String, revision: String = "@"): CommandResult
+    fun describe(message: String, revision: String = "@"): CommandResult
 
     /**
      * Create a new change on top of the current one
-     * @param root The VCS root directory
      * @param message Optional description for the new change
      * @return Command result
      */
-    fun new(root: VirtualFile, message: String? = null): CommandResult
+    fun new(message: String? = null): CommandResult
 
     /**
      * Get the log for specific revisions
-     * @param root The VCS root directory
      * @param revisions Revisions to show (e.g., "@", "@-")
      * @param template Template for output (e.g., "description", "change_id")
      * @return Command result with log output
      */
-    fun log(root: VirtualFile, revisions: String = "@", template: String? = null): CommandResult
+    fun log(revisions: String = "@", template: String? = null): CommandResult
 }

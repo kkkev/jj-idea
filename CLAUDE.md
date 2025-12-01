@@ -61,11 +61,13 @@ This document captures all requirements, implementation decisions, and developme
 #### VCS Integration Layer
 ```
 JujutsuVcs (extends AbstractVcs)
+├── root: VirtualFile - Auto-discovers .jj directory by searching upward
+├── JujutsuContentRevision (inner class) - File content at specific revision
 ├── JujutsuChangeProvider - Detects file changes via `jj status`
 ├── JujutsuDiffProvider - Provides diff content
 ├── JujutsuCheckinEnvironment - Enables commit view (minimal)
 └── JujutsuCommandExecutor (interface)
-    └── JujutsuCliExecutor - CLI implementation
+    └── JujutsuCliExecutor(root) - CLI implementation
 ```
 
 #### Command Executor Pattern
@@ -169,24 +171,59 @@ val content2 = if (afterVirtualFile != null && afterVirtualFile.exists()) {
 This enables editing the working copy directly from the diff view.
 
 #### 5. Revision Identifiers
-**Decision**: Use `@-` for parent of working copy (before revision).
+**Decision**: Use `@` for working copy commit (before revision) when showing working copy changes.
 
 **JJ Concepts**:
 - `@` = working copy commit (always exists)
 - `@-` = parent of working copy
-- Modified file diff: `@-` (before) vs `@` (after/working copy)
+- Working copy changes (from `jj status`): `@` (before) vs working copy files (after)
+- Note: `jj status` shows uncommitted changes in the working copy relative to the `@` commit
+
+#### 6. Log Parsing with Null Byte Separator
+**Decision**: Use null byte (`\0`) as field separator in `jj log` template output instead of pipe (`|`) or other visible characters.
+
+**Rationale**: Commit descriptions can contain:
+- Newlines (multi-line descriptions)
+- Pipe characters (e.g., "Use grep | sort | uniq")
+- Other special characters
+
+Using null byte separator ensures robust parsing:
+- Null bytes cannot appear in text fields
+- Works correctly with multi-line descriptions
+- No escaping needed for special characters
+
+**Implementation**:
+```kotlin
+// Template uses ++ concatenation with \0 separators
+val template = """
+    change_id.shortest() ++ "\0" ++
+    commit_id ++ "\0" ++
+    description ++ "\0" ++
+    bookmarks ++ "\0" ++
+    if(current_working_copy, "true", "false") ++ "\0" ++
+    if(conflict, "true", "false") ++ "\0" ++
+    if(empty, "true", "false") ++ "\0"
+""".trimIndent()
+
+// Parse by splitting on null bytes and chunking into groups of 8
+val fields = output.split("\u0000")
+val entries = fields.chunked(8).map { /* parse entry */ }
+```
+
+**Note**: Using `++` concatenation instead of `separate()` is crucial because `separate()` skips empty values, which breaks parsing when fields like description or bookmarks are empty.
 
 ## File Structure
 
 ```
 src/main/kotlin/in/kkkev/jjidea/
 ├── JujutsuVcs.kt                          # Main VCS implementation
+│                                          # └── JujutsuContentRevision (inner class)
 ├── commands/
 │   ├── JujutsuCommandExecutor.kt          # Interface for all jj commands
 │   └── JujutsuCliExecutor.kt              # CLI implementation
 ├── changes/
 │   ├── JujutsuChangeProvider.kt           # Detects file changes
-│   ├── JujutsuContentRevision.kt          # File content at revision
+│   ├── JujutsuContentRevision.kt          # JujutsuRevisionNumber only
 │   └── CurrentContentRevision.kt          # Working copy content
 ├── diff/
 │   └── JujutsuDiffProvider.kt             # Provides diffs
@@ -195,12 +232,18 @@ src/main/kotlin/in/kkkev/jjidea/
 └── ui/
     ├── JujutsuToolWindowFactory.kt        # Creates tool window
     ├── JujutsuToolWindowPanel.kt          # Main UI panel
+    ├── JujutsuLogPanel.kt                 # Commit history view
+    ├── JujutsuLogParser.kt                # Parses jj log output
+    ├── JujutsuCommitFormatter.kt          # Formats commit display
     ├── JujutsuChangesTreeModel.kt         # Tree model with grouping
-    ├── JujutsuChangesTreeCellRenderer.kt  # Custom renderer
-    └── ChangeListCellRenderer.kt          # (Legacy, unused)
+    └── JujutsuChangesTreeCellRenderer.kt  # Custom renderer
 
 src/test/kotlin/in/kkkev/jjidea/
-└── RequirementsTest.kt                    # Documents all requirements
+├── RequirementsTest.kt                    # Documents all requirements
+└── ui/
+    ├── JujutsuLogParserTest.kt            # Log parser tests
+    ├── JujutsuCommitFormatterTest.kt      # Commit formatter tests
+    └── JujutsuChangesTreeModelSimpleTest.kt # Tree model tests
 
 src/main/resources/META-INF/
 └── plugin.xml                             # Plugin configuration
@@ -227,6 +270,8 @@ src/main/resources/META-INF/
 - `JujutsuCommandResultTest.kt` - ✅ Tests for CommandResult (passing)
 - `JujutsuRevisionNumberTest.kt` - Tests for revision numbers (need IntelliJ classpath)
 - `JujutsuChangesTreeModelSimpleTest.kt` - ✅ Tests for tree node display logic (passing)
+- `JujutsuLogParserTest.kt` - ✅ Comprehensive tests for log parsing with null byte separator (15+ test cases)
+- `JujutsuCommitFormatterTest.kt` - ✅ Tests for commit ID formatting
 
 **To Run Tests**:
 ```bash
@@ -237,9 +282,9 @@ src/main/resources/META-INF/
 ./gradlew test  # Currently disabled due to instrumentation issues
 ```
 
-**Test Results** (as of 2025-11-29):
-- 33 tests discovered
-- 27 tests passing (command results, tree model nodes)
+**Test Results** (as of 2025-12-02):
+- 47 tests discovered (15+ new log parser tests added)
+- All simple unit tests passing (command results, tree model nodes, log parsing, commit formatting)
 - 6 tests require IntelliJ Platform test fixtures (revision numbers, content revisions)
 
 **Writing New Tests**:
@@ -421,13 +466,53 @@ When adding features or fixing bugs:
    ./gradlew build test
    ```
 
+## Recent Changes
+
+### 2025-12-02: Architecture Refactoring & Log Parser Improvements
+
+**Major Refactoring**:
+1. **JujutsuVcs Enhancements**:
+   - Added `root` property that auto-discovers .jj directory by searching upward from project base
+   - Moved `JujutsuContentRevision` as inner class for better encapsulation
+   - Added `createRevision()` helper method for consistent revision creation
+   - Added `find()` companion method to easily find VCS instance
+   - Added `Project.root` extension property
+
+2. **Log Parser Complete Rewrite**:
+   - Changed from pipe (`|`) separator to null byte (`\0`) separator
+   - Now correctly handles multi-line descriptions
+   - Handles descriptions with special characters (pipes, quotes, etc.)
+   - Simplified parsing logic: split on null bytes, chunk into groups of 8
+   - Added 15+ comprehensive test cases covering edge cases
+
+3. **CLI Executor Simplification**:
+   - Constructor now requires `root: VirtualFile` parameter
+   - Consistent use of expression body for cleaner code
+   - All command methods simplified
+
+4. **Provider Cleanup**:
+   - `JujutsuChangeProvider`: Uses `vcs.createRevision()` consistently
+   - `JujutsuDiffProvider`: Removed duplicate code, uses expression body
+   - Both providers now cleaner and more maintainable
+
+5. **Test Suite Improvements**:
+   - Deleted: `JujutsuCommandAvailabilityTest` (incompatible with new constructor)
+   - Expanded: `JujutsuLogParserTest` with 15+ edge case tests
+   - Updated: `JujutsuCommitFormatterTest` to match simplified API
+
+**Bug Fixes**:
+- Fixed parsing failure when commit descriptions are empty
+- Fixed parsing failure when bookmarks are empty
+- Fixed parsing of multi-line descriptions with embedded newlines
+- Fixed handling of descriptions containing pipe characters
+
 ## License
 
 [Your license here]
 
 ---
 
-**Last Updated**: 2025-11-29
+**Last Updated**: 2025-12-02
 **Plugin Version**: 0.1.0-SNAPSHOT
 **IntelliJ Version**: 2025.2
 - 
