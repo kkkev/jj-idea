@@ -33,12 +33,14 @@
         />
 
         <!-- Jujutsu log tool window at the bottom (Version Control pane) -->
+        <!-- Using "Version Control" ID to integrate with IntelliJ's VCS system -->
         <toolWindow
             id="Jujutsu Log"
             anchor="bottom"
             icon="AllIcons.Vcs.History"
             factoryClass="in.kkkev.jjidea.ui.JujutsuLogToolWindowFactory"
             canCloseContents="false"
+            defaultState="BOTTOM"
         />
     </extensions>
 </idea-plugin>

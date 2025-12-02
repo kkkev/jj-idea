@@ -51,10 +51,12 @@ This will launch a new IntelliJ IDEA instance with the plugin installed.
 - Java 21 or later
 - Gradle 8.13 or later (included via wrapper)
 
-## Future Enhancements
+## Documentation
 
-- Commit history view (jj log)
-- Interactive operations (commit, describe, etc.)
-- Native library integration for better performance
-- Branch/bookmark management
-- Conflict resolution UI
+- **[Development Roadmap](docs/ROADMAP.md)** - Prioritized feature roadmap with GitLab issue links
+- **[Developer Guide](CLAUDE.md)** - Complete project documentation and architecture
+- **[VCS API Reference](docs/VCS_API_REFERENCE.md)** - IntelliJ VCS integration reference
+
+## Contributing
+
+See [ROADMAP.md](docs/ROADMAP.md) for planned features and [CLAUDE.md](CLAUDE.md) for development guidelines.

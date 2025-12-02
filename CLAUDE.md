@@ -519,3 +519,4 @@ When adding features or fixing bugs:
 - Respect .editorconfig, prefer code on a single line where it fits into the width
 - Use expression body for functions where possible
 - Use a single return point in functions where possible
+- Keep documentation in the docs folder
