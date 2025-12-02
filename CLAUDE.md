@@ -520,3 +520,4 @@ When adding features or fixing bugs:
 - Use expression body for functions where possible
 - Use a single return point in functions where possible
 - Keep documentation in the docs folder
+- Store tasks in glab. When I refer to issues or tasks, look in glab.

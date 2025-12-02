@@ -281,22 +281,21 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             return
         }
 
-        val vcsInstance = vcs ?: return
-        val root = project.root ?: return
+        vcs?.let { vcsInstance ->
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val result = vcsInstance.commandExecutor.describe(description)
 
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val result = vcsInstance.commandExecutor.describe(description)
-
-            ApplicationManager.getApplication().invokeLater {
-                if (result.isSuccess) {
-                    refresh()
-                } else {
-                    JOptionPane.showMessageDialog(
-                        panel,
-                        "Failed to describe change:\n${result.stderr}",
-                        "Error",
-                        JOptionPane.ERROR_MESSAGE
-                    )
+                ApplicationManager.getApplication().invokeLater {
+                    if (result.isSuccess) {
+                        refresh()
+                    } else {
+                        JOptionPane.showMessageDialog(
+                            panel,
+                            "Failed to describe change:\n${result.stderr}",
+                            "Error",
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
                 }
             }
         }
@@ -349,35 +348,61 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private fun loadCurrentDescription() {
         val vcsInstance = vcs ?: return
-        val root = project.baseDir ?: return
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            // Get change ID and description for working copy
-            val template = "change_id ++ \"|\" ++ description"
+            // Use same template format as JujutsuLogPanel for consistency
+            // Parent format: "fullId~shortId, fullId~shortId" (~ separates full from short, comma separates parents)
+            // Note: Truncation to 8 chars happens in rendering, not in template
+            val template = """
+                change_id ++ "\0" ++
+                change_id.shortest() ++ "\0" ++
+                commit_id ++ "\0" ++
+                description ++ "\0" ++
+                bookmarks ++ "\0" ++
+                parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
+                if(current_working_copy, "true", "false") ++ "\0" ++
+                if(conflict, "true", "false") ++ "\0" ++
+                if(empty, "true", "false") ++ "\0"
+            """.trimIndent().replace("\n", " ")
+
             val result = vcsInstance.commandExecutor.log("@", template)
 
             ApplicationManager.getApplication().invokeLater {
                 if (result.isSuccess) {
-                    val output = result.stdout.trim()
-                    val parts = output.split("|", limit = 2)
-
-                    if (parts.size >= 2) {
-                        val changeId = parts[0].trim()
-                        val description = parts[1].trim()
+                    val entries = JujutsuLogParser.parseLog(result.stdout)
+                    if (entries.isNotEmpty()) {
+                        val entry = entries[0]
 
                         // Update the description text area
-                        descriptionArea.text = description
+                        descriptionArea.text = entry.description
 
-                        // Update the label to show commit name with @ symbol
-                        val shortPrefix = if (changeId.length >= 2) changeId.substring(0, 2) else changeId
-                        val formattedChangeId = JujutsuCommitFormatter.formatChangeId(changeId, shortPrefix)
+                        // Format change ID with theme-aware colors
+                        val formattedChangeId = entry.getFormattedChangeId()
+                        val changeIdHtml = JujutsuCommitFormatter.toHtml(formattedChangeId)
 
-                        // Create HTML to show bold short prefix
-                        val labelText =
-                            "<html><font color=#f010f0><b>${formattedChangeId.shortPart}</b></font><font color=#808080>${formattedChangeId.restPart}</font> @ - Working Copy</html>"
+                        // Create HTML for label showing change ID, @ marker, and parents
+                        val labelText = buildString {
+                            append("<html>")
+                            append(changeIdHtml)
+                            append(" @ - Working Copy")
+
+                            // Add parent IDs if present
+                            if (entry.parentIds.isNotEmpty()) {
+                                append("<br>")
+                                append("<font size=-1>Parents: ")
+                                entry.parentIds.forEachIndexed { index, parentFullId ->
+                                    if (index > 0) append(", ")
+                                    // Extract short prefix from the full ID (take first 2 chars as minimum)
+                                    val shortPrefix = if (parentFullId.length >= 2) parentFullId.substring(0, 2) else parentFullId
+                                    val parentFormatted = JujutsuCommitFormatter.formatChangeId(parentFullId, shortPrefix)
+                                    append(JujutsuCommitFormatter.toHtml(parentFormatted))
+                                }
+                                append("</font>")
+                            }
+
+                            append("</html>")
+                        }
                         currentChangeLabel.text = labelText
-                    } else {
-                        descriptionArea.text = output
                     }
                 }
             }

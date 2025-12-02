@@ -58,4 +58,6 @@ class JujutsuCommitFormatterTest {
         formatted shouldContain "@"
         formatted shouldContain "(empty)"
     }
+
+    // Note: toHtml tests require IntelliJ Platform classes and should be tested in full integration tests
 }

@@ -144,15 +144,18 @@ class JujutsuLogPanel(private val project: Project) : Disposable {
 
             // Create template to extract all needed information
             // Use null byte separator to avoid conflicts with pipe characters in descriptions
-            // Format: changeId\0shortChangeId\0commitId\0description\0bookmarks\0isWorkingCopy\0hasConflict\0isEmpty\0
+            // Format: changeId\0shortChangeId\0commitId\0description\0bookmarks\0parentIds\0isWorkingCopy\0hasConflict\0isEmpty\0
+            // Parent format: "fullId~shortId, fullId~shortId" (~ separates full from short, comma separates parents)
             // Note: Using ++ concatenation instead of separate() because separate() skips empty values
-            // IMPORTANT: Must end with "\0" to separate entries (8 fields per entry, trailing \0 creates separator)
+            // Note: Truncation to 8 chars happens in rendering, not in template
+            // IMPORTANT: Must end with "\0" to separate entries (9 fields per entry, trailing \0 creates separator)
             val template = """
-                change_id.short(8) ++ "\0" ++
+                change_id ++ "\0" ++
                 change_id.shortest() ++ "\0" ++
                 commit_id ++ "\0" ++
                 description ++ "\0" ++
                 bookmarks ++ "\0" ++
+                parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
                 if(current_working_copy, "true", "false") ++ "\0" ++
                 if(conflict, "true", "false") ++ "\0" ++
                 if(empty, "true", "false") ++ "\0"
@@ -234,10 +237,11 @@ class JujutsuLogPanel(private val project: Project) : Disposable {
         ): Component {
             val text = value?.toString() ?: ""
 
-            // For Change ID column, make the short prefix bold
+            // For Change ID column, use theme-aware colored formatting
             if (column == 0 && row < logEntries.size) {
                 val entry = logEntries[row]
                 val formatted = entry.getFormattedChangeId()
+                val changeIdHtml = JujutsuCommitFormatter.toHtml(formatted)
                 val markers = entry.getMarkers()
 
                 val markerStr = if (markers.isNotEmpty()) {
@@ -248,8 +252,7 @@ class JujutsuLogPanel(private val project: Project) : Disposable {
 
                 val workingCopyMarker = if (entry.isWorkingCopy) " <b>@</b>" else ""
 
-                label.text =
-                    "<html><b>${formatted.shortPart}</b>${formatted.restPart}$workingCopyMarker$markerStr</html>"
+                label.text = "<html>$changeIdHtml$workingCopyMarker$markerStr</html>"
             } else {
                 label.text = text
             }

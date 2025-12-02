@@ -20,12 +20,8 @@ class JujutsuLogEntryTest {
             changeId = changeId,
             commitId = commitId,
             description = description,
-            bookmarks = bookmarks,
-            isWorkingCopy = false,
-            hasConflict = false,
-            isEmpty = false,
-            isUndescribed = false,
-            shortChangeIdPrefix = "qp"
+            shortChangeIdPrefix = "qp",
+            bookmarks = bookmarks
         )
 
         entry.changeId shouldBe changeId
@@ -41,12 +37,8 @@ class JujutsuLogEntryTest {
             changeId = "qpvuntsm",
             commitId = "abc123",
             description = "Work in progress",
-            bookmarks = emptyList(),
-            isWorkingCopy = true,
-            hasConflict = false,
-            isEmpty = false,
-            isUndescribed = false,
-            shortChangeIdPrefix = "qp"
+            shortChangeIdPrefix = "qp",
+            isWorkingCopy = true
         )
 
         entry.isWorkingCopy shouldBe true
@@ -58,12 +50,8 @@ class JujutsuLogEntryTest {
             changeId = "qpvuntsm",
             commitId = "abc123",
             description = "Conflicted change",
-            bookmarks = emptyList(),
-            isWorkingCopy = false,
-            hasConflict = true,
-            isEmpty = false,
-            isUndescribed = false,
-            shortChangeIdPrefix = "qp"
+            shortChangeIdPrefix = "qp",
+            hasConflict = true
         )
 
         entry.hasConflict shouldBe true
@@ -75,12 +63,8 @@ class JujutsuLogEntryTest {
             changeId = "qpvuntsm",
             commitId = "abc123",
             description = "",
-            bookmarks = emptyList(),
-            isWorkingCopy = false,
-            hasConflict = false,
-            isEmpty = true,
-            isUndescribed = false,
-            shortChangeIdPrefix = "qp"
+            shortChangeIdPrefix = "qp",
+            isEmpty = true
         )
 
         entry.isEmpty shouldBe true
@@ -92,12 +76,8 @@ class JujutsuLogEntryTest {
             changeId = "qpvuntsm",
             commitId = "abc123",
             description = "",
-            bookmarks = emptyList(),
-            isWorkingCopy = false,
-            hasConflict = false,
-            isEmpty = false,
-            isUndescribed = true,
-            shortChangeIdPrefix = "qp"
+            shortChangeIdPrefix = "qp",
+            isUndescribed = true
         )
 
         entry.isUndescribed shouldBe true
@@ -109,11 +89,6 @@ class JujutsuLogEntryTest {
             changeId = "qpvuntsm",
             commitId = "abc123",
             description = "Test",
-            bookmarks = emptyList(),
-            isWorkingCopy = false,
-            hasConflict = false,
-            isEmpty = false,
-            isUndescribed = false,
             shortChangeIdPrefix = "qp"
         )
 
@@ -129,12 +104,8 @@ class JujutsuLogEntryTest {
             changeId = "qpvuntsm",
             commitId = "abc123",
             description = "Test",
-            bookmarks = emptyList(),
-            isWorkingCopy = false,
-            hasConflict = true,
-            isEmpty = false,
-            isUndescribed = false,
-            shortChangeIdPrefix = "qp"
+            shortChangeIdPrefix = "qp",
+            hasConflict = true
         )
 
         val markers = conflictEntry.getMarkers()

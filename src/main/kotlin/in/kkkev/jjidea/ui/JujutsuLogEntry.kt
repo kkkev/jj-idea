@@ -7,19 +7,18 @@ data class JujutsuLogEntry(
     val changeId: String,
     val commitId: String,
     val description: String,
-    val bookmarks: List<String>,
-    val isWorkingCopy: Boolean,
-    val hasConflict: Boolean,
-    val isEmpty: Boolean,
-    val isUndescribed: Boolean,
-    val shortChangeIdPrefix: String
+    val shortChangeIdPrefix: String,
+    val bookmarks: List<String> = emptyList(),
+    val parentIds: List<String> = emptyList(),
+    val isWorkingCopy: Boolean = false,
+    val hasConflict: Boolean = false,
+    val isEmpty: Boolean = false,
+    val isUndescribed: Boolean = false
 ) {
     /**
      * Get the formatted change ID with short prefix separated
      */
-    fun getFormattedChangeId(): JujutsuCommitFormatter.FormattedChangeId {
-        return JujutsuCommitFormatter.formatChangeId(changeId, shortChangeIdPrefix)
-    }
+    fun getFormattedChangeId() = JujutsuCommitFormatter.formatChangeId(changeId, shortChangeIdPrefix)
 
     /**
      * Get markers for special states (conflict, empty, undescribed)
@@ -43,24 +42,21 @@ data class JujutsuLogEntry(
     /**
      * Get a display-friendly description
      */
-    fun getDisplayDescription(): String {
-        return when {
-            hasConflict && description.isEmpty() -> "(conflict)"
-            isEmpty -> "(empty)"
-            isUndescribed -> "(no description)"
-            description.isEmpty() -> "(no description)"
-            else -> description
-        }
+    fun getDisplayDescription() = when {
+        hasConflict && description.isEmpty() -> "(conflict)"
+        isEmpty -> "(empty)"
+        isUndescribed -> "(no description)"
+        description.isEmpty() -> "(no description)"
+        else -> description
     }
 
     /**
      * Get bookmark display string
      */
-    fun getBookmarkDisplay(): String {
-        return if (bookmarks.isEmpty()) {
-            ""
-        } else {
-            bookmarks.joinToString(", ")
-        }
-    }
+    fun getBookmarkDisplay(): String = bookmarks.joinToString(", ")
+
+    /**
+     * Get parent IDs display string
+     */
+    fun getParentIdsDisplay(): String = parentIds.joinToString(", ")
 }
