@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui
 
+import `in`.kkkev.jjidea.log.ChangeId
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -16,12 +17,11 @@ class JujutsuLogParserTest {
 
         val entry = JujutsuLogParser.parseLogLine(logLine)
 
-        entry.changeId shouldBe "qpvuntsm"
+        entry.changeId shouldBe ChangeId("qpvuntsm", 1)
         entry.commitId shouldBe "abc123def456"
         entry.description shouldBe "Add new feature"
         entry.bookmarks shouldHaveSize 0
         entry.parentIds shouldHaveSize 0
-        entry.shortChangeIdPrefix shouldBe "q"
     }
 
     @Test
@@ -73,9 +73,9 @@ class JujutsuLogParserTest {
         val entries = JujutsuLogParser.parseLog(logOutput)
 
         entries shouldHaveSize 3
-        entries[0].changeId shouldBe "qpvuntsm"
-        entries[1].changeId shouldBe "rlvkpnrz"
-        entries[2].changeId shouldBe "zxwvutsq"
+        entries[0].changeId shouldBe ChangeId("qpvuntsm", 1)
+        entries[1].changeId shouldBe ChangeId("rlvkpnrz", 2)
+        entries[2].changeId shouldBe ChangeId("zxwvutsq", 1)
     }
 
     @Test
@@ -85,7 +85,7 @@ class JujutsuLogParserTest {
 
         val entry = JujutsuLogParser.parseLogLine(logLine)
 
-        entry.changeId shouldBe "qpvuntsm"
+        entry.changeId shouldBe ChangeId("qpvuntsm", 2)
         entry.commitId shouldBe "abc123def456"
         entry.description shouldBe "First line\nSecond line"
         entry.bookmarks shouldHaveSize 0
@@ -115,16 +115,16 @@ class JujutsuLogParserTest {
 
         entries shouldHaveSize 2
         entries[0].description shouldBe "Line 1\nLine 2\nLine 3"
-        entries[0].changeId shouldBe "qpvuntsm"
+        entries[0].changeId shouldBe ChangeId("qpvuntsm", 1)
         entries[1].description shouldBe "Another commit"
-        entries[1].changeId shouldBe "rlvkpnrz"
+        entries[1].changeId shouldBe ChangeId("rlvkpnrz", 2)
     }
 
     @Test
     fun `parse entry with empty lines in multi-line description`() {
         // Description with blank line (actual double newline in description field)
-        val entry1 = "qpvuntsm${Z}q${Z}abc123${Z}First paragraph\n\nSecond paragraph${Z}main${Z}${Z}true${Z}false${Z}false$Z"
-        val logOutput = entry1
+        val logOutput =
+            "qpvuntsm${Z}q${Z}abc123${Z}First paragraph\n\nSecond paragraph${Z}main${Z}${Z}true${Z}false${Z}false${Z}"
 
         val entries = JujutsuLogParser.parseLog(logOutput)
 
@@ -139,7 +139,7 @@ class JujutsuLogParserTest {
 
         val entry = JujutsuLogParser.parseLogLine(logLine)
 
-        entry.changeId shouldBe "qpvuntsm"
+        entry.changeId shouldBe ChangeId("qpvuntsm", 1)
         entry.commitId shouldBe "abc123def456"
         entry.description shouldBe "Use grep | sort | uniq"
     }
@@ -168,8 +168,7 @@ class JujutsuLogParserTest {
 
         val entry = JujutsuLogParser.parseLogLine(logLine)
 
-        entry.changeId shouldBe "wnxouzzv"
-        entry.shortChangeIdPrefix shouldBe "w"
+        entry.changeId shouldBe ChangeId("wnxouzzv", 1)
         entry.commitId shouldBe "46da5a6ad44feb2fa45fc03309fab4c1f25ff05d"
         entry.description shouldBe ""
         entry.bookmarks shouldHaveSize 0
@@ -191,14 +190,14 @@ class JujutsuLogParserTest {
         val entries = JujutsuLogParser.parseLog(logOutput)
 
         entries shouldHaveSize 2
-        entries[0].changeId shouldBe "wpvzxtyo"
-        entries[0].shortChangeIdPrefix shouldBe "wp"
+        entries[0].changeId.full shouldBe "wpvzxtyo"
+        entries[0].changeId.short shouldBe "wp"
         entries[0].description shouldBe "Did some stuff!\n"
         entries[0].bookmarks shouldHaveSize 0
         entries[0].isWorkingCopy shouldBe true
 
-        entries[1].changeId shouldBe "pyusqzmk"
-        entries[1].shortChangeIdPrefix shouldBe "py"
+        entries[1].changeId.full shouldBe "pyusqzmk"
+        entries[1].changeId.short shouldBe "py"
         entries[1].description shouldBe "Fix integration tests by using minimal Spring context configurations\n"
         entries[1].bookmarks shouldBe listOf("master")
         entries[1].isWorkingCopy shouldBe false
@@ -210,9 +209,9 @@ class JujutsuLogParserTest {
 
         val entry = JujutsuLogParser.parseLogLine(logLine)
 
-        entry.changeId shouldBe "qpvuntsm"
+        entry.changeId.full shouldBe "qpvuntsm"
         entry.parentIds shouldHaveSize 1
-        entry.parentIds shouldBe listOf("plkvukqt")
+        entry.parentIds shouldBe listOf(ChangeId("plkvukqt", 1))
     }
 
     @Test
@@ -223,7 +222,7 @@ class JujutsuLogParserTest {
 
         entry.changeId shouldBe "qpvuntsm"
         entry.parentIds shouldHaveSize 2
-        entry.parentIds shouldBe listOf("abcdefgh", "defghijk")
+        entry.parentIds shouldBe listOf(ChangeId("abcdefgh", 3), ChangeId("defghijk", 3))
     }
 
     @Test
@@ -232,7 +231,7 @@ class JujutsuLogParserTest {
 
         val entry = JujutsuLogParser.parseLogLine(logLine)
 
-        entry.changeId shouldBe "zxwvutsq"
+        entry.changeId shouldBe ChangeId("zxwvutsq", 1)
         entry.parentIds shouldHaveSize 0
     }
 
@@ -246,28 +245,26 @@ class JujutsuLogParserTest {
         val entries = JujutsuLogParser.parseLog(logOutput)
 
         entries shouldHaveSize 3
-        entries[0].parentIds shouldBe listOf("plkvukqt")
-        entries[1].parentIds shouldBe listOf("abcdefgh", "defghijk")
+        entries[0].parentIds shouldBe listOf(ChangeId("plkvukqt", 1))
+        entries[1].parentIds shouldBe listOf(ChangeId("abcdefgh", 3), ChangeId("defghijk", 3))
         entries[2].parentIds shouldHaveSize 0
     }
 
     @Test
     fun `getParentIdsDisplay returns formatted string`() {
         val entryWithParents = JujutsuLogEntry(
-            changeId = "qpvuntsm",
+            changeId = ChangeId("qpvuntsm", 1),
             commitId = "abc123",
             description = "Test",
-            shortChangeIdPrefix = "q",
-            parentIds = listOf("plkvukqt", "qrstuvwx")
+            parentIds = listOf(ChangeId("plkvukqt"), ChangeId("qrstuvwx"))
         )
 
         entryWithParents.getParentIdsDisplay() shouldBe "plkvukqt, qrstuvwx"
 
         val entryWithoutParents = JujutsuLogEntry(
-            changeId = "zxwvutsq",
+            changeId = ChangeId("zxwvutsq", 1),
             commitId = "def456",
-            description = "Root",
-            shortChangeIdPrefix = "z"
+            description = "Root"
         )
 
         entryWithoutParents.getParentIdsDisplay() shouldBe ""

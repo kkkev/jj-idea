@@ -3,9 +3,13 @@ package `in`.kkkev.jjidea
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectLocator
+import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.vcs.AbstractVcs
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
+import com.intellij.openapi.vcs.VcsException
+import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -15,6 +19,7 @@ import `in`.kkkev.jjidea.checkin.JujutsuCheckinEnvironment
 import `in`.kkkev.jjidea.commands.JujutsuCliExecutor
 import `in`.kkkev.jjidea.commands.JujutsuCommandExecutor
 import `in`.kkkev.jjidea.diff.JujutsuDiffProvider
+import `in`.kkkev.jjidea.history.JujutsuHistoryProvider
 
 /**
  * Main VCS implementation for Jujutsu
@@ -23,16 +28,21 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
 
     private val log = Logger.getInstance(JujutsuVcs::class.java)
 
-    val commandExecutor: JujutsuCommandExecutor = JujutsuCliExecutor(project.root)
+    val commandExecutor: JujutsuCommandExecutor by lazy {
+        root?.let { JujutsuCliExecutor(it) } ?: throw IllegalStateException("Jujutsu repository root not found")
+    }
     private val _changeProvider by lazy { JujutsuChangeProvider(this) }
     private val _diffProvider by lazy { JujutsuDiffProvider(myProject, this) }
     private val _checkinEnvironment by lazy { JujutsuCheckinEnvironment(this) }
+    private val _historyProvider by lazy { JujutsuHistoryProvider(this) }
 
     override fun getChangeProvider() = _changeProvider
 
     override fun getDiffProvider() = _diffProvider
 
     override fun getCheckinEnvironment() = _checkinEnvironment
+
+    override fun getVcsHistoryProvider() = _historyProvider
 
     override fun getConfigurable(): Configurable? {
         // TODO: Add configuration UI if needed
@@ -53,7 +63,8 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
 
     val root: VirtualFile? by lazy {
         // Start from project base directory
-        var currentDir = project.root
+        val basePath = project.basePath ?: return@lazy null
+        var currentDir = LocalFileSystem.getInstance().findFileByPath(basePath) ?: return@lazy null
         var foundRoot: VirtualFile? = null
 
         // Search upwards for .jj directory
@@ -103,8 +114,19 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
         const val VCS_NAME = "Jujutsu"
         const val VCS_DISPLAY_NAME = "Jujutsu"
 
-        fun find(project: Project) = ProjectLevelVcsManager.getInstance(project).getVcsFor(project.root) as? JujutsuVcs
+        @OptIn(IntellijInternalApi::class)
+        private val KEY = VcsKey(VCS_NAME)
+
+        fun getKey() = KEY
+
+        fun find(project: Project): JujutsuVcs? {
+            val basePath = project.basePath ?: return null
+            val root = LocalFileSystem.getInstance().findFileByPath(basePath) ?: return null
+            return ProjectLevelVcsManager.getInstance(project).getVcsFor(root) as? JujutsuVcs
+        }
+
+        fun find(root: VirtualFile) = ProjectLocator.getInstance().guessProjectForFile(root)?.let { find(it) }
+
+        fun findRequired(root: VirtualFile) = find(root) ?: throw VcsException("Jujutsu VCS not available for $root")
     }
 }
-
-val Project.root get() = this.basePath!!.let { LocalFileSystem.getInstance().findFileByPath(it) }!!

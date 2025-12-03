@@ -1,0 +1,6 @@
+<idea-plugin>
+    <!-- VCS Log integration - only loaded when Git4Idea is available -->
+    <extensions defaultExtensionNs="com.intellij">
+        <vcs.log.provider implementation="in.kkkev.jjidea.log.JujutsuLogProvider" />
+    </extensions>
+</idea-plugin>

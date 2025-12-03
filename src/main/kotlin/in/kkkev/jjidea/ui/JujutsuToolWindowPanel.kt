@@ -24,7 +24,6 @@ import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
 import `in`.kkkev.jjidea.JujutsuVcs
-import `in`.kkkev.jjidea.root
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
@@ -362,7 +361,13 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                 parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
                 if(current_working_copy, "true", "false") ++ "\0" ++
                 if(conflict, "true", "false") ++ "\0" ++
-                if(empty, "true", "false") ++ "\0"
+                if(empty, "true", "false") ++ "\0" ++
+                author.timestamp().utc().format("%s") ++ "\0" ++
+                committer.timestamp().utc().format("%s") ++ "\0" ++
+                author.name() ++ "\0" ++
+                author.email() ++ "\0" ++
+                committer.name() ++ "\0" ++
+                committer.email() ++ "\0"
             """.trimIndent().replace("\n", " ")
 
             val result = vcsInstance.commandExecutor.log("@", template)
@@ -390,11 +395,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                             if (entry.parentIds.isNotEmpty()) {
                                 append("<br>")
                                 append("<font size=-1>Parents: ")
-                                entry.parentIds.forEachIndexed { index, parentFullId ->
+                                entry.parentIds.forEachIndexed { index, parentId ->
                                     if (index > 0) append(", ")
                                     // Extract short prefix from the full ID (take first 2 chars as minimum)
-                                    val shortPrefix = if (parentFullId.length >= 2) parentFullId.substring(0, 2) else parentFullId
-                                    val parentFormatted = JujutsuCommitFormatter.formatChangeId(parentFullId, shortPrefix)
+                                    val parentFormatted = JujutsuCommitFormatter.format(parentId)
                                     append(JujutsuCommitFormatter.toHtml(parentFormatted))
                                 }
                                 append("</font>")

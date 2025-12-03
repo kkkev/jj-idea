@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.10.5"
 }
 
-group = "com.github.kevinb9n"
+group = "in.kkkev"
 version = "0.1.0-SNAPSHOT"
 
 repositories {
@@ -19,6 +19,9 @@ dependencies {
     intellijPlatform {
         val platformVersion = project.property("platformVersion") as String
         intellijIdeaCommunity(platformVersion)
+
+        // VCS modules - including the VCS itself as a plugin
+        bundledPlugin("Git4Idea")
     }
 
     // Test framework

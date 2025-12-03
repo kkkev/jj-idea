@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui
 
+import `in`.kkkev.jjidea.log.ChangeId
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -8,23 +9,24 @@ import org.junit.jupiter.api.Test
  * Tests for parsing and representing jj log entries
  */
 class JujutsuLogEntryTest {
+    companion object {
+        val CHANGE_ID = ChangeId("qpvuntsm", 2)
+    }
 
     @Test
     fun `parse log entry with all fields`() {
-        val changeId = "qpvuntsm"
         val commitId = "abc123def456"
         val description = "Add new feature"
         val bookmarks = listOf("main", "feature-branch")
 
         val entry = JujutsuLogEntry(
-            changeId = changeId,
+            changeId = CHANGE_ID,
             commitId = commitId,
             description = description,
-            shortChangeIdPrefix = "qp",
             bookmarks = bookmarks
         )
 
-        entry.changeId shouldBe changeId
+        entry.changeId shouldBe CHANGE_ID
         entry.commitId shouldBe commitId
         entry.description shouldBe description
         entry.bookmarks shouldContain "main"
@@ -34,10 +36,9 @@ class JujutsuLogEntryTest {
     @Test
     fun `working copy entry has special marker`() {
         val entry = JujutsuLogEntry(
-            changeId = "qpvuntsm",
+            changeId = CHANGE_ID,
             commitId = "abc123",
             description = "Work in progress",
-            shortChangeIdPrefix = "qp",
             isWorkingCopy = true
         )
 
@@ -47,10 +48,9 @@ class JujutsuLogEntryTest {
     @Test
     fun `conflict entry has marker`() {
         val entry = JujutsuLogEntry(
-            changeId = "qpvuntsm",
+            changeId = CHANGE_ID,
             commitId = "abc123",
             description = "Conflicted change",
-            shortChangeIdPrefix = "qp",
             hasConflict = true
         )
 
@@ -60,10 +60,9 @@ class JujutsuLogEntryTest {
     @Test
     fun `empty commit has marker`() {
         val entry = JujutsuLogEntry(
-            changeId = "qpvuntsm",
+            changeId = CHANGE_ID,
             commitId = "abc123",
             description = "",
-            shortChangeIdPrefix = "qp",
             isEmpty = true
         )
 
@@ -73,10 +72,9 @@ class JujutsuLogEntryTest {
     @Test
     fun `undescribed commit has marker`() {
         val entry = JujutsuLogEntry(
-            changeId = "qpvuntsm",
+            changeId = CHANGE_ID,
             commitId = "abc123",
             description = "",
-            shortChangeIdPrefix = "qp",
             isUndescribed = true
         )
 
@@ -86,10 +84,9 @@ class JujutsuLogEntryTest {
     @Test
     fun `format change ID for display`() {
         val entry = JujutsuLogEntry(
-            changeId = "qpvuntsm",
+            changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "Test",
-            shortChangeIdPrefix = "qp"
+            description = "Test"
         )
 
         val formatted = entry.getFormattedChangeId()
@@ -101,10 +98,9 @@ class JujutsuLogEntryTest {
     @Test
     fun `display markers for special states`() {
         val conflictEntry = JujutsuLogEntry(
-            changeId = "qpvuntsm",
+            changeId = CHANGE_ID,
             commitId = "abc123",
             description = "Test",
-            shortChangeIdPrefix = "qp",
             hasConflict = true
         )
 

@@ -1,7 +1,5 @@
 package `in`.kkkev.jjidea.commands
 
-import com.intellij.openapi.vfs.VirtualFile
-
 /**
  * Abstraction for executing jujutsu commands.
  * This interface allows for different implementations (CLI, native library, etc.)
@@ -19,10 +17,11 @@ interface JujutsuCommandExecutor {
     }
 
     /**
-     * Get the status of the working copy
+     * Get the status of the working copy or a specific revision
+     * @param revision Revision to get status for (default: working copy)
      * @return List of file statuses
      */
-    fun status(): CommandResult
+    fun status(revision: String? = null): CommandResult
 
     /**
      * Get the diff for a specific file
@@ -30,6 +29,13 @@ interface JujutsuCommandExecutor {
      * @return Diff output
      */
     fun diff(filePath: String): CommandResult
+
+    /**
+     * Get summary of changes for a specific revision
+     * @param revision Revision identifier (e.g., "@", "@-", commit hash)
+     * @return Summary of file changes
+     */
+    fun diffSummary(revision: String): CommandResult
 
     /**
      * Get the content of a file at a specific revision
@@ -70,7 +76,8 @@ interface JujutsuCommandExecutor {
      * Get the log for specific revisions
      * @param revisions Revisions to show (e.g., "@", "@-")
      * @param template Template for output (e.g., "description", "change_id")
+     * @param filePaths Optional file paths to filter log (e.g., "src/main.kt")
      * @return Command result with log output
      */
-    fun log(revisions: String = "@", template: String? = null): CommandResult
+    fun log(revisions: String = "@", template: String? = null, filePaths: List<String> = emptyList()): CommandResult
 }

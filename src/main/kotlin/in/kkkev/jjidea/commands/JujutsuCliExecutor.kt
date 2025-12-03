@@ -17,10 +17,21 @@ class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable
     private val log = Logger.getInstance(JujutsuCliExecutor::class.java)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
 
-    override fun status(): JujutsuCommandExecutor.CommandResult = execute(root, listOf("status"))
+    override fun status(revision: String?): JujutsuCommandExecutor.CommandResult {
+        val args = mutableListOf("status")
+        if (revision != null) {
+            args.add("-r")
+            args.add(revision)
+        }
+        return execute(root, args)
+    }
 
     override fun diff(filePath: String): JujutsuCommandExecutor.CommandResult = execute(root, listOf("diff", filePath))
 
+    override fun diffSummary(revision: String): JujutsuCommandExecutor.CommandResult =
+        execute(root, listOf("diff", "--summary", "-r", revision))
+
+    // TODO Not a change id here - need a revision type that could be change, bookmark or special token such as @
     override fun show(filePath: String, revision: String): JujutsuCommandExecutor.CommandResult =
         execute(root, listOf("file", "show", "-r", revision, filePath))
 
@@ -56,12 +67,13 @@ class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable
         return execute(root, args)
     }
 
-    override fun log(revisions: String, template: String?): JujutsuCommandExecutor.CommandResult {
+    override fun log(revisions: String, template: String?, filePaths: List<String>): JujutsuCommandExecutor.CommandResult {
         val args = mutableListOf("log", "-r", revisions, "--no-graph")
         if (template != null) {
             args.add("-T")
             args.add(template)
         }
+        args.addAll(filePaths)
         return execute(root, args)
     }
 

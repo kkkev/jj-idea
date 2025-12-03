@@ -3,7 +3,7 @@ package `in`.kkkev.jjidea.ui
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.NamedColorUtil
-import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.log.ChangeId
 import java.awt.Color
 
 /**
@@ -38,6 +38,8 @@ object JujutsuCommitFormatter {
         val remainder: Color
             get() = NamedColorUtil.getInactiveTextColor()
     }
+
+    fun format(changeId: ChangeId) = formatChangeId(changeId.full, changeId.short)
 
     /**
      * Format a change ID with its short unique prefix, truncating to 8 characters
@@ -75,7 +77,7 @@ object JujutsuCommitFormatter {
         val boldTag = if (bold) "b" else "span"
 
         return "<font color=$shortColor><$boldTag>${formatted.shortPart}</$boldTag></font>" +
-               "<font color=$restColor>${formatted.restPart}</font>"
+                "<font color=$restColor>${formatted.restPart}</font>"
     }
 
     /**

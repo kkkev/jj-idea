@@ -1,24 +1,32 @@
 package `in`.kkkev.jjidea.ui
 
+import `in`.kkkev.jjidea.log.ChangeId
+
 /**
  * Represents a single entry in the jj log
  */
+// TODO Smoosh author and commit info into relevant VCS objects
 data class JujutsuLogEntry(
-    val changeId: String,
+    val changeId: ChangeId,
     val commitId: String,
     val description: String,
-    val shortChangeIdPrefix: String,
     val bookmarks: List<String> = emptyList(),
-    val parentIds: List<String> = emptyList(),
+    val parentIds: List<ChangeId> = emptyList(),
     val isWorkingCopy: Boolean = false,
     val hasConflict: Boolean = false,
     val isEmpty: Boolean = false,
-    val isUndescribed: Boolean = false
+    val isUndescribed: Boolean = false,
+    val authorTimestamp: Long = 0,  // Unix timestamp in milliseconds
+    val committerTimestamp: Long = 0,  // Unix timestamp in milliseconds
+    val authorName: String = "",
+    val authorEmail: String = "",
+    val committerName: String = "",
+    val committerEmail: String = ""
 ) {
     /**
      * Get the formatted change ID with short prefix separated
      */
-    fun getFormattedChangeId() = JujutsuCommitFormatter.formatChangeId(changeId, shortChangeIdPrefix)
+    fun getFormattedChangeId() = JujutsuCommitFormatter.format(changeId)
 
     /**
      * Get markers for special states (conflict, empty, undescribed)
