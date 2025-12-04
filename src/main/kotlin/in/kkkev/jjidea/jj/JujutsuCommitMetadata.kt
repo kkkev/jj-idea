@@ -7,6 +7,6 @@ import com.intellij.openapi.vfs.VirtualFile
  * All methods are inherited from JujutsuCommitMetadataBase.
  */
 class JujutsuCommitMetadata(
-    entry: JujutsuLogEntry,
+    entry: LogEntry,
     root: VirtualFile
 ) : JujutsuCommitMetadataBase(entry, root)

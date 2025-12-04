@@ -13,7 +13,7 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
  * Extends JujutsuCommitMetadataBase for common metadata handling.
  */
 class JujutsuFullCommitDetails(
-    entry: JujutsuLogEntry,
+    entry: LogEntry,
     root: VirtualFile,
     private val changesList: Collection<Change>
 ) : JujutsuCommitMetadataBase(entry, root), VcsFullCommitDetails {
@@ -30,12 +30,12 @@ class JujutsuFullCommitDetails(
          * Create JujutsuFullCommitDetails by loading changes for the entry.
          * Must be called from a background thread.
          */
-        fun create(entry: JujutsuLogEntry, root: VirtualFile): JujutsuFullCommitDetails {
+        fun create(entry: LogEntry, root: VirtualFile): JujutsuFullCommitDetails {
             val changes = loadChanges(entry, root)
             return JujutsuFullCommitDetails(entry, root, changes)
         }
 
-        private fun loadChanges(entry: JujutsuLogEntry, root: VirtualFile): Collection<Change> {
+        private fun loadChanges(entry: LogEntry, root: VirtualFile): Collection<Change> {
             val vcs = JujutsuVcs.findRequired(root)
 
             // Use logService to get file changes
@@ -55,7 +55,7 @@ class JujutsuFullCommitDetails(
          */
         private fun convertToChange(
             fileChange: FileChange,
-            entry: JujutsuLogEntry,
+            entry: LogEntry,
             root: VirtualFile,
             vcs: JujutsuVcs
         ): Change? {

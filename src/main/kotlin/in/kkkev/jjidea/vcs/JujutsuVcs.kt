@@ -16,12 +16,12 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.checkin.JujutsuCheckinEnvironment
-import `in`.kkkev.jjidea.jj.cli.JujutsuCliExecutor
-import `in`.kkkev.jjidea.jj.JujutsuCommandExecutor
+import `in`.kkkev.jjidea.jj.cli.CliExecutor
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.vcs.diff.JujutsuDiffProvider
 import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
-import `in`.kkkev.jjidea.jj.cli.JujutsuCliLogService
-import `in`.kkkev.jjidea.jj.JujutsuLogService
+import `in`.kkkev.jjidea.jj.cli.CliLogService
+import `in`.kkkev.jjidea.jj.LogService
 
 /**
  * Main VCS implementation for Jujutsu
@@ -30,10 +30,10 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
 
     private val log = Logger.getInstance(JujutsuVcs::class.java)
 
-    val commandExecutor: JujutsuCommandExecutor by lazy {
-        root?.let { JujutsuCliExecutor(it) } ?: throw IllegalStateException("Jujutsu repository root not found")
+    val commandExecutor: CommandExecutor by lazy {
+        root?.let { CliExecutor(it) } ?: throw IllegalStateException("Jujutsu repository root not found")
     }
-    val logService: JujutsuLogService by lazy { JujutsuCliLogService(commandExecutor) }
+    val logService: LogService by lazy { CliLogService(commandExecutor) }
     private val _changeProvider by lazy { JujutsuChangeProvider(this) }
     private val _diffProvider by lazy { JujutsuDiffProvider(myProject, this) }
     private val _checkinEnvironment by lazy { JujutsuCheckinEnvironment(this) }

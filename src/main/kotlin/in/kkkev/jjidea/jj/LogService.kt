@@ -5,7 +5,7 @@ package `in`.kkkev.jjidea.jj
  * Encapsulates template generation, command execution, and parsing.
  * This interface allows future replacement with a native JJ library.
  */
-interface JujutsuLogService {
+interface LogService {
 
     /**
      * Get log entries with full metadata (author, committer, timestamps)
@@ -13,7 +13,7 @@ interface JujutsuLogService {
      * @param filePaths Optional file paths to filter by
      * @return List of log entries with complete metadata
      */
-    fun getLog(revisions: String = "all()", filePaths: List<String> = emptyList()): Result<List<JujutsuLogEntry>>
+    fun getLog(revisions: String = "all()", filePaths: List<String> = emptyList()): Result<List<LogEntry>>
 
     /**
      * Get log entries with minimal metadata (no author/committer info)
@@ -22,7 +22,7 @@ interface JujutsuLogService {
      * @param filePaths Optional file paths to filter by
      * @return List of log entries with basic metadata
      */
-    fun getLogBasic(revisions: String = "all()", filePaths: List<String> = emptyList()): Result<List<JujutsuLogEntry>>
+    fun getLogBasic(revisions: String = "all()", filePaths: List<String> = emptyList()): Result<List<LogEntry>>
 
     /**
      * Get refs (bookmarks and working copy marker) for all commits

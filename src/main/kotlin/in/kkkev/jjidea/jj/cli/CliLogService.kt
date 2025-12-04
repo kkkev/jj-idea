@@ -1,21 +1,20 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.openapi.diagnostic.Logger
-import `in`.kkkev.jjidea.jj.JujutsuCommandExecutor
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.JujutsuLogService
+import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.FileChangeStatus
-import `in`.kkkev.jjidea.jj.JujutsuLogEntry
-import `in`.kkkev.jjidea.jj.cli.JujutsuLogParser
+import `in`.kkkev.jjidea.jj.LogEntry
 
 /**
  * CLI-based implementation of JujutsuLogService.
  * Centralizes all template generation and parsing logic.
  */
-class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : JujutsuLogService {
+class CliLogService(private val executor: CommandExecutor) : LogService {
 
-    private val log = Logger.getInstance(JujutsuCliLogService::class.java)
+    private val log = Logger.getInstance(CliLogService::class.java)
 
     companion object {
         /**
@@ -79,7 +78,7 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
         """.trimIndent().replace("\n", " ")
     }
 
-    override fun getLog(revisions: String, filePaths: List<String>): Result<List<JujutsuLogEntry>> {
+    override fun getLog(revisions: String, filePaths: List<String>): Result<List<LogEntry>> {
         log.debug("Getting log for revisions: $revisions, files: $filePaths")
 
         val result = executor.log(revisions, FULL_TEMPLATE, filePaths)
@@ -99,7 +98,7 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
         }
     }
 
-    override fun getLogBasic(revisions: String, filePaths: List<String>): Result<List<JujutsuLogEntry>> {
+    override fun getLogBasic(revisions: String, filePaths: List<String>): Result<List<LogEntry>> {
         log.debug("Getting basic log for revisions: $revisions, files: $filePaths")
 
         val result = executor.log(revisions, BASIC_TEMPLATE, filePaths)
@@ -119,7 +118,7 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
         }
     }
 
-    override fun getRefs(): Result<List<JujutsuLogService.JujutsuRef>> {
+    override fun getRefs(): Result<List<LogService.JujutsuRef>> {
         log.debug("Getting refs")
 
         val result = executor.log("all()", REFS_TEMPLATE)
@@ -139,7 +138,7 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
         }
     }
 
-    override fun getCommitGraph(revisions: String): Result<List<JujutsuLogService.CommitGraphNode>> {
+    override fun getCommitGraph(revisions: String): Result<List<LogService.CommitGraphNode>> {
         log.debug("Getting commit graph for revisions: $revisions")
 
         val result = executor.log(revisions, GRAPH_TEMPLATE)
@@ -162,12 +161,12 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
     /**
      * Parse refs output (4 fields per entry).
      */
-    private fun parseRefs(output: String): List<JujutsuLogService.JujutsuRef> {
+    private fun parseRefs(output: String): List<LogService.JujutsuRef> {
         val trimmed = output.trim()
         if (trimmed.isBlank()) return emptyList()
 
         val fields = trimmed.split("\u0000")
-        val refs = mutableListOf<JujutsuLogService.JujutsuRef>()
+        val refs = mutableListOf<LogService.JujutsuRef>()
 
         fields.chunked(4).forEach { chunk ->
             if (chunk.size == 4) {
@@ -178,10 +177,10 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
                 // Add working copy ref
                 if (isWorkingCopy) {
                     refs.add(
-                        JujutsuLogService.JujutsuRef(
+                        LogService.JujutsuRef(
                             changeId = changeId,
                             name = "@",
-                            type = JujutsuLogService.RefType.WORKING_COPY
+                            type = LogService.RefType.WORKING_COPY
                         )
                     )
                 }
@@ -190,10 +189,10 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
                 if (bookmarks.isNotEmpty()) {
                     bookmarks.split(",").forEach { bookmark ->
                         refs.add(
-                            JujutsuLogService.JujutsuRef(
+                            LogService.JujutsuRef(
                                 changeId = changeId,
                                 name = bookmark.trim(),
-                                type = JujutsuLogService.RefType.BOOKMARK
+                                type = LogService.RefType.BOOKMARK
                             )
                         )
                     }
@@ -207,7 +206,7 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
     /**
      * Parse commit graph output (4 fields per entry).
      */
-    private fun parseCommitGraph(output: String): List<JujutsuLogService.CommitGraphNode> {
+    private fun parseCommitGraph(output: String): List<LogService.CommitGraphNode> {
         val trimmed = output.trim()
         if (trimmed.isBlank()) return emptyList()
 
@@ -233,7 +232,7 @@ class JujutsuCliLogService(private val executor: JujutsuCommandExecutor) : Jujut
                 }
                 val timestamp = chunk[3].toLongOrNull()?.times(1000) ?: 0L
 
-                JujutsuLogService.CommitGraphNode(
+                LogService.CommitGraphNode(
                     changeId = changeId,
                     parentIds = parentIds,
                     timestamp = timestamp

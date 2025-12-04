@@ -12,21 +12,21 @@ class JujutsuLogServiceTest {
 
     @Test
     fun `RefType enum has expected values`() {
-        val values = JujutsuLogService.RefType.entries
+        val values = LogService.RefType.entries
 
         values shouldBe listOf(
-            JujutsuLogService.RefType.BOOKMARK,
-            JujutsuLogService.RefType.WORKING_COPY
+            LogService.RefType.BOOKMARK,
+            LogService.RefType.WORKING_COPY
         )
     }
 
     @Test
     fun `RefType valueOf works for BOOKMARK`() {
-        JujutsuLogService.RefType.valueOf("BOOKMARK") shouldBe JujutsuLogService.RefType.BOOKMARK
+        LogService.RefType.valueOf("BOOKMARK") shouldBe LogService.RefType.BOOKMARK
     }
 
     @Test
     fun `RefType valueOf works for WORKING_COPY`() {
-        JujutsuLogService.RefType.valueOf("WORKING_COPY") shouldBe JujutsuLogService.RefType.WORKING_COPY
+        LogService.RefType.valueOf("WORKING_COPY") shouldBe LogService.RefType.WORKING_COPY
     }
 }

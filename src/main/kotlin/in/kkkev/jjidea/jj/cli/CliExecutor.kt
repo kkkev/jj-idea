@@ -5,20 +5,20 @@ import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.jj.JujutsuCommandExecutor
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
 /**
  * CLI-based implementation of JujutsuCommandExecutor
  */
-class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable: String = "jj") :
-    JujutsuCommandExecutor {
+class CliExecutor(private val root: VirtualFile, private val jjExecutable: String = "jj") :
+    CommandExecutor {
 
-    private val log = Logger.getInstance(JujutsuCliExecutor::class.java)
+    private val log = Logger.getInstance(CliExecutor::class.java)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
 
-    override fun status(revision: String?): JujutsuCommandExecutor.CommandResult {
+    override fun status(revision: String?): CommandExecutor.CommandResult {
         val args = mutableListOf("status")
         if (revision != null) {
             args.add("-r")
@@ -27,13 +27,13 @@ class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable
         return execute(root, args)
     }
 
-    override fun diff(filePath: String): JujutsuCommandExecutor.CommandResult = execute(root, listOf("diff", filePath))
+    override fun diff(filePath: String): CommandExecutor.CommandResult = execute(root, listOf("diff", filePath))
 
-    override fun diffSummary(revision: String): JujutsuCommandExecutor.CommandResult =
+    override fun diffSummary(revision: String): CommandExecutor.CommandResult =
         execute(root, listOf("diff", "--summary", "-r", revision))
 
     // TODO Not a change id here - need a revision type that could be change, bookmark or special token such as @
-    override fun show(filePath: String, revision: String): JujutsuCommandExecutor.CommandResult =
+    override fun show(filePath: String, revision: String): CommandExecutor.CommandResult =
         execute(root, listOf("file", "show", "-r", revision, filePath))
 
     override fun isAvailable(): Boolean = try {
@@ -56,10 +56,10 @@ class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable
         null
     }
 
-    override fun describe(message: String, revision: String): JujutsuCommandExecutor.CommandResult =
+    override fun describe(message: String, revision: String): CommandExecutor.CommandResult =
         execute(root, listOf("describe", "-r", revision, "-m", message))
 
-    override fun new(message: String?): JujutsuCommandExecutor.CommandResult {
+    override fun new(message: String?): CommandExecutor.CommandResult {
         val args = mutableListOf("new")
         if (message != null) {
             args.add("-m")
@@ -68,7 +68,7 @@ class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable
         return execute(root, args)
     }
 
-    override fun log(revisions: String, template: String?, filePaths: List<String>): JujutsuCommandExecutor.CommandResult {
+    override fun log(revisions: String, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
         val args = mutableListOf("log", "-r", revisions, "--no-graph")
         if (template != null) {
             args.add("-T")
@@ -82,7 +82,7 @@ class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable
         workingDir: VirtualFile?,
         args: List<String>,
         timeout: Long = defaultTimeout
-    ): JujutsuCommandExecutor.CommandResult {
+    ): CommandExecutor.CommandResult {
         val commandLine = GeneralCommandLine(jjExecutable)
             .withParameters(args)
             .withCharset(StandardCharsets.UTF_8)
@@ -97,7 +97,7 @@ class JujutsuCliExecutor(private val root: VirtualFile, private val jjExecutable
         val processHandler = CapturingProcessHandler(commandLine)
         val output: ProcessOutput = processHandler.runProcess(timeout.toInt())
 
-        return JujutsuCommandExecutor.CommandResult(
+        return CommandExecutor.CommandResult(
             exitCode = output.exitCode,
             stdout = output.stdout,
             stderr = output.stderr

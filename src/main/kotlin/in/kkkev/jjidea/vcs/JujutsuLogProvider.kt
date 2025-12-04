@@ -9,11 +9,12 @@ import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.Consumer
 import com.intellij.vcs.log.*
+import com.intellij.vcs.log.graph.PermanentGraph
 import com.intellij.vcs.log.impl.VcsRefImpl
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuCommitMetadata
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
-import `in`.kkkev.jjidea.jj.JujutsuLogService
+import `in`.kkkev.jjidea.jj.LogService
 
 /**
  * Provides repository-wide log for Jujutsu VCS
@@ -163,8 +164,8 @@ class JujutsuLogProvider : VcsLogProvider {
             return emptySet()
         }.map { jjRef ->
             val refType = when (jjRef.type) {
-                JujutsuLogService.RefType.WORKING_COPY -> JujutsuLogRefManager.WORKING_COPY
-                JujutsuLogService.RefType.BOOKMARK -> JujutsuLogRefManager.BOOKMARK
+                LogService.RefType.WORKING_COPY -> JujutsuLogRefManager.WORKING_COPY
+                LogService.RefType.BOOKMARK -> JujutsuLogRefManager.BOOKMARK
             }
 
             VcsRefImpl(
@@ -188,6 +189,7 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun getCommitsMatchingFilter(
         root: VirtualFile,
         filterData: VcsLogFilterCollection,
+        graphOptions: PermanentGraph.Options,
         maxCount: Int
     ): List<TimedVcsCommit> {
         // Basic implementation - just return all commits
@@ -199,8 +201,6 @@ class JujutsuLogProvider : VcsLogProvider {
 
         return if (maxCount > 0) commits.take(maxCount) else commits
     }
-
-    override fun getDiffHandler(): VcsLogDiffHandler? = null // Use default handler
 
     override fun subscribeToRootRefreshEvents(roots: Collection<VirtualFile>, refresher: VcsLogRefresher): Disposable {
         // TODO: Subscribe to file system events to refresh when .jj directory changes

@@ -1,7 +1,8 @@
 package `in`.kkkev.jjidea.jj.cli
 
+import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.JujutsuLogEntry
+import `in`.kkkev.jjidea.jj.LogEntry
 
 /**
  * Parses jj log output into structured log entries
@@ -19,7 +20,7 @@ object JujutsuLogParser {
      * @param line The line to parse
      * @return Parsed log entry
      */
-    fun parseLogLine(line: String): JujutsuLogEntry {
+    fun parseLogLine(line: String): LogEntry {
         val parts = line.split(FIELD_SEPARATOR)
         require(parts.size >= 15) {
             "Invalid log line format: expected at least 15 parts (14 null bytes), got ${parts.size}"
@@ -64,7 +65,7 @@ object JujutsuLogParser {
         // Determine if undescribed (empty description and not explicitly marked as empty commit)
         val isUndescribed = description.isEmpty() && !isEmpty
 
-        return JujutsuLogEntry(
+        return LogEntry(
             changeId = ChangeId(fullChangeId, shortChangeId),
             commitId = commitId,
             description = description,
@@ -76,10 +77,8 @@ object JujutsuLogParser {
             isUndescribed = isUndescribed,
             authorTimestamp = authorTimestamp,
             committerTimestamp = committerTimestamp,
-            authorName = authorName,
-            authorEmail = authorEmail,
-            committerName = committerName,
-            committerEmail = committerEmail
+            author = VcsUserImpl(authorName, authorEmail),
+            committer = VcsUserImpl(committerName, committerEmail),
         )
     }
 
@@ -87,7 +86,7 @@ object JujutsuLogParser {
      * Parse jj log output into log entries
      * Simply splits on null bytes and groups into chunks of 15 fields
      */
-    fun parseLog(logOutput: String): List<JujutsuLogEntry> {
+    fun parseLog(logOutput: String): List<LogEntry> {
         val trimmed = logOutput.trim()
         if (trimmed.isBlank()) return emptyList()
 
@@ -99,7 +98,7 @@ object JujutsuLogParser {
         return fields.chunked(15)
             .filter { it.size == 15 }  // Only complete entries (exactly 15 fields)
             .map { chunk ->
-                JujutsuLogEntry(
+                LogEntry(
                     changeId = ChangeId(chunk[0], chunk[1]),
                     commitId = chunk[2],
                     description = chunk[3],
@@ -123,10 +122,8 @@ object JujutsuLogParser {
                     isUndescribed = chunk[3].isEmpty() && !chunk[8].toBoolean(),
                     authorTimestamp = chunk[9].toLongOrNull()?.times(1000) ?: 0L,
                     committerTimestamp = chunk[10].toLongOrNull()?.times(1000) ?: 0L,
-                    authorName = chunk[11],
-                    authorEmail = chunk[12],
-                    committerName = chunk[13],
-                    committerEmail = chunk[14]
+                    author = VcsUserImpl(chunk[11], chunk[12]),
+                    committer = VcsUserImpl(chunk[13], chunk[14])
                 )
             }
     }

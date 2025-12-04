@@ -1,7 +1,7 @@
 package `in`.kkkev.jjidea.ui
 
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.JujutsuLogEntry
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.cli.JujutsuLogParser
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -254,7 +254,7 @@ class JujutsuLogParserTest {
 
     @Test
     fun `getParentIdsDisplay returns formatted string`() {
-        val entryWithParents = JujutsuLogEntry(
+        val entryWithParents = LogEntry(
             changeId = ChangeId("qpvuntsm", 1),
             commitId = "abc123",
             description = "Test",
@@ -263,7 +263,7 @@ class JujutsuLogParserTest {
 
         entryWithParents.getParentIdsDisplay() shouldBe "plkvukqt, qrstuvwx"
 
-        val entryWithoutParents = JujutsuLogEntry(
+        val entryWithoutParents = LogEntry(
             changeId = ChangeId("zxwvutsq", 1),
             commitId = "def456",
             description = "Root"

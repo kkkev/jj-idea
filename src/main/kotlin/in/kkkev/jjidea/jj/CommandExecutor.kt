@@ -4,7 +4,7 @@ package `in`.kkkev.jjidea.jj
  * Abstraction for executing jujutsu commands.
  * This interface allows for different implementations (CLI, native library, etc.)
  */
-interface JujutsuCommandExecutor {
+interface CommandExecutor {
     /**
      * Result of a jujutsu command execution
      */

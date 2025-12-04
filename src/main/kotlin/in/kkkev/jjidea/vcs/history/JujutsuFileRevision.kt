@@ -7,13 +7,13 @@ import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
-import `in`.kkkev.jjidea.jj.JujutsuLogEntry
+import `in`.kkkev.jjidea.jj.LogEntry
 
 /**
  * Represents a single revision of a file in Jujutsu history
  */
 class JujutsuFileRevision(
-    private val entry: JujutsuLogEntry,
+    private val entry: LogEntry,
     private val filePath: FilePath,
     private val vcs: JujutsuVcs
 ) : VcsFileRevision {

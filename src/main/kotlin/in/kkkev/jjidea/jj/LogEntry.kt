@@ -1,5 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
+import com.intellij.vcs.log.VcsUser
+import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
 
 /**
@@ -8,7 +10,7 @@ import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
  * Conversion to VCS framework objects (VcsUser, VcsCommitMetadata, etc.)
  * is handled by JujutsuCommitMetadataBase and its subclasses.
  */
-data class JujutsuLogEntry(
+data class LogEntry(
     val changeId: ChangeId,
     val commitId: String,
     val description: String,
@@ -20,10 +22,8 @@ data class JujutsuLogEntry(
     val isUndescribed: Boolean = false,
     val authorTimestamp: Long = 0,  // Unix timestamp in milliseconds
     val committerTimestamp: Long = 0,  // Unix timestamp in milliseconds
-    val authorName: String = "",
-    val authorEmail: String = "",
-    val committerName: String = "",
-    val committerEmail: String = ""
+    val author: VcsUser = VcsUserImpl("", ""),
+    val committer: VcsUser = VcsUserImpl("", "")
 ) {
     /**
      * Get the formatted change ID with short prefix separated
