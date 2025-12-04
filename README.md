@@ -33,8 +33,27 @@ This will launch a new IntelliJ IDEA instance with the plugin installed.
 
 ## Installing
 
+### Option 1: From Custom Repository (Recommended - Auto Updates)
+
+1. In IntelliJ IDEA: **Settings → Plugins → ⚙️ (gear icon) → Manage Plugin Repositories**
+2. Click **+** and add: `https://raw.githubusercontent.com/kevinb9n/jj-idea/main/updatePlugins.xml`
+3. Click **OK**
+4. Search for "Jujutsu VCS Integration" in the Marketplace tab
+5. Click **Install**
+
+Future updates will be automatically detected and available through the normal plugin update mechanism.
+
+### Option 2: From GitHub Releases
+
+1. Go to [Releases](https://github.com/kevinb9n/jj-idea/releases)
+2. Download the latest `.zip` file
+3. In IntelliJ IDEA: **Settings → Plugins → ⚙️ → Install Plugin from Disk**
+4. Select the downloaded ZIP file
+
+### Option 3: Build from Source
+
 1. Build the plugin: `./gradlew buildPlugin`
-2. In IntelliJ IDEA: Settings → Plugins → Install Plugin from Disk
+2. In IntelliJ IDEA: **Settings → Plugins → Install Plugin from Disk**
 3. Select the generated ZIP file from `build/distributions/`
 
 ## Using the Plugin

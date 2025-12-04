@@ -1,0 +1,88 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  release:
+    types: [ created ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Build plugin
+        run: ./gradlew buildPlugin
+
+      - name: Run tests
+        run: ./gradlew simpleTest
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-artifact
+          path: build/distributions/*.zip
+          retention-days: 30
+
+      - name: Upload to release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/distributions/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update plugin repository XML
+        if: github.event_name == 'release'
+        run: |
+          VERSION=$(grep '^version = ' build.gradle.kts | cut -d'"' -f2)
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          PLUGIN_FILE="jj-idea-${VERSION}.zip"
+
+          cat > updatePlugins.xml << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <plugins>
+            <plugin id="in.kkkev.jj-idea" url="https://github.com/kevinb9n/jj-idea/releases/download/${TAG_NAME}/${PLUGIN_FILE}" version="${VERSION}">
+              <idea-version since-build="252.0" />
+              <name>Jujutsu VCS Integration</name>
+              <description><![CDATA[
+                Native integration with Jujutsu (jj) version control system.
+
+                Features:
+                - JJ-native workflow tool window (left side)
+                - Describe-first workflow support
+                - Continuous commit workflow
+                - Working copy status and diffs
+                - Commands: jj describe, jj new
+              ]]></description>
+              <vendor email="jj-idea@me.kkkev.in" url="https://github.com/kevinb9n/jj-idea">Kevin Thomas</vendor>
+              <change-notes><![CDATA[
+                <h3>${VERSION}</h3>
+                <p>See <a href="https://github.com/kevinb9n/jj-idea/releases/tag/${TAG_NAME}">release notes</a> for details.</p>
+              ]]></change-notes>
+            </plugin>
+          </plugins>
+          EOF
+
+      - name: Commit updated plugin repository XML
+        if: github.event_name == 'release'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add updatePlugins.xml
+          git commit -m "Update plugin repository for release ${GITHUB_REF#refs/tags/}" || echo "No changes to commit"
+          git push origin HEAD:main
