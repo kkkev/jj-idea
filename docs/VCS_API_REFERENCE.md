@@ -401,10 +401,8 @@ class JujutsuToolWindowFactory : ToolWindowFactory {
         val content1 = contentFactory.createContent(panel1.getContent(), "Changes", false)
         toolWindow.contentManager.addContent(content1)
 
-        // Create second tab
-        val panel2 = JujutsuLogPanel(project)
-        val content2 = contentFactory.createContent(panel2.getContent(), "Log", false)
-        toolWindow.contentManager.addContent(content2)
+        // Log is provided by JujutsuLogProvider integration with IntelliJ VCS Log
+        // Available in View -> Tool Windows -> Git (shows as "Jujutsu" when active)
     }
 
     override fun shouldBeAvailable(project: Project): Boolean {

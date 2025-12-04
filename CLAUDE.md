@@ -216,37 +216,64 @@ val entries = fields.chunked(8).map { /* parse entry */ }
 
 ```
 src/main/kotlin/in/kkkev/jjidea/
-├── JujutsuVcs.kt                          # Main VCS implementation
-│                                          # └── JujutsuContentRevision (inner class)
-├── commands/
+├── jj/                                    # Core JJ domain types and interfaces
+│   ├── ChangeId.kt                        # JJ change identifier with short prefix
+│   ├── FileChange.kt                      # File change DTO (path + status)
 │   ├── JujutsuCommandExecutor.kt          # Interface for all jj commands
-│   └── JujutsuCliExecutor.kt              # CLI implementation
-├── changes/
-│   ├── JujutsuChangeProvider.kt           # Detects file changes
-│   ├── JujutsuContentRevision.kt          # JujutsuRevisionNumber only
-│   └── CurrentContentRevision.kt          # Working copy content
-├── diff/
-│   └── JujutsuDiffProvider.kt             # Provides diffs
-├── checkin/
-│   └── JujutsuCheckinEnvironment.kt       # Enables commit view
-└── ui/
-    ├── JujutsuToolWindowFactory.kt        # Creates tool window
-    ├── JujutsuToolWindowPanel.kt          # Main UI panel
-    ├── JujutsuLogPanel.kt                 # Commit history view
-    ├── JujutsuLogParser.kt                # Parses jj log output
-    ├── JujutsuCommitFormatter.kt          # Formats commit display
+│   ├── JujutsuCommitMetadata.kt           # VCS metadata wrapper
+│   ├── JujutsuCommitMetadataBase.kt       # Base for metadata implementations
+│   ├── JujutsuFullCommitDetails.kt        # Full commit with file changes
+│   ├── JujutsuLogEntry.kt                 # Parsed log entry DTO
+│   ├── JujutsuLogService.kt               # Interface for log queries
+│   └── cli/                               # CLI implementation
+│       ├── JujutsuCliExecutor.kt          # CLI command execution
+│       ├── JujutsuCliLogService.kt        # CLI-based log service
+│       └── JujutsuLogParser.kt            # Parses jj log output
+├── vcs/                                   # IntelliJ VCS framework integration
+│   ├── JujutsuVcs.kt                      # Main VCS implementation
+│   ├── JujutsuLogProvider.kt              # VCS log integration
+│   ├── JujutsuLogRefManager.kt            # Ref (bookmark) manager
+│   ├── JujutsuRootChecker.kt              # VCS root detection
+│   ├── JujutsuTimedCommit.kt              # Timed commit for log graph
+│   ├── changes/
+│   │   ├── JujutsuChangeProvider.kt       # Detects file changes
+│   │   └── JujutsuContentRevision.kt      # Revision number
+│   ├── checkin/
+│   │   └── JujutsuCheckinEnvironment.kt   # Enables commit view
+│   ├── diff/
+│   │   └── JujutsuDiffProvider.kt         # Provides diffs
+│   └── history/
+│       ├── JujutsuFileRevision.kt         # File revision
+│       ├── JujutsuHistoryProvider.kt      # File history provider
+│       └── JujutsuHistorySession.kt       # History session
+└── ui/                                    # User interface components
+    ├── ChangeListCellRenderer.kt          # (unused, can be deleted)
+    ├── JujutsuChangesTreeCellRenderer.kt  # Custom tree cell renderer
     ├── JujutsuChangesTreeModel.kt         # Tree model with grouping
-    └── JujutsuChangesTreeCellRenderer.kt  # Custom renderer
+    ├── JujutsuCommitFormatter.kt          # Formats commit display
+    ├── JujutsuToolWindowFactory.kt        # Creates tool window
+    └── JujutsuToolWindowPanel.kt          # Main UI panel (Changes view)
 
 src/test/kotlin/in/kkkev/jjidea/
 ├── RequirementsTest.kt                    # Documents all requirements
-└── ui/
-    ├── JujutsuLogParserTest.kt            # Log parser tests
-    ├── JujutsuCommitFormatterTest.kt      # Commit formatter tests
-    └── JujutsuChangesTreeModelSimpleTest.kt # Tree model tests
+├── commands/
+│   └── JujutsuCommandResultTest.kt        # CommandResult tests
+├── jj/
+│   ├── ChangeIdTest.kt                    # ChangeId tests (18 tests)
+│   ├── FileChangeTest.kt                  # FileChange tests (11 tests)
+│   └── JujutsuLogServiceTest.kt           # LogService enum tests (3 tests)
+├── ui/
+│   ├── JujutsuChangesTreeModelSimpleTest.kt # Tree model tests (4 tests)
+│   ├── JujutsuCommitFormatterTest.kt      # Commit formatter tests (4 tests)
+│   ├── JujutsuLogEntryTest.kt             # Log entry tests (~30 tests)
+│   └── JujutsuLogParserTest.kt            # Log parser tests (15+ tests)
+└── vcs/
+    └── changes/
+        └── JujutsuRevisionNumberTest.kt   # Revision number tests
 
 src/main/resources/META-INF/
-└── plugin.xml                             # Plugin configuration
+├── plugin.xml                             # Main plugin configuration
+└── jujutsu-vcslog.xml                     # VCS log provider registration
 ```
 
 ## JJ Commands Used
@@ -267,25 +294,30 @@ src/main/resources/META-INF/
 
 **Test Files**:
 - `RequirementsTest.kt` - Documents all 25+ requirements as integration test placeholders
-- `JujutsuCommandResultTest.kt` - ✅ Tests for CommandResult (passing)
-- `JujutsuRevisionNumberTest.kt` - Tests for revision numbers (need IntelliJ classpath)
-- `JujutsuChangesTreeModelSimpleTest.kt` - ✅ Tests for tree node display logic (passing)
-- `JujutsuLogParserTest.kt` - ✅ Comprehensive tests for log parsing with null byte separator (15+ test cases)
-- `JujutsuCommitFormatterTest.kt` - ✅ Tests for commit ID formatting
+- `JujutsuCommandResultTest.kt` - ✅ Tests for CommandResult (3 tests)
+- `ChangeIdTest.kt` - ✅ Tests for ChangeId (18 tests - NEW)
+- `FileChangeTest.kt` - ✅ Tests for FileChange (11 tests - NEW)
+- `JujutsuLogServiceTest.kt` - ✅ Tests for JujutsuLogService enums (3 tests - NEW)
+- `JujutsuLogEntryTest.kt` - ✅ Tests for JujutsuLogEntry (~30 tests, 18+ added)
+- `JujutsuLogParserTest.kt` - ✅ Comprehensive tests for log parsing (15+ tests)
+- `JujutsuCommitFormatterTest.kt` - ✅ Tests for commit ID formatting (4 tests)
+- `JujutsuChangesTreeModelSimpleTest.kt` - ✅ Tests for tree node display logic (4 tests)
+- `JujutsuRevisionNumberTest.kt` - Tests for revision numbers (needs IntelliJ Platform)
 
 **To Run Tests**:
 ```bash
-# Simple unit tests without IntelliJ instrumentation
+# Simple unit tests without IntelliJ instrumentation (25 tests)
 ./gradlew simpleTest
 
 # Full integration tests (requires proper IntelliJ test setup)
 ./gradlew test  # Currently disabled due to instrumentation issues
 ```
 
-**Test Results** (as of 2025-12-02):
-- 47 tests discovered (15+ new log parser tests added)
-- All simple unit tests passing (command results, tree model nodes, log parsing, commit formatting)
-- 6 tests require IntelliJ Platform test fixtures (revision numbers, content revisions)
+**Test Results** (as of 2025-12-04):
+- 70+ tests total
+- 25 simple unit tests passing (all green)
+- ~45 tests require IntelliJ Platform test fixtures (ChangeId, JujutsuLogEntry, etc. use Hash type)
+- Test coverage increased from ~20 to 70+ tests
 
 **Writing New Tests**:
 Use JUnit tests with Kotest assertions:

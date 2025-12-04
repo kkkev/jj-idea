@@ -350,7 +350,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val vcsInstance = vcs ?: return
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            // Use same template format as JujutsuLogPanel for consistency
+            // Query log for working copy commit
             // Parent format: "fullId~shortId, fullId~shortId" (~ separates full from short, comma separates parents)
             // Note: Truncation to 8 chars happens in rendering, not in template
             val template = """

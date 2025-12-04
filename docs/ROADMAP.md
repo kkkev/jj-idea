@@ -64,18 +64,20 @@ Display the current change (@) details prominently in the tool window.
 
 ### 2. Enhanced Log View [#11](http://gitlab.home.marigoldfeathers.com/kevin/jj-idea/-/issues/11)
 
-**Priority**: HIGH | **Effort**: 2-3 days
+**Priority**: HIGH | **Status**: ✅ Completed via IntelliJ VCS Log
 
-Improve the existing `JujutsuLogPanel` with better UI and navigation.
+Uses IntelliJ's built-in VCS log system via `JujutsuLogProvider`.
 
-**Enhancements needed**:
-- Show last 50 changes (configurable)
-- Better table/list formatting
-- Double-click to see full change details
-- Scroll to load more history
-- Show bookmarks on changes
+**Features provided by IntelliJ VCS Log**:
+- ✅ Visual commit graph (drawn automatically)
+- ✅ Author and timestamp columns
+- ✅ Filtering and searching (built-in UI)
+- ✅ Pagination and lazy loading (automatic)
+- ✅ Full commit details on click (details panel)
+- ✅ Performance optimized for large repos
+- ✅ Shows bookmarks as refs
 
-**Current status**: Basic log panel exists but needs UI improvements.
+**Current status**: Fully functional through VCS log integration.
 
 ---
 
