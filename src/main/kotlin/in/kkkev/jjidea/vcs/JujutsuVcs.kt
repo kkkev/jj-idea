@@ -5,23 +5,19 @@ import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectLocator
 import com.intellij.openapi.util.IntellijInternalApi
-import com.intellij.openapi.vcs.AbstractVcs
-import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vcs.VcsException
-import com.intellij.openapi.vcs.VcsKey
+import com.intellij.openapi.vcs.*
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.LogService
+import `in`.kkkev.jjidea.jj.cli.CliExecutor
+import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.checkin.JujutsuCheckinEnvironment
-import `in`.kkkev.jjidea.jj.cli.CliExecutor
-import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.vcs.diff.JujutsuDiffProvider
 import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
-import `in`.kkkev.jjidea.jj.cli.CliLogService
-import `in`.kkkev.jjidea.jj.LogService
 
 /**
  * Main VCS implementation for Jujutsu

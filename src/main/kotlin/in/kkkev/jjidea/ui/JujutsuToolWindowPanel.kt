@@ -4,6 +4,7 @@ import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
@@ -16,6 +17,9 @@ import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
@@ -23,8 +27,8 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.jj.cli.JujutsuLogParser
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
@@ -34,6 +38,8 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
+import javax.swing.tree.TreeNode
+import javax.swing.tree.TreePath
 
 /**
  * Main panel for the Jujutsu tool window
@@ -53,6 +59,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private val vcs get() = JujutsuVcs.find(project)
 
+    companion object {
+        private const val EXPANDED_DIRECTORIES_KEY = "JujutsuToolWindow.ExpandedDirectories"
+    }
+
     init {
         // Create the changes tree
         changesTree = Tree()
@@ -63,6 +73,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         createUI()
         setupTreeInteractions()
         setupVcsListener()
+        setupVfsListener()
 
         // Try to load immediately in case VCS is already available
         loadCurrentChanges()
@@ -179,6 +190,18 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         })
     }
 
+    private fun setupVfsListener() {
+        project.messageBus.connect(this).subscribe(
+            VirtualFileManager.VFS_CHANGES,
+            object : BulkFileListener {
+                override fun after(events: List<VFileEvent>) {
+                    refresh()
+                }
+            }
+        )
+
+    }
+
     private fun setupTreeInteractions() {
         // Single-click: open file in preview tab
         changesTree.addTreeSelectionListener {
@@ -199,6 +222,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         // F4 to open file in permanent tab
         changesTree.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
+                // TODO Needs to be configurable - command from keymap
                 if (e.keyCode == KeyEvent.VK_F4) {
                     val selectedChange = getSelectedChange()
                     selectedChange?.let { openFilePermanent(it) }
@@ -235,12 +259,69 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun rebuildTree() {
+        // Save expansion state before rebuilding
+        val currentExpandedDirectories = saveExpansionState()
+
         val modelBuilder = JujutsuChangesTreeModel(project, groupByDirectory)
         val model = modelBuilder.buildModel(currentChanges)
         changesTree.model = model
 
-        // Expand the root and first level
-        TreeUtil.expand(changesTree, 1)
+        // Restore expansion state - try current state first, then persisted state
+        val expandedDirectories = currentExpandedDirectories.ifEmpty { loadPersistedExpansionState() }
+        if (expandedDirectories.isNotEmpty()) {
+            restoreExpansionState(expandedDirectories)
+        } else {
+            // Default: expand root and first level on first load
+            TreeUtil.expand(changesTree, 1)
+        }
+    }
+
+    private val treeRoot get() = changesTree.model.root as TreeNode
+    private val directoryNodes
+        get() = treeRoot.children().asSequence().mapNotNull { it as? JujutsuChangesTreeModel.DirectoryNode }
+
+    private fun saveExpansionState(): Set<String> {
+        val root = treeRoot
+
+        val expandedDirectories = directoryNodes
+            .filter { child -> changesTree.isExpanded(TreePath(arrayOf(root, child))) }
+            .map { it.directory }
+            .toSet()
+
+        // Persist to storage
+        if (expandedDirectories.isNotEmpty()) {
+            persistExpansionState(expandedDirectories)
+        }
+
+        return expandedDirectories
+    }
+
+    private fun restoreExpansionState(expandedDirectories: Set<String>) {
+        val root = treeRoot
+
+        // Always expand the root
+        changesTree.expandPath(TreePath(root))
+
+        // Restore expanded directory nodes
+        directoryNodes.filter { it.directory in expandedDirectories }.forEach { child ->
+            changesTree.expandPath(TreePath(arrayOf(root, child)))
+        }
+    }
+
+    private fun persistExpansionState(expandedDirectories: Set<String>) {
+        val properties = PropertiesComponent.getInstance(project)
+        // Store as comma-separated paths
+        properties.setValue(EXPANDED_DIRECTORIES_KEY, expandedDirectories.joinToString("\u0000"))
+    }
+
+    private fun loadPersistedExpansionState(): Set<String> {
+        val properties = PropertiesComponent.getInstance(project)
+        val stored = properties.getValue(EXPANDED_DIRECTORIES_KEY) ?: return emptySet()
+        return if (stored.isNotEmpty()) {
+            stored.split("\u0000").filter { it.isNotEmpty() }.toSet()
+        } else {
+            emptySet()
+        }
     }
 
     private fun createButtonPanel(): JPanel {
