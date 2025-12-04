@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.changes
+package `in`.kkkev.jjidea.vcs.changes
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
@@ -7,7 +7,7 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
-import `in`.kkkev.jjidea.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
 
 /**
  * Provides change information for jujutsu working copy

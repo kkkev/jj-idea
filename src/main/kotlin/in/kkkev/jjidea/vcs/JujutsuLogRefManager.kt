@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.log
+package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.Comparing
@@ -10,6 +10,7 @@ import org.jetbrains.annotations.Unmodifiable
 import java.awt.Color
 import java.io.DataInput
 import java.io.DataOutput
+import java.util.Comparator
 
 /**
  * Manages Jujutsu bookmarks (refs) in the VCS log
@@ -101,8 +102,8 @@ class JujutsuLogRefManager : VcsLogRefManager {
         }
     }
 
-    override fun getBranchLayoutComparator(): java.util.Comparator<VcsRef?> {
-        return java.util.Comparator { ref1, ref2 ->
+    override fun getBranchLayoutComparator(): Comparator<VcsRef?> {
+        return Comparator { ref1, ref2 ->
             when {
                 ref1 == null && ref2 == null -> 0
                 ref1 == null -> 1
@@ -112,8 +113,8 @@ class JujutsuLogRefManager : VcsLogRefManager {
         }
     }
 
-    override fun getLabelsOrderComparator(): java.util.Comparator<VcsRef?> {
-        return java.util.Comparator { ref1, ref2 ->
+    override fun getLabelsOrderComparator(): Comparator<VcsRef?> {
+        return Comparator { ref1, ref2 ->
             when {
                 ref1 == null && ref2 == null -> 0
                 ref1 == null -> 1

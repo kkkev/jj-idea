@@ -1,11 +1,13 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.jj
 
-import `in`.kkkev.jjidea.log.ChangeId
+import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
 
 /**
- * Represents a single entry in the jj log
+ * Represents a single entry in the jj log.
+ * This is a pure data class / DTO representing parsed JJ log output.
+ * Conversion to VCS framework objects (VcsUser, VcsCommitMetadata, etc.)
+ * is handled by JujutsuCommitMetadataBase and its subclasses.
  */
-// TODO Smoosh author and commit info into relevant VCS objects
 data class JujutsuLogEntry(
     val changeId: ChangeId,
     val commitId: String,

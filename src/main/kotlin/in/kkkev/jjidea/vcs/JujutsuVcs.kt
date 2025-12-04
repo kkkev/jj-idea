@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea
+package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.Configurable
@@ -13,13 +13,15 @@ import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.changes.JujutsuChangeProvider
-import `in`.kkkev.jjidea.changes.JujutsuRevisionNumber
-import `in`.kkkev.jjidea.checkin.JujutsuCheckinEnvironment
-import `in`.kkkev.jjidea.commands.JujutsuCliExecutor
-import `in`.kkkev.jjidea.commands.JujutsuCommandExecutor
-import `in`.kkkev.jjidea.diff.JujutsuDiffProvider
-import `in`.kkkev.jjidea.history.JujutsuHistoryProvider
+import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.vcs.checkin.JujutsuCheckinEnvironment
+import `in`.kkkev.jjidea.jj.cli.JujutsuCliExecutor
+import `in`.kkkev.jjidea.jj.JujutsuCommandExecutor
+import `in`.kkkev.jjidea.vcs.diff.JujutsuDiffProvider
+import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
+import `in`.kkkev.jjidea.jj.cli.JujutsuCliLogService
+import `in`.kkkev.jjidea.jj.JujutsuLogService
 
 /**
  * Main VCS implementation for Jujutsu
@@ -31,6 +33,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     val commandExecutor: JujutsuCommandExecutor by lazy {
         root?.let { JujutsuCliExecutor(it) } ?: throw IllegalStateException("Jujutsu repository root not found")
     }
+    val logService: JujutsuLogService by lazy { JujutsuCliLogService(commandExecutor) }
     private val _changeProvider by lazy { JujutsuChangeProvider(this) }
     private val _diffProvider by lazy { JujutsuDiffProvider(myProject, this) }
     private val _checkinEnvironment by lazy { JujutsuCheckinEnvironment(this) }

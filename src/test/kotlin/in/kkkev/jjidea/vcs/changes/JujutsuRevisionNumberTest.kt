@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.changes
+package `in`.kkkev.jjidea.vcs.changes
 
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

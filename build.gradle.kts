@@ -81,4 +81,7 @@ tasks.register<Test>("simpleTest") {
     exclude("**/changes/**") // JujutsuRevisionNumberTest needs VcsRevisionNumber
     exclude("**/RequirementsTest.class") // Integration test placeholders
     exclude("**/JujutsuCommandAvailabilityTest.class") // Needs actual jj binary
+    exclude("**/JujutsuLogEntryTest*.class") // Uses ChangeId which references Hash type
+    exclude("**/JujutsuLogParserTest*.class") // Uses ChangeId which references Hash type
+    exclude("**/jj/ChangeIdTest*.class") // ChangeId references Hash type in lazy property
 }

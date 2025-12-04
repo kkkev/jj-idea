@@ -13,7 +13,8 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
-import `in`.kkkev.jjidea.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.jj.JujutsuLogEntry
 import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.JPanel
@@ -140,47 +141,26 @@ class JujutsuLogPanel(private val project: Project) : Disposable {
         }
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            // TODO Tidy this up: keep template and parser together
+            log.info("Loading log entries using JujutsuLogService")
 
-            // Create template to extract all needed information
-            // Use null byte separator to avoid conflicts with pipe characters in descriptions
-            // Format: changeId\0shortChangeId\0commitId\0description\0bookmarks\0parentIds\0isWorkingCopy\0hasConflict\0isEmpty\0
-            // Parent format: "fullId~shortId, fullId~shortId" (~ separates full from short, comma separates parents)
-            // Note: Using ++ concatenation instead of separate() because separate() skips empty values
-            // Note: Truncation to 8 chars happens in rendering, not in template
-            // IMPORTANT: Must end with "\0" to separate entries (9 fields per entry, trailing \0 creates separator)
-            val template = """
-                change_id ++ "\0" ++
-                change_id.shortest() ++ "\0" ++
-                commit_id ++ "\0" ++
-                description ++ "\0" ++
-                bookmarks ++ "\0" ++
-                parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
-                if(current_working_copy, "true", "false") ++ "\0" ++
-                if(conflict, "true", "false") ++ "\0" ++
-                if(empty, "true", "false") ++ "\0"
-            """.trimIndent().replace("\n", " ")
-
-            log.info("Executing jj log command with revset: all()")
-            log.debug("Template: $template")
-
-            // Show all commits in the log (like jj log)
-            val result = vcsInstance.commandExecutor.log("all()", template)
-
-            log.info("JJ log command completed. Exit code: ${result.exitCode}")
-            log.debug("Stdout length: ${result.stdout.length}")
-            log.debug("Stderr: ${result.stderr}")
+            // Use logService to get log entries (templates and parsing encapsulated)
+            val result = vcsInstance.logService.getLogBasic("all()")
 
             ApplicationManager.getApplication().invokeLater {
-                if (result.isSuccess) {
-                    log.info("Parsing log output...")
-                    val entries = JujutsuLogParser.parseLog(result.stdout)
-                    log.info("Parsed ${entries.size} log entries")
+                result.onSuccess { entries ->
+                    log.info("Successfully loaded ${entries.size} log entries")
                     updateLogView(entries)
-                } else {
-                    log.error("JJ Log command failed: ${result.stderr}")
-                    log.error("Exit code: ${result.exitCode}")
-                    log.error("Stdout: ${result.stdout}")
+                }.onFailure { error ->
+                    log.error("Failed to load log entries", error)
+                    tableModel.rowCount = 0
+                    tableModel.addRow(
+                        arrayOf(
+                            "Error loading log",
+                            "",
+                            error.message ?: "Unknown error",
+                            ""
+                        )
+                    )
                 }
             }
         }

@@ -3,7 +3,7 @@ package `in`.kkkev.jjidea.ui
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.NamedColorUtil
-import `in`.kkkev.jjidea.log.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeId
 import java.awt.Color
 
 /**

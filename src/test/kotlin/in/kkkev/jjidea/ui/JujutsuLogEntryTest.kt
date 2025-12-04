@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui
 
-import `in`.kkkev.jjidea.log.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.JujutsuLogEntry
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -107,5 +108,232 @@ class JujutsuLogEntryTest {
         val markers = conflictEntry.getMarkers()
 
         markers shouldContain "conflict"
+    }
+
+    @Test
+    fun `display markers for empty commit`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "",
+            isEmpty = true
+        )
+
+        val markers = entry.getMarkers()
+
+        markers shouldContain "empty"
+    }
+
+    @Test
+    fun `display markers for undescribed commit`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "",
+            isUndescribed = true
+        )
+
+        val markers = entry.getMarkers()
+
+        markers shouldContain "(no description)"
+    }
+
+    @Test
+    fun `display multiple markers at once`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "",
+            hasConflict = true,
+            isEmpty = true,
+            isUndescribed = true
+        )
+
+        val markers = entry.getMarkers()
+
+        markers.size shouldBe 3
+        markers shouldContain "conflict"
+        markers shouldContain "empty"
+        markers shouldContain "(no description)"
+    }
+
+    @Test
+    fun `getDisplayDescription for normal commit`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Add new feature"
+        )
+
+        entry.getDisplayDescription() shouldBe "Add new feature"
+    }
+
+    @Test
+    fun `getDisplayDescription for conflict with empty description`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "",
+            hasConflict = true
+        )
+
+        entry.getDisplayDescription() shouldBe "(conflict)"
+    }
+
+    @Test
+    fun `getDisplayDescription for empty commit`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "",
+            isEmpty = true
+        )
+
+        entry.getDisplayDescription() shouldBe "(empty)"
+    }
+
+    @Test
+    fun `getDisplayDescription for undescribed commit`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "",
+            isUndescribed = true
+        )
+
+        entry.getDisplayDescription() shouldBe "(no description)"
+    }
+
+    @Test
+    fun `getDisplayDescription for empty description without special flags`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = ""
+        )
+
+        entry.getDisplayDescription() shouldBe "(no description)"
+    }
+
+    @Test
+    fun `getBookmarkDisplay with no bookmarks`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Test",
+            bookmarks = emptyList()
+        )
+
+        entry.getBookmarkDisplay() shouldBe ""
+    }
+
+    @Test
+    fun `getBookmarkDisplay with single bookmark`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Test",
+            bookmarks = listOf("main")
+        )
+
+        entry.getBookmarkDisplay() shouldBe "main"
+    }
+
+    @Test
+    fun `getBookmarkDisplay with multiple bookmarks`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Test",
+            bookmarks = listOf("main", "develop", "feature")
+        )
+
+        entry.getBookmarkDisplay() shouldBe "main, develop, feature"
+    }
+
+    @Test
+    fun `getParentIdsDisplay with no parents`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Test",
+            parentIds = emptyList()
+        )
+
+        entry.getParentIdsDisplay() shouldBe ""
+    }
+
+    @Test
+    fun `getParentIdsDisplay with single parent`() {
+        val parentId = ChangeId("abcdefgh", 2)
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Test",
+            parentIds = listOf(parentId)
+        )
+
+        entry.getParentIdsDisplay() shouldBe "ab:cdefgh"
+    }
+
+    @Test
+    fun `getParentIdsDisplay with multiple parents (merge)`() {
+        val parent1 = ChangeId("abcdefgh", 2)
+        val parent2 = ChangeId("xyzwvuts", 2)
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Merge commit",
+            parentIds = listOf(parent1, parent2)
+        )
+
+        entry.getParentIdsDisplay() shouldBe "ab:cdefgh, xy:zwvuts"
+    }
+
+    @Test
+    fun `entry with author and committer information`() {
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Test",
+            authorName = "Alice",
+            authorEmail = "alice@example.com",
+            committerName = "Bob",
+            committerEmail = "bob@example.com"
+        )
+
+        entry.authorName shouldBe "Alice"
+        entry.authorEmail shouldBe "alice@example.com"
+        entry.committerName shouldBe "Bob"
+        entry.committerEmail shouldBe "bob@example.com"
+    }
+
+    @Test
+    fun `entry with timestamps`() {
+        val authorTime = 1638360000000L  // Example timestamp
+        val committerTime = 1638361000000L
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = "Test",
+            authorTimestamp = authorTime,
+            committerTimestamp = committerTime
+        )
+
+        entry.authorTimestamp shouldBe authorTime
+        entry.committerTimestamp shouldBe committerTime
+    }
+
+    @Test
+    fun `multi-line description is preserved`() {
+        val multiLineDesc = "First line\n\nSecond paragraph\nThird line"
+        val entry = JujutsuLogEntry(
+            changeId = CHANGE_ID,
+            commitId = "abc123",
+            description = multiLineDesc
+        )
+
+        entry.description shouldBe multiLineDesc
+        entry.getDisplayDescription() shouldBe multiLineDesc
     }
 }

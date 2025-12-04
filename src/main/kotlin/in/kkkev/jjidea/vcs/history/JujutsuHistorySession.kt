@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.history
+package `in`.kkkev.jjidea.vcs.history
 
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.history.VcsFileRevision

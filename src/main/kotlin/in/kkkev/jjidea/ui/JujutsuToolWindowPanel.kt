@@ -23,7 +23,8 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
-import `in`.kkkev.jjidea.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.jj.cli.JujutsuLogParser
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints

@@ -24,9 +24,9 @@
     <depends optional="true">Git4Idea</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <vcs name="Jujutsu" vcsClass="in.kkkev.jjidea.JujutsuVcs" />
-        <vcsRootChecker implementation="in.kkkev.jjidea.JujutsuRootChecker" />
-        <logProvider implementation="in.kkkev.jjidea.log.JujutsuLogProvider" />
+        <vcs name="Jujutsu" vcsClass="in.kkkev.jjidea.vcs.JujutsuVcs" />
+        <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" />
+        <logProvider implementation="in.kkkev.jjidea.vcs.JujutsuLogProvider" />
 
         <!-- Jujutsu tool window on the left side (Commit view) -->
         <toolWindow

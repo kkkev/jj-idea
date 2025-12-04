@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea
+package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.vcs.VcsRootChecker
 import com.intellij.openapi.vfs.VirtualFile

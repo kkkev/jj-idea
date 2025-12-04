@@ -1,11 +1,11 @@
-package `in`.kkkev.jjidea.checkin
+package `in`.kkkev.jjidea.vcs.checkin
 
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.checkin.CheckinEnvironment
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
 
 /**
  * Checkin environment for Jujutsu VCS

@@ -1,6 +1,7 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.jj.cli
 
-import `in`.kkkev.jjidea.log.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.JujutsuLogEntry
 
 /**
  * Parses jj log output into structured log entries
@@ -35,8 +36,17 @@ object JujutsuLogParser {
         }
         val parentIds = if (parts[5].isNotEmpty()) {
             // Format is "fullId~shortId, fullId~shortId"
-            // Extract just the full IDs (shortId is computed during rendering with first 2 chars as fallback)
-            parts[5].split(",").map { it.trim().substringBefore("~") }
+            // Extract both full and short IDs
+            parts[5].split(",").map { parent ->
+                val trimmed = parent.trim()
+                val parts = trimmed.split("~")
+                if (parts.size == 2) {
+                    ChangeId(parts[0], parts[1])
+                } else {
+                    // Fallback if format is unexpected
+                    ChangeId(trimmed)
+                }
+            }
         } else {
             emptyList()
         }
@@ -59,8 +69,7 @@ object JujutsuLogParser {
             commitId = commitId,
             description = description,
             bookmarks = bookmarks,
-            // TODO Parent short ids
-            parentIds = parentIds.map { ChangeId(it) },
+            parentIds = parentIds,
             isWorkingCopy = isWorkingCopy,
             hasConflict = hasConflict,
             isEmpty = isEmpty,
@@ -95,8 +104,19 @@ object JujutsuLogParser {
                     commitId = chunk[2],
                     description = chunk[3],
                     bookmarks = if (chunk[4].isNotEmpty()) chunk[4].split(",").map { it.trim() } else emptyList(),
-                    // TODO Is this correct for short/full?
-                    parentIds = if (chunk[5].isNotEmpty()) chunk[5].split(",").map { ChangeId(it.trim().substringBefore("~")) } else emptyList(),
+                    // Format is "fullId~shortId, fullId~shortId" - extract both parts
+                    parentIds = if (chunk[5].isNotEmpty()) {
+                        chunk[5].split(",").map { parent ->
+                            val parts = parent.trim().split("~")
+                            if (parts.size == 2) {
+                                ChangeId(parts[0], parts[1])
+                            } else {
+                                ChangeId(parts[0])
+                            }
+                        }
+                    } else {
+                        emptyList()
+                    },
                     isWorkingCopy = chunk[6].toBoolean(),
                     hasConflict = chunk[7].toBoolean(),
                     isEmpty = chunk[8].toBoolean(),

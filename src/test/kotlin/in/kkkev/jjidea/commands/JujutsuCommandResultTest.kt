@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.commands
 
+import `in`.kkkev.jjidea.jj.JujutsuCommandExecutor
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 

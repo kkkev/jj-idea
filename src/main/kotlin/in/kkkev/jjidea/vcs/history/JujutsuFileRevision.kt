@@ -1,13 +1,13 @@
-package `in`.kkkev.jjidea.history
+package `in`.kkkev.jjidea.vcs.history
 
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.RepositoryLocation
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
-import `in`.kkkev.jjidea.JujutsuVcs
-import `in`.kkkev.jjidea.changes.JujutsuRevisionNumber
-import `in`.kkkev.jjidea.ui.JujutsuLogEntry
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.jj.JujutsuLogEntry
 
 /**
  * Represents a single revision of a file in Jujutsu history

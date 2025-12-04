@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.diff
+package `in`.kkkev.jjidea.vcs.diff
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -9,8 +9,8 @@ import com.intellij.openapi.vcs.diff.ItemLatestState
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
-import `in`.kkkev.jjidea.JujutsuVcs
-import `in`.kkkev.jjidea.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
 
 /**
  * Provides diff functionality for jujutsu files

@@ -1,20 +1,23 @@
-package `in`.kkkev.jjidea.log
+package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.log.Hash
 import com.intellij.vcs.log.VcsCommitMetadata
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
-import `in`.kkkev.jjidea.ui.JujutsuLogEntry
 
 /**
- * Metadata for a Jujutsu commit
+ * Abstract base for Jujutsu commit metadata implementations.
+ * Provides common implementation of VcsCommitMetadata methods based on JujutsuLogEntry.
  */
-class JujutsuCommitMetadata(private val entry: JujutsuLogEntry, private val root: VirtualFile) : VcsCommitMetadata {
+abstract class JujutsuCommitMetadataBase(
+    protected val entry: JujutsuLogEntry,
+    private val root: VirtualFile
+) : VcsCommitMetadata {
 
-    override fun getId() = entry.changeId.hashImpl
+    override fun getId(): Hash = entry.changeId.hash
 
-    override fun getParents(): List<Hash> = entry.parentIds.map { it.hashImpl }
+    override fun getParents(): List<Hash> = entry.parentIds.map { it.hash }
 
     override fun getCommitTime(): Long = entry.committerTimestamp
 

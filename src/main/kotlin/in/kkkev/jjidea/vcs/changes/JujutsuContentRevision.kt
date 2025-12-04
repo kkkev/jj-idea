@@ -1,7 +1,7 @@
-package `in`.kkkev.jjidea.changes
+package `in`.kkkev.jjidea.vcs.changes
 
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
-import `in`.kkkev.jjidea.log.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeId
 
 /**
  * Simple revision number implementation for jujutsu

@@ -1,10 +1,11 @@
-package `in`.kkkev.jjidea.commands
+package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.jj.JujutsuCommandExecutor
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 

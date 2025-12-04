@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.commands
+package `in`.kkkev.jjidea.jj
 
 /**
  * Abstraction for executing jujutsu commands.
