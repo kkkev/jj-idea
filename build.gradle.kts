@@ -22,6 +22,7 @@ dependencies {
 
         // VCS modules - including the VCS itself as a plugin
         bundledPlugin("Git4Idea")
+        bundledModule("intellij.platform.vcs.impl")
     }
 
     // Test framework
