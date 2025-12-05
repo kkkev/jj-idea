@@ -5,8 +5,6 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  release:
-    types: [ created ]
 
 permissions:
   contents: write
@@ -18,6 +16,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for version calculation
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -27,6 +27,20 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
+
+      - name: Calculate version
+        id: version
+        run: |
+          # Use run number for patch version: 0.1.{run_number}
+          VERSION="0.1.${{ github.run_number }}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
+          echo "Calculated version: ${VERSION}"
+
+      - name: Update version in build.gradle.kts
+        run: |
+          sed -i 's/^version = .*/version = "${{ steps.version.outputs.version }}"/' build.gradle.kts
+          cat build.gradle.kts | grep '^version'
 
       - name: Build plugin
         run: ./gradlew buildPlugin
@@ -41,26 +55,35 @@ jobs:
           path: build/distributions/*.zip
           retention-days: 30
 
-      - name: Upload to release
-        if: github.event_name == 'release'
-        uses: softprops/action-gh-release@v1
+      # Only create release on push to main/master (not on PRs)
+      - name: Create GitHub Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.version }}
+          body: |
+            Automated release of version ${{ steps.version.outputs.version }}
+
+            Commit: ${{ github.sha }}
           files: build/distributions/*.zip
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update plugin repository XML
-        if: github.event_name == 'release'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
-          VERSION=$(grep '^version = ' build.gradle.kts | cut -d'"' -f2)
-          TAG_NAME=${GITHUB_REF#refs/tags/}
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG_NAME="${{ steps.version.outputs.tag }}"
           PLUGIN_FILE="jj-idea-${VERSION}.zip"
 
           cat > updatePlugins.xml << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <plugins>
             <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/${TAG_NAME}/${PLUGIN_FILE}" version="${VERSION}">
-              <idea-version since-build="252.0" />
+              <idea-version since-build="251.0" />
               <name>Jujutsu VCS Integration</name>
               <description><![CDATA[
                 Native integration with Jujutsu (jj) version control system.
@@ -72,7 +95,7 @@ jobs:
                 - Working copy status and diffs
                 - Commands: jj describe, jj new
               ]]></description>
-              <vendor email="jj-idea@me.kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
+              <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
               <change-notes><![CDATA[
                 <h3>${VERSION}</h3>
                 <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/${TAG_NAME}">release notes</a> for details.</p>
@@ -82,12 +105,10 @@ jobs:
           EOF
 
       - name: Commit updated plugin repository XML
-        if: github.event_name == 'release'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git fetch origin main
-          git checkout main
           git add updatePlugins.xml
-          git commit -m "Update plugin repository for release ${GITHUB_REF#refs/tags/}" || echo "No changes to commit"
-          git push origin main
+          git commit -m "Update plugin repository for release ${TAG_NAME}" || echo "No changes to commit"
+          git push origin ${{ github.ref_name }}

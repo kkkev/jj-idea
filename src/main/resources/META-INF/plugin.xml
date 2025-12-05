@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>in.kkkev.jj-idea</id>
     <name>Jujutsu VCS Integration</name>
-    <vendor email="jj-idea@me.kkkev.in" url="https://github.com/kevinb9n/jj-idea">Kevin Thomas</vendor>
+    <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
 
     <description><![CDATA[
     Native integration with Jujutsu (jj) version control system.

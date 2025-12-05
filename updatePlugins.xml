@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
   <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.1.0/jj-idea-0.1.0-SNAPSHOT.zip" version="0.1.0-SNAPSHOT">
-    <idea-version since-build="252.0" />
+    <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
       Native integration with Jujutsu (jj) version control system.
@@ -13,7 +13,7 @@
       - Working copy status and diffs
       - Commands: jj describe, jj new
     ]]></description>
-    <vendor email="jj-idea@me.kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
+    <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
       <h3>0.1.0-SNAPSHOT</h3>
       <ul>
