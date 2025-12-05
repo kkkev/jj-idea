@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectLocator
-import com.intellij.openapi.util.IntellijInternalApi
 import com.intellij.openapi.vcs.*
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -113,8 +112,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
         const val VCS_NAME = "Jujutsu"
         const val VCS_DISPLAY_NAME = "Jujutsu"
 
-        @OptIn(IntellijInternalApi::class)
-        private val KEY = VcsKey(VCS_NAME)
+        private val KEY = createKey(VCS_NAME)
 
         fun getKey() = KEY
 
