@@ -80,4 +80,13 @@ interface CommandExecutor {
      * @return Command result with log output
      */
     fun log(revisions: String = "@", template: String? = null, filePaths: List<String> = emptyList()): CommandResult
+
+    /**
+     * Get line-by-line annotation (blame) for a file
+     * @param filePath Path relative to root
+     * @param revision Revision identifier (default: "@")
+     * @param template Template for annotation output
+     * @return Annotation output with change info per line
+     */
+    fun annotate(filePath: String, revision: String = "@", template: String? = null): CommandResult
 }

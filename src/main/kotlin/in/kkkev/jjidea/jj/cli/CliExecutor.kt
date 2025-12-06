@@ -78,6 +78,16 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         return execute(root, args)
     }
 
+    override fun annotate(filePath: String, revision: String, template: String?): CommandExecutor.CommandResult {
+        val args = mutableListOf("file", "annotate", "-r", revision)
+        if (template != null) {
+            args.add("-T")
+            args.add(template)
+        }
+        args.add(filePath)
+        return execute(root, args)
+    }
+
     private fun execute(
         workingDir: VirtualFile?,
         args: List<String>,

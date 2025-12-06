@@ -553,3 +553,6 @@ When adding features or fixing bugs:
 - Use a single return point in functions where possible
 - Keep documentation in the docs folder
 - Store tasks in glab. When I refer to issues or tasks, look in glab.
+- In functions, avoid multiple return points where possible. For example, rather than shortcut by returning when a required variable is null, chain calls with ?.let.
+Prefer single-line expressions for functions. For example, if a function just returns a simple expression, rather than use `fun foo() { return bar }`, use `fun foo() = bar`
+Where a function returns an unambiguous type and is declared as a single-line expression, omit the type. For example, rather than `fun foo(): String = bar`, use `fun foo() = bar`. However, if the expression is the result of a platform call where nullity is ambiguous, declare the type explicitly.

@@ -22,7 +22,7 @@
 
     <!-- Optional dependency on Git plugin for VCS log classes -->
     <!-- TODO Should this be optional? There's a solid code-level dependency -->
-    <depends optional="true">Git4Idea</depends>
+    <!--<depends optional="true">Git4Idea</depends>-->
 
     <extensions defaultExtensionNs="com.intellij">
         <vcs name="Jujutsu" vcsClass="in.kkkev.jjidea.vcs.JujutsuVcs" />
@@ -37,4 +37,13 @@
             factoryClass="in.kkkev.jjidea.ui.JujutsuToolWindowFactory"
         />
     </extensions>
+
+    <actions>
+        <!-- Jujutsu action group in editor context menu -->
+        <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.vcs.actions.JujutsuEditorActionGroup" popup="true">
+            <action id="Jujutsu.EditorAnnotate" class="in.kkkev.jjidea.vcs.actions.JujutsuAnnotateAction"/>
+            <!--<add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu.GoToMenu"/>-->
+            <add-to-group group-id="VcsGroup" anchor="last"/>
+        </group>
+    </actions>
 </idea-plugin>
