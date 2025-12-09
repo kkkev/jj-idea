@@ -80,6 +80,7 @@ tasks.register<Test>("simpleTest") {
 
     // Exclude tests that need IntelliJ Platform classes
     exclude("**/changes/**") // JujutsuRevisionNumberTest needs VcsRevisionNumber
+    exclude("**/annotate/**") // JujutsuFileAnnotationTest needs Platform classes
     exclude("**/RequirementsTest.class") // Integration test placeholders
     exclude("**/JujutsuCommandAvailabilityTest.class") // Needs actual jj binary
     exclude("**/JujutsuLogEntryTest*.class") // Uses ChangeId which references Hash type

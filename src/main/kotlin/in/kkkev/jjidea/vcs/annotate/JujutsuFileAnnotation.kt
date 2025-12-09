@@ -53,6 +53,14 @@ class JujutsuFileAnnotation(
     override fun getRevisions() = null
 
     /**
+     * Override to prevent EDT slow operations.
+     * The default implementation calls ProjectLevelVcsManager.getVcsFor() which performs
+     * slow file system checks (like isIgnored()) on EDT, causing SlowOperations warnings.
+     * Returning null disables the "Show Diff" feature from annotation gutter.
+     */
+    override fun getRevisionsChangesProvider(): Nothing? = null
+
+    /**
      * Handle click on annotation - open the change in the VCS Log tool window
      */
     fun handleAnnotationClick(lineNumber: Int) {
