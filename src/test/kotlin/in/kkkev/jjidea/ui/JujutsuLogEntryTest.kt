@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui
 
 import com.intellij.vcs.log.impl.VcsUserImpl
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldContain
@@ -21,7 +22,7 @@ class JujutsuLogEntryTest {
     fun `parse log entry with all fields`() {
         val commitId = "abc123def456"
         val description = "Add new feature"
-        val bookmarks = listOf("main", "feature-branch")
+        val bookmarks = listOf(Bookmark("main"), Bookmark("feature-branch"))
 
         val entry = LogEntry(
             changeId = CHANGE_ID,
@@ -236,7 +237,7 @@ class JujutsuLogEntryTest {
             changeId = CHANGE_ID,
             commitId = "abc123",
             description = "Test",
-            bookmarks = listOf("main")
+            bookmarks = listOf(Bookmark("main"))
         )
 
         entry.getBookmarkDisplay() shouldBe "main"
@@ -248,7 +249,7 @@ class JujutsuLogEntryTest {
             changeId = CHANGE_ID,
             commitId = "abc123",
             description = "Test",
-            bookmarks = listOf("main", "develop", "feature")
+            bookmarks = listOf(Bookmark("main"), Bookmark("develop"), Bookmark("feature"))
         )
 
         entry.getBookmarkDisplay() shouldBe "main, develop, feature"

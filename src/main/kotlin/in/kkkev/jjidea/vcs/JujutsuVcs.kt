@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogService
+import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider
@@ -30,7 +31,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     }
     val logService: LogService by lazy { CliLogService(commandExecutor) }
     private val _changeProvider by lazy { JujutsuChangeProvider(this) }
-    private val _diffProvider by lazy { JujutsuDiffProvider(myProject, this) }
+    private val _diffProvider by lazy { JujutsuDiffProvider(this) }
     private val _checkinEnvironment by lazy { JujutsuCheckinEnvironment(this) }
     private val _historyProvider by lazy { JujutsuHistoryProvider(this) }
     private val _annotationProvider by lazy { JujutsuAnnotationProvider(myProject, this) }
@@ -77,7 +78,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
         foundRoot
     }
 
-    fun createRevision(filePath: FilePath, revision: String) = JujutsuContentRevision(filePath, revision)
+    fun createRevision(filePath: FilePath, revision: Revision) = JujutsuContentRevision(filePath, revision)
 
     fun getRelativePath(filePath: FilePath): String {
         val repoRoot = root ?: throw VcsException("Project is not within a JJ repository")
@@ -94,7 +95,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     /**
      * Represents the content of a file at a specific jujutsu revision
      */
-    inner class JujutsuContentRevision(private val filePath: FilePath, private val revision: String) : ContentRevision {
+    inner class JujutsuContentRevision(private val filePath: FilePath, private val revision: Revision) : ContentRevision {
         override fun getContent(): String? {
             val result = commandExecutor.show(getRelativePath(filePath), revision)
             return if (result.isSuccess) result.stdout else null

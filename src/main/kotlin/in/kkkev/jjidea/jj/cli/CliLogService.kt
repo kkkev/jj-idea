@@ -1,249 +1,141 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.openapi.diagnostic.Logger
-import `in`.kkkev.jjidea.jj.CommandExecutor
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.LogService
-import `in`.kkkev.jjidea.jj.FileChange
-import `in`.kkkev.jjidea.jj.FileChangeStatus
-import `in`.kkkev.jjidea.jj.LogEntry
+import com.intellij.openapi.vcs.VcsException
+import `in`.kkkev.jjidea.jj.*
+import kotlinx.datetime.Instant
+
+interface LogSpec<T> {
+    val spec: String
+    val count: Int
+    fun take(input: Iterator<String>): T
+}
+
+abstract class SingleField<T>(private val fieldName: String) : LogSpec<T> {
+    override val spec get() = "$fieldName ++ \"\\0\""
+    override val count get() = 1
+    abstract fun parse(input: String): T
+    override fun take(input: Iterator<String>) = parse(input.next())
+}
+
+// TODO Need a way to ensure that only single fields are terminated
+interface MultipleFields<T> : LogSpec<T> {
+    val fields: Array<out LogSpec<*>>
+    override val spec get() = fields.joinToString(" ++ ") { it.spec }
+    override val count get() = fields.sumOf { it.count }
+}
+
+object LogTemplates {
+    fun <T> singleField(spec: String, parser: (String) -> T) = object : SingleField<T>(spec) {
+        override fun parse(input: String) = parser(input)
+    }
+
+    fun stringField(spec: String) = singleField(spec) { it }
+    fun booleanField(spec: String) = singleField("""if($spec, "true", "false")""") { it.toBoolean() }
+    fun timestampField(spec: String) = singleField("""$spec.timestamp().utc().format("%s")""") {
+        Instant.fromEpochSeconds(it.toLong())
+    }
+
+    class SignatureFields(spec: String) : MultipleFields<Signature> {
+        val name = stringField("$spec.name()")
+        val email = stringField("$spec.email()")
+        val timestamp = timestampField(spec)
+
+        override val fields: Array<LogSpec<*>> = arrayOf(name, email, timestamp)
+        override fun take(input: Iterator<String>) = Signature(
+            name.take(input),
+            email.take(input),
+            timestamp.take(input)
+        )
+    }
+
+    val changeId = singleField("change_id ++ \"~\" ++ change_id.shortest()") {
+        val (full, short) = it.split("~")
+        ChangeId(full, short)
+    }
+    val commitId = stringField("commit_id")
+    val description = stringField("description")
+    val currentWorkingCopy = booleanField("current_working_copy")
+    val conflict = booleanField("conflict")
+    val empty = booleanField("empty")
+    val bookmarks = singleField("bookmarks") { it.splitByComma(::Bookmark) }
+    val parents = singleField("""parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",")""") {
+        it.splitByComma(changeId::parse)
+    }
+    val author = SignatureFields("author")
+    val committer = SignatureFields("committer")
+
+    val basicLogTemplate = logTemplate(
+        changeId, commitId, description, bookmarks, parents, currentWorkingCopy, conflict, empty
+    ) {
+        LogEntry(
+            changeId.take(it),
+            commitId.take(it),
+            description.take(it),
+            bookmarks.take(it),
+            parents.take(it),
+            currentWorkingCopy.take(it),
+            conflict.take(it),
+            empty.take(it)
+        )
+    }
+
+    val fullLogTemplate = logTemplate(basicLogTemplate, author, committer) {
+        val basic = basicLogTemplate.take(it)
+        val jjAuthor = author.take(it)
+        val jjCommitter = committer.take(it)
+        basic.copy(
+            authorTimestamp = jjAuthor.timestamp,
+            committerTimestamp = jjCommitter.timestamp,
+            author = jjAuthor.user,
+            committer = jjCommitter.user
+        )
+    }
+
+    val refsLogTemplate = logTemplate(changeId, bookmarks, currentWorkingCopy) {
+        val changeId = changeId.take(it)
+        val bookmarks = bookmarks.take(it)
+        val currentWorkingCopy = currentWorkingCopy.take(it)
+        listOfNotNull(
+            listOf(WorkingCopy).takeIf { currentWorkingCopy },
+            bookmarks
+        ).flatten().map { ref -> RefAtRevision(changeId, ref) }
+    }
+
+    val commitGraphLogTemplate = logTemplate(changeId, parents, committer.timestamp) {
+        CommitGraphNode(
+            changeId.take(it),
+            parents.take(it),
+            committer.timestamp.take(it)
+        )
+    }
+}
+
+abstract class LogTemplate<T>(override vararg val fields: LogSpec<*>) : MultipleFields<T>
+
+fun <T> logTemplate(vararg fields: LogSpec<*>, taker: (Iterator<String>) -> T) = object : LogTemplate<T>(*fields) {
+    override fun take(input: Iterator<String>) = taker(input)
+}
+
 
 /**
  * CLI-based implementation of JujutsuLogService.
  * Centralizes all template generation and parsing logic.
  */
 class CliLogService(private val executor: CommandExecutor) : LogService {
+    private val log = Logger.getInstance(javaClass)
 
-    private val log = Logger.getInstance(CliLogService::class.java)
+    override fun getLog(revset: Revset, filePaths: List<String>) =
+        getLog(LogTemplates.fullLogTemplate, revset, filePaths)
 
-    companion object {
-        /**
-         * Full template with all metadata fields (15 fields).
-         * Used when author/committer information is needed.
-         */
-        private val FULL_TEMPLATE = """
-            change_id ++ "\0" ++
-            change_id.shortest() ++ "\0" ++
-            commit_id ++ "\0" ++
-            description ++ "\0" ++
-            bookmarks ++ "\0" ++
-            parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
-            if(current_working_copy, "true", "false") ++ "\0" ++
-            if(conflict, "true", "false") ++ "\0" ++
-            if(empty, "true", "false") ++ "\0" ++
-            author.timestamp().utc().format("%s") ++ "\0" ++
-            committer.timestamp().utc().format("%s") ++ "\0" ++
-            author.name() ++ "\0" ++
-            author.email() ++ "\0" ++
-            committer.name() ++ "\0" ++
-            committer.email() ++ "\0"
-        """.trimIndent().replace("\n", " ")
+    override fun getLogBasic(revset: Revset, filePaths: List<String>) =
+        getLog(LogTemplates.basicLogTemplate, revset, filePaths)
 
-        /**
-         * Basic template without author/committer fields (9 fields).
-         * More efficient when only basic commit info is needed.
-         */
-        private val BASIC_TEMPLATE = """
-            change_id ++ "\0" ++
-            change_id.shortest() ++ "\0" ++
-            commit_id ++ "\0" ++
-            description ++ "\0" ++
-            bookmarks ++ "\0" ++
-            parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
-            if(current_working_copy, "true", "false") ++ "\0" ++
-            if(conflict, "true", "false") ++ "\0" ++
-            if(empty, "true", "false") ++ "\0"
-        """.trimIndent().replace("\n", " ")
+    override fun getRefs(): Result<List<RefAtRevision>> = getLog(LogTemplates.refsLogTemplate).map { it.flatten() }
 
-        /**
-         * Minimal template for refs (4 fields).
-         * Includes short IDs for efficient display.
-         */
-        private val REFS_TEMPLATE = """
-            change_id ++ "\0" ++
-            change_id.shortest() ++ "\0" ++
-            bookmarks ++ "\0" ++
-            if(current_working_copy, "true", "false") ++ "\0"
-        """.trimIndent().replace("\n", " ")
+    override fun getCommitGraph(revset: Revset) = getLog(LogTemplates.commitGraphLogTemplate, revset)
 
-        /**
-         * Minimal template for commit graph (4 fields).
-         * Includes short IDs for parents to match format used elsewhere.
-         */
-        private val GRAPH_TEMPLATE = """
-            change_id ++ "\0" ++
-            change_id.shortest() ++ "\0" ++
-            parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
-            committer.timestamp().utc().format("%s") ++ "\0"
-        """.trimIndent().replace("\n", " ")
-    }
-
-    override fun getLog(revisions: String, filePaths: List<String>): Result<List<LogEntry>> {
-        log.debug("Getting log for revisions: $revisions, files: $filePaths")
-
-        val result = executor.log(revisions, FULL_TEMPLATE, filePaths)
-
-        return if (result.isSuccess) {
-            try {
-                val entries = JujutsuLogParser.parseLog(result.stdout)
-                log.debug("Parsed ${entries.size} log entries")
-                Result.success(entries)
-            } catch (e: Exception) {
-                log.error("Failed to parse log output", e)
-                Result.failure(e)
-            }
-        } else {
-            log.error("Log command failed: ${result.stderr}")
-            Result.failure(Exception("Log command failed: ${result.stderr}"))
-        }
-    }
-
-    override fun getLogBasic(revisions: String, filePaths: List<String>): Result<List<LogEntry>> {
-        log.debug("Getting basic log for revisions: $revisions, files: $filePaths")
-
-        val result = executor.log(revisions, BASIC_TEMPLATE, filePaths)
-
-        return if (result.isSuccess) {
-            try {
-                val entries = JujutsuLogParser.parseLog(result.stdout)
-                log.debug("Parsed ${entries.size} basic log entries")
-                Result.success(entries)
-            } catch (e: Exception) {
-                log.error("Failed to parse basic log output", e)
-                Result.failure(e)
-            }
-        } else {
-            log.error("Basic log command failed: ${result.stderr}")
-            Result.failure(Exception("Log command failed: ${result.stderr}"))
-        }
-    }
-
-    override fun getRefs(): Result<List<LogService.JujutsuRef>> {
-        log.debug("Getting refs")
-
-        val result = executor.log("all()", REFS_TEMPLATE)
-
-        return if (result.isSuccess) {
-            try {
-                val refs = parseRefs(result.stdout)
-                log.debug("Parsed ${refs.size} refs")
-                Result.success(refs)
-            } catch (e: Exception) {
-                log.error("Failed to parse refs", e)
-                Result.failure(e)
-            }
-        } else {
-            log.error("Refs command failed: ${result.stderr}")
-            Result.failure(Exception("Refs command failed: ${result.stderr}"))
-        }
-    }
-
-    override fun getCommitGraph(revisions: String): Result<List<LogService.CommitGraphNode>> {
-        log.debug("Getting commit graph for revisions: $revisions")
-
-        val result = executor.log(revisions, GRAPH_TEMPLATE)
-
-        return if (result.isSuccess) {
-            try {
-                val nodes = parseCommitGraph(result.stdout)
-                log.debug("Parsed ${nodes.size} commit graph nodes")
-                Result.success(nodes)
-            } catch (e: Exception) {
-                log.error("Failed to parse commit graph", e)
-                Result.failure(e)
-            }
-        } else {
-            log.error("Commit graph command failed: ${result.stderr}")
-            Result.failure(Exception("Commit graph command failed: ${result.stderr}"))
-        }
-    }
-
-    /**
-     * Parse refs output (4 fields per entry).
-     */
-    private fun parseRefs(output: String): List<LogService.JujutsuRef> {
-        val trimmed = output.trim()
-        if (trimmed.isBlank()) return emptyList()
-
-        val fields = trimmed.split("\u0000")
-        val refs = mutableListOf<LogService.JujutsuRef>()
-
-        fields.chunked(4).forEach { chunk ->
-            if (chunk.size == 4) {
-                val changeId = ChangeId(chunk[0], chunk[1])
-                val bookmarks = chunk[2]
-                val isWorkingCopy = chunk[3].toBoolean()
-
-                // Add working copy ref
-                if (isWorkingCopy) {
-                    refs.add(
-                        LogService.JujutsuRef(
-                            changeId = changeId,
-                            name = "@",
-                            type = LogService.RefType.WORKING_COPY
-                        )
-                    )
-                }
-
-                // Add bookmark refs
-                if (bookmarks.isNotEmpty()) {
-                    bookmarks.split(",").forEach { bookmark ->
-                        refs.add(
-                            LogService.JujutsuRef(
-                                changeId = changeId,
-                                name = bookmark.trim(),
-                                type = LogService.RefType.BOOKMARK
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        return refs
-    }
-
-    /**
-     * Parse commit graph output (4 fields per entry).
-     */
-    private fun parseCommitGraph(output: String): List<LogService.CommitGraphNode> {
-        val trimmed = output.trim()
-        if (trimmed.isBlank()) return emptyList()
-
-        val fields = trimmed.split("\u0000")
-
-        return fields.chunked(4).mapNotNull { chunk ->
-            if (chunk.size == 4) {
-                val changeId = ChangeId(chunk[0], chunk[1])
-                val parentIds = if (chunk[2].isNotEmpty()) {
-                    // Format is "fullId~shortId, fullId~shortId"
-                    // Extract both full and short IDs
-                    chunk[2].split(",").map { parent ->
-                        val parts = parent.trim().split("~")
-                        if (parts.size == 2) {
-                            ChangeId(parts[0], parts[1])
-                        } else {
-                            // Fallback if format is unexpected
-                            ChangeId(parts[0])
-                        }
-                    }
-                } else {
-                    emptyList()
-                }
-                val timestamp = chunk[3].toLongOrNull()?.times(1000) ?: 0L
-
-                LogService.CommitGraphNode(
-                    changeId = changeId,
-                    parentIds = parentIds,
-                    timestamp = timestamp
-                )
-            } else {
-                null
-            }
-        }
-    }
-
-    override fun getFileChanges(revision: String): Result<List<FileChange>> {
+    override fun getFileChanges(revision: Revision): Result<List<FileChange>> {
         log.debug("Getting file changes for revision: $revision")
 
         val result = executor.diffSummary(revision)
@@ -297,4 +189,41 @@ class CliLogService(private val executor: CommandExecutor) : LogService {
             FileChange(filePath, status)
         }
     }
+
+    private fun <T> getLog(
+        template: LogTemplate<T>,
+        revset: Revset = Expression.ALL,
+        filePaths: List<String> = emptyList()
+    ): Result<List<T>> {
+        log.debug("Getting log for revset: $revset, files: $filePaths")
+
+        val result = executor.log(revset, template.spec, filePaths)
+        return if (result.isSuccess) {
+            try {
+                Result.success(parse(template, result.stdout))
+            } catch (e: Exception) {
+                // TODO Improve logging
+                log.error("Failed to parse", e)
+                Result.failure(e)
+            }
+        } else {
+            // TODO Improve logging
+            Result.failure(VcsException("Error from jj log: " + result.stderr))
+        }
+    }
+
+    private fun <T> parse(template: LogTemplate<T>, logOutput: String): List<T> {
+        val fields = logOutput.trim().split(FIELD_SEPARATOR)
+        val recordSize = template.count
+        return fields.chunked(recordSize)
+            .filter { it.size == recordSize }
+            .map { chunk -> template.take(chunk.iterator()) }
+    }
+
+    companion object {
+        private const val FIELD_SEPARATOR = "\u0000" // Null byte
+    }
 }
+
+fun <T> String.splitByComma(transform: (String) -> T) =
+    if (this.isEmpty()) emptyList() else this.split(",").map(transform)

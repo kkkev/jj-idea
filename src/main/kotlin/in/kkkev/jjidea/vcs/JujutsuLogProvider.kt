@@ -11,10 +11,9 @@ import com.intellij.util.Consumer
 import com.intellij.vcs.log.*
 import com.intellij.vcs.log.graph.PermanentGraph
 import com.intellij.vcs.log.impl.VcsRefImpl
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.JujutsuCommitMetadata
-import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
-import `in`.kkkev.jjidea.jj.LogService
+import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.jj.Expression
+import `in`.kkkev.jjidea.jj.WorkingCopy
 
 /**
  * Provides repository-wide log for Jujutsu VCS
@@ -38,7 +37,7 @@ class JujutsuLogProvider : VcsLogProvider {
         val vcsInstance = JujutsuVcs.findRequired(root)
 
         // Use logService to get log entries
-        val result = vcsInstance.logService.getLog("all()")
+        val result = vcsInstance.logService.getLog(Expression.ALL)
 
         val entries = result.getOrElse {
             throw VcsException("Failed to read commits: ${it.message}")
@@ -81,7 +80,7 @@ class JujutsuLogProvider : VcsLogProvider {
         val vcsInstance = JujutsuVcs.findRequired(root)
 
         // Use logService to get commit graph
-        val result = vcsInstance.logService.getCommitGraph("all()")
+        val result = vcsInstance.logService.getCommitGraph(Expression.ALL)
 
         result.getOrElse {
             log.error("Failed to read commit hashes: ${it.message}")
@@ -90,7 +89,7 @@ class JujutsuLogProvider : VcsLogProvider {
             val commit = JujutsuTimedCommit(
                 changeId = node.changeId,
                 parentIds = node.parentIds,
-                timestamp = node.timestamp
+                timestamp = node.timestamp.toEpochMilliseconds()
             )
             consumer.consume(commit)
         }
@@ -109,7 +108,7 @@ class JujutsuLogProvider : VcsLogProvider {
         hashes.forEach { hexHash ->
             try {
                 // Convert hex string back to JJ change ID string
-                val changeIdString = ChangeId.Companion.fromHexString(hexHash)
+                val changeIdString = ChangeId.fromHexString(hexHash)
                 log.info("Reading details for hash: $hexHash (change ID: $changeIdString)")
 
                 // Use logService to get log entry for this specific revision
@@ -118,7 +117,7 @@ class JujutsuLogProvider : VcsLogProvider {
                 result.onSuccess { entries ->
                     log.info("Successfully read log for $changeIdString, got ${entries.size} entries")
                     if (entries.isNotEmpty()) {
-                        consumer.consume(JujutsuFullCommitDetails.Companion.create(entries[0], root))
+                        consumer.consume(JujutsuFullCommitDetails.create(entries[0], root))
                         log.info("Consumed details for $changeIdString")
                     } else {
                         log.error("No entries returned for $changeIdString")
@@ -146,7 +145,8 @@ class JujutsuLogProvider : VcsLogProvider {
         return key
     }
 
-    override fun getVcsRoot(project: Project, root: VirtualFile, path: FilePath): VirtualFile? {
+    // TODO This looks wrong - when is it called? Does this work for multi-root projects?
+    override fun getVcsRoot(project: Project, root: VirtualFile, path: FilePath): VirtualFile {
         log.info("getVcsRoot() called for path: ${path.path}, root: ${root.path}")
         return root
     }
@@ -162,18 +162,17 @@ class JujutsuLogProvider : VcsLogProvider {
         val refs = result.getOrElse {
             log.error("Failed to read refs: ${it.message}")
             return emptySet()
-        }.map { jjRef ->
-            val refType = when (jjRef.type) {
-                LogService.RefType.WORKING_COPY -> JujutsuLogRefManager.WORKING_COPY
-                LogService.RefType.BOOKMARK -> JujutsuLogRefManager.BOOKMARK
+        }.map { refAtChange ->
+            val refType = when (refAtChange.ref) {
+                WorkingCopy -> JujutsuLogRefManager.WORKING_COPY
+                is Bookmark -> JujutsuLogRefManager.BOOKMARK
+                // TODO Is this a sensible default?
+                else -> JujutsuLogRefManager.BOOKMARK
             }
 
-            VcsRefImpl(
-                jjRef.changeId.hash,
-                jjRef.name,
-                refType,
-                root
-            )
+            // We have no choice but to use this implementation here - anything else breaks IntelliJ during serde
+            @Suppress("UnstableApiUsage")
+            VcsRefImpl(refAtChange.changeId.hash, refAtChange.ref.toString(), refType, root)
         }.toSet()
 
         log.info("Found ${refs.size} refs")
@@ -225,18 +224,4 @@ class JujutsuLogProvider : VcsLogProvider {
         // Return null - JJ uses bookmarks instead of a current branch concept
         return null
     }
-
-    companion object {
-        fun getKey(): VcsKey = JujutsuVcs.getKey()
-    }
 }
-
-/*
-data class VcsRefImpl(private val hash: Hash, private val name: String, private val type: VcsRefType, private val root: VirtualFile) : VcsRef {
-    override fun getCommitHash() = hash
-    override fun getName() = name
-    override fun getType() = type
-    override fun getRoot() = root
-}
-*/
-

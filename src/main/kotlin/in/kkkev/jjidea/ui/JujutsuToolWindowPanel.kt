@@ -13,6 +13,7 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -27,7 +28,7 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.tree.TreeUtil
-import `in`.kkkev.jjidea.jj.cli.JujutsuLogParser
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Component
@@ -428,35 +429,13 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun loadCurrentDescription() {
+
         val vcsInstance = vcs ?: return
 
         ApplicationManager.getApplication().executeOnPooledThread {
-            // Query log for working copy commit
-            // Parent format: "fullId~shortId, fullId~shortId" (~ separates full from short, comma separates parents)
-            // Note: Truncation to 8 chars happens in rendering, not in template
-            val template = """
-                change_id ++ "\0" ++
-                change_id.shortest() ++ "\0" ++
-                commit_id ++ "\0" ++
-                description ++ "\0" ++
-                bookmarks ++ "\0" ++
-                parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++
-                if(current_working_copy, "true", "false") ++ "\0" ++
-                if(conflict, "true", "false") ++ "\0" ++
-                if(empty, "true", "false") ++ "\0" ++
-                author.timestamp().utc().format("%s") ++ "\0" ++
-                committer.timestamp().utc().format("%s") ++ "\0" ++
-                author.name() ++ "\0" ++
-                author.email() ++ "\0" ++
-                committer.name() ++ "\0" ++
-                committer.email() ++ "\0"
-            """.trimIndent().replace("\n", " ")
-
-            val result = vcsInstance.commandExecutor.log("@", template)
-
+            val result = vcs!!.logService.getLog(WorkingCopy)
             ApplicationManager.getApplication().invokeLater {
-                if (result.isSuccess) {
-                    val entries = JujutsuLogParser.parseLog(result.stdout)
+                result.getOrNull()?.let { entries ->
                     if (entries.isNotEmpty()) {
                         val entry = entries[0]
 
@@ -490,7 +469,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         }
                         currentChangeLabel.text = labelText
                     }
-                }
+                    // TODO Improve logging here
+                } ?: throw VcsException(result.exceptionOrNull())
             }
         }
     }

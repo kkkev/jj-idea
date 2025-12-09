@@ -29,6 +29,9 @@
         <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" />
         <logProvider implementation="in.kkkev.jjidea.vcs.JujutsuLogProvider" />
 
+        <!-- Services -->
+        <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
+
         <!-- Jujutsu tool window on the left side (Commit view) -->
         <toolWindow
             id="Jujutsu"
@@ -42,6 +45,8 @@
         <!-- Jujutsu action group in editor context menu -->
         <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.vcs.actions.JujutsuEditorActionGroup" popup="true">
             <action id="Jujutsu.EditorAnnotate" class="in.kkkev.jjidea.vcs.actions.JujutsuAnnotateAction"/>
+            <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.vcs.actions.JujutsuCompareWithBranchAction"/>
+            <action id="Jujutsu.ShowHistoryForSelection" class="in.kkkev.jjidea.vcs.actions.JujutsuShowHistoryForSelectionAction"/>
             <!--<add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu.GoToMenu"/>-->
             <add-to-group group-id="VcsGroup" anchor="last"/>
         </group>

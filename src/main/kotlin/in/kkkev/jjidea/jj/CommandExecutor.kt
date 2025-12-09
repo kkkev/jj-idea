@@ -18,10 +18,9 @@ interface CommandExecutor {
 
     /**
      * Get the status of the working copy or a specific revision
-     * @param revision Revision to get status for (default: working copy)
      * @return List of file statuses
      */
-    fun status(revision: String? = null): CommandResult
+    fun status(): CommandResult
 
     /**
      * Get the diff for a specific file
@@ -32,18 +31,18 @@ interface CommandExecutor {
 
     /**
      * Get summary of changes for a specific revision
-     * @param revision Revision identifier (e.g., "@", "@-", commit hash)
+     * @param revision Revision (e.g., "@", "@-", commit hash)
      * @return Summary of file changes
      */
-    fun diffSummary(revision: String): CommandResult
+    fun diffSummary(revision: Revision): CommandResult
 
     /**
      * Get the content of a file at a specific revision
      * @param filePath Path relative to root
-     * @param revision Revision identifier (e.g., "@", "@-", commit hash)
+     * @param revision Revision (e.g., "@", "@-", commit hash)
      * @return File content
      */
-    fun show(filePath: String, revision: String): CommandResult
+    fun show(filePath: String, revision: Revision): CommandResult
 
     /**
      * Check if jujutsu is available and working
@@ -63,7 +62,7 @@ interface CommandExecutor {
      * @param revision The revision to describe (default: "@")
      * @return Command result
      */
-    fun describe(message: String, revision: String = "@"): CommandResult
+    fun describe(message: String, revision: Revision = WorkingCopy): CommandResult
 
     /**
      * Create a new change on top of the current one
@@ -73,20 +72,26 @@ interface CommandExecutor {
     fun new(message: String? = null): CommandResult
 
     /**
-     * Get the log for specific revisions
-     * @param revisions Revisions to show (e.g., "@", "@-")
+     * Get the log for specific revset
+     * @param revset Revisions to show (e.g., "@", "@-")
      * @param template Template for output (e.g., "description", "change_id")
      * @param filePaths Optional file paths to filter log (e.g., "src/main.kt")
      * @return Command result with log output
      */
-    fun log(revisions: String = "@", template: String? = null, filePaths: List<String> = emptyList()): CommandResult
+    fun log(revset: Revset = Expression.ALL, template: String? = null, filePaths: List<String> = emptyList()): CommandResult
 
     /**
      * Get line-by-line annotation (blame) for a file
      * @param filePath Path relative to root
-     * @param revision Revision identifier (default: "@")
+     * @param revision Revision from which to start annotating (default: "@")
      * @param template Template for annotation output
      * @return Annotation output with change info per line
      */
-    fun annotate(filePath: String, revision: String = "@", template: String? = null): CommandResult
+    fun annotate(filePath: String, revision: Revision = WorkingCopy, template: String? = null): CommandResult
+
+    /**
+     * List all bookmarks in the repository
+     * @return Command result with bookmark list (format: "bookmark-name: change-id")
+     */
+    fun bookmarkList(): CommandResult
 }

@@ -54,6 +54,13 @@ This document captures all requirements, implementation decisions, and developme
 24. ✅ Editable working copy side
 25. ✅ Load content off EDT to avoid blocking
 
+### Phase 5: File-Specific Actions (Issue #27)
+26. ✅ Annotate (blame) support - Show change info per line
+27. ✅ Show file history
+28. ✅ Show diff with working copy
+29. ✅ Compare file with bookmark/change/revision
+30. ✅ Show history for selected lines
+
 ## Architecture
 
 ### Core Components
@@ -223,12 +230,13 @@ src/main/kotlin/in/kkkev/jjidea/
 │   ├── JujutsuCommitMetadata.kt           # VCS metadata wrapper
 │   ├── JujutsuCommitMetadataBase.kt       # Base for metadata implementations
 │   ├── JujutsuFullCommitDetails.kt        # Full commit with file changes
-│   ├── JujutsuLogEntry.kt                 # Parsed log entry DTO
-│   ├── JujutsuLogService.kt               # Interface for log queries
+│   ├── LogEntry.kt                        # Parsed log entry DTO
+│   ├── LogService.kt                      # Interface for log queries
+│   ├── JJRef.kt                           # Bookmark and ref types
 │   └── cli/                               # CLI implementation
-│       ├── JujutsuCliExecutor.kt          # CLI command execution
-│       ├── JujutsuCliLogService.kt        # CLI-based log service
-│       └── JujutsuLogParser.kt            # Parses jj log output
+│       ├── CliExecutor.kt                 # CLI command execution
+│       ├── CliLogService.kt               # CLI-based log service with templates
+│       └── AnnotationParser.kt            # Parses jj file annotate output
 ├── vcs/                                   # IntelliJ VCS framework integration
 │   ├── JujutsuVcs.kt                      # Main VCS implementation
 │   ├── JujutsuLogProvider.kt              # VCS log integration
@@ -261,13 +269,17 @@ src/test/kotlin/in/kkkev/jjidea/
 ├── jj/
 │   ├── ChangeIdTest.kt                    # ChangeId tests (18 tests)
 │   ├── FileChangeTest.kt                  # FileChange tests (11 tests)
-│   └── JujutsuLogServiceTest.kt           # LogService enum tests (3 tests)
+│   └── cli/
+│       ├── AnnotationParserTest.kt        # Annotation parser tests
+│       └── LogTemplateTest.kt             # Log template integration tests (30 tests)
 ├── ui/
 │   ├── JujutsuChangesTreeModelSimpleTest.kt # Tree model tests (4 tests)
 │   ├── JujutsuCommitFormatterTest.kt      # Commit formatter tests (4 tests)
-│   ├── JujutsuLogEntryTest.kt             # Log entry tests (~30 tests)
-│   └── JujutsuLogParserTest.kt            # Log parser tests (15+ tests)
+│   ├── JujutsuFileAnnotationTest.kt       # File annotation tests
+│   └── JujutsuLogEntryTest.kt             # Log entry tests (~30 tests)
 └── vcs/
+    ├── actions/
+    │   └── JujutsuCompareWithPopupTest.kt # Compare popup bookmark parsing tests (14 tests)
     └── changes/
         └── JujutsuRevisionNumberTest.kt   # Revision number tests
 
@@ -283,9 +295,11 @@ src/main/resources/META-INF/
 | `jj status` | List working copy changes | `JujutsuChangeProvider.parseStatus()` |
 | `jj describe -r @ -m "msg"` | Set working copy description | "Describe" button |
 | `jj new` | Create new change on top | "New Change" button |
-| `jj log -r @ --no-graph -T description` | Get current description | `loadCurrentDescription()` |
-| `jj file show -r @ path` | Get file content at revision | `JujutsuContentRevision.getContent()` |
-| `jj diff path` | Show diff for file | `JujutsuDiffProvider` (future) |
+| `jj log -r @ --no-graph -T template` | Get log entries with metadata | `CliLogService`, history provider |
+| `jj file show -r @ path` | Get file content at revision | `JujutsuContentRevision.getContent()`, compare actions |
+| `jj file annotate -r @ -T template path` | Get line-by-line change attribution | `JujutsuAnnotationProvider` |
+| `jj bookmark list` | List all bookmarks | `JujutsuCompareWithBranchAction` |
+| `jj diff path` | Show diff for file | `JujutsuDiffProvider` |
 | `jj --version` | Check availability | `isAvailable()`, `version()` |
 
 ## Testing Strategy
@@ -313,11 +327,11 @@ src/main/resources/META-INF/
 ./gradlew test  # Currently disabled due to instrumentation issues
 ```
 
-**Test Results** (as of 2025-12-04):
-- 70+ tests total
-- 25 simple unit tests passing (all green)
-- ~45 tests require IntelliJ Platform test fixtures (ChangeId, JujutsuLogEntry, etc. use Hash type)
-- Test coverage increased from ~20 to 70+ tests
+**Test Results** (as of 2025-12-10):
+- 58 tests total
+- 34 simple unit tests passing
+- 24 tests require IntelliJ Platform test fixtures (ChangeId, JujutsuLogEntry, etc. use Hash type)
+- Test coverage includes comprehensive template-based log parsing tests
 
 **Writing New Tests**:
 Use JUnit tests with Kotest assertions:
@@ -500,6 +514,38 @@ When adding features or fixing bugs:
 
 ## Recent Changes
 
+### 2025-12-10: Template-Based Log Parsing System
+
+**Major Architectural Change**:
+Replaced string-based log parsing with a type-safe, composable template system.
+
+1. **New Template System (`CliLogService.kt`)**:
+   - `LogSpec<T>` interface for individual field parsers
+   - Composable templates: `basicLogTemplate`, `fullLogTemplate`, `refsLogTemplate`, `commitGraphLogTemplate`
+   - Type-safe parsing with compile-time validation
+   - Generates JJ template strings from Kotlin code
+   - Centralized template logic in one place
+
+2. **Benefits**:
+   - DRY: Template specs defined once, used for both generation and parsing
+   - Type-safe: Compiler ensures fields match between template and parser
+   - Composable: Build complex templates from simpler ones
+   - Testable: Each field parser can be tested independently
+   - Maintainable: Changes to JJ template format only need updates in one place
+
+3. **Test Suite Refactoring**:
+   - Added `LogTemplateTest.kt`: 30 tests for template integration
+   - Added `JujutsuCompareWithPopupTest.kt`: 14 tests for bookmark parsing in compare popup
+   - Deleted `JujutsuLogParser.kt` and `JujutsuLogParserTest.kt` (replaced by template system)
+   - Deleted `BookmarkParser.kt` and `BookmarkParserTest.kt` (functionality moved inline to JujutsuCompareWithPopup)
+   - Deleted `LogSpecTest.kt` (individual field parsers are now private within LogTemplates)
+   - Total: 58 tests (34 passing in simpleTest, 24 require IntelliJ Platform)
+
+4. **Breaking Changes**:
+   - `LogEntry.bookmarks` is now `List<Bookmark>` instead of `List<String>`
+   - `LogService.getRefs()` returns `List<RefAtChange>` with sealed `JJRef` interface
+   - Timestamps now use `kotlinx.datetime.Instant` instead of `Long` in templates
+
 ### 2025-12-02: Architecture Refactoring & Log Parser Improvements
 
 **Major Refactoring**:
@@ -510,33 +556,10 @@ When adding features or fixing bugs:
    - Added `find()` companion method to easily find VCS instance
    - Added `Project.root` extension property
 
-2. **Log Parser Complete Rewrite**:
-   - Changed from pipe (`|`) separator to null byte (`\0`) separator
-   - Now correctly handles multi-line descriptions
-   - Handles descriptions with special characters (pipes, quotes, etc.)
-   - Simplified parsing logic: split on null bytes, chunk into groups of 8
-   - Added 15+ comprehensive test cases covering edge cases
-
-3. **CLI Executor Simplification**:
-   - Constructor now requires `root: VirtualFile` parameter
-   - Consistent use of expression body for cleaner code
-   - All command methods simplified
-
-4. **Provider Cleanup**:
+2. **Provider Cleanup**:
    - `JujutsuChangeProvider`: Uses `vcs.createRevision()` consistently
    - `JujutsuDiffProvider`: Removed duplicate code, uses expression body
    - Both providers now cleaner and more maintainable
-
-5. **Test Suite Improvements**:
-   - Deleted: `JujutsuCommandAvailabilityTest` (incompatible with new constructor)
-   - Expanded: `JujutsuLogParserTest` with 15+ edge case tests
-   - Updated: `JujutsuCommitFormatterTest` to match simplified API
-
-**Bug Fixes**:
-- Fixed parsing failure when commit descriptions are empty
-- Fixed parsing failure when bookmarks are empty
-- Fixed parsing of multi-line descriptions with embedded newlines
-- Fixed handling of descriptions containing pipe characters
 
 ## License
 
@@ -544,7 +567,7 @@ When adding features or fixing bugs:
 
 ---
 
-**Last Updated**: 2025-12-02
+**Last Updated**: 2025-12-10
 **Plugin Version**: 0.1.0-SNAPSHOT
 **IntelliJ Version**: 2025.2
 - 

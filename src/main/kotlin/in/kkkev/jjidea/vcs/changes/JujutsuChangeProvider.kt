@@ -7,6 +7,7 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 
 /**
@@ -126,7 +127,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addModifiedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = vcs.createRevision(path, "@-") // Parent commit
+        val beforeRevision = vcs.createRevision(path, WorkingCopy.parent) // Parent commit
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -145,7 +146,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addDeletedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = vcs.createRevision(path, "@-")
+        val beforeRevision = vcs.createRevision(path, WorkingCopy.parent)
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),

@@ -6,6 +6,8 @@ import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.Revset
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
@@ -18,25 +20,16 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
     private val log = Logger.getInstance(CliExecutor::class.java)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
 
-    override fun status(revision: String?): CommandExecutor.CommandResult {
-        val args = mutableListOf("status")
-        if (revision != null) {
-            args.add("-r")
-            args.add(revision)
-        }
-        return execute(root, args)
-    }
+    override fun status() = execute(root, listOf("status"))
 
-    override fun diff(filePath: String): CommandExecutor.CommandResult = execute(root, listOf("diff", filePath))
+    override fun diff(filePath: String) = execute(root, listOf("diff", filePath))
 
-    override fun diffSummary(revision: String): CommandExecutor.CommandResult =
-        execute(root, listOf("diff", "--summary", "-r", revision))
+    override fun diffSummary(revision: Revision) = execute(root, listOf("diff", "--summary", "-r", revision))
 
-    // TODO Not a change id here - need a revision type that could be change, bookmark or special token such as @
-    override fun show(filePath: String, revision: String): CommandExecutor.CommandResult =
+    override fun show(filePath: String, revision: Revision) =
         execute(root, listOf("file", "show", "-r", revision, filePath))
 
-    override fun isAvailable(): Boolean = try {
+    override fun isAvailable() = try {
         val result = execute(null, listOf("--version"))
         result.isSuccess
     } catch (e: Exception) {
@@ -44,7 +37,7 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         false
     }
 
-    override fun version(): String? = try {
+    override fun version() = try {
         val result = execute(null, listOf("--version"))
         if (result.isSuccess) {
             result.stdout.trim()
@@ -56,7 +49,7 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         null
     }
 
-    override fun describe(message: String, revision: String): CommandExecutor.CommandResult =
+    override fun describe(message: String, revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("describe", "-r", revision, "-m", message))
 
     override fun new(message: String?): CommandExecutor.CommandResult {
@@ -68,8 +61,8 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         return execute(root, args)
     }
 
-    override fun log(revisions: String, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
-        val args = mutableListOf("log", "-r", revisions, "--no-graph")
+    override fun log(revset: Revset, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
+        val args = mutableListOf("log", "-r", revset, "--no-graph")
         if (template != null) {
             args.add("-T")
             args.add(template)
@@ -78,7 +71,7 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         return execute(root, args)
     }
 
-    override fun annotate(filePath: String, revision: String, template: String?): CommandExecutor.CommandResult {
+    override fun annotate(filePath: String, revision: Revision, template: String?): CommandExecutor.CommandResult {
         val args = mutableListOf("file", "annotate", "-r", revision)
         if (template != null) {
             args.add("-T")
@@ -88,13 +81,15 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         return execute(root, args)
     }
 
+    override fun bookmarkList(): CommandExecutor.CommandResult = execute(root, listOf("bookmark", "list"))
+
     private fun execute(
         workingDir: VirtualFile?,
-        args: List<String>,
+        args: List<Any>,
         timeout: Long = defaultTimeout
     ): CommandExecutor.CommandResult {
         val commandLine = GeneralCommandLine(jjExecutable)
-            .withParameters(args)
+            .withParameters(args.map { it.toString() })
             .withCharset(StandardCharsets.UTF_8)
 
         workingDir?.let { commandLine.setWorkDirectory(it.path) }

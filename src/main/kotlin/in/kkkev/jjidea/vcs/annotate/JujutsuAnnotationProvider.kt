@@ -9,6 +9,9 @@ import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
 import com.intellij.vcsUtil.VcsUtil
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 
@@ -26,7 +29,7 @@ class JujutsuAnnotationProvider(
     override fun populateCache(file: VirtualFile) {
         // Pre-load annotations in the background for caching
         try {
-            val annotation = annotateInternal(file, "@")
+            val annotation = annotateInternal(file, WorkingCopy)
             cache[file] = annotation
         } catch (e: Exception) {
             log.warn("Failed to populate annotation cache for ${file.path}", e)
@@ -38,13 +41,13 @@ class JujutsuAnnotationProvider(
     /**
      * Annotate a file at the current working copy revision
      */
-    override fun annotate(file: VirtualFile) = annotateInternal(file, "@")
+    override fun annotate(file: VirtualFile) = annotateInternal(file, WorkingCopy)
 
     /**
      * Annotate a file at a specific revision
      */
     override fun annotate(file: VirtualFile, revision: VcsFileRevision?) =
-        annotateInternal(file, revision?.revisionNumber?.asString() ?: "@")
+        annotateInternal(file, revision?.revisionNumber?.asString()?.let(::ChangeId) ?: WorkingCopy)
 
     /**
      * Check if we can annotate this revision
@@ -54,7 +57,7 @@ class JujutsuAnnotationProvider(
     /**
      * Internal method to perform annotation
      */
-    private fun annotateInternal(file: VirtualFile, revision: String): FileAnnotation {
+    private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
         try {
             // Get the relative path from the root
             val relativePath = vcs.getRelativePath(VcsUtil.getFilePath(file))

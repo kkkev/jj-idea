@@ -39,7 +39,7 @@ class JujutsuFullCommitDetails(
             val vcs = JujutsuVcs.findRequired(root)
 
             // Use logService to get file changes
-            val result = vcs.logService.getFileChanges(entry.changeId.short)
+            val result = vcs.logService.getFileChanges(entry.changeId)
 
             return result.getOrElse { error ->
                 log.error("Error loading changes for ${entry.changeId}: ${error.message}", error)
@@ -62,17 +62,17 @@ class JujutsuFullCommitDetails(
             val path = VcsUtil.getFilePath(root.path + "/" + fileChange.filePath, false)
 
             // For historical commits, we use the parent revision as "before"
-            val parentRevision = entry.parentIds.firstOrNull()?.full
+            val parentRevision = entry.parentIds.firstOrNull()
 
             return when (fileChange.status) {
                 FileChangeStatus.MODIFIED -> {
                     val beforeRevision = parentRevision?.let { vcs.createRevision(path, it) }
-                    val afterRevision = vcs.createRevision(path, entry.changeId.full)
+                    val afterRevision = vcs.createRevision(path, entry.changeId)
                     Change(beforeRevision, afterRevision, FileStatus.MODIFIED)
                 }
 
                 FileChangeStatus.ADDED -> {
-                    val afterRevision = vcs.createRevision(path, entry.changeId.full)
+                    val afterRevision = vcs.createRevision(path, entry.changeId)
                     Change(null, afterRevision, FileStatus.ADDED)
                 }
 

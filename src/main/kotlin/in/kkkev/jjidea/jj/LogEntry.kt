@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
+import kotlinx.datetime.Instant
 
 /**
  * Represents a single entry in the jj log.
@@ -14,16 +15,16 @@ data class LogEntry(
     val changeId: ChangeId,
     val commitId: String,
     val description: String,
-    val bookmarks: List<String> = emptyList(),
+    val bookmarks: List<Bookmark> = emptyList(),
     val parentIds: List<ChangeId> = emptyList(),
     val isWorkingCopy: Boolean = false,
     val hasConflict: Boolean = false,
     val isEmpty: Boolean = false,
     val isUndescribed: Boolean = false,
-    val authorTimestamp: Long = 0,  // Unix timestamp in milliseconds
-    val committerTimestamp: Long = 0,  // Unix timestamp in milliseconds
-    val author: VcsUser = VcsUserImpl("", ""),
-    val committer: VcsUser = VcsUserImpl("", "")
+    val authorTimestamp: Instant? = null,
+    val committerTimestamp: Instant? = null,
+    val author: VcsUser? = null,
+    val committer: VcsUser? = null
 ) {
     /**
      * Get the formatted change ID with short prefix separated

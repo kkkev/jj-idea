@@ -13,12 +13,14 @@ abstract class JujutsuCommitMetadataBase(
 ) : VcsCommitMetadata {
     override fun getId() = entry.changeId.hash
     override fun getParents() = entry.parentIds.map { it.hash }
-    override fun getCommitTime() = entry.committerTimestamp
+    // TODO What if null?
+    override fun getCommitTime() = entry.committerTimestamp!!.toEpochMilliseconds()
     override fun getTimestamp() = commitTime
-    override fun getAuthor() = entry.author
+    // TODO What if null?
+    override fun getAuthor() = entry.author!!
     override fun getFullMessage() = entry.description
     override fun getSubject() = entry.description.lines().firstOrNull() ?: entry.description
-    override fun getCommitter() = entry.committer
-    override fun getAuthorTime() = entry.authorTimestamp
+    override fun getCommitter() = entry.committer!!
+    override fun getAuthorTime() = entry.authorTimestamp!!.toEpochMilliseconds()
     override fun getRoot() = root
 }

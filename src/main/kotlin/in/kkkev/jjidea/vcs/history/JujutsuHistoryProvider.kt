@@ -7,6 +7,7 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.history.*
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import javax.swing.JComponent
 
@@ -25,10 +26,7 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
             log.debug("Fetching history for file: ${filePath.path}")
 
             // Use logService to get log entries for this file
-            val result = vcs.logService.getLogBasic(
-                revisions = "all()",
-                filePaths = listOf(filePath.path)
-            )
+            val result = vcs.logService.getLogBasic(Expression.ALL, listOf(filePath.path))
 
             val entries = result.getOrElse { error ->
                 log.error("Failed to get file history: ${error.message}")

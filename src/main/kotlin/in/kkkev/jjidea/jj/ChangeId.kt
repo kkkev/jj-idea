@@ -7,10 +7,13 @@ import com.intellij.vcs.log.impl.HashImpl
 For now, store as a string in reverse (z-k) hex form.
 Eventually, store in 2-long form and allow transforms to reverse and forward hex.
  */
-data class ChangeId(val full: String, private val shortLength: Int? = null) {
+data class ChangeId(val full: String, private val shortLength: Int? = null) : Revision {
     constructor(full: String, short: String) : this(full, calculateShortLength(full, short))
 
-    override fun toString() = shortLength?.let { "$short:$remainder" } ?: full
+    /**
+     * The string form can always safely be the short form - this can be used in commands.
+     */
+    override fun toString() = short
 
     val short get() = shortLength?.let { full.take(it) } ?: full
 
@@ -36,11 +39,12 @@ data class ChangeId(val full: String, private val shortLength: Int? = null) {
         /**
          * Convert a hex string (from HashImpl) back to a JJ change ID
          */
-        fun fromHexString(hexString: String): String {
-            return hexString.map { hexChar ->
+        fun fromHexString(hexString: String) = hexString
+            .map { hexChar ->
                 val hexIndex = HEX.indexOf(hexChar.lowercaseChar())
                 if (hexIndex >= 0) CHARS[hexIndex] else hexChar
-            }.joinToString("")
-        }
+            }
+            .joinToString("")
+            .let(::ChangeId)
     }
 }

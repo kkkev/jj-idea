@@ -20,7 +20,7 @@ class JujutsuFileRevision(
 
     override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.changeId)
 
-    override fun getBranchName(): String = entry.bookmarks.firstOrNull() ?: ""
+    override fun getBranchName(): String = entry.bookmarks.firstOrNull()?.name ?: ""
 
     override fun getRevisionDate() = null // JJ doesn't track timestamps by default
 
@@ -32,7 +32,7 @@ class JujutsuFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val result = vcs.commandExecutor.show(filePath.path, entry.changeId.full)
+        val result = vcs.commandExecutor.show(filePath.path, entry.changeId)
         if (!result.isSuccess) {
             throw VcsException("Failed to load file content at revision ${entry.changeId}: ${result.stderr}")
         }

@@ -64,21 +64,21 @@ class ChangeIdTest {
         // JJ uses reverse hex: z=0, y=1, x=2, etc.
         val jjId = ChangeId.fromHexString("0123456789abcdef")
 
-        jjId shouldBe "zyxwvutsrqponmlk"
+        jjId.full shouldBe "zyxwvutsrqponmlk"
     }
 
     @Test
     fun `fromHexString handles uppercase hex`() {
         val jjId = ChangeId.fromHexString("ABCDEF")
 
-        jjId shouldBe "ponmlk"
+        jjId.full shouldBe "ponmlk"
     }
 
     @Test
     fun `fromHexString handles mixed case`() {
         val jjId = ChangeId.fromHexString("0aF3")
 
-        jjId shouldBe "zpkw"
+        jjId.full shouldBe "zpkw"
     }
 
     @Test
@@ -86,7 +86,7 @@ class ChangeIdTest {
         // If there are non-hex characters, they should be preserved
         val jjId = ChangeId.fromHexString("0-1")
 
-        jjId shouldBe "z-y"
+        jjId.full shouldBe "z-y"
     }
 
     @Test
