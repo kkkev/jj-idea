@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.vcs.actions
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -15,7 +14,7 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
 class JujutsuAnnotateAction : DumbAwareAction(
     "Annotate",
     "Annotate the current file with Jujutsu changes",
-    AllIcons.Actions.Annotate
+    null
 ) {
     private val log = Logger.getInstance(JujutsuAnnotateAction::class.java)
 
