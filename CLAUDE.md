@@ -61,6 +61,9 @@ This document captures all requirements, implementation decisions, and developme
 29. ✅ Compare file with bookmark/change/revision
 30. ✅ Show history for selected lines
 
+### Phase 6: Auto-Refresh
+31. ✅ Real-time status updates - Automatically refresh when files change
+
 ## Architecture
 
 ### Core Components
@@ -73,25 +76,17 @@ JujutsuVcs (extends AbstractVcs)
 ├── JujutsuChangeProvider - Detects file changes via `jj status`
 ├── JujutsuDiffProvider - Provides diff content
 ├── JujutsuCheckinEnvironment - Enables commit view (minimal)
+├── BulkFileListener - Auto-refresh on file system changes
 └── JujutsuCommandExecutor (interface)
     └── JujutsuCliExecutor(root) - CLI implementation
 ```
 
 #### Command Executor Pattern
-```kotlin
-interface JujutsuCommandExecutor {
-    fun status(root: VirtualFile): CommandResult
-    fun diff(root: VirtualFile, filePath: String): CommandResult
-    fun show(root: VirtualFile, filePath: String, revision: String): CommandResult
-    fun describe(root: VirtualFile, message: String, revision: String = "@"): CommandResult
-    fun new(root: VirtualFile, message: String? = null): CommandResult
-    fun log(root: VirtualFile, revisions: String = "@", template: String? = null): CommandResult
-    fun isAvailable(): Boolean
-    fun version(): String?
-}
-```
+**Pattern**: `CommandExecutor` interface with CLI implementation (`CliExecutor`)
 
 **Rationale**: Interface abstraction allows future replacement with native library if/when available.
+
+**See**: `src/main/kotlin/in/kkkev/jjidea/jj/CommandExecutor.kt` and `jj/cli/CliExecutor.kt`
 
 #### UI Layer
 ```
@@ -119,63 +114,21 @@ JujutsuToolWindowFactory
 #### 2. Grouping Implementation
 **Decision**: Custom tree model with `groupByDirectory` boolean parameter.
 
-**Implementation**:
-```kotlin
-class JujutsuChangesTreeModel(
-    private val project: Project,
-    private val groupByDirectory: Boolean
-) {
-    fun buildModel(changes: List<Change>): DefaultTreeModel
-}
-```
+**Behavior**: When enabled, groups files by directory with counts (e.g., "src/main (5 files)"). When disabled, shows flat list.
 
-When `groupByDirectory = true`:
-- Creates `DirectoryNode` for each unique parent directory
-- Shows file count: "src/main (5 files)"
-- Sorts directories and files alphabetically
-
-When `groupByDirectory = false`:
-- All files as direct children of root
-- Flat structure
+**See**: `ui/JujutsuChangesTreeModel.kt`
 
 #### 3. Diff Content Loading
 **Decision**: Load revision content in background thread, create UI on EDT.
 
-**Rationale**: Calling `change.beforeRevision?.content` executes synchronous `jj file show` command. This blocks EDT and causes errors:
-```
-Synchronous execution on EDT: jj file show -r @ .idea/vcs.xml
-```
+**Rationale**: `jj file show` is synchronous and blocks EDT. Load content in pooled thread, then create diff UI on EDT.
 
-**Solution**:
-```kotlin
-private fun showDiff(change: Change) {
-    ApplicationManager.getApplication().executeOnPooledThread {
-        // Load content in background (jj file show)
-        val beforeContent = change.beforeRevision?.content ?: ""
-        val afterVirtualFile = LocalFileSystem.getInstance().findFileByPath(afterPath.path)
-
-        ApplicationManager.getApplication().invokeLater {
-            // Create and show diff on EDT
-            val diffRequest = SimpleDiffRequest(fileName, content1, content2, ...)
-            diffManager.showDiff(project, diffRequest)
-        }
-    }
-}
-```
+**See**: `ui/JujutsuToolWindowPanel.kt` - `showDiff()` method
 
 #### 4. Working Copy as Editable Diff Side
-**Decision**: Use `VirtualFile` for after-revision instead of string content.
+**Decision**: Use `VirtualFile` for after-revision to enable editing working copy directly from diff view.
 
-**Implementation**:
-```kotlin
-val content2 = if (afterVirtualFile != null && afterVirtualFile.exists()) {
-    contentFactory.create(project, virtualFile)  // Editable
-} else {
-    contentFactory.create(project, afterContent, filePath)  // Read-only
-}
-```
-
-This enables editing the working copy directly from the diff view.
+**See**: `ui/JujutsuToolWindowPanel.kt` - diff content creation
 
 #### 5. Revision Identifiers
 **Decision**: Use `@` for working copy commit (before revision) when showing working copy changes.
@@ -187,37 +140,21 @@ This enables editing the working copy directly from the diff view.
 - Note: `jj status` shows uncommitted changes in the working copy relative to the `@` commit
 
 #### 6. Log Parsing with Null Byte Separator
-**Decision**: Use null byte (`\0`) as field separator in `jj log` template output instead of pipe (`|`) or other visible characters.
+**Decision**: Use null byte (`\0`) as field separator in `jj log` template output.
 
-**Rationale**: Commit descriptions can contain:
-- Newlines (multi-line descriptions)
-- Pipe characters (e.g., "Use grep | sort | uniq")
-- Other special characters
+**Rationale**: Commit descriptions can contain newlines, pipes, and special characters. Null bytes ensure robust parsing without escaping.
 
-Using null byte separator ensures robust parsing:
-- Null bytes cannot appear in text fields
-- Works correctly with multi-line descriptions
-- No escaping needed for special characters
+**Note**: Use `++` concatenation (not `separate()`) since `separate()` skips empty values.
 
-**Implementation**:
-```kotlin
-// Template uses ++ concatenation with \0 separators
-val template = """
-    change_id.shortest() ++ "\0" ++
-    commit_id ++ "\0" ++
-    description ++ "\0" ++
-    bookmarks ++ "\0" ++
-    if(current_working_copy, "true", "false") ++ "\0" ++
-    if(conflict, "true", "false") ++ "\0" ++
-    if(empty, "true", "false") ++ "\0"
-""".trimIndent()
+**See**: `jj/cli/CliLogService.kt` - template system and parsing
 
-// Parse by splitting on null bytes and chunking into groups of 8
-val fields = output.split("\u0000")
-val entries = fields.chunked(8).map { /* parse entry */ }
-```
+#### 7. Auto-Refresh with BulkFileListener
+**Decision**: Use `BulkFileListener` with message bus to automatically refresh when files change.
 
-**Note**: Using `++` concatenation instead of `separate()` is crucial because `separate()` skips empty values, which breaks parsing when fields like description or bookmarks are empty.
+**Rationale**:
+- Modern IntelliJ Platform API (avoids deprecated `VirtualFileListener`)
+- Processes file changes in batches for better performance
+- Automatic disposal through message bus connection
 
 ## File Structure
 
@@ -409,74 +346,38 @@ Output: `build/distributions/jj-idea-<version>.zip`
 ✅ Tool window at bottom instead of left (fixed: `anchor="left"`)
 ✅ Files showing M/A letters instead of colors (fixed: custom renderer)
 
-## Future Enhancements
+## Future Work
 
-### High Priority
-1. **Commit History View**: Show `jj log` graphically with revision graph
-2. **Bookmark Management**: Create/manage bookmarks (JJ's version of branches)
-3. **Conflict Resolution**: UI for handling merge conflicts
-4. **Rebase/Squash Operations**: Support common jj operations
+For planned features and enhancements, see the issue tracker managed with beads:
 
-### Medium Priority
-5. **Auto-refresh**: Update when files change on disk
-6. **Module Grouping**: Group by IntelliJ module in addition to directory
-7. **Enhanced Context Menu**: More VCS operations (revert, abandon, etc.)
-8. **Status Bar**: Show current change description
+```bash
+bd list --status=open    # View all open issues
+bd ready                 # View issues ready to work on
+bd show <issue-id>       # View detailed issue information
+```
 
-### Low Priority
-9. **Settings Panel**: Configure jj executable path, default flags
-10. **Annotations**: Show change information in editor gutter
-11. **Diff Syntax Highlighting**: Improve diff view appearance
+Visit the beads repository for project planning and tracking.
 
 ## Development Workflow
 
 ### Adding a New JJ Command
 
-1. **Update interface** (`JujutsuCommandExecutor.kt`):
-```kotlin
-fun newCommand(root: VirtualFile, param: String): CommandResult
-```
-
-2. **Implement in CLI executor** (`JujutsuCliExecutor.kt`):
-```kotlin
-override fun newCommand(root: VirtualFile, param: String): CommandResult {
-    return execute(root, listOf("command", param))
-}
-```
-
-3. **Use in UI or provider**:
-```kotlin
-val result = vcs.commandExecutor.newCommand(root, "value")
-if (result.isSuccess) {
-    // Handle success
-}
-```
+1. Add method to `CommandExecutor` interface
+2. Implement in `CliExecutor`
+3. Use from UI or VCS providers
 
 ### Adding UI Features
 
 1. Update `JujutsuToolWindowPanel.kt`
-2. Add action to toolbar if needed (`createChangesToolbar()`)
-3. Wire up event handlers
-4. Test in `runIde`
+2. Add toolbar actions if needed
+3. Wire event handlers
+4. Test with `./gradlew runIde`
 
-### Debugging Tips
+### Debugging
 
-1. **Enable debug logging**:
-```kotlin
-private val log = Logger.getInstance(MyClass::class.java)
-log.debug("Message: $value")
-```
-
-2. **Run with debug**:
-```bash
-./gradlew runIde --debug-jvm
-```
-
-3. **Check command output**:
-All `jj` commands log via `JujutsuCliExecutor`:
-```kotlin
-log.debug("Executing: ${commandLine.commandLineString}")
-```
+- Enable debug logging with `Logger.getInstance(MyClass::class.java)`
+- Run with `./gradlew runIde --debug-jvm`
+- All jj commands are logged by `CliExecutor`
 
 ## References
 
@@ -500,66 +401,19 @@ log.debug("Executing: ${commandLine.commandLineString}")
 
 When adding features or fixing bugs:
 
-1. **Update this document** with new requirements/decisions
-2. **Add tests** documenting the requirement in `RequirementsTest.kt`
-3. **Follow threading rules**:
-   - File I/O and `jj` commands: background thread (`executeOnPooledThread`)
-   - UI updates: EDT (`invokeLater`)
-4. **Use kotest assertions** in tests: `result shouldBe expected`
-5. **Mock dependencies** with MockK when testing
-6. **Build and test** before committing:
-   ```bash
-   ./gradlew build test
-   ```
+1. Track work in beads issue tracker (`bd create`, `bd update`, etc.)
+2. Update CLAUDE.md with new architectural decisions
+3. Add tests (use Kotest assertions, MockK for mocking)
+4. Follow threading rules: I/O on background threads, UI on EDT
+5. Build and test before committing: `./gradlew build simpleTest`
 
 ## Recent Changes
 
-### 2025-12-10: Template-Based Log Parsing System
+For detailed change history, see git log. Major architectural changes documented here:
 
-**Major Architectural Change**:
-Replaced string-based log parsing with a type-safe, composable template system.
-
-1. **New Template System (`CliLogService.kt`)**:
-   - `LogSpec<T>` interface for individual field parsers
-   - Composable templates: `basicLogTemplate`, `fullLogTemplate`, `refsLogTemplate`, `commitGraphLogTemplate`
-   - Type-safe parsing with compile-time validation
-   - Generates JJ template strings from Kotlin code
-   - Centralized template logic in one place
-
-2. **Benefits**:
-   - DRY: Template specs defined once, used for both generation and parsing
-   - Type-safe: Compiler ensures fields match between template and parser
-   - Composable: Build complex templates from simpler ones
-   - Testable: Each field parser can be tested independently
-   - Maintainable: Changes to JJ template format only need updates in one place
-
-3. **Test Suite Refactoring**:
-   - Added `LogTemplateTest.kt`: 30 tests for template integration
-   - Added `JujutsuCompareWithPopupTest.kt`: 14 tests for bookmark parsing in compare popup
-   - Deleted `JujutsuLogParser.kt` and `JujutsuLogParserTest.kt` (replaced by template system)
-   - Deleted `BookmarkParser.kt` and `BookmarkParserTest.kt` (functionality moved inline to JujutsuCompareWithPopup)
-   - Deleted `LogSpecTest.kt` (individual field parsers are now private within LogTemplates)
-   - Total: 58 tests (34 passing in simpleTest, 24 require IntelliJ Platform)
-
-4. **Breaking Changes**:
-   - `LogEntry.bookmarks` is now `List<Bookmark>` instead of `List<String>`
-   - `LogService.getRefs()` returns `List<RefAtChange>` with sealed `JJRef` interface
-   - Timestamps now use `kotlinx.datetime.Instant` instead of `Long` in templates
-
-### 2025-12-02: Architecture Refactoring & Log Parser Improvements
-
-**Major Refactoring**:
-1. **JujutsuVcs Enhancements**:
-   - Added `root` property that auto-discovers .jj directory by searching upward from project base
-   - Moved `JujutsuContentRevision` as inner class for better encapsulation
-   - Added `createRevision()` helper method for consistent revision creation
-   - Added `find()` companion method to easily find VCS instance
-   - Added `Project.root` extension property
-
-2. **Provider Cleanup**:
-   - `JujutsuChangeProvider`: Uses `vcs.createRevision()` consistently
-   - `JujutsuDiffProvider`: Removed duplicate code, uses expression body
-   - Both providers now cleaner and more maintainable
+- **2025-12-11**: Auto-refresh with BulkFileListener (jj-idea-7gw)
+- **2025-12-10**: Template-based log parsing system with type-safe composable templates
+- **2025-12-02**: Architecture refactoring - VCS root discovery and provider cleanup
 
 ## License
 
@@ -567,7 +421,7 @@ Replaced string-based log parsing with a type-safe, composable template system.
 
 ---
 
-**Last Updated**: 2025-12-10
+**Last Updated**: 2025-12-11
 **Plugin Version**: 0.1.0-SNAPSHOT
 **IntelliJ Version**: 2025.2
 - 
@@ -577,5 +431,7 @@ Replaced string-based log parsing with a type-safe, composable template system.
 - Keep documentation in the docs folder
 - Store tasks in glab. When I refer to issues or tasks, look in glab.
 - In functions, avoid multiple return points where possible. For example, rather than shortcut by returning when a required variable is null, chain calls with ?.let.
-Prefer single-line expressions for functions. For example, if a function just returns a simple expression, rather than use `fun foo() { return bar }`, use `fun foo() = bar`
-Where a function returns an unambiguous type and is declared as a single-line expression, omit the type. For example, rather than `fun foo(): String = bar`, use `fun foo() = bar`. However, if the expression is the result of a platform call where nullity is ambiguous, declare the type explicitly.
+- Prefer single-line expressions for functions. For example, if a function just returns a simple expression, rather than use `fun foo() { return bar }`, use `fun foo() = bar`
+- Where a function returns an unambiguous type and is declared as a single-line expression, omit the type. For example, rather than `fun foo(): String = bar`, use `fun foo() = bar`. However, if the expression is the result of a platform call where nullity is ambiguous, declare the type explicitly.
+- Always use imports over fully-qualified symbols
+- Always optimise imports
