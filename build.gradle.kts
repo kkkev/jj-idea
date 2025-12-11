@@ -87,4 +87,5 @@ tasks.register<Test>("simpleTest") {
     exclude("**/JujutsuLogParserTest*.class") // Uses ChangeId which references Hash type
     exclude("**/jj/ChangeIdTest*.class") // ChangeId references Hash type in lazy property
     exclude("**/cli/AnnotationParserTest*.class") // Uses ChangeId which references Hash type
+    exclude("**/cli/LogTemplateTest*.class") // Uses VcsUser and ChangeId with Hash type
 }
