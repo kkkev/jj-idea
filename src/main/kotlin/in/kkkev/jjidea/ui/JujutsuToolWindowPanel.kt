@@ -4,7 +4,6 @@ import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
@@ -16,61 +15,50 @@ import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.vfs.newvfs.BulkFileListener
-import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextArea
-import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.tree.TreeUtil
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
-import java.awt.event.KeyAdapter
-import java.awt.event.KeyEvent
-import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
-import javax.swing.tree.TreeNode
-import javax.swing.tree.TreePath
 
 /**
  * Main panel for the Jujutsu tool window
  * Implements JJ's "describe-first" workflow with a tree view of changes
  */
+// Localise strings in here
 class JujutsuToolWindowPanel(private val project: Project) : Disposable {
-    private val panel = JPanel(BorderLayout())
-    private val descriptionArea = JBTextArea(3, 50)
-    private val currentChangeLabel = JBLabel("Working Copy (@)")
+    private val panel = JPanel(BorderLayout()).apply {
+        border = JBUI.Borders.empty(8)
+    }
 
-    // Tree for displaying changes
-    private val changesTree: Tree
-    private var currentChanges: List<Change> = emptyList()
+    private val descriptionArea = JBTextArea(3, 50).apply {
+        lineWrap = true
+        wrapStyleWord = true
+        toolTipText = "Describe what you're working on (jj describe)"
+    }
 
-    // Grouping state
-    private var groupByDirectory = true
+    private val currentChangeLabel = JBLabel("Working Copy (@)").apply {
+        // TODO Pick font size according to IntelliJ appearance settings
+        font = font.deriveFont(13f)
+    }
+
+    // Tree for displaying changes (using IntelliJ's built-in changes tree)
+    private val changesTree = JujutsuChangesTree(project)
 
     private val vcs get() = JujutsuVcs.find(project)
 
-    companion object {
-        private const val EXPANDED_DIRECTORIES_KEY = "JujutsuToolWindow.ExpandedDirectories"
-    }
-
     init {
-        // Create the changes tree
-        changesTree = Tree()
-        changesTree.cellRenderer = JujutsuChangesTreeCellRenderer(project)
-        changesTree.isRootVisible = true
-        changesTree.showsRootHandles = true
-
         createUI()
         setupTreeInteractions()
         setupVcsListener()
@@ -81,49 +69,37 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun createUI() {
-        panel.border = JBUI.Borders.empty(8)
-
         // Top panel: Current change info and description
         val topPanel = JPanel(GridBagLayout())
-        val gbc = GridBagConstraints()
-        gbc.fill = GridBagConstraints.HORIZONTAL
-        gbc.anchor = GridBagConstraints.WEST
-        gbc.insets = JBUI.insets(4)
+
+        val gbc = GridBagConstraints().apply {
+            fill = GridBagConstraints.HORIZONTAL
+            anchor = GridBagConstraints.WEST
+            insets = JBUI.insets(4)
+        }
 
         // Current change label
-        gbc.gridx = 0
-        gbc.gridy = 0
-        gbc.gridwidth = 2
-        gbc.weightx = 1.0
-        currentChangeLabel.font = currentChangeLabel.font.deriveFont(13f)
-        topPanel.add(currentChangeLabel, gbc)
+        topPanel.add(currentChangeLabel, gbc.apply {
+            gridx = 0; gridy = 0; gridwidth = 2; weightx = 1.0
+        })
 
         // Description label
-        gbc.gridy = 1
-        gbc.gridwidth = 1
-        gbc.weightx = 0.0
-        topPanel.add(JBLabel("Description:"), gbc)
+        topPanel.add(JBLabel("Description:"), gbc.apply {
+            gridy = 1; gridwidth = 1; weightx = 0.0
+        })
 
         // Description text area
-        gbc.gridy = 2
-        gbc.gridwidth = 2
-        gbc.weightx = 1.0
-        gbc.weighty = 0.0
-        gbc.fill = GridBagConstraints.BOTH
-        descriptionArea.lineWrap = true
-        descriptionArea.wrapStyleWord = true
-        descriptionArea.toolTipText = "Describe what you're working on (jj describe)"
         val scrollPane = ScrollPaneFactory.createScrollPane(descriptionArea)
         scrollPane.preferredSize = JBUI.size(400, 80)
-        topPanel.add(scrollPane, gbc)
+        topPanel.add(scrollPane, gbc.apply {
+            gridy = 2; gridwidth = 2; weightx = 1.0; weighty = 0.0; fill = GridBagConstraints.BOTH
+        })
 
         // Buttons
-        gbc.gridy = 3
-        gbc.gridwidth = 2
-        gbc.weighty = 0.0
-        gbc.fill = GridBagConstraints.NONE
         val buttonPanel = createButtonPanel()
-        topPanel.add(buttonPanel, gbc)
+        topPanel.add(buttonPanel, gbc.apply {
+            gridy = 3; gridwidth = 2; weighty = 0.0; fill = GridBagConstraints.NONE
+        })
 
         panel.add(topPanel, BorderLayout.NORTH)
 
@@ -131,8 +107,9 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val changesPanel = JPanel(BorderLayout())
 
         // Toolbar
-        val toolbar = createChangesToolbar()
-        toolbar.targetComponent = changesTree  // Fix: Set target component to avoid warning
+        val toolbar = createChangesToolbar().apply {
+            targetComponent = changesTree  // Fix: Set target component to avoid warning
+        }
         changesPanel.add(toolbar.component, BorderLayout.NORTH)
 
         // Tree
@@ -153,32 +130,18 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
         group.addSeparator()
 
-        // Expand all
-        group.add(object : DumbAwareAction("Expand All", "Expand all nodes", AllIcons.Actions.Expandall) {
-            override fun actionPerformed(e: AnActionEvent) {
-                TreeUtil.expandAll(changesTree)
-            }
-        })
-
-        // Collapse all
-        group.add(object : DumbAwareAction("Collapse All", "Collapse all nodes", AllIcons.Actions.Collapseall) {
-            override fun actionPerformed(e: AnActionEvent) {
-                TreeUtil.collapseAll(changesTree, 1)
-            }
-        })
+        // Tree expander actions (expand all / collapse all) provided by the tree
+        val treeExpander = changesTree.treeExpander
+        if (treeExpander != null) {
+            val commonActionsManager = com.intellij.ide.CommonActionsManager.getInstance()
+            group.add(commonActionsManager.createExpandAllAction(treeExpander, changesTree))
+            group.add(commonActionsManager.createCollapseAllAction(treeExpander, changesTree))
+        }
 
         group.addSeparator()
 
-        // Group by directory toggle
-        group.add(object :
-            ToggleAction("Group By Directory", "Group changes by directory", AllIcons.Actions.GroupByPackage) {
-            override fun isSelected(e: AnActionEvent): Boolean = groupByDirectory
-
-            override fun setSelected(e: AnActionEvent, state: Boolean) {
-                groupByDirectory = state
-                rebuildTree()
-            }
-        })
+        // Grouping actions provided by the tree's grouping support
+        group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
 
         return ActionManager.getInstance().createActionToolbar(ActionPlaces.CHANGES_VIEW_TOOLBAR, group, true)
     }
@@ -187,143 +150,55 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         // Listen for VCS mapping changes to reload when Jujutsu VCS is enabled
         val connection = project.messageBus.connect(this)
         connection.subscribe(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED, VcsListener {
+            // TODO Or should it be loadCurrentChanges()?
             refresh()
         })
     }
 
     private fun setupVfsListener() {
+        // Listen to ChangeListManager updates triggered by VCS change detection
         project.messageBus.connect(this).subscribe(
-            VirtualFileManager.VFS_CHANGES,
-            object : BulkFileListener {
-                override fun after(events: List<VFileEvent>) {
-                    refresh()
+            ChangeListListener.TOPIC,
+            object : ChangeListListener {
+                override fun changeListUpdateDone() {
+                    // TODO Or should it be refresh()? Or dirtyScopeManager.fileDirty(file)? Or does that call this?
+                    loadCurrentChanges()
                 }
             }
         )
-
     }
 
     private fun setupTreeInteractions() {
         // Single-click: open file in preview tab
         changesTree.addTreeSelectionListener {
-            val selectedChange = getSelectedChange()
-            selectedChange?.let { openFileInPreview(it) }
+            getSelectedChange()?.let { openFileInPreview(it) }
         }
 
-        // Mouse clicks: double-click shows diff
-        changesTree.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent) {
-                if (SwingUtilities.isLeftMouseButton(e) && e.clickCount == 2) {
-                    val selectedChange = getSelectedChange()
-                    selectedChange?.let { showDiff(it) }
-                }
-            }
-        })
+        // Double-click handler: show diff
+        changesTree.setDoubleClickHandler { e ->
+            getSelectedChange()?.let {
+                showDiff(it)
+                true
+            } ?: false
+        }
 
-        // F4 to open file in permanent tab
-        changesTree.addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
-                // TODO Needs to be configurable - command from keymap
-                if (e.keyCode == KeyEvent.VK_F4) {
-                    val selectedChange = getSelectedChange()
-                    selectedChange?.let { openFilePermanent(it) }
-                }
-            }
-        })
+        // Enter key handler: show diff
+        changesTree.setEnterKeyHandler {
+            getSelectedChange()?.let {
+                showDiff(it)
+                true
+            } ?: false
+        }
 
         // Right-click context menu
         changesTree.addMouseListener(object : PopupHandler() {
-            override fun invokePopup(comp: Component, x: Int, y: Int) {
+            override fun invokePopup(comp: java.awt.Component, x: Int, y: Int) {
                 showContextMenu(comp, x, y)
             }
         })
-
-        // Enter key shows diff (like Git plugin)
-        changesTree.addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
-                if (e.keyCode == KeyEvent.VK_ENTER) {
-                    val selectedChange = getSelectedChange()
-                    selectedChange?.let { showDiff(it) }
-                }
-            }
-        })
     }
 
-    private fun getSelectedChange(): Change? {
-        val path = changesTree.selectionPath ?: return null
-        val node = path.lastPathComponent
-        return if (node is JujutsuChangesTreeModel.ChangeNode) {
-            node.change
-        } else {
-            null
-        }
-    }
-
-    private fun rebuildTree() {
-        // Save expansion state before rebuilding
-        val currentExpandedDirectories = saveExpansionState()
-
-        val modelBuilder = JujutsuChangesTreeModel(project, groupByDirectory)
-        val model = modelBuilder.buildModel(currentChanges)
-        changesTree.model = model
-
-        // Restore expansion state - try current state first, then persisted state
-        val expandedDirectories = currentExpandedDirectories.ifEmpty { loadPersistedExpansionState() }
-        if (expandedDirectories.isNotEmpty()) {
-            restoreExpansionState(expandedDirectories)
-        } else {
-            // Default: expand root and first level on first load
-            TreeUtil.expand(changesTree, 1)
-        }
-    }
-
-    private val treeRoot get() = changesTree.model.root as TreeNode
-    private val directoryNodes
-        get() = treeRoot.children().asSequence().mapNotNull { it as? JujutsuChangesTreeModel.DirectoryNode }
-
-    private fun saveExpansionState(): Set<String> {
-        val root = treeRoot
-
-        val expandedDirectories = directoryNodes
-            .filter { child -> changesTree.isExpanded(TreePath(arrayOf(root, child))) }
-            .map { it.directory }
-            .toSet()
-
-        // Persist to storage
-        if (expandedDirectories.isNotEmpty()) {
-            persistExpansionState(expandedDirectories)
-        }
-
-        return expandedDirectories
-    }
-
-    private fun restoreExpansionState(expandedDirectories: Set<String>) {
-        val root = treeRoot
-
-        // Always expand the root
-        changesTree.expandPath(TreePath(root))
-
-        // Restore expanded directory nodes
-        directoryNodes.filter { it.directory in expandedDirectories }.forEach { child ->
-            changesTree.expandPath(TreePath(arrayOf(root, child)))
-        }
-    }
-
-    private fun persistExpansionState(expandedDirectories: Set<String>) {
-        val properties = PropertiesComponent.getInstance(project)
-        // Store as comma-separated paths
-        properties.setValue(EXPANDED_DIRECTORIES_KEY, expandedDirectories.joinToString("\u0000"))
-    }
-
-    private fun loadPersistedExpansionState(): Set<String> {
-        val properties = PropertiesComponent.getInstance(project)
-        val stored = properties.getValue(EXPANDED_DIRECTORIES_KEY) ?: return emptySet()
-        return if (stored.isNotEmpty()) {
-            stored.split("\u0000").filter { it.isNotEmpty() }.toSet()
-        } else {
-            emptySet()
-        }
-    }
+    private fun getSelectedChange() = changesTree.selectedChanges.firstOrNull()
 
     private fun createButtonPanel(): JPanel {
         val buttonPanel = JPanel()
@@ -429,9 +304,6 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun loadCurrentDescription() {
-
-        val vcsInstance = vcs ?: return
-
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = vcs!!.logService.getLog(WorkingCopy)
             ApplicationManager.getApplication().invokeLater {
@@ -481,8 +353,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun updateChangesView(changes: List<Change>) {
-        currentChanges = changes
-        rebuildTree()
+        // The new tree handles tree building and state management automatically
+        changesTree.setChangesToDisplay(changes)
     }
 
     private fun showDiff(change: Change) {

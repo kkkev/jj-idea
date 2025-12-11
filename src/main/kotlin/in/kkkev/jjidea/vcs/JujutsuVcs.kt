@@ -6,8 +6,16 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectLocator
 import com.intellij.openapi.vcs.*
 import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.Revision
@@ -26,15 +34,31 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
 class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     private val log = Logger.getInstance(JujutsuVcs::class.java)
 
-    val commandExecutor: CommandExecutor by lazy {
-        root?.let { CliExecutor(it) } ?: throw IllegalStateException("Jujutsu repository root not found")
-    }
+    val commandExecutor: CommandExecutor by lazy { CliExecutor(root) }
     val logService: LogService by lazy { CliLogService(commandExecutor) }
     private val _changeProvider by lazy { JujutsuChangeProvider(this) }
     private val _diffProvider by lazy { JujutsuDiffProvider(this) }
     private val _checkinEnvironment by lazy { JujutsuCheckinEnvironment(this) }
     private val _historyProvider by lazy { JujutsuHistoryProvider(this) }
     private val _annotationProvider by lazy { JujutsuAnnotationProvider(myProject, this) }
+
+    private val fileListener = object : BulkFileListener {
+        override fun after(events: List<VFileEvent>) {
+            val dirtyScopeManager = VcsDirtyScopeManager.getInstance(myProject)
+
+            events.forEach { event ->
+                when (event) {
+                    is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
+                        event.file?.let { file ->
+                            if (VfsUtil.isAncestor(root, file, false)) {
+                                dirtyScopeManager.fileDirty(file)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     override fun getChangeProvider() = _changeProvider
     override fun getDiffProvider() = _diffProvider
@@ -52,6 +76,8 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun activate() {
         log.info("Jujutsu VCS activated for project: ${myProject.name}")
         super.activate()
+        myProject.messageBus.connect(myProject).subscribe(VirtualFileManager.VFS_CHANGES, fileListener)
+        log.debug("File listener registered for auto-refresh")
     }
 
     override fun deactivate() {
@@ -59,7 +85,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
         super.deactivate()
     }
 
-    val root: VirtualFile? by lazy {
+    val root: VirtualFile by lazy {
         // Start from project base directory
         var currentDir = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
         var foundRoot: VirtualFile? = null
@@ -71,6 +97,10 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
                 break
             }
             currentDir = currentDir.parent
+        }
+
+        if (foundRoot == null) {
+            throw VcsException("Project is not within a JJ repository (couldn't find a .jj directory above ${project.basePath}")
         }
 
         log.info("Jujutsu root for project ${project.name}: $foundRoot")
