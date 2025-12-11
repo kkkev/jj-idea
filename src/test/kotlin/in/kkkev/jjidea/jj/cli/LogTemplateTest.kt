@@ -213,12 +213,12 @@ class LogTemplateTest {
         entry.changeId shouldBe ChangeId("qpvuntsm", "q")
         entry.commitId shouldBe "abc123def456"
         entry.description shouldBe "Add new feature"
-        entry.author.name shouldBe "Test Author"
-        entry.author.email shouldBe "author@example.com"
-        entry.authorTimestamp shouldBe 1234567890
-        entry.committer.name shouldBe "Test Committer"
-        entry.committer.email shouldBe "committer@example.com"
-        entry.committerTimestamp shouldBe 1234567890
+        entry.author!!.name shouldBe "Test Author"
+        entry.author!!.email shouldBe "author@example.com"
+        entry.authorTimestamp shouldBe Instant.fromEpochSeconds(1234567890)
+        entry.committer!!.name shouldBe "Test Committer"
+        entry.committer!!.email shouldBe "committer@example.com"
+        entry.committerTimestamp shouldBe Instant.fromEpochSeconds(1234567890)
     }
 
     @Test
@@ -242,12 +242,12 @@ class LogTemplateTest {
 
         val entry = fullLogTemplate.take(fields.iterator())
 
-        entry.author.name shouldBe "Original Author"
-        entry.author.email shouldBe "original@example.com"
-        entry.authorTimestamp shouldBe 1000000000
-        entry.committer.name shouldBe "Cherry Picker"
-        entry.committer.email shouldBe "picker@example.com"
-        entry.committerTimestamp shouldBe 2000000000
+        entry.author!!.name shouldBe "Original Author"
+        entry.author!!.email shouldBe "original@example.com"
+        entry.authorTimestamp shouldBe Instant.fromEpochSeconds(1000000000)
+        entry.committer!!.name shouldBe "Cherry Picker"
+        entry.committer!!.email shouldBe "picker@example.com"
+        entry.committerTimestamp shouldBe Instant.fromEpochSeconds(2000000000)
     }
 
     @Test

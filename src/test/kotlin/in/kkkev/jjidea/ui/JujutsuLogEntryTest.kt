@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
+import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
 
 /**
@@ -310,8 +311,8 @@ class JujutsuLogEntryTest {
 
     @Test
     fun `entry with timestamps`() {
-        val authorTime = 1638360000000L  // Example timestamp
-        val committerTime = 1638361000000L
+        val authorTime = Instant.fromEpochMilliseconds(1638360000000L)
+        val committerTime = Instant.fromEpochMilliseconds(1638361000000L)
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
