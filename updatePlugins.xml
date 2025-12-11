@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.1.5/jj-idea-0.1.5.zip" version="0.1.5">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.1.9/jj-idea-0.1.9.zip" version="0.1.9">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -15,8 +15,8 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.1.5</h3>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.1.5">release notes</a> for details.</p>
+      <h3>0.1.9</h3>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.1.9">release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
