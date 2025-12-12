@@ -9,6 +9,7 @@ import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.Consumer
 import com.intellij.vcs.log.*
+import com.intellij.vcs.log.VcsLogProperties.VcsLogProperty
 import com.intellij.vcs.log.graph.PermanentGraph
 import com.intellij.vcs.log.impl.VcsRefImpl
 import `in`.kkkev.jjidea.jj.*
@@ -50,11 +51,16 @@ class JujutsuLogProvider : VcsLogProvider {
         val limitedEntries = if (limit > 0) entries.take(limit) else entries
 
         // Convert to VcsCommitMetadata
-        val commits = limitedEntries.map { entry -> JujutsuCommitMetadata(entry, root) }
+        val commits = limitedEntries.map { entry ->
+            val commit = JujutsuCommitMetadata(entry, root)
+            log.info("Created commit: id='${commit.id}' subject='${commit.subject.take(50)}'")
+            commit
+        }
 
         // Read refs
         val refs = readAllRefsInternal(root)
 
+        log.info("Returning ${commits.size} commits and ${refs.size} refs")
         return DetailedLogDataImpl(commits, refs)
     }
 
@@ -167,15 +173,18 @@ class JujutsuLogProvider : VcsLogProvider {
                 WorkingCopy -> JujutsuLogRefManager.WORKING_COPY
                 is Bookmark -> JujutsuLogRefManager.BOOKMARK
                 // TODO Is this a sensible default?
+                // TODO What about tags?
                 else -> JujutsuLogRefManager.BOOKMARK
             }
 
             // We have no choice but to use this implementation here - anything else breaks IntelliJ during serde
             @Suppress("UnstableApiUsage")
-            VcsRefImpl(refAtChange.changeId.hash, refAtChange.ref.toString(), refType, root)
+            val ref = VcsRefImpl(refAtChange.changeId.hash, refAtChange.ref.toString(), refType, root)
+            log.info("Created ref: name='${ref.name}' hash='${ref.commitHash}' type='${ref.type}'")
+            ref
         }.toSet()
 
-        log.info("Found ${refs.size} refs")
+        log.info("Found ${refs.size} refs: ${refs.joinToString { "${it.name}@${it.commitHash}" }}")
         return refs
     }
 
@@ -215,9 +224,14 @@ class JujutsuLogProvider : VcsLogProvider {
         return emptyList()
     }
 
-    override fun <T : Any?> getPropertyValue(property: VcsLogProperties.VcsLogProperty<T?>?): T? {
-        // Return null for all properties for now
-        return null
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : Any?> getPropertyValue(property: VcsLogProperty<T?>?): T? {
+        return when (property) {
+            VcsLogProperties.LIGHTWEIGHT_BRANCHES -> true as T
+            VcsLogProperties.SUPPORTS_INDEXING -> false as T
+            VcsLogProperties.SUPPORTS_LOG_DIRECTORY_HISTORY -> false as T
+            else -> null
+        }
     }
 
     override fun getCurrentBranch(root: VirtualFile): String? {

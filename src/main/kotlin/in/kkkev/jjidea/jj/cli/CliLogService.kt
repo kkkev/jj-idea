@@ -58,7 +58,7 @@ object LogTemplates {
     val currentWorkingCopy = booleanField("current_working_copy")
     val conflict = booleanField("conflict")
     val empty = booleanField("empty")
-    val bookmarks = singleField("bookmarks") { it.splitByComma(::Bookmark) }
+    val bookmarks = singleField("""bookmarks.map(|b| b.name()).join(",")""") { it.splitByComma(::Bookmark) }
     val parents = singleField("""parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",")""") {
         it.splitByComma(changeId::parse)
     }

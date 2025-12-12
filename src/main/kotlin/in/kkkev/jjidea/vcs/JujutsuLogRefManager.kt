@@ -7,6 +7,8 @@ import com.intellij.vcs.log.VcsLogRefManager
 import com.intellij.vcs.log.VcsRef
 import com.intellij.vcs.log.VcsRefType
 import org.jetbrains.annotations.Unmodifiable
+import com.intellij.ui.JBColor
+import com.intellij.vcs.log.VcsLogStandardColors
 import java.awt.Color
 import java.io.DataInput
 import java.io.DataOutput
@@ -20,16 +22,26 @@ class JujutsuLogRefManager : VcsLogRefManager {
     private val log = Logger.getInstance(JujutsuLogRefManager::class.java)
 
     companion object {
+        // Theme-aware colors with fallbacks to standard VCS log colors
+        private val BOOKMARK_COLOR = JBColor.namedColor(
+            "VersionControl.JujutsuLog.bookmarkIconColor",
+            VcsLogStandardColors.Refs.BRANCH
+        )
+
+        private val WORKING_COPY_COLOR = JBColor.namedColor(
+            "VersionControl.JujutsuLog.workingCopyIconColor",
+            VcsLogStandardColors.Refs.TIP
+        )
+
         // Jujutsu ref types (bookmarks are like Git branches)
-        // TODO Configure in a colour scheme
         val BOOKMARK = object : VcsRefType {
             override fun isBranch() = true
-            override fun getBackgroundColor() = Color(0x75, 0xA7, 0xFF) // Blue for bookmarks
+            override fun getBackgroundColor() = BOOKMARK_COLOR
         }
 
         val WORKING_COPY = object : VcsRefType {
             override fun isBranch() = false
-            override fun getBackgroundColor() = Color(0x7A, 0xBA, 0x3A) // Green for working copy
+            override fun getBackgroundColor() = WORKING_COPY_COLOR
         }
     }
 
@@ -38,18 +50,20 @@ class JujutsuLogRefManager : VcsLogRefManager {
         compact: Boolean,
         showTagNames: Boolean
     ): List<RefGroup> {
-        // Group bookmarks together
+        // Create individual groups for each ref so they display as separate tags
         val result = mutableListOf<RefGroup>()
 
         val bookmarks = references.filter { it.type == BOOKMARK }
         val workingCopy = references.filter { it.type == WORKING_COPY }
 
-        if (workingCopy.isNotEmpty()) {
-            result.add(RefGroupImpl(true, "@", workingCopy))
+        // Working copy refs - each gets its own group with color
+        workingCopy.forEach { ref ->
+            result.add(RefGroupImpl(true, ref.name, listOf(ref), listOf(ref.type.backgroundColor)))
         }
 
-        if (bookmarks.isNotEmpty()) {
-            result.add(RefGroupImpl(false, "Bookmarks", bookmarks))
+        // Bookmarks - each gets its own group for individual display with color
+        bookmarks.forEach { ref ->
+            result.add(RefGroupImpl(false, ref.name, listOf(ref), listOf(ref.type.backgroundColor)))
         }
 
         return result

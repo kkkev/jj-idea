@@ -25,7 +25,7 @@ class LogTemplateTest {
         val spec = basicLogTemplate.spec
 
         // Should contain all field specs joined with ++ and null byte separators
-        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0""""
+        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0""""
     }
 
     @Test
@@ -86,7 +86,7 @@ class LogTemplateTest {
             "abc123def456",
             "Merge commit",
             "",
-            "plkvukqt~p, rlvkpnrz~rl",
+            "plkvukqt~p,rlvkpnrz~rl",
             "false",
             "false",
             "false"
@@ -180,7 +180,7 @@ class LogTemplateTest {
         val spec = fullLogTemplate.spec
 
         // Should contain basic template fields plus author and committer
-        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0" ++ author.name() ++ "\0" ++ author.email() ++ "\0" ++ author.timestamp().utc().format("%s") ++ "\0" ++ committer.name() ++ "\0" ++ committer.email() ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
+        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0" ++ author.name() ++ "\0" ++ author.email() ++ "\0" ++ author.timestamp().utc().format("%s") ++ "\0" ++ committer.name() ++ "\0" ++ committer.email() ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
     }
 
     @Test
@@ -254,7 +254,7 @@ class LogTemplateTest {
     fun `refsLogTemplate generates correct spec string`() {
         val spec = refsLogTemplate.spec
 
-        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ bookmarks ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0""""
+        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0""""
     }
 
     @Test
@@ -352,7 +352,7 @@ class LogTemplateTest {
     fun `commitGraphLogTemplate parses merge node`() {
         val fields = listOf(
             "qpvuntsm~q",
-            "plkvukqt~p, rlvkpnrz~rl",
+            "plkvukqt~p,rlvkpnrz~rl",
             "1234567890"
         )
 
