@@ -6,6 +6,7 @@ import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.DIRECTORY_GROUPING
+import com.intellij.openapi.vcs.changes.ui.ChangesTree
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
 import javax.swing.tree.DefaultTreeModel
 
@@ -20,8 +21,9 @@ class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(projec
     }
 
     init {
-        // Keep tree state (expansion) across updates
-        isKeepTreeState = true
+        // Use KEEP_NON_EMPTY strategy: preserves user's manual expansion/collapse actions
+        // while expanding default nodes (including new ones) when tree is rebuilt
+        treeStateStrategy = ChangesTree.KEEP_NON_EMPTY
     }
 
     override fun buildTreeModel(

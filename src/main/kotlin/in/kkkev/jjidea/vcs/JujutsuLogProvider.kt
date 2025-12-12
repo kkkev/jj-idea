@@ -13,8 +13,6 @@ import com.intellij.vcs.log.VcsLogProperties.VcsLogProperty
 import com.intellij.vcs.log.graph.PermanentGraph
 import com.intellij.vcs.log.impl.VcsRefImpl
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.jj.WorkingCopy
 
 /**
  * Provides repository-wide log for Jujutsu VCS
@@ -52,9 +50,9 @@ class JujutsuLogProvider : VcsLogProvider {
 
         // Convert to VcsCommitMetadata
         val commits = limitedEntries.map { entry ->
-            val commit = JujutsuCommitMetadata(entry, root)
-            log.info("Created commit: id='${commit.id}' subject='${commit.subject.take(50)}'")
-            commit
+            JujutsuCommitMetadata(entry, root).apply {
+                log.debug("Created commit: id='$id' subject='${subject.take(50)}'")
+            }
         }
 
         // Read refs

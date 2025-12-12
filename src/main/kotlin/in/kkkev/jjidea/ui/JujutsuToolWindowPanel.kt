@@ -9,14 +9,17 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
+import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -25,6 +28,10 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import javax.swing.event.TreeExpansionEvent
+import javax.swing.event.TreeExpansionListener
+import javax.swing.tree.DefaultMutableTreeNode
+import javax.swing.tree.TreePath
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
@@ -38,6 +45,13 @@ import javax.swing.*
  */
 // Localise strings in here
 class JujutsuToolWindowPanel(private val project: Project) : Disposable {
+    companion object {
+        private const val COLLAPSED_PATHS_KEY_PREFIX = "JujutsuToolWindow.CollapsedPaths"
+        private val LOG = Logger.getInstance(JujutsuToolWindowPanel::class.java)
+    }
+
+    private val collapsedPathsKey = "$COLLAPSED_PATHS_KEY_PREFIX.${project.locationHash}"
+
     private val panel = JPanel(BorderLayout()).apply {
         border = JBUI.Borders.empty(8)
     }
@@ -56,11 +70,22 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     // Tree for displaying changes (using IntelliJ's built-in changes tree)
     private val changesTree = JujutsuChangesTree(project)
 
+    // Track paths that user explicitly collapsed (persisted across sessions)
+    private val userCollapsedPaths: MutableSet<String>
+
+    // Flag to ignore programmatic expand/collapse events
+    // Start as true to ignore events during initialization, then enable tracking after tree settles
+    private var ignoreExpansionEvents = true
+
     private val vcs get() = JujutsuVcs.find(project)
 
     init {
+        LOG.info("Initializing JujutsuToolWindowPanel for project: ${project.name}")
+        userCollapsedPaths = loadCollapsedPaths()
+
         createUI()
         setupTreeInteractions()
+        setupTreeExpansionTracking()
         setupVcsListener()
         setupVfsListener()
 
@@ -132,11 +157,9 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
         // Tree expander actions (expand all / collapse all) provided by the tree
         val treeExpander = changesTree.treeExpander
-        if (treeExpander != null) {
-            val commonActionsManager = com.intellij.ide.CommonActionsManager.getInstance()
-            group.add(commonActionsManager.createExpandAllAction(treeExpander, changesTree))
-            group.add(commonActionsManager.createCollapseAllAction(treeExpander, changesTree))
-        }
+        val commonActionsManager = com.intellij.ide.CommonActionsManager.getInstance()
+        group.add(commonActionsManager.createExpandAllAction(treeExpander, changesTree))
+        group.add(commonActionsManager.createCollapseAllAction(treeExpander, changesTree))
 
         group.addSeparator()
 
@@ -144,6 +167,67 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
 
         return ActionManager.getInstance().createActionToolbar(ActionPlaces.CHANGES_VIEW_TOOLBAR, group, true)
+    }
+
+    private fun setupTreeExpansionTracking() {
+        // Track user's explicit collapse/expand actions
+        changesTree.addTreeExpansionListener(object : TreeExpansionListener {
+            override fun treeCollapsed(event: TreeExpansionEvent) {
+                if (ignoreExpansionEvents) {
+                    LOG.info("Ignoring collapse (programmatic)")
+                    return
+                }
+
+                getPathIdentifier(event.path)?.let {
+                    LOG.info("User collapsed: $it")
+                    userCollapsedPaths.add(it)
+                    saveCollapsedPaths()
+                }
+            }
+
+            override fun treeExpanded(event: TreeExpansionEvent) {
+                if (ignoreExpansionEvents) {
+                    LOG.info("Ignoring expand (programmatic)")
+                    return
+                }
+
+                getPathIdentifier(event.path)?.let {
+                    LOG.info("User expanded: $it")
+                    userCollapsedPaths.remove(it)
+                    saveCollapsedPaths()
+                }
+            }
+        })
+    }
+
+    private fun getPathIdentifier(treePath: TreePath): String? {
+        // Create a stable identifier for a tree path based on the full tree path
+        val parts = mutableListOf<String>()
+
+        // Build path from root to this node
+        for (i in 1 until treePath.pathCount) { // Skip root
+            val component = treePath.getPathComponent(i)
+
+            // The component itself is the node (extends ChangesBrowserNode)
+            val changesBrowserNode = component as? ChangesBrowserNode<*>
+            if (changesBrowserNode == null) {
+                // Fallback: try as DefaultMutableTreeNode
+                val treeNode = component as? DefaultMutableTreeNode
+                val userObj = treeNode?.userObject
+
+                // Use userObject's string representation
+                if (userObj != null) {
+                    parts.add(userObj.toString())
+                }
+                continue
+            }
+
+            // Use the node's text presentation
+            val name = changesBrowserNode.textPresentation ?: changesBrowserNode.toString()
+            parts.add(name)
+        }
+
+        return if (parts.isEmpty()) null else parts.joinToString("/")
     }
 
     private fun setupVcsListener() {
@@ -169,10 +253,14 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun setupTreeInteractions() {
-        // Single-click: open file in preview tab
-        changesTree.addTreeSelectionListener {
-            getSelectedChange()?.let { openFileInPreview(it) }
-        }
+        // Single-click: open file in preview tab (only on user clicks, not selection changes)
+        changesTree.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                if (e.clickCount == 1 && !e.isPopupTrigger) {
+                    getSelectedChange()?.let { openFileInPreview(it) }
+                }
+            }
+        })
 
         // Double-click handler: show diff
         changesTree.setDoubleClickHandler { e ->
@@ -355,6 +443,47 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     private fun updateChangesView(changes: List<Change>) {
         // The new tree handles tree building and state management automatically
         changesTree.setChangesToDisplay(changes)
+
+        // After refresh: expand all nodes, then re-collapse user's explicit collapses
+        changesTree.invokeAfterRefresh {
+            // Ignore expansion events during programmatic operations
+            ignoreExpansionEvents = true
+
+            // Expand all nodes by default
+            changesTree.treeExpander?.expandAll()
+
+            // Re-collapse paths that user explicitly collapsed
+            reapplyUserCollapses()
+
+            // Re-enable expansion event tracking after a delay to let event queue settle
+            ApplicationManager.getApplication().invokeLater {
+                LOG.info("Re-enabling expansion event tracking")
+                ignoreExpansionEvents = false
+            }
+        }
+    }
+
+    private fun reapplyUserCollapses() {
+        // Walk the tree and collapse paths that match user's collapsed set
+        LOG.info("Reapplying user collapses (${userCollapsedPaths.size} paths)")
+        val root = changesTree.model.root ?: return
+        collapseMatchingPaths(TreePath(root))
+    }
+
+    private fun collapseMatchingPaths(path: TreePath) {
+        val identifier = getPathIdentifier(path)
+        if (identifier != null && identifier in userCollapsedPaths) {
+            LOG.info("Re-collapsing: $identifier")
+            changesTree.collapsePath(path)
+        }
+
+        // Recursively check children
+        val node = path.lastPathComponent
+        val childCount = changesTree.model.getChildCount(node)
+        for (i in 0 until childCount) {
+            val child = changesTree.model.getChild(node, i)
+            collapseMatchingPaths(path.pathByAddingChild(child))
+        }
     }
 
     private fun showDiff(change: Change) {
@@ -463,7 +592,26 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         popupMenu.component.show(component, x, y)
     }
 
+    private fun loadCollapsedPaths(): MutableSet<String> {
+        val properties = PropertiesComponent.getInstance(project)
+        val stored = properties.getValue(collapsedPathsKey)
+        LOG.info("Loading collapsed paths from key '$collapsedPathsKey': '$stored'")
+        if (stored == null) return mutableSetOf()
+        val paths = stored.split("|").filter { it.isNotEmpty() }.toMutableSet()
+        LOG.info("Loaded ${paths.size} collapsed paths")
+        return paths
+    }
+
+    private fun saveCollapsedPaths() {
+        val properties = PropertiesComponent.getInstance(project)
+        val value = userCollapsedPaths.joinToString("|")
+        LOG.info("Saving ${userCollapsedPaths.size} collapsed paths to key '$collapsedPathsKey': '$value'")
+        properties.setValue(collapsedPathsKey, value)
+    }
+
     override fun dispose() {
-        // Nothing to dispose
+        // Save collapsed paths on disposal
+        LOG.info("Disposing JujutsuToolWindowPanel")
+        saveCollapsedPaths()
     }
 }
