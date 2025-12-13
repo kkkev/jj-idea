@@ -4,15 +4,15 @@ import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsListener
@@ -28,16 +28,15 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import javax.swing.event.TreeExpansionEvent
-import javax.swing.event.TreeExpansionListener
-import javax.swing.tree.DefaultMutableTreeNode
-import javax.swing.tree.TreePath
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.event.MouseEvent
 import javax.swing.*
+import javax.swing.event.TreeExpansionEvent
+import javax.swing.event.TreeExpansionListener
+import javax.swing.tree.TreePath
 
 /**
  * Main panel for the Jujutsu tool window
@@ -47,8 +46,9 @@ import javax.swing.*
 class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     companion object {
         private const val COLLAPSED_PATHS_KEY_PREFIX = "JujutsuToolWindow.CollapsedPaths"
-        private val LOG = Logger.getInstance(JujutsuToolWindowPanel::class.java)
     }
+
+    private val log = Logger.getInstance(javaClass)
 
     private val collapsedPathsKey = "$COLLAPSED_PATHS_KEY_PREFIX.${project.locationHash}"
 
@@ -80,17 +80,12 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     private val vcs get() = JujutsuVcs.find(project)
 
     init {
-        LOG.info("Initializing JujutsuToolWindowPanel for project: ${project.name}")
         userCollapsedPaths = loadCollapsedPaths()
 
         createUI()
         setupTreeInteractions()
         setupTreeExpansionTracking()
-        setupVcsListener()
         setupVfsListener()
-
-        // Try to load immediately in case VCS is already available
-        loadCurrentChanges()
     }
 
     private fun createUI() {
@@ -170,74 +165,41 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun setupTreeExpansionTracking() {
-        // Track user's explicit collapse/expand actions
         changesTree.addTreeExpansionListener(object : TreeExpansionListener {
-            override fun treeCollapsed(event: TreeExpansionEvent) {
+            private fun update(event: TreeExpansionEvent, consumer: (String) -> Unit) {
                 if (ignoreExpansionEvents) {
-                    LOG.info("Ignoring collapse (programmatic)")
-                    return
-                }
-
-                getPathIdentifier(event.path)?.let {
-                    LOG.info("User collapsed: $it")
-                    userCollapsedPaths.add(it)
-                    saveCollapsedPaths()
+                    log.debug("Ignoring collapse (programmatic)")
+                } else {
+                    getPathIdentifier(event.path)?.let {
+                        consumer(it)
+                        saveCollapsedPaths()
+                    }
                 }
             }
 
-            override fun treeExpanded(event: TreeExpansionEvent) {
-                if (ignoreExpansionEvents) {
-                    LOG.info("Ignoring expand (programmatic)")
-                    return
-                }
+            override fun treeCollapsed(event: TreeExpansionEvent) = update(event) {
+                log.debug("User collapsed: $it")
+                userCollapsedPaths.add(it)
+            }
 
-                getPathIdentifier(event.path)?.let {
-                    LOG.info("User expanded: $it")
-                    userCollapsedPaths.remove(it)
-                    saveCollapsedPaths()
-                }
+            override fun treeExpanded(event: TreeExpansionEvent) = update(event) {
+                log.debug("User expanded: $it")
+                userCollapsedPaths.remove(it)
             }
         })
     }
 
-    private fun getPathIdentifier(treePath: TreePath): String? {
-        // Create a stable identifier for a tree path based on the full tree path
-        val parts = mutableListOf<String>()
-
-        // Build path from root to this node
-        for (i in 1 until treePath.pathCount) { // Skip root
-            val component = treePath.getPathComponent(i)
-
-            // The component itself is the node (extends ChangesBrowserNode)
-            val changesBrowserNode = component as? ChangesBrowserNode<*>
-            if (changesBrowserNode == null) {
-                // Fallback: try as DefaultMutableTreeNode
-                val treeNode = component as? DefaultMutableTreeNode
-                val userObj = treeNode?.userObject
-
-                // Use userObject's string representation
-                if (userObj != null) {
-                    parts.add(userObj.toString())
-                }
-                continue
+    private fun getPathIdentifier(treePath: TreePath) = treePath.path
+        .drop(1) // Skip root
+        .mapNotNull { component ->
+            when (component) {
+                is ChangesBrowserNode<*> -> component.textPresentation ?: component.toString()
+                //is DefaultMutableTreeNode -> component.userObject?.toString()
+                else -> null
             }
-
-            // Use the node's text presentation
-            val name = changesBrowserNode.textPresentation ?: changesBrowserNode.toString()
-            parts.add(name)
         }
-
-        return if (parts.isEmpty()) null else parts.joinToString("/")
-    }
-
-    private fun setupVcsListener() {
-        // Listen for VCS mapping changes to reload when Jujutsu VCS is enabled
-        val connection = project.messageBus.connect(this)
-        connection.subscribe(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED, VcsListener {
-            // TODO Or should it be loadCurrentChanges()?
-            refresh()
-        })
-    }
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString("/")
 
     private fun setupVfsListener() {
         // Listen to ChangeListManager updates triggered by VCS change detection
@@ -245,8 +207,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             ChangeListListener.TOPIC,
             object : ChangeListListener {
                 override fun changeListUpdateDone() {
-                    // TODO Or should it be refresh()? Or dirtyScopeManager.fileDirty(file)? Or does that call this?
-                    loadCurrentChanges()
+                    refresh()
                 }
             }
         )
@@ -441,39 +402,41 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun updateChangesView(changes: List<Change>) {
-        // The new tree handles tree building and state management automatically
-        changesTree.setChangesToDisplay(changes)
+        if (changes != changesTree.changes) {
+            changesTree.setChangesToDisplay(changes)
 
-        // After refresh: expand all nodes, then re-collapse user's explicit collapses
-        changesTree.invokeAfterRefresh {
-            // Ignore expansion events during programmatic operations
-            ignoreExpansionEvents = true
+            // After refresh: expand all nodes, then re-collapse user's explicit collapses
+            changesTree.invokeAfterRefresh {
+                // Ignore expansion events during programmatic operations
+                ignoreExpansionEvents = true
 
-            // Expand all nodes by default
-            changesTree.treeExpander?.expandAll()
+                // Expand all nodes by default
+                changesTree.treeExpander.expandAll()
 
-            // Re-collapse paths that user explicitly collapsed
-            reapplyUserCollapses()
+                // Re-collapse paths that user explicitly collapsed
+                reapplyUserCollapses()
 
-            // Re-enable expansion event tracking after a delay to let event queue settle
-            ApplicationManager.getApplication().invokeLater {
-                LOG.info("Re-enabling expansion event tracking")
-                ignoreExpansionEvents = false
+                // Re-enable expansion event tracking after a delay to let event queue settle
+                ApplicationManager.getApplication().invokeLater {
+                    log.info("Re-enabling expansion event tracking")
+                    ignoreExpansionEvents = false
+                }
             }
         }
     }
 
     private fun reapplyUserCollapses() {
         // Walk the tree and collapse paths that match user's collapsed set
-        LOG.info("Reapplying user collapses (${userCollapsedPaths.size} paths)")
-        val root = changesTree.model.root ?: return
-        collapseMatchingPaths(TreePath(root))
+        log.info("Reapplying user collapses (${userCollapsedPaths.size} paths)")
+        changesTree.model.root?.let {
+            collapseMatchingPaths(TreePath(it))
+        }
     }
 
     private fun collapseMatchingPaths(path: TreePath) {
         val identifier = getPathIdentifier(path)
         if (identifier != null && identifier in userCollapsedPaths) {
-            LOG.info("Re-collapsing: $identifier")
+            log.info("Re-collapsing: $identifier")
             changesTree.collapsePath(path)
         }
 
@@ -594,24 +557,16 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private fun loadCollapsedPaths(): MutableSet<String> {
         val properties = PropertiesComponent.getInstance(project)
-        val stored = properties.getValue(collapsedPathsKey)
-        LOG.info("Loading collapsed paths from key '$collapsedPathsKey': '$stored'")
-        if (stored == null) return mutableSetOf()
-        val paths = stored.split("|").filter { it.isNotEmpty() }.toMutableSet()
-        LOG.info("Loaded ${paths.size} collapsed paths")
-        return paths
+        val stored = properties.getValue(collapsedPathsKey) ?: return mutableSetOf()
+        return stored.split("|").filter { it.isNotEmpty() }.toMutableSet()
     }
 
     private fun saveCollapsedPaths() {
         val properties = PropertiesComponent.getInstance(project)
-        val value = userCollapsedPaths.joinToString("|")
-        LOG.info("Saving ${userCollapsedPaths.size} collapsed paths to key '$collapsedPathsKey': '$value'")
-        properties.setValue(collapsedPathsKey, value)
+        properties.setValue(collapsedPathsKey, userCollapsedPaths.joinToString("|"))
     }
 
     override fun dispose() {
-        // Save collapsed paths on disposal
-        LOG.info("Disposing JujutsuToolWindowPanel")
         saveCollapsedPaths()
     }
 }
