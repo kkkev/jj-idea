@@ -16,17 +16,19 @@ import javax.swing.JComponent
  */
 class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
 
-    private val log = Logger.getInstance(JujutsuHistoryProvider::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     @RequiresBackgroundThread
     override fun createSessionFor(filePath: FilePath): VcsHistorySession? {
         log.info("Creating history session for file: ${filePath.path}")
 
         try {
-            log.debug("Fetching history for file: ${filePath.path}")
+            // Get relative path from repository root
+            val relativePath = vcs.getRelativePath(filePath)
+            log.debug("Fetching history for file: $relativePath (absolute: ${filePath.path})")
 
             // Use logService to get log entries for this file
-            val result = vcs.logService.getLogBasic(Expression.ALL, listOf(filePath.path))
+            val result = vcs.logService.getLogBasic(Expression.ALL, listOf(relativePath))
 
             val entries = result.getOrElse { error ->
                 log.error("Failed to get file history: ${error.message}")
@@ -41,12 +43,11 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
             }
 
             // Convert to VcsFileRevision objects
-            val revisions: List<VcsFileRevision> = entries.map { entry ->
-                JujutsuFileRevision(entry, filePath, vcs)
-            }
+            val revisions = entries.map { entry -> JujutsuFileRevision(entry, filePath, vcs) }
 
             // Return history session
-            return JujutsuHistorySession(revisions, filePath)
+            val currentRevision = revisions.firstOrNull()?.revisionNumber
+            return JujutsuHistorySession(revisions, currentRevision)
 
         } catch (e: Exception) {
             log.error("Error creating history session for ${filePath.path}", e)
@@ -55,18 +56,50 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
     }
 
     override fun reportAppendableHistory(filePath: FilePath, partner: VcsAppendableHistorySessionPartner) {
-        // Not supported - we load all history at once
+        log.info("reportAppendableHistory called for file: ${filePath.path}")
+
+        // Step 1: Report empty session immediately (required by platform)
+        val emptySession = JujutsuHistorySession(emptyList(), null)
+        partner.reportCreatedEmptySession(emptySession)
+
+        try {
+            // Get relative path from repository root
+            val relativePath = vcs.getRelativePath(filePath)
+            log.debug("Fetching history for file: $relativePath (absolute: ${filePath.path})")
+
+            // Step 2: Load history
+            val result = vcs.logService.getLog(Expression.ALL, listOf(relativePath))
+
+            val entries = result.getOrElse { error ->
+                log.error("Failed to get file history: ${error.message}")
+                partner.reportException(VcsException("Failed to get file history: ${error.message}", error))
+                return
+            }
+
+            log.info("Found ${entries.size} revisions for file: ${filePath.path}")
+
+            // Step 3: Stream each revision to the partner
+            entries.forEach { entry ->
+                val revision = JujutsuFileRevision(entry, filePath, vcs)
+                partner.acceptRevision(revision)
+            }
+
+        } catch (e: Exception) {
+            log.error("Error loading file history for ${filePath.path}", e)
+            partner.reportException(VcsException("Error loading file history: ${e.message}", e))
+        }
+
+        // Step 4: Return - framework will call partner.finished() automatically
     }
 
     override fun supportsHistoryForDirectories() = false
 
-    override fun getUICustomization(session: VcsHistorySession, root: JComponent): VcsDependentHistoryComponents {
-        return VcsDependentHistoryComponents(null, null, null)
-    }
+    override fun getUICustomization(session: VcsHistorySession, root: JComponent) =
+        VcsDependentHistoryComponents.createOnlyColumns(emptyArray())
 
     override fun getAdditionalActions(refresher: Runnable): Array<AnAction> = emptyArray()
 
-    override fun isDateOmittable() = true // JJ doesn't track timestamps by default
+    override fun isDateOmittable() = false
 
     override fun getHelpId(): String? = null
 

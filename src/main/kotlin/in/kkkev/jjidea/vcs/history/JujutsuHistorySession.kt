@@ -1,26 +1,20 @@
 package `in`.kkkev.jjidea.vcs.history
 
-import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.history.VcsAbstractHistorySession
 import com.intellij.openapi.vcs.history.VcsFileRevision
-import com.intellij.openapi.vcs.history.VcsHistorySession
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 
 /**
  * Represents a history session for a file, holding all revisions
  */
 class JujutsuHistorySession(
-    private val revisions: List<VcsFileRevision>,
-    private val filePath: FilePath
-) : VcsHistorySession {
+    revisions: List<VcsFileRevision>,
+    currentRevisionNumber: VcsRevisionNumber?
+) : VcsAbstractHistorySession(revisions, currentRevisionNumber) {
 
-    override fun getRevisionList() = revisions
+    override fun calcCurrentRevisionNumber(): VcsRevisionNumber? = null
 
-    override fun getCurrentRevisionNumber(): VcsRevisionNumber? = revisions.firstOrNull()?.revisionNumber
-
-    override fun isCurrentRevision(revisionNumber: VcsRevisionNumber) =
-        revisionNumber == getCurrentRevisionNumber()
-
-    override fun shouldBeRefreshed() = false
+    override fun copy() = JujutsuHistorySession(revisionList, currentRevisionNumber)
 
     override fun isContentAvailable(revision: VcsFileRevision) = true
 

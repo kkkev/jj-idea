@@ -29,7 +29,7 @@ class JujutsuFileAnnotation(
 
     override fun getFile() = file
 
-    override fun getLineRevisionNumber(lineNumber: Int) = getAnnotationDetail(lineNumber) { it.commitId }
+    override fun getLineRevisionNumber(lineNumber: Int) = getAnnotationDetail(lineNumber) { it.changeId.short }
         ?.let(::JujutsuRevisionNumber)
 
     override fun getToolTip(lineNumber: Int) = getAnnotationLine(lineNumber)?.getTooltip()

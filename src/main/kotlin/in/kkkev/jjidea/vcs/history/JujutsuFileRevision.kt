@@ -8,6 +8,7 @@ import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
 
 /**
  * Represents a single revision of a file in Jujutsu history
@@ -22,17 +23,19 @@ class JujutsuFileRevision(
 
     override fun getBranchName(): String = entry.bookmarks.firstOrNull()?.name ?: ""
 
-    override fun getRevisionDate() = null // JJ doesn't track timestamps by default
+    override fun getRevisionDate() = entry.authorTimestamp?.toJavaDate()
 
-    override fun getAuthor(): String? = null // Could add to log template in future
+    override fun getAuthor() = entry.author?.name
 
     override fun getCommitMessage(): String = entry.description.ifEmpty { "(no description)" }
 
+    // TODO Fill this in
     override fun getChangedRepositoryPath(): RepositoryLocation? = null
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val result = vcs.commandExecutor.show(filePath.path, entry.changeId)
+        val relativePath = vcs.getRelativePath(filePath)
+        val result = vcs.commandExecutor.show(relativePath, entry.changeId)
         if (!result.isSuccess) {
             throw VcsException("Failed to load file content at revision ${entry.changeId}: ${result.stderr}")
         }

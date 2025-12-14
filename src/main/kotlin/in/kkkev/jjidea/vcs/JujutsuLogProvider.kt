@@ -143,15 +143,11 @@ class JujutsuLogProvider : VcsLogProvider {
 
     override fun getReferenceManager(): VcsLogRefManager = refManager
 
-    override fun getSupportedVcs(): VcsKey {
-        val key = JujutsuVcs.getKey()
-        log.info("getSupportedVcs() called, returning: $key")
-        return key
-    }
+    override fun getSupportedVcs() = JujutsuVcs.getKey()
 
     // TODO This looks wrong - when is it called? Does this work for multi-root projects?
     override fun getVcsRoot(project: Project, root: VirtualFile, path: FilePath): VirtualFile {
-        log.info("getVcsRoot() called for path: ${path.path}, root: ${root.path}")
+        log.debug("getVcsRoot() called for path: ${path.path}, root: ${root.path}")
         return root
     }
 

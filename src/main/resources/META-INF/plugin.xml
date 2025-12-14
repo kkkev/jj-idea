@@ -46,6 +46,7 @@
         <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.vcs.actions.JujutsuEditorActionGroup" popup="true">
             <action id="Jujutsu.EditorAnnotate" class="in.kkkev.jjidea.vcs.actions.JujutsuAnnotateAction"/>
             <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.vcs.actions.JujutsuCompareWithBranchAction"/>
+            <reference ref="Vcs.ShowTabbedFileHistory"/>
             <action id="Jujutsu.ShowHistoryForSelection" class="in.kkkev.jjidea.vcs.actions.JujutsuShowHistoryForSelectionAction"/>
             <!--<add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu.GoToMenu"/>-->
             <add-to-group group-id="VcsGroup" anchor="last"/>
