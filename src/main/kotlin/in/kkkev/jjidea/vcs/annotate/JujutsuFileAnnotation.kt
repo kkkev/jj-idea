@@ -11,6 +11,7 @@ import com.intellij.util.text.DateFormatUtil
 import com.intellij.vcs.log.impl.VcsLogNavigationUtil.jumpToRevisionAsync
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.AnnotationLine
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import kotlinx.datetime.Instant
 import java.util.*
@@ -29,7 +30,8 @@ class JujutsuFileAnnotation(
 
     override fun getFile() = file
 
-    override fun getLineRevisionNumber(lineNumber: Int) = getAnnotationDetail(lineNumber) { it.changeId.short }
+    override fun getLineRevisionNumber(lineNumber: Int) = getAnnotationLine(lineNumber)
+        ?.changeId
         ?.let(::JujutsuRevisionNumber)
 
     override fun getToolTip(lineNumber: Int) = getAnnotationLine(lineNumber)?.getTooltip()
@@ -47,7 +49,8 @@ class JujutsuFileAnnotation(
     override fun getAnnotatedContent() = annotationLines.joinToString("\n") { it.lineContent }
 
     // For Jujutsu, the current revision is typically the working copy commit (@)
-    override fun getCurrentRevision() = JujutsuRevisionNumber("@")
+    // TODO Where is this used? Is this correct? Can we annotate old revisions?
+    override fun getCurrentRevision() = JujutsuRevisionNumber(WorkingCopy)
 
     // TODO Should this integrate with JujutsuHistoryProvider?
     override fun getRevisions() = null

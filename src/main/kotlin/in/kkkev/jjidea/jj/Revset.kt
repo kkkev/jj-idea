@@ -7,6 +7,8 @@ sealed interface Revset
  */
 sealed interface Revision : Revset {
     val parent get() = RevisionExpression("${this}-")
+    val full: String get() = toString()
+    val short: String get() = toString()
 }
 
 /**

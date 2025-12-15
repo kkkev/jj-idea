@@ -8,7 +8,7 @@ import com.intellij.vcs.log.VcsCommitMetadata
  * Provides common implementation of VcsCommitMetadata methods based on JujutsuLogEntry.
  */
 abstract class JujutsuCommitMetadataBase(
-    protected val entry: LogEntry,
+    val entry: LogEntry,  // Public to allow column rendering access
     private val root: VirtualFile
 ) : VcsCommitMetadata {
     override fun getId() = entry.changeId.hash

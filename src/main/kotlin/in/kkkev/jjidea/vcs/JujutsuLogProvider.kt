@@ -1,11 +1,14 @@
 package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
-import com.intellij.openapi.vcs.VcsKey
+import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.Consumer
 import com.intellij.vcs.log.*
@@ -31,7 +34,7 @@ class JujutsuLogProvider : VcsLogProvider {
         root: VirtualFile,
         requirements: VcsLogProvider.Requirements
     ): VcsLogProvider.DetailedLogData {
-        log.info("Reading first block of commits for root: ${root.path}")
+        log.debug("Reading first block of commits for root: ${root.path}")
 
         val vcsInstance = JujutsuVcs.findRequired(root)
 
@@ -42,23 +45,17 @@ class JujutsuLogProvider : VcsLogProvider {
             throw VcsException("Failed to read commits: ${it.message}")
         }
 
-        log.info("Read ${entries.size} commits")
-
         // Take only the requested number of commits
         val limit = requirements.commitCount
         val limitedEntries = if (limit > 0) entries.take(limit) else entries
 
         // Convert to VcsCommitMetadata
-        val commits = limitedEntries.map { entry ->
-            JujutsuCommitMetadata(entry, root).apply {
-                log.debug("Created commit: id='$id' subject='${subject.take(50)}'")
-            }
-        }
+        val commits = limitedEntries.map { entry -> JujutsuCommitMetadata(entry, root) }
 
         // Read refs
         val refs = readAllRefsInternal(root)
 
-        log.info("Returning ${commits.size} commits and ${refs.size} refs")
+        log.debug("Returning ${commits.size} commits and ${refs.size} refs")
         return DetailedLogDataImpl(commits, refs)
     }
 
@@ -79,7 +76,7 @@ class JujutsuLogProvider : VcsLogProvider {
     }
 
     override fun readAllHashes(root: VirtualFile, consumer: Consumer<in TimedVcsCommit>): VcsLogProvider.LogData {
-        log.info("Reading all commit hashes for root: ${root.path}")
+        log.debug("Reading all commit hashes for root: ${root.path}")
 
         val vcsInstance = JujutsuVcs.findRequired(root)
 
@@ -105,29 +102,27 @@ class JujutsuLogProvider : VcsLogProvider {
     }
 
     override fun readFullDetails(root: VirtualFile, hashes: List<String>, consumer: Consumer<in VcsFullCommitDetails>) {
-        log.info("Reading full details for ${hashes.size} commits: ${hashes.joinToString(", ")}")
+        log.debug("Reading full details for ${hashes.size} commits")
 
         val vcsInstance = JujutsuVcs.findRequired(root)
 
         hashes.forEach { hexHash ->
             try {
-                // Convert hex string back to JJ change ID string
-                val changeIdString = ChangeId.fromHexString(hexHash)
-                log.info("Reading details for hash: $hexHash (change ID: $changeIdString)")
+                // Convert hex string back to JJ change ID
+                val changeId = ChangeId.fromHexString(hexHash)
 
                 // Use logService to get log entry for this specific revision
-                val result = vcsInstance.logService.getLog(changeIdString)
+                // IMPORTANT: Use Expression with the FULL change ID, not the short prefix!
+                val result = vcsInstance.logService.getLog(Expression(changeId.full))
 
                 result.onSuccess { entries ->
-                    log.info("Successfully read log for $changeIdString, got ${entries.size} entries")
                     if (entries.isNotEmpty()) {
                         consumer.consume(JujutsuFullCommitDetails.create(entries[0], root))
-                        log.info("Consumed details for $changeIdString")
                     } else {
-                        log.error("No entries returned for $changeIdString")
+                        log.error("No entries returned for $changeId")
                     }
                 }.onFailure { error ->
-                    log.error("Failed to read log for $changeIdString: ${error.message}")
+                    log.error("Failed to read log for $changeId: ${error.message}")
                 }
             } catch (e: Exception) {
                 log.error("Failed to read commit details for $hexHash", e)
@@ -136,7 +131,7 @@ class JujutsuLogProvider : VcsLogProvider {
     }
 
     override fun readMetadata(root: VirtualFile, hashes: List<String>, consumer: Consumer<in VcsCommitMetadata>) {
-        log.info("Reading metadata for ${hashes.size} commits")
+        log.debug("Reading metadata for ${hashes.size} commits: ${hashes.take(3).joinToString(", ")}...")
         // Reuse readFullDetails since JJ loads everything anyway
         readFullDetails(root, hashes, Consumer { consumer.consume(it) })
     }
@@ -152,7 +147,7 @@ class JujutsuLogProvider : VcsLogProvider {
     }
 
     private fun readAllRefsInternal(root: VirtualFile): Set<VcsRef> {
-        log.info("Reading all refs for root: ${root.path}")
+        log.debug("Reading all refs for root: ${root.path}")
 
         val vcsInstance = JujutsuVcs.findRequired(root)
 
@@ -173,12 +168,10 @@ class JujutsuLogProvider : VcsLogProvider {
 
             // We have no choice but to use this implementation here - anything else breaks IntelliJ during serde
             @Suppress("UnstableApiUsage")
-            val ref = VcsRefImpl(refAtChange.changeId.hash, refAtChange.ref.toString(), refType, root)
-            log.info("Created ref: name='${ref.name}' hash='${ref.commitHash}' type='${ref.type}'")
-            ref
+            VcsRefImpl(refAtChange.changeId.hash, refAtChange.ref.toString(), refType, root)
         }.toSet()
 
-        log.info("Found ${refs.size} refs: ${refs.joinToString { "${it.name}@${it.commitHash}" }}")
+        log.debug("Found ${refs.size} refs")
         return refs
     }
 
@@ -196,7 +189,7 @@ class JujutsuLogProvider : VcsLogProvider {
     ): List<TimedVcsCommit> {
         // Basic implementation - just return all commits
         // Full filtering would require translating IntelliJ filters to JJ revsets
-        log.info("Getting commits matching filter (maxCount=$maxCount)")
+        log.debug("Getting commits matching filter (maxCount=$maxCount)")
 
         val commits = mutableListOf<TimedVcsCommit>()
         readAllHashes(root) { commits.add(it) }
@@ -206,7 +199,7 @@ class JujutsuLogProvider : VcsLogProvider {
 
     override fun subscribeToRootRefreshEvents(roots: Collection<VirtualFile>, refresher: VcsLogRefresher): Disposable {
         // TODO: Subscribe to file system events to refresh when .jj directory changes
-        log.info("Subscribed to refresh events for ${roots.size} roots")
+        log.debug("Subscribed to refresh events for ${roots.size} roots")
         return Disposable { }
     }
 
@@ -231,5 +224,63 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun getCurrentBranch(root: VirtualFile): String? {
         // Return null - JJ uses bookmarks instead of a current branch concept
         return null
+    }
+
+    override fun getDiffHandler(): VcsLogDiffHandler = JujutsuLogDiffHandler
+}
+
+/**
+ * Basic diff handler for Jujutsu VCS Log.
+ * Currently minimal implementation just to enable modern file history UI.
+ * TODO: Implement full diff functionality for comparing commits from log
+ */
+private object JujutsuLogDiffHandler : VcsLogDiffHandler {
+
+    override fun showDiff(
+        root: VirtualFile,
+        leftPath: FilePath?,
+        leftHash: Hash,
+        rightPath: FilePath?,
+        rightHash: Hash
+    ) {
+        // TODO: Implement diff between two revisions
+    }
+
+    override fun showDiffWithLocal(
+        root: VirtualFile,
+        revisionPath: FilePath?,
+        hash: Hash,
+        localPath: FilePath
+    ) {
+        // TODO: Implement diff with local version
+    }
+
+    override fun showDiffForPaths(
+        root: VirtualFile,
+        affectedPaths: Collection<FilePath>?,
+        leftRevision: Hash,
+        rightRevision: Hash?
+    ) {
+        // TODO: Implement diff for multiple paths
+    }
+
+    override fun createContentRevision(filePath: FilePath, hash: Hash): ContentRevision {
+        // Convert hash back to ChangeId
+        val changeId = ChangeId.fromHexString(hash.asString())
+
+        // Find VCS instance by checking all open projects
+        // This is done in a read action to avoid EDT violations
+        val vcs = ReadAction.compute<JujutsuVcs?, RuntimeException> {
+            ProjectManager.getInstance().openProjects.firstNotNullOfOrNull { project ->
+                val vcsManager = ProjectLevelVcsManager.getInstance(project)
+                // Check if this project has Jujutsu VCS and if it manages this file path
+                vcsManager.allVcsRoots
+                    .firstOrNull { it.vcs is JujutsuVcs && filePath.path.startsWith(it.path.path) }
+                    ?.vcs as? JujutsuVcs
+            }
+        } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${filePath.path}")
+
+        // Create and return the content revision
+        return vcs.createRevision(filePath, changeId)
     }
 }

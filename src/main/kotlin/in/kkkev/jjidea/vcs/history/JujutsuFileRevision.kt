@@ -3,12 +3,13 @@ package `in`.kkkev.jjidea.vcs.history
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.RepositoryLocation
 import com.intellij.openapi.vcs.VcsException
-import com.intellij.openapi.vcs.history.VcsFileRevision
+import com.intellij.openapi.vcs.history.VcsFileRevisionEx
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
+import java.util.Date
 
 /**
  * Represents a single revision of a file in Jujutsu history
@@ -17,7 +18,7 @@ class JujutsuFileRevision(
     private val entry: LogEntry,
     private val filePath: FilePath,
     private val vcs: JujutsuVcs
-) : VcsFileRevision {
+) : VcsFileRevisionEx() {
 
     override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.changeId)
 
@@ -28,6 +29,16 @@ class JujutsuFileRevision(
     override fun getAuthor() = entry.author?.name
 
     override fun getCommitMessage(): String = entry.description.ifEmpty { "(no description)" }
+
+    /**
+     * Get the committer name (may differ from author in JJ)
+     */
+    fun getCommitter() = entry.committer?.name
+
+    /**
+     * Get the committer timestamp
+     */
+    fun getCommitterDate() = entry.committerTimestamp?.toJavaDate()
 
     // TODO Fill this in
     override fun getChangedRepositoryPath(): RepositoryLocation? = null
@@ -43,10 +54,24 @@ class JujutsuFileRevision(
     }
 
     @Throws(VcsException::class)
+    @Deprecated("Use loadContent() instead")
     override fun getContent(): ByteArray = loadContent()
 
     /**
      * Get the full log entry for this revision
      */
     fun getLogEntry() = entry
+
+    // VcsFileRevisionEx abstract methods
+    override fun getAuthorEmail(): String? = entry.author?.email
+
+    override fun getCommitterName(): String? = entry.committer?.name
+
+    override fun getCommitterEmail(): String? = entry.committer?.email
+
+    override fun getPath(): FilePath = filePath
+
+    override fun getAuthorDate(): Date? = entry.authorTimestamp?.toJavaDate()
+
+    override fun isDeleted(): Boolean = false // TODO: Determine from file status
 }

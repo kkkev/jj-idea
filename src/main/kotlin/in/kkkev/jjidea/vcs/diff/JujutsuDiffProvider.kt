@@ -39,7 +39,8 @@ class JujutsuDiffProvider(private val vcs: JujutsuVcs) : DiffProvider {
         vcs.createRevision(VcsUtil.getFilePath(file), RevisionExpression(it.toString()))
     }
 
-    override fun getCurrentRevision(file: VirtualFile) = JujutsuRevisionNumber("@")
+    // TODO When addressing jj-idea-3jo, ensure that these return the correct change ids
+    override fun getCurrentRevision(file: VirtualFile) = JujutsuRevisionNumber(WorkingCopy)
 
-    override fun getLatestCommittedRevision(file: VirtualFile) = JujutsuRevisionNumber("@-")
+    override fun getLatestCommittedRevision(file: VirtualFile) = JujutsuRevisionNumber(WorkingCopy.parent)
 }

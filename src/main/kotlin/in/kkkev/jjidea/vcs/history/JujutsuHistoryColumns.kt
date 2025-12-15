@@ -5,70 +5,53 @@ import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.text.DateFormatUtil
 import com.intellij.util.ui.ColumnInfo
-import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import java.util.*
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
 /**
- * Custom column for Change ID with formatted display (bold short part)
+ * Custom column for committer (may differ from author in JJ)
  */
-class ChangeIdColumnInfo : ColumnInfo<VcsFileRevision, String>("Change ID") {
+class CommitterColumnInfo : ColumnInfo<VcsFileRevision, String>("Committer") {
+    override fun valueOf(revision: VcsFileRevision): String =
+        (revision as? JujutsuFileRevision)?.getCommitter() ?: ""
 
-    private val renderer = object : ColoredTableCellRenderer() {
-        override fun customizeCellRenderer(
-            table: JTable,
-            value: Any?,
-            selected: Boolean,
-            hasFocus: Boolean,
-            row: Int,
-            column: Int
-        ) {
-            if (value !is String) return
+    override fun getComparator(): Comparator<VcsFileRevision> =
+        compareBy { (it as? JujutsuFileRevision)?.getCommitter() ?: "" }
 
-            // Get the revision to extract formatted change ID
-            val tableModel = table.model
-            if (row < 0 || row >= tableModel.rowCount) return
+    override fun getPreferredStringValue() = "user@example.com"
 
-            // Try to get the actual revision object to access the revision number
-            val actualRow = table.convertRowIndexToModel(row)
-            val revisionColumn = 0  // Revision is typically first column
+    override fun getAdditionalWidth() = 10
+}
 
-            val cellValue = tableModel.getValueAt(actualRow, revisionColumn)
-            val revisionNumber = when (cellValue) {
-                is VcsFileRevision -> cellValue.revisionNumber
-                is JujutsuRevisionNumber -> cellValue
-                else -> null
-            } as? JujutsuRevisionNumber
+/**
+ * Custom column for commit timestamp (committer timestamp)
+ */
+class CommitTimestampColumnInfo : ColumnInfo<VcsFileRevision, Date?>("Commit Time") {
+    override fun valueOf(revision: VcsFileRevision): Date? =
+        (revision as? JujutsuFileRevision)?.getCommitterDate()
 
-            if (revisionNumber != null) {
-                // Get short and full versions
-                val shortVersion = revisionNumber.toShortString()
-                val fullVersion = revisionNumber.asString()
+    override fun getComparator(): Comparator<VcsFileRevision> =
+        compareBy(nullsLast()) { (it as? JujutsuFileRevision)?.getCommitterDate() }
 
-                // Render short part in bold, remainder in gray
-                append(shortVersion, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-                if (fullVersion.length > shortVersion.length) {
-                    val remainder = fullVersion.substring(shortVersion.length)
-                    append(remainder, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+    override fun getRenderer(revision: VcsFileRevision): TableCellRenderer {
+        return object : ColoredTableCellRenderer() {
+            override fun customizeCellRenderer(
+                table: JTable,
+                value: Any?,
+                selected: Boolean,
+                hasFocus: Boolean,
+                row: Int,
+                column: Int
+            ) {
+                if (value is Date) {
+                    append(DateFormatUtil.formatPrettyDateTime(value), SimpleTextAttributes.REGULAR_ATTRIBUTES)
                 }
-            } else {
-                // Fallback to plain rendering
-                append(value, SimpleTextAttributes.REGULAR_ATTRIBUTES)
             }
         }
     }
 
-    override fun valueOf(revision: VcsFileRevision): String =
-        revision.revisionNumber.asString()
+    override fun getPreferredStringValue() = "2025-12-15 12:00"
 
-    override fun getRenderer(revision: VcsFileRevision): TableCellRenderer = renderer
-
-    override fun getComparator(): Comparator<VcsFileRevision> =
-        compareBy { it.revisionNumber.asString() }
-
-    // Set preferred column width (in pixels)
-    override fun getWidth(table: JTable): Int = 180
-
-    override fun getMaxStringValue(): String = "k".repeat(24) // Approximate max width
+    override fun getAdditionalWidth() = 10
 }

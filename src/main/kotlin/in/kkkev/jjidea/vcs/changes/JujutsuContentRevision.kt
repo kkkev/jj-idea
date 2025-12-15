@@ -8,28 +8,26 @@ import `in`.kkkev.jjidea.jj.Revision
 /**
  * Revision number implementation for Jujutsu that supports both full and short display formats
  */
-class JujutsuRevisionNumber(
-    private val fullRevision: String,
-    private val shortRevision: String? = null
-) : ShortVcsRevisionNumber {
+class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumber {
+    /**
+     * Returns hex format when used with VCS Log (Hash compatibility),
+     * otherwise returns JJ change ID format
+     */
+    override fun asString() = (revision as? ChangeId)?.hexString ?: revision.full
 
-    constructor(changeId: ChangeId) : this(changeId.full, changeId.short)
-    constructor(revision: Revision) : this(revision.toString(), null)
-
-    override fun asString(): String = fullRevision
-
-    override fun toShortString(): String = shortRevision ?: fullRevision
+    override fun toShortString() = revision.short
 
     override fun equals(other: Any?) = when {
         other !is JujutsuRevisionNumber -> false
-        this.fullRevision == other.fullRevision -> true
+        this.revision == other.revision -> true
         else -> false
     }
 
-    override fun hashCode() = fullRevision.hashCode()
+    override fun hashCode() = revision.hashCode()
 
+    // TODO What is the ordering assumption here?
     override fun compareTo(other: VcsRevisionNumber?) = if (other !is JujutsuRevisionNumber)
         0
     else
-        fullRevision.compareTo(other.fullRevision)
+        revision.full.compareTo(other.revision.full)
 }
