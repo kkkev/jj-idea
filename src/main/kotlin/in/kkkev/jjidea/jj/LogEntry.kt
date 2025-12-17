@@ -13,13 +13,12 @@ import kotlinx.datetime.Instant
 data class LogEntry(
     val changeId: ChangeId,
     val commitId: String,
-    val description: String,
+    private val underlyingDescription: String,
     val bookmarks: List<Bookmark> = emptyList(),
     val parentIds: List<ChangeId> = emptyList(),
     val isWorkingCopy: Boolean = false,
     val hasConflict: Boolean = false,
     val isEmpty: Boolean = false,
-    val isUndescribed: Boolean = false,
     val authorTimestamp: Instant? = null,
     val committerTimestamp: Instant? = null,
     val author: VcsUser? = null,
@@ -30,43 +29,5 @@ data class LogEntry(
      */
     fun getFormattedChangeId() = JujutsuCommitFormatter.format(changeId)
 
-    /**
-     * Get markers for special states (conflict, empty, undescribed)
-     */
-    fun getMarkers(): List<String> {
-        val markers = mutableListOf<String>()
-
-        if (hasConflict) {
-            markers.add("conflict")
-        }
-        if (isEmpty) {
-            markers.add("empty")
-        }
-        if (isUndescribed) {
-            markers.add("(no description)")
-        }
-
-        return markers
-    }
-
-    /**
-     * Get a display-friendly description
-     */
-    fun getDisplayDescription() = when {
-        hasConflict && description.isEmpty() -> "(conflict)"
-        isEmpty -> "(empty)"
-        isUndescribed -> "(no description)"
-        description.isEmpty() -> "(no description)"
-        else -> description
-    }
-
-    /**
-     * Get bookmark display string
-     */
-    fun getBookmarkDisplay(): String = bookmarks.joinToString(", ")
-
-    /**
-     * Get parent IDs display string
-     */
-    fun getParentIdsDisplay(): String = parentIds.joinToString(", ")
+    val description = Description(underlyingDescription)
 }

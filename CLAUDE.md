@@ -435,3 +435,4 @@ For detailed change history, see git log. Major architectural changes documented
 - Where a function returns an unambiguous type and is declared as a single-line expression, omit the type. For example, rather than `fun foo(): String = bar`, use `fun foo() = bar`. However, if the expression is the result of a platform call where nullity is ambiguous, declare the type explicitly.
 - Always use imports over fully-qualified symbols
 - Always optimise imports
+- When pushing, just push to origin by default. I will push to github manually.

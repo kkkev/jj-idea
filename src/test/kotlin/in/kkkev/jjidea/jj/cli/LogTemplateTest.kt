@@ -51,7 +51,7 @@ class LogTemplateTest {
 
         entry.changeId shouldBe ChangeId("qpvuntsm", "q")
         entry.commitId shouldBe "abc123def456"
-        entry.description shouldBe "Add new feature"
+        entry.description.display shouldBe "Add new feature"
         entry.bookmarks.shouldBeEmpty()
         entry.parentIds.shouldBeEmpty()
         entry.isWorkingCopy shouldBe false
@@ -114,7 +114,7 @@ class LogTemplateTest {
 
         val entry = basicLogTemplate.take(fields.iterator())
 
-        entry.description shouldBe "First line\nSecond line\nThird line"
+        entry.description.display shouldBe "First line\nSecond line\nThird line"
     }
 
     @Test
@@ -132,9 +132,8 @@ class LogTemplateTest {
 
         val entry = basicLogTemplate.take(fields.iterator())
 
-        entry.description shouldBe ""
+        entry.description.empty shouldBe true
         entry.isEmpty shouldBe true
-        entry.isUndescribed shouldBe false  // Empty commits are not undescribed
     }
 
     @Test
@@ -152,9 +151,9 @@ class LogTemplateTest {
 
         val entry = basicLogTemplate.take(fields.iterator())
 
-        entry.description shouldBe ""
+        entry.description.actual shouldBe ""
         entry.isEmpty shouldBe false
-        entry.isUndescribed shouldBe true  // Empty description but not empty commit
+        entry.description.empty shouldBe true  // Empty description but not empty commit
     }
 
     @Test

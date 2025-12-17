@@ -285,7 +285,7 @@ object JujutsuCompareWithPopup {
         } else {
             entries.filter { entry ->
                 val changeId = entry.changeId.short
-                val description = entry.description
+                val description = entry.description.display
                 changeId.contains(query, ignoreCase = true) ||
                         description.contains(query, ignoreCase = true)
             }.take(DEFAULT_LIMIT)
@@ -294,7 +294,7 @@ object JujutsuCompareWithPopup {
         // Convert to CompareItems
         filteredEntries.forEach { entry ->
             val changeId = entry.changeId.short
-            val description = entry.description.trim().ifEmpty { "(no description)" }
+            val description = entry.description.display
             items.add(CompareItem.Change(changeId, description))
         }
 

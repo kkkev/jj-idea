@@ -18,8 +18,8 @@ abstract class JujutsuCommitMetadataBase(
     override fun getTimestamp() = commitTime
     // TODO What if null?
     override fun getAuthor() = entry.author!!
-    override fun getFullMessage() = entry.description
-    override fun getSubject() = entry.description.lines().firstOrNull() ?: entry.description
+    override fun getFullMessage() = entry.description.display
+    override fun getSubject() = entry.description.summary
     override fun getCommitter() = entry.committer!!
     override fun getAuthorTime() = entry.authorTimestamp!!.toEpochMilliseconds()
     override fun getRoot() = root

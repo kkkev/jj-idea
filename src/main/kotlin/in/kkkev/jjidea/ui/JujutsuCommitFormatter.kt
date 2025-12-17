@@ -10,7 +10,6 @@ import `in`.kkkev.jjidea.jj.ChangeId
  * - Working copy shows both commit name and @
  */
 object JujutsuCommitFormatter {
-
     /**
      * Represents a formatted change ID with its parts separated
      */

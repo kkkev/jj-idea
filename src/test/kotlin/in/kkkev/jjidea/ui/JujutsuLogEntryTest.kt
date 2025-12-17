@@ -28,7 +28,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = commitId,
-            description = description,
+            underlyingDescription = description,
             bookmarks = bookmarks
         )
 
@@ -44,7 +44,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "Work in progress",
+            underlyingDescription = "Work in progress",
             isWorkingCopy = true
         )
 
@@ -56,7 +56,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "Conflicted change",
+            underlyingDescription = "Conflicted change",
             hasConflict = true
         )
 
@@ -68,7 +68,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "",
+            underlyingDescription = "",
             isEmpty = true
         )
 
@@ -80,11 +80,10 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "",
-            isUndescribed = true
+            underlyingDescription = ""
         )
 
-        entry.isUndescribed shouldBe true
+        entry.description.empty shouldBe true
     }
 
     @Test
@@ -92,7 +91,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "Test"
+            underlyingDescription = "Test"
         )
 
         val formatted = entry.getFormattedChangeId()
@@ -102,205 +101,11 @@ class JujutsuLogEntryTest {
     }
 
     @Test
-    fun `display markers for special states`() {
-        val conflictEntry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Test",
-            hasConflict = true
-        )
-
-        val markers = conflictEntry.getMarkers()
-
-        markers shouldContain "conflict"
-    }
-
-    @Test
-    fun `display markers for empty commit`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "",
-            isEmpty = true
-        )
-
-        val markers = entry.getMarkers()
-
-        markers shouldContain "empty"
-    }
-
-    @Test
-    fun `display markers for undescribed commit`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "",
-            isUndescribed = true
-        )
-
-        val markers = entry.getMarkers()
-
-        markers shouldContain "(no description)"
-    }
-
-    @Test
-    fun `display multiple markers at once`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "",
-            hasConflict = true,
-            isEmpty = true,
-            isUndescribed = true
-        )
-
-        val markers = entry.getMarkers()
-
-        markers.size shouldBe 3
-        markers shouldContain "conflict"
-        markers shouldContain "empty"
-        markers shouldContain "(no description)"
-    }
-
-    @Test
-    fun `getDisplayDescription for normal commit`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Add new feature"
-        )
-
-        entry.getDisplayDescription() shouldBe "Add new feature"
-    }
-
-    @Test
-    fun `getDisplayDescription for conflict with empty description`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "",
-            hasConflict = true
-        )
-
-        entry.getDisplayDescription() shouldBe "(conflict)"
-    }
-
-    @Test
-    fun `getDisplayDescription for empty commit`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "",
-            isEmpty = true
-        )
-
-        entry.getDisplayDescription() shouldBe "(empty)"
-    }
-
-    @Test
-    fun `getDisplayDescription for undescribed commit`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "",
-            isUndescribed = true
-        )
-
-        entry.getDisplayDescription() shouldBe "(no description)"
-    }
-
-    @Test
-    fun `getDisplayDescription for empty description without special flags`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = ""
-        )
-
-        entry.getDisplayDescription() shouldBe "(no description)"
-    }
-
-    @Test
-    fun `getBookmarkDisplay with no bookmarks`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Test",
-            bookmarks = emptyList()
-        )
-
-        entry.getBookmarkDisplay() shouldBe ""
-    }
-
-    @Test
-    fun `getBookmarkDisplay with single bookmark`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Test",
-            bookmarks = listOf(Bookmark("main"))
-        )
-
-        entry.getBookmarkDisplay() shouldBe "main"
-    }
-
-    @Test
-    fun `getBookmarkDisplay with multiple bookmarks`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Test",
-            bookmarks = listOf(Bookmark("main"), Bookmark("develop"), Bookmark("feature"))
-        )
-
-        entry.getBookmarkDisplay() shouldBe "main, develop, feature"
-    }
-
-    @Test
-    fun `getParentIdsDisplay with no parents`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Test",
-            parentIds = emptyList()
-        )
-
-        entry.getParentIdsDisplay() shouldBe ""
-    }
-
-    @Test
-    fun `getParentIdsDisplay with single parent`() {
-        val parentId = ChangeId("abcdefgh", 2)
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Test",
-            parentIds = listOf(parentId)
-        )
-
-        entry.getParentIdsDisplay() shouldBe "ab:cdefgh"
-    }
-
-    @Test
-    fun `getParentIdsDisplay with multiple parents (merge)`() {
-        val parent1 = ChangeId("abcdefgh", 2)
-        val parent2 = ChangeId("xyzwvuts", 2)
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            description = "Merge commit",
-            parentIds = listOf(parent1, parent2)
-        )
-
-        entry.getParentIdsDisplay() shouldBe "ab:cdefgh, xy:zwvuts"
-    }
-
-    @Test
     fun `entry with author and committer information`() {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "Test",
+            underlyingDescription = "Test",
             author = ALICE,
             committer = BOB
         )
@@ -316,7 +121,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = "Test",
+            underlyingDescription = "Test",
             authorTimestamp = authorTime,
             committerTimestamp = committerTime
         )
@@ -331,10 +136,9 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             changeId = CHANGE_ID,
             commitId = "abc123",
-            description = multiLineDesc
+            underlyingDescription = multiLineDesc
         )
 
         entry.description shouldBe multiLineDesc
-        entry.getDisplayDescription() shouldBe multiLineDesc
     }
 }

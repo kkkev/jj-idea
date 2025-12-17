@@ -50,7 +50,7 @@ class JujutsuFileRevision(
 
     override fun getCommitterEmail(): String? = entry.committer?.email
 
-    override fun getCommitMessage(): String = entry.description.ifEmpty { "(no description)" }
+    override fun getCommitMessage(): String = entry.description.display
 
     /**
      * Get the committer name (may differ from author in JJ)

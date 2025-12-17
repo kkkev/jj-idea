@@ -357,11 +357,9 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             val result = vcs!!.logService.getLog(WorkingCopy)
             ApplicationManager.getApplication().invokeLater {
                 result.getOrNull()?.let { entries ->
-                    if (entries.isNotEmpty()) {
-                        val entry = entries[0]
-
+                    entries.firstOrNull()?.let { entry ->
                         // Update the description text area
-                        descriptionArea.text = entry.description
+                        descriptionArea.text = entry.description.actual
 
                         // Format change ID with theme-aware colors
                         val formattedChangeId = entry.getFormattedChangeId()
