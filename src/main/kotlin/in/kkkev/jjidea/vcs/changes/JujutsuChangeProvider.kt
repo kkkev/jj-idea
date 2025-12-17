@@ -116,8 +116,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             }
 
             'R' -> {
-                // Renamed file - jj shows this differently, may need special handling
-                log.debug("Renamed file detected: $filePath")
+                // Renamed file: format is "R {oldname => newname}"
+                addRenamedChange(filePath, root, builder)
             }
 
             else -> {
@@ -152,5 +152,41 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             Change(beforeRevision, null, FileStatus.DELETED),
             vcs.keyInstanceMethod
         )
+    }
+
+    /**
+     * Parse rename status and add change
+     * Format: "{oldname => newname}"
+     */
+    private fun addRenamedChange(renameSpec: String, root: VirtualFile, builder: ChangelistBuilder) {
+        // Remove braces and parse
+        val spec = renameSpec.trim().removeSurrounding("{", "}")
+        val parts = spec.split(" => ")
+
+        if (parts.size != 2) {
+            log.warn("Invalid rename format: $renameSpec")
+            return
+        }
+
+        val oldPath = parts[0].trim()
+        val newPath = parts[1].trim()
+
+        log.info("Detected rename: $oldPath => $newPath")
+
+        // Create file paths
+        val beforePath = VcsUtil.getFilePath(root.path + "/" + oldPath, false)
+        val afterPath = VcsUtil.getFilePath(root.path + "/" + newPath, false)
+
+        // Create revisions
+        val beforeRevision = vcs.createRevision(beforePath, WorkingCopy.parent)
+        val afterRevision = CurrentContentRevision(afterPath)
+
+        // Create change with MODIFIED status (IntelliJ shows renames as modifications)
+        val change = Change(beforeRevision, afterRevision, FileStatus.MODIFIED)
+
+        // Mark as renamed
+        change.isIsReplaced = true
+
+        builder.processChange(change, vcs.keyInstanceMethod)
     }
 }

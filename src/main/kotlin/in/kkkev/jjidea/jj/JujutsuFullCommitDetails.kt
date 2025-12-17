@@ -38,14 +38,100 @@ class JujutsuFullCommitDetails(
         private fun loadChanges(entry: LogEntry, root: VirtualFile): Collection<Change> {
             val vcs = JujutsuVcs.findRequired(root)
 
-            // Use logService to get file changes
+            // First, detect renames using git-format diff
+            val renames = detectRenames(entry, root, vcs)
+            val renamedPaths = renames.flatMap { (oldPath, newPath) ->
+                listOf(oldPath, newPath)
+            }.toSet()
+
+            // Get regular file changes
             val result = vcs.logService.getFileChanges(entry.changeId)
 
-            return result.getOrElse { error ->
+            val regularChanges = result.getOrElse { error ->
                 log.error("Error loading changes for ${entry.changeId}: ${error.message}", error)
                 emptyList()
+            }.filter { fileChange ->
+                // Filter out files that are part of renames to avoid duplicates
+                fileChange.filePath !in renamedPaths
             }.mapNotNull { fileChange ->
                 convertToChange(fileChange, entry, root, vcs)
+            }
+
+            // Create Change objects for renames
+            val renameChanges = renames.map { (oldPath, newPath) ->
+                createRenameChange(oldPath, newPath, entry, root, vcs)
+            }
+
+            return regularChanges + renameChanges
+        }
+
+        /**
+         * Detect file renames using git-format diff.
+         * Returns a list of (oldPath, newPath) pairs.
+         */
+        private fun detectRenames(entry: LogEntry, root: VirtualFile, vcs: JujutsuVcs): List<Pair<String, String>> {
+            val result = vcs.commandExecutor.diffGit(entry.changeId)
+
+            if (!result.isSuccess) {
+                log.debug("Failed to get git diff for ${entry.changeId}: ${result.stderr}")
+                return emptyList()
+            }
+
+            return parseGitDiffRenames(result.stdout)
+        }
+
+        /**
+         * Parse git-format diff to extract rename pairs.
+         * Format:
+         * ```
+         * diff --git a/old.txt b/new.txt
+         * rename from old.txt
+         * rename to new.txt
+         * ```
+         */
+        private fun parseGitDiffRenames(diffOutput: String): List<Pair<String, String>> {
+            val lines = diffOutput.lines()
+            val renames = mutableListOf<Pair<String, String>>()
+            var renameFrom: String? = null
+
+            for (line in lines) {
+                when {
+                    line.startsWith("rename from ") -> {
+                        renameFrom = line.substringAfter("rename from ").trim()
+                    }
+
+                    line.startsWith("rename to ") -> {
+                        val renameTo = line.substringAfter("rename to ").trim()
+                        if (renameFrom != null) {
+                            renames.add(renameFrom to renameTo)
+                            log.info("Detected rename in ${diffOutput.lines().firstOrNull()}: $renameFrom -> $renameTo")
+                            renameFrom = null
+                        }
+                    }
+                }
+            }
+
+            return renames
+        }
+
+        /**
+         * Create a Change object for a renamed file.
+         */
+        private fun createRenameChange(
+            oldPath: String,
+            newPath: String,
+            entry: LogEntry,
+            root: VirtualFile,
+            vcs: JujutsuVcs
+        ): Change {
+            val beforePath = VcsUtil.getFilePath(root.path + "/" + oldPath, false)
+            val afterPath = VcsUtil.getFilePath(root.path + "/" + newPath, false)
+
+            val beforeRevision = entry.parentIds.firstOrNull()?.let { vcs.createRevision(beforePath, it) }
+            val afterRevision = vcs.createRevision(afterPath, entry.changeId)
+
+            return Change(beforeRevision, afterRevision, FileStatus.MODIFIED).apply {
+                this.isIsReplaced = true
             }
         }
 

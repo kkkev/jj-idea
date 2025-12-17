@@ -111,9 +111,8 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     fun createRevision(filePath: FilePath, revision: Revision) = JujutsuContentRevision(filePath, revision)
 
     fun getRelativePath(filePath: FilePath): String {
-        val repoRoot = root ?: throw VcsException("Project is not within a JJ repository")
         val absolutePath = filePath.path
-        val rootPath = repoRoot.path
+        val rootPath = root.path
         return  if (absolutePath.startsWith(rootPath)) {
             absolutePath.removePrefix(rootPath).removePrefix("/")
         } else {

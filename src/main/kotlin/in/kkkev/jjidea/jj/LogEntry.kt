@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
-import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
 import kotlinx.datetime.Instant
 

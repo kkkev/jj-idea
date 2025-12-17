@@ -3,7 +3,6 @@ package `in`.kkkev.jjidea.vcs.history
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.history.VcsFileRevision
@@ -24,11 +23,15 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
 
     private val log = Logger.getInstance(javaClass)
 
-    override val supportedVcs: VcsKey
-        get() = JujutsuVcs.getKey()
+    override val supportedVcs get() = JujutsuVcs.getKey()
 
-    override fun getSupportedFilters(root: VirtualFile, filePath: FilePath, hash: Hash?): Set<VcsLogFilterCollection.FilterKey<*>> {
+    override fun getSupportedFilters(
+        root: VirtualFile,
+        filePath: FilePath,
+        hash: Hash?
+    ): Set<VcsLogFilterCollection.FilterKey<*>> {
         // JJ doesn't support filters yet (branch, revision filters would go here)
+        // TODO Fill this in
         return emptySet()
     }
 
@@ -41,11 +44,7 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
         commitCount: Int,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        log.info("Loading fast file history for ${filePath.path} (limit: $commitCount)")
-
-        val vcsManager = ProjectLevelVcsManager.getInstance(project)
-        val vcs = vcsManager.getVcsFor(root) as? JujutsuVcs
-            ?: throw VcsException("Jujutsu VCS not found for root: $root")
+        val vcs = JujutsuVcs.findRequired(root)
 
         val relativePath = vcs.getRelativePath(filePath)
 
@@ -77,11 +76,7 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
         filters: VcsLogFilterCollection,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        log.info("Collecting full file history for ${filePath.path}")
-
-        val vcsManager = ProjectLevelVcsManager.getInstance(project)
-        val vcs = vcsManager.getVcsFor(root) as? JujutsuVcs
-            ?: throw VcsException("Jujutsu VCS not found for root: $root")
+        val vcs = JujutsuVcs.findRequired(root)
 
         val relativePath = vcs.getRelativePath(filePath)
 
@@ -104,15 +99,8 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
     }
 
     @Throws(VcsException::class)
-    override fun getRename(
-        root: VirtualFile,
-        filePath: FilePath,
-        beforeHash: Hash,
-        afterHash: Hash
-    ): Rename? {
-        // JJ doesn't explicitly track file renames yet
-        // TODO: Implement when JJ adds rename tracking or when we add heuristic detection
-        log.debug("Rename detection not yet supported for Jujutsu")
+    override fun getRename(root: VirtualFile, filePath: FilePath, beforeHash: Hash, afterHash: Hash): Rename? {
+        // TODO: Implement rename detection for file history (lower priority)
         return null
     }
 }

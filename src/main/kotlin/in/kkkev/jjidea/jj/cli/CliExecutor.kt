@@ -83,6 +83,9 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
 
     override fun bookmarkList(): CommandExecutor.CommandResult = execute(root, listOf("bookmark", "list"))
 
+    override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
+        execute(root, listOf("diff", "--git", "-r", revision))
+
     private fun execute(
         workingDir: VirtualFile?,
         args: List<Any>,

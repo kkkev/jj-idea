@@ -9,9 +9,8 @@ import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.jj.FileChangeStatus
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
-import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import java.util.Date
 
 /**
@@ -88,17 +87,4 @@ class JujutsuFileRevision(
      * Get the full log entry for this revision
      */
     fun getLogEntry() = entry
-
-    // VcsFileRevisionEx abstract methods
-    override fun getAuthorEmail(): String? = entry.author?.email
-
-    override fun getCommitterName(): String? = entry.committer?.name
-
-    override fun getCommitterEmail(): String? = entry.committer?.email
-
-    override fun getPath(): FilePath = filePath
-
-    override fun getAuthorDate(): Date? = entry.authorTimestamp?.toJavaDate()
-
-    override fun isDeleted(): Boolean = false // TODO: Determine from file status
 }

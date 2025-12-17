@@ -94,4 +94,11 @@ interface CommandExecutor {
      * @return Command result with bookmark list (format: "bookmark-name: change-id")
      */
     fun bookmarkList(): CommandResult
+
+    /**
+     * Get git-format diff for a revision (to detect renames)
+     * @param revision Revision to diff (e.g., "@", change ID)
+     * @return Git-format diff output
+     */
+    fun diffGit(revision: Revision): CommandResult
 }
