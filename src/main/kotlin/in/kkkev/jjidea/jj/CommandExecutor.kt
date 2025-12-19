@@ -91,9 +91,10 @@ interface CommandExecutor {
 
     /**
      * List all bookmarks in the repository
-     * @return Command result with bookmark list (format: "bookmark-name: change-id")
+     * @param template Optional template for output formatting
+     * @return Command result with bookmark list
      */
-    fun bookmarkList(): CommandResult
+    fun bookmarkList(template: String? = null): CommandResult
 
     /**
      * Get git-format diff for a revision (to detect renames)

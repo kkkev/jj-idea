@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
+import `in`.kkkev.jjidea.ui.DescriptionRenderer
 import kotlinx.datetime.Instant
 
 /**
@@ -27,10 +28,11 @@ data class AnnotationLine(
             append(" <${author.email}>")
         }
         append("\n")
+        val displayText = DescriptionRenderer.toDisplayText(descriptionFirstLine)
         if (descriptionFirstLine.isNotEmpty()) {
-            append("Description: $descriptionFirstLine")
+            append("Description: $displayText")
         } else {
-            append("(no description)")
+            append(displayText)
         }
     }
 

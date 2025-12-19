@@ -44,4 +44,10 @@ interface LogService {
      * @return List of file changes
      */
     fun getFileChanges(revision: Revision): Result<List<FileChange>>
+
+    /**
+     * Get all bookmarks in the repository
+     * @return List of bookmarks with their associated change IDs
+     */
+    fun getBookmarks(): Result<List<BookmarkItem>>
 }

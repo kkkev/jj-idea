@@ -109,6 +109,24 @@ object LogTemplates {
             committer.timestamp.take(it)
         )
     }
+
+    /**
+     * Template for bookmark list parsing
+     * Uses: jj bookmark list -T 'name ++ "\0" ++ normal_target.change_id() ++ "~" ++ normal_target.change_id().shortest() ++ "\0"'
+     */
+    val bookmarkListTemplate = object : LogTemplate<BookmarkItem>(
+        stringField("name"),
+        singleField("normal_target.change_id() ++ \"~\" ++ normal_target.change_id().shortest()") {
+            val (full, short) = it.split("~")
+            ChangeId(full, short)
+        }
+    ) {
+        override fun take(input: Iterator<String>): BookmarkItem {
+            val name = fields[0].take(input) as String
+            val changeId = fields[1].take(input) as ChangeId
+            return BookmarkItem(Bookmark(name), changeId)
+        }
+    }
 }
 
 abstract class LogTemplate<T>(override vararg val fields: LogSpec<*>) : MultipleFields<T>
@@ -134,6 +152,23 @@ class CliLogService(private val executor: CommandExecutor) : LogService {
     override fun getRefs(): Result<List<RefAtRevision>> = getLog(LogTemplates.refsLogTemplate).map { it.flatten() }
 
     override fun getCommitGraph(revset: Revset) = getLog(LogTemplates.commitGraphLogTemplate, revset)
+
+    override fun getBookmarks(): Result<List<BookmarkItem>> {
+        log.debug("Getting bookmarks")
+
+        val result = executor.bookmarkList(LogTemplates.bookmarkListTemplate.spec)
+        return if (result.isSuccess) {
+            try {
+                Result.success(parse(LogTemplates.bookmarkListTemplate, result.stdout))
+            } catch (e: Exception) {
+                log.error("Failed to parse bookmarks", e)
+                Result.failure(e)
+            }
+        } else {
+            log.error("Bookmark list command failed: ${result.stderr}")
+            Result.failure(VcsException("Error from jj bookmark list: " + result.stderr))
+        }
+    }
 
     override fun getFileChanges(revision: Revision): Result<List<FileChange>> {
         log.debug("Getting file changes for revision: $revision")

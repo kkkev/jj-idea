@@ -12,8 +12,14 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.popup.AbstractPopup
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.jj.BookmarkItem
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogCache
+import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.DescriptionRenderer
+import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -44,18 +50,19 @@ object JujutsuCompareWithPopup {
     sealed class CompareItem(open val displayName: String, open val revision: String) {
         /** Recent change with description */
         data class Change(
-            val changeId: String,
-            val description: String,
-            override val displayName: String = "$changeId - ${description.take(60)}",
-            override val revision: String = changeId
-        ) : CompareItem(displayName, revision)
+            val entry: LogEntry,
+            override val displayName: String = "${entry.changeId.short} ${entry.description.summary}",
+            override val revision: String = entry.changeId.toString()
+        ) : CompareItem(displayName, revision) {
+            val changeId: ChangeId get() = entry.changeId
+            val description: Description get() = entry.description
+        }
 
-        /** Named bookmark */
+        /** Named bookmark with change ID */
         data class Bookmark(
-            val name: String,
-            val changeId: String,
-            override val displayName: String = "$name ($changeId)",
-            override val revision: String = name
+            val item: BookmarkItem,
+            override val displayName: String = "${item.bookmark.name} (${item.changeId.short})",
+            override val revision: String = item.bookmark.name
         ) : CompareItem(displayName, revision)
     }
 
@@ -80,6 +87,9 @@ object JujutsuCompareWithPopup {
                 .setMovable(true)
                 .setRequestFocus(true)
                 .createPopup()
+
+            // Set popup reference so panel can close it
+            panel.setPopup(popup)
 
             popup.showCenteredInCurrentWindow(project)
 
@@ -111,7 +121,49 @@ object JujutsuCompareWithPopup {
         }
 
         private val listModel = DefaultListModel<CompareItem>()
-        private val list = JBList(listModel).apply {
+        private val list = object : JBList<CompareItem>(listModel) {
+            override fun getToolTipText(event: MouseEvent): String? {
+                val index = locationToIndex(event.point)
+                if (index < 0) return null
+
+                val item = model.getElementAt(index)
+                return when (item) {
+                    is CompareItem.Change -> {
+                        val formatted = JujutsuCommitFormatter.format(item.entry.changeId)
+                        buildString {
+                            append("<html>")
+                            append("<b>${formatted.shortPart}</b>")
+                            if (formatted.restPart.isNotEmpty()) {
+                                append("<font color=gray><small>${formatted.restPart}</small></font>")
+                            }
+                            append("<br>")
+                            item.entry.author?.let { author ->
+                                append("${author.name} &lt;${author.email}&gt;<br>")
+                            }
+                            item.entry.authorTimestamp?.let { timestamp ->
+                                append("${timestamp}<br>")
+                            }
+                            append("<br>")
+                            append(DescriptionRenderer.toHtml(item.entry.description, multiline = true))
+                            append("</html>")
+                        }
+                    }
+                    is CompareItem.Bookmark -> {
+                        val formatted = JujutsuCommitFormatter.format(item.item.changeId)
+                        buildString {
+                            append("<html>")
+                            append("<b>${item.item.bookmark.name}</b><br>")
+                            append("Change: <b>${formatted.shortPart}</b>")
+                            if (formatted.restPart.isNotEmpty()) {
+                                append("<font color=gray><small>${formatted.restPart}</small></font>")
+                            }
+                            append("</html>")
+                        }
+                    }
+                    else -> null
+                }
+            }
+        }.apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
             cellRenderer = CompareItemRenderer()
         }
@@ -125,7 +177,7 @@ object JujutsuCompareWithPopup {
             // Results list
             val scrollPane = JBScrollPane(list).apply {
                 border = JBUI.Borders.empty()
-                preferredSize = Dimension(500, 400)
+                preferredSize = Dimension(600, 400)
             }
             add(scrollPane, BorderLayout.CENTER)
 
@@ -133,6 +185,36 @@ object JujutsuCompareWithPopup {
             searchField.addDocumentListener(object : com.intellij.ui.DocumentAdapter() {
                 override fun textChanged(e: javax.swing.event.DocumentEvent) {
                     loadData(searchField.text)
+                }
+            })
+
+            // Handle up/down keys in search field to navigate list
+            searchField.textEditor.addKeyListener(object : KeyAdapter() {
+                override fun keyPressed(e: KeyEvent) {
+                    when (e.keyCode) {
+                        KeyEvent.VK_DOWN -> {
+                            if (listModel.size() > 0) {
+                                val currentIndex = list.selectedIndex
+                                list.selectedIndex = if (currentIndex < listModel.size() - 1) currentIndex + 1 else 0
+                                list.ensureIndexIsVisible(list.selectedIndex)
+                                e.consume()
+                            }
+                        }
+                        KeyEvent.VK_UP -> {
+                            if (listModel.size() > 0) {
+                                val currentIndex = list.selectedIndex
+                                list.selectedIndex = if (currentIndex > 0) currentIndex - 1 else listModel.size() - 1
+                                list.ensureIndexIsVisible(list.selectedIndex)
+                                e.consume()
+                            }
+                        }
+                        KeyEvent.VK_ENTER -> {
+                            if (list.selectedValue != null) {
+                                selectItem(list.selectedValue)
+                                e.consume()
+                            }
+                        }
+                    }
                 }
             })
 
@@ -179,18 +261,8 @@ object JujutsuCompareWithPopup {
          */
         private fun selectItem(item: CompareItem) {
             onSelected(item.revision)
-            // Find and close the popup
-            val parent = this.parent
-            if (parent != null) {
-                var component = parent
-                while (component != null) {
-                    if (component is AbstractPopup) {
-                        component.cancel()
-                        break
-                    }
-                    component = component.parent
-                }
-            }
+            // Close the popup
+            currentPopup?.cancel()
         }
 
         /**
@@ -215,17 +287,24 @@ object JujutsuCompareWithPopup {
             when (value) {
                 is CompareItem.Bookmark -> {
                     icon = AllIcons.Vcs.Branch
-                    append(value.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-                    // TODO Format this change id
-                    append(" (${value.changeId})", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    append(value.item.bookmark.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                    append(" (", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    val formatted = JujutsuCommitFormatter.format(value.item.changeId)
+                    append(formatted.shortPart, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                    if (formatted.restPart.isNotEmpty()) {
+                        append(formatted.restPart, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                    }
+                    append(")", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                 }
                 is CompareItem.Change -> {
                     icon = AllIcons.Vcs.CommitNode
-                    // TODO Format this change id
-                    append(value.changeId, SimpleTextAttributes.REGULAR_ATTRIBUTES)
-                    append(" - ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                    val desc = value.description.lines().firstOrNull()?.take(60) ?: "(no description)"
-                    append(desc, SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    val formatted = JujutsuCommitFormatter.format(value.changeId)
+                    append(formatted.shortPart, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                    if (formatted.restPart.isNotEmpty()) {
+                        append(formatted.restPart, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                    }
+                    append(" ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    DescriptionRenderer.renderToComponent(value.description, ::append)
                 }
                 null -> {}
             }
@@ -244,32 +323,21 @@ object JujutsuCompareWithPopup {
         val cache = LogCache.getInstance(project)
 
         // Add bookmarks - always show all bookmarks filtered by query
-        val bookmarkResult = vcs.commandExecutor.bookmarkList()
+        val bookmarkResult = vcs.logService.getBookmarks()
         if (bookmarkResult.isSuccess) {
-            val bookmarkLines = bookmarkResult.stdout.lines().filter { it.isNotBlank() && it.contains(':') }
-            val bookmarks = bookmarkLines.mapNotNull { line ->
-                // Format: "bookmark-name: change-id"
-                val parts = line.split(':', limit = 2)
-                if (parts.size == 2) {
-                    val bookmarkName = parts[0].trim()
-                    val changeId = parts[1].trim().take(12)
-                    if (bookmarkName.isNotEmpty()) {
-                        CompareItem.Bookmark(bookmarkName, changeId)
-                    } else null
-                } else null
-            }
+            val bookmarks = bookmarkResult.getOrNull() ?: emptyList()
 
             // Filter bookmarks by query
             val filteredBookmarks = if (query.isEmpty()) {
                 bookmarks
             } else {
                 bookmarks.filter { bookmark ->
-                    bookmark.name.contains(query, ignoreCase = true) ||
-                            bookmark.changeId.contains(query, ignoreCase = true)
+                    bookmark.bookmark.name.contains(query, ignoreCase = true) ||
+                            bookmark.changeId.short.contains(query, ignoreCase = true)
                 }
             }
 
-            items.addAll(filteredBookmarks)
+            items.addAll(filteredBookmarks.map { CompareItem.Bookmark(it) })
         }
 
         // Add recent changes - limit to DEFAULT_LIMIT and filter by query
@@ -287,18 +355,14 @@ object JujutsuCompareWithPopup {
             entries.take(DEFAULT_LIMIT)
         } else {
             entries.filter { entry ->
-                val changeId = entry.changeId.short
-                val description = entry.description.display
-                changeId.contains(query, ignoreCase = true) ||
-                        description.contains(query, ignoreCase = true)
+                entry.changeId.short.contains(query, ignoreCase = true) ||
+                        entry.description.display.contains(query, ignoreCase = true)
             }.take(DEFAULT_LIMIT)
         }
 
         // Convert to CompareItems
         filteredEntries.forEach { entry ->
-            val changeId = entry.changeId.short
-            val description = entry.description.display
-            items.add(CompareItem.Change(changeId, description))
+            items.add(CompareItem.Change(entry))
         }
 
         return items

@@ -27,10 +27,19 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
-        // Show popup to select revision/bookmark
-        // TODO What does this take? A hash? change id? bookmark? what combination?
-        JujutsuCompareWithPopup.show(e.project!!, e.vcs!!) { chosen ->
-            showDiffWithRevision(e.project!!, e.file!!, RevisionExpression(chosen), e.vcs!!)
+        val project = e.project ?: return
+        val file = e.file ?: return
+
+        // Get VCS on background thread to avoid slow operations on EDT
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val vcs = JujutsuVcs.find(project) ?: return@executeOnPooledThread
+
+            // Show popup on EDT
+            ApplicationManager.getApplication().invokeLater {
+                JujutsuCompareWithPopup.show(project, vcs) { chosen ->
+                    showDiffWithRevision(project, file, RevisionExpression(chosen), vcs)
+                }
+            }
         }
     }
 
