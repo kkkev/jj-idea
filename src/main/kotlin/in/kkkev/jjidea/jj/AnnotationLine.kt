@@ -20,7 +20,7 @@ data class AnnotationLine(
      * Get a tooltip-friendly display of this annotation
      */
     fun getTooltip(): String = buildString {
-        append("Change: ${changeId.short}\n")
+        append("Change: ${changeId.display}\n")
         append("Commit: ${commitId.take(12)}\n")
         append("Author: ${author.name}")
         if (author.email.isNotEmpty()) {

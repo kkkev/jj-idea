@@ -156,6 +156,24 @@ JujutsuToolWindowFactory
 - Processes file changes in batches for better performance
 - Automatic disposal through message bus connection
 
+#### 8. HashImpl Requirement - Cannot Customize Hash Display
+**Decision**: Must use `HashImpl.build(hexString)` for all commit hashes. Cannot display JJ change IDs directly in VCS log.
+
+**Critical Constraints**:
+1. **Serialization**: `VcsLogStorageImpl` line 269 performs hardcoded cast: `((HashImpl)value.getHash()).write(out)` - custom Hash implementations throw `ClassCastException`
+2. **Hex Format**: `HashImpl.build()` validates input and only accepts hex characters (0-9a-f) - JJ characters (z-k) are rejected with "bad hash string" error
+3. **No Extension Points**: No way to customize hash display in details pane - rendering is hardcoded in `CommitPresentationUtil`
+4. **Plain Text Only**: Hash interface only provides `asString()` and `toShortString()` - no HTML formatting possible
+
+**Implication**: VCS log details pane shows hex format (e.g., "0123456") instead of JJ format (e.g., "qpvuntsm"). This is a platform limitation with no workaround.
+
+**Current Implementation**:
+- `ChangeId.hexString` converts JJ format to hex for storage in HashImpl
+- `ChangeId.fromHexString()` converts hex back to JJ format when needed
+- VCS log columns can show JJ format via custom column implementations
+
+**See**: `jj/ChangeId.kt` - hex conversion implementation
+
 ## File Structure
 
 ```
@@ -246,29 +264,38 @@ src/main/resources/META-INF/
 **Test Files**:
 - `RequirementsTest.kt` - Documents all 25+ requirements as integration test placeholders
 - `JujutsuCommandResultTest.kt` - ✅ Tests for CommandResult (3 tests)
-- `ChangeIdTest.kt` - ✅ Tests for ChangeId (18 tests - NEW)
-- `FileChangeTest.kt` - ✅ Tests for FileChange (11 tests - NEW)
-- `JujutsuLogServiceTest.kt` - ✅ Tests for JujutsuLogService enums (3 tests - NEW)
-- `JujutsuLogEntryTest.kt` - ✅ Tests for JujutsuLogEntry (~30 tests, 18+ added)
+- `ChangeIdTest.kt` - ✅ Tests for ChangeId (18 tests)
+- `FileChangeTest.kt` - ✅ Tests for FileChange (11 tests)
+- `JujutsuLogServiceTest.kt` - ✅ Tests for JujutsuLogService enums (3 tests)
+- `JujutsuLogEntryTest.kt` - ✅ Tests for JujutsuLogEntry (~30 tests)
 - `JujutsuLogParserTest.kt` - ✅ Comprehensive tests for log parsing (15+ tests)
 - `JujutsuCommitFormatterTest.kt` - ✅ Tests for commit ID formatting (4 tests)
 - `JujutsuChangesTreeModelSimpleTest.kt` - ✅ Tests for tree node display logic (4 tests)
+- `DescriptionTest.kt` - ✅ Tests for Description class (12 tests)
+- `RevsetTest.kt` - ✅ Tests for Revset types (19 tests)
+- `StringExtensionsTest.kt` - ✅ Tests for String extension utilities (11 tests)
 - `JujutsuRevisionNumberTest.kt` - Tests for revision numbers (needs IntelliJ Platform)
 
 **To Run Tests**:
 ```bash
-# Simple unit tests without IntelliJ instrumentation (25 tests)
+# Simple unit tests without IntelliJ instrumentation (85 tests)
 ./gradlew simpleTest
 
 # Full integration tests (requires proper IntelliJ test setup)
 ./gradlew test  # Currently disabled due to instrumentation issues
 ```
 
-**Test Results** (as of 2025-12-10):
-- 58 tests total
-- 34 simple unit tests passing
-- 24 tests require IntelliJ Platform test fixtures (ChangeId, JujutsuLogEntry, etc. use Hash type)
-- Test coverage includes comprehensive template-based log parsing tests
+**Test Results** (as of 2025-12-19):
+- 85 tests total (up from 58)
+- All simple unit tests passing
+- Comprehensive test coverage for:
+  - Core domain types (ChangeId, FileChange, Description, Revset)
+  - Template-based log parsing
+  - String utilities
+  - Commit formatting
+  - Tree model display logic
+  - Annotation parsing
+  - Compare with popup functionality
 
 **Writing New Tests**:
 Use JUnit tests with Kotest assertions:
@@ -421,7 +448,7 @@ For detailed change history, see git log. Major architectural changes documented
 
 ---
 
-**Last Updated**: 2025-12-11
+**Last Updated**: 2025-12-19
 **Plugin Version**: 0.1.0-SNAPSHOT
 **IntelliJ Version**: 2025.2
 - 
@@ -436,3 +463,4 @@ For detailed change history, see git log. Major architectural changes documented
 - Always use imports over fully-qualified symbols
 - Always optimise imports
 - When pushing, just push to origin by default. I will push to github manually.
+- You cannot use a custom implementation of com.intellij.vcs.log.Hash, because IntelliJ's VCS log cache's serialization mechanism (VcsLogStorageImpl) is hard-coded to use HashImpl.

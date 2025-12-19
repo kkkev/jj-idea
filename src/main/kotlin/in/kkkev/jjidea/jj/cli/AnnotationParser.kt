@@ -33,7 +33,7 @@ object AnnotationParser {
      */
     val TEMPLATE = """
         commit.change_id() ++ "\0" ++
-        commit.change_id().shortest(8) ++ "\0" ++
+        commit.change_id().shortest() ++ "\0" ++
         commit.commit_id() ++ "\0" ++
         commit.author().name() ++ "\0" ++
         commit.author().email() ++ "\0" ++

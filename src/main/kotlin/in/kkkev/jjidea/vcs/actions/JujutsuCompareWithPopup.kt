@@ -10,6 +10,7 @@ import com.intellij.ui.SearchTextField
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.popup.AbstractPopup
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogCache
@@ -183,7 +184,7 @@ object JujutsuCompareWithPopup {
             if (parent != null) {
                 var component = parent
                 while (component != null) {
-                    if (component is com.intellij.ui.popup.AbstractPopup) {
+                    if (component is AbstractPopup) {
                         component.cancel()
                         break
                     }
@@ -215,10 +216,12 @@ object JujutsuCompareWithPopup {
                 is CompareItem.Bookmark -> {
                     icon = AllIcons.Vcs.Branch
                     append(value.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+                    // TODO Format this change id
                     append(" (${value.changeId})", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                 }
                 is CompareItem.Change -> {
                     icon = AllIcons.Vcs.CommitNode
+                    // TODO Format this change id
                     append(value.changeId, SimpleTextAttributes.REGULAR_ATTRIBUTES)
                     append(" - ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     val desc = value.description.lines().firstOrNull()?.take(60) ?: "(no description)"
