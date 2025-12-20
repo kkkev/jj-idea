@@ -40,6 +40,7 @@
 
         <!-- Services -->
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
+        <projectService serviceImplementation="in.kkkev.jjidea.ui.JujutsuCustomLogTabManager" />
 
         <!-- Jujutsu working copy tool window on the left side -->
         <toolWindow
@@ -51,6 +52,14 @@
     </extensions>
 
     <actions>
+        <!-- Open custom Jujutsu log tab -->
+        <action id="Jujutsu.OpenLogTab"
+                class="in.kkkev.jjidea.vcs.actions.OpenJujutsuLogTabAction"
+                text="Open Jujutsu Log"
+                description="Open a custom Jujutsu log tab with advanced features">
+            <add-to-group group-id="VcsGroup" anchor="first"/>
+        </action>
+
         <!-- Jujutsu action group in editor context menu -->
         <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.vcs.actions.JujutsuEditorActionGroup" popup="true">
             <action id="Jujutsu.EditorAnnotate" class="in.kkkev.jjidea.vcs.actions.JujutsuAnnotateAction"/>
