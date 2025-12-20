@@ -5,9 +5,10 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
+import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 
 /**
- * Factory for creating the Jujutsu tool window
+ * Factory for creating the Jujutsu working copy tool window
  */
 class JujutsuToolWindowFactory : ToolWindowFactory, DumbAware {
 
@@ -22,9 +23,6 @@ class JujutsuToolWindowFactory : ToolWindowFactory, DumbAware {
         toolWindow.contentManager.addContent(content)
     }
 
-    override fun shouldBeAvailable(project: Project): Boolean {
-        // Only show if Jujutsu VCS is configured for this project
-        // For now, always show it
-        return true
-    }
+    override fun shouldBeAvailable(project: Project) =
+        JujutsuRootChecker.findJujutsuRoot(project.basePath) != null
 }

@@ -86,25 +86,10 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     }
 
     val root: VirtualFile by lazy {
-        // Start from project base directory
-        var currentDir = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
-        var foundRoot: VirtualFile? = null
-
-        // Search upwards for .jj directory
-        while (currentDir != null) {
-            if (currentDir.findChild(".jj") != null) {
-                foundRoot = currentDir
-                break
-            }
-            currentDir = currentDir.parent
-        }
-
-        if (foundRoot == null) {
-            throw VcsException("Project is not within a JJ repository (couldn't find a .jj directory above ${project.basePath}")
-        }
+        val foundRoot = JujutsuRootChecker.findJujutsuRoot(project.basePath)
+            ?: throw VcsException("Project is not within a JJ repository (couldn't find a .jj directory above ${project.basePath}")
 
         log.info("Jujutsu root for project ${project.name}: $foundRoot")
-
         foundRoot
     }
 

@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.vcs.VcsRootChecker
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 
 /**
@@ -18,5 +19,26 @@ class JujutsuRootChecker : VcsRootChecker() {
          * Check if the given directory is a jujutsu repository root
          */
         fun isJujutsuRoot(dir: VirtualFile) = dir.findChild(".jj")?.isDirectory ?: false
+
+        /**
+         * Search upward from the given directory to find the JJ repository root.
+         * Returns the directory containing the .jj directory, or null if not found.
+         */
+        fun findJujutsuRoot(startDir: VirtualFile?): VirtualFile? {
+            var currentDir = startDir
+            while (currentDir != null) {
+                if (isJujutsuRoot(currentDir)) return currentDir
+                currentDir = currentDir.parent
+            }
+            return null
+        }
+
+        /**
+         * Search upward from the given path to find the JJ repository root.
+         * Returns the directory containing the .jj directory, or null if not found.
+         */
+        fun findJujutsuRoot(startPath: String?): VirtualFile? =
+            startPath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+                ?.let { findJujutsuRoot(it) }
     }
 }

@@ -41,9 +41,9 @@
         <!-- Services -->
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
 
-        <!-- Jujutsu tool window on the left side (Commit view) -->
+        <!-- Jujutsu working copy tool window on the left side -->
         <toolWindow
-            id="Jujutsu"
+            id="Working copy"
             anchor="left"
             icon="AllIcons.Vcs.Branch"
             factoryClass="in.kkkev.jjidea.ui.JujutsuToolWindowFactory"
