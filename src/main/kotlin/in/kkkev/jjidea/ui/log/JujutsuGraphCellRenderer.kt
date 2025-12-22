@@ -68,6 +68,9 @@ class JujutsuGraphCellRenderer(
                 table.background
             }
 
+            // Draw pass-through lines first (behind commit)
+            drawPassThroughLines(g2d, graphNode)
+
             // Calculate commit position
             val commitX = LANE_WIDTH / 2 + graphNode.lane * LANE_WIDTH
             val commitY = height / 2
@@ -77,6 +80,39 @@ class JujutsuGraphCellRenderer(
 
             // Draw commit circle
             drawCommitCircle(g2d, graphNode, commitX, commitY)
+        }
+
+        private fun drawPassThroughLines(g2d: Graphics2D, node: GraphNode) {
+            // Draw vertical lines for child lanes passing through this row
+            // Look at all previous commits (children) that have parents in rows after this one
+            val model = table.model as? JujutsuLogTableModel ?: return
+            val currentEntry = model.getEntry(row) ?: return
+
+            for (prevRow in 0 until row) {
+                val prevEntry = model.getEntry(prevRow) ?: continue
+                val prevNode = graphNodes[prevEntry.changeId] ?: continue
+
+                // Check if this child has a parent that comes after this row
+                for (parentId in prevEntry.parentIds) {
+                    // Find parent's row
+                    var parentRow = -1
+                    for (r in row + 1 until model.rowCount) {
+                        if (model.getEntry(r)?.changeId == parentId) {
+                            parentRow = r
+                            break
+                        }
+                    }
+
+                    if (parentRow > row) {
+                        // This child's line passes through this row in the child's lane
+                        val childLane = prevNode.lane
+                        val childX = LANE_WIDTH / 2 + childLane * LANE_WIDTH
+                        g2d.color = prevNode.color
+                        g2d.drawLine(childX, 0, childX, height)
+                        break // Only draw once per child
+                    }
+                }
+            }
         }
 
         private fun drawCommitCircle(g2d: Graphics2D, node: GraphNode, x: Int, y: Int) {
@@ -97,39 +133,33 @@ class JujutsuGraphCellRenderer(
 
         private fun drawLinesToParents(g2d: Graphics2D, node: GraphNode, commitX: Int, commitY: Int, currentRow: Int) {
             val model = table.model as? JujutsuLogTableModel ?: return
+            val currentEntry = model.getEntry(currentRow) ?: return
 
-            // Draw incoming lines from previous row (child commits)
-            // Check if there are commits in the previous row that connect to this one
-            if (currentRow > 0) {
-                val prevEntry = model.getEntry(currentRow - 1)
-                if (prevEntry != null) {
-                    val prevNode = graphNodes[prevEntry.changeId]
-                    if (prevNode != null) {
-                        // Check if previous commit has this commit as a parent
-                        val parentIndex = prevEntry.parentIds.indexOf(model.getEntry(currentRow)?.changeId)
-                        if (parentIndex >= 0 && parentIndex < prevNode.parentLanes.size) {
-                            val prevLane = prevNode.lane
-                            val prevX = LANE_WIDTH / 2 + prevLane * LANE_WIDTH
+            // Draw incoming lines from children (from their lanes at top of this row to this commit)
+            // Look through ALL previous rows to find children that have this commit as a parent
+            for (prevRow in 0 until currentRow) {
+                val prevEntry = model.getEntry(prevRow) ?: continue
+                val prevNode = graphNodes[prevEntry.changeId] ?: continue
 
-                            val prevLineEndX = commitX + (prevX - commitX) / 2
-
-                            // Draw line from top of this cell to current commit
-                            g2d.color = prevNode.color
-                            g2d.drawLine(prevLineEndX, 0, commitX, commitY /*- COMMIT_RADIUS*/)
-                        }
-                    }
+                // Check if this previous commit has current commit as a parent
+                if (prevEntry.parentIds.contains(currentEntry.changeId)) {
+                    // Draw from CHILD's lane at TOP of THIS row to THIS commit's center
+                    // The line travels in the child's lane through pass-through rows,
+                    // then diagonals (or stays vertical) to reach this commit
+                    val childLane = prevNode.lane
+                    val childX = LANE_WIDTH / 2 + childLane * LANE_WIDTH
+                    g2d.color = prevNode.color
+                    g2d.drawLine(childX, 0, commitX, commitY)
                 }
             }
 
-            // Draw outgoing lines to parents (in next row)
-            for ((index, parentLane) in node.parentLanes.withIndex()) {
-                val parentX = LANE_WIDTH / 2 + parentLane * LANE_WIDTH
-
-                val parentLineEndX = commitX + (parentX - commitX) / 2
-
-                // Draw line from commit to bottom of cell
+            // Draw outgoing lines to parents
+            // Always draw vertical in THIS commit's lane - the line continues through pass-through
+            // until it reaches the parent, where it diagonals to the parent's position
+            if (node.parentLanes.isNotEmpty()) {
+                // Draw vertical line from commit center to bottom of cell (in THIS commit's lane)
                 g2d.color = node.color
-                g2d.drawLine(commitX, commitY /*+ COMMIT_RADIUS*/, parentLineEndX, height)
+                g2d.drawLine(commitX, commitY, commitX, height)
             }
         }
 

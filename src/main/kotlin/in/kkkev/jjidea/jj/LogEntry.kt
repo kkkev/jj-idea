@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
+import `in`.kkkev.jjidea.ui.log.GraphableEntry
 import kotlinx.datetime.Instant
 
 /**
@@ -11,11 +12,11 @@ import kotlinx.datetime.Instant
  * is handled by JujutsuCommitMetadataBase and its subclasses.
  */
 data class LogEntry(
-    val changeId: ChangeId,
+    override val changeId: ChangeId,
     val commitId: String,
     private val underlyingDescription: String,
     val bookmarks: List<Bookmark> = emptyList(),
-    val parentIds: List<ChangeId> = emptyList(),
+    override val parentIds: List<ChangeId> = emptyList(),
     val isWorkingCopy: Boolean = false,
     val hasConflict: Boolean = false,
     val isEmpty: Boolean = false,
@@ -23,7 +24,7 @@ data class LogEntry(
     val committerTimestamp: Instant? = null,
     val author: VcsUser? = null,
     val committer: VcsUser? = null
-) {
+) : GraphableEntry {
     /**
      * Get the formatted change ID with short prefix separated
      */
