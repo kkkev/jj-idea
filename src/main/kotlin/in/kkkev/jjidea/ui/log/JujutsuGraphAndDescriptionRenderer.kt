@@ -21,14 +21,15 @@ import javax.swing.table.TableCellRenderer
  * Layout (left to right):
  * 1. Commit graph (colored circles and lines)
  * 2. Status indicators (conflict, empty)
- * 3. Change ID (short form, bold)
- * 4. Description text (aligned with rightmost lane)
- * 5. Decorations on right (bookmarks, tags, working copy indicator)
+ * 3. Change ID (short form, bold) - optional
+ * 4. Description text (aligned with rightmost lane) - optional
+ * 5. Decorations on right (bookmarks, tags, working copy indicator) - optional
  *
  * This maximizes horizontal space by combining elements that Git plugin keeps separate.
  */
 class JujutsuGraphAndDescriptionRenderer(
-    private val graphNodes: Map<ChangeId, GraphNode>
+    private val graphNodes: Map<ChangeId, GraphNode>,
+    private val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
 ) : TableCellRenderer {
 
     companion object {
@@ -75,6 +76,24 @@ class JujutsuGraphAndDescriptionRenderer(
                 isHovered -> UIUtil.getListBackground(true, false)
                 else -> table.background
             }
+
+            // Set tooltip to full description with HTML formatting
+            entry?.let { e ->
+                if (!e.description.empty) {
+                    toolTipText = formatDescriptionTooltip(e.description.actual)
+                }
+            }
+        }
+
+        private fun formatDescriptionTooltip(description: String): String {
+            // Convert to HTML and replace newlines with <br>
+            val htmlEscaped = description
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\n", "<br>")
+
+            return "<html>$htmlEscaped</html>"
         }
 
         override fun paintComponent(g: Graphics) {
@@ -100,17 +119,23 @@ class JujutsuGraphAndDescriptionRenderer(
             val rightmostLaneX = graphStartX + LANE_WIDTH / 2 + rightmostActiveLane * LANE_WIDTH
             var x = rightmostLaneX + LANE_WIDTH / 2 + HORIZONTAL_PADDING
 
-            // 2. Draw status indicators
+            // 2. Draw status indicators (always shown)
             x = drawStatusIndicators(g2d, entry, x)
 
-            // 3. Draw change ID
-            x = drawChangeId(g2d, entry.changeId, x)
+            // 3. Draw change ID (optional)
+            if (columnManager.showChangeId) {
+                x = drawChangeId(g2d, entry.changeId, x)
+            }
 
-            // 4. Draw description
-            x = drawDescription(g2d, entry, x)
+            // 4. Draw description (optional)
+            if (columnManager.showDescription) {
+                x = drawDescription(g2d, entry, x)
+            }
 
-            // 5. Draw decorations on the right (bookmarks, tags, working copy)
-            drawDecorations(g2d, entry, width - HORIZONTAL_PADDING)
+            // 5. Draw decorations on the right (bookmarks, tags, working copy) - optional
+            if (columnManager.showDecorations) {
+                drawDecorations(g2d, entry, width - HORIZONTAL_PADDING)
+            }
         }
 
         private fun drawGraph(g2d: Graphics2D, node: GraphNode, startX: Int): Set<Int> {

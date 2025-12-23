@@ -3,7 +3,9 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.icons.AllIcons
 import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.SimpleTextAttributes
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import kotlinx.datetime.Clock
 import java.awt.Component
@@ -172,22 +174,135 @@ class DateCellRenderer : ColoredTableCellRenderer() {
 }
 
 /**
+ * Renderer for separate Change ID column.
+ */
+class SeparateChangeIdCellRenderer : ColoredTableCellRenderer() {
+    override fun customizeCellRenderer(
+        table: JTable,
+        value: Any?,
+        selected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int
+    ) {
+        val changeId = value as? ChangeId ?: return
+
+        // Show JJ's dynamic short prefix in bold
+        append(changeId.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+
+        // Show remainder up to display limit in gray/small
+        if (changeId.displayRemainder.isNotEmpty()) {
+            append(changeId.displayRemainder, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+        }
+    }
+}
+
+/**
+ * Renderer for separate Description column.
+ */
+class SeparateDescriptionCellRenderer : ColoredTableCellRenderer() {
+    override fun customizeCellRenderer(
+        table: JTable,
+        value: Any?,
+        selected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int
+    ) {
+        val description = value as? Description ?: return
+
+        // Show description (italic if empty)
+        val attributes = if (description.empty) {
+            SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
+        } else {
+            SimpleTextAttributes.REGULAR_ATTRIBUTES
+        }
+
+        append(description.summary, attributes)
+
+        // Set tooltip to full description with HTML formatting
+        if (!description.empty) {
+            toolTipText = formatDescriptionTooltip(description.actual)
+        }
+    }
+
+    private fun formatDescriptionTooltip(description: String): String {
+        // Convert to HTML and replace newlines with <br>
+        val htmlEscaped = description
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\n", "<br>")
+
+        return "<html>$htmlEscaped</html>"
+    }
+}
+
+/**
+ * Renderer for separate Decorations column (bookmarks/tags).
+ */
+class SeparateDecorationsCellRenderer : ColoredTableCellRenderer() {
+    override fun customizeCellRenderer(
+        table: JTable,
+        value: Any?,
+        selected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int
+    ) {
+        val bookmarks = value as? List<*> ?: return
+
+        bookmarks.filterIsInstance<Bookmark>().forEachIndexed { index, bookmark ->
+            if (index > 0) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
+            append(bookmark.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+        }
+    }
+}
+
+/**
  * Install all custom renderers on the given table.
  * Note: Combined graph+description renderer is installed separately when graph data is loaded.
+ * Only installs renderers for columns that are actually present in the column model.
  */
 fun JujutsuLogTable.installRenderers() {
+    val changeIdRenderer = SeparateChangeIdCellRenderer()
+    val descriptionRenderer = SeparateDescriptionCellRenderer()
+    val decorationsRenderer = SeparateDecorationsCellRenderer()
     val authorRenderer = AuthorCellRenderer()
     val dateRenderer = DateCellRenderer()
 
-    // Combined graph+description renderer will be set when graph data is loaded via updateGraph()
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_AUTHOR).cellRenderer = authorRenderer
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_DATE).cellRenderer = dateRenderer
+    // Iterate through actual columns in the column model
+    for (i in 0 until columnModel.columnCount) {
+        val column = columnModel.getColumn(i)
+        val modelIndex = column.modelIndex
 
-    // Set preferred column widths
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION).preferredWidth = 600
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_AUTHOR).preferredWidth = 120
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_DATE).apply {
-        preferredWidth = 80
-        maxWidth = 120
+        // Set renderer based on model index
+        when (modelIndex) {
+            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
+                // Will be set when graph data is loaded via updateGraph()
+                column.preferredWidth = 600
+            }
+            JujutsuLogTableModel.COLUMN_CHANGE_ID -> {
+                column.cellRenderer = changeIdRenderer
+                column.preferredWidth = 100
+            }
+            JujutsuLogTableModel.COLUMN_DESCRIPTION -> {
+                column.cellRenderer = descriptionRenderer
+                column.preferredWidth = 300
+            }
+            JujutsuLogTableModel.COLUMN_DECORATIONS -> {
+                column.cellRenderer = decorationsRenderer
+                column.preferredWidth = 150
+            }
+            JujutsuLogTableModel.COLUMN_AUTHOR -> {
+                column.cellRenderer = authorRenderer
+                column.preferredWidth = 120
+            }
+            JujutsuLogTableModel.COLUMN_DATE -> {
+                column.cellRenderer = dateRenderer
+                column.preferredWidth = 80
+                column.maxWidth = 120
+            }
+        }
     }
 }

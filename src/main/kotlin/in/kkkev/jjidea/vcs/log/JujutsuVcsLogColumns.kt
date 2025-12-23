@@ -163,10 +163,7 @@ class JujutsuStatusColumn : LogEntryCustomColumn<LogEntry?> {
 
     override fun isEnabledByDefault() = true
 
-    override fun isAvailable(project: Project, roots: Collection<VirtualFile>) =
-        roots.any { root ->
-            ProjectLevelVcsManager.getInstance(project).getVcsFor(root) is JujutsuVcs
-        }
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>) = true
 }
 
 /**
@@ -202,12 +199,7 @@ class JujutsuChangeIdColumn : LogEntryCustomColumn<ChangeId> {
 
     override fun isEnabledByDefault(): Boolean = true
 
-    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean {
-        // Only available if at least one root is a Jujutsu repository
-        return roots.any { root ->
-            ProjectLevelVcsManager.getInstance(project).getVcsFor(root) is JujutsuVcs
-        }
-    }
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean = true
 }
 
 /**
@@ -248,11 +240,7 @@ class JujutsuBookmarksColumn : VcsLogCustomColumn<String> {
 
     override fun isEnabledByDefault(): Boolean = true
 
-    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean {
-        return roots.any { root ->
-            ProjectLevelVcsManager.getInstance(project).getVcsFor(root) is JujutsuVcs
-        }
-    }
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean = true
 }
 
 /**
@@ -292,9 +280,5 @@ class JujutsuCommitterColumn : VcsLogCustomColumn<String> {
 
     override fun isEnabledByDefault(): Boolean = false  // Hidden by default
 
-    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean {
-        return roots.any { root ->
-            ProjectLevelVcsManager.getInstance(project).getVcsFor(root) is JujutsuVcs
-        }
-    }
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean = true
 }
