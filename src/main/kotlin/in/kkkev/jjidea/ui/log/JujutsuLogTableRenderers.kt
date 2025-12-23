@@ -5,6 +5,7 @@ import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import kotlinx.datetime.Clock
 import java.awt.Component
 import java.text.SimpleDateFormat
 import java.util.*
@@ -155,7 +156,7 @@ class DateCellRenderer : ColoredTableCellRenderer() {
     }
 
     private fun getRelativeTime(timestamp: kotlinx.datetime.Instant): String {
-        val now = kotlinx.datetime.Clock.System.now()
+        val now = Clock.System.now()
         val duration = now - timestamp
 
         return when {
@@ -172,36 +173,18 @@ class DateCellRenderer : ColoredTableCellRenderer() {
 
 /**
  * Install all custom renderers on the given table.
- * Note: Graph renderer is installed separately when graph data is loaded.
+ * Note: Combined graph+description renderer is installed separately when graph data is loaded.
  */
 fun JujutsuLogTable.installRenderers() {
-    val statusRenderer = StatusCellRenderer()
-    val changeIdRenderer = ChangeIdCellRenderer()
-    val descriptionRenderer = DescriptionCellRenderer()
     val authorRenderer = AuthorCellRenderer()
     val dateRenderer = DateCellRenderer()
 
-    // Graph renderer will be set when graph data is loaded via updateGraph()
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_STATUS).cellRenderer = statusRenderer
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_CHANGE_ID).cellRenderer = changeIdRenderer
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_DESCRIPTION).cellRenderer = descriptionRenderer
+    // Combined graph+description renderer will be set when graph data is loaded via updateGraph()
     columnModel.getColumn(JujutsuLogTableModel.COLUMN_AUTHOR).cellRenderer = authorRenderer
     columnModel.getColumn(JujutsuLogTableModel.COLUMN_DATE).cellRenderer = dateRenderer
 
     // Set preferred column widths
-    /*columnModel.getColumn(JujutsuLogTableModel.COLUMN_GRAPH).apply {
-        preferredWidth = 30
-        maxWidth = 50
-    }*/
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_STATUS).apply {
-        preferredWidth = 30
-        maxWidth = 50
-    }
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_CHANGE_ID).apply {
-        preferredWidth = 80
-        maxWidth = 150
-    }
-    columnModel.getColumn(JujutsuLogTableModel.COLUMN_DESCRIPTION).preferredWidth = 400
+    columnModel.getColumn(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION).preferredWidth = 600
     columnModel.getColumn(JujutsuLogTableModel.COLUMN_AUTHOR).preferredWidth = 120
     columnModel.getColumn(JujutsuLogTableModel.COLUMN_DATE).apply {
         preferredWidth = 80

@@ -33,6 +33,13 @@ class JujutsuLogTable : JBTable(JujutsuLogTableModel()) {
 
         // Striped rows for better readability
         setStriped(true)
+
+        // Enable hover effect - repaint on mouse movement
+        addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
+            override fun mouseMoved(e: java.awt.event.MouseEvent) {
+                repaint()
+            }
+        })
     }
 
     /**
@@ -51,15 +58,15 @@ class JujutsuLogTable : JBTable(JujutsuLogTableModel()) {
         }
 
     /**
-     * Update graph nodes and refresh graph column.
+     * Update graph nodes and refresh graph+description column.
      * Called after data is loaded.
      */
     fun updateGraph(nodes: Map<ChangeId, GraphNode>) {
         graphNodes = nodes
-        // Refresh graph column rendering
+        // Refresh combined graph+description column rendering
         if (columnModel.columnCount > 0) {
-            columnModel.getColumn(JujutsuLogTableModel.COLUMN_GRAPH).cellRenderer =
-                JujutsuGraphCellRenderer(graphNodes)
+            columnModel.getColumn(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION).cellRenderer =
+                JujutsuGraphAndDescriptionRenderer(graphNodes)
         }
         repaint()
     }
@@ -69,30 +76,21 @@ class JujutsuLogTable : JBTable(JujutsuLogTableModel()) {
  * Table model for Jujutsu commit log.
  *
  * Columns:
- * 1. Graph - Visual commit graph (placeholder for Phase 2)
- * 2. Status - Conflict/empty indicators
- * 3. Change ID - Formatted change ID
- * 4. Description - Commit description with refs
- * 5. Author - Author name
- * 6. Date - Commit timestamp
+ * 1. Graph+Description - Combined column with graph, status, change ID, description, and decorations
+ * 2. Author - Author name
+ * 3. Date - Commit timestamp
  */
 class JujutsuLogTableModel : AbstractTableModel() {
 
     private val entries = mutableListOf<LogEntry>()
 
     companion object {
-        const val COLUMN_GRAPH = 0
-        const val COLUMN_STATUS = 1
-        const val COLUMN_CHANGE_ID = 2
-        const val COLUMN_DESCRIPTION = 3
-        const val COLUMN_AUTHOR = 4
-        const val COLUMN_DATE = 5
+        const val COLUMN_GRAPH_AND_DESCRIPTION = 0
+        const val COLUMN_AUTHOR = 1
+        const val COLUMN_DATE = 2
 
         private val COLUMN_NAMES = arrayOf(
-            "Graph",
-            "Status",
-            "Change ID",
-            "Description",
+            "", // No heading for combined graph+description column
             "Author",
             "Date"
         )
@@ -110,10 +108,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
         val entry = entries[rowIndex]
 
         return when (columnIndex) {
-            COLUMN_GRAPH -> "" // Placeholder for graph rendering
-            COLUMN_STATUS -> entry // Return full entry for status renderer
-            COLUMN_CHANGE_ID -> entry.changeId
-            COLUMN_DESCRIPTION -> entry // Return full entry for description renderer
+            COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
             COLUMN_AUTHOR -> entry.author?.name ?: ""
             COLUMN_DATE -> entry.authorTimestamp ?: entry.committerTimestamp
             else -> null
