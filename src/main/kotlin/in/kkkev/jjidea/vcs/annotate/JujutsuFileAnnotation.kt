@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.text.DateFormatUtil
 import com.intellij.vcs.log.impl.VcsLogNavigationUtil.jumpToRevisionAsync
 import com.intellij.vcsUtil.VcsUtil
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
@@ -100,18 +101,33 @@ class JujutsuFileAnnotation(
         }
     }
 
-    private inner class ChangeIdAspect : Aspect("change-id", "Change", false, { it.changeId.short })
-    private inner class AuthorAspect : Aspect("author", "Author", true, { it.author.name })
+    private inner class ChangeIdAspect : Aspect(
+        "change-id",
+        JujutsuBundle.message("annotation.aspect.change"),
+        false,
+        { it.changeId.short }
+    )
+
+    private inner class AuthorAspect : Aspect(
+        "author",
+        JujutsuBundle.message("annotation.aspect.author"),
+        true,
+        { it.author.name }
+    )
+
     private inner class AuthorInstantAspect : Aspect(
         "author-instant",
-        "Author date/time",
+        JujutsuBundle.message("annotation.aspect.authordate"),
         true,
-        { it.authorTimestamp?.let(::formatPrettyDate) })
+        { it.authorTimestamp?.let(::formatPrettyDate) }
+    )
 
     private inner class DescriptionAspect : Aspect(
-        "description", "Description", false, { it.descriptionFirstLine },
-        // TODO Localise this
-        "(no description)"
+        "description",
+        JujutsuBundle.message("annotation.aspect.description"),
+        false,
+        { it.descriptionFirstLine },
+        JujutsuBundle.message("description.empty")
     )
 }
 

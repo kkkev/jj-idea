@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui
 
 import com.intellij.ui.SimpleTextAttributes
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Description
 
 /**
@@ -15,7 +16,7 @@ object DescriptionRenderer {
      */
     fun renderToComponent(description: Description, append: (String, SimpleTextAttributes) -> Unit) {
         if (description.empty) {
-            append("(no description)", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES)
+            append(JujutsuBundle.message("description.empty"), SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES)
         } else {
             append(description.summary, SimpleTextAttributes.REGULAR_ATTRIBUTES)
         }
@@ -27,7 +28,7 @@ object DescriptionRenderer {
      * @return Plain text representation
      */
     fun toPlainText(description: Description): String =
-        if (description.empty) "(no description)" else description.actual
+        if (description.empty) JujutsuBundle.message("description.empty") else description.actual
 
     /**
      * Get HTML representation of description for tooltips
@@ -36,7 +37,7 @@ object DescriptionRenderer {
      * @return HTML-formatted description
      */
     fun toHtml(description: Description, multiline: Boolean = true): String = when {
-        description.empty -> "<i>(no description)</i>"
+        description.empty -> "<i>${JujutsuBundle.message("description.empty")}</i>"
         multiline -> description.actual.replace("\n", "<br>")
         else -> description.summary
     }
@@ -46,5 +47,5 @@ object DescriptionRenderer {
      * Used in annotations and other line-based displays
      */
     fun toDisplayText(descriptionFirstLine: String): String =
-        descriptionFirstLine.ifEmpty { "(no description)" }
+        descriptionFirstLine.ifEmpty { JujutsuBundle.message("description.empty") }
 }

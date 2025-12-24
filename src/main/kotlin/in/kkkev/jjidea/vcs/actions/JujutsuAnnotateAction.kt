@@ -6,14 +6,15 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.vcs.actions.AnnotateToggleAction
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 
 /**
  * Action to toggle Jujutsu annotations in the editor
  */
 class JujutsuAnnotateAction : DumbAwareAction(
-    "Annotate",
-    "Annotate the current file with Jujutsu changes",
+    JujutsuBundle.message("action.annotate"),
+    JujutsuBundle.message("action.annotate.description"),
     null
 ) {
     private val log = Logger.getInstance(JujutsuAnnotateAction::class.java)

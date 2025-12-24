@@ -8,6 +8,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.ScrollPaneFactory
+import `in`.kkkev.jjidea.JujutsuBundle
 import java.awt.BorderLayout
 import javax.swing.JPanel
 
@@ -81,8 +82,8 @@ class JujutsuLogPanel(
      * Refresh action - reload commits.
      */
     private inner class RefreshAction : AnAction(
-        "Refresh",
-        "Reload commits from Jujutsu",
+        JujutsuBundle.message("log.action.refresh"),
+        JujutsuBundle.message("log.action.refresh.tooltip"),
         AllIcons.Actions.Refresh
     ) {
         override fun actionPerformed(e: AnActionEvent) {
@@ -94,7 +95,7 @@ class JujutsuLogPanel(
     /**
      * Columns sub-menu - show column visibility options.
      */
-    private inner class ColumnsAction : DefaultActionGroup("Columns", true) {
+    private inner class ColumnsAction : DefaultActionGroup(JujutsuBundle.message("log.action.columns"), true) {
         init {
             templatePresentation.icon = AllIcons.Actions.Show
             add(createColumnsActionGroup())
@@ -102,24 +103,24 @@ class JujutsuLogPanel(
     }
 
     private fun createColumnsActionGroup() = DefaultActionGroup().apply {
-        add(ToggleColumnAction("Change ID",
+        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.changeid"),
             getter = { columnManager.showChangeIdColumn },
             setter = { columnManager.showChangeIdColumn = it }
         ))
-        add(ToggleColumnAction("Description",
+        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.description"),
             getter = { columnManager.showDescriptionColumn },
             setter = { columnManager.showDescriptionColumn = it }
         ))
-        add(ToggleColumnAction("Decorations",
+        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.decorations"),
             getter = { columnManager.showDecorationsColumn },
             setter = { columnManager.showDecorationsColumn = it }
         ))
         addSeparator()
-        add(ToggleColumnAction("Author",
+        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.author"),
             getter = { columnManager.showAuthorColumn },
             setter = { columnManager.showAuthorColumn = it }
         ))
-        add(ToggleColumnAction("Date",
+        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.date"),
             getter = { columnManager.showDateColumn },
             setter = { columnManager.showDateColumn = it }
         ))

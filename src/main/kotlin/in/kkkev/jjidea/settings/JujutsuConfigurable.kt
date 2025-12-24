@@ -5,47 +5,48 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.ui.dsl.builder.*
+import `in`.kkkev.jjidea.JujutsuBundle
 
 /**
  * Settings panel for Jujutsu plugin configuration.
  *
  * Appears under Settings → Version Control → Jujutsu
  */
-class JujutsuConfigurable(private val project: Project) : BoundConfigurable("Jujutsu") {
+class JujutsuConfigurable(private val project: Project) : BoundConfigurable(JujutsuBundle.message("settings.title")) {
     private val settings = JujutsuSettings.getInstance(project)
 
     override fun createPanel(): DialogPanel = panel {
-        group("Executable") {
-            row("JJ executable path:") {
+        group(JujutsuBundle.message("settings.group.executable")) {
+            row(JujutsuBundle.message("settings.jj.path.label")) {
                 textFieldWithBrowseButton(
                     FileChooserDescriptorFactory.createSingleFileOrExecutableAppDescriptor()
-                        .withTitle("Select JJ Executable"),
+                        .withTitle(JujutsuBundle.message("settings.jj.path.chooser.title")),
                     project
                 ).bindText(settings.state::jjExecutablePath)
                     .columns(COLUMNS_LARGE)
-                    .comment("Path to the jj executable (default: 'jj' from PATH)")
+                    .comment(JujutsuBundle.message("settings.jj.path.comment"))
             }
         }
 
-        group("UI Preferences") {
+        group(JujutsuBundle.message("settings.group.ui")) {
             row {
-                checkBox("Enable auto-refresh")
+                checkBox(JujutsuBundle.message("settings.autorefresh.label"))
                     .bindSelected(settings.state::autoRefreshEnabled)
-                    .comment("Automatically refresh working copy status when files change")
+                    .comment(JujutsuBundle.message("settings.autorefresh.comment"))
             }
             row {
-                checkBox("Show change IDs in short format")
+                checkBox(JujutsuBundle.message("settings.shortformat.label"))
                     .bindSelected(settings.state::showChangeIdsInShortFormat)
-                    .comment("Display shortened change IDs (e.g., 'qpvuntsm' instead of full format)")
+                    .comment(JujutsuBundle.message("settings.shortformat.comment"))
             }
         }
 
-        group("Log Settings") {
-            row("Number of changes to show:") {
+        group(JujutsuBundle.message("settings.group.log")) {
+            row(JujutsuBundle.message("settings.log.limit.label")) {
                 intTextField(range = 1..1000)
                     .bindIntText(settings.state::logChangeLimit)
                     .columns(COLUMNS_TINY)
-                    .comment("Default number of changes to load in log view")
+                    .comment(JujutsuBundle.message("settings.log.limit.comment"))
             }
         }
     }

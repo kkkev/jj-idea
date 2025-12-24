@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.vcs.actions.SelectedBlockHistoryAction
+import `in`.kkkev.jjidea.JujutsuBundle
 
 /**
  * Action to show history filtered to selected lines in the editor
@@ -14,8 +15,8 @@ import com.intellij.openapi.vcs.actions.SelectedBlockHistoryAction
  * line-range history display using the VCS provider's history implementation.
  */
 class JujutsuShowHistoryForSelectionAction : DumbAwareAction(
-    "Show History for Selection",
-    "Show file history filtered to changes affecting the selected lines",
+    JujutsuBundle.message("action.show.history.selection"),
+    JujutsuBundle.message("action.show.history.selection.description"),
     null
 ) {
     private val log = Logger.getInstance(JujutsuShowHistoryForSelectionAction::class.java)

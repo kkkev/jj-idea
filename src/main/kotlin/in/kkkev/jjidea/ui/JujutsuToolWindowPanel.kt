@@ -26,6 +26,7 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
@@ -59,10 +60,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     private val descriptionArea = JBTextArea(3, 50).apply {
         lineWrap = true
         wrapStyleWord = true
-        toolTipText = "Describe what you're working on (jj describe)"
+        toolTipText = JujutsuBundle.message("toolwindow.description.tooltip")
     }
 
-    private val currentChangeLabel = JBLabel("Working Copy (@)").apply {
+    private val currentChangeLabel = JBLabel(JujutsuBundle.message("toolwindow.workingcopy.label")).apply {
         // TODO Pick font size according to IntelliJ appearance settings
         font = font.deriveFont(13f)
     }
@@ -104,7 +105,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         })
 
         // Description label
-        topPanel.add(JBLabel("Description:"), gbc.apply {
+        topPanel.add(JBLabel(JujutsuBundle.message("toolwindow.description.label")), gbc.apply {
             gridy = 1; gridwidth = 1; weightx = 0.0
         })
 
@@ -142,7 +143,11 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val group = DefaultActionGroup()
 
         // Refresh action
-        group.add(object : DumbAwareAction("Refresh", "Refresh changes", AllIcons.Actions.Refresh) {
+        group.add(object : DumbAwareAction(
+            JujutsuBundle.message("button.refresh"),
+            JujutsuBundle.message("button.refresh.tooltip"),
+            AllIcons.Actions.Refresh
+        ) {
             override fun actionPerformed(e: AnActionEvent) {
                 refresh()
             }
@@ -254,15 +259,15 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         buttonPanel.layout = BoxLayout(buttonPanel, BoxLayout.X_AXIS)
 
         // Describe button - updates the description of current working copy
-        val describeButton = JButton("Describe")
-        describeButton.toolTipText = "Set description for current change (jj describe)"
+        val describeButton = JButton(JujutsuBundle.message("button.describe"))
+        describeButton.toolTipText = JujutsuBundle.message("button.describe.tooltip")
         describeButton.addActionListener {
             describeCurrentChange()
         }
 
         // New button - creates a new commit on top of current one
-        val newButton = JButton("New Change")
-        newButton.toolTipText = "Start a new change on top of current one (jj new)"
+        val newButton = JButton(JujutsuBundle.message("button.newchange"))
+        newButton.toolTipText = JujutsuBundle.message("button.newchange.tooltip")
         newButton.addActionListener {
             createNewChange()
         }
@@ -280,8 +285,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         if (description.isEmpty()) {
             JOptionPane.showMessageDialog(
                 panel,
-                "Please enter a description",
-                "No Description",
+                JujutsuBundle.message("dialog.describe.empty.message"),
+                JujutsuBundle.message("dialog.describe.empty.title"),
                 JOptionPane.WARNING_MESSAGE
             )
             return
@@ -297,8 +302,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     } else {
                         JOptionPane.showMessageDialog(
                             panel,
-                            "Failed to describe change:\n${result.stderr}",
-                            "Error",
+                            JujutsuBundle.message("dialog.describe.error.message", result.stderr),
+                            JujutsuBundle.message("dialog.describe.error.title"),
                             JOptionPane.ERROR_MESSAGE
                         )
                     }
@@ -319,15 +324,15 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     refresh()
                     JOptionPane.showMessageDialog(
                         panel,
-                        "New change created. You can now start working on the next task.",
-                        "Success",
+                        JujutsuBundle.message("dialog.newchange.success.message"),
+                        JujutsuBundle.message("dialog.newchange.success.title"),
                         JOptionPane.INFORMATION_MESSAGE
                     )
                 } else {
                     JOptionPane.showMessageDialog(
                         panel,
-                        "Failed to create new change:\n${result.stderr}",
-                        "Error",
+                        JujutsuBundle.message("dialog.newchange.error.message", result.stderr),
+                        JujutsuBundle.message("dialog.newchange.error.title"),
                         JOptionPane.ERROR_MESSAGE
                     )
                 }
@@ -369,12 +374,15 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         val labelText = buildString {
                             append("<html>")
                             append(changeIdHtml)
-                            append(" @ - Working Copy")
+                            append(" @ - ")
+                            append(JujutsuBundle.message("status.workingcopy"))
 
                             // Add parent IDs if present
                             if (entry.parentIds.isNotEmpty()) {
                                 append("<br>")
-                                append("<font size=-1>Parents: ")
+                                append("<font size=-1>")
+                                append(JujutsuBundle.message("toolwindow.parents.label"))
+                                append(" ")
                                 entry.parentIds.forEachIndexed { index, parentId ->
                                     if (index > 0) append(", ")
                                     // Extract short prefix from the full ID (take first 2 chars as minimum)
@@ -452,7 +460,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         ApplicationManager.getApplication().executeOnPooledThread {
             val beforePath = change.beforeRevision?.file
             val afterPath = change.afterRevision?.file
-            val fileName = afterPath?.name ?: beforePath?.name ?: "Unknown"
+            val fileName = afterPath?.name ?: beforePath?.name ?: JujutsuBundle.message("diff.title.unknown")
 
             // Load content in background
             val beforeContent = change.beforeRevision?.content ?: ""
@@ -491,8 +499,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     fileName,
                     content1,
                     content2,
-                    "${beforePath?.name ?: "Before"} (@-)",
-                    "${afterPath?.name ?: "After"} (@)"
+                    "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} (@-)",
+                    "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} (@)"
                 )
 
                 diffManager.showDiff(project, diffRequest)
@@ -527,14 +535,14 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val group = DefaultActionGroup()
 
         // Add common VCS actions with keyboard shortcuts displayed
-        val showDiffAction = object : DumbAwareAction("Show Diff (Click)") {
+        val showDiffAction = object : DumbAwareAction(JujutsuBundle.message("action.show.diff")) {
             override fun actionPerformed(e: AnActionEvent) {
                 showDiff(selectedChange)
             }
         }
         group.add(showDiffAction)
 
-        val openFileAction = object : DumbAwareAction("Open File") {
+        val openFileAction = object : DumbAwareAction(JujutsuBundle.message("action.open.file")) {
             init {
                 // Set keyboard shortcuts - will be displayed in menu
                 shortcutSet = CustomShortcutSet(

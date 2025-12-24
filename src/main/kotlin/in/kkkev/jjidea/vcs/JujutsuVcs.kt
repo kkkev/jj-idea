@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.Revision
@@ -69,7 +70,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun getVcsHistoryProvider() = _historyProvider
     override fun getAnnotationProvider() = _annotationProvider
 
-    override fun getDisplayName(): String = VCS_DISPLAY_NAME
+    override fun getDisplayName(): String = JujutsuBundle.message("vcs.displayname")
 
     override fun activate() {
         log.info("Jujutsu VCS activated for project: ${myProject.name}")
@@ -85,7 +86,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
 
     val root: VirtualFile by lazy {
         val foundRoot = JujutsuRootChecker.findJujutsuRoot(project.basePath)
-            ?: throw VcsException("Project is not within a JJ repository (couldn't find a .jj directory above ${project.basePath}")
+            ?: throw VcsException(JujutsuBundle.message("vcs.error.not.in.repository", project.basePath ?: "unknown"))
 
         log.info("Jujutsu root for project ${project.name}: $foundRoot")
         foundRoot
@@ -120,7 +121,6 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
 
     companion object {
         const val VCS_NAME = "Jujutsu"
-        const val VCS_DISPLAY_NAME = "Jujutsu"
 
         private val KEY = createKey(VCS_NAME)
 
@@ -138,6 +138,6 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
             ?.let(ProjectLevelVcsManager::getInstance)
             ?.getVcsFor(root) as? JujutsuVcs
 
-        fun findRequired(root: VirtualFile) = find(root) ?: throw VcsException("Jujutsu VCS not available for $root")
+        fun findRequired(root: VirtualFile) = find(root) ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", root.path))
     }
 }

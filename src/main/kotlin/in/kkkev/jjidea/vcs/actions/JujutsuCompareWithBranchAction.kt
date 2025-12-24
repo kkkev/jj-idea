@@ -10,6 +10,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
@@ -18,8 +19,8 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
  * Action to compare current file with a bookmark, change, or revision
  */
 class JujutsuCompareWithBranchAction : DumbAwareAction(
-    "Compare with Branch or Change...",
-    "Compare current file with a bookmark, change ID, or revision",
+    JujutsuBundle.message("action.compare.branch"),
+    JujutsuBundle.message("action.compare.branch.description"),
     null
 ) {
     private val log = Logger.getInstance(JujutsuCompareWithBranchAction::class.java)
@@ -70,14 +71,11 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
                 }
 
                 val diffRequest = SimpleDiffRequest(
-                    "Compare ${file.name} with $revision",
+                    JujutsuBundle.message("diff.title.compare", file.name, revision.toString()),
                     content1,
                     content2,
-                    // TODO Is this the correct title?
                     revision.toString(),
-                    // TODO Should this be "working copy"? @?
-                    // TODO Localise this
-                    "Current"
+                    JujutsuBundle.message("diff.label.current")
                 )
 
                 diffManager.showDiff(project, diffRequest)

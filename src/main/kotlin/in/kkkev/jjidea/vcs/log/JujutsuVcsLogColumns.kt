@@ -11,6 +11,7 @@ import com.intellij.vcs.log.ui.table.GraphTableModel
 import com.intellij.vcs.log.ui.table.VcsLogGraphTable
 import com.intellij.vcs.log.ui.table.VcsLogTableIndex
 import com.intellij.vcs.log.ui.table.column.VcsLogCustomColumn
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuCommitMetadataBase
@@ -42,7 +43,7 @@ data class DescriptionWithRefs(
 
 class JujutsuDescriptionColumn : VcsLogCustomColumn<DescriptionWithRefs> {
     override val id = "Jujutsu.Description"
-    override val localizedName = "Description"
+    override val localizedName = JujutsuBundle.message("column.description")
     override val isDynamic = true
 
     override fun getValue(model: GraphTableModel, row: VcsLogTableIndex): DescriptionWithRefs? {
@@ -119,7 +120,7 @@ private class JujutsuDescriptionRenderer(private val table: VcsLogGraphTable) : 
  */
 class JujutsuStatusColumn : LogEntryCustomColumn<LogEntry?> {
     override val id = "Jujutsu.Status"
-    override val localizedName = "Status"
+    override val localizedName = JujutsuBundle.message("column.status")
 
     override fun getValue(logEntry: LogEntry): LogEntry? =
         if (logEntry.hasConflict || logEntry.isEmpty) logEntry else null
@@ -144,7 +145,7 @@ class JujutsuStatusColumn : LogEntryCustomColumn<LogEntry?> {
             if (value.isEmpty) {
                 icon = if (value.hasConflict) {
                     // Both indicators - use warning icon, add text
-                    append("Empty ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    append(JujutsuBundle.message("status.empty") + " ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     AllIcons.General.Warning
                 } else {
                     AllIcons.General.BalloonInformation
@@ -171,7 +172,7 @@ class JujutsuStatusColumn : LogEntryCustomColumn<LogEntry?> {
  */
 class JujutsuChangeIdColumn : LogEntryCustomColumn<ChangeId> {
     override val id = "Jujutsu.ChangeId"
-    override val localizedName = "Change ID"
+    override val localizedName = JujutsuBundle.message("column.changeid")
 
     override fun getValue(logEntry: LogEntry) = logEntry.changeId
 
@@ -209,7 +210,7 @@ class JujutsuBookmarksColumn : VcsLogCustomColumn<String> {
 
     override val id: String = "Jujutsu.Bookmarks"
 
-    override val localizedName: String = "Bookmarks"
+    override val localizedName: String = JujutsuBundle.message("column.bookmarks")
 
     override val isDynamic: Boolean = true
 
@@ -250,7 +251,7 @@ class JujutsuCommitterColumn : VcsLogCustomColumn<String> {
 
     override val id: String = "Jujutsu.Committer"
 
-    override val localizedName: String = "Committer"
+    override val localizedName: String = JujutsuBundle.message("column.committer")
 
     override val isDynamic: Boolean = true
 
@@ -276,7 +277,7 @@ class JujutsuCommitterColumn : VcsLogCustomColumn<String> {
         }
     }
 
-    override fun getStubValue(model: GraphTableModel): String = "John Doe"
+    override fun getStubValue(model: GraphTableModel): String = JujutsuBundle.message("log.stub.author")
 
     override fun isEnabledByDefault(): Boolean = false  // Hidden by default
 
