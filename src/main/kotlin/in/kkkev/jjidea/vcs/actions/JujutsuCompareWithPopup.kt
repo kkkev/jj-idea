@@ -6,18 +6,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.ColoredListCellRenderer
+import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.popup.AbstractPopup
 import com.intellij.util.ui.JBUI
-import `in`.kkkev.jjidea.jj.BookmarkItem
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.jj.LogCache
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.DescriptionRenderer
 import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
@@ -31,6 +26,7 @@ import javax.swing.DefaultListModel
 import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.ListSelectionModel
+import javax.swing.event.DocumentEvent
 
 /**
  * Popup for selecting a bookmark, change, or revision to compare with
@@ -122,6 +118,9 @@ object JujutsuCompareWithPopup {
 
         private val listModel = DefaultListModel<CompareItem>()
         private val list = object : JBList<CompareItem>(listModel) {
+            // Make list fill viewport width instead of expanding to content width
+            override fun getScrollableTracksViewportWidth() = true
+
             override fun getToolTipText(event: MouseEvent): String? {
                 val index = locationToIndex(event.point)
                 if (index < 0) return null
@@ -148,6 +147,7 @@ object JujutsuCompareWithPopup {
                             append("</html>")
                         }
                     }
+
                     is CompareItem.Bookmark -> {
                         val formatted = JujutsuCommitFormatter.format(item.item.changeId)
                         buildString {
@@ -160,12 +160,14 @@ object JujutsuCompareWithPopup {
                             append("</html>")
                         }
                     }
+
                     else -> null
                 }
             }
         }.apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
             cellRenderer = CompareItemRenderer()
+            visibleRowCount = 15  // Show 15 items without scrolling
         }
 
         private var currentPopup: JBPopup? = null
@@ -174,16 +176,20 @@ object JujutsuCompareWithPopup {
             // Search field
             add(searchField, BorderLayout.NORTH)
 
-            // Results list
+            // Results list - fills available panel space
             val scrollPane = JBScrollPane(list).apply {
                 border = JBUI.Borders.empty()
-                preferredSize = Dimension(600, 400)
             }
             add(scrollPane, BorderLayout.CENTER)
 
+            // Set preferred width only - let height be determined by list's visibleRowCount
+            // Add small buffer for borders and padding
+            preferredSize =
+                Dimension(JBUI.scale(700), scrollPane.preferredSize.height + searchField.preferredSize.height + JBUI.scale(12))
+
             // Listen to search field changes
-            searchField.addDocumentListener(object : com.intellij.ui.DocumentAdapter() {
-                override fun textChanged(e: javax.swing.event.DocumentEvent) {
+            searchField.addDocumentListener(object : DocumentAdapter() {
+                override fun textChanged(e: DocumentEvent) {
                     loadData(searchField.text)
                 }
             })
@@ -200,6 +206,7 @@ object JujutsuCompareWithPopup {
                                 e.consume()
                             }
                         }
+
                         KeyEvent.VK_UP -> {
                             if (listModel.size() > 0) {
                                 val currentIndex = list.selectedIndex
@@ -208,6 +215,7 @@ object JujutsuCompareWithPopup {
                                 e.consume()
                             }
                         }
+
                         KeyEvent.VK_ENTER -> {
                             if (list.selectedValue != null) {
                                 selectItem(list.selectedValue)
@@ -296,6 +304,7 @@ object JujutsuCompareWithPopup {
                     }
                     append(")", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                 }
+
                 is CompareItem.Change -> {
                     icon = AllIcons.Vcs.CommitNode
                     val formatted = JujutsuCommitFormatter.format(value.changeId)
@@ -306,6 +315,7 @@ object JujutsuCompareWithPopup {
                     append(" ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                     DescriptionRenderer.renderToComponent(value.description, ::append)
                 }
+
                 null -> {}
             }
         }

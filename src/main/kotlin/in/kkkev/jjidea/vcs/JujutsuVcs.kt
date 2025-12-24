@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectLocator
 import com.intellij.openapi.vcs.*
@@ -21,6 +20,7 @@ import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.jj.cli.CliLogService
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
@@ -34,7 +34,10 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
 class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     private val log = Logger.getInstance(JujutsuVcs::class.java)
 
-    val commandExecutor: CommandExecutor by lazy { CliExecutor(root) }
+    val commandExecutor: CommandExecutor by lazy {
+        val settings = JujutsuSettings.getInstance(myProject)
+        CliExecutor(root, settings.state.jjExecutablePath)
+    }
     val logService: LogService by lazy { CliLogService(commandExecutor) }
     private val _changeProvider by lazy { JujutsuChangeProvider(this) }
     private val _diffProvider by lazy { JujutsuDiffProvider(this) }
@@ -65,11 +68,6 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun getCheckinEnvironment() = _checkinEnvironment
     override fun getVcsHistoryProvider() = _historyProvider
     override fun getAnnotationProvider() = _annotationProvider
-
-    override fun getConfigurable(): Configurable? {
-        // TODO: Add configuration UI if needed
-        return null
-    }
 
     override fun getDisplayName(): String = VCS_DISPLAY_NAME
 

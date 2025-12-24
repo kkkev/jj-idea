@@ -64,6 +64,14 @@ This document captures all requirements, implementation decisions, and developme
 ### Phase 6: Auto-Refresh
 31. ✅ Real-time status updates - Automatically refresh when files change
 
+### Phase 7: Settings/Configuration UI
+32. ✅ Settings panel under Settings → Version Control → Jujutsu
+33. ✅ JJ executable path configuration with file picker
+34. ✅ Auto-refresh toggle
+35. ✅ Change ID format preference (short/long)
+36. ✅ Log change limit configuration
+37. ✅ Persistent settings across IDE restarts
+
 ## Architecture
 
 ### Core Components
@@ -174,6 +182,27 @@ JujutsuToolWindowFactory
 
 **See**: `jj/ChangeId.kt` - hex conversion implementation
 
+#### 9. Settings Architecture
+**Decision**: Use project-level `PersistentStateComponent` service with `BoundConfigurable` UI.
+
+**Implementation**:
+- `JujutsuSettingsState` - Data class holding all settings
+- `JujutsuSettings` - Service managing persistent state
+- `JujutsuConfigurable` - UI panel using Kotlin UI DSL
+
+**Rationale**:
+- Project-level settings allow different configurations per project
+- `BoundConfigurable` with UI DSL provides modern, declarative UI
+- Settings stored in `.idea/jujutsu.xml` for easy version control exclusion
+
+**Settings**:
+- JJ executable path (default: "jj" from PATH)
+- Auto-refresh enabled (default: true)
+- Show change IDs in short format (default: true)
+- Log change limit (default: 50)
+
+**See**: `settings/` package - all settings implementation
+
 ## File Structure
 
 ```
@@ -209,6 +238,10 @@ src/main/kotlin/in/kkkev/jjidea/
 │       ├── JujutsuFileRevision.kt         # File revision
 │       ├── JujutsuHistoryProvider.kt      # File history provider
 │       └── JujutsuHistorySession.kt       # History session
+├── settings/                              # Plugin settings and configuration
+│   ├── JujutsuSettings.kt                 # Persistent state service
+│   ├── JujutsuSettingsState.kt            # Settings data class
+│   └── JujutsuConfigurable.kt             # Settings UI panel
 └── ui/                                    # User interface components
     ├── ChangeListCellRenderer.kt          # (unused, can be deleted)
     ├── JujutsuChangesTreeCellRenderer.kt  # Custom tree cell renderer
@@ -438,6 +471,7 @@ When adding features or fixing bugs:
 
 For detailed change history, see git log. Major architectural changes documented here:
 
+- **2025-12-24**: Settings/Configuration UI with persistent state (jj-idea-l15)
 - **2025-12-11**: Auto-refresh with BulkFileListener (jj-idea-7gw)
 - **2025-12-10**: Template-based log parsing system with type-safe composable templates
 - **2025-12-02**: Architecture refactoring - VCS root discovery and provider cleanup
@@ -448,7 +482,7 @@ For detailed change history, see git log. Major architectural changes documented
 
 ---
 
-**Last Updated**: 2025-12-19
+**Last Updated**: 2025-12-24
 **Plugin Version**: 0.1.0-SNAPSHOT
 **IntelliJ Version**: 2025.2
 - 

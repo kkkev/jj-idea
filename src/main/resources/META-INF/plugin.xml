@@ -41,6 +41,14 @@
         <!-- Services -->
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
         <projectService serviceImplementation="in.kkkev.jjidea.ui.JujutsuCustomLogTabManager" />
+        <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings" />
+
+        <!-- Settings -->
+        <projectConfigurable
+            id="vcs.Jujutsu"
+            displayName="Jujutsu"
+            instance="in.kkkev.jjidea.settings.JujutsuConfigurable"
+            parentId="project.propVCSSupport.Mappings" />
 
         <!-- Jujutsu working copy tool window on the left side -->
         <toolWindow
@@ -57,7 +65,7 @@
                 class="in.kkkev.jjidea.vcs.actions.OpenJujutsuLogTabAction"
                 text="Open Jujutsu Log"
                 description="Open a custom Jujutsu log tab with advanced features">
-            <add-to-group group-id="VcsGroup" anchor="first"/>
+            <!-- Not added to VcsGroup to avoid StandardVcsGroup requirement -->
         </action>
 
         <!-- Jujutsu action group in editor context menu -->

@@ -98,7 +98,9 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
     override fun supportsHistoryForDirectories() = false
 
     override fun getUICustomization(session: VcsHistorySession, root: JComponent) =
-        VcsDependentHistoryComponents.createOnlyColumns(emptyArray())
+        VcsDependentHistoryComponents.createOnlyColumns(
+            arrayOf(CommitterColumnInfo(), CommitTimestampColumnInfo())
+        )
 
     override fun getAdditionalActions(refresher: Runnable): Array<AnAction> {
         return arrayOf(
