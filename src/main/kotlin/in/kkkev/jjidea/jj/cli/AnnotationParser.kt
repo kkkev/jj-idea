@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj.cli
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.AnnotationLine
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Description
 import kotlinx.datetime.Instant
 
 /**
@@ -38,7 +39,7 @@ object AnnotationParser {
         commit.author().name() ++ "\0" ++
         commit.author().email() ++ "\0" ++
         commit.author().timestamp().utc().format("%s") ++ "\0" ++
-        commit.description().first_line() ++ "\0" ++
+        commit.description() ++ "\0" ++
         content ++ "\0"
     """.trimIndent().replace("\n", "")
 
@@ -79,7 +80,7 @@ object AnnotationParser {
         val authorName = chunk[3]
         val authorEmail = chunk[4]
         val authorTimestamp = chunk[5].toLongOrNull()?.let(Instant::fromEpochSeconds)
-        val descriptionFirstLine = chunk[6]
+        val description = Description(chunk[6])
         val lineContent = chunk[7]
 
         return AnnotationLine(
@@ -87,7 +88,7 @@ object AnnotationParser {
             commitId = commitId,
             author = VcsUserImpl(authorName, authorEmail),
             authorTimestamp = authorTimestamp,
-            descriptionFirstLine = descriptionFirstLine,
+            description = description,
             lineContent = lineContent,
             lineNumber = lineNumber,
         )

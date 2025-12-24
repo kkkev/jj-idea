@@ -203,6 +203,60 @@ JujutsuToolWindowFactory
 
 **See**: `settings/` package - all settings implementation
 
+#### 10. TextCanvas Pattern for Consistent Rendering
+**Decision**: Use `TextCanvas` interface with extension functions for consistent formatting across all UI components.
+
+**Architecture**:
+```kotlin
+interface TextCanvas {
+    fun append(text: String, style: SimpleTextAttributes)
+}
+```
+
+**Implementations**:
+- `HtmlTextCanvas` - Renders to RichText for HTML output
+- `StringBuilderHtmlTextCanvas` - Renders to StringBuilder for HTML building
+- `ComponentTextCanvas` - Renders to SimpleColoredComponent for table cells
+
+**Extension Functions** (in `TextCanvas.kt`):
+- `append(changeId: ChangeId)` - Renders change ID with bold short part + greyed small remainder
+- `append(description: Description)` - Renders description with italic styling if empty
+- `appendSummary(description: Description)` - Renders description summary only
+- `append(instant: Instant)` - Renders timestamp using DateTimeFormatter
+- `append(bookmarks: List<Bookmark>)` - Renders bookmark list with icons
+- `append(user: VcsUser)` - Renders user with clickable email
+
+**Supporting Utilities**:
+- `DateTimeFormatter.formatRelative(instant)` - "Today HH:MM", "Yesterday HH:MM", or localized date
+- `DateTimeFormatter.formatAbsolute(instant)` - Full absolute timestamp for tooltips
+- `Formatters.escapeHtml(text)` - HTML entity escaping
+- `Formatters.getBodyStyle()` - Consistent HTML body font styling
+- `JujutsuColors` - Centralized color palette (WORKING_COPY, BOOKMARK, CONFLICT, etc.)
+
+**Usage Pattern**:
+```kotlin
+// Table cell renderer
+class MyRenderer : TextCellRenderer<ChangeId>() {
+    override fun render(value: ChangeId) = append(value)  // Uses extension function
+}
+
+// HTML building
+val html = htmlText {
+    append(changeId)  // Consistent rendering
+    append(" ")
+    append(timestamp)
+}
+```
+
+**Rationale**:
+- **Consistency**: All change IDs, dates, descriptions render identically across the plugin
+- **Type Safety**: Extension functions provide compile-time checking for supported types
+- **Centralization**: Single source of truth for formatting rules
+- **Testability**: Pure functions easy to unit test
+- **Maintainability**: Change formatting in one place, applies everywhere
+
+**See**: `ui/TextCanvas.kt`, `ui/DateTimeFormatter.kt`, `ui/Formatters.kt`, `ui/JujutsuColors.kt`
+
 ## File Structure
 
 ```
@@ -244,11 +298,25 @@ src/main/kotlin/in/kkkev/jjidea/
 │   └── JujutsuConfigurable.kt             # Settings UI panel
 └── ui/                                    # User interface components
     ├── ChangeListCellRenderer.kt          # (unused, can be deleted)
+    ├── DateTimeFormatter.kt               # Consistent date/time formatting (Today/Yesterday/locale)
+    ├── Formatters.kt                      # HTML formatting utilities
     ├── JujutsuChangesTreeCellRenderer.kt  # Custom tree cell renderer
     ├── JujutsuChangesTreeModel.kt         # Tree model with grouping
+    ├── JujutsuColors.kt                   # Centralized color palette
     ├── JujutsuCommitFormatter.kt          # Formats commit display
     ├── JujutsuToolWindowFactory.kt        # Creates tool window
-    └── JujutsuToolWindowPanel.kt          # Main UI panel (Changes view)
+    ├── JujutsuToolWindowPanel.kt          # Main UI panel (Changes view)
+    ├── TextCanvas.kt                      # Consistent rendering interface + extensions
+    └── log/                               # Custom VCS log implementation
+        ├── JujutsuColumnManager.kt        # Column visibility management
+        ├── JujutsuCommitGraph.kt          # Graph building and layouting
+        ├── JujutsuCommitDetailsPanel.kt   # Commit details panel
+        ├── JujutsuGraphAndDescriptionRenderer.kt  # Combined graph+description renderer
+        ├── JujutsuGraphCellRenderer.kt    # Graph cell renderer
+        ├── JujutsuLogDataLoader.kt        # Background data loading
+        ├── JujutsuLogPanel.kt             # Main custom log panel
+        ├── JujutsuLogTable.kt             # Custom log table
+        └── JujutsuLogTableRenderers.kt    # Table cell renderers
 
 src/test/kotlin/in/kkkev/jjidea/
 ├── RequirementsTest.kt                    # Documents all requirements

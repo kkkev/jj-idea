@@ -123,7 +123,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
             COLUMN_CHANGE_ID -> entry.changeId
             COLUMN_DESCRIPTION -> entry.description
             COLUMN_DECORATIONS -> entry.bookmarks
-            COLUMN_AUTHOR -> entry.author?.name ?: ""
+            COLUMN_AUTHOR -> entry.author
             COLUMN_DATE -> entry.authorTimestamp ?: entry.committerTimestamp
             else -> null
         }

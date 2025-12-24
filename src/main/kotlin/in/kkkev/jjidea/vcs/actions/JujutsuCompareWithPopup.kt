@@ -13,8 +13,11 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.ComponentTextCanvas
 import `in`.kkkev.jjidea.ui.DescriptionRenderer
-import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
+import `in`.kkkev.jjidea.ui.StringBuilderHtmlTextCanvas
+import `in`.kkkev.jjidea.ui.append
+import `in`.kkkev.jjidea.ui.appendSummary
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -128,19 +131,19 @@ object JujutsuCompareWithPopup {
                 val item = model.getElementAt(index)
                 return when (item) {
                     is CompareItem.Change -> {
-                        val formatted = JujutsuCommitFormatter.format(item.entry.changeId)
                         buildString {
+                            val canvas = StringBuilderHtmlTextCanvas(this)
+
                             append("<html>")
-                            append("<b>${formatted.shortPart}</b>")
-                            if (formatted.restPart.isNotEmpty()) {
-                                append("<font color=gray><small>${formatted.restPart}</small></font>")
-                            }
+                            canvas.append(item.entry.changeId)
                             append("<br>")
-                            item.entry.author?.let { author ->
-                                append("${author.name} &lt;${author.email}&gt;<br>")
+                            item.entry.author?.let {
+                                canvas.append(it)
+                                append("<br>")
                             }
                             item.entry.authorTimestamp?.let { timestamp ->
-                                append("${timestamp}<br>")
+                                canvas.append(timestamp)
+                                append("<br>")
                             }
                             append("<br>")
                             append(DescriptionRenderer.toHtml(item.entry.description, multiline = true))
@@ -149,14 +152,12 @@ object JujutsuCompareWithPopup {
                     }
 
                     is CompareItem.Bookmark -> {
-                        val formatted = JujutsuCommitFormatter.format(item.item.changeId)
                         buildString {
+                            val canvas = StringBuilderHtmlTextCanvas(this)
+
                             append("<html>")
                             append("<b>${item.item.bookmark.name}</b><br>")
-                            append("Change: <b>${formatted.shortPart}</b>")
-                            if (formatted.restPart.isNotEmpty()) {
-                                append("<font color=gray><small>${formatted.restPart}</small></font>")
-                            }
+                            canvas.append(item.item.changeId)
                             append("</html>")
                         }
                     }
@@ -185,7 +186,10 @@ object JujutsuCompareWithPopup {
             // Set preferred width only - let height be determined by list's visibleRowCount
             // Add small buffer for borders and padding
             preferredSize =
-                Dimension(JBUI.scale(700), scrollPane.preferredSize.height + searchField.preferredSize.height + JBUI.scale(12))
+                Dimension(
+                    JBUI.scale(700),
+                    scrollPane.preferredSize.height + searchField.preferredSize.height + JBUI.scale(12)
+                )
 
             // Listen to search field changes
             searchField.addDocumentListener(object : DocumentAdapter() {
@@ -292,28 +296,22 @@ object JujutsuCompareWithPopup {
             selected: Boolean,
             hasFocus: Boolean
         ) {
+            val canvas = ComponentTextCanvas(this)
             when (value) {
                 is CompareItem.Bookmark -> {
                     icon = AllIcons.Vcs.Branch
                     append(value.item.bookmark.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
                     append(" (", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                    val formatted = JujutsuCommitFormatter.format(value.item.changeId)
-                    append(formatted.shortPart, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-                    if (formatted.restPart.isNotEmpty()) {
-                        append(formatted.restPart, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
-                    }
+                    canvas.append(value.item.changeId)
                     append(")", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                 }
 
                 is CompareItem.Change -> {
                     icon = AllIcons.Vcs.CommitNode
-                    val formatted = JujutsuCommitFormatter.format(value.changeId)
-                    append(formatted.shortPart, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-                    if (formatted.restPart.isNotEmpty()) {
-                        append(formatted.restPart, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
-                    }
+                    canvas.append(value.changeId)
                     append(" ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                    DescriptionRenderer.renderToComponent(value.description, ::append)
+
+                    ComponentTextCanvas(this).appendSummary(value.description)
                 }
 
                 null -> {}

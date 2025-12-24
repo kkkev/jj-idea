@@ -19,7 +19,7 @@ class AnnotationParserTest {
         result[0].commitId shouldBe "abc123"
         result[0].author.name shouldBe "John Doe"
         result[0].author.email shouldBe "john@example.com"
-        result[0].descriptionFirstLine shouldBe "Initial commit"
+        result[0].description.summary shouldBe "Initial commit"
         result[0].lineContent shouldBe "println(\"Hello\")"
         result[0].lineNumber shouldBe 1
     }
@@ -54,7 +54,7 @@ class AnnotationParserTest {
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 1
-        result[0].descriptionFirstLine shouldBe ""
+        result[0].description.summary shouldBe "(no description)"
         result[0].lineContent shouldBe "println(\"Hello\")"
     }
 
@@ -97,7 +97,7 @@ class AnnotationParserTest {
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 1
-        result[0].descriptionFirstLine shouldBe "Fix: use grep | sort"
+        result[0].description.summary shouldBe "Fix: use grep | sort"
     }
 
     @Test
@@ -170,7 +170,7 @@ class AnnotationParserTest {
 
         result shouldHaveSize 1
         result[0].author.name shouldBe "José García"
-        result[0].descriptionFirstLine shouldBe "Añadir función"
+        result[0].description.summary shouldBe "Añadir función"
         result[0].lineContent shouldBe "println(\"¡Hola!\")"
     }
 
@@ -231,6 +231,6 @@ class AnnotationParserTest {
         emptyLine.commitId shouldBe ""
         emptyLine.author.name shouldBe ""
         emptyLine.author.email shouldBe ""
-        emptyLine.descriptionFirstLine shouldBe ""
+        emptyLine.description.summary shouldBe "(no description)"
     }
 }

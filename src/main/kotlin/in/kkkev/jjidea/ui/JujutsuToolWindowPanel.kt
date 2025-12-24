@@ -13,9 +13,7 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
-import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -366,16 +364,12 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         // Update the description text area
                         descriptionArea.text = entry.description.actual
 
-                        // Format change ID with theme-aware colors
-                        val formattedChangeId = entry.getFormattedChangeId()
-                        val changeIdHtml = JujutsuCommitFormatter.toHtml(formattedChangeId)
-
                         // Create HTML for label showing change ID, @ marker, and parents
                         val labelText = buildString {
+                            val canvas = StringBuilderHtmlTextCanvas(this)
+
                             append("<html>")
-                            append(changeIdHtml)
-                            append(" @ - ")
-                            append(JujutsuBundle.message("status.workingcopy"))
+                            canvas.append(entry.changeId)
 
                             // Add parent IDs if present
                             if (entry.parentIds.isNotEmpty()) {
@@ -385,9 +379,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                                 append(" ")
                                 entry.parentIds.forEachIndexed { index, parentId ->
                                     if (index > 0) append(", ")
-                                    // Extract short prefix from the full ID (take first 2 chars as minimum)
-                                    val parentFormatted = JujutsuCommitFormatter.format(parentId)
-                                    append(JujutsuCommitFormatter.toHtml(parentFormatted))
+                                    canvas.append(parentId)
                                 }
                                 append("</font>")
                             }

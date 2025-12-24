@@ -2,7 +2,8 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
-import `in`.kkkev.jjidea.ui.DescriptionRenderer
+import `in`.kkkev.jjidea.ui.StringBuilderHtmlTextCanvas
+import `in`.kkkev.jjidea.ui.appendSummary
 import kotlinx.datetime.Instant
 
 /**
@@ -13,7 +14,7 @@ data class AnnotationLine(
     val commitId: String,
     val author: VcsUser,
     val authorTimestamp: Instant?,
-    val descriptionFirstLine: String,
+    val description: Description,
     val lineContent: String,
     val lineNumber: Int
 ) {
@@ -28,12 +29,7 @@ data class AnnotationLine(
             append(" <${author.email}>")
         }
         append("\n")
-        val displayText = DescriptionRenderer.toDisplayText(descriptionFirstLine)
-        if (descriptionFirstLine.isNotEmpty()) {
-            append("Description: $displayText")
-        } else {
-            append(displayText)
-        }
+        append(description.display)
     }
 
     companion object {
@@ -45,7 +41,7 @@ data class AnnotationLine(
             commitId = "",
             author = VcsUserImpl("", ""),
             authorTimestamp = null,
-            descriptionFirstLine = "",
+            description = Description.EMPTY,
             lineContent = lineContent,
             lineNumber = lineNumber
         )

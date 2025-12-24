@@ -87,20 +87,6 @@ class JujutsuLogEntryTest {
     }
 
     @Test
-    fun `format change ID for display`() {
-        val entry = LogEntry(
-            changeId = CHANGE_ID,
-            commitId = "abc123",
-            underlyingDescription = "Test"
-        )
-
-        val formatted = entry.getFormattedChangeId()
-
-        formatted.shortPart shouldBe "qp"
-        formatted.restPart shouldBe "vuntsm"
-    }
-
-    @Test
     fun `entry with author and committer information`() {
         val entry = LogEntry(
             changeId = CHANGE_ID,

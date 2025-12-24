@@ -7,18 +7,19 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import `in`.kkkev.jjidea.JujutsuBundle
 import java.awt.BorderLayout
 import javax.swing.JPanel
+import javax.swing.event.ListSelectionListener
 
 /**
  * Main panel for Jujutsu commit log UI.
  *
  * Layout:
- * - NORTH: Toolbar (refresh, filters - Phase 4)
- * - CENTER: Log table with commits
- * - SOUTH: Details pane (Phase 4)
+ * - NORTH: Toolbar (refresh, filters)
+ * - CENTER: Splitter with log table (top) and details panel (bottom)
  *
  * Built from scratch - no dependency on IntelliJ's VCS log UI.
  */
@@ -35,6 +36,15 @@ class JujutsuLogPanel(
     // Table showing commits
     private val logTable = JujutsuLogTable(columnManager)
 
+    // Details panel showing selected commit info
+    private val detailsPanel = JujutsuCommitDetailsPanel()
+
+    // Splitter for table and details panel
+    private var splitter: OnePixelSplitter
+
+    // Details panel position (true = right, false = bottom)
+    private var detailsOnRight = true
+
     // Data loader for background loading
     private val dataLoader = JujutsuLogDataLoader(project, root, logTable.logModel, logTable)
 
@@ -45,18 +55,40 @@ class JujutsuLogPanel(
         // Set up initial column visibility
         updateColumnVisibility()
 
-        // Add table in scroll pane
-        val scrollPane = ScrollPaneFactory.createScrollPane(logTable)
-        add(scrollPane, BorderLayout.CENTER)
+        // Create splitter with table and details panel
+        val tableScrollPane = ScrollPaneFactory.createScrollPane(logTable)
+        splitter = createSplitter(tableScrollPane, detailsOnRight)
+
+        add(splitter, BorderLayout.CENTER)
 
         // Add toolbar
         add(createToolbar(), BorderLayout.NORTH)
+
+        // Wire table selection to details panel
+        logTable.selectionModel.addListSelectionListener(
+            ListSelectionListener { e ->
+                if (!e.valueIsAdjusting) {
+                    detailsPanel.showCommit(logTable.selectedEntry)
+                }
+            }
+        )
 
         // Load initial data
         dataLoader.loadCommits()
 
         log.info("JujutsuLogPanel initialized for root: ${root.path}")
     }
+
+    /**
+     * Create a splitter with the given orientation.
+     * @param tableScrollPane The scroll pane containing the table
+     * @param horizontal True to position details on right, false for bottom
+     */
+    private fun createSplitter(tableScrollPane: javax.swing.JScrollPane, horizontal: Boolean) =
+        OnePixelSplitter(!horizontal, if (horizontal) 0.7f else 0.7f).apply {
+            firstComponent = tableScrollPane
+            secondComponent = detailsPanel
+        }
 
     private fun createToolbar(): JPanel {
         val toolbar = ActionManager.getInstance().createActionToolbar(
@@ -75,7 +107,7 @@ class JujutsuLogPanel(
     private fun createActionGroup() = DefaultActionGroup().apply {
         add(RefreshAction())
         add(ColumnsAction())
-        // Phase 4: Add filter, search, etc.
+        add(DetailsPositionAction())
     }
 
     /**
@@ -99,6 +131,43 @@ class JujutsuLogPanel(
         init {
             templatePresentation.icon = AllIcons.Actions.Show
             add(createColumnsActionGroup())
+        }
+    }
+
+    /**
+     * Details position sub-menu - toggle between right and bottom.
+     */
+    private inner class DetailsPositionAction : DefaultActionGroup(JujutsuBundle.message("log.action.details.position"), true) {
+        init {
+            templatePresentation.icon = AllIcons.Actions.SplitHorizontally
+            add(DetailsOnRightAction())
+            add(DetailsOnBottomAction())
+        }
+    }
+
+    /**
+     * Action to position details on the right.
+     */
+    private inner class DetailsOnRightAction : ToggleAction(JujutsuBundle.message("log.action.details.right")) {
+        override fun isSelected(e: AnActionEvent) = detailsOnRight
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            if (state && !detailsOnRight) {
+                toggleDetailsPosition()
+            }
+        }
+    }
+
+    /**
+     * Action to position details on the bottom.
+     */
+    private inner class DetailsOnBottomAction : ToggleAction(JujutsuBundle.message("log.action.details.bottom")) {
+        override fun isSelected(e: AnActionEvent) = !detailsOnRight
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            if (state && detailsOnRight) {
+                toggleDetailsPosition()
+            }
         }
     }
 
@@ -177,9 +246,33 @@ class JujutsuLogPanel(
         logTable.installRenderers()
     }
 
+    /**
+     * Toggle the details panel position between right and bottom.
+     */
+    private fun toggleDetailsPosition() {
+        detailsOnRight = !detailsOnRight
+
+        // Remove old splitter
+        remove(splitter)
+
+        // Create new splitter with new orientation
+        val tableScrollPane = ScrollPaneFactory.createScrollPane(logTable)
+        splitter = createSplitter(tableScrollPane, detailsOnRight)
+
+        // Add new splitter
+        add(splitter, BorderLayout.CENTER)
+
+        // Refresh UI
+        revalidate()
+        repaint()
+
+        log.info("Details panel position toggled to ${if (detailsOnRight) "right" else "bottom"}")
+    }
+
     override fun dispose() {
         log.info("JujutsuLogPanel disposed")
-        // Cleanup will happen automatically
+        detailsPanel.dispose()
+        // Other cleanup will happen automatically
     }
 
     companion object {

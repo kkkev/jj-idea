@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
-import `in`.kkkev.jjidea.ui.JujutsuCommitFormatter
 import `in`.kkkev.jjidea.ui.log.GraphableEntry
 import kotlinx.datetime.Instant
 
@@ -25,10 +24,5 @@ data class LogEntry(
     val author: VcsUser? = null,
     val committer: VcsUser? = null
 ) : GraphableEntry {
-    /**
-     * Get the formatted change ID with short prefix separated
-     */
-    fun getFormattedChangeId() = JujutsuCommitFormatter.format(changeId)
-
     val description = Description(underlyingDescription)
 }

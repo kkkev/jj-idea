@@ -2,11 +2,10 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
-import com.intellij.ui.SimpleTextAttributes
-import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.JujutsuColors
 import java.awt.Component
 import java.awt.Graphics
 import java.awt.Graphics2D
@@ -211,7 +210,14 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
-        private fun drawLinesToParents(g2d: Graphics2D, node: GraphNode, commitX: Int, commitY: Int, currentRow: Int, graphStartX: Int) {
+        private fun drawLinesToParents(
+            g2d: Graphics2D,
+            node: GraphNode,
+            commitX: Int,
+            commitY: Int,
+            currentRow: Int,
+            graphStartX: Int
+        ) {
             val model = table.model as? JujutsuLogTableModel ?: return
             val currentEntry = model.getEntry(currentRow) ?: return
 
@@ -247,7 +253,12 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // Empty indicator
             if (entry.isEmpty) {
-                AllIcons.General.BalloonInformation.paintIcon(this, g2d, x, centerY - AllIcons.General.BalloonInformation.iconHeight / 2)
+                AllIcons.General.BalloonInformation.paintIcon(
+                    this,
+                    g2d,
+                    x,
+                    centerY - AllIcons.General.BalloonInformation.iconHeight / 2
+                )
                 x += AllIcons.General.BalloonInformation.iconWidth + HORIZONTAL_PADDING
             }
 
@@ -321,7 +332,7 @@ class JujutsuGraphAndDescriptionRenderer(
             for (bookmark in entry.bookmarks.reversed()) {
                 // Draw bookmark name
                 g2d.font = boldFont
-                g2d.color = if (isSelected) table.selectionForeground else JBColor.BLUE
+                g2d.color = if (isSelected) table.selectionForeground else JujutsuColors.BOOKMARK
                 val nameWidth = fontMetrics.stringWidth(bookmark.name)
                 x -= nameWidth
                 g2d.drawString(bookmark.name, x, centerY + fontMetrics.ascent / 2)

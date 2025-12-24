@@ -13,6 +13,7 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.ui.DateTimeFormatter
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import kotlinx.datetime.Instant
 import java.util.*
@@ -119,17 +120,17 @@ class JujutsuFileAnnotation(
         "author-instant",
         JujutsuBundle.message("annotation.aspect.authordate"),
         true,
-        { it.authorTimestamp?.let(::formatPrettyDate) }
+        { it.authorTimestamp?.let(DateTimeFormatter::formatAbsolute) }
     )
 
     private inner class DescriptionAspect : Aspect(
         "description",
         JujutsuBundle.message("annotation.aspect.description"),
         false,
-        { it.descriptionFirstLine },
+        { it.description.summary },
         JujutsuBundle.message("description.empty")
     )
 }
 
+// TODO Use standard formatter
 fun Instant.toJavaDate() = Date(this.toEpochMilliseconds())
-fun formatPrettyDate(instant: Instant) = DateFormatUtil.formatPrettyDate(instant.toJavaDate())
