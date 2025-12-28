@@ -39,6 +39,11 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     .bindSelected(settings.state::showChangeIdsInShortFormat)
                     .comment(JujutsuBundle.message("settings.shortformat.comment"))
             }
+            row {
+                checkBox(JujutsuBundle.message("settings.autoopenlog.label"))
+                    .bindSelected(settings.state::autoOpenCustomLogTab)
+                    .comment(JujutsuBundle.message("settings.autoopenlog.comment"))
+            }
         }
 
         group(JujutsuBundle.message("settings.group.log")) {

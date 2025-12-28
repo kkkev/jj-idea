@@ -72,6 +72,11 @@ This document captures all requirements, implementation decisions, and developme
 36. ✅ Log change limit configuration
 37. ✅ Persistent settings across IDE restarts
 
+### Phase 8: Custom Log Auto-Open
+38. ✅ Startup activity to automatically open custom log tab
+39. ✅ Setting to enable/disable auto-open behavior
+40. ✅ Replace standard VCS log with custom implementation on startup
+
 ## Architecture
 
 ### Core Components
@@ -88,6 +93,19 @@ JujutsuVcs (extends AbstractVcs)
 └── JujutsuCommandExecutor (interface)
     └── JujutsuCliExecutor(root) - CLI implementation
 ```
+
+**JujutsuVcs Utility Methods**: Always use these companion object methods to find JujutsuVcs instances:
+- `JujutsuVcs.find(project: Project?): JujutsuVcs?` - Find JujutsuVcs for project's base path, returns null if not found
+- `JujutsuVcs.find(root: VirtualFile): JujutsuVcs?` - Find JujutsuVcs for specific VirtualFile root, returns null if not found
+- `JujutsuVcs.findRequired(root: VirtualFile): JujutsuVcs` - Find JujutsuVcs or throw VcsException
+
+**Usage Guidelines**:
+- ALWAYS use `JujutsuVcs.find()` methods instead of directly accessing `ProjectLevelVcsManager`
+- Use `find(project)` to check if a project is a Jujutsu project
+- Use `find(root)` when you have a specific VirtualFile root
+- Use `findRequired(root)` when JujutsuVcs must exist (e.g., in VCS providers)
+
+**See**: `vcs/JujutsuVcs.kt` companion object
 
 #### Command Executor Pattern
 **Pattern**: `CommandExecutor` interface with CLI implementation (`CliExecutor`)
@@ -257,6 +275,36 @@ val html = htmlText {
 
 **See**: `ui/TextCanvas.kt`, `ui/DateTimeFormatter.kt`, `ui/Formatters.kt`, `ui/JujutsuColors.kt`
 
+#### 11. Auto-Open Custom Log on Startup
+**Decision**: Use `PostStartupActivity` to automatically open the custom Jujutsu log tab when a project with Jujutsu VCS is detected.
+
+**Implementation**:
+- `JujutsuStartupActivity` - Startup activity that checks for Jujutsu VCS root
+- `JujutsuSettings.autoOpenCustomLogTab` - Boolean setting to enable/disable auto-open
+- Registered in `plugin.xml` as `postStartupActivity`
+
+**Behavior**:
+- On project startup, checks if settings allow auto-open
+- If enabled, checks if project has any Jujutsu VCS root using `JujutsuVcs.find(project)`
+- If found:
+  1. Closes any existing default VCS log tabs (named "Log") via `ToolWindowManager`
+  2. Installs `ContentManagerListener` to suppress default log tabs from being recreated
+  3. Opens custom Jujutsu log tab via `JujutsuCustomLogTabManager`
+- Tab appears in Changes view (VCS tool window area)
+- UI modifications wrapped in `withContext(Dispatchers.EDT)` to run on EDT
+- Listener automatically closes any "Log" tabs added after startup
+
+**Rationale**:
+- Replaces standard VCS log with custom implementation automatically
+- Removes default VCS log tabs to avoid confusion and provide clean UI
+- Uses `ContentManagerListener` to prevent default tabs from reappearing after initial close
+- Provides seamless user experience - custom log is available immediately
+- Configurable via settings for users who prefer manual opening
+- Uses post-startup to avoid blocking IDE initialization
+- EDT dispatch ensures thread safety for UI modifications
+
+**See**: `JujutsuStartupActivity.kt`, `settings/JujutsuSettingsState.kt`
+
 ## File Structure
 
 ```
@@ -275,6 +323,7 @@ src/main/kotlin/in/kkkev/jjidea/
 │       ├── CliExecutor.kt                 # CLI command execution
 │       ├── CliLogService.kt               # CLI-based log service with templates
 │       └── AnnotationParser.kt            # Parses jj file annotate output
+├── JujutsuStartupActivity.kt              # Startup activity to auto-open custom log
 ├── vcs/                                   # IntelliJ VCS framework integration
 │   ├── JujutsuVcs.kt                      # Main VCS implementation
 │   ├── JujutsuLogProvider.kt              # VCS log integration

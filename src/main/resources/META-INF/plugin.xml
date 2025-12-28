@@ -27,6 +27,9 @@
         <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" />
         <logProvider implementation="in.kkkev.jjidea.vcs.JujutsuLogProvider" />
 
+        <!-- Startup activity to automatically open custom log tab -->
+        <postStartupActivity implementation="in.kkkev.jjidea.JujutsuStartupActivity" />
+
         <!-- Modern file history handler (toolbar at top, details on right) -->
         <vcsLogFileHistoryHandler implementation="in.kkkev.jjidea.vcs.history.JujutsuLogFileHistoryHandler" order="first" />
 
