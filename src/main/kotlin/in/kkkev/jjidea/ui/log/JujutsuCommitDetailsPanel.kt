@@ -1,14 +1,31 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.diff.DiffContentFactory
+import com.intellij.diff.DiffManager
+import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.OnePixelSplitter
+import com.intellij.ui.PopupHandler
+import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.*
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import javax.swing.JEditorPane
 import javax.swing.JPanel
@@ -22,14 +39,25 @@ import javax.swing.text.html.HTMLEditorKit
  * - TOP: Changed files tree
  * - BOTTOM: Commit metadata and description
  */
-class JujutsuCommitDetailsPanel : JPanel(BorderLayout()), Disposable {
+class JujutsuCommitDetailsPanel(
+    private val project: Project,
+    private val root: VirtualFile
+) : JPanel(BorderLayout()), Disposable {
+
+    private val log = Logger.getInstance(JujutsuCommitDetailsPanel::class.java)
 
     private val metadataPanel = JPanel(BorderLayout())
-    private val changesPanel = JPanel(BorderLayout()) // Placeholder for file tree
+    private val changesPanel = JPanel(BorderLayout())
     private val splitter: OnePixelSplitter
 
     // Metadata components
     private val metadataPane = JEditorPane()
+
+    // Changes tree
+    private val changesTree = JujutsuChangesTree(project)
+
+    // Current selected entry
+    private var currentEntry: LogEntry? = null
 
     init {
         // Configure metadata pane
@@ -43,11 +71,8 @@ class JujutsuCommitDetailsPanel : JPanel(BorderLayout()), Disposable {
 
         metadataPanel.add(JBScrollPane(metadataPane), BorderLayout.CENTER)
 
-        // Placeholder for changes panel
-        changesPanel.add(JBLabel("Changed files tree (coming soon)").apply {
-            border = JBUI.Borders.empty(8)
-            foreground = UIUtil.getLabelDisabledForeground()
-        }, BorderLayout.CENTER)
+        // Setup changes panel with tree and toolbar
+        setupChangesPanel()
 
         // Create splitter: changes on top, metadata on bottom
         splitter = OnePixelSplitter(true, 0.5f).apply {
@@ -57,25 +82,200 @@ class JujutsuCommitDetailsPanel : JPanel(BorderLayout()), Disposable {
 
         add(splitter, BorderLayout.CENTER)
 
+        // Setup tree interactions
+        setupTreeInteractions()
+
         // Show empty state initially
         showEmptyState()
+    }
+
+    private fun setupChangesPanel() {
+        // Add toolbar
+        val toolbar = createChangesToolbar()
+        changesPanel.add(toolbar.component, BorderLayout.NORTH)
+
+        // Add tree
+        val treeScrollPane = ScrollPaneFactory.createScrollPane(changesTree)
+        changesPanel.add(treeScrollPane, BorderLayout.CENTER)
+    }
+
+    private fun createChangesToolbar(): ActionToolbar {
+        val group = DefaultActionGroup()
+
+        // Tree expander actions (expand all / collapse all)
+        val treeExpander = changesTree.treeExpander
+        val commonActionsManager = com.intellij.ide.CommonActionsManager.getInstance()
+        group.add(commonActionsManager.createExpandAllAction(treeExpander, changesTree))
+        group.add(commonActionsManager.createCollapseAllAction(treeExpander, changesTree))
+
+        group.addSeparator()
+
+        // Grouping actions
+        group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
+
+        return ActionManager.getInstance().createActionToolbar(
+            "JujutsuCommitDetailsChangesToolbar",
+            group,
+            true
+        ).apply {
+            targetComponent = changesTree
+        }
+    }
+
+    private fun setupTreeInteractions() {
+        // Double-click to show diff
+        changesTree.setDoubleClickHandler {
+            changesTree.selectedChanges.firstOrNull()?.let { change ->
+                showDiff(change)
+                true
+            } ?: false
+        }
+
+        // Enter key to show diff
+        changesTree.setEnterKeyHandler {
+            changesTree.selectedChanges.firstOrNull()?.let { change ->
+                showDiff(change)
+                true
+            } ?: false
+        }
+
+        // Context menu
+        changesTree.addMouseListener(object : PopupHandler() {
+            override fun invokePopup(comp: java.awt.Component, x: Int, y: Int) {
+                showContextMenu(comp, x, y)
+            }
+        })
+    }
+
+    private fun showDiff(change: Change) {
+        // Load content in background thread to avoid EDT blocking
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val beforePath = change.beforeRevision?.file
+            val afterPath = change.afterRevision?.file
+            val fileName = afterPath?.name ?: beforePath?.name ?: JujutsuBundle.message("diff.title.unknown")
+
+            // Load revision content in background
+            val beforeContent = change.beforeRevision?.content ?: ""
+            val afterContent = change.afterRevision?.content ?: ""
+
+            // Get parent and current change IDs for titles
+            val entry = currentEntry
+            val parentId = entry?.parentIds?.firstOrNull()?.short ?: "parent"
+            val currentId = entry?.changeId?.short ?: "current"
+
+            // Create diff UI on EDT with loaded content
+            ApplicationManager.getApplication().invokeLater {
+                val contentFactory = DiffContentFactory.getInstance()
+                val diffManager = DiffManager.getInstance()
+
+                val content1 = if (beforePath != null && beforeContent.isNotEmpty()) {
+                    contentFactory.create(project, beforeContent, beforePath.fileType)
+                } else {
+                    contentFactory.createEmpty()
+                }
+
+                val content2 = if (afterPath != null && afterContent.isNotEmpty()) {
+                    contentFactory.create(project, afterContent, afterPath.fileType)
+                } else {
+                    contentFactory.createEmpty()
+                }
+
+                val diffRequest = SimpleDiffRequest(
+                    fileName,
+                    content1,
+                    content2,
+                    "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} ($parentId)",
+                    "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} ($currentId)"
+                )
+
+                diffManager.showDiff(project, diffRequest)
+            }
+        }
+    }
+
+    private fun openFile(change: Change) {
+        val virtualFile = change.afterRevision?.file?.virtualFile
+            ?: change.beforeRevision?.file?.virtualFile
+            ?: return
+
+        FileEditorManager.getInstance(project).openTextEditor(
+            OpenFileDescriptor(project, virtualFile),
+            true
+        )
+    }
+
+    private fun showContextMenu(comp: java.awt.Component, x: Int, y: Int) {
+        val selectedChange = changesTree.selectedChanges.firstOrNull() ?: return
+
+        val actionGroup = DefaultActionGroup().apply {
+            add(object : DumbAwareAction(JujutsuBundle.message("action.showdiff")) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    showDiff(selectedChange)
+                }
+            })
+            add(object : DumbAwareAction(JujutsuBundle.message("action.openfile")) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    openFile(selectedChange)
+                }
+            })
+        }
+
+        val popupMenu = ActionManager.getInstance().createActionPopupMenu(
+            "JujutsuCommitDetailsChangesContextMenu",
+            actionGroup
+        )
+
+        popupMenu.component.show(comp, x, y)
     }
 
     /**
      * Update the panel to show details for the given commit.
      */
     fun showCommit(entry: LogEntry?) {
+        currentEntry = entry
+
         if (entry == null) {
             showEmptyState()
+            changesTree.setChangesToDisplay(emptyList())
             return
         }
 
+        // Update metadata immediately
         val html = buildCommitHtml(entry)
         metadataPane.text = html
 
         // Scroll to top
         SwingUtilities.invokeLater {
             metadataPane.caretPosition = 0
+        }
+
+        // Load changes in background
+        loadChanges(entry)
+    }
+
+    private fun loadChanges(entry: LogEntry) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val fullDetails = JujutsuFullCommitDetails.create(entry, root)
+                val changes = fullDetails.changes.toList()
+
+                ApplicationManager.getApplication().invokeLater {
+                    if (currentEntry == entry) { // Only update if still the same commit
+                        changesTree.setChangesToDisplay(changes)
+                        // Expand all nodes by default after loading changes
+                        changesTree.invokeAfterRefresh {
+                            changesTree.treeExpander.expandAll()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                log.error("Failed to load changes for ${entry.changeId}", e)
+                ApplicationManager.getApplication().invokeLater {
+                    if (currentEntry == entry) {
+                        changesTree.setChangesToDisplay(emptyList())
+                    }
+                }
+            }
         }
     }
 

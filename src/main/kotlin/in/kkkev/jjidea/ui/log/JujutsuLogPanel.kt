@@ -5,14 +5,12 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import `in`.kkkev.jjidea.JujutsuBundle
 import java.awt.BorderLayout
 import javax.swing.JPanel
-import javax.swing.event.ListSelectionListener
 
 /**
  * Main panel for Jujutsu commit log UI.
@@ -23,10 +21,7 @@ import javax.swing.event.ListSelectionListener
  *
  * Built from scratch - no dependency on IntelliJ's VCS log UI.
  */
-class JujutsuLogPanel(
-    private val project: Project,
-    private val root: VirtualFile
-) : JPanel(BorderLayout()), Disposable {
+class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout()), Disposable {
 
     private val log = Logger.getInstance(JujutsuLogPanel::class.java)
 
@@ -37,7 +32,7 @@ class JujutsuLogPanel(
     private val logTable = JujutsuLogTable(columnManager)
 
     // Details panel showing selected commit info
-    private val detailsPanel = JujutsuCommitDetailsPanel()
+    private val detailsPanel = JujutsuCommitDetailsPanel(project, root)
 
     // Splitter for table and details panel
     private var splitter: OnePixelSplitter
@@ -55,23 +50,20 @@ class JujutsuLogPanel(
         // Set up initial column visibility
         updateColumnVisibility()
 
-        // Create splitter with table and details panel
-        val tableScrollPane = ScrollPaneFactory.createScrollPane(logTable)
-        splitter = createSplitter(tableScrollPane, detailsOnRight)
+        // Create table panel with toolbar
+        val tablePanel = createTablePanel()
+
+        // Create splitter with table panel and details panel
+        splitter = createSplitter(tablePanel, detailsOnRight)
 
         add(splitter, BorderLayout.CENTER)
 
-        // Add toolbar
-        add(createToolbar(), BorderLayout.NORTH)
-
         // Wire table selection to details panel
-        logTable.selectionModel.addListSelectionListener(
-            ListSelectionListener { e ->
-                if (!e.valueIsAdjusting) {
-                    detailsPanel.showCommit(logTable.selectedEntry)
-                }
+        logTable.selectionModel.addListSelectionListener { e ->
+            if (!e.valueIsAdjusting) {
+                detailsPanel.showCommit(logTable.selectedEntry)
             }
-        )
+        }
 
         // Load initial data
         dataLoader.loadCommits()
@@ -80,13 +72,24 @@ class JujutsuLogPanel(
     }
 
     /**
+     * Create a panel containing the table with its toolbar.
+     */
+    private fun createTablePanel() = JPanel(BorderLayout()).apply {
+        // Add toolbar at the top
+        add(createToolbar(), BorderLayout.NORTH)
+
+        // Add table scroll pane in the center
+        add(ScrollPaneFactory.createScrollPane(logTable), BorderLayout.CENTER)
+    }
+
+    /**
      * Create a splitter with the given orientation.
-     * @param tableScrollPane The scroll pane containing the table
+     * @param tablePanel The panel containing the table and toolbar
      * @param horizontal True to position details on right, false for bottom
      */
-    private fun createSplitter(tableScrollPane: javax.swing.JScrollPane, horizontal: Boolean) =
+    private fun createSplitter(tablePanel: JPanel, horizontal: Boolean) =
         OnePixelSplitter(!horizontal, if (horizontal) 0.7f else 0.7f).apply {
-            firstComponent = tableScrollPane
+            firstComponent = tablePanel
             secondComponent = detailsPanel
         }
 
@@ -137,7 +140,8 @@ class JujutsuLogPanel(
     /**
      * Details position sub-menu - toggle between right and bottom.
      */
-    private inner class DetailsPositionAction : DefaultActionGroup(JujutsuBundle.message("log.action.details.position"), true) {
+    private inner class DetailsPositionAction :
+        DefaultActionGroup(JujutsuBundle.message("log.action.details.position"), true) {
         init {
             templatePresentation.icon = AllIcons.Actions.SplitHorizontally
             add(DetailsOnRightAction())
@@ -172,34 +176,44 @@ class JujutsuLogPanel(
     }
 
     private fun createColumnsActionGroup() = DefaultActionGroup().apply {
-        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.changeid"),
-            getter = { columnManager.showChangeIdColumn },
-            setter = { columnManager.showChangeIdColumn = it }
-        ))
-        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.description"),
-            getter = { columnManager.showDescriptionColumn },
-            setter = { columnManager.showDescriptionColumn = it }
-        ))
-        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.decorations"),
-            getter = { columnManager.showDecorationsColumn },
-            setter = { columnManager.showDecorationsColumn = it }
-        ))
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.changeid"),
+                getter = { columnManager.showChangeIdColumn },
+                setter = { columnManager.showChangeIdColumn = it }
+            ))
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.description"),
+                getter = { columnManager.showDescriptionColumn },
+                setter = { columnManager.showDescriptionColumn = it }
+            ))
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.decorations"),
+                getter = { columnManager.showDecorationsColumn },
+                setter = { columnManager.showDecorationsColumn = it }
+            ))
         addSeparator()
-        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.author"),
-            getter = { columnManager.showAuthorColumn },
-            setter = { columnManager.showAuthorColumn = it }
-        ))
-        add(ToggleColumnAction(JujutsuBundle.message("log.column.toggle.date"),
-            getter = { columnManager.showDateColumn },
-            setter = { columnManager.showDateColumn = it }
-        ))
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.author"),
+                getter = { columnManager.showAuthorColumn },
+                setter = { columnManager.showAuthorColumn = it }
+            ))
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.date"),
+                getter = { columnManager.showDateColumn },
+                setter = { columnManager.showDateColumn = it }
+            ))
     }
 
     /**
      * Toggle action for a single column.
      */
     private inner class ToggleColumnAction(
-        private val columnName: String,
+        columnName: String,
         private val getter: () -> Boolean,
         private val setter: (Boolean) -> Unit
     ) : ToggleAction(columnName) {
@@ -256,8 +270,8 @@ class JujutsuLogPanel(
         remove(splitter)
 
         // Create new splitter with new orientation
-        val tableScrollPane = ScrollPaneFactory.createScrollPane(logTable)
-        splitter = createSplitter(tableScrollPane, detailsOnRight)
+        val tablePanel = createTablePanel()
+        splitter = createSplitter(tablePanel, detailsOnRight)
 
         // Add new splitter
         add(splitter, BorderLayout.CENTER)
