@@ -4,14 +4,10 @@ import com.intellij.icons.AllIcons
 import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.vcs.log.VcsUser
-import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.DateTimeFormatter
-import `in`.kkkev.jjidea.ui.TextCanvas
-import `in`.kkkev.jjidea.ui.append
-import `in`.kkkev.jjidea.ui.appendSummary
+import `in`.kkkev.jjidea.ui.*
 import kotlinx.datetime.Instant
 import javax.swing.JTable
 
@@ -115,29 +111,13 @@ class SeparateChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
 /**
  * Renderer for separate Description column.
  */
-class SeparateDescriptionCellRenderer : ColoredTableCellRenderer() {
-    override fun customizeCellRenderer(
-        table: JTable,
-        value: Any?,
-        selected: Boolean,
-        hasFocus: Boolean,
-        row: Int,
-        column: Int
-    ) {
-        val description = value as? Description ?: return
-
-        // Show description (italic if empty)
-        val attributes = if (description.empty) {
-            SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
-        } else {
-            SimpleTextAttributes.REGULAR_ATTRIBUTES
-        }
-
-        append(description.summary, attributes)
+class SeparateDescriptionCellRenderer : TextCellRenderer<Description>() {
+    override fun render(value: Description) {
+        append(value)
 
         // Set tooltip to full description with HTML formatting
-        if (!description.empty) {
-            toolTipText = formatDescriptionTooltip(description.actual)
+        if (!value.empty) {
+            toolTipText = formatDescriptionTooltip(value.actual)
         }
     }
 
@@ -154,22 +134,23 @@ class SeparateDescriptionCellRenderer : ColoredTableCellRenderer() {
 }
 
 /**
- * Renderer for separate Decorations column (bookmarks/tags).
+ * Renderer for separate Decorations column (@ working copy marker and bookmarks).
  */
-class SeparateDecorationsCellRenderer : ColoredTableCellRenderer() {
-    override fun customizeCellRenderer(
-        table: JTable,
-        value: Any?,
-        selected: Boolean,
-        hasFocus: Boolean,
-        row: Int,
-        column: Int
-    ) {
-        val bookmarks = value as? List<*> ?: return
+class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
+    override fun render(value: LogEntry) {
+        var hasContent = false
 
-        bookmarks.filterIsInstance<Bookmark>().forEachIndexed { index, bookmark ->
-            if (index > 0) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
-            append(bookmark.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+        // Show @ for working copy
+        if (value.isWorkingCopy) {
+            append("@", SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JujutsuColors.WORKING_COPY))
+            hasContent = true
+        }
+
+        // Show bookmarks
+        value.bookmarks.forEachIndexed { index, bookmark ->
+            if (hasContent || index > 0) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
+            append(bookmark.name, SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JujutsuColors.BOOKMARK))
+            hasContent = true
         }
     }
 }

@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.JujutsuColors
 import java.awt.Component
+import java.awt.Font
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -270,7 +271,7 @@ class JujutsuGraphAndDescriptionRenderer(
             val fontMetrics = g2d.fontMetrics
 
             // Draw short prefix in bold
-            val boldFont = fontMetrics.font.deriveFont(java.awt.Font.BOLD)
+            val boldFont = fontMetrics.font.deriveFont(Font.BOLD)
             g2d.font = boldFont
             g2d.color = if (isSelected) table.selectionForeground else table.foreground
 
@@ -280,7 +281,7 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // Draw remainder in gray/small if present
             if (changeId.displayRemainder.isNotEmpty()) {
-                val regularFont = fontMetrics.font.deriveFont(java.awt.Font.PLAIN)
+                val regularFont = fontMetrics.font.deriveFont(Font.PLAIN)
                 val smallFont = regularFont.deriveFont(regularFont.size2D * 0.85f)
                 g2d.font = smallFont
                 g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
@@ -301,7 +302,7 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // Use italic for empty descriptions
             if (entry.description.empty) {
-                val italicFont = fontMetrics.font.deriveFont(java.awt.Font.ITALIC)
+                val italicFont = fontMetrics.font.deriveFont(Font.ITALIC)
                 g2d.font = italicFont
                 g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
             } else {
@@ -320,11 +321,11 @@ class JujutsuGraphAndDescriptionRenderer(
         }
 
         private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int) {
-            if (entry.bookmarks.isEmpty()) return
+            if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return
 
             val centerY = height / 2
             val fontMetrics = g2d.fontMetrics
-            val boldFont = fontMetrics.font.deriveFont(java.awt.Font.BOLD)
+            val boldFont = fontMetrics.font.deriveFont(Font.BOLD)
 
             var x = rightX
 
@@ -343,6 +344,16 @@ class JujutsuGraphAndDescriptionRenderer(
                 x -= icon.iconWidth
                 icon.paintIcon(this, g2d, x, centerY - icon.iconHeight / 2)
                 x -= HORIZONTAL_PADDING * 2
+            }
+
+            // Draw @ symbol for working copy
+            if (entry.isWorkingCopy) {
+                g2d.font = boldFont
+                g2d.color = if (isSelected) table.selectionForeground else JujutsuColors.WORKING_COPY
+                val atWidth = fontMetrics.stringWidth("@")
+                x -= atWidth
+                g2d.drawString("@", x, centerY + fontMetrics.ascent / 2)
+                x -= HORIZONTAL_PADDING
             }
 
             // Reset font

@@ -122,7 +122,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
             COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
             COLUMN_CHANGE_ID -> entry.changeId
             COLUMN_DESCRIPTION -> entry.description
-            COLUMN_DECORATIONS -> entry.bookmarks
+            COLUMN_DECORATIONS -> entry // Return full entry to access both isWorkingCopy and bookmarks
             COLUMN_AUTHOR -> entry.author
             COLUMN_DATE -> entry.authorTimestamp ?: entry.committerTimestamp
             else -> null
