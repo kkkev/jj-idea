@@ -3,14 +3,24 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ex.ActionButtonLook
+import com.intellij.openapi.actionSystem.impl.ActionButton
+import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
+import com.intellij.openapi.actionSystem.impl.FieldInplaceActionButtonLook
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
+import com.intellij.ui.SearchTextField
+import com.intellij.ui.components.SearchFieldWithExtension
 import `in`.kkkev.jjidea.JujutsuBundle
-import java.awt.BorderLayout
+import java.awt.*
+import javax.swing.Icon
 import javax.swing.JPanel
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
+import javax.swing.table.TableColumn
 
 /**
  * Main panel for Jujutsu commit log UI.
@@ -43,7 +53,39 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
     // Data loader for background loading
     private val dataLoader = JujutsuLogDataLoader(project, root, logTable.logModel, logTable)
 
+    // Filter options state
+    private var useRegex = false
+    private var matchCase = false
+    private var matchWholeWords = false
+
+    // Base search field with history
+    private val searchTextField = SearchTextField(true).apply {
+        textEditor.emptyText.text = JujutsuBundle.message("log.filter.text.placeholder")
+        toolTipText = JujutsuBundle.message("log.filter.text.tooltip")
+
+        // Listen for text changes
+        textEditor.document.addDocumentListener(object : DocumentListener {
+            override fun insertUpdate(e: DocumentEvent?) = applyFilter()
+            override fun removeUpdate(e: DocumentEvent?) = applyFilter()
+            override fun changedUpdate(e: DocumentEvent?) = applyFilter()
+        })
+
+        // Add Enter key listener to save search to history
+        textEditor.addActionListener {
+            val text = text?.trim()
+            if (!text.isNullOrEmpty()) {
+                addCurrentTextToHistory()
+            }
+        }
+    }
+
+    // Filter panel using SearchFieldWithExtension
+    private val filterField: SearchFieldWithExtension
+
     init {
+        // Create filter field with extension toolbar
+        filterField = createFilterField()
+
         // Install custom renderers
         logTable.installRenderers()
 
@@ -93,18 +135,58 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
             secondComponent = detailsPanel
         }
 
-    private fun createToolbar(): JPanel {
+    private fun createToolbar() = JPanel(BorderLayout()).apply {
+        // Create main toolbar with actions on the right
         val toolbar = ActionManager.getInstance().createActionToolbar(
             "JujutsuLogToolbar",
             createActionGroup(),
             true
         )
+        toolbar.targetComponent = this@JujutsuLogPanel
 
-        toolbar.targetComponent = this
+        add(filterField, BorderLayout.WEST)
+        add(toolbar.component, BorderLayout.EAST)
+    }
 
-        return JPanel(BorderLayout()).apply {
-            add(toolbar.component, BorderLayout.CENTER)
+    /**
+     * Create the filter field using SearchFieldWithExtension pattern.
+     * Following IntelliJ's VCS log approach with ActionToolbar inside the search field.
+     */
+    private fun createFilterField(): SearchFieldWithExtension {
+        // Create action group with toggle buttons
+        val filterActionsGroup = DefaultActionGroup().apply {
+            add(RegexFilterAction())
+            add(MatchCaseAction())
+            add(MatchWholeWordsAction())
         }
+
+        // Create custom toolbar that uses toggle-aware action buttons
+        val toolbar = object : ActionToolbarImpl(
+            "JujutsuLogFilter",
+            filterActionsGroup,
+            true // horizontal
+        ) {
+            override fun createToolbarButton(
+                action: AnAction,
+                look: ActionButtonLook?,
+                place: String,
+                presentation: Presentation,
+                minimumSize: java.util.function.Supplier<out Dimension?>
+            ): ActionButton {
+                val button = ToggleAwareActionButton(action, presentation)
+                button.isFocusable = true
+                applyToolbarLook(look, presentation, button)
+                return button
+            }
+        }
+
+        toolbar.apply {
+            targetComponent = searchTextField.textEditor
+            setCustomButtonLook(FieldInplaceActionButtonLook())
+            isReservePlaceAutoPopupIcon = false
+        }
+
+        return SearchFieldWithExtension(toolbar.component, searchTextField)
     }
 
     private fun createActionGroup() = DefaultActionGroup().apply {
@@ -175,6 +257,54 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
         }
     }
 
+    /**
+     * Toggle regex filter mode.
+     */
+    private inner class RegexFilterAction : ToggleAction(
+        JujutsuBundle.message("log.filter.regex"),
+        JujutsuBundle.message("log.filter.regex.tooltip"),
+        AllIcons.Actions.RegexHovered
+    ) {
+        override fun isSelected(e: AnActionEvent) = useRegex
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            useRegex = state
+            applyFilter()
+        }
+    }
+
+    /**
+     * Toggle match case in filter.
+     */
+    private inner class MatchCaseAction : ToggleAction(
+        JujutsuBundle.message("log.filter.matchcase"),
+        JujutsuBundle.message("log.filter.matchcase.tooltip"),
+        AllIcons.Actions.MatchCase
+    ) {
+        override fun isSelected(e: AnActionEvent) = matchCase
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            matchCase = state
+            applyFilter()
+        }
+    }
+
+    /**
+     * Toggle match whole words in filter.
+     */
+    private inner class MatchWholeWordsAction : ToggleAction(
+        JujutsuBundle.message("log.filter.words"),
+        JujutsuBundle.message("log.filter.words.tooltip"),
+        AllIcons.Actions.Words
+    ) {
+        override fun isSelected(e: AnActionEvent) = matchWholeWords
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            matchWholeWords = state
+            applyFilter()
+        }
+    }
+
     private fun createColumnsActionGroup() = DefaultActionGroup().apply {
         add(
             ToggleColumnAction(
@@ -235,7 +365,7 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
         val tableModel = logTable.logModel
 
         // Store current columns
-        val existingColumns = mutableListOf<javax.swing.table.TableColumn>()
+        val existingColumns = mutableListOf<TableColumn>()
         for (i in 0 until columnModel.columnCount) {
             existingColumns.add(columnModel.getColumn(i))
         }
@@ -250,7 +380,7 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
             if (columnManager.isColumnVisible(idx)) {
                 // Try to reuse existing column or create new one
                 val column = existingColumns.find { it.modelIndex == idx }
-                    ?: javax.swing.table.TableColumn(idx)
+                    ?: TableColumn(idx)
 
                 columnModel.addColumn(column)
             }
@@ -283,10 +413,42 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
         log.info("Details panel position toggled to ${if (detailsOnRight) "right" else "bottom"}")
     }
 
+    /**
+     * Apply the current filter text to the table.
+     */
+    private fun applyFilter() {
+        val filterText = searchTextField.text
+        log.info("Applying filter: '$filterText' (regex=$useRegex, matchCase=$matchCase, wholeWords=$matchWholeWords)")
+        logTable.logModel.setFilter(filterText, useRegex, matchCase, matchWholeWords)
+    }
+
     override fun dispose() {
         log.info("JujutsuLogPanel disposed")
         detailsPanel.dispose()
         // Other cleanup will happen automatically
+    }
+
+    /**
+     * Custom ActionButton that shows visual feedback (different background) when selected.
+     * Based on IntelliJ's VCS log implementation.
+     */
+    private class ToggleAwareActionButton(action: AnAction, presentation: Presentation) :
+        ActionButton(action, presentation, "JujutsuLogFilter", ActionToolbar.DEFAULT_MINIMUM_BUTTON_SIZE) {
+
+        init {
+            updateIcon()
+        }
+
+        override fun getPopState(): Int =
+            if (isSelected) SELECTED else super.getPopState()
+
+        override fun getIcon(): Icon {
+            if (isEnabled && isSelected) {
+                val selectedIcon = myPresentation.selectedIcon
+                if (selectedIcon != null) return selectedIcon
+            }
+            return super.getIcon()
+        }
     }
 
     companion object {

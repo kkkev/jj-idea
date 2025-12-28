@@ -88,6 +88,11 @@ class JujutsuLogTable(
 class JujutsuLogTableModel : AbstractTableModel() {
 
     private val entries = mutableListOf<LogEntry>()
+    private val filteredEntries = mutableListOf<LogEntry>()
+    private var filterText: String = ""
+    private var useRegex: Boolean = false
+    private var matchCase: Boolean = false
+    private var matchWholeWords: Boolean = false
 
     companion object {
         const val COLUMN_GRAPH_AND_DESCRIPTION = 0
@@ -107,16 +112,16 @@ class JujutsuLogTableModel : AbstractTableModel() {
         )
     }
 
-    override fun getRowCount() = entries.size
+    override fun getRowCount() = filteredEntries.size
 
     override fun getColumnCount() = COLUMN_NAMES.size
 
     override fun getColumnName(column: Int) = COLUMN_NAMES[column]
 
     override fun getValueAt(rowIndex: Int, columnIndex: Int): Any? {
-        if (rowIndex < 0 || rowIndex >= entries.size) return null
+        if (rowIndex < 0 || rowIndex >= filteredEntries.size) return null
 
-        val entry = entries[rowIndex]
+        val entry = filteredEntries[rowIndex]
 
         return when (columnIndex) {
             COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
@@ -133,7 +138,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
      * Get the log entry at the given row.
      */
     fun getEntry(row: Int): LogEntry? =
-        if (row in entries.indices) entries[row] else null
+        if (row in filteredEntries.indices) filteredEntries[row] else null
 
     /**
      * Update the table with new log entries.
@@ -142,26 +147,98 @@ class JujutsuLogTableModel : AbstractTableModel() {
     fun setEntries(newEntries: List<LogEntry>) {
         entries.clear()
         entries.addAll(newEntries)
+        applyFilter()
+    }
+
+    /**
+     * Set the filter text and options, then update the filtered entries.
+     */
+    fun setFilter(text: String, regex: Boolean = false, caseSensitive: Boolean = false, wholeWords: Boolean = false) {
+        filterText = text
+        useRegex = regex
+        matchCase = caseSensitive
+        matchWholeWords = wholeWords
+        applyFilter()
+    }
+
+    /**
+     * Apply the current filter to the entries.
+     */
+    private fun applyFilter() {
+        filteredEntries.clear()
+
+        if (filterText.isBlank()) {
+            // No filter - show all entries
+            filteredEntries.addAll(entries)
+        } else {
+            // Build the matcher function based on options
+            val matcher: (String) -> Boolean = if (useRegex) {
+                // Regex mode
+                try {
+                    val pattern = if (matchCase) {
+                        filterText.toRegex()
+                    } else {
+                        filterText.toRegex(RegexOption.IGNORE_CASE)
+                    }
+                    { text: String -> pattern.containsMatchIn(text) }
+                } catch (e: Exception) {
+                    // Invalid regex - fall back to literal search
+                    createLiteralMatcher(filterText, matchCase, matchWholeWords)
+                }
+            } else {
+                // Literal search
+                createLiteralMatcher(filterText, matchCase, matchWholeWords)
+            }
+
+            // Filter entries
+            filteredEntries.addAll(entries.filter { entry ->
+                matcher(entry.description.summary) ||
+                matcher(entry.changeId.toString()) ||
+                entry.author?.name?.let(matcher) == true ||
+                entry.author?.email?.let(matcher) == true
+            })
+        }
+
         fireTableDataChanged()
+    }
+
+    /**
+     * Create a literal string matcher with case sensitivity and whole word options.
+     */
+    private fun createLiteralMatcher(filter: String, caseSensitive: Boolean, wholeWords: Boolean): (String) -> Boolean {
+        if (wholeWords) {
+            // Match whole words only
+            val pattern = if (caseSensitive) {
+                "\\b${Regex.escape(filter)}\\b".toRegex()
+            } else {
+                "\\b${Regex.escape(filter)}\\b".toRegex(RegexOption.IGNORE_CASE)
+            }
+            return { text: String -> pattern.containsMatchIn(text) }
+        }
+
+        // Simple substring match
+        if (caseSensitive) {
+            return { text: String -> text.contains(filter) }
+        }
+
+        val lowerFilter = filter.lowercase()
+        return { text: String -> text.lowercase().contains(lowerFilter) }
     }
 
     /**
      * Append more entries (for pagination/incremental loading).
      */
     fun appendEntries(moreEntries: List<LogEntry>) {
-        val oldSize = entries.size
         entries.addAll(moreEntries)
-        fireTableRowsInserted(oldSize, entries.size - 1)
+        applyFilter()
     }
 
     /**
      * Clear all entries.
      */
     fun clear() {
-        val oldSize = entries.size
         entries.clear()
-        if (oldSize > 0) {
-            fireTableRowsDeleted(0, oldSize - 1)
-        }
+        filteredEntries.clear()
+        fireTableDataChanged()
     }
 }
