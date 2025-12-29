@@ -16,8 +16,7 @@ import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.SearchFieldWithExtension
 import `in`.kkkev.jjidea.JujutsuBundle
 import java.awt.*
-import javax.swing.Icon
-import javax.swing.JPanel
+import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 import javax.swing.table.TableColumn
@@ -31,7 +30,10 @@ import javax.swing.table.TableColumn
  *
  * Built from scratch - no dependency on IntelliJ's VCS log UI.
  */
-class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout()), Disposable {
+class JujutsuLogPanel(
+    private val project: Project,
+    private val root: VirtualFile
+) : JPanel(BorderLayout()), Disposable {
 
     private val log = Logger.getInstance(JujutsuLogPanel::class.java)
 
@@ -136,6 +138,14 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
         }
 
     private fun createToolbar() = JPanel(BorderLayout()).apply {
+        // Create left-side panel with text filter and dropdown filters
+        val leftPanel = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(filterField)
+            add(Box.createHorizontalStrut(5))
+            add(createFilterComponents())
+        }
+
         // Create main toolbar with actions on the right
         val toolbar = ActionManager.getInstance().createActionToolbar(
             "JujutsuLogToolbar",
@@ -144,8 +154,42 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
         )
         toolbar.targetComponent = this@JujutsuLogPanel
 
-        add(filterField, BorderLayout.WEST)
+        add(leftPanel, BorderLayout.WEST)
         add(toolbar.component, BorderLayout.EAST)
+    }
+
+    /**
+     * Create the filter components panel (Bookmark, Author, Date, Paths).
+     */
+    private fun createFilterComponents() = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.X_AXIS)
+
+        // Reference filter (bookmarks, tags, @)
+        add(JujutsuReferenceFilterComponent(logTable.logModel).apply {
+            initUi()
+            initialize()
+        })
+        add(Box.createHorizontalStrut(5))
+
+        // Author filter
+        add(JujutsuAuthorFilterComponent(logTable.logModel).apply {
+            initUi()
+            initialize()
+        })
+        add(Box.createHorizontalStrut(5))
+
+        // Date filter
+        add(JujutsuDateFilterComponent(logTable.logModel).apply {
+            initUi()
+            initialize()
+        })
+        add(Box.createHorizontalStrut(5))
+
+        // Paths filter
+        add(JujutsuPathsFilterComponent(project, root, logTable.logModel).apply {
+            initUi()
+            initialize()
+        })
     }
 
     /**
@@ -194,6 +238,7 @@ class JujutsuLogPanel(project: Project, root: VirtualFile) : JPanel(BorderLayout
         add(ColumnsAction())
         add(DetailsPositionAction())
     }
+
 
     /**
      * Refresh action - reload commits.

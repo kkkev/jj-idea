@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.ui.table.JBTable
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import kotlinx.datetime.Instant
 import javax.swing.ListSelectionModel
 import javax.swing.table.AbstractTableModel
 
@@ -93,6 +94,10 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var useRegex: Boolean = false
     private var matchCase: Boolean = false
     private var matchWholeWords: Boolean = false
+    private var authorFilter: Set<String> = emptySet() // Filter by author email
+    private var bookmarkFilter: Set<ChangeId> = emptySet() // Filter by bookmark change IDs (includes ancestors)
+    private var dateFilterCutoff: Instant? = null // Filter by date (show commits after cutoff)
+    private var pathsFilter: Set<String> = emptySet() // Filter by paths
 
     companion object {
         const val COLUMN_GRAPH_AND_DESCRIPTION = 0
@@ -162,17 +167,68 @@ class JujutsuLogTableModel : AbstractTableModel() {
     }
 
     /**
+     * Set the author filter (by author email).
+     * Empty set means no author filtering.
+     */
+    fun setAuthorFilter(authors: Set<String>) {
+        authorFilter = authors
+        applyFilter()
+    }
+
+    /**
+     * Set the bookmark filter (by change IDs that should be included).
+     * Empty set means no bookmark filtering.
+     * The set should include all ancestors of the selected bookmark.
+     */
+    fun setBookmarkFilter(changeIds: Set<ChangeId>) {
+        bookmarkFilter = changeIds
+        applyFilter()
+    }
+
+    /**
+     * Set the date filter (commits after the given instant).
+     * Null means no date filtering.
+     */
+    fun setDateFilter(cutoff: Instant?) {
+        dateFilterCutoff = cutoff
+        applyFilter()
+    }
+
+    /**
+     * Set the paths filter.
+     * Empty set means no path filtering.
+     */
+    fun setPathsFilter(paths: Set<String>) {
+        pathsFilter = paths
+        applyFilter()
+    }
+
+    /**
+     * Get all unique authors in the current entries (for filter UI).
+     */
+    fun getAllAuthors(): List<String> =
+        entries.mapNotNull { it.author?.email }.distinct().sorted()
+
+    /**
+     * Get all unique bookmarks in the current entries (for filter UI).
+     */
+    fun getAllBookmarks(): List<String> =
+        entries.flatMap { it.bookmarks.map { bookmark -> bookmark.name } }.distinct().sorted()
+
+    /**
+     * Get all entries (unfiltered) for computing ancestors.
+     */
+    fun getAllEntries(): List<LogEntry> = entries
+
+    /**
      * Apply the current filter to the entries.
      */
     private fun applyFilter() {
         filteredEntries.clear()
 
-        if (filterText.isBlank()) {
-            // No filter - show all entries
-            filteredEntries.addAll(entries)
-        } else {
-            // Build the matcher function based on options
-            val matcher: (String) -> Boolean = if (useRegex) {
+        // Build text matcher if text filter is active
+        val textMatcher: ((String) -> Boolean)? = if (filterText.isNotBlank()) {
+            if (useRegex) {
                 // Regex mode
                 try {
                     val pattern = if (matchCase) {
@@ -189,15 +245,46 @@ class JujutsuLogTableModel : AbstractTableModel() {
                 // Literal search
                 createLiteralMatcher(filterText, matchCase, matchWholeWords)
             }
+        } else {
+            null
+        }
 
-            // Filter entries
-            filteredEntries.addAll(entries.filter { entry ->
+        // Filter entries by all active filters
+        filteredEntries.addAll(entries.filter { entry ->
+            // Text filter (if active)
+            val matchesText = textMatcher?.let { matcher ->
                 matcher(entry.description.summary) ||
                 matcher(entry.changeId.toString()) ||
                 entry.author?.name?.let(matcher) == true ||
                 entry.author?.email?.let(matcher) == true
-            })
-        }
+            } ?: true
+
+            // Author filter (if active)
+            val matchesAuthor = if (authorFilter.isNotEmpty()) {
+                entry.author?.email?.let { authorFilter.contains(it) } == true
+            } else {
+                true
+            }
+
+            // Bookmark filter (if active) - filter by change ID
+            val matchesBookmark = if (bookmarkFilter.isNotEmpty()) {
+                bookmarkFilter.contains(entry.changeId)
+            } else {
+                true
+            }
+
+            // Date filter (if active)
+            val matchesDate = dateFilterCutoff?.let { cutoff ->
+                val timestamp = entry.authorTimestamp ?: entry.committerTimestamp
+                timestamp != null && timestamp >= cutoff
+            } ?: true
+
+            // Paths filter (if active) - placeholder for now
+            // TODO: Implement path filtering once file changes are available in LogEntry
+            val matchesPaths = pathsFilter.isEmpty()
+
+            matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths
+        })
 
         fireTableDataChanged()
     }
