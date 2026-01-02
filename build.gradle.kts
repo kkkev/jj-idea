@@ -87,6 +87,8 @@ tasks.register<Test>("simpleTest") {
     exclude("**/JujutsuLogEntryTest*.class") // Uses ChangeId which references Hash type
     exclude("**/JujutsuLogParserTest*.class") // Uses ChangeId which references Hash type
     exclude("**/jj/ChangeIdTest*.class") // ChangeId references Hash type in lazy property
+    exclude("**/jj/DescriptionTest*.class") // Description uses JujutsuBundle which requires DynamicBundle
     exclude("**/cli/AnnotationParserTest*.class") // Uses ChangeId which references Hash type
     exclude("**/cli/LogTemplateTest*.class") // Uses VcsUser and ChangeId with Hash type
+    exclude("**/JujutsuDateTimeFormatterTest*.class") // DateTimeFormatter uses DateFormatUtil
 }
