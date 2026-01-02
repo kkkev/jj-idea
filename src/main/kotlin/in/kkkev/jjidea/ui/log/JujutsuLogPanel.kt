@@ -41,7 +41,7 @@ class JujutsuLogPanel(
     private val columnManager = JujutsuColumnManager()
 
     // Table showing commits
-    private val logTable = JujutsuLogTable(columnManager)
+    private val logTable = JujutsuLogTable(project, columnManager)
 
     // Details panel showing selected commit info
     private val detailsPanel = JujutsuCommitDetailsPanel(project, root)
@@ -93,6 +93,9 @@ class JujutsuLogPanel(
 
         // Set up initial column visibility
         updateColumnVisibility()
+
+        // Load saved column widths from settings
+        logTable.loadColumnWidths()
 
         // Create table panel with toolbar
         val tablePanel = createTablePanel()
@@ -353,6 +356,12 @@ class JujutsuLogPanel(
     private fun createColumnsActionGroup() = DefaultActionGroup().apply {
         add(
             ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.status"),
+                getter = { columnManager.showStatusColumn },
+                setter = { columnManager.showStatusColumn = it }
+            ))
+        add(
+            ToggleColumnAction(
                 JujutsuBundle.message("log.column.toggle.changeid"),
                 getter = { columnManager.showChangeIdColumn },
                 setter = { columnManager.showChangeIdColumn = it }
@@ -375,6 +384,12 @@ class JujutsuLogPanel(
                 JujutsuBundle.message("log.column.toggle.author"),
                 getter = { columnManager.showAuthorColumn },
                 setter = { columnManager.showAuthorColumn = it }
+            ))
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.committer"),
+                getter = { columnManager.showCommitterColumn },
+                setter = { columnManager.showCommitterColumn = it }
             ))
         add(
             ToggleColumnAction(
@@ -433,6 +448,9 @@ class JujutsuLogPanel(
 
         // Re-install renderers
         logTable.installRenderers()
+
+        // Restore saved column widths
+        logTable.loadColumnWidths()
     }
 
     /**

@@ -129,7 +129,14 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // 4. Draw description (optional)
             if (columnManager.showDescription) {
-                x = drawDescription(g2d, entry, x)
+                // Calculate space available for description (accounting for decorations on the right)
+                val decorationsWidth = if (columnManager.showDecorations) {
+                    calculateDecorationsWidth(g2d, entry)
+                } else {
+                    0
+                }
+                val maxDescriptionX = width - HORIZONTAL_PADDING - decorationsWidth
+                x = drawDescription(g2d, entry, x, maxDescriptionX)
             }
 
             // 5. Draw decorations on the right (bookmarks, tags, working copy) - optional
@@ -296,7 +303,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return x + HORIZONTAL_PADDING * 2
         }
 
-        private fun drawDescription(g2d: Graphics2D, entry: LogEntry, startX: Int): Int {
+        private fun drawDescription(g2d: Graphics2D, entry: LogEntry, startX: Int, maxX: Int): Int {
             val centerY = height / 2
             val fontMetrics = g2d.fontMetrics
 
@@ -310,14 +317,55 @@ class JujutsuGraphAndDescriptionRenderer(
             }
 
             val text = entry.description.summary
-            g2d.drawString(text, startX, centerY + fontMetrics.ascent / 2)
+            val availableWidth = maxX - startX
+
+            // Truncate text if it doesn't fit
+            val displayText = if (fontMetrics.stringWidth(text) > availableWidth) {
+                // Binary search for the right length
+                var truncated = text
+                while (truncated.isNotEmpty() && fontMetrics.stringWidth(truncated + "...") > availableWidth) {
+                    truncated = truncated.dropLast(1)
+                }
+                if (truncated.isEmpty()) "" else truncated + "..."
+            } else {
+                text
+            }
+
+            if (displayText.isNotEmpty()) {
+                g2d.drawString(displayText, startX, centerY + fontMetrics.ascent / 2)
+            }
 
             // Reset font
             if (entry.description.empty) {
                 g2d.font = fontMetrics.font
             }
 
-            return startX + fontMetrics.stringWidth(text)
+            return startX + fontMetrics.stringWidth(displayText)
+        }
+
+        private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry): Int {
+            if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return 0
+
+            val fontMetrics = g2d.fontMetrics
+            val boldFont = fontMetrics.font.deriveFont(Font.BOLD)
+            val boldFontMetrics = g2d.getFontMetrics(boldFont)
+            var width = 0
+
+            // Calculate bookmark widths
+            for (bookmark in entry.bookmarks) {
+                width += boldFontMetrics.stringWidth(bookmark.name)
+                width += HORIZONTAL_PADDING
+                width += AllIcons.Vcs.Branch.iconWidth
+                width += HORIZONTAL_PADDING * 2
+            }
+
+            // Calculate @ symbol width
+            if (entry.isWorkingCopy) {
+                width += boldFontMetrics.stringWidth("@")
+                width += HORIZONTAL_PADDING
+            }
+
+            return width
         }
 
         private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int) {

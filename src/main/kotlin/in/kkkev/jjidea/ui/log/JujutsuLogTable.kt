@@ -1,10 +1,16 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.project.Project
 import com.intellij.ui.table.JBTable
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import kotlinx.datetime.Instant
 import javax.swing.ListSelectionModel
+import javax.swing.event.ChangeEvent
+import javax.swing.event.ListSelectionEvent
+import javax.swing.event.TableColumnModelEvent
+import javax.swing.event.TableColumnModelListener
 import javax.swing.table.AbstractTableModel
 
 /**
@@ -14,6 +20,7 @@ import javax.swing.table.AbstractTableModel
  * This gives us complete control over rendering and behavior.
  */
 class JujutsuLogTable(
+    private val project: Project,
     val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
 ) : JBTable(JujutsuLogTableModel()) {
 
@@ -25,11 +32,15 @@ class JujutsuLogTable(
         // Single selection mode for now
         selectionModel.selectionMode = ListSelectionModel.SINGLE_SELECTION
 
-        // Enable column reordering
+        // Enable column reordering and resizing
         tableHeader.reorderingAllowed = true
+        tableHeader.resizingAllowed = true
 
-        // Auto-resize mode
-        autoResizeMode = AUTO_RESIZE_SUBSEQUENT_COLUMNS
+        // Ensure header is visible even with empty column names
+        tableHeader.preferredSize = java.awt.Dimension(tableHeader.preferredSize.width, 24)
+
+        // Disable auto-resize to allow manual column sizing
+        autoResizeMode = AUTO_RESIZE_OFF
 
         // Row height for better readability
         rowHeight = 22
@@ -42,6 +53,18 @@ class JujutsuLogTable(
             override fun mouseMoved(e: java.awt.event.MouseEvent) {
                 repaint()
             }
+        })
+
+        // Add column model listener to persist column widths
+        columnModel.addColumnModelListener(object : TableColumnModelListener {
+            override fun columnMarginChanged(e: ChangeEvent) {
+                saveColumnWidths()
+            }
+
+            override fun columnAdded(e: TableColumnModelEvent) {}
+            override fun columnRemoved(e: TableColumnModelEvent) {}
+            override fun columnMoved(e: TableColumnModelEvent) {}
+            override fun columnSelectionChanged(e: ListSelectionEvent) {}
         })
     }
 
@@ -73,6 +96,44 @@ class JujutsuLogTable(
         }
         repaint()
     }
+
+    /**
+     * Save current column widths to settings.
+     */
+    private fun saveColumnWidths() {
+        val settings = JujutsuSettings.getInstance(project)
+        val widths = mutableMapOf<Int, Int>()
+
+        for (i in 0 until columnModel.columnCount) {
+            val column = columnModel.getColumn(i)
+            widths[column.modelIndex] = column.width
+        }
+
+        settings.state.customLogColumnWidths = widths
+    }
+
+    /**
+     * Load saved column widths from settings and apply them to columns.
+     * Should be called after columns are set up.
+     */
+    fun loadColumnWidths() {
+        val settings = JujutsuSettings.getInstance(project)
+        val savedWidths = settings.state.customLogColumnWidths
+
+        if (savedWidths.isEmpty()) {
+            return // No saved widths, use defaults
+        }
+
+        for (i in 0 until columnModel.columnCount) {
+            val column = columnModel.getColumn(i)
+            val savedWidth = savedWidths[column.modelIndex]
+            if (savedWidth != null && savedWidth > 0) {
+                // Set both to override defaults but still allow resizing
+                column.preferredWidth = savedWidth
+                column.width = savedWidth
+            }
+        }
+    }
 }
 
 /**
@@ -80,11 +141,13 @@ class JujutsuLogTable(
  *
  * Columns:
  * 0. Graph+Description - Combined column (optional elements controlled by column manager)
- * 1. Change ID - Separate column (optional)
- * 2. Description - Separate column (optional)
- * 3. Decorations - Separate column for bookmarks/tags (optional)
- * 4. Author - Author name
- * 5. Date - Commit timestamp
+ * 1. Status - Conflict/empty indicators (optional)
+ * 2. Change ID - Separate column (optional)
+ * 3. Description - Separate column (optional)
+ * 4. Decorations - Separate column for bookmarks/tags (optional)
+ * 5. Author - Author name
+ * 6. Committer - Committer name (optional)
+ * 7. Date - Commit timestamp
  */
 class JujutsuLogTableModel : AbstractTableModel() {
 
@@ -101,14 +164,18 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
     companion object {
         const val COLUMN_GRAPH_AND_DESCRIPTION = 0
-        const val COLUMN_CHANGE_ID = 1
-        const val COLUMN_DESCRIPTION = 2
-        const val COLUMN_DECORATIONS = 3
-        const val COLUMN_AUTHOR = 4
-        const val COLUMN_DATE = 5
+        const val COLUMN_STATUS = 1
+        const val COLUMN_CHANGE_ID = 2
+        const val COLUMN_DESCRIPTION = 3
+        const val COLUMN_DECORATIONS = 4
+        const val COLUMN_AUTHOR = 5
+        const val COLUMN_COMMITTER = 6
+        const val COLUMN_DATE = 7
 
         private val COLUMN_NAMES = arrayOf(
             "", // No column headings - matches Git plugin
+            "",
+            "",
             "",
             "",
             "",
@@ -130,10 +197,12 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
         return when (columnIndex) {
             COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
+            COLUMN_STATUS -> if (entry.hasConflict || entry.isEmpty) entry else null
             COLUMN_CHANGE_ID -> entry.changeId
             COLUMN_DESCRIPTION -> entry.description
             COLUMN_DECORATIONS -> entry // Return full entry to access both isWorkingCopy and bookmarks
             COLUMN_AUTHOR -> entry.author
+            COLUMN_COMMITTER -> entry.committer ?: entry.author
             COLUMN_DATE -> entry.authorTimestamp ?: entry.committerTimestamp
             else -> null
         }

@@ -10,12 +10,14 @@ package `in`.kkkev.jjidea.ui.log
 class JujutsuColumnManager {
 
     // Separate columns (mutually exclusive with showing in graph column)
+    var showStatusColumn: Boolean = false
     var showChangeIdColumn: Boolean = false
     var showDescriptionColumn: Boolean = false
     var showDecorationsColumn: Boolean = false
 
     // Standard columns
     var showAuthorColumn: Boolean = true
+    var showCommitterColumn: Boolean = false
     var showDateColumn: Boolean = true
 
     // Graph column content elements (only shown if corresponding column is hidden)
@@ -35,6 +37,10 @@ class JujutsuColumnManager {
     fun getVisibleColumns(): List<Int> {
         val columns = mutableListOf(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
 
+        if (showStatusColumn) {
+            columns.add(JujutsuLogTableModel.COLUMN_STATUS)
+        }
+
         if (showChangeIdColumn) {
             columns.add(JujutsuLogTableModel.COLUMN_CHANGE_ID)
         }
@@ -51,6 +57,10 @@ class JujutsuColumnManager {
             columns.add(JujutsuLogTableModel.COLUMN_AUTHOR)
         }
 
+        if (showCommitterColumn) {
+            columns.add(JujutsuLogTableModel.COLUMN_COMMITTER)
+        }
+
         if (showDateColumn) {
             columns.add(JujutsuLogTableModel.COLUMN_DATE)
         }
@@ -63,10 +73,12 @@ class JujutsuColumnManager {
      */
     fun isColumnVisible(columnIndex: Int): Boolean = when (columnIndex) {
         JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> true // Always visible
+        JujutsuLogTableModel.COLUMN_STATUS -> showStatusColumn
         JujutsuLogTableModel.COLUMN_CHANGE_ID -> showChangeIdColumn
         JujutsuLogTableModel.COLUMN_DESCRIPTION -> showDescriptionColumn
         JujutsuLogTableModel.COLUMN_DECORATIONS -> showDecorationsColumn
         JujutsuLogTableModel.COLUMN_AUTHOR -> showAuthorColumn
+        JujutsuLogTableModel.COLUMN_COMMITTER -> showCommitterColumn
         JujutsuLogTableModel.COLUMN_DATE -> showDateColumn
         else -> false
     }

@@ -37,19 +37,24 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
 // It's set dynamically when graph data is loaded
 
 /**
- * Renderer for the Status column (conflict/empty indicators).
+ * Renderer for separate Status column (conflict/empty indicators).
+ * Matches the logic from JujutsuStatusColumn in VcsLogCustomColumns.
  */
-class StatusCellRenderer : TextCellRenderer<LogEntry>() {
+class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
     override fun render(value: LogEntry) {
-        when {
-            value.hasConflict -> {
-                icon = AllIcons.General.Warning
-                append("!", SimpleTextAttributes.ERROR_ATTRIBUTES)
-            }
-
-            value.isEmpty -> {
-                icon = AllIcons.General.BalloonInformation
-                append("∅", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+        // Show conflict icon
+        if (value.hasConflict) {
+            icon = AllIcons.General.Warning
+            append(" ")
+        }
+        // Show empty icon
+        if (value.isEmpty) {
+            icon = if (value.hasConflict) {
+                // Both indicators - use warning icon, add text
+                append("Empty", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                AllIcons.General.Warning
+            } else {
+                AllIcons.General.BalloonInformation
             }
         }
     }
@@ -83,6 +88,16 @@ class DescriptionCellRenderer : TextCellRenderer<LogEntry>() {
  * Renderer for the Author column.
  */
 class AuthorCellRenderer : TextCellRenderer<VcsUser>() {
+    override fun render(value: VcsUser) {
+        append(value.name)
+    }
+}
+
+/**
+ * Renderer for the Committer column.
+ * Matches the logic from JujutsuCommitterColumn in VcsLogCustomColumns.
+ */
+class CommitterCellRenderer : TextCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
         append(value.name)
     }
@@ -156,15 +171,31 @@ class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
 }
 
 /**
+ * Default column widths (sensible defaults that can be overridden by user preferences).
+ */
+private val DEFAULT_COLUMN_WIDTHS = mapOf(
+    JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION to 600,
+    JujutsuLogTableModel.COLUMN_STATUS to 50,
+    JujutsuLogTableModel.COLUMN_CHANGE_ID to 90,
+    JujutsuLogTableModel.COLUMN_DESCRIPTION to 500,
+    JujutsuLogTableModel.COLUMN_DECORATIONS to 120,
+    JujutsuLogTableModel.COLUMN_AUTHOR to 100,
+    JujutsuLogTableModel.COLUMN_COMMITTER to 100,
+    JujutsuLogTableModel.COLUMN_DATE to 120
+)
+
+/**
  * Install all custom renderers on the given table.
  * Note: Combined graph+description renderer is installed separately when graph data is loaded.
  * Only installs renderers for columns that are actually present in the column model.
  */
 fun JujutsuLogTable.installRenderers() {
+    val statusRenderer = SeparateStatusCellRenderer()
     val changeIdRenderer = SeparateChangeIdCellRenderer()
     val descriptionRenderer = SeparateDescriptionCellRenderer()
     val decorationsRenderer = SeparateDecorationsCellRenderer()
     val authorRenderer = AuthorCellRenderer()
+    val committerRenderer = CommitterCellRenderer()
     val dateRenderer = DateCellRenderer()
 
     // Iterate through actual columns in the column model
@@ -172,37 +203,63 @@ fun JujutsuLogTable.installRenderers() {
         val column = columnModel.getColumn(i)
         val modelIndex = column.modelIndex
 
-        // Set renderer based on model index
+        // Set renderer and width based on model index
+        val defaultWidth = DEFAULT_COLUMN_WIDTHS[modelIndex] ?: 100
+
         when (modelIndex) {
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 // Will be set when graph data is loaded via updateGraph()
-                column.preferredWidth = 600
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+            }
+
+            JujutsuLogTableModel.COLUMN_STATUS -> {
+                column.cellRenderer = statusRenderer
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+                column.minWidth = 40
             }
 
             JujutsuLogTableModel.COLUMN_CHANGE_ID -> {
                 column.cellRenderer = changeIdRenderer
-                column.preferredWidth = 100
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+                column.minWidth = 70
             }
 
             JujutsuLogTableModel.COLUMN_DESCRIPTION -> {
                 column.cellRenderer = descriptionRenderer
-                column.preferredWidth = 300
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+                column.minWidth = 100
             }
 
             JujutsuLogTableModel.COLUMN_DECORATIONS -> {
                 column.cellRenderer = decorationsRenderer
-                column.preferredWidth = 150
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+                column.minWidth = 80
             }
 
             JujutsuLogTableModel.COLUMN_AUTHOR -> {
                 column.cellRenderer = authorRenderer
-                column.preferredWidth = 120
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+                column.minWidth = 80
+            }
+
+            JujutsuLogTableModel.COLUMN_COMMITTER -> {
+                column.cellRenderer = committerRenderer
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+                column.minWidth = 80
             }
 
             JujutsuLogTableModel.COLUMN_DATE -> {
                 column.cellRenderer = dateRenderer
-                column.preferredWidth = 80
-                column.maxWidth = 120
+                column.preferredWidth = defaultWidth
+                column.width = defaultWidth
+                column.minWidth = 70
             }
         }
     }
