@@ -36,7 +36,7 @@ This will launch a new IntelliJ IDEA instance with the plugin installed.
 ### Option 1: From Custom Repository (Recommended - Auto Updates)
 
 1. In IntelliJ IDEA: **Settings → Plugins → ⚙️ (gear icon) → Manage Plugin Repositories**
-2. Click **+** and add: `https://raw.githubusercontent.com/kkkev/jj-idea/main/updatePlugins.xml`
+2. Click **+** and add: `https://raw.githubusercontent.com/kkkev/jj-idea/master/updatePlugins.xml`
 3. Click **OK**
 4. Search for "Jujutsu VCS Integration" in the Marketplace tab
 5. Click **Install**
