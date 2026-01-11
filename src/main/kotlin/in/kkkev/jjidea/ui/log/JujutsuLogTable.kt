@@ -36,6 +36,9 @@ class JujutsuLogTable(
         tableHeader.reorderingAllowed = true
         tableHeader.resizingAllowed = true
 
+        // Enable column sorting
+        autoCreateRowSorter = true
+
         // Ensure header is visible even with empty column names
         tableHeader.preferredSize = java.awt.Dimension(tableHeader.preferredSize.width, 24)
 
@@ -76,11 +79,16 @@ class JujutsuLogTable(
 
     /**
      * Get the currently selected log entry, if any.
+     * Handles row sorting by converting view index to model index.
      */
     val selectedEntry: LogEntry?
         get() {
-            val row = selectedRow
-            return if (row >= 0) logModel.getEntry(row) else null
+            val viewRow = selectedRow
+            if (viewRow < 0) return null
+
+            // Convert view row to model row (in case sorting is active)
+            val modelRow = convertRowIndexToModel(viewRow)
+            return logModel.getEntry(modelRow)
         }
 
     /**

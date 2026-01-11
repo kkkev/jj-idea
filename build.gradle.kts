@@ -86,6 +86,7 @@ tasks.register<Test>("simpleTest") {
     exclude("**/JujutsuCommandAvailabilityTest.class") // Needs actual jj binary
     exclude("**/JujutsuLogEntryTest*.class") // Uses ChangeId which references Hash type
     exclude("**/JujutsuLogParserTest*.class") // Uses ChangeId which references Hash type
+    exclude("**/JujutsuLogTableColumnTest*.class") // Uses VcsUser and table model from Platform
     exclude("**/jj/ChangeIdTest*.class") // ChangeId references Hash type in lazy property
     exclude("**/jj/DescriptionTest*.class") // Description uses JujutsuBundle which requires DynamicBundle
     exclude("**/cli/AnnotationParserTest*.class") // Uses ChangeId which references Hash type
