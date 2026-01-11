@@ -320,6 +320,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                 if (result.isSuccess) {
                     descriptionArea.text = ""
                     refresh()
+
+                    // Also refresh log tabs
+                    JujutsuCustomLogTabManager.getInstance(project).refreshAllTabs()
+
                     JOptionPane.showMessageDialog(
                         panel,
                         JujutsuBundle.message("dialog.newchange.success.message"),

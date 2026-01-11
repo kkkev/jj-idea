@@ -77,6 +77,23 @@ This document captures all requirements, implementation decisions, and developme
 39. ✅ Setting to enable/disable auto-open behavior
 40. ✅ Replace standard VCS log with custom implementation on startup
 
+### Phase 9: Log Context Menu and Auto-Refresh
+41. ✅ Right-click context menu for log table entries
+42. ✅ Copy Change ID action
+43. ✅ Copy Description action
+44. ✅ New Change From This action (create new working copy from selected commit)
+    - Modal dialog to enter description before creating
+    - Only shows error if operation fails
+    - Automatically refreshes log and working copy tool windows on success
+    - Automatically selects the newly created working copy (@) in log
+45. ✅ Describe Working Copy action (for @ entries only)
+    - Modal dialog to edit description
+    - Automatically refreshes on success
+    - Maintains selection on working copy
+46. ✅ Show Changes action (placeholder for future implementation)
+47. ✅ Auto-refresh log and working copy after VCS operations
+48. ✅ Smart selection: select working copy (@) after "new change" operations
+
 ## Architecture
 
 ### Core Components
@@ -365,7 +382,8 @@ src/main/kotlin/in/kkkev/jjidea/
         ├── JujutsuLogDataLoader.kt        # Background data loading
         ├── JujutsuLogPanel.kt             # Main custom log panel
         ├── JujutsuLogTable.kt             # Custom log table
-        └── JujutsuLogTableRenderers.kt    # Table cell renderers
+        ├── JujutsuLogTableRenderers.kt    # Table cell renderers
+        └── JujutsuLogContextMenuActions.kt # Context menu actions for log table
 
 src/test/kotlin/in/kkkev/jjidea/
 ├── RequirementsTest.kt                    # Documents all requirements
@@ -399,7 +417,7 @@ src/main/resources/META-INF/
 |---------|---------|----------------|
 | `jj status` | List working copy changes | `JujutsuChangeProvider.parseStatus()` |
 | `jj describe -r @ -m "msg"` | Set working copy description | "Describe" button |
-| `jj new` | Create new change on top | "New Change" button |
+| `jj new [revision]` | Create new change on top | "New Change" button, context menu "New Change From This" |
 | `jj log -r @ --no-graph -T template` | Get log entries with metadata | `CliLogService`, history provider |
 | `jj file show -r @ path` | Get file content at revision | `JujutsuContentRevision.getContent()`, compare actions |
 | `jj file annotate -r @ -T template path` | Get line-by-line change attribution | `JujutsuAnnotationProvider` |

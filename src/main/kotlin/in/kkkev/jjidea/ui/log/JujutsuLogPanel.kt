@@ -487,6 +487,17 @@ class JujutsuLogPanel(
         logTable.logModel.setFilter(filterText, useRegex, matchCase, matchWholeWords)
     }
 
+    /**
+     * Refresh the log data from the VCS.
+     * Reloads all commits and updates the display.
+     *
+     * @param selectWorkingCopy If true, select the working copy (@) after refresh completes
+     */
+    fun refresh(selectWorkingCopy: Boolean = false) {
+        log.info("Refreshing log panel (selectWorkingCopy=$selectWorkingCopy)")
+        dataLoader.refresh(selectWorkingCopy)
+    }
+
     override fun dispose() {
         log.info("JujutsuLogPanel disposed")
         detailsPanel.dispose()

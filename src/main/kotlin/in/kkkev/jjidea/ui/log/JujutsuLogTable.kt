@@ -1,11 +1,15 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.project.Project
+import com.intellij.ui.PopupHandler
 import com.intellij.ui.table.JBTable
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import kotlinx.datetime.Instant
+import java.awt.Component
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ListSelectionEvent
@@ -69,6 +73,26 @@ class JujutsuLogTable(
             override fun columnMoved(e: TableColumnModelEvent) {}
             override fun columnSelectionChanged(e: ListSelectionEvent) {}
         })
+
+        // Add context menu support
+        addMouseListener(object : PopupHandler() {
+            override fun invokePopup(comp: Component, x: Int, y: Int) {
+                showContextMenu(comp, x, y)
+            }
+        })
+    }
+
+    /**
+     * Show context menu at the given location.
+     * Called when user right-clicks on the table.
+     */
+    private fun showContextMenu(component: Component, x: Int, y: Int) {
+        val entry = selectedEntry ?: return
+
+        val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, entry)
+        val popupMenu = ActionManager.getInstance()
+            .createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
+        popupMenu.component.show(component, x, y)
     }
 
     /**

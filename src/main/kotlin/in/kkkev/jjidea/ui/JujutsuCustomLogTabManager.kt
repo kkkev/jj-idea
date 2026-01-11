@@ -28,6 +28,7 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
 
     private val log = Logger.getInstance(JujutsuCustomLogTabManager::class.java)
     private val openTabs = mutableListOf<Content>()
+    private val openPanels = mutableListOf<JujutsuLogPanel>()
     private var tabCounter = 1
 
     /**
@@ -74,6 +75,7 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
             changesViewContentManager.setSelectedContent(content)
 
             openTabs.add(content)
+            openPanels.add(logPanel)
 
             log.info("Custom Jujutsu log tab opened successfully")
 
@@ -82,8 +84,23 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
         }
     }
 
+    /**
+     * Refresh all open log tabs.
+     * Called when VCS state changes (e.g., after creating a new change).
+     *
+     * @param selectWorkingCopy If true, select the working copy (@) after refresh
+     */
+    fun refreshAllTabs(selectWorkingCopy: Boolean = false) {
+        log.info("Refreshing ${openPanels.size} open log tabs (selectWorkingCopy=$selectWorkingCopy)")
+        openPanels.forEach { panel ->
+            panel.refresh(selectWorkingCopy)
+        }
+    }
+
     override fun dispose() {
         log.info("Disposing JujutsuCustomLogTabManager")
+        openTabs.clear()
+        openPanels.clear()
         // Cleanup happens automatically via Disposer
     }
 

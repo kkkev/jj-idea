@@ -29,8 +29,9 @@ class JujutsuLogDataLoader(
      * Load commits in the background.
      *
      * @param revset Revision expression to load (default: all commits)
+     * @param selectWorkingCopy If true, select the working copy (@) after load completes
      */
-    fun loadCommits(revset: Expression = Expression.ALL) {
+    fun loadCommits(revset: Expression = Expression.ALL, selectWorkingCopy: Boolean = false) {
         object : Task.Backgroundable(project, "Loading Jujutsu Commits", true) {
             private var entries: List<LogEntry> = emptyList()
             private var error: Throwable? = null
@@ -69,6 +70,11 @@ class JujutsuLogDataLoader(
                         tableModel.setEntries(entries)
                         table.updateGraph(graphNodes)
                         log.info("Table updated with ${entries.size} commits and graph layout")
+
+                        // Select working copy if requested
+                        if (selectWorkingCopy) {
+                            selectWorkingCopyInTable()
+                        }
                     }
                 }
             }
@@ -80,11 +86,35 @@ class JujutsuLogDataLoader(
     }
 
     /**
-     * Refresh the log - reload all commits.
+     * Select the working copy (@) entry in the table and scroll it into view.
      */
-    fun refresh() {
-        log.info("Refreshing log")
-        loadCommits()
+    private fun selectWorkingCopyInTable() {
+        // Find the working copy entry in the table model
+        val workingCopyIndex = (0 until tableModel.rowCount).firstOrNull { row ->
+            tableModel.getEntry(row)?.isWorkingCopy == true
+        }
+
+        if (workingCopyIndex != null) {
+            // Select the row
+            table.setRowSelectionInterval(workingCopyIndex, workingCopyIndex)
+
+            // Scroll to the selected row
+            table.scrollRectToVisible(table.getCellRect(workingCopyIndex, 0, true))
+
+            log.info("Selected working copy at row $workingCopyIndex")
+        } else {
+            log.warn("Working copy not found in table after refresh")
+        }
+    }
+
+    /**
+     * Refresh the log - reload all commits.
+     *
+     * @param selectWorkingCopy If true, select the working copy (@) after refresh completes
+     */
+    fun refresh(selectWorkingCopy: Boolean = false) {
+        log.info("Refreshing log (selectWorkingCopy=$selectWorkingCopy)")
+        loadCommits(selectWorkingCopy = selectWorkingCopy)
     }
 
     /**

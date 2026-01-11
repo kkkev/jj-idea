@@ -67,9 +67,10 @@ interface CommandExecutor {
     /**
      * Create a new change on top of the current one
      * @param message Optional description for the new change
+     * @param parentRevision Optional parent revision (default: current working copy)
      * @return Command result
      */
-    fun new(message: String? = null): CommandResult
+    fun new(message: String? = null, parentRevision: Revision? = null): CommandResult
 
     /**
      * Get the log for specific revset

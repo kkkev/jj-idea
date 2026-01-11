@@ -52,11 +52,14 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
     override fun describe(message: String, revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("describe", "-r", revision, "-m", message))
 
-    override fun new(message: String?): CommandExecutor.CommandResult {
+    override fun new(message: String?, parentRevision: Revision?): CommandExecutor.CommandResult {
         val args = mutableListOf("new")
         if (message != null) {
             args.add("-m")
             args.add(message)
+        }
+        if (parentRevision != null) {
+            args.add(parentRevision.toString())
         }
         return execute(root, args)
     }
