@@ -27,7 +27,7 @@ This document captures all requirements, implementation decisions, and developme
 7. ✅ Describe-first workflow support
    - Description text area
    - "Describe" button → `jj describe`
-   - "New Change" button → `jj new`
+   - "New Change" button → `jj new` (with multi-line dialog, auto-refresh, smart selection)
 8. ✅ Load current description from `jj log`
 9. ✅ Continuous commit workflow (working copy is always a commit)
 
@@ -111,16 +111,56 @@ JujutsuVcs (extends AbstractVcs)
     └── JujutsuCliExecutor(root) - CLI implementation
 ```
 
-**JujutsuVcs Utility Methods**: Always use these companion object methods to find JujutsuVcs instances:
-- `JujutsuVcs.find(project: Project?): JujutsuVcs?` - Find JujutsuVcs for project's base path, returns null if not found
-- `JujutsuVcs.find(root: VirtualFile): JujutsuVcs?` - Find JujutsuVcs for specific VirtualFile root, returns null if not found
-- `JujutsuVcs.findRequired(root: VirtualFile): JujutsuVcs` - Find JujutsuVcs or throw VcsException
+**JujutsuVcs Utility Methods**: Three-tier VCS access pattern for proper error handling:
 
-**Usage Guidelines**:
-- ALWAYS use `JujutsuVcs.find()` methods instead of directly accessing `ProjectLevelVcsManager`
-- Use `find(project)` to check if a project is a Jujutsu project
-- Use `find(root)` when you have a specific VirtualFile root
-- Use `findRequired(root)` when JujutsuVcs must exist (e.g., in VCS providers)
+1. **`find(project/root)`** - Returns `JujutsuVcs?` (nullable)
+   - Use for checking VCS availability
+   - Use in action `update()` methods to enable/disable actions
+   - Use in helper methods that need to check if VCS exists
+
+2. **`getVcsWithUserErrorHandling(project, actionName, logger)`** - Returns `JujutsuVcs?` (nullable)
+   - Use in **user-facing actions** where VCS might not be configured
+   - Logs at **INFO level** (user error, not plugin error)
+   - Shows user-friendly error dialog explaining how to configure Jujutsu
+   - Returns null if VCS not found
+   - Examples: Context menu actions, toolbar actions, editor actions
+   - Pattern:
+     ```kotlin
+     ApplicationManager.getApplication().executeOnPooledThread {
+         val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "Action Name", log)
+             ?: return@executeOnPooledThread
+         // ... use vcs
+     }
+     ```
+
+3. **`findRequired(project/root)`** - Returns `JujutsuVcs` or throws `VcsException`
+   - Use when VCS **MUST** exist (plugin error if it doesn't)
+   - Logs at **ERROR level** when caught (indicates programming error)
+   - Use in contexts where VCS is guaranteed:
+     - Inside Jujutsu-specific tool windows
+     - Inside VCS providers (only called when VCS is active)
+     - Inside log panels and data loaders
+   - Pattern:
+     ```kotlin
+     ApplicationManager.getApplication().executeOnPooledThread {
+         try {
+             val vcs = JujutsuVcs.findRequired(project)
+             // ... use vcs
+         } catch (e: VcsException) {
+             log.error("Failed to find Jujutsu VCS in tool window", e)
+             // Show error dialog
+         }
+     }
+     ```
+
+**Logging Strategy**:
+- **INFO**: User errors (VCS not configured, user tried Jujutsu action outside Jujutsu project)
+- **ERROR**: Plugin errors (VCS should exist but doesn't, programming errors, unexpected state)
+
+**Threading**:
+- Always call VCS lookup methods in **background threads** to avoid EDT slow operations
+- VCS lookup performs file system checks and can block
+- Use `ApplicationManager.getApplication().executeOnPooledThread { }`
 
 **See**: `vcs/JujutsuVcs.kt` companion object
 

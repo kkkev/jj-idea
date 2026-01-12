@@ -33,12 +33,12 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
 
         // Get VCS on background thread to avoid slow operations on EDT
         ApplicationManager.getApplication().executeOnPooledThread {
-            val vcs = JujutsuVcs.find(project) ?: return@executeOnPooledThread
-
-            // Show popup on EDT
-            ApplicationManager.getApplication().invokeLater {
-                JujutsuCompareWithPopup.show(project, vcs) { chosen ->
-                    showDiffWithRevision(project, file, RevisionExpression(chosen), vcs)
+            JujutsuVcs.getVcsWithUserErrorHandling(project, "Compare with Branch", log)
+                ?.let { vcs ->
+                ApplicationManager.getApplication().invokeLater {
+                    JujutsuCompareWithPopup.show(project, vcs) { chosen ->
+                        showDiffWithRevision(project, file, RevisionExpression(chosen), vcs)
+                    }
                 }
             }
         }

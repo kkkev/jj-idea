@@ -17,6 +17,7 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.PopupHandler
@@ -76,7 +77,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     // Start as true to ignore events during initialization, then enable tracking after tree settles
     private var ignoreExpansionEvents = true
 
-    private val vcs get() = JujutsuVcs.find(project)
+    // Note: No longer used - we call findRequired() directly where needed to make intent clear
 
     init {
         userCollapsedPaths = loadCollapsedPaths()
@@ -290,13 +291,23 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             return
         }
 
-        vcs?.let { vcsInstance ->
-            ApplicationManager.getApplication().executeOnPooledThread {
+        // Move VCS lookup to background thread to avoid EDT slow operations
+        // Use findRequired() since this tool window only exists when Jujutsu VCS is configured
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val vcsInstance = JujutsuVcs.findRequired(project)
                 val result = vcsInstance.commandExecutor.describe(description)
 
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
+                        // Refresh working copy tool window
                         refresh()
+
+                        // Refresh log tabs and keep working copy selected
+                        JujutsuCustomLogTabManager.getInstance(project).refreshAllTabs(selectWorkingCopy = true)
+
+                        // Trigger VCS change list update
+                        VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
                     } else {
                         JOptionPane.showMessageDialog(
                             panel,
@@ -306,34 +317,73 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         )
                     }
                 }
+            } catch (e: VcsException) {
+                // This should never happen since tool window only exists when VCS is configured
+                // If it does, it indicates a programming error or serious state corruption
+                log.error("Failed to find Jujutsu VCS in tool window", e)
+                ApplicationManager.getApplication().invokeLater {
+                    JOptionPane.showMessageDialog(
+                        panel,
+                        "Internal error: ${e.message}",
+                        JujutsuBundle.message("dialog.describe.error.title"),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
             }
         }
     }
 
     private fun createNewChange() {
-        val vcsInstance = vcs ?: return
+        // Show modal dialog to get description for the new change
+        val description = com.intellij.openapi.ui.Messages.showMultilineInputDialog(
+            project,
+            JujutsuBundle.message("dialog.newchange.input.message"),
+            JujutsuBundle.message("dialog.newchange.input.title"),
+            "",
+            null,
+            null
+        ) ?: return // User cancelled
 
+        // Allow empty description - Jujutsu permits it
+        val descriptionArg = if (description.isNotBlank()) description.trim() else null
+
+        // Move VCS lookup to background thread to avoid EDT slow operations
+        // Use findRequired() since this tool window only exists when Jujutsu VCS is configured
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = vcsInstance.commandExecutor.new()
+            try {
+                val vcsInstance = JujutsuVcs.findRequired(project)
+                val result = vcsInstance.commandExecutor.new(message = descriptionArg)
 
-            ApplicationManager.getApplication().invokeLater {
-                if (result.isSuccess) {
-                    descriptionArea.text = ""
-                    refresh()
+                ApplicationManager.getApplication().invokeLater {
+                    if (result.isSuccess) {
+                        // Clear the description area since we've created a new change
+                        descriptionArea.text = ""
 
-                    // Also refresh log tabs
-                    JujutsuCustomLogTabManager.getInstance(project).refreshAllTabs()
+                        // Refresh working copy tool window
+                        refresh()
 
+                        // Refresh log tabs and select the new working copy
+                        JujutsuCustomLogTabManager.getInstance(project).refreshAllTabs(selectWorkingCopy = true)
+
+                        // Trigger VCS change list update
+                        VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
+                    } else {
+                        JOptionPane.showMessageDialog(
+                            panel,
+                            JujutsuBundle.message("dialog.newchange.error.message", result.stderr),
+                            JujutsuBundle.message("dialog.newchange.error.title"),
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
+                }
+            } catch (e: VcsException) {
+                // This should never happen since tool window only exists when VCS is configured
+                // If it does, it indicates a programming error or serious state corruption
+                log.error("Failed to find Jujutsu VCS in tool window", e)
+                ApplicationManager.getApplication().invokeLater {
                     JOptionPane.showMessageDialog(
                         panel,
-                        JujutsuBundle.message("dialog.newchange.success.message"),
-                        JujutsuBundle.message("dialog.newchange.success.title"),
-                        JOptionPane.INFORMATION_MESSAGE
-                    )
-                } else {
-                    JOptionPane.showMessageDialog(
-                        panel,
-                        JujutsuBundle.message("dialog.newchange.error.message", result.stderr),
+                        "Internal error: ${e.message}",
                         JujutsuBundle.message("dialog.newchange.error.title"),
                         JOptionPane.ERROR_MESSAGE
                     )
@@ -361,10 +411,12 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private fun loadCurrentDescription() {
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = vcs!!.logService.getLog(WorkingCopy)
-            ApplicationManager.getApplication().invokeLater {
-                result.getOrNull()?.let { entries ->
-                    entries.firstOrNull()?.let { entry ->
+            try {
+                val vcsInstance = JujutsuVcs.findRequired(project)
+                val result = vcsInstance.logService.getLog(WorkingCopy)
+                ApplicationManager.getApplication().invokeLater {
+                    result.getOrNull()?.let { entries ->
+                        entries.firstOrNull()?.let { entry ->
                         // Update the description text area
                         descriptionArea.text = entry.description.actual
 
@@ -392,8 +444,15 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         }
                         currentChangeLabel.text = labelText
                     }
-                    // TODO Improve logging here
-                } ?: throw VcsException(result.exceptionOrNull())
+                }
+                // Log errors from getLog() if any
+                result.exceptionOrNull()?.let { error ->
+                    log.error("Failed to load current description", error)
+                }
+                }
+            } catch (e: VcsException) {
+                // Tool window should not exist when VCS is not configured
+                log.error("Failed to find Jujutsu VCS in tool window", e)
             }
         }
     }

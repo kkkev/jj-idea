@@ -90,11 +90,6 @@ object JujutsuLogContextMenuActions {
         null
     ) {
         override fun actionPerformed(e: AnActionEvent) {
-            val vcs = JujutsuVcs.find(project) ?: run {
-                log.warn("Jujutsu VCS not found for project")
-                return
-            }
-
             // Show modal dialog to get description for the new change
             val description = Messages.showMultilineInputDialog(
                 project,
@@ -109,6 +104,9 @@ object JujutsuLogContextMenuActions {
             val descriptionArg = if (description.isNotBlank()) description.trim() else null
 
             ApplicationManager.getApplication().executeOnPooledThread {
+                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "New Change From This", log)
+                    ?: return@executeOnPooledThread
+
                 val result = vcs.commandExecutor.new(message = descriptionArg, parentRevision = changeId)
 
                 ApplicationManager.getApplication().invokeLater {
@@ -141,13 +139,11 @@ object JujutsuLogContextMenuActions {
         null
     ) {
         override fun actionPerformed(e: AnActionEvent) {
-            val vcs = JujutsuVcs.find(project) ?: run {
-                log.warn("Jujutsu VCS not found for project")
-                return
-            }
-
             // Load current description in background thread to avoid EDT violation
             ApplicationManager.getApplication().executeOnPooledThread {
+                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "Describe Working Copy", log)
+                    ?: return@executeOnPooledThread
+
                 val currentDescription = getCurrentDescription(vcs)
 
                 // Show dialog on EDT
