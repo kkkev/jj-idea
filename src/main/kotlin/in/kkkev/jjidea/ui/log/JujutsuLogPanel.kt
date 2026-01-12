@@ -211,7 +211,9 @@ class JujutsuLogPanel(
         val toolbar = object : ActionToolbarImpl(
             "JujutsuLogFilter",
             filterActionsGroup,
-            true // horizontal
+            true, // horizontal
+            false, // decorateButtons
+            true // customizable
         ) {
             override fun createToolbarButton(
                 action: AnAction,
