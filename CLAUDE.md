@@ -418,9 +418,19 @@ bd close <id>            # Close completed issue
   - See `jj/ChangeId.kt` for hex conversion implementation
 
 ### Git Workflow
-- **Push destination**: When pushing, just push to `origin` by default
-  - Owner will push to `github` manually
-  - Use `jj git push` (pushes to default remote)
+- **Push workflow**: This project has two remotes (origin and github) with automated workflows
+  - `origin`: Primary GitLab remote at home.marigoldfeathers.com
+  - `github`: Public GitHub remote
+  - GitHub Actions automatically creates tags and advances master in background
+
+- **Standard push sequence**:
+  1. Push to origin: `jj git push --remote origin`
+  2. Fetch from github: `jj git fetch --remote github` (get automated updates)
+  3. Merge if needed: `jj new master@github master@origin -m "Merge github and origin master branches"`
+  4. Update master bookmark: `jj bookmark set master`
+  5. Push to both remotes: `jj git push --remote origin && jj git push --remote github`
+
+- **Why this order**: GitHub Actions may have updated master@github with new tags since last push, so always fetch from github before pushing to avoid conflicts
 
 ### Task Management
 - **Use beads**: Store all tasks in beads issue tracker
