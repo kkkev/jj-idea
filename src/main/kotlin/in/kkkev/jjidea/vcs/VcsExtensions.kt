@@ -1,7 +1,9 @@
 package `in`.kkkev.jjidea.vcs
 
+import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectLocator
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.ProjectLevelVcsManager.getInstance
 import com.intellij.openapi.vcs.VcsException
@@ -56,3 +58,10 @@ val VirtualFile.jujutsuVcs
         ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
 
 val VirtualFile.isJujutsu get() = this.possibleJujutsuVcs != null
+
+val VirtualFile.jujutsuProject
+    get() = ReadAction.compute<Project?, RuntimeException> {
+        ProjectManager.getInstance().openProjects.firstOrNull { project ->
+            project.jujutsuRoots.any { it.path == this }
+        }
+    } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${this.path}")
