@@ -12,7 +12,9 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.JujutsuStateModel
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.ui.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.datatransfer.StringSelection
@@ -37,6 +39,11 @@ object JujutsuLogContextMenuActions {
         // Always offer "New Change From This"
         add(NewChangeFromThisAction(project, entry.changeId))
 
+        // Offer "Edit" for non-working-copy, non-immutable changes
+        if (!entry.isWorkingCopy && !entry.immutable) {
+            add(EditChangeAction(project, entry.changeId))
+        }
+
         // For working copy, also offer "Describe"
         if (entry.isWorkingCopy) {
             add(DescribeWorkingCopyAction(project))
@@ -55,7 +62,7 @@ object JujutsuLogContextMenuActions {
     private class CopyChangeIdAction(private val changeId: ChangeId) : DumbAwareAction(
         JujutsuBundle.message("log.action.copy.changeid"),
         JujutsuBundle.message("log.action.copy.changeid.tooltip"),
-        null
+        AllIcons.Actions.Copy
     ) {
         override fun actionPerformed(e: AnActionEvent) {
             val selection = StringSelection(changeId.toString())
@@ -70,7 +77,7 @@ object JujutsuLogContextMenuActions {
     private class CopyDescriptionAction(private val description: String) : DumbAwareAction(
         JujutsuBundle.message("log.action.copy.description"),
         JujutsuBundle.message("log.action.copy.description.tooltip"),
-        null
+        AllIcons.Actions.Copy
     ) {
         override fun actionPerformed(e: AnActionEvent) {
             val selection = StringSelection(description)
@@ -89,7 +96,7 @@ object JujutsuLogContextMenuActions {
     ) : DumbAwareAction(
         JujutsuBundle.message("log.action.new.from"),
         JujutsuBundle.message("log.action.new.from.tooltip"),
-        null
+        AllIcons.General.Add
     ) {
         override fun actionPerformed(e: AnActionEvent) {
             // Show modal dialog to get description for the new change
@@ -113,9 +120,8 @@ object JujutsuLogContextMenuActions {
 
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
-                        // Refresh both log and working copy tool windows
-                        // The new change will be selected automatically (it becomes @)
-                        refreshAfterNewChange(project, selectWorkingCopy = true)
+                        // Refresh all views via state model
+                        refreshAfterVcsOperation(project, selectWorkingCopy = true)
 
                         log.info("Created new change from $changeId with description: ${descriptionArg ?: "(empty)"}")
                     } else {
@@ -132,13 +138,50 @@ object JujutsuLogContextMenuActions {
     }
 
     /**
+     * Edit change action.
+     * Moves the working copy to the selected commit.
+     * Uses `jj edit <change-id>` to make the selected commit the new working copy.
+     */
+    private class EditChangeAction(
+        private val project: Project,
+        private val changeId: ChangeId
+    ) : DumbAwareAction(
+        JujutsuBundle.message("log.action.edit"),
+        JujutsuBundle.message("log.action.edit.tooltip"),
+        AllIcons.Actions.Edit
+    ) {
+        override fun actionPerformed(e: AnActionEvent) {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "Edit Change")
+                    ?: return@executeOnPooledThread
+
+                val result = vcs.commandExecutor.edit(changeId)
+
+                ApplicationManager.getApplication().invokeLater {
+                    if (result.isSuccess) {
+                        refreshAfterVcsOperation(project, selectWorkingCopy = true)
+                        log.info("Edited change $changeId")
+                    } else {
+                        Messages.showErrorDialog(
+                            project,
+                            JujutsuBundle.message("log.action.edit.error.message", result.stderr),
+                            JujutsuBundle.message("log.action.edit.error.title")
+                        )
+                        log.warn("Failed to edit change $changeId: ${result.stderr}")
+                    }
+                }
+            }
+        }
+    }
+
+    /**
      * Describe working copy action.
      * Opens a dialog to edit the working copy description.
      */
     private class DescribeWorkingCopyAction(private val project: Project) : DumbAwareAction(
         JujutsuBundle.message("log.action.describe"),
         JujutsuBundle.message("log.action.describe.tooltip"),
-        null
+        AllIcons.Actions.Edit
     ) {
         override fun actionPerformed(e: AnActionEvent) {
             // Load current description in background thread to avoid EDT violation
@@ -174,8 +217,8 @@ object JujutsuLogContextMenuActions {
 
                         ApplicationManager.getApplication().invokeLater {
                             if (result.isSuccess) {
-                                // Refresh both log and working copy tool windows
-                                refreshAfterNewChange(project, selectWorkingCopy = true)
+                                // Refresh all views via state model
+                                refreshAfterVcsOperation(project, selectWorkingCopy = true)
 
                                 log.info("Updated working copy description")
                             } else {
@@ -194,7 +237,7 @@ object JujutsuLogContextMenuActions {
 
         private fun getCurrentDescription(vcs: JujutsuVcs): String {
             val result = vcs.commandExecutor.log(
-                revset = `in`.kkkev.jjidea.jj.WorkingCopy,
+                revset = WorkingCopy,
                 template = "description"
             )
             return if (result.isSuccess) result.stdout.trim() else ""
@@ -254,8 +297,8 @@ object JujutsuLogContextMenuActions {
 
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
-                        // Refresh log and select working copy
-                        refreshAfterNewChange(project, selectWorkingCopy = true)
+                        // Refresh all views via state model
+                        refreshAfterVcsOperation(project, selectWorkingCopy = true)
                         log.info("Abandoned change ${entry.changeId}")
                     } else {
                         Messages.showErrorDialog(
@@ -280,7 +323,7 @@ object JujutsuLogContextMenuActions {
     ) : DumbAwareAction(
         JujutsuBundle.message("log.action.show.changes"),
         JujutsuBundle.message("log.action.show.changes.tooltip"),
-        null
+        AllIcons.Actions.Show
     ) {
         override fun actionPerformed(e: AnActionEvent) {
             // TODO: Implement showing changes for this commit
@@ -296,16 +339,16 @@ object JujutsuLogContextMenuActions {
 
     /**
      * Helper function to refresh all UI components after VCS state changes.
+     * Invalidates the state model, which will notify all observers.
      *
      * @param project The project to refresh
-     * @param selectWorkingCopy If true, select the working copy (@) in the log after refresh
+     * @param selectWorkingCopy If true, log views should select the working copy after refresh
      */
-    private fun refreshAfterNewChange(project: Project, selectWorkingCopy: Boolean = false) {
-        // Refresh all open custom log tabs
-        JujutsuCustomLogTabManager.getInstance(project).refreshAllTabs(selectWorkingCopy)
+    private fun refreshAfterVcsOperation(project: Project, selectWorkingCopy: Boolean = true) {
+        // Invalidate the model - it will notify all subscribers
+        JujutsuStateModel.getInstance(project).invalidate(selectWorkingCopy)
 
-        // Trigger VCS change list update to refresh working copy tool window
-        // This marks everything as dirty and triggers ChangeListListener.changeListUpdateDone()
+        // Still need to mark VCS dirty for change list detection
         VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
     }
 }

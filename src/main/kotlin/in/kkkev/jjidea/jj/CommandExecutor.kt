@@ -80,6 +80,13 @@ interface CommandExecutor {
     fun abandon(revision: Revision): CommandResult
 
     /**
+     * Edit a change (move working copy to specified revision)
+     * @param revision The revision to edit
+     * @return Command result
+     */
+    fun edit(revision: Revision): CommandResult
+
+    /**
      * Get the log for specific revset
      * @param revset Revisions to show (e.g., "@", "@-")
      * @param template Template for output (e.g., "description", "change_id")

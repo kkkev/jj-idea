@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.vcs.actions
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
@@ -23,7 +24,7 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
 class JujutsuCompareWithBranchAction : DumbAwareAction(
     JujutsuBundle.message("action.compare.branch"),
     JujutsuBundle.message("action.compare.branch.description"),
-    null
+    AllIcons.Actions.Diff
 ) {
     private val log = Logger.getInstance(javaClass)
 
