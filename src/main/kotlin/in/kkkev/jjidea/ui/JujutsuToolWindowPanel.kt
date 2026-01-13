@@ -55,9 +55,15 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private val collapsedPathsKey = "$COLLAPSED_PATHS_KEY_PREFIX.${project.locationHash}"
 
-    private val panel = JPanel(BorderLayout()).apply {
-        border = JBUI.Borders.empty(8)
-    }
+    private val panel = JPanel(BorderLayout())
+
+    // Track whether description has been modified since last load
+    private var isDescriptionModified = false
+    private var persistedDescription = ""
+
+    // References to buttons that need to be updated when modification state changes
+    private lateinit var describeButton: JButton
+    private lateinit var revertButton: JButton
 
     private val descriptionArea = JBTextArea().apply {
         rows = 4  // Explicitly set number of visible rows
@@ -66,12 +72,29 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         wrapStyleWord = true
         isEditable = true
         toolTipText = JujutsuBundle.message("toolwindow.description.tooltip")
+
+        // Track modifications to show visual feedback
+        document.addDocumentListener(object : javax.swing.event.DocumentListener {
+            override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+            override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+            override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+
+            private fun checkModified() {
+                val newModified = text.trim() != persistedDescription.trim()
+                if (newModified != isDescriptionModified) {
+                    isDescriptionModified = newModified
+                    updateDescriptionLabel()
+                }
+            }
+        })
     }
 
     private val currentChangeLabel = JBLabel(JujutsuBundle.message("toolwindow.workingcopy.label")).apply {
         // TODO Pick font size according to IntelliJ appearance settings
         font = font.deriveFont(13f)
     }
+
+    private val descriptionLabel = JBLabel(JujutsuBundle.message("toolwindow.description.label"))
 
     // Tree for displaying changes (using IntelliJ's built-in changes tree)
     private val changesTree = JujutsuChangesTree(project)
@@ -96,13 +119,23 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun createUI() {
-        // Top panel: Current change info and description
-        val topPanel = JPanel(GridBagLayout())
+        // Overall container with all sections
+        val mainPanel = JPanel(BorderLayout())
 
+        // Working copy toolbar at the very top
+        val workingCopyToolbar = createWorkingCopyToolbar()
+        mainPanel.add(workingCopyToolbar.component, BorderLayout.NORTH)
+
+        // Middle section: Current change info and description
+        val infoPanel = JPanel(BorderLayout()).apply {
+            border = JBUI.Borders.empty(0, 8, 0, 8)
+        }
+
+        val topPanel = JPanel(GridBagLayout())
         val gbc = GridBagConstraints().apply {
             fill = GridBagConstraints.HORIZONTAL
             anchor = GridBagConstraints.WEST
-            insets = JBUI.insets(4)
+            insets = JBUI.insets(1)
         }
 
         // Current change label
@@ -110,9 +143,19 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             gridx = 0; gridy = 0; gridwidth = 2; weightx = 1.0
         })
 
-        // Description label
-        topPanel.add(JBLabel(JujutsuBundle.message("toolwindow.description.label")), gbc.apply {
-            gridy = 1; gridwidth = 1; weightx = 0.0
+        // Description label with inline action buttons
+        val descriptionHeaderPanel = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(descriptionLabel)
+            add(Box.createHorizontalStrut(8))
+            add(createDescribeButton())
+            add(Box.createHorizontalStrut(4))
+            add(createRevertButton())
+            add(Box.createHorizontalGlue())
+        }
+
+        topPanel.add(descriptionHeaderPanel, gbc.apply {
+            gridy = 1; gridwidth = 2; weightx = 1.0
         })
 
         // Description text area with scroll pane
@@ -124,13 +167,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             gridy = 2; gridwidth = 2; weightx = 1.0; weighty = 0.0; fill = GridBagConstraints.BOTH
         })
 
-        // Buttons
-        val buttonPanel = createButtonPanel()
-        topPanel.add(buttonPanel, gbc.apply {
-            gridy = 3; gridwidth = 2; weighty = 0.0; fill = GridBagConstraints.NONE
-        })
+        infoPanel.add(topPanel, BorderLayout.CENTER)
+        mainPanel.add(infoPanel, BorderLayout.CENTER)
 
-        panel.add(topPanel, BorderLayout.NORTH)
+        panel.add(mainPanel, BorderLayout.NORTH)
 
         // Center: Changes tree with toolbar
         val changesPanel = JPanel(BorderLayout())
@@ -145,6 +185,51 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         changesPanel.add(ScrollPaneFactory.createScrollPane(changesTree), BorderLayout.CENTER)
 
         panel.add(changesPanel, BorderLayout.CENTER)
+    }
+
+    private fun createWorkingCopyToolbar(): ActionToolbar {
+        val group = DefaultActionGroup()
+
+        // New Change action - primary workflow operation
+        group.add(object : DumbAwareAction(
+            JujutsuBundle.message("button.newchange"),
+            JujutsuBundle.message("button.newchange.tooltip"),
+            AllIcons.General.Add
+        ) {
+            override fun actionPerformed(e: AnActionEvent) {
+                createNewChange()
+            }
+        })
+
+        // Placeholder for future actions: Edit, Abandon, Rebase, etc.
+
+        return ActionManager.getInstance().createActionToolbar(
+            "JujutsuWorkingCopyToolbar",
+            group,
+            true
+        )
+    }
+
+    private fun createDescribeButton(): JButton {
+        describeButton = JButton(JujutsuBundle.message("button.describe")).apply {
+            toolTipText = JujutsuBundle.message("button.describe.tooltip")
+            icon = AllIcons.Actions.MenuSaveall
+            addActionListener { describeCurrentChange() }
+            // Start disabled, will be enabled when description is modified
+            isEnabled = false
+        }
+        return describeButton
+    }
+
+    private fun createRevertButton(): JButton {
+        revertButton = JButton("Revert").apply {
+            toolTipText = "Reload description from working copy"
+            icon = AllIcons.Actions.Rollback
+            addActionListener { revertDescription() }
+            // Start disabled, will be enabled when description is modified
+            isEnabled = false
+        }
+        return revertButton
     }
 
     private fun createChangesToolbar(): ActionToolbar {
@@ -236,7 +321,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         // Update description and label from model
                         val model = JujutsuStateModel.getInstance(project)
                         model.workingCopy?.let { entry ->
-                            descriptionArea.text = entry.description.actual
+                            persistedDescription = entry.description.actual
+                            descriptionArea.text = persistedDescription
+                            isDescriptionModified = false
+                            updateDescriptionLabel()
                             updateWorkingCopyLabel(entry)
                         }
                         // Update file changes
@@ -249,7 +337,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     ApplicationManager.getApplication().invokeLater {
                         val model = JujutsuStateModel.getInstance(project)
                         model.workingCopy?.let { entry ->
-                            descriptionArea.text = entry.description.actual
+                            persistedDescription = entry.description.actual
+                            descriptionArea.text = persistedDescription
+                            isDescriptionModified = false
+                            updateDescriptionLabel()
                             updateWorkingCopyLabel(entry)
                         }
                     }
@@ -294,30 +385,18 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private fun getSelectedChange() = changesTree.selectedChanges.firstOrNull()
 
-    private fun createButtonPanel(): JPanel {
-        val buttonPanel = JPanel()
-        buttonPanel.layout = BoxLayout(buttonPanel, BoxLayout.X_AXIS)
+    private fun updateDescriptionLabel() {
+        val baseLabel = JujutsuBundle.message("toolwindow.description.label")
+        descriptionLabel.text = if (isDescriptionModified) "$baseLabel *" else baseLabel
+        // Update button states
+        describeButton.isEnabled = isDescriptionModified
+        revertButton.isEnabled = isDescriptionModified
+    }
 
-        // Describe button - updates the description of current working copy
-        val describeButton = JButton(JujutsuBundle.message("button.describe"))
-        describeButton.toolTipText = JujutsuBundle.message("button.describe.tooltip")
-        describeButton.addActionListener {
-            describeCurrentChange()
-        }
-
-        // New button - creates a new commit on top of current one
-        val newButton = JButton(JujutsuBundle.message("button.newchange"))
-        newButton.toolTipText = JujutsuBundle.message("button.newchange.tooltip")
-        newButton.addActionListener {
-            createNewChange()
-        }
-
-        buttonPanel.add(describeButton)
-        buttonPanel.add(Box.createHorizontalStrut(8))
-        buttonPanel.add(newButton)
-        buttonPanel.add(Box.createHorizontalGlue())
-
-        return buttonPanel
+    private fun revertDescription() {
+        descriptionArea.text = persistedDescription
+        isDescriptionModified = false
+        updateDescriptionLabel()
     }
 
     private fun describeCurrentChange() {
@@ -340,6 +419,11 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
+                        // Update persisted description and reset modified flag
+                        persistedDescription = description
+                        isDescriptionModified = false
+                        updateDescriptionLabel()
+
                         // Invalidate state model - observers will refresh
                         JujutsuStateModel.getInstance(project).invalidate(selectWorkingCopy = true)
                         VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
@@ -391,7 +475,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
                         // Clear the description area since we've created a new change
+                        persistedDescription = ""
                         descriptionArea.text = ""
+                        isDescriptionModified = false
+                        updateDescriptionLabel()
 
                         // Invalidate state model - observers will refresh
                         JujutsuStateModel.getInstance(project).invalidate(selectWorkingCopy = true)
@@ -445,7 +532,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                 result.onSuccess { entries ->
                     entries.firstOrNull()?.let { entry ->
                         // Update the description text area
-                        descriptionArea.text = entry.description.actual
+                        persistedDescription = entry.description.actual
+                        descriptionArea.text = persistedDescription
+                        isDescriptionModified = false
+                        updateDescriptionLabel()
                         updateWorkingCopyLabel(entry)
                     }
                 }.onFailure { error ->
