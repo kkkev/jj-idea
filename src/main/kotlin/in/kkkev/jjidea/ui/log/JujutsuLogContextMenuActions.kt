@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
@@ -40,6 +41,9 @@ object JujutsuLogContextMenuActions {
         if (entry.isWorkingCopy) {
             add(DescribeWorkingCopyAction(project))
         }
+
+        // Can abandon any change including working copy
+        add(AbandonChangeAction(project, entry))
 
         addSeparator()
         add(ShowChangesAction(project, entry))
@@ -194,6 +198,75 @@ object JujutsuLogContextMenuActions {
                 template = "description"
             )
             return if (result.isSuccess) result.stdout.trim() else ""
+        }
+    }
+
+    /**
+     * Abandon change action.
+     * Removes the change from the log with confirmation if it has file modifications or a description.
+     */
+    private class AbandonChangeAction(
+        private val project: Project,
+        private val entry: LogEntry
+    ) : DumbAwareAction(
+        JujutsuBundle.message("log.action.abandon"),
+        JujutsuBundle.message("log.action.abandon.tooltip"),
+        AllIcons.General.Delete
+    ) {
+        override fun actionPerformed(e: AnActionEvent) {
+            // Check if confirmation is needed
+            val needsConfirmation = !entry.isEmpty || !entry.description.empty
+
+            if (needsConfirmation) {
+                // Build confirmation message based on what will be lost
+                val confirmMessage = when {
+                    !entry.isEmpty && !entry.description.empty ->
+                        JujutsuBundle.message("log.action.abandon.confirm.both")
+                    !entry.isEmpty ->
+                        JujutsuBundle.message("log.action.abandon.confirm.files")
+                    else ->
+                        JujutsuBundle.message("log.action.abandon.confirm.description")
+                }
+
+                val confirmTitle = JujutsuBundle.message("log.action.abandon.confirm.title", entry.changeId.short)
+
+                // Show yes/no confirmation dialog
+                val result = Messages.showYesNoDialog(
+                    project,
+                    confirmMessage,
+                    confirmTitle,
+                    Messages.getWarningIcon()
+                )
+
+                // If user selected No or cancelled, don't proceed
+                if (result != Messages.YES) {
+                    log.info("User cancelled abandon of ${entry.changeId}")
+                    return
+                }
+            }
+
+            // Execute abandon in background thread
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "Abandon Change")
+                    ?: return@executeOnPooledThread
+
+                val result = vcs.commandExecutor.abandon(entry.changeId)
+
+                ApplicationManager.getApplication().invokeLater {
+                    if (result.isSuccess) {
+                        // Refresh log and select working copy
+                        refreshAfterNewChange(project, selectWorkingCopy = true)
+                        log.info("Abandoned change ${entry.changeId}")
+                    } else {
+                        Messages.showErrorDialog(
+                            project,
+                            JujutsuBundle.message("log.action.abandon.error.message", result.stderr),
+                            JujutsuBundle.message("log.action.abandon.error.title")
+                        )
+                        log.warn("Failed to abandon change ${entry.changeId}: ${result.stderr}")
+                    }
+                }
+            }
         }
     }
 
