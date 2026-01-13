@@ -35,7 +35,7 @@ class JujutsuLogPanel(
     private val root: VirtualFile
 ) : JPanel(BorderLayout()), Disposable {
 
-    private val log = Logger.getInstance(JujutsuLogPanel::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     // Column manager for controlling column visibility
     private val columnManager = JujutsuColumnManager()

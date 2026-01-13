@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
@@ -23,29 +22,28 @@ import java.awt.datatransfer.StringSelection
  * Provides actions like Copy Change ID, Copy Description, New Change From This, etc.
  */
 object JujutsuLogContextMenuActions {
-    private val log = Logger.getInstance(JujutsuLogContextMenuActions::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     /**
      * Create the action group for the context menu.
      * Different actions are shown depending on whether the selected entry is the working copy.
      */
-    fun createActionGroup(project: Project, entry: LogEntry): DefaultActionGroup =
-        DefaultActionGroup().apply {
-            add(CopyChangeIdAction(entry.changeId))
-            add(CopyDescriptionAction(entry.description.actual))
-            addSeparator()
+    fun createActionGroup(project: Project, entry: LogEntry): DefaultActionGroup = DefaultActionGroup().apply {
+        add(CopyChangeIdAction(entry.changeId))
+        add(CopyDescriptionAction(entry.description.actual))
+        addSeparator()
 
-            // Always offer "New Change From This"
-            add(NewChangeFromThisAction(project, entry.changeId))
+        // Always offer "New Change From This"
+        add(NewChangeFromThisAction(project, entry.changeId))
 
-            // For working copy, also offer "Describe"
-            if (entry.isWorkingCopy) {
-                add(DescribeWorkingCopyAction(project))
-            }
-
-            addSeparator()
-            add(ShowChangesAction(project, entry))
+        // For working copy, also offer "Describe"
+        if (entry.isWorkingCopy) {
+            add(DescribeWorkingCopyAction(project))
         }
+
+        addSeparator()
+        add(ShowChangesAction(project, entry))
+    }
 
     /**
      * Copy Change ID to clipboard.
@@ -104,7 +102,7 @@ object JujutsuLogContextMenuActions {
             val descriptionArg = if (description.isNotBlank()) description.trim() else null
 
             ApplicationManager.getApplication().executeOnPooledThread {
-                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "New Change From This", log)
+                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "New Change From This")
                     ?: return@executeOnPooledThread
 
                 val result = vcs.commandExecutor.new(message = descriptionArg, parentRevision = changeId)
@@ -141,7 +139,7 @@ object JujutsuLogContextMenuActions {
         override fun actionPerformed(e: AnActionEvent) {
             // Load current description in background thread to avoid EDT violation
             ApplicationManager.getApplication().executeOnPooledThread {
-                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "Describe Working Copy", log)
+                val vcs = JujutsuVcs.getVcsWithUserErrorHandling(project, "Describe Working Copy")
                     ?: return@executeOnPooledThread
 
                 val currentDescription = getCurrentDescription(vcs)

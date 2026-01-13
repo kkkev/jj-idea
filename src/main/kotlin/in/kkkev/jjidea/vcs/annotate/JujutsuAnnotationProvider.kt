@@ -22,8 +22,7 @@ class JujutsuAnnotationProvider(
     private val project: Project,
     private val vcs: JujutsuVcs
 ) : AnnotationProvider, CacheableAnnotationProvider {
-
-    private val log = Logger.getInstance(JujutsuAnnotationProvider::class.java)
+    private val log = Logger.getInstance(javaClass)
     private val cache = mutableMapOf<VirtualFile, FileAnnotation>()
 
     override fun populateCache(file: VirtualFile) {

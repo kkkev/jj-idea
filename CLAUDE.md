@@ -111,14 +111,15 @@ JujutsuVcs (extends AbstractVcs)
     └── JujutsuCliExecutor(root) - CLI implementation
 ```
 
-**JujutsuVcs Utility Methods**: Three-tier VCS access pattern for proper error handling:
+**How to get a JujutsuVcs instance**: Three-tier VCS access pattern for proper error handling:
+Each of these fields is on `Project` and `VirtualFile`:
 
-1. **`find(project/root)`** - Returns `JujutsuVcs?` (nullable)
+1. **`possibleJujutsuVcs`** - Returns `JujutsuVcs?` (nullable)
    - Use for checking VCS availability
    - Use in action `update()` methods to enable/disable actions
    - Use in helper methods that need to check if VCS exists
 
-2. **`getVcsWithUserErrorHandling(project, actionName, logger)`** - Returns `JujutsuVcs?` (nullable)
+2. **`getVcsWithUserErrorHandling(actionName, logger)`** - Returns `JujutsuVcs?` (nullable)
    - Use in **user-facing actions** where VCS might not be configured
    - Logs at **INFO level** (user error, not plugin error)
    - Shows user-friendly error dialog explaining how to configure Jujutsu
@@ -133,7 +134,7 @@ JujutsuVcs (extends AbstractVcs)
      }
      ```
 
-3. **`findRequired(project/root)`** - Returns `JujutsuVcs` or throws `VcsException`
+3. **`jujutsuVcs`** - Returns `JujutsuVcs` or throws `VcsException`
    - Use when VCS **MUST** exist (plugin error if it doesn't)
    - Logs at **ERROR level** when caught (indicates programming error)
    - Use in contexts where VCS is guaranteed:

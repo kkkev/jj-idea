@@ -6,7 +6,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.VirtualFile
@@ -21,8 +20,7 @@ import `in`.kkkev.jjidea.jj.*
  * Provides repository-wide log for Jujutsu VCS
  */
 class JujutsuLogProvider : VcsLogProvider {
-
-    private val log = Logger.getInstance(JujutsuLogProvider::class.java)
+    private val log = Logger.getInstance(javaClass)
     private val refManager = JujutsuLogRefManager()
 
     init {
@@ -36,10 +34,8 @@ class JujutsuLogProvider : VcsLogProvider {
     ): VcsLogProvider.DetailedLogData {
         log.debug("Reading first block of commits for root: ${root.path}")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
-
         // Use logService to get log entries
-        val result = vcsInstance.logService.getLog(Expression.ALL)
+        val result = root.jujutsuVcs.logService.getLog(Expression.ALL)
 
         val entries = result.getOrElse {
             throw VcsException("Failed to read commits: ${it.message}")
@@ -78,10 +74,8 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun readAllHashes(root: VirtualFile, consumer: Consumer<in TimedVcsCommit>): VcsLogProvider.LogData {
         log.debug("Reading all commit hashes for root: ${root.path}")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
-
         // Use logService to get commit graph
-        val result = vcsInstance.logService.getCommitGraph(Expression.ALL)
+        val result = root.jujutsuVcs.logService.getCommitGraph(Expression.ALL)
 
         result.getOrElse {
             log.error("Failed to read commit hashes: ${it.message}")
@@ -104,7 +98,7 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun readFullDetails(root: VirtualFile, hashes: List<String>, consumer: Consumer<in VcsFullCommitDetails>) {
         log.debug("Reading full details for ${hashes.size} commits")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
+        val vcsInstance = root.jujutsuVcs
 
         hashes.forEach { hexHash ->
             try {
@@ -149,10 +143,8 @@ class JujutsuLogProvider : VcsLogProvider {
     private fun readAllRefsInternal(root: VirtualFile): Set<VcsRef> {
         log.debug("Reading all refs for root: ${root.path}")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
-
         // Use logService to get refs
-        val result = vcsInstance.logService.getRefs()
+        val result = root.jujutsuVcs.logService.getRefs()
 
         val refs = result.getOrElse {
             log.error("Failed to read refs: ${it.message}")
@@ -272,10 +264,8 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         // This is done in a read action to avoid EDT violations
         val vcs = ReadAction.compute<JujutsuVcs?, RuntimeException> {
             ProjectManager.getInstance().openProjects.firstNotNullOfOrNull { project ->
-                val vcsManager = ProjectLevelVcsManager.getInstance(project)
-                // Check if this project has Jujutsu VCS and if it manages this file path
-                vcsManager.allVcsRoots
-                    .firstOrNull { it.vcs is JujutsuVcs && filePath.path.startsWith(it.path.path) }
+                project.jujutsuRoots
+                    .firstOrNull { filePath.path.startsWith(it.path.path) }
                     ?.vcs as? JujutsuVcs
             }
         } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${filePath.path}")

@@ -1,26 +1,17 @@
 package `in`.kkkev.jjidea.vcs
 
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.util.Comparing
-import com.intellij.vcs.log.RefGroup
-import com.intellij.vcs.log.VcsLogRefManager
-import com.intellij.vcs.log.VcsRef
-import com.intellij.vcs.log.VcsRefType
-import org.jetbrains.annotations.Unmodifiable
 import com.intellij.ui.JBColor
-import com.intellij.vcs.log.VcsLogStandardColors
+import com.intellij.vcs.log.*
+import org.jetbrains.annotations.Unmodifiable
 import java.awt.Color
 import java.io.DataInput
 import java.io.DataOutput
-import java.util.Comparator
 
 /**
  * Manages Jujutsu bookmarks (refs) in the VCS log
  */
 class JujutsuLogRefManager : VcsLogRefManager {
-
-    private val log = Logger.getInstance(JujutsuLogRefManager::class.java)
-
     companion object {
         // Theme-aware colors with fallbacks to standard VCS log colors
         private val BOOKMARK_COLOR = JBColor.namedColor(
@@ -166,7 +157,12 @@ class JujutsuLogRefManager : VcsLogRefManager {
 }
 
 // TODO Do we still need this or can we import from framework?
-data class RefGroupImpl(private val expanded: Boolean, private val name: String, private val refs: List<VcsRef>, private val colors: List<Color> = emptyList()) :
+data class RefGroupImpl(
+    private val expanded: Boolean,
+    private val name: String,
+    private val refs: List<VcsRef>,
+    private val colors: List<Color> = emptyList()
+) :
     RefGroup {
     override fun isExpanded() = expanded
     override fun getName() = name

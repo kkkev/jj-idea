@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 class CliExecutor(private val root: VirtualFile, private val jjExecutable: String = "jj") :
     CommandExecutor {
 
-    private val log = Logger.getInstance(CliExecutor::class.java)
+    private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
 
     override fun status() = execute(root, listOf("status"))

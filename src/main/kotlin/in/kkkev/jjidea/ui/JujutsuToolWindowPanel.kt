@@ -27,7 +27,7 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.jujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
@@ -228,7 +228,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         })
 
         // Double-click handler: show diff
-        changesTree.setDoubleClickHandler { e ->
+        changesTree.setDoubleClickHandler { _ ->
             getSelectedChange()?.let {
                 showDiff(it)
                 true
@@ -245,7 +245,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
         // Right-click context menu
         changesTree.addMouseListener(object : PopupHandler() {
-            override fun invokePopup(comp: java.awt.Component, x: Int, y: Int) {
+            override fun invokePopup(comp: Component, x: Int, y: Int) {
                 showContextMenu(comp, x, y)
             }
         })
@@ -295,8 +295,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         // Use findRequired() since this tool window only exists when Jujutsu VCS is configured
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val vcsInstance = JujutsuVcs.findRequired(project)
-                val result = vcsInstance.commandExecutor.describe(description)
+                val result = project.jujutsuVcs.commandExecutor.describe(description)
 
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
@@ -348,11 +347,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val descriptionArg = if (description.isNotBlank()) description.trim() else null
 
         // Move VCS lookup to background thread to avoid EDT slow operations
-        // Use findRequired() since this tool window only exists when Jujutsu VCS is configured
+        // Use project.jujutsuVcs since this tool window only exists when Jujutsu VCS is configured
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val vcsInstance = JujutsuVcs.findRequired(project)
-                val result = vcsInstance.commandExecutor.new(message = descriptionArg)
+                val result = project.jujutsuVcs.commandExecutor.new(message = descriptionArg)
 
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
@@ -412,43 +410,42 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     private fun loadCurrentDescription() {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val vcsInstance = JujutsuVcs.findRequired(project)
-                val result = vcsInstance.logService.getLog(WorkingCopy)
+                val result = project.jujutsuVcs.logService.getLog(WorkingCopy)
                 ApplicationManager.getApplication().invokeLater {
                     result.getOrNull()?.let { entries ->
                         entries.firstOrNull()?.let { entry ->
-                        // Update the description text area
-                        descriptionArea.text = entry.description.actual
+                            // Update the description text area
+                            descriptionArea.text = entry.description.actual
 
-                        // Create HTML for label showing change ID, @ marker, and parents
-                        val labelText = buildString {
-                            val canvas = StringBuilderHtmlTextCanvas(this)
+                            // Create HTML for label showing change ID, @ marker, and parents
+                            val labelText = buildString {
+                                val canvas = StringBuilderHtmlTextCanvas(this)
 
-                            append("<html>")
-                            canvas.append(entry.changeId)
+                                append("<html>")
+                                canvas.append(entry.changeId)
 
-                            // Add parent IDs if present
-                            if (entry.parentIds.isNotEmpty()) {
-                                append("<br>")
-                                append("<font size=-1>")
-                                append(JujutsuBundle.message("toolwindow.parents.label"))
-                                append(" ")
-                                entry.parentIds.forEachIndexed { index, parentId ->
-                                    if (index > 0) append(", ")
-                                    canvas.append(parentId)
+                                // Add parent IDs if present
+                                if (entry.parentIds.isNotEmpty()) {
+                                    append("<br>")
+                                    append("<font size=-1>")
+                                    append(JujutsuBundle.message("toolwindow.parents.label"))
+                                    append(" ")
+                                    entry.parentIds.forEachIndexed { index, parentId ->
+                                        if (index > 0) append(", ")
+                                        canvas.append(parentId)
+                                    }
+                                    append("</font>")
                                 }
-                                append("</font>")
-                            }
 
-                            append("</html>")
+                                append("</html>")
+                            }
+                            currentChangeLabel.text = labelText
                         }
-                        currentChangeLabel.text = labelText
                     }
-                }
-                // Log errors from getLog() if any
-                result.exceptionOrNull()?.let { error ->
-                    log.error("Failed to load current description", error)
-                }
+                    // Log errors from getLog() if any
+                    result.exceptionOrNull()?.let { error ->
+                        log.error("Failed to load current description", error)
+                    }
                 }
             } catch (e: VcsException) {
                 // Tool window should not exist when VCS is not configured

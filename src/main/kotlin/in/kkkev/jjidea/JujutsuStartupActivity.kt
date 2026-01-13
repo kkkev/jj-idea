@@ -7,11 +7,11 @@ import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.JujutsuCustomLogTabManager
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.isJujutsu
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Startup activity that automatically opens the custom Jujutsu log tab
@@ -34,10 +34,7 @@ class JujutsuStartupActivity : ProjectActivity {
             return
         }
 
-        // Check if this is a Jujutsu project using JujutsuVcs.find()
-        val jujutsuVcs = JujutsuVcs.find(project)
-
-        if (jujutsuVcs != null) {
+        if (project.isJujutsu) {
             log.info("Jujutsu project detected, replacing standard VCS log with custom implementation")
 
             // Open the custom log tab on EDT (UI modifications must happen on EDT)
