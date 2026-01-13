@@ -42,19 +42,32 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
  */
 class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
     override fun render(value: LogEntry) {
-        // Show conflict icon
+        val hasMultipleIndicators = listOf(value.hasConflict, value.isEmpty, value.immutable).count { it } > 1
+
+        // Show conflict icon/text
         if (value.hasConflict) {
-            icon = AllIcons.General.Warning
-            append(" ")
-        }
-        // Show empty icon
-        if (value.isEmpty) {
-            icon = if (value.hasConflict) {
-                // Both indicators - use warning icon, add text
-                append("Empty", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                AllIcons.General.Warning
+            if (hasMultipleIndicators) {
+                append("Conflict", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
             } else {
-                AllIcons.General.BalloonInformation
+                icon = AllIcons.General.Warning
+            }
+        }
+
+        // Show empty indicator - always use text for clarity
+        if (value.isEmpty) {
+            append("Empty", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            if (value.immutable) {
+                append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
+            }
+        }
+
+        // Show immutable icon/text
+        if (value.immutable) {
+            if (hasMultipleIndicators) {
+                append("Immutable", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            } else {
+                icon = AllIcons.Nodes.Locked
             }
         }
     }
@@ -211,6 +224,7 @@ fun JujutsuLogTable.installRenderers() {
                 // Will be set when graph data is loaded via updateGraph()
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
+                column.maxWidth = Int.MAX_VALUE
             }
 
             JujutsuLogTableModel.COLUMN_STATUS -> {
@@ -232,6 +246,7 @@ fun JujutsuLogTable.installRenderers() {
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
                 column.minWidth = 100
+                column.maxWidth = Int.MAX_VALUE
             }
 
             JujutsuLogTableModel.COLUMN_DECORATIONS -> {

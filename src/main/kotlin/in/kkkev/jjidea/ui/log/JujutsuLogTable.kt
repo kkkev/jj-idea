@@ -80,6 +80,13 @@ class JujutsuLogTable(
                 showContextMenu(comp, x, y)
             }
         })
+
+        // Add component resize listener for dynamic column width adjustment
+        addComponentListener(object : java.awt.event.ComponentAdapter() {
+            override fun componentResized(e: java.awt.event.ComponentEvent?) {
+                adjustDescriptionColumnWidth()
+            }
+        })
     }
 
     /**
@@ -166,6 +173,45 @@ class JujutsuLogTable(
             }
         }
     }
+
+    /**
+     * Dynamically adjust description column to fill available width.
+     * Runs on component resize.
+     */
+    private fun adjustDescriptionColumnWidth() {
+        // Skip if no columns
+        if (columnModel.columnCount == 0) return
+
+        // Find the description column (either combined or separate)
+        val descColumnIndex = if (columnManager.showDescriptionColumn) {
+            // Using separate description column
+            JujutsuLogTableModel.COLUMN_DESCRIPTION
+        } else {
+            // Using combined graph+description column
+            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
+        }
+
+        // Find the actual column in the column model
+        val descColumn = (0 until columnModel.columnCount)
+            .map { columnModel.getColumn(it) }
+            .firstOrNull { it.modelIndex == descColumnIndex }
+            ?: return
+
+        // Calculate total width of other columns
+        val otherColumnsWidth = (0 until columnModel.columnCount)
+            .map { columnModel.getColumn(it) }
+            .filter { it != descColumn }
+            .sumOf { it.width }
+
+        // Calculate available width for description
+        val availableWidth = width - otherColumnsWidth
+
+        // Set description column width (respect minimum)
+        if (availableWidth > descColumn.minWidth) {
+            descColumn.preferredWidth = availableWidth
+            descColumn.width = availableWidth
+        }
+    }
 }
 
 /**
@@ -229,7 +275,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
         return when (columnIndex) {
             COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
-            COLUMN_STATUS -> if (entry.hasConflict || entry.isEmpty) entry else null
+            COLUMN_STATUS -> if (entry.hasConflict || entry.isEmpty || entry.immutable) entry else null
             COLUMN_CHANGE_ID -> entry.changeId
             COLUMN_DESCRIPTION -> entry.description
             COLUMN_DECORATIONS -> entry // Return full entry to access both isWorkingCopy and bookmarks
