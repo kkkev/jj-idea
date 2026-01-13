@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.vcs.actions
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -12,7 +13,11 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
  * This provides full control over the log UI, allowing customizations not
  * possible with standard VCS log extension points.
  */
-class OpenJujutsuLogTabAction : DumbAwareAction(JujutsuBundle.message("action.open.log")) {
+class OpenJujutsuLogTabAction : DumbAwareAction(
+    JujutsuBundle.message("action.open.log"),
+    null,
+    AllIcons.Vcs.History
+) {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         JujutsuCustomLogTabManager.getInstance(project).openCustomLogTab()

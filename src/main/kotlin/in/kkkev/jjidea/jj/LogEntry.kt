@@ -22,7 +22,8 @@ data class LogEntry(
     val authorTimestamp: Instant? = null,
     val committerTimestamp: Instant? = null,
     val author: VcsUser? = null,
-    val committer: VcsUser? = null
+    val committer: VcsUser? = null,
+    val immutable: Boolean = false
 ) : GraphableEntry {
     val description = Description(underlyingDescription)
 }

@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.vcs.actions
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
@@ -17,7 +18,7 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
 class JujutsuShowHistoryForSelectionAction : DumbAwareAction(
     JujutsuBundle.message("action.show.history.selection"),
     JujutsuBundle.message("action.show.history.selection.description"),
-    null
+    AllIcons.Vcs.History
 ) {
     private val log = Logger.getInstance(javaClass)
 

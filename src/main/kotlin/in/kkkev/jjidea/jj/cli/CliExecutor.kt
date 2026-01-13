@@ -67,6 +67,9 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
     override fun abandon(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("abandon", "-r", revision))
 
+    override fun edit(revision: Revision): CommandExecutor.CommandResult =
+        execute(root, listOf("edit", revision))
+
     override fun log(revset: Revset, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
         val args = mutableListOf("log", "-r", revset, "--no-graph")
         if (template != null) {

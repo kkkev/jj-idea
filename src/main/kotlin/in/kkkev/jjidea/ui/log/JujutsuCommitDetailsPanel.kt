@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
@@ -208,12 +209,20 @@ class JujutsuCommitDetailsPanel(
         val selectedChange = changesTree.selectedChanges.firstOrNull() ?: return
 
         val actionGroup = DefaultActionGroup().apply {
-            add(object : DumbAwareAction(JujutsuBundle.message("action.showdiff")) {
+            add(object : DumbAwareAction(
+                JujutsuBundle.message("action.showdiff"),
+                null,
+                AllIcons.Actions.Diff
+            ) {
                 override fun actionPerformed(e: AnActionEvent) {
                     showDiff(selectedChange)
                 }
             })
-            add(object : DumbAwareAction(JujutsuBundle.message("action.openfile")) {
+            add(object : DumbAwareAction(
+                JujutsuBundle.message("action.openfile"),
+                null,
+                AllIcons.Actions.EditSource
+            ) {
                 override fun actionPerformed(e: AnActionEvent) {
                     openFile(selectedChange)
                 }

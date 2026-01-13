@@ -26,6 +26,9 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.JujutsuStateListener
+import `in`.kkkev.jjidea.jj.JujutsuStateModel
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.jujutsuVcs
 import java.awt.BorderLayout
@@ -56,9 +59,12 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         border = JBUI.Borders.empty(8)
     }
 
-    private val descriptionArea = JBTextArea(3, 50).apply {
+    private val descriptionArea = JBTextArea().apply {
+        rows = 4  // Explicitly set number of visible rows
+        columns = 50
         lineWrap = true
         wrapStyleWord = true
+        isEditable = true
         toolTipText = JujutsuBundle.message("toolwindow.description.tooltip")
     }
 
@@ -86,6 +92,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         setupTreeInteractions()
         setupTreeExpansionTracking()
         setupVfsListener()
+        setupStateListener()
     }
 
     private fun createUI() {
@@ -108,9 +115,11 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             gridy = 1; gridwidth = 1; weightx = 0.0
         })
 
-        // Description text area
-        val scrollPane = ScrollPaneFactory.createScrollPane(descriptionArea)
-        scrollPane.preferredSize = JBUI.size(400, 80)
+        // Description text area with scroll pane
+        val scrollPane = ScrollPaneFactory.createScrollPane(descriptionArea).apply {
+            minimumSize = JBUI.size(200, 70)
+            preferredSize = JBUI.size(400, 90)
+        }
         topPanel.add(scrollPane, gbc.apply {
             gridy = 2; gridwidth = 2; weightx = 1.0; weighty = 0.0; fill = GridBagConstraints.BOTH
         })
@@ -217,6 +226,38 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         )
     }
 
+    private fun setupStateListener() {
+        // Subscribe to state changes from the model (MVC pattern)
+        project.messageBus.connect(this).subscribe(
+            JujutsuStateListener.TOPIC,
+            object : JujutsuStateListener {
+                override fun workingCopyChanged() {
+                    ApplicationManager.getApplication().invokeLater {
+                        // Update description and label from model
+                        val model = JujutsuStateModel.getInstance(project)
+                        model.workingCopy?.let { entry ->
+                            descriptionArea.text = entry.description.actual
+                            updateWorkingCopyLabel(entry)
+                        }
+                        // Update file changes
+                        updateChangesView(model.fileChanges)
+                    }
+                }
+
+                override fun logUpdated() {
+                    // Refresh description in case working copy changed
+                    ApplicationManager.getApplication().invokeLater {
+                        val model = JujutsuStateModel.getInstance(project)
+                        model.workingCopy?.let { entry ->
+                            descriptionArea.text = entry.description.actual
+                            updateWorkingCopyLabel(entry)
+                        }
+                    }
+                }
+            }
+        )
+    }
+
     private fun setupTreeInteractions() {
         // Single-click: open file in preview tab (only on user clicks, not selection changes)
         changesTree.addMouseListener(object : java.awt.event.MouseAdapter() {
@@ -299,13 +340,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
                 ApplicationManager.getApplication().invokeLater {
                     if (result.isSuccess) {
-                        // Refresh working copy tool window
-                        refresh()
-
-                        // Refresh log tabs and keep working copy selected
-                        JujutsuCustomLogTabManager.getInstance(project).refreshAllTabs(selectWorkingCopy = true)
-
-                        // Trigger VCS change list update
+                        // Invalidate state model - observers will refresh
+                        JujutsuStateModel.getInstance(project).invalidate(selectWorkingCopy = true)
                         VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
                     } else {
                         JOptionPane.showMessageDialog(
@@ -357,13 +393,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                         // Clear the description area since we've created a new change
                         descriptionArea.text = ""
 
-                        // Refresh working copy tool window
-                        refresh()
-
-                        // Refresh log tabs and select the new working copy
-                        JujutsuCustomLogTabManager.getInstance(project).refreshAllTabs(selectWorkingCopy = true)
-
-                        // Trigger VCS change list update
+                        // Invalidate state model - observers will refresh
+                        JujutsuStateModel.getInstance(project).invalidate(selectWorkingCopy = true)
                         VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
                     } else {
                         JOptionPane.showMessageDialog(
@@ -409,49 +440,45 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private fun loadCurrentDescription() {
         ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                val result = project.jujutsuVcs.logService.getLog(WorkingCopy)
-                ApplicationManager.getApplication().invokeLater {
-                    result.getOrNull()?.let { entries ->
-                        entries.firstOrNull()?.let { entry ->
-                            // Update the description text area
-                            descriptionArea.text = entry.description.actual
-
-                            // Create HTML for label showing change ID, @ marker, and parents
-                            val labelText = buildString {
-                                val canvas = StringBuilderHtmlTextCanvas(this)
-
-                                append("<html>")
-                                canvas.append(entry.changeId)
-
-                                // Add parent IDs if present
-                                if (entry.parentIds.isNotEmpty()) {
-                                    append("<br>")
-                                    append("<font size=-1>")
-                                    append(JujutsuBundle.message("toolwindow.parents.label"))
-                                    append(" ")
-                                    entry.parentIds.forEachIndexed { index, parentId ->
-                                        if (index > 0) append(", ")
-                                        canvas.append(parentId)
-                                    }
-                                    append("</font>")
-                                }
-
-                                append("</html>")
-                            }
-                            currentChangeLabel.text = labelText
-                        }
+            val result = project.jujutsuVcs.logService.getLog(WorkingCopy)
+            ApplicationManager.getApplication().invokeLater {
+                result.onSuccess { entries ->
+                    entries.firstOrNull()?.let { entry ->
+                        // Update the description text area
+                        descriptionArea.text = entry.description.actual
+                        updateWorkingCopyLabel(entry)
                     }
-                    // Log errors from getLog() if any
-                    result.exceptionOrNull()?.let { error ->
-                        log.error("Failed to load current description", error)
-                    }
+                }.onFailure { error ->
+                    log.error("Failed to load current description", error)
                 }
-            } catch (e: VcsException) {
-                // Tool window should not exist when VCS is not configured
-                log.error("Failed to find Jujutsu VCS in tool window", e)
             }
         }
+    }
+
+    private fun updateWorkingCopyLabel(entry: LogEntry) {
+        // Create HTML for label showing change ID, @ marker, and parents
+        val labelText = buildString {
+            val canvas = StringBuilderHtmlTextCanvas(this)
+
+            append("<html>")
+            canvas.append(entry.changeId)
+
+            // Add parent IDs if present
+            if (entry.parentIds.isNotEmpty()) {
+                append("<br>")
+                append("<font size=-1>")
+                append(JujutsuBundle.message("toolwindow.parents.label"))
+                append(" ")
+                entry.parentIds.forEachIndexed { index, parentId ->
+                    if (index > 0) append(", ")
+                    canvas.append(parentId)
+                }
+                append("</font>")
+            }
+
+            append("</html>")
+        }
+        currentChangeLabel.text = labelText
     }
 
     private fun getWorkingCopyChanges(): List<Change> {
@@ -587,14 +614,22 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val group = DefaultActionGroup()
 
         // Add common VCS actions with keyboard shortcuts displayed
-        val showDiffAction = object : DumbAwareAction(JujutsuBundle.message("action.show.diff")) {
+        val showDiffAction = object : DumbAwareAction(
+            JujutsuBundle.message("action.show.diff"),
+            null,
+            AllIcons.Actions.Diff
+        ) {
             override fun actionPerformed(e: AnActionEvent) {
                 showDiff(selectedChange)
             }
         }
         group.add(showDiffAction)
 
-        val openFileAction = object : DumbAwareAction(JujutsuBundle.message("action.open.file")) {
+        val openFileAction = object : DumbAwareAction(
+            JujutsuBundle.message("action.open.file"),
+            null,
+            AllIcons.Actions.EditSource
+        ) {
             init {
                 // Set keyboard shortcuts - will be displayed in menu
                 shortcutSet = CustomShortcutSet(

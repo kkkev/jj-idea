@@ -10,11 +10,14 @@ import com.intellij.openapi.actionSystem.impl.FieldInplaceActionButtonLook
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.SearchFieldWithExtension
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.JujutsuStateListener
+import `in`.kkkev.jjidea.jj.JujutsuStateModel
 import java.awt.*
 import javax.swing.*
 import javax.swing.event.DocumentEvent
@@ -112,10 +115,31 @@ class JujutsuLogPanel(
             }
         }
 
+        // Subscribe to state changes (MVC pattern)
+        setupStateListener()
+
         // Load initial data
         dataLoader.loadCommits()
 
         log.info("JujutsuLogPanel initialized for root: ${root.path}")
+    }
+
+    private fun setupStateListener() {
+        project.messageBus.connect(this).subscribe(
+            JujutsuStateListener.TOPIC,
+            object : JujutsuStateListener {
+                override fun workingCopyChanged() {
+                    // Minor update, might not need full refresh
+                }
+
+                override fun logUpdated() {
+                    ApplicationManager.getApplication().invokeLater {
+                        val model = JujutsuStateModel.getInstance(project)
+                        refresh(selectWorkingCopy = model.shouldSelectWorkingCopy)
+                    }
+                }
+            }
+        )
     }
 
     /**

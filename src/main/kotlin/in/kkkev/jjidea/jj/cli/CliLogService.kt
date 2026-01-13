@@ -64,9 +64,10 @@ object LogTemplates {
     }
     val author = SignatureFields("author")
     val committer = SignatureFields("committer")
+    val immutable = booleanField("immutable")
 
     val basicLogTemplate = logTemplate(
-        changeId, commitId, description, bookmarks, parents, currentWorkingCopy, conflict, empty
+        changeId, commitId, description, bookmarks, parents, currentWorkingCopy, conflict, empty, immutable
     ) {
         LogEntry(
             changeId.take(it),
@@ -76,7 +77,8 @@ object LogTemplates {
             parents.take(it),
             currentWorkingCopy.take(it),
             conflict.take(it),
-            empty.take(it)
+            empty.take(it),
+            immutable = immutable.take(it)
         )
     }
 

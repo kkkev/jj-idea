@@ -14,6 +14,7 @@ class JujutsuToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val jujutsuPanel = JujutsuToolWindowPanel(project)
+
         val content = ContentFactory.getInstance().createContent(
             jujutsuPanel.getContent(),
             "",
