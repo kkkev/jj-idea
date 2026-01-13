@@ -8,7 +8,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.jujutsuVcs
 
 /**
  * Loads commit log data in the background and updates the table model on EDT.
@@ -22,7 +22,7 @@ class JujutsuLogDataLoader(
     private val tableModel: JujutsuLogTableModel,
     private val table: JujutsuLogTable
 ) {
-    private val log = Logger.getInstance(JujutsuLogDataLoader::class.java)
+    private val log = Logger.getInstance(javaClass)
     private val graphBuilder = CommitGraphBuilder()
 
     /**
@@ -41,11 +41,8 @@ class JujutsuLogDataLoader(
                 indicator.isIndeterminate = false
 
                 try {
-                    // Get VCS instance for this root
-                    val vcs = JujutsuVcs.findRequired(root)
-
                     // Load log entries using our existing LogService
-                    val result = vcs.logService.getLog(revset)
+                    val result = root.jujutsuVcs.logService.getLog(revset)
 
                     result.onSuccess { loadedEntries ->
                         entries = loadedEntries

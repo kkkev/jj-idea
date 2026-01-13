@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 class CliExecutor(private val root: VirtualFile, private val jjExecutable: String = "jj") :
     CommandExecutor {
 
-    private val log = Logger.getInstance(CliExecutor::class.java)
+    private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
 
     override fun status() = execute(root, listOf("status"))
@@ -63,6 +63,9 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         }
         return execute(root, args)
     }
+
+    override fun abandon(revision: Revision): CommandExecutor.CommandResult =
+        execute(root, listOf("abandon", "-r", revision))
 
     override fun log(revset: Revset, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
         val args = mutableListOf("log", "-r", revset, "--no-graph")

@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
-import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.log.Hash
@@ -14,6 +13,7 @@ import com.intellij.vcs.log.VcsLogFilterCollection
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.jujutsuVcs
 
 /**
  * Modern file history handler for VCS Log integration.
@@ -44,7 +44,7 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
         commitCount: Int,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        val vcs = JujutsuVcs.findRequired(root)
+        val vcs = root.jujutsuVcs
 
         val relativePath = vcs.getRelativePath(filePath)
 
@@ -76,7 +76,7 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
         filters: VcsLogFilterCollection,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        val vcs = JujutsuVcs.findRequired(root)
+        val vcs = root.jujutsuVcs
 
         val relativePath = vcs.getRelativePath(filePath)
 

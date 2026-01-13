@@ -7,6 +7,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.log.VcsFullCommitDetails
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.jujutsuVcs
 
 /**
  * Full commit details for a Jujutsu commit including file changes.
@@ -36,10 +37,10 @@ class JujutsuFullCommitDetails(
         }
 
         private fun loadChanges(entry: LogEntry, root: VirtualFile): Collection<Change> {
-            val vcs = JujutsuVcs.findRequired(root)
+            val vcs = root.jujutsuVcs
 
             // First, detect renames using git-format diff
-            val renames = detectRenames(entry, root, vcs)
+            val renames = detectRenames(entry, vcs)
             val renamedPaths = renames.flatMap { (oldPath, newPath) ->
                 listOf(oldPath, newPath)
             }.toSet()
@@ -69,7 +70,7 @@ class JujutsuFullCommitDetails(
          * Detect file renames using git-format diff.
          * Returns a list of (oldPath, newPath) pairs.
          */
-        private fun detectRenames(entry: LogEntry, root: VirtualFile, vcs: JujutsuVcs): List<Pair<String, String>> {
+        private fun detectRenames(entry: LogEntry, vcs: JujutsuVcs): List<Pair<String, String>> {
             val result = vcs.commandExecutor.diffGit(entry.changeId)
 
             if (!result.isSuccess) {

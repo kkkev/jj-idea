@@ -3,12 +3,13 @@ package `in`.kkkev.jjidea.vcs
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectLocator
 import com.intellij.openapi.ui.Messages.showErrorDialog
-import com.intellij.openapi.vcs.*
+import com.intellij.openapi.vcs.AbstractVcs
+import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.VcsException
+import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -35,8 +36,6 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
  * Main VCS implementation for Jujutsu
  */
 class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
-    private val log = Logger.getInstance(JujutsuVcs::class.java)
-
     val commandExecutor: CommandExecutor by lazy {
         val settings = JujutsuSettings.getInstance(myProject)
         CliExecutor(root, settings.state.jjExecutablePath)
@@ -125,45 +124,11 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     companion object {
         const val VCS_NAME = "Jujutsu"
 
+        private val log = Logger.getInstance(JujutsuVcs::class.java)
+
         private val KEY = createKey(VCS_NAME)
 
         fun getKey(): VcsKey = KEY
-
-        /**
-         * Find JujutsuVcs for a project. Returns null if not found.
-         * Use when VCS might not be available (e.g., general actions that could run in any context).
-         */
-        fun find(project: Project?) = project?.let { project ->
-            ProjectLevelVcsManager.getInstance(project)
-                .getVcsFor(
-                    project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
-                ) as? JujutsuVcs
-        }
-
-        /**
-         * Find JujutsuVcs for a virtual file root. Returns null if not found.
-         * Use when VCS might not be available.
-         */
-        fun find(root: VirtualFile) = ProjectLocator.getInstance()
-            .guessProjectForFile(root)
-            ?.let(ProjectLevelVcsManager::getInstance)
-            ?.getVcsFor(root) as? JujutsuVcs
-
-        /**
-         * Find JujutsuVcs for a project, throwing if not found.
-         * Use when VCS MUST be available (e.g., within Jujutsu-specific tool windows or providers).
-         * @throws VcsException if Jujutsu VCS is not configured for this project
-         */
-        fun findRequired(project: Project) = find(project)
-            ?: throw VcsException("Jujutsu VCS not available for project ${project.name}")
-
-        /**
-         * Find JujutsuVcs for a virtual file root, throwing if not found.
-         * Use when VCS MUST be available (e.g., within VCS providers).
-         * @throws VcsException if Jujutsu VCS is not configured for this root
-         */
-        fun findRequired(root: VirtualFile) = find(root)
-            ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", root.path))
 
         /**
          * Get VCS with user-friendly error handling.
@@ -178,12 +143,11 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
          *
          * @param project The project to find VCS for
          * @param actionName Name of the action for logging (e.g., "New Change", "Compare with Branch")
-         * @param logger Logger instance for this action
          * @return JujutsuVcs instance or null if not found
          */
-        fun getVcsWithUserErrorHandling(project: Project, actionName: String, logger: Logger) =
-            find(project) ?: run {
-                logger.info("User attempted '$actionName' in non-Jujutsu project: ${project.name}")
+        fun getVcsWithUserErrorHandling(project: Project, actionName: String) =
+            project.possibleJujutsuVcs ?: run {
+                log.info("User attempted '$actionName' in non-Jujutsu project: ${project.name}")
                 ApplicationManager.getApplication().invokeLater {
                     showErrorDialog(
                         project,

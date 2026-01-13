@@ -14,7 +14,7 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
  * Provides change information for jujutsu working copy
  */
 class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
-    private val log = Logger.getInstance(JujutsuChangeProvider::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     override fun getChanges(
         dirtyScope: VcsDirtyScope,

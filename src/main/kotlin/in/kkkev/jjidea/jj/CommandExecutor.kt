@@ -73,6 +73,13 @@ interface CommandExecutor {
     fun new(message: String? = null, parentRevision: Revision? = null): CommandResult
 
     /**
+     * Abandon a change (remove it from the log)
+     * @param revision The revision to abandon
+     * @return Command result
+     */
+    fun abandon(revision: Revision): CommandResult
+
+    /**
      * Get the log for specific revset
      * @param revset Revisions to show (e.g., "@", "@-")
      * @param template Template for output (e.g., "description", "change_id")

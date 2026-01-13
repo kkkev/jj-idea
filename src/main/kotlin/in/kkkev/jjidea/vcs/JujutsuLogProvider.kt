@@ -1,28 +1,32 @@
 package `in`.kkkev.jjidea.vcs
 
+import com.intellij.diff.DiffContentFactory
+import com.intellij.diff.DiffManager
+import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.Consumer
 import com.intellij.vcs.log.*
 import com.intellij.vcs.log.VcsLogProperties.VcsLogProperty
 import com.intellij.vcs.log.graph.PermanentGraph
 import com.intellij.vcs.log.impl.VcsRefImpl
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 
 /**
  * Provides repository-wide log for Jujutsu VCS
  */
 class JujutsuLogProvider : VcsLogProvider {
-
-    private val log = Logger.getInstance(JujutsuLogProvider::class.java)
+    private val log = Logger.getInstance(javaClass)
     private val refManager = JujutsuLogRefManager()
 
     init {
@@ -36,10 +40,8 @@ class JujutsuLogProvider : VcsLogProvider {
     ): VcsLogProvider.DetailedLogData {
         log.debug("Reading first block of commits for root: ${root.path}")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
-
         // Use logService to get log entries
-        val result = vcsInstance.logService.getLog(Expression.ALL)
+        val result = root.jujutsuVcs.logService.getLog(Expression.ALL)
 
         val entries = result.getOrElse {
             throw VcsException("Failed to read commits: ${it.message}")
@@ -78,10 +80,8 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun readAllHashes(root: VirtualFile, consumer: Consumer<in TimedVcsCommit>): VcsLogProvider.LogData {
         log.debug("Reading all commit hashes for root: ${root.path}")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
-
         // Use logService to get commit graph
-        val result = vcsInstance.logService.getCommitGraph(Expression.ALL)
+        val result = root.jujutsuVcs.logService.getCommitGraph(Expression.ALL)
 
         result.getOrElse {
             log.error("Failed to read commit hashes: ${it.message}")
@@ -104,7 +104,7 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun readFullDetails(root: VirtualFile, hashes: List<String>, consumer: Consumer<in VcsFullCommitDetails>) {
         log.debug("Reading full details for ${hashes.size} commits")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
+        val vcsInstance = root.jujutsuVcs
 
         hashes.forEach { hexHash ->
             try {
@@ -149,10 +149,8 @@ class JujutsuLogProvider : VcsLogProvider {
     private fun readAllRefsInternal(root: VirtualFile): Set<VcsRef> {
         log.debug("Reading all refs for root: ${root.path}")
 
-        val vcsInstance = JujutsuVcs.findRequired(root)
-
         // Use logService to get refs
-        val result = vcsInstance.logService.getRefs()
+        val result = root.jujutsuVcs.logService.getRefs()
 
         val refs = result.getOrElse {
             log.error("Failed to read refs: ${it.message}")
@@ -230,11 +228,11 @@ class JujutsuLogProvider : VcsLogProvider {
 }
 
 /**
- * Basic diff handler for Jujutsu VCS Log.
- * Currently minimal implementation just to enable modern file history UI.
- * TODO: Implement full diff functionality for comparing commits from log
+ * Diff handler for Jujutsu VCS Log.
+ * Enables comparing revisions from the VCS Log view.
  */
 private object JujutsuLogDiffHandler : VcsLogDiffHandler {
+    private val log = Logger.getInstance(javaClass)
 
     override fun showDiff(
         root: VirtualFile,
@@ -243,7 +241,51 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         rightPath: FilePath?,
         rightHash: Hash
     ) {
-        // TODO: Implement diff between two revisions
+        val path = rightPath ?: leftPath ?: return
+        val fileName = path.name
+
+        // Find project for this root
+        val project = root.jujutsuProject
+
+        // Load content in background thread to avoid EDT blocking
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val vcs = root.jujutsuVcs
+                val leftChangeId = ChangeId.fromHexString(leftHash.asString())
+                val rightChangeId = ChangeId.fromHexString(rightHash.asString())
+
+                // Get relative path for jj commands
+                val relPath = vcs.getRelativePath(path)
+
+                // Load content for both revisions
+                val leftResult = vcs.commandExecutor.show(relPath, leftChangeId)
+                val rightResult = vcs.commandExecutor.show(relPath, rightChangeId)
+
+                val leftContent = if (leftResult.isSuccess) leftResult.stdout else ""
+                val rightContent = if (rightResult.isSuccess) rightResult.stdout else ""
+
+                // Show diff on EDT
+                ApplicationManager.getApplication().invokeLater {
+                    val contentFactory = DiffContentFactory.getInstance()
+                    val diffManager = DiffManager.getInstance()
+
+                    val content1 = contentFactory.create(project, leftContent)
+                    val content2 = contentFactory.create(project, rightContent)
+
+                    val diffRequest = SimpleDiffRequest(
+                        fileName,
+                        content1,
+                        content2,
+                        leftChangeId.short,
+                        rightChangeId.short
+                    )
+
+                    diffManager.showDiff(project, diffRequest)
+                }
+            } catch (e: Exception) {
+                log.error("Failed to show diff for ${path.path}", e)
+            }
+        }
     }
 
     override fun showDiffWithLocal(
@@ -252,7 +294,54 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         hash: Hash,
         localPath: FilePath
     ) {
-        // TODO: Implement diff with local version
+        val path = revisionPath ?: localPath
+        val fileName = path.name
+
+        // Find project for this root
+        val project = root.jujutsuProject
+
+        // Load content in background thread to avoid EDT blocking
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val vcs = root.jujutsuVcs
+                val changeId = ChangeId.fromHexString(hash.asString())
+
+                // Get relative path for jj commands
+                val relPath = vcs.getRelativePath(path)
+
+                // Load revision content
+                val revisionResult = vcs.commandExecutor.show(relPath, changeId)
+                val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
+
+                // Show diff on EDT
+                ApplicationManager.getApplication().invokeLater {
+                    val contentFactory = DiffContentFactory.getInstance()
+                    val diffManager = DiffManager.getInstance()
+
+                    val content1 = contentFactory.create(project, revisionContent)
+
+                    // Use VirtualFile for local file to allow editing
+                    val localFile = LocalFileSystem.getInstance().findFileByPath(localPath.path)
+                    val content2 = if (localFile != null && localFile.exists()) {
+                        contentFactory.create(project, localFile)
+                    } else {
+                        contentFactory.createEmpty()
+                    }
+
+                    val diffRequest = SimpleDiffRequest(
+                        fileName,
+                        content1,
+                        content2,
+                        changeId.short,
+                        JujutsuBundle.message("diff.label.local")
+                    )
+
+                    diffManager.showDiff(project, diffRequest)
+                }
+            } catch (e: Exception) {
+                log.error("Failed to show diff with local for ${path.path}", e)
+            }
+        }
     }
 
     override fun showDiffForPaths(
@@ -261,7 +350,22 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         leftRevision: Hash,
         rightRevision: Hash?
     ) {
-        // TODO: Implement diff for multiple paths
+        // If no paths specified, nothing to do
+        if (affectedPaths.isNullOrEmpty()) return
+
+        // If right revision is null, compare with working copy
+        if (rightRevision == null) {
+            // Show diff with local for each path
+            affectedPaths.forEach { path ->
+                showDiffWithLocal(root, path, leftRevision, path)
+            }
+            return
+        }
+
+        // Show diff between two revisions for each path
+        affectedPaths.forEach { path ->
+            showDiff(root, path, leftRevision, path, rightRevision)
+        }
     }
 
     override fun createContentRevision(filePath: FilePath, hash: Hash): ContentRevision {
@@ -272,10 +376,8 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         // This is done in a read action to avoid EDT violations
         val vcs = ReadAction.compute<JujutsuVcs?, RuntimeException> {
             ProjectManager.getInstance().openProjects.firstNotNullOfOrNull { project ->
-                val vcsManager = ProjectLevelVcsManager.getInstance(project)
-                // Check if this project has Jujutsu VCS and if it manages this file path
-                vcsManager.allVcsRoots
-                    .firstOrNull { it.vcs is JujutsuVcs && filePath.path.startsWith(it.path.path) }
+                project.jujutsuRoots
+                    .firstOrNull { filePath.path.startsWith(it.path.path) }
                     ?.vcs as? JujutsuVcs
             }
         } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${filePath.path}")

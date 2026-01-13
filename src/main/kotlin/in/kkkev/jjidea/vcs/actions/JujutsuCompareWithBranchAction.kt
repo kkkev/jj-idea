@@ -10,10 +10,12 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.isJujutsu
 
 /**
  * Action to compare current file with a bookmark, change, or revision
@@ -23,7 +25,7 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
     JujutsuBundle.message("action.compare.branch.description"),
     null
 ) {
-    private val log = Logger.getInstance(JujutsuCompareWithBranchAction::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
@@ -33,23 +35,23 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
 
         // Get VCS on background thread to avoid slow operations on EDT
         ApplicationManager.getApplication().executeOnPooledThread {
-            JujutsuVcs.getVcsWithUserErrorHandling(project, "Compare with Branch", log)
+            JujutsuVcs.getVcsWithUserErrorHandling(project, "Compare with Branch")
                 ?.let { vcs ->
-                ApplicationManager.getApplication().invokeLater {
-                    JujutsuCompareWithPopup.show(project, vcs) { chosen ->
-                        showDiffWithRevision(project, file, RevisionExpression(chosen), vcs)
+                    ApplicationManager.getApplication().invokeLater {
+                        JujutsuCompareWithPopup.show(project, vcs) { chosen ->
+                            showDiffWithRevision(project, file, RevisionExpression(chosen), vcs)
+                        }
                     }
                 }
-            }
         }
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = (e.project != null) && (e.file != null) && (e.vcs != null)
+        e.presentation.isEnabledAndVisible = (e.project?.isJujutsu ?: false) && (e.file != null)
     }
 
     private fun showDiffWithRevision(project: Project, file: VirtualFile, revision: Revision, vcs: JujutsuVcs) {
-        val filePath = vcs.getRelativePath(com.intellij.vcsUtil.VcsUtil.getFilePath(file))
+        val filePath = vcs.getRelativePath(VcsUtil.getFilePath(file))
 
         // Load content in background to avoid EDT blocking
         ApplicationManager.getApplication().executeOnPooledThread {

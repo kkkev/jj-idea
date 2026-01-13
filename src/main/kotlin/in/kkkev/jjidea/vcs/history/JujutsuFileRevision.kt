@@ -22,7 +22,7 @@ class JujutsuFileRevision(
     private val vcs: JujutsuVcs
 ) : VcsFileRevisionEx() {
 
-    private val log = Logger.getInstance(JujutsuFileRevision::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     /**
      * Lazy-loaded file status. Determines if this file was deleted in this revision.

@@ -7,7 +7,6 @@ import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspect
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspectAdapter
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.util.text.DateFormatUtil
 import com.intellij.vcs.log.impl.VcsLogNavigationUtil.jumpToRevisionAsync
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -27,8 +26,7 @@ class JujutsuFileAnnotation(
     private val annotationLines: List<AnnotationLine>,
     private val vcsKey: VcsKey
 ) : FileAnnotation(project) {
-
-    private val log = Logger.getInstance(JujutsuFileAnnotation::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     override fun getFile() = file
 

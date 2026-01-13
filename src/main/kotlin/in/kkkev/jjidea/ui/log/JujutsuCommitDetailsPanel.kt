@@ -3,9 +3,11 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -17,7 +19,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
-import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -25,7 +26,6 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.*
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import javax.swing.JEditorPane
 import javax.swing.JPanel
@@ -44,7 +44,7 @@ class JujutsuCommitDetailsPanel(
     private val root: VirtualFile
 ) : JPanel(BorderLayout()), Disposable {
 
-    private val log = Logger.getInstance(JujutsuCommitDetailsPanel::class.java)
+    private val log = Logger.getInstance(javaClass)
 
     private val metadataPanel = JPanel(BorderLayout())
     private val changesPanel = JPanel(BorderLayout())
