@@ -51,9 +51,6 @@ object JujutsuLogContextMenuActions {
 
         // Can abandon any change including working copy
         add(AbandonChangeAction(project, entry))
-
-        addSeparator()
-        add(ShowChangesAction(project, entry))
     }
 
     /**
@@ -310,30 +307,6 @@ object JujutsuLogContextMenuActions {
                     }
                 }
             }
-        }
-    }
-
-    /**
-     * Show changes in this commit.
-     * Displays what files were changed in this commit.
-     */
-    private class ShowChangesAction(
-        private val project: Project,
-        private val entry: LogEntry
-    ) : DumbAwareAction(
-        JujutsuBundle.message("log.action.show.changes"),
-        JujutsuBundle.message("log.action.show.changes.tooltip"),
-        AllIcons.Actions.Show
-    ) {
-        override fun actionPerformed(e: AnActionEvent) {
-            // TODO: Implement showing changes for this commit
-            // This will be implemented in jj-idea-4fv (VcsLogDiffHandler)
-            Messages.showInfoMessage(
-                project,
-                "Show changes for ${entry.changeId.short} - Coming soon!",
-                "Not Implemented"
-            )
-            log.info("Show changes requested for ${entry.changeId}")
         }
     }
 
