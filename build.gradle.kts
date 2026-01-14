@@ -92,4 +92,6 @@ tasks.register<Test>("simpleTest") {
     exclude("**/cli/AnnotationParserTest*.class") // Uses ChangeId which references Hash type
     exclude("**/cli/LogTemplateTest*.class") // Uses VcsUser and ChangeId with Hash type
     exclude("**/JujutsuDateTimeFormatterTest*.class") // DateTimeFormatter uses DateFormatUtil
+    exclude("**/DescriptionRenderingStyleTest*.class") // Uses SimpleTextAttributes and JBColor
+    exclude("**/JujutsuLogTableModelFilterTest*.class") // Uses VcsUser and log model classes
 }

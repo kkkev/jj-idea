@@ -123,7 +123,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val mainPanel = JPanel(BorderLayout())
 
         // Working copy toolbar at the very top
-        val workingCopyToolbar = createWorkingCopyToolbar()
+        val workingCopyToolbar = createWorkingCopyToolbar(mainPanel)
         mainPanel.add(workingCopyToolbar.component, BorderLayout.NORTH)
 
         // Middle section: Current change info and description
@@ -187,7 +187,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         panel.add(changesPanel, BorderLayout.CENTER)
     }
 
-    private fun createWorkingCopyToolbar(): ActionToolbar {
+    private fun createWorkingCopyToolbar(owner: JComponent): ActionToolbar {
         val group = DefaultActionGroup()
 
         // New Change action - primary workflow operation
@@ -207,7 +207,9 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             "JujutsuWorkingCopyToolbar",
             group,
             true
-        )
+        ).apply {
+            targetComponent = owner
+        }
     }
 
     private fun createDescribeButton(): JButton {
