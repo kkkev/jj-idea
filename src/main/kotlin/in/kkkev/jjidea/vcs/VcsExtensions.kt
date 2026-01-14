@@ -5,9 +5,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectLocator
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vcs.ProjectLevelVcsManager.getInstance
 import com.intellij.openapi.vcs.VcsException
-import com.intellij.openapi.vfs.LocalFileSystem.getInstance
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import org.jetbrains.annotations.NonNls
@@ -18,9 +17,11 @@ import org.jetbrains.annotations.SystemIndependent
  * Use when VCS might not be available (e.g., general actions that could run in any context).
  */
 val Project.possibleJujutsuVcs
-    get() = getInstance(this)
+    get() = ProjectLevelVcsManager.getInstance(this)
         .getVcsFor(
-            this.basePath?.let<@SystemIndependent @NonNls String, VirtualFile?> { getInstance().findFileByPath(it) }
+            this.basePath?.let<@SystemIndependent @NonNls String, VirtualFile?> {
+                LocalFileSystem.getInstance().findFileByPath(it)
+            }
         ) as? JujutsuVcs
 
 /**
@@ -34,7 +35,7 @@ val Project.jujutsuVcs
 
 val Project.isJujutsu get() = this.possibleJujutsuVcs != null
 
-val Project.jujutsuRoots get() = getInstance(this).allVcsRoots.filter { it.vcs is JujutsuVcs }
+val Project.jujutsuRoots get() = ProjectLevelVcsManager.getInstance(this).allVcsRoots.filter { it.vcs is JujutsuVcs }
 
 /**
  * Find JujutsuVcs for a virtual file root. Returns null if not found.

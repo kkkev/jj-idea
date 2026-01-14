@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -54,6 +55,12 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
  * Matches the logic from JujutsuStatusColumn in VcsLogCustomColumns.
  */
 class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
+    companion object {
+        private const val CONFLICT_TOOLTIP = "Conflict - This change has unresolved merge conflicts"
+        private const val EMPTY_TOOLTIP = "Empty - This change has no file modifications"
+        private const val IMMUTABLE_TOOLTIP = "Immutable - This change cannot be modified (protected)"
+    }
+
     override fun render(value: LogEntry) {
         val hasMultipleIndicators = listOf(value.hasConflict, value.isEmpty, value.immutable).count { it } > 1
 
@@ -64,8 +71,12 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
             SimpleTextAttributes.GRAYED_ATTRIBUTES
         }
 
+        // Build tooltip parts
+        val tooltipParts = mutableListOf<String>()
+
         // Show conflict icon/text
         if (value.hasConflict) {
+            tooltipParts.add(CONFLICT_TOOLTIP)
             if (hasMultipleIndicators) {
                 append("Conflict", textAttributes)
                 append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
@@ -76,6 +87,7 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
 
         // Show empty indicator - always use text for clarity
         if (value.isEmpty) {
+            tooltipParts.add(EMPTY_TOOLTIP)
             append("Empty", textAttributes)
             if (value.immutable) {
                 append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
@@ -84,11 +96,19 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
 
         // Show immutable icon/text
         if (value.immutable) {
+            tooltipParts.add(IMMUTABLE_TOOLTIP)
             if (hasMultipleIndicators) {
                 append("Immutable", textAttributes)
             } else {
                 icon = AllIcons.Nodes.Locked
             }
+        }
+
+        // Set tooltip if any indicators present, clear if none
+        toolTipText = if (tooltipParts.isNotEmpty()) {
+            "<html>${tooltipParts.joinToString("<br>")}</html>"
+        } else {
+            null
         }
     }
 }
@@ -201,7 +221,8 @@ class SeparateDescriptionCellRenderer(
 ) : JPanel(), TableCellRenderer {
 
     companion object {
-        private const val HORIZONTAL_PADDING = 4
+        // HiDPI-aware padding using JBValue for proper scaling
+        private val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Description.horizontalPadding", 4)
     }
 
     private var entry: LogEntry? = null
@@ -260,12 +281,13 @@ class SeparateDescriptionCellRenderer(
 
         val centerY = height / 2
         val baseFontMetrics = g2d.fontMetrics
+        val horizontalPadding = HORIZONTAL_PADDING.get()
 
         // Calculate decorations width
-        val decorationsWidth = calculateDecorationsWidth(g2d, entry)
+        val decorationsWidth = calculateDecorationsWidth(g2d, entry, horizontalPadding)
 
         // Calculate available width for description
-        val maxDescriptionWidth = width - (HORIZONTAL_PADDING * 2) - decorationsWidth
+        val maxDescriptionWidth = width - (horizontalPadding * 2) - decorationsWidth
 
         // Draw description
         val fontStyle = DescriptionRenderingStyle.getFontStyle(entry)
@@ -297,7 +319,7 @@ class SeparateDescriptionCellRenderer(
         // Truncate text if it doesn't fit
         val displayText = truncateText(text, fontMetrics, availableWidthForDescription)
 
-        var x = HORIZONTAL_PADDING
+        var x = horizontalPadding
         if (displayText.isNotEmpty()) {
             g2d.drawString(displayText, x, centerY + fontMetrics.ascent / 2)
             x += fontMetrics.stringWidth(displayText)
@@ -315,7 +337,7 @@ class SeparateDescriptionCellRenderer(
         g2d.font = baseFontMetrics.font
 
         // Draw decorations on the right
-        drawDecorations(g2d, entry, width - HORIZONTAL_PADDING)
+        drawDecorations(g2d, entry, width - horizontalPadding, horizontalPadding)
     }
 
     private fun truncateText(text: String, fontMetrics: FontMetrics, availableWidth: Int): String {
@@ -329,7 +351,7 @@ class SeparateDescriptionCellRenderer(
         return if (truncated.isEmpty()) "" else truncated + "..."
     }
 
-    private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry): Int {
+    private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry, horizontalPadding: Int): Int {
         if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return 0
 
         val fontMetrics = g2d.fontMetrics
@@ -346,13 +368,14 @@ class SeparateDescriptionCellRenderer(
         // Calculate @ symbol width
         if (entry.isWorkingCopy) {
             width += boldFontMetrics.stringWidth("@")
-            width += HORIZONTAL_PADDING
+            width += horizontalPadding
         }
 
         return width
     }
 
-    private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int) {
+    @Suppress("UNUSED_PARAMETER")
+    private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int, horizontalPadding: Int) {
         if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return
 
         val centerY = height / 2

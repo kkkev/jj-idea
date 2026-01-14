@@ -34,9 +34,15 @@ abstract class JujutsuFilterComponent(
 ) : JBPanel<JujutsuFilterComponent>(null) {
 
     companion object {
-        private const val GAP_BEFORE_ARROW = 3
-        private const val BORDER_SIZE = 2
-        private const val ARC_SIZE = 10
+        // Base values that will be scaled via JBUI.scale() for HiDPI support
+        private const val GAP_BEFORE_ARROW_BASE = 3
+        private const val BORDER_SIZE_BASE = 2
+        private const val ARC_SIZE_BASE = 10
+
+        // Use these scaled values in the UI
+        private fun gapBeforeArrow() = JBUI.scale(GAP_BEFORE_ARROW_BASE)
+        private fun borderSize() = BORDER_SIZE_BASE  // Border size handled by JBUI.insets()
+        private fun arcSize() = ARC_SIZE_BASE  // Arc size handled in paintBorder
     }
 
     private lateinit var nameLabel: JBLabel
@@ -70,7 +76,7 @@ abstract class JujutsuFilterComponent(
         // Add components
         add(nameLabel)
         add(valueLabel)
-        add(Box.createHorizontalStrut(GAP_BEFORE_ARROW))
+        add(Box.createHorizontalStrut(gapBeforeArrow()))
         add(filterButton)
 
         // Setup filter button action
@@ -192,10 +198,10 @@ abstract class JujutsuFilterComponent(
     )
 
     private fun createFocusedBorder(): Border =
-        FilledRoundedBorder(UIUtil.getFocusedBorderColor(), ARC_SIZE, BORDER_SIZE, false)
+        FilledRoundedBorder(UIUtil.getFocusedBorderColor(), arcSize(), borderSize(), false)
 
     private fun createUnfocusedBorder(): Border =
-        JBUI.Borders.empty(BORDER_SIZE)
+        JBUI.Borders.empty(borderSize())
 
     private fun wrapBorder(outerBorder: Border): Border =
         BorderFactory.createCompoundBorder(outerBorder, JBUI.Borders.empty(2))

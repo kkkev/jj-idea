@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
+import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.isJujutsu
 
 /**
@@ -23,5 +24,7 @@ class JujutsuToolWindowFactory : ToolWindowFactory, DumbAware {
         toolWindow.contentManager.addContent(content)
     }
 
-    override fun shouldBeAvailable(project: Project) = project.isJujutsu
+    // NOTE: Ideally this would use project.isJujutsu but that doesn't work at startup when tool window availability is
+    // evaluated
+    override fun shouldBeAvailable(project: Project) = JujutsuRootChecker.findJujutsuRoot(project.basePath) != null
 }

@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.ui.JBColor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import java.awt.Color
@@ -47,15 +48,16 @@ interface GraphableEntry {
  */
 class CommitGraphBuilder {
 
-    private val colors = listOf(
-        Color(0x4285F4), // Blue
-        Color(0xEA4335), // Red
-        Color(0xFBBC04), // Yellow
-        Color(0x34A853), // Green
-        Color(0xFF6D00), // Orange
-        Color(0x9C27B0), // Purple
-        Color(0x00ACC1), // Cyan
-        Color(0x7CB342), // Light green
+    // Graph colors with light/dark theme variants for good contrast
+    private val colors: List<Color> = listOf(
+        JBColor(0x4285F4, 0x6AA1FF), // Blue
+        JBColor(0xEA4335, 0xFF6B5E), // Red
+        JBColor(0xC99700, 0xE0B800), // Yellow (darker for light theme visibility)
+        JBColor(0x34A853, 0x5DCD73), // Green
+        JBColor(0xFF6D00, 0xFF8A3D), // Orange
+        JBColor(0x9C27B0, 0xC25ED0), // Purple
+        JBColor(0x00ACC1, 0x4DD0E1), // Cyan
+        JBColor(0x689F38, 0x8BC34A), // Light green (darker for light theme)
     )
 
     /**
