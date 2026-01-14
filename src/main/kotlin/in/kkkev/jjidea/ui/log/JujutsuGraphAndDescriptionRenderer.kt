@@ -307,13 +307,18 @@ class JujutsuGraphAndDescriptionRenderer(
 
         private fun drawDescription(g2d: Graphics2D, entry: LogEntry, startX: Int, maxX: Int): Int {
             val centerY = height / 2
+            val baseFontMetrics = g2d.fontMetrics
+
+            // Use shared style logic for font and color
+            val fontStyle = DescriptionRenderingStyle.getFontStyle(entry)
+            g2d.font = baseFontMetrics.font.deriveFont(fontStyle)
             val fontMetrics = g2d.fontMetrics
 
             // Calculate width needed for "(empty)" indicator if applicable
             val emptyText = " (empty)"
             val emptyIndicatorWidth = if (entry.isEmpty) {
-                val italicFont = fontMetrics.font.deriveFont(Font.ITALIC)
-                g2d.getFontMetrics(italicFont).stringWidth(emptyText)
+                val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
+                g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
             } else {
                 0
             }
@@ -321,28 +326,18 @@ class JujutsuGraphAndDescriptionRenderer(
             // Reduce available width for description to reserve space for "(empty)"
             val availableWidthForDescription = maxX - startX - emptyIndicatorWidth
 
-            // Use italic for empty descriptions
-            if (entry.description.empty) {
-                val italicFont = fontMetrics.font.deriveFont(Font.ITALIC)
-                g2d.font = italicFont
-                g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
-            } else {
-                g2d.color = if (isSelected) table.selectionForeground else table.foreground
-            }
+            // Set color using shared logic
+            g2d.color = DescriptionRenderingStyle.getTextColor(
+                entry.description,
+                isSelected,
+                table.selectionForeground,
+                table.foreground
+            )
 
             val text = entry.description.summary
 
-            // Truncate text if it doesn't fit (using reduced available width)
-            val displayText = if (fontMetrics.stringWidth(text) > availableWidthForDescription) {
-                // Binary search for the right length
-                var truncated = text
-                while (truncated.isNotEmpty() && fontMetrics.stringWidth(truncated + "...") > availableWidthForDescription) {
-                    truncated = truncated.dropLast(1)
-                }
-                if (truncated.isEmpty()) "" else truncated + "..."
-            } else {
-                text
-            }
+            // Truncate text if it doesn't fit
+            val displayText = truncateText(text, fontMetrics, availableWidthForDescription)
 
             var x = startX
             if (displayText.isNotEmpty()) {
@@ -350,23 +345,30 @@ class JujutsuGraphAndDescriptionRenderer(
                 x += fontMetrics.stringWidth(displayText)
             }
 
-            // Reset font if it was changed for empty description
-            if (entry.description.empty) {
-                g2d.font = fontMetrics.font
+            // Draw "(empty)" indicator if entry is empty
+            if (entry.isEmpty) {
+                val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
+                g2d.font = baseFontMetrics.font.deriveFont(emptyStyle)
+                g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
+                g2d.drawString(emptyText, x, centerY + g2d.fontMetrics.ascent / 2)
+                x += g2d.fontMetrics.stringWidth(emptyText)
             }
 
-            // Draw "(empty)" indicator if entry is empty (now guaranteed to have space)
-            if (entry.isEmpty) {
-                val emptyFont = fontMetrics.font.deriveFont(Font.ITALIC)
-                g2d.font = emptyFont
-                g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
-                g2d.drawString(emptyText, x, centerY + fontMetrics.ascent / 2)
-                x += g2d.fontMetrics.stringWidth(emptyText)
-                // Reset font
-                g2d.font = fontMetrics.font
-            }
+            // Reset font
+            g2d.font = baseFontMetrics.font
 
             return x
+        }
+
+        private fun truncateText(text: String, fontMetrics: java.awt.FontMetrics, availableWidth: Int): String {
+            if (fontMetrics.stringWidth(text) <= availableWidth) return text
+
+            // Binary search for the right length
+            var truncated = text
+            while (truncated.isNotEmpty() && fontMetrics.stringWidth(truncated + "...") > availableWidth) {
+                truncated = truncated.dropLast(1)
+            }
+            return if (truncated.isEmpty()) "" else truncated + "..."
         }
 
         private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry): Int {
@@ -377,12 +379,10 @@ class JujutsuGraphAndDescriptionRenderer(
             val boldFontMetrics = g2d.getFontMetrics(boldFont)
             var width = 0
 
-            // Calculate bookmark widths
-            for (bookmark in entry.bookmarks) {
-                width += boldFontMetrics.stringWidth(bookmark.name)
-                width += HORIZONTAL_PADDING
-                width += AllIcons.Vcs.Branch.iconWidth
-                width += HORIZONTAL_PADDING * 2
+            // Calculate bookmark widths using platform-style painter
+            if (entry.bookmarks.isNotEmpty()) {
+                val painter = JujutsuLabelPainter(this, compact = false)
+                width += painter.calculateWidth(entry.bookmarks, fontMetrics)
             }
 
             // Calculate @ symbol width
@@ -403,21 +403,27 @@ class JujutsuGraphAndDescriptionRenderer(
 
             var x = rightX
 
-            // Draw bookmarks from right to left (icon first, then text)
-            for (bookmark in entry.bookmarks.reversed()) {
-                // Draw bookmark name
-                g2d.font = boldFont
-                g2d.color = if (isSelected) table.selectionForeground else JujutsuColors.BOOKMARK
-                val nameWidth = fontMetrics.stringWidth(bookmark.name)
-                x -= nameWidth
-                g2d.drawString(bookmark.name, x, centerY + fontMetrics.ascent / 2)
-                x -= HORIZONTAL_PADDING
+            // Draw bookmarks using platform-style painter
+            if (entry.bookmarks.isNotEmpty()) {
+                val painter = JujutsuLabelPainter(this, compact = false)
+                val background = when {
+                    isSelected -> table.selectionBackground
+                    isHovered -> UIUtil.getListBackground(true, false)
+                    else -> table.background
+                }
+                // Use grey text color (icon is orange, text is grey)
+                val foreground = if (isSelected) table.selectionForeground else JBColor.GRAY
 
-                // Draw bookmark icon to the left of the text
-                val icon = AllIcons.Vcs.Branch
-                x -= icon.iconWidth
-                icon.paintIcon(this, g2d, x, centerY - icon.iconHeight / 2)
-                x -= HORIZONTAL_PADDING * 2
+                x = painter.paintRightAligned(
+                    g2d,
+                    x,
+                    0,
+                    height,
+                    entry.bookmarks,
+                    background,
+                    foreground,
+                    isSelected
+                )
             }
 
             // Draw @ symbol for working copy

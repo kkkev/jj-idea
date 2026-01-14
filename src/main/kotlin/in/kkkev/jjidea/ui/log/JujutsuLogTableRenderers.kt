@@ -7,11 +7,16 @@ import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.*
+import `in`.kkkev.jjidea.ui.DateTimeFormatter
+import `in`.kkkev.jjidea.ui.JujutsuColors
+import `in`.kkkev.jjidea.ui.TextCanvas
+import `in`.kkkev.jjidea.ui.append
 import kotlinx.datetime.Instant
 import javax.swing.JTable
 
 abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
+    protected var isWorkingCopyRow = false
+
     override fun customizeCellRenderer(
         table: JTable,
         value: Any?,
@@ -20,6 +25,10 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
         row: Int,
         column: Int
     ) {
+        // Check if this row is the working copy
+        val model = table.model as? JujutsuLogTableModel
+        isWorkingCopyRow = model?.getEntry(row)?.isWorkingCopy ?: false
+
         (value as? T)?.let { render(it) }
     }
 
@@ -44,10 +53,17 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
     override fun render(value: LogEntry) {
         val hasMultipleIndicators = listOf(value.hasConflict, value.isEmpty, value.immutable).count { it } > 1
 
+        // Use bold attributes for working copy row
+        val textAttributes = if (value.isWorkingCopy) {
+            SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, SimpleTextAttributes.GRAYED_ATTRIBUTES.fgColor)
+        } else {
+            SimpleTextAttributes.GRAYED_ATTRIBUTES
+        }
+
         // Show conflict icon/text
         if (value.hasConflict) {
             if (hasMultipleIndicators) {
-                append("Conflict", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                append("Conflict", textAttributes)
                 append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
             } else {
                 icon = AllIcons.General.Warning
@@ -56,7 +72,7 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
 
         // Show empty indicator - always use text for clarity
         if (value.isEmpty) {
-            append("Empty", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+            append("Empty", textAttributes)
             if (value.immutable) {
                 append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
             }
@@ -65,7 +81,7 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
         // Show immutable icon/text
         if (value.immutable) {
             if (hasMultipleIndicators) {
-                append("Immutable", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                append("Immutable", textAttributes)
             } else {
                 icon = AllIcons.Nodes.Locked
             }
@@ -77,7 +93,17 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
  * Renderer for the Change ID column.
  */
 class ChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
-    override fun render(value: ChangeId) = append(value)
+    override fun render(value: ChangeId) {
+        // Use bold for working copy row
+        if (isWorkingCopyRow) {
+            append(value.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+            if (value.displayRemainder.isNotEmpty()) {
+                append(value.displayRemainder, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+            }
+        } else {
+            append(value)
+        }
+    }
 }
 
 /**
@@ -87,7 +113,11 @@ class ChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
  */
 class DescriptionCellRenderer : TextCellRenderer<LogEntry>() {
     override fun render(value: LogEntry) {
-        appendSummary(value.description)
+        // Use shared style logic
+        val descAttributes = DescriptionRenderingStyle.getTextAttributes(value)
+
+        // Append description summary
+        append(value.description.summary, descAttributes)
 
         // Phase 1: Show bookmarks as simple text
         append(value.bookmarks)
@@ -102,7 +132,10 @@ class DescriptionCellRenderer : TextCellRenderer<LogEntry>() {
  */
 class AuthorCellRenderer : TextCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
-        append(value.name)
+        // Use bold for working copy row
+        val attributes =
+            if (isWorkingCopyRow) SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES else SimpleTextAttributes.REGULAR_ATTRIBUTES
+        append(value.name, attributes)
     }
 }
 
@@ -112,7 +145,10 @@ class AuthorCellRenderer : TextCellRenderer<VcsUser>() {
  */
 class CommitterCellRenderer : TextCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
-        append(value.name)
+        // Use bold for working copy row
+        val attributes =
+            if (isWorkingCopyRow) SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES else SimpleTextAttributes.REGULAR_ATTRIBUTES
+        append(value.name, attributes)
     }
 }
 
@@ -122,7 +158,13 @@ class CommitterCellRenderer : TextCellRenderer<VcsUser>() {
  */
 class DateCellRenderer : TextCellRenderer<Instant>() {
     override fun render(value: Instant) {
-        append(value)
+        // Use bold for working copy row
+        if (isWorkingCopyRow) {
+            val dateStr = DateTimeFormatter.formatRelative(value)
+            append(dateStr, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+        } else {
+            append(value)
+        }
 
         // Tooltip shows full absolute time
         toolTipText = DateTimeFormatter.formatAbsolute(value)
@@ -133,7 +175,17 @@ class DateCellRenderer : TextCellRenderer<Instant>() {
  * Renderer for separate Change ID column.
  */
 class SeparateChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
-    override fun render(value: ChangeId) = append(value)
+    override fun render(value: ChangeId) {
+        // Use bold for working copy row
+        if (isWorkingCopyRow) {
+            append(value.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+            if (value.displayRemainder.isNotEmpty()) {
+                append(value.displayRemainder, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+            }
+        } else {
+            append(value)
+        }
+    }
 }
 
 /**
@@ -141,7 +193,11 @@ class SeparateChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
  */
 class SeparateDescriptionCellRenderer : TextCellRenderer<Description>() {
     override fun render(value: Description) {
-        append(value)
+        // Use shared style logic
+        val attributes = DescriptionRenderingStyle.getTextAttributes(value, isWorkingCopyRow)
+
+        // Render description text
+        append(value.display, attributes)
 
         // Set tooltip to full description with HTML formatting
         if (!value.empty) {
@@ -163,8 +219,26 @@ class SeparateDescriptionCellRenderer : TextCellRenderer<Description>() {
 
 /**
  * Renderer for separate Decorations column (@ working copy marker and bookmarks).
+ * Uses platform-style bookmark icon for native appearance.
+ *
+ * Note: ColoredTableCellRenderer only supports one icon per cell, so we show a single
+ * bookmark icon at the start if there are any bookmarks. Full platform-style rendering
+ * with icon-per-bookmark will be implemented in jj-idea-srz (right-aligned refs).
  */
 class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
+    override fun customizeCellRenderer(
+        table: JTable,
+        value: Any?,
+        selected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int
+    ) {
+        // Clear tooltip before rendering to prevent flashing
+        toolTipText = null
+        super.customizeCellRenderer(table, value, selected, hasFocus, row, column)
+    }
+
     override fun render(value: LogEntry) {
         var hasContent = false
 
@@ -174,11 +248,21 @@ class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
             hasContent = true
         }
 
-        // Show bookmarks
-        value.bookmarks.forEachIndexed { index, bookmark ->
-            if (hasContent || index > 0) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
-            append(bookmark.name, SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JujutsuColors.BOOKMARK))
-            hasContent = true
+        // Show bookmarks with platform-style icon at the start
+        if (value.bookmarks.isNotEmpty()) {
+            if (hasContent) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
+
+            // Set platform-style bookmark icon (appears once at start of bookmarks)
+            // Use font metrics height for proper scaling
+            val fontMetrics = getFontMetrics(font)
+            val iconHeight = fontMetrics.height
+            icon = JujutsuBookmarkIcon(iconHeight)
+
+            // Render bookmark names with smaller, grayed text (grey text, not orange)
+            value.bookmarks.forEachIndexed { index, bookmark ->
+                if (index > 0) append(", ", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                append(bookmark.name, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+            }
         }
     }
 }
