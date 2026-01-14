@@ -6,7 +6,6 @@ import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.DIRECTORY_GROUPING
-import com.intellij.openapi.vcs.changes.ui.ChangesTree
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
 import javax.swing.tree.DefaultTreeModel
 
@@ -15,15 +14,10 @@ import javax.swing.tree.DefaultTreeModel
  * Provides grouping, speed search, and standard VCS actions.
  */
 class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(project, false, true) {
-
-    companion object {
-        private const val GROUPING_KEYS_PROPERTY = "JujutsuToolWindow.GroupingKeys"
-    }
-
     init {
         // Use KEEP_NON_EMPTY strategy: preserves user's manual expansion/collapse actions
         // while expanding default nodes (including new ones) when tree is rebuilt
-        treeStateStrategy = ChangesTree.KEEP_NON_EMPTY
+        treeStateStrategy = KEEP_NON_EMPTY
     }
 
     override fun buildTreeModel(

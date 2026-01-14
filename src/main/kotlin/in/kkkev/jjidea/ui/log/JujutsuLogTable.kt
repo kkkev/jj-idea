@@ -384,7 +384,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
                         filterText.toRegex(RegexOption.IGNORE_CASE)
                     }
                     { text: String -> pattern.containsMatchIn(text) }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     // Invalid regex - fall back to literal search
                     createLiteralMatcher(filterText, matchCase, matchWholeWords)
                 }

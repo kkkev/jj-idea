@@ -28,7 +28,6 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
     private val openTabs = mutableListOf<Content>()
     private val openPanels = mutableListOf<JujutsuLogPanel>()
-    private var tabCounter = 1
 
     /**
      * Opens a new custom Jujutsu log tab.
@@ -71,19 +70,6 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
 
         } catch (e: Exception) {
             log.error("Failed to open custom Jujutsu log tab", e)
-        }
-    }
-
-    /**
-     * Refresh all open log tabs.
-     * Called when VCS state changes (e.g., after creating a new change).
-     *
-     * @param selectWorkingCopy If true, select the working copy (@) after refresh
-     */
-    fun refreshAllTabs(selectWorkingCopy: Boolean = false) {
-        log.info("Refreshing ${openPanels.size} open log tabs (selectWorkingCopy=$selectWorkingCopy)")
-        openPanels.forEach { panel ->
-            panel.refresh(selectWorkingCopy)
         }
     }
 
