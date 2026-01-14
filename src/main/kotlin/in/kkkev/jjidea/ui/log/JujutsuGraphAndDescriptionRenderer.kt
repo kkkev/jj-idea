@@ -255,20 +255,22 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // Conflict indicator
             if (entry.hasConflict) {
-                AllIcons.General.Warning.paintIcon(this, g2d, x, centerY - AllIcons.General.Warning.iconHeight / 2)
-                x += AllIcons.General.Warning.iconWidth + HORIZONTAL_PADDING
+                val icon = AllIcons.General.Warning
+                val iconY = centerY - icon.iconHeight / 2
+                icon.paintIcon(this, g2d, x, iconY)
+                x += icon.iconWidth + HORIZONTAL_PADDING
             }
 
-            // Empty indicator
-            if (entry.isEmpty) {
-                AllIcons.General.BalloonInformation.paintIcon(
-                    this,
-                    g2d,
-                    x,
-                    centerY - AllIcons.General.BalloonInformation.iconHeight / 2
-                )
-                x += AllIcons.General.BalloonInformation.iconWidth + HORIZONTAL_PADDING
+            // Immutable indicator
+            if (entry.immutable) {
+                val icon = AllIcons.Nodes.Locked
+                val iconY = centerY - icon.iconHeight / 2
+                icon.paintIcon(this, g2d, x, iconY)
+                x += icon.iconWidth + HORIZONTAL_PADDING
             }
+
+            // Note: Empty indicator is shown as "(empty)" text inline with description
+            // No icon needed here to avoid redundancy
 
             return x
         }
@@ -307,6 +309,18 @@ class JujutsuGraphAndDescriptionRenderer(
             val centerY = height / 2
             val fontMetrics = g2d.fontMetrics
 
+            // Calculate width needed for "(empty)" indicator if applicable
+            val emptyText = " (empty)"
+            val emptyIndicatorWidth = if (entry.isEmpty) {
+                val italicFont = fontMetrics.font.deriveFont(Font.ITALIC)
+                g2d.getFontMetrics(italicFont).stringWidth(emptyText)
+            } else {
+                0
+            }
+
+            // Reduce available width for description to reserve space for "(empty)"
+            val availableWidthForDescription = maxX - startX - emptyIndicatorWidth
+
             // Use italic for empty descriptions
             if (entry.description.empty) {
                 val italicFont = fontMetrics.font.deriveFont(Font.ITALIC)
@@ -317,13 +331,12 @@ class JujutsuGraphAndDescriptionRenderer(
             }
 
             val text = entry.description.summary
-            val availableWidth = maxX - startX
 
-            // Truncate text if it doesn't fit
-            val displayText = if (fontMetrics.stringWidth(text) > availableWidth) {
+            // Truncate text if it doesn't fit (using reduced available width)
+            val displayText = if (fontMetrics.stringWidth(text) > availableWidthForDescription) {
                 // Binary search for the right length
                 var truncated = text
-                while (truncated.isNotEmpty() && fontMetrics.stringWidth(truncated + "...") > availableWidth) {
+                while (truncated.isNotEmpty() && fontMetrics.stringWidth(truncated + "...") > availableWidthForDescription) {
                     truncated = truncated.dropLast(1)
                 }
                 if (truncated.isEmpty()) "" else truncated + "..."
@@ -331,16 +344,29 @@ class JujutsuGraphAndDescriptionRenderer(
                 text
             }
 
+            var x = startX
             if (displayText.isNotEmpty()) {
-                g2d.drawString(displayText, startX, centerY + fontMetrics.ascent / 2)
+                g2d.drawString(displayText, x, centerY + fontMetrics.ascent / 2)
+                x += fontMetrics.stringWidth(displayText)
             }
 
-            // Reset font
+            // Reset font if it was changed for empty description
             if (entry.description.empty) {
                 g2d.font = fontMetrics.font
             }
 
-            return startX + fontMetrics.stringWidth(displayText)
+            // Draw "(empty)" indicator if entry is empty (now guaranteed to have space)
+            if (entry.isEmpty) {
+                val emptyFont = fontMetrics.font.deriveFont(Font.ITALIC)
+                g2d.font = emptyFont
+                g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
+                g2d.drawString(emptyText, x, centerY + fontMetrics.ascent / 2)
+                x += g2d.fontMetrics.stringWidth(emptyText)
+                // Reset font
+                g2d.font = fontMetrics.font
+            }
+
+            return x
         }
 
         private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry): Int {
