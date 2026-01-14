@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.vcs.log
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.SimpleTextAttributes
@@ -13,11 +12,8 @@ import com.intellij.vcs.log.ui.table.VcsLogTableIndex
 import com.intellij.vcs.log.ui.table.column.VcsLogCustomColumn
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuCommitMetadataBase
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import java.awt.Component
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
@@ -52,9 +48,7 @@ class JujutsuDescriptionColumn : VcsLogCustomColumn<DescriptionWithRefs> {
         return DescriptionWithRefs(metadata.entry, refs)
     }
 
-    override fun createTableCellRenderer(table: VcsLogGraphTable): TableCellRenderer {
-        return JujutsuDescriptionRenderer(table)
-    }
+    override fun createTableCellRenderer(table: VcsLogGraphTable): TableCellRenderer = JujutsuDescriptionRenderer
 
     override fun getStubValue(model: GraphTableModel) = DescriptionWithRefs(
         entry = LogEntry(
@@ -71,7 +65,7 @@ class JujutsuDescriptionColumn : VcsLogCustomColumn<DescriptionWithRefs> {
 /**
  * Renderer for description column that shows refs/bookmarks with colored labels.
  */
-private class JujutsuDescriptionRenderer(private val table: VcsLogGraphTable) : ColoredTableCellRenderer() {
+private object JujutsuDescriptionRenderer : ColoredTableCellRenderer() {
     override fun customizeCellRenderer(
         table: JTable,
         value: Any?,

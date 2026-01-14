@@ -7,7 +7,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
@@ -26,8 +25,6 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
     JujutsuBundle.message("action.compare.branch.description"),
     AllIcons.Actions.Diff
 ) {
-    private val log = Logger.getInstance(javaClass)
-
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {

@@ -4,8 +4,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
 val AnActionEvent.file: VirtualFile? get() = this.getData(CommonDataKeys.VIRTUAL_FILE)
 val AnActionEvent.editor: Editor? get() = this.getData(CommonDataKeys.EDITOR)

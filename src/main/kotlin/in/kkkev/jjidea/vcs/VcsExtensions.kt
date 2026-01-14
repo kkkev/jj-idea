@@ -18,12 +18,10 @@ import org.jetbrains.annotations.SystemIndependent
  * Use when VCS might not be available (e.g., general actions that could run in any context).
  */
 val Project.possibleJujutsuVcs
-    get() = this?.let { project ->
-        getInstance(this)
-            .getVcsFor(
-                this.basePath?.let<@SystemIndependent @NonNls String, VirtualFile?> { getInstance().findFileByPath(it) }
-            ) as? JujutsuVcs
-    }
+    get() = getInstance(this)
+        .getVcsFor(
+            this.basePath?.let<@SystemIndependent @NonNls String, VirtualFile?> { getInstance().findFileByPath(it) }
+        ) as? JujutsuVcs
 
 /**
  * Find JujutsuVcs for a project, throwing if not found.
@@ -36,7 +34,7 @@ val Project.jujutsuVcs
 
 val Project.isJujutsu get() = this.possibleJujutsuVcs != null
 
-val Project.jujutsuRoots get() = ProjectLevelVcsManager.getInstance(this).allVcsRoots.filter { it.vcs is JujutsuVcs }
+val Project.jujutsuRoots get() = getInstance(this).allVcsRoots.filter { it.vcs is JujutsuVcs }
 
 /**
  * Find JujutsuVcs for a virtual file root. Returns null if not found.

@@ -128,7 +128,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
         // Middle section: Current change info and description
         val infoPanel = JPanel(BorderLayout()).apply {
-            border = JBUI.Borders.empty(0, 8, 0, 8)
+            border = JBUI.Borders.empty(0, 8)
         }
 
         val topPanel = JPanel(GridBagLayout())

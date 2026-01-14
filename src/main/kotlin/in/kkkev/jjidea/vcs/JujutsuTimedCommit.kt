@@ -11,10 +11,7 @@ class JujutsuTimedCommit(
     private val parentIds: List<ChangeId>,
     private val timestamp: Long
 ) : TimedVcsCommit {
-
     override fun getId() = changeId.hash
-
     override fun getParents() = parentIds.map { it.hash }
-
     override fun getTimestamp() = timestamp
 }
