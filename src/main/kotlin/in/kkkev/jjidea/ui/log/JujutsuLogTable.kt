@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import kotlinx.datetime.Instant
 import java.awt.Component
+import java.awt.event.ComponentAdapter
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ListSelectionEvent
@@ -34,7 +35,7 @@ class JujutsuLogTable(
 
     init {
         // Single selection mode for now
-        selectionModel.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        selectionModel.selectionMode = ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
 
         // Enable column reordering and resizing
         tableHeader.reorderingAllowed = true
@@ -82,7 +83,7 @@ class JujutsuLogTable(
         })
 
         // Add component resize listener for dynamic column width adjustment
-        addComponentListener(object : java.awt.event.ComponentAdapter() {
+        addComponentListener(object : ComponentAdapter() {
             override fun componentResized(e: java.awt.event.ComponentEvent?) {
                 adjustDescriptionColumnWidth()
             }
@@ -94,9 +95,7 @@ class JujutsuLogTable(
      * Called when user right-clicks on the table.
      */
     private fun showContextMenu(component: Component, x: Int, y: Int) {
-        val entry = selectedEntry ?: return
-
-        val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, entry)
+        val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, selectedEntries)
         val popupMenu = ActionManager.getInstance()
             .createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
         popupMenu.component.show(component, x, y)
@@ -109,18 +108,16 @@ class JujutsuLogTable(
         get() = model as JujutsuLogTableModel
 
     /**
-     * Get the currently selected log entry, if any.
+     * Get the currently selected log entry, if there is exactly one.
      * Handles row sorting by converting view index to model index.
      */
-    val selectedEntry: LogEntry?
-        get() {
-            val viewRow = selectedRow
-            if (viewRow < 0) return null
+    val selectedEntry get() = selectedRows.singleOrNull()?.let(::convertRowIndexToModel)?.let(logModel::getEntry)
 
-            // Convert view row to model row (in case sorting is active)
-            val modelRow = convertRowIndexToModel(viewRow)
-            return logModel.getEntry(modelRow)
-        }
+    /**
+     * Get the currently selected log entries.
+     * Handles row sorting by converting view index to model index.
+     */
+    val selectedEntries get() = selectedRows.map(::convertRowIndexToModel).mapNotNull(logModel::getEntry)
 
     /**
      * Update graph nodes and refresh graph+description column.
@@ -250,23 +247,15 @@ class JujutsuLogTableModel : AbstractTableModel() {
         const val COLUMN_COMMITTER = 6
         const val COLUMN_DATE = 7
 
-        private val COLUMN_NAMES = arrayOf(
-            "", // No column headings - matches Git plugin
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            ""
-        )
+        const val NUM_COLUMNS = 8
     }
 
     override fun getRowCount() = filteredEntries.size
 
-    override fun getColumnCount() = COLUMN_NAMES.size
+    override fun getColumnCount() = NUM_COLUMNS
 
-    override fun getColumnName(column: Int) = COLUMN_NAMES[column]
+    // No column headings - matches Git plugin
+    override fun getColumnName(column: Int) = ""
 
     override fun getValueAt(rowIndex: Int, columnIndex: Int): Any? {
         if (rowIndex < 0 || rowIndex >= filteredEntries.size) return null
@@ -401,9 +390,9 @@ class JujutsuLogTableModel : AbstractTableModel() {
             // Text filter (if active)
             val matchesText = textMatcher?.let { matcher ->
                 matcher(entry.description.summary) ||
-                matcher(entry.changeId.toString()) ||
-                entry.author?.name?.let(matcher) == true ||
-                entry.author?.email?.let(matcher) == true
+                        matcher(entry.changeId.toString()) ||
+                        entry.author?.name?.let(matcher) == true ||
+                        entry.author?.email?.let(matcher) == true
             } ?: true
 
             // Author filter (if active)

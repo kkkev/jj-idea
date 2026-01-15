@@ -6,6 +6,7 @@ import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.Revset
 import java.nio.charset.StandardCharsets
@@ -49,18 +50,16 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         null
     }
 
-    override fun describe(message: String, revision: Revision): CommandExecutor.CommandResult =
-        execute(root, listOf("describe", "-r", revision, "-m", message))
+    override fun describe(description: Description, revision: Revision): CommandExecutor.CommandResult =
+        execute(root, listOf("describe", "-r", revision, "-m", description.actual))
 
-    override fun new(message: String?, parentRevision: Revision?): CommandExecutor.CommandResult {
+    override fun new(description: Description, parentRevisions: List<Revision>): CommandExecutor.CommandResult {
         val args = mutableListOf("new")
-        if (message != null) {
+        if (!description.empty) {
             args.add("-m")
-            args.add(message)
+            args.add(description.actual)
         }
-        if (parentRevision != null) {
-            args.add(parentRevision.toString())
-        }
+        args.addAll(parentRevisions.map { it.toString() })
         return execute(root, args)
     }
 

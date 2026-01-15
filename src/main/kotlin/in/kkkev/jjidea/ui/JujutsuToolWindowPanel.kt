@@ -13,11 +13,9 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
-import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.ui.PopupHandler
@@ -26,10 +24,9 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.JujutsuStateListener
-import `in`.kkkev.jjidea.jj.JujutsuStateModel
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.vcs.actions.refreshAfterVcsOperation
+import `in`.kkkev.jjidea.vcs.actions.requestDescription
 import `in`.kkkev.jjidea.vcs.jujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Component
@@ -59,7 +56,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     // Track whether description has been modified since last load
     private var isDescriptionModified = false
-    private var persistedDescription = ""
+    private var persistedDescription = Description.EMPTY
 
     // References to buttons that need to be updated when modification state changes
     private lateinit var describeButton: JButton
@@ -72,6 +69,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         wrapStyleWord = true
         isEditable = true
         toolTipText = JujutsuBundle.message("toolwindow.description.tooltip")
+        // TODO Show "(empty)" in italics if empty - as a "default" or "exemplar" value
 
         // Track modifications to show visual feedback
         document.addDocumentListener(object : javax.swing.event.DocumentListener {
@@ -80,7 +78,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
             override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
 
             private fun checkModified() {
-                val newModified = text.trim() != persistedDescription.trim()
+                val newModified = text != persistedDescription.actual
                 if (newModified != isDescriptionModified) {
                     isDescriptionModified = newModified
                     updateDescriptionLabel()
@@ -318,13 +316,13 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         project.messageBus.connect(this).subscribe(
             JujutsuStateListener.TOPIC,
             object : JujutsuStateListener {
-                override fun workingCopyChanged() {
+                private fun updateDescription() {
                     ApplicationManager.getApplication().invokeLater {
                         // Update description and label from model
                         val model = JujutsuStateModel.getInstance(project)
                         model.workingCopy?.let { entry ->
-                            persistedDescription = entry.description.actual
-                            descriptionArea.text = persistedDescription
+                            persistedDescription = entry.description
+                            descriptionArea.text = persistedDescription.actual
                             isDescriptionModified = false
                             updateDescriptionLabel()
                             updateWorkingCopyLabel(entry)
@@ -334,19 +332,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     }
                 }
 
-                override fun logUpdated() {
-                    // Refresh description in case working copy changed
-                    ApplicationManager.getApplication().invokeLater {
-                        val model = JujutsuStateModel.getInstance(project)
-                        model.workingCopy?.let { entry ->
-                            persistedDescription = entry.description.actual
-                            descriptionArea.text = persistedDescription
-                            isDescriptionModified = false
-                            updateDescriptionLabel()
-                            updateWorkingCopyLabel(entry)
-                        }
-                    }
-                }
+                override fun workingCopyChanged() = updateDescription()
+                override fun logUpdated() = updateDescription()
             }
         )
     }
@@ -396,118 +383,59 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     }
 
     private fun revertDescription() {
-        descriptionArea.text = persistedDescription
+        descriptionArea.text = persistedDescription.actual
         isDescriptionModified = false
         updateDescriptionLabel()
     }
 
     private fun describeCurrentChange() {
-        val description = descriptionArea.text.trim()
-        if (description.isEmpty()) {
-            JOptionPane.showMessageDialog(
-                panel,
-                JujutsuBundle.message("dialog.describe.empty.message"),
-                JujutsuBundle.message("dialog.describe.empty.title"),
-                JOptionPane.WARNING_MESSAGE
-            )
-            return
-        }
+        val description = Description(descriptionArea.text.trim())
 
-        // Move VCS lookup to background thread to avoid EDT slow operations
-        // Use findRequired() since this tool window only exists when Jujutsu VCS is configured
-        ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                val result = project.jujutsuVcs.commandExecutor.describe(description)
+        project.jujutsuVcs.commandExecutor
+            .createCommand { describe(description) }
+            .onSuccess {
+                // Update persisted description and reset modified flag
+                persistedDescription = description
+                isDescriptionModified = false
+                updateDescriptionLabel()
 
-                ApplicationManager.getApplication().invokeLater {
-                    if (result.isSuccess) {
-                        // Update persisted description and reset modified flag
-                        persistedDescription = description
-                        isDescriptionModified = false
-                        updateDescriptionLabel()
-
-                        // Invalidate state model - observers will refresh
-                        JujutsuStateModel.getInstance(project).invalidate(selectWorkingCopy = true)
-                        VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
-                    } else {
-                        JOptionPane.showMessageDialog(
-                            panel,
-                            JujutsuBundle.message("dialog.describe.error.message", result.stderr),
-                            JujutsuBundle.message("dialog.describe.error.title"),
-                            JOptionPane.ERROR_MESSAGE
-                        )
-                    }
-                }
-            } catch (e: VcsException) {
-                // This should never happen since tool window only exists when VCS is configured
-                // If it does, it indicates a programming error or serious state corruption
-                log.error("Failed to find Jujutsu VCS in tool window", e)
-                ApplicationManager.getApplication().invokeLater {
-                    JOptionPane.showMessageDialog(
-                        panel,
-                        "Internal error: ${e.message}",
-                        JujutsuBundle.message("dialog.describe.error.title"),
-                        JOptionPane.ERROR_MESSAGE
-                    )
-                }
+                project.refreshAfterVcsOperation(true)
             }
-        }
+            .onFailure {
+                JOptionPane.showMessageDialog(
+                    panel,
+                    JujutsuBundle.message("dialog.describe.error.message", stderr),
+                    JujutsuBundle.message("dialog.describe.error.title"),
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }
     }
 
     private fun createNewChange() {
         // Show modal dialog to get description for the new change
-        val description = com.intellij.openapi.ui.Messages.showMultilineInputDialog(
-            project,
-            JujutsuBundle.message("dialog.newchange.input.message"),
-            JujutsuBundle.message("dialog.newchange.input.title"),
-            "",
-            null,
-            null
-        ) ?: return // User cancelled
+        val description = project.requestDescription("dialog.newchange.input") ?: return
 
-        // Allow empty description - Jujutsu permits it
-        val descriptionArg = if (description.isNotBlank()) description.trim() else null
-
-        // Move VCS lookup to background thread to avoid EDT slow operations
-        // Use project.jujutsuVcs since this tool window only exists when Jujutsu VCS is configured
-        ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                val result = project.jujutsuVcs.commandExecutor.new(message = descriptionArg)
-
-                ApplicationManager.getApplication().invokeLater {
-                    if (result.isSuccess) {
-                        // Clear the description area since we've created a new change
-                        persistedDescription = ""
-                        descriptionArea.text = ""
-                        isDescriptionModified = false
-                        updateDescriptionLabel()
-
-                        // Invalidate state model - observers will refresh
-                        JujutsuStateModel.getInstance(project).invalidate(selectWorkingCopy = true)
-                        VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
-                    } else {
-                        JOptionPane.showMessageDialog(
-                            panel,
-                            JujutsuBundle.message("dialog.newchange.error.message", result.stderr),
-                            JujutsuBundle.message("dialog.newchange.error.title"),
-                            JOptionPane.ERROR_MESSAGE
-                        )
-                    }
-                }
-            } catch (e: VcsException) {
-                // This should never happen since tool window only exists when VCS is configured
-                // If it does, it indicates a programming error or serious state corruption
-                log.error("Failed to find Jujutsu VCS in tool window", e)
-                ApplicationManager.getApplication().invokeLater {
-                    JOptionPane.showMessageDialog(
-                        panel,
-                        "Internal error: ${e.message}",
-                        JujutsuBundle.message("dialog.newchange.error.title"),
-                        JOptionPane.ERROR_MESSAGE
-                    )
-                }
+        project.jujutsuVcs.commandExecutor
+            .createCommand {
+                new(description = description)
             }
-        }
+            .onSuccess {
+                // Clear the description area since we've created a new change
+                persistedDescription = Description.EMPTY
+                descriptionArea.text = ""
+                isDescriptionModified = false
+                updateDescriptionLabel()
+
+                project.refreshAfterVcsOperation(true)
+            }
+            .onFailure {
+                JOptionPane.showMessageDialog(
+                    panel,
+                    JujutsuBundle.message("dialog.newchange.error.message", stderr),
+                    JujutsuBundle.message("dialog.newchange.error.title"),
+                    JOptionPane.ERROR_MESSAGE
+                )
+            }.executeAsync()
     }
 
     fun getContent(): JComponent = panel
@@ -534,8 +462,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                 result.onSuccess { entries ->
                     entries.firstOrNull()?.let { entry ->
                         // Update the description text area
-                        persistedDescription = entry.description.actual
-                        descriptionArea.text = persistedDescription
+                        persistedDescription = entry.description
+                        descriptionArea.text = persistedDescription.actual
                         isDescriptionModified = false
                         updateDescriptionLabel()
                         updateWorkingCopyLabel(entry)

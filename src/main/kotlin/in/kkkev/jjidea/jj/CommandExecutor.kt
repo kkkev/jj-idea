@@ -1,5 +1,11 @@
 package `in`.kkkev.jjidea.jj
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
+import `in`.kkkev.jjidea.JujutsuBundle
+
 /**
  * Abstraction for executing jujutsu commands.
  * This interface allows for different implementations (CLI, native library, etc.)
@@ -58,19 +64,19 @@ interface CommandExecutor {
 
     /**
      * Set the description for a commit (default: working copy @)
-     * @param message The description message
+     * @param description The description message
      * @param revision The revision to describe (default: "@")
      * @return Command result
      */
-    fun describe(message: String, revision: Revision = WorkingCopy): CommandResult
+    fun describe(description: Description, revision: Revision = WorkingCopy): CommandResult
 
     /**
      * Create a new change on top of the current one
-     * @param message Optional description for the new change
-     * @param parentRevision Optional parent revision (default: current working copy)
+     * @param description Optional description for the new change
+     * @param parentRevisions Optional parent revisions (default: current working copy)
      * @return Command result
      */
-    fun new(message: String? = null, parentRevision: Revision? = null): CommandResult
+    fun new(description: Description, parentRevisions: List<Revision> = listOf(WorkingCopy)): CommandResult
 
     /**
      * Abandon a change (remove it from the log)
@@ -93,7 +99,11 @@ interface CommandExecutor {
      * @param filePaths Optional file paths to filter log (e.g., "src/main.kt")
      * @return Command result with log output
      */
-    fun log(revset: Revset = Expression.ALL, template: String? = null, filePaths: List<String> = emptyList()): CommandResult
+    fun log(
+        revset: Revset = Expression.ALL,
+        template: String? = null,
+        filePaths: List<String> = emptyList()
+    ): CommandResult
 
     /**
      * Get line-by-line annotation (blame) for a file
@@ -117,4 +127,33 @@ interface CommandExecutor {
      * @return Git-format diff output
      */
     fun diffGit(revision: Revision): CommandResult
+
+    data class Command(
+        val commandExecutor: CommandExecutor,
+        val action: CommandExecutor.() -> CommandResult,
+        val onSuccess: (String) -> Unit = {},
+        val onFailure: CommandResult.() -> Unit = {}
+    ) {
+        fun onSuccess(callback: (String) -> Unit) = copy(onSuccess = callback)
+        fun onFailure(callback: CommandResult.() -> Unit) = copy(onFailure = callback)
+        fun onFailureTellUser(resourceKeyPrefix: String, project: Project, log: Logger) = onFailure {
+            val message = JujutsuBundle.message("${resourceKeyPrefix}.message", stderr)
+            Messages.showErrorDialog(project, message, JujutsuBundle.message("${resourceKeyPrefix}.title"))
+            log.warn(message)
+        }
+
+        fun executeAsync() {
+            ApplicationManager.getApplication().executeOnPooledThread {
+                val result = commandExecutor.action()
+                ApplicationManager.getApplication().invokeLater {
+                    if (result.isSuccess)
+                        onSuccess(result.stdout)
+                    else
+                        onFailure(result)
+                }
+            }
+        }
+    }
+
+    fun createCommand(action: CommandExecutor.() -> CommandResult): Command = Command(this, action)
 }

@@ -266,6 +266,52 @@ Modern IntelliJ Platform API for file change detection. Processes changes in bat
 
 **See**: `JujutsuStartupActivity.kt`
 
+#### 7. Action Factory Pattern for VCS Operations
+VCS actions (edit, abandon, describe, etc.) use factory functions that return `AnAction` instances:
+
+```kotlin
+fun editChangeAction(project: Project, changeId: ChangeId?) =
+    nullAndDumbAwareAction(changeId, "log.action.edit", AllIcons.Actions.Edit) {
+        project.jujutsuVcs.commandExecutor
+            .createCommand { edit(target) }
+            .onSuccess { project.refreshAfterVcsOperation(selectWorkingCopy = true) }
+            .onFailureTellUser("log.action.edit.error", project, log)
+            .executeAsync()
+    }
+```
+
+**Key Components**:
+
+1. **Helper Functions** (`NullAndDumbAwareAction.kt`):
+   - `nullAndDumbAwareAction(target, messageKey, icon) { }` - For single nullable target
+   - `emptyAndDumbAwareAction(targets, messageKey, icon) { }` - For list of targets
+   - Auto-disables action when target is null/empty
+   - Provides `ActionContext<T>` with `target`, `event`, and `log`
+
+2. **Command Builder** (`CommandExecutor.kt`) - **Always use this from actions**:
+   - `commandExecutor.createCommand { edit(target) }` - Creates command
+   - `.onSuccess { stdout -> }` - Handle success (called on EDT)
+   - `.onFailureTellUser(resourceKeyPrefix, project, log)` - Show error dialog
+   - `.executeAsync()` - Execute command on background thread, callbacks on EDT
+   - Handles all thread switching automatically - no manual `executeOnPooledThread` needed
+
+3. **Message Key Conventions** (`JujutsuBundle.properties`):
+   - Action: `log.action.<name>` (display text), `log.action.<name>.tooltip`
+   - Errors: `log.action.<name>.error.title`, `log.action.<name>.error.message`
+   - Dialogs: `dialog.<name>.input.message`, `dialog.<name>.input.title`
+
+4. **Input Dialogs** (`Inputs.kt`):
+   - `project.requestDescription(resourceKeyPrefix, initial)` - Multiline input dialog
+   - Returns `Description?` (null if cancelled)
+
+5. **Refresh After Operations** (`ChangeActions.kt`):
+   - `project.refreshAfterVcsOperation(selectWorkingCopy = true|false)`
+   - Invalidates state model, marks VCS dirty
+
+**File Organization**: One file per action in `vcs/actions/` with lowercase filename and `Action` suffix (e.g., `editChangeAction.kt`).
+
+**See**: `vcs/actions/` package
+
 ## File Structure
 
 ```
@@ -283,6 +329,7 @@ src/main/kotlin/in/kkkev/jjidea/
 ├── vcs/                         # IntelliJ VCS integration
 │   ├── JujutsuVcs.kt
 │   ├── JujutsuLogProvider.kt
+│   ├── actions/                 # VCS operation actions (see pattern §7)
 │   ├── changes/
 │   ├── diff/
 │   └── history/
