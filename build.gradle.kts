@@ -44,6 +44,9 @@ dependencies {
 
     // MockK for mocking
     testImplementation("io.mockk:mockk:1.13.9")
+
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    //testRuntimeOnly("idea:ideaIC:aarch64:2025.2")
 }
 
 intellijPlatform {
@@ -115,4 +118,5 @@ tasks.register<Test>("unitTest") {
 
     description = "Run unit tests with IntelliJ Platform classes on classpath"
     group = "verification"
+}
 }

@@ -661,4 +661,51 @@ class CommitGraphBuilderTest {
             graph["parent"]!!.lane shouldBe 2  // SHOULD be 2 (leftmost), currently likely 3
         }
     }
+
+    @Nested
+    inner class `11 Bug jj-idea-1f2 Merge Rendering` {
+
+        @Test
+        fun `merge commit qn with parents rso and oq`() {
+            // Exact scenario from bug jj-idea-1f2:
+            // Commits: py, wp, oq, rso, qn
+            // Relationships: wp:py, oq:py, rso:wp, qn:rso,oq
+            // qn is the merge commit with two parents: rso and oq
+            //
+            // Log order (newest first, topologically sorted):
+            val entries = listOf(
+                entry("qn", listOf("rso", "oq")),  // Merge commit
+                entry("rso", listOf("wp")),        // First parent of qn
+                entry("oq", listOf("py")),         // Second parent of qn
+                entry("wp", listOf("py")),
+                entry("py")
+            )
+
+            val graph = builder.buildGraph(entries)
+
+            // qn should be in lane 0
+            graph["qn"]!!.lane shouldBe 0
+
+            // qn should have two parent lanes
+            graph["qn"]!!.parentLanes shouldHaveSize 2
+
+            // First parent (rso) should be in lane 0 (same as qn)
+            graph["qn"]!!.parentLanes[0] shouldBe 0
+
+            // Second parent (oq) should be in a different lane (1)
+            graph["qn"]!!.parentLanes[1] shouldBe 1
+
+            // rso should be in lane 0
+            graph["rso"]!!.lane shouldBe 0
+
+            // oq should be in lane 1
+            graph["oq"]!!.lane shouldBe 1
+
+            // Verify the graph visually makes sense:
+            // Lane 0: qn -> rso -> wp -> py
+            // Lane 1: qn -> oq -> py (diagonal from qn to oq)
+            graph["wp"]!!.lane shouldBe 0
+            graph["py"]!!.lane shouldBe 0
+        }
+    }
 }

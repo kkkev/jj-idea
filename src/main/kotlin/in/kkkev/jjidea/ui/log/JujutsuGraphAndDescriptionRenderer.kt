@@ -43,6 +43,21 @@ class JujutsuGraphAndDescriptionRenderer(
         // Tooltip text for status indicators
         private const val CONFLICT_TOOLTIP = "<html><b>Conflict</b><br>This change has unresolved merge conflicts</html>"
         private const val IMMUTABLE_TOOLTIP = "<html><b>Immutable</b><br>This change cannot be modified (protected commit)</html>"
+
+        // Lane colors - must match CommitGraphBuilder colors for consistent coloring
+        private val LANE_COLORS = listOf(
+            JBColor(0x4285F4, 0x6AA1FF), // Blue
+            JBColor(0xEA4335, 0xFF6B5E), // Red
+            JBColor(0xC99700, 0xE0B800), // Yellow
+            JBColor(0x34A853, 0x5DCD73), // Green
+            JBColor(0xFF6D00, 0xFF8A3D), // Orange
+            JBColor(0x9C27B0, 0xC25ED0), // Purple
+            JBColor(0x00ACC1, 0x4DD0E1), // Cyan
+            JBColor(0x689F38, 0x8BC34A), // Light green
+        )
+
+        /** Get the color for a specific lane */
+        fun colorForLane(lane: Int) = LANE_COLORS[lane % LANE_COLORS.size]
     }
 
     override fun getTableCellRendererComponent(
@@ -184,11 +199,9 @@ class JujutsuGraphAndDescriptionRenderer(
             // This commit's lane is active
             activeLanes.add(node.lane)
 
-            // Calculate commit position - align with text vertically
+            // Calculate commit position - center vertically for symmetric diagonals
             val commitX = startX + laneWidth / 2 + node.lane * laneWidth
-            val fontMetrics = g2d.fontMetrics
-            val textCenterY = height / 2 + fontMetrics.ascent / 4 // Align with text center
-            val commitY = textCenterY
+            val commitY = height / 2
 
             // Draw lines to parents (in next row)
             drawLinesToParents(g2d, node, commitX, commitY, row, startX, laneWidth)
@@ -208,7 +221,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 val prevEntry = model.getEntry(prevRow) ?: continue
                 val prevNode = graphNodes[prevEntry.changeId] ?: continue
 
-                for (parentId in prevEntry.parentIds) {
+                for ((parentIndex, parentId) in prevEntry.parentIds.withIndex()) {
                     var parentRow = -1
                     for (r in row + 1 until model.rowCount) {
                         if (model.getEntry(r)?.changeId == parentId) {
@@ -219,11 +232,23 @@ class JujutsuGraphAndDescriptionRenderer(
 
                     if (parentRow > row) {
                         val childLane = prevNode.lane
-                        val childX = graphStartX + laneWidth / 2 + childLane * laneWidth
-                        g2d.color = prevNode.color
-                        g2d.drawLine(childX, 0, childX, height)
-                        passThroughLanes.add(childLane)
-                        break
+                        val parentLane = prevNode.parentLanes.getOrNull(parentIndex) ?: childLane
+                        val passX = graphStartX + laneWidth / 2 + parentLane * laneWidth
+
+                        // Color logic matching outgoing:
+                        // - Fork (child has single parent, different lane): use CHILD's color
+                        // - Merge (child has multiple parents): use PARENT's color
+                        // - Same lane: use parent's lane color
+                        val isCrossLane = parentLane != childLane
+                        val isMerge = prevNode.parentLanes.size > 1 && isCrossLane
+                        g2d.color = when {
+                            isMerge -> colorForLane(parentLane)  // Merge: parent's lane color
+                            isCrossLane -> colorForLane(childLane)  // Fork: child's lane color
+                            else -> colorForLane(parentLane)  // Same lane
+                        }
+                        g2d.drawLine(passX, 0, passX, height)
+                        passThroughLanes.add(parentLane)
+                        // Continue to handle other parents (don't break)
                     }
                 }
             }
@@ -258,22 +283,68 @@ class JujutsuGraphAndDescriptionRenderer(
             val currentEntry = model.getEntry(currentRow) ?: return
 
             // Draw incoming lines from children
+            // First, find all cross-lane connections and which lanes they use
+            val crossLaneConnectionLanes = mutableSetOf<Int>()
+            for (prevRow in 0 until currentRow) {
+                val prevEntry = model.getEntry(prevRow) ?: continue
+                val prevNode = graphNodes[prevEntry.changeId] ?: continue
+                val parentIndex = prevEntry.parentIds.indexOf(currentEntry.changeId)
+                if (parentIndex >= 0) {
+                    val childLane = prevNode.lane
+                    val parentLane = prevNode.parentLanes.getOrNull(parentIndex) ?: childLane
+                    if (childLane != parentLane) {
+                        crossLaneConnectionLanes.add(parentLane)
+                    }
+                }
+            }
+
+            // Now draw incoming lines
             for (prevRow in 0 until currentRow) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
                 val prevNode = graphNodes[prevEntry.changeId] ?: continue
 
-                if (prevEntry.parentIds.contains(currentEntry.changeId)) {
+                val parentIndex = prevEntry.parentIds.indexOf(currentEntry.changeId)
+                if (parentIndex >= 0) {
                     val childLane = prevNode.lane
-                    val childX = graphStartX + laneWidth / 2 + childLane * laneWidth
-                    g2d.color = prevNode.color
-                    g2d.drawLine(childX, 0, commitX, commitY)
+                    val parentLane = prevNode.parentLanes.getOrNull(parentIndex) ?: childLane
+                    val isCrossLane = childLane != parentLane
+
+                    // Skip same-lane incoming if there's a cross-lane at the same position
+                    // (the cross-lane will draw it with the correct color)
+                    if (!isCrossLane && crossLaneConnectionLanes.contains(parentLane)) {
+                        continue
+                    }
+
+                    val connectionX = graphStartX + laneWidth / 2 + parentLane * laneWidth
+                    // Color logic matching outgoing:
+                    // - Fork: use child's color
+                    // - Merge: use parent's color (this commit)
+                    val isMerge = prevNode.parentLanes.size > 1 && isCrossLane
+                    g2d.color = when {
+                        isMerge -> colorForLane(parentLane)  // Merge: parent's lane color (this commit's expected lane)
+                        isCrossLane -> colorForLane(childLane)  // Fork: child's lane color
+                        else -> node.color  // Same lane
+                    }
+                    g2d.drawLine(connectionX, 0, commitX, commitY)
                 }
             }
 
-            // Draw outgoing lines to parents
-            if (node.parentLanes.isNotEmpty()) {
-                g2d.color = node.color
-                g2d.drawLine(commitX, commitY, commitX, height)
+            // Draw outgoing lines to parents (each parent may be in a different lane)
+            for (parentLane in node.parentLanes) {
+                val parentX = graphStartX + laneWidth / 2 + parentLane * laneWidth
+
+                // Color logic for cross-lane connections:
+                // - Fork (child in different lane than parent): use CHILD's color (node.lane)
+                // - Merge (child has multiple parents): use PARENT's color (parentLane)
+                // - Same lane: use node's color
+                val isCrossLane = parentLane != node.lane
+                val isMerge = node.parentLanes.size > 1 && isCrossLane
+                g2d.color = when {
+                    isMerge -> colorForLane(parentLane)  // Merge: use parent's lane color
+                    isCrossLane -> colorForLane(node.lane)  // Fork: use child's lane color
+                    else -> node.color  // Same lane: use node's color
+                }
+                g2d.drawLine(commitX, commitY, parentX, height)
             }
         }
 
