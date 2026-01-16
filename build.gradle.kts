@@ -1,3 +1,5 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
@@ -23,11 +25,19 @@ dependencies {
         // VCS modules - including the VCS itself as a plugin
         bundledPlugin("Git4Idea")
         bundledModule("intellij.platform.vcs.impl")
+
+        // Test framework for IntelliJ Platform tests
+        testFramework(TestFrameworkType.Platform)
+        testFramework(TestFrameworkType.JUnit5)
     }
 
     // Test framework
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+
+    // Workarounds for IJPL-157292 and IJPL-159134
+    testImplementation("org.opentest4j:opentest4j:1.3.0")
+    testRuntimeOnly("junit:junit:4.13.2")
 
     // Kotest assertions
     testImplementation("io.kotest:kotest-assertions-core:5.8.0")
@@ -66,32 +76,43 @@ kotlin {
     jvmToolchain(21)
 }
 
+// Disable the default test task - it's configured by IntelliJ Platform plugin with
+// JBR and coroutines agent that crash on macOS. Use unitTest task instead.
 tasks.test {
-    useJUnitPlatform()
-    // Disable instrumentation for simple unit tests
-    enabled = false  // Disable until we set up proper IntelliJ test fixtures
+    enabled = false
 }
 
-// Create a simple test task without instrumentation
-tasks.register<Test>("simpleTest") {
+// Create a clean test task that runs with IntelliJ Platform classes on classpath
+// but without the IDE bootstrap machinery (custom classloader, coroutines agent, etc.)
+tasks.register<Test>("unitTest") {
     useJUnitPlatform()
     testClassesDirs = sourceSets["test"].output.classesDirs
-    classpath = sourceSets["test"].runtimeClasspath
 
-    // Exclude tests that need IntelliJ Platform classes
-    exclude("**/changes/**") // JujutsuRevisionNumberTest needs VcsRevisionNumber
-    exclude("**/annotate/**") // JujutsuFileAnnotationTest needs Platform classes
-    exclude("**/actions/**") // JujutsuCompareWithPopupTest uses ChangeId which references Hash type
-    exclude("**/RequirementsTest.class") // Integration test placeholders
-    exclude("**/JujutsuCommandAvailabilityTest.class") // Needs actual jj binary
-    exclude("**/JujutsuLogEntryTest*.class") // Uses ChangeId which references Hash type
-    exclude("**/JujutsuLogParserTest*.class") // Uses ChangeId which references Hash type
-    exclude("**/JujutsuLogTableColumnTest*.class") // Uses VcsUser and table model from Platform
-    exclude("**/jj/ChangeIdTest*.class") // ChangeId references Hash type in lazy property
-    exclude("**/jj/DescriptionTest*.class") // Description uses JujutsuBundle which requires DynamicBundle
-    exclude("**/cli/AnnotationParserTest*.class") // Uses ChangeId which references Hash type
-    exclude("**/cli/LogTemplateTest*.class") // Uses VcsUser and ChangeId with Hash type
-    exclude("**/JujutsuDateTimeFormatterTest*.class") // DateTimeFormatter uses DateFormatUtil
-    exclude("**/DescriptionRenderingStyleTest*.class") // Uses SimpleTextAttributes and JBColor
-    exclude("**/JujutsuLogTableModelFilterTest*.class") // Uses VcsUser and log model classes
+    // Use the test compile classpath which resolves IntelliJ Platform modules correctly
+    classpath = configurations["testCompileClasspath"] +
+            configurations["testRuntimeClasspath"] +
+            sourceSets["test"].output +
+            sourceSets["main"].output
+
+    // Use standard JDK 21, not JBR
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    })
+
+    // JVM arguments required for IntelliJ Platform test framework
+    jvmArgs(
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt.event=ALL-UNNAMED",
+        "--add-opens=java.desktop/javax.swing=ALL-UNNAMED",
+        "--add-opens=java.desktop/javax.swing.plaf.basic=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.font=ALL-UNNAMED"
+    )
+
+    description = "Run unit tests with IntelliJ Platform classes on classpath"
+    group = "verification"
 }

@@ -1,13 +1,33 @@
 package `in`.kkkev.jjidea.ui
 
+import com.intellij.util.text.DateFormatUtil
+import com.intellij.util.text.DateTimeFormatManager
+import io.mockk.every
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith
 import kotlinx.datetime.Instant
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.*
 
 class JujutsuDateTimeFormatterTest {
+
+
+    @BeforeEach
+    fun setUp() {
+        mockkStatic(DateTimeFormatManager::class)
+        every { DateTimeFormatManager.getInstance() } returns DateTimeFormatManager()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        unmockkStatic(DateTimeFormatManager::class)
+    }
+
 
     @Test
     fun `format timestamp from today shows 'Today' with time`() {

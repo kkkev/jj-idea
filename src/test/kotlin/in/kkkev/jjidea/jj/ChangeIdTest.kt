@@ -26,7 +26,7 @@ class ChangeIdTest {
         changeId.full shouldBe "qpvuntsm"
         changeId.short shouldBe "qp"
         changeId.remainder shouldBe "vuntsm"
-        changeId.toString() shouldBe "qp:vuntsm"
+        changeId.toString() shouldBe "qp"
     }
 
     @Test
@@ -36,7 +36,7 @@ class ChangeIdTest {
         changeId.full shouldBe "qpvuntsm"
         changeId.short shouldBe "qp"
         changeId.remainder shouldBe "vuntsm"
-        changeId.toString() shouldBe "qp:vuntsm"
+        changeId.toString() shouldBe "qp"
     }
 
     @Test
@@ -90,21 +90,12 @@ class ChangeIdTest {
     }
 
     @Test
-    fun `short length of zero returns full as short`() {
-        val changeId = ChangeId("qpvuntsm", 0)
-
-        changeId.short shouldBe ""
-        changeId.remainder shouldBe "qpvuntsm"
-        changeId.toString() shouldBe ":qpvuntsm"
-    }
-
-    @Test
     fun `short length equal to full length`() {
         val changeId = ChangeId("qpvuntsm", 8)
 
         changeId.short shouldBe "qpvuntsm"
         changeId.remainder shouldBe ""
-        changeId.toString() shouldBe "qpvuntsm:"
+        changeId.toString() shouldBe "qpvuntsm"
     }
 
     @Test

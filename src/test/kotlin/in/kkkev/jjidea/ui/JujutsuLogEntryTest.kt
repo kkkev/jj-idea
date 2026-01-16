@@ -34,9 +34,9 @@ class JujutsuLogEntryTest {
 
         entry.changeId shouldBe CHANGE_ID
         entry.commitId shouldBe commitId
-        entry.description shouldBe description
-        entry.bookmarks shouldContain "main"
-        entry.bookmarks shouldContain "feature-branch"
+        entry.description.actual shouldBe description
+        entry.bookmarks shouldContain Bookmark("main")
+        entry.bookmarks shouldContain Bookmark("feature-branch")
     }
 
     @Test
@@ -125,6 +125,6 @@ class JujutsuLogEntryTest {
             underlyingDescription = multiLineDesc
         )
 
-        entry.description shouldBe multiLineDesc
+        entry.description.actual shouldBe multiLineDesc
     }
 }

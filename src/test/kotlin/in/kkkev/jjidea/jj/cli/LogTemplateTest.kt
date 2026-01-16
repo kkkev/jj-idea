@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.cli.LogTemplates.basicLogTemplate
 import `in`.kkkev.jjidea.jj.cli.LogTemplates.commitGraphLogTemplate
 import `in`.kkkev.jjidea.jj.cli.LogTemplates.fullLogTemplate
@@ -25,13 +26,13 @@ class LogTemplateTest {
         val spec = basicLogTemplate.spec
 
         // Should contain all field specs joined with ++ and null byte separators
-        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0""""
+        spec shouldBe """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0" ++ if(immutable, "true", "false") ++ "\0""""
     }
 
     @Test
     fun `basicLogTemplate has correct field count`() {
-        // 8 single fields: changeId, commitId, description, bookmarks, parents, currentWorkingCopy, conflict, empty
-        basicLogTemplate.count shouldBe 8
+        // 9 single fields: changeId, commitId, description, bookmarks, parents, currentWorkingCopy, conflict, empty, immutable
+        basicLogTemplate.count shouldBe 9
     }
 
     @Test
@@ -42,6 +43,7 @@ class LogTemplateTest {
             "Add new feature",
             "",
             "",
+            "false",
             "false",
             "false",
             "false"
@@ -57,6 +59,7 @@ class LogTemplateTest {
         entry.isWorkingCopy shouldBe false
         entry.hasConflict shouldBe false
         entry.isEmpty shouldBe false
+        entry.immutable shouldBe false
     }
 
     @Test
@@ -69,7 +72,8 @@ class LogTemplateTest {
             "",
             "true",
             "false",
-            "false"
+            "false",
+            "false",
         )
 
         val entry = basicLogTemplate.take(fields.iterator())
@@ -87,6 +91,7 @@ class LogTemplateTest {
             "Merge commit",
             "",
             "plkvukqt~p,rlvkpnrz~rl",
+            "false",
             "false",
             "false",
             "false"
@@ -109,6 +114,7 @@ class LogTemplateTest {
             "",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -127,7 +133,8 @@ class LogTemplateTest {
             "",
             "false",
             "false",
-            "true"
+            "true",
+            "false"
         )
 
         val entry = basicLogTemplate.take(fields.iterator())
@@ -146,7 +153,8 @@ class LogTemplateTest {
             "",
             "false",
             "false",
-            "false"  // Not empty
+            "false", // Not empty
+            "false"
         )
 
         val entry = basicLogTemplate.take(fields.iterator())
@@ -166,6 +174,7 @@ class LogTemplateTest {
             "",
             "false",
             "true",
+            "false",
             "false"
         )
 
@@ -179,13 +188,13 @@ class LogTemplateTest {
         val spec = fullLogTemplate.spec
 
         // Should contain basic template fields plus author and committer
-        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0" ++ author.name() ++ "\0" ++ author.email() ++ "\0" ++ author.timestamp().utc().format("%s") ++ "\0" ++ committer.name() ++ "\0" ++ committer.email() ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
+        spec shouldBe """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0" ++ if(immutable, "true", "false") ++ "\0" ++ author.name() ++ "\0" ++ author.email() ++ "\0" ++ author.timestamp().utc().format("%s") ++ "\0" ++ committer.name() ++ "\0" ++ committer.email() ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
     }
 
     @Test
     fun `fullLogTemplate has correct field count`() {
-        // 8 basic fields + 3 author fields + 3 committer fields = 14
-        fullLogTemplate.count shouldBe 14
+        // 9 basic fields + 3 author fields + 3 committer fields = 15
+        fullLogTemplate.count shouldBe 15
     }
 
     @Test
@@ -196,6 +205,7 @@ class LogTemplateTest {
             "Add new feature",
             "",
             "",
+            "false",
             "false",
             "false",
             "false",
@@ -211,7 +221,7 @@ class LogTemplateTest {
 
         entry.changeId shouldBe ChangeId("qpvuntsm", "q")
         entry.commitId shouldBe "abc123def456"
-        entry.description shouldBe "Add new feature"
+        entry.description shouldBe Description("Add new feature")
         entry.author!!.name shouldBe "Test Author"
         entry.author!!.email shouldBe "author@example.com"
         entry.authorTimestamp shouldBe Instant.fromEpochSeconds(1234567890)
@@ -228,6 +238,7 @@ class LogTemplateTest {
             "Cherry-picked commit",
             "",
             "",
+            "false",
             "false",
             "false",
             "false",
@@ -253,7 +264,7 @@ class LogTemplateTest {
     fun `refsLogTemplate generates correct spec string`() {
         val spec = refsLogTemplate.spec
 
-        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0""""
+        spec shouldBe """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0""""
     }
 
     @Test
@@ -323,7 +334,7 @@ class LogTemplateTest {
     fun `commitGraphLogTemplate generates correct spec string`() {
         val spec = commitGraphLogTemplate.spec
 
-        spec shouldBe """change_id ++ "~" + change_id.shortest() ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(", ") ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
+        spec shouldBe """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
     }
 
     @Test

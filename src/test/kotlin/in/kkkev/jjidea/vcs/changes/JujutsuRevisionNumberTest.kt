@@ -14,7 +14,7 @@ class JujutsuRevisionNumberTest {
     fun `revision number returns revision as string`() {
         val revNum = JujutsuRevisionNumber(CHANGE_ID)
 
-        revNum.asString() shouldBe "abc123"
+        revNum.asString() shouldBe "7a8b6"
     }
 
     @Test
@@ -56,6 +56,6 @@ class JujutsuRevisionNumberTest {
     }
 
     companion object {
-        val CHANGE_ID = ChangeId("abc123")
+        val CHANGE_ID = ChangeId("sprot")
     }
 }
