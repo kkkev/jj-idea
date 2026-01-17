@@ -119,4 +119,3 @@ tasks.register<Test>("unitTest") {
     description = "Run unit tests with IntelliJ Platform classes on classpath"
     group = "verification"
 }
-}

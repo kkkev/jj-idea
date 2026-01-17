@@ -9,7 +9,7 @@ class Graph {
 
 data class GraphEntry(
     val current: ChangeId,
-    val parents: Set<ChangeId>
+    val parents: List<ChangeId>  // Order matters: first parent is typically main branch
 )
 
 // === Output ===

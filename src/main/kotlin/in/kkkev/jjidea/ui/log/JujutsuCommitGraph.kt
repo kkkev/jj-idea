@@ -3,13 +3,15 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.ui.JBColor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
+import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
 import java.awt.Color
 
 /**
  * Commit graph layout algorithm and rendering data structures.
  *
- * Calculates horizontal positions (lanes) for each commit based on parent
- * relationships, similar to `git log --graph`.
+ * Uses [LayoutCalculatorImpl] for the core layout algorithm.
+ * @see <a href="../../../../../../docs/LOG_GRAPH_ALGORITHM.md">Log Graph Algorithm</a>
  */
 
 /**
@@ -39,12 +41,8 @@ interface GraphableEntry {
 /**
  * Builds graph layout for a list of commits.
  *
- * Algorithm:
- * 1. Process commits top-to-bottom (newest first)
- * 2. Assign each commit to a lane
- * 3. Track active lanes (lanes with ongoing branches)
- * 4. When a commit has parents, connect to parent lanes
- * 5. Merge branches when they converge
+ * Delegates to [LayoutCalculatorImpl] for the core algorithm, then converts
+ * the result to [GraphNode] objects for rendering.
  */
 class CommitGraphBuilder {
 
@@ -60,6 +58,10 @@ class CommitGraphBuilder {
         JBColor(0x689F38, 0x8BC34A), // Light green (darker for light theme)
     )
 
+    private val layoutCalculator = LayoutCalculatorImpl()
+
+    private fun colorForLane(lane: Int): Color = colors[lane % colors.size]
+
     /**
      * Build graph layout for commits.
      *
@@ -67,135 +69,33 @@ class CommitGraphBuilder {
      * @return Map of changeId -> GraphNode
      */
     fun buildGraph(entries: List<GraphableEntry>): Map<ChangeId, GraphNode> {
-        /*
-        Algorithm:
-        * If not yet assigned, assign to a spare lane
-        * Assign parent to min(whatever it has, this lane)
-        * Lane becomes spare only after parent of all lanes is done
-        * Inbound lines come from all children and point to the centre of the cell in the child's lane and previous row
-        * Outbound lines go to all parents and point to the centre of the parent cell (if next row is the parent) or
-        * the centre of the cell below and in the same lane
-        * Because of this, need to know if the next item in the graph is a parent of any lane
-        * Colour according to the branch - and hence lane
-        * Draw lines for all lanes in progress
-        *
-        * So:
-        * Each lane records the parent (not just if it is free)
+        // Convert to GraphEntry for the layout calculator
+        val graphEntries = entries.map { GraphEntry(it.changeId, it.parentIds) }
 
-         */
-        val graph = mutableMapOf<ChangeId, GraphNode>()
-        val laneAssignments = mutableMapOf<ChangeId, Int>() // changeId -> lane
-        val laneColors = mutableMapOf<Int, Color>() // lane -> color for that lane
-        val availableLanes = mutableSetOf<Int>() // Lanes that are free
-        val childrenByParent = mutableMapOf<ChangeId, MutableList<Pair<ChangeId, Int>>>() // parent -> (child, childLane)
-        var maxLane = 0
+        // Calculate layout using the algorithm
+        val layout = layoutCalculator.calculate(graphEntries)
 
-        for ((index, entry) in entries.withIndex()) {
-            val changeId = entry.changeId
-
-            // Determine lane for this commit
-            val lane = if (laneAssignments.containsKey(changeId)) {
-                // Already assigned by a child
-                laneAssignments.remove(changeId)!!
-            } else {
-                // New commit, use leftmost available lane
-                if (availableLanes.isNotEmpty()) {
-                    availableLanes.min().also { availableLanes.remove(it) }
-                } else {
-                    maxLane.also { maxLane++ }  // Use current value, then increment
-                }
-            }
-
-            // Free lanes from children that merged into this commit
-            // If this commit has multiple children in different lanes, free the child lanes (except this lane)
-            childrenByParent[changeId]?.forEach { (childId, childLane) ->
-                if (childLane != lane) {
-                    availableLanes.add(childLane)
-                }
-            }
-
-            // Lane becomes available only if this commit has no parents (branch ends)
-            if (entry.parentIds.isEmpty()) {
-                availableLanes.add(lane)
-            }
-
-            // Choose color based on lane
-            val color = colors[lane % colors.size]
-            laneColors[lane] = color
-
-            // Calculate pass-through lanes for this row BEFORE assigning parents
-            // These are lanes with active lines from previous commits that don't have a commit in this row
-            val passThroughLanes = laneAssignments.values
-                .filter { it != lane } // Exclude this commit's lane
-                .distinct() // Remove duplicates
-                .associateWith { laneColors[it] ?: colors[it % colors.size] }
-
-            // Assign lanes to parents and track children
-            val parentLanes = entry.parentIds.map { parentId ->
-                val parentLane = if (laneAssignments.containsKey(parentId)) {
-                    val currentParentLane = laneAssignments[parentId]!!
-                    // If this child's lane is less than parent's current lane, reassign parent to leftmost
-                    if (lane < currentParentLane) {
-                        laneAssignments[parentId] = lane
-                        lane
-                    } else {
-                        currentParentLane
-                    }
-                } else {
-                    // Parent not yet assigned, assign based on whether it's first parent
-                    val newLane = if (parentId == entry.parentIds.firstOrNull()) {
-                        lane // First parent continues in same lane
-                    } else {
-                        maxLane.also { maxLane++ } // Merge - additional parent gets new lane
-                    }
-                    laneAssignments[parentId] = newLane
-                    newLane
-                }
-                // Track this child-parent relationship
-                childrenByParent.getOrPut(parentId) { mutableListOf() }.add(changeId to lane)
-
-                // If this child merges into a parent in a different lane, free this child's lane immediately
-                // BUT: Only free if this is NOT a leaf node (has children), because leaf merges
-                // should preserve lanes for visual clarity when multiple siblings merge consecutively
-                if (parentLane != lane) {
-                    val hasChildren = childrenByParent.containsKey(changeId)
-                    if (hasChildren) {
-                        availableLanes.add(lane)
-                    }
-                }
-
-                parentLane
-            }
-
-            // Store graph node
-            graph[changeId] = GraphNode(
-                lane = lane,
-                color = color,
-                parentLanes = parentLanes,
-                passThroughLanes = passThroughLanes
+        // Convert RowLayout to GraphNode
+        return layout.rows.associate { row ->
+            row.changeId to GraphNode(
+                lane = row.lane,
+                color = colorForLane(row.lane),
+                parentLanes = row.parentLanes,
+                passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
             )
         }
-
-        return graph
     }
 
     /**
      * Simplified version that assigns sequential lanes.
      * Use this if the full algorithm is too complex initially.
      */
-    fun buildSimpleGraph(entries: List<LogEntry>): Map<ChangeId, GraphNode> {
-        val graph = mutableMapOf<ChangeId, GraphNode>()
-
-        for ((index, entry) in entries.withIndex()) {
-            // For now, just put everything in lane 0
-            // This gives us a straight vertical line - good for initial testing
-            graph[entry.changeId] = GraphNode(
+    fun buildSimpleGraph(entries: List<LogEntry>): Map<ChangeId, GraphNode> =
+        entries.associate { entry ->
+            entry.changeId to GraphNode(
                 lane = 0,
                 color = colors[0],
                 parentLanes = entry.parentIds.indices.map { 0 }
             )
         }
-
-        return graph
-    }
 }

@@ -1,5 +1,8 @@
 package `in`.kkkev.jjidea.ui.log
 
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
+import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
 import java.awt.Color
 
 /**
@@ -9,7 +12,7 @@ import java.awt.Color
 
 /**
  * Simple graph builder that uses strings instead of ChangeId for testing.
- * This avoids IntelliJ Platform dependencies (ChangeId uses Hash/HashImpl).
+ * Delegates to [LayoutCalculatorImpl] for the core algorithm.
  */
 class GraphBuilder {
     private val colors = listOf(
@@ -22,6 +25,10 @@ class GraphBuilder {
         Color(0x00ACC1), // Cyan
         Color(0x7CB342), // Light green
     )
+
+    private val layoutCalculator = LayoutCalculatorImpl()
+
+    private fun colorForLane(lane: Int): Color = colors[lane % colors.size]
 
     data class Node(
         val id: String,
@@ -37,99 +44,22 @@ class GraphBuilder {
     )
 
     fun buildGraph(entries: List<Entry>): Map<String, Node> {
-        val graph = mutableMapOf<String, Node>()
-        val laneAssignments = mutableMapOf<String, Int>()
-        val laneColors = mutableMapOf<Int, Color>()
-        val availableLanes = mutableSetOf<Int>()
-        val childrenByParent = mutableMapOf<String, MutableList<Pair<String, Int>>>() // parent -> (child, childLane)
-        var maxLane = 0
+        // Convert to GraphEntry for the layout calculator
+        val graphEntries = entries.map { GraphEntry(ChangeId(it.id), it.parentIds.map { p -> ChangeId(p) }) }
 
-        for ((index, entry) in entries.withIndex()) {
-            val id = entry.id
+        // Calculate layout using the algorithm
+        val layout = layoutCalculator.calculate(graphEntries)
 
-            // Determine lane for this commit
-            val lane = if (laneAssignments.containsKey(id)) {
-                // Already assigned by a child
-                laneAssignments.remove(id)!!
-            } else {
-                // New commit, use leftmost available lane
-                if (availableLanes.isNotEmpty()) {
-                    availableLanes.min().also { availableLanes.remove(it) }
-                } else {
-                    maxLane.also { maxLane++ }  // Use current value, then increment
-                }
-            }
-
-            // Free lanes from children that merged into this commit
-            // If this commit has multiple children in different lanes, free the child lanes (except this lane)
-            childrenByParent[id]?.forEach { (childId, childLane) ->
-                if (childLane != lane) {
-                    availableLanes.add(childLane)
-                }
-            }
-
-            // Lane becomes available only if this commit has no parents (branch ends)
-            if (entry.parentIds.isEmpty()) {
-                availableLanes.add(lane)
-            }
-
-            // Choose color based on lane
-            val color = colors[lane % colors.size]
-            laneColors[lane] = color
-
-            // Calculate pass-through lanes BEFORE assigning parents
-            val passThroughLanes = laneAssignments.values
-                .filter { it != lane }
-                .distinct()
-                .associateWith { laneColors[it] ?: colors[it % colors.size] }
-
-            // Assign lanes to parents and track children
-            val parentLanes = entry.parentIds.map { parentId ->
-                val parentLane = if (laneAssignments.containsKey(parentId)) {
-                    val currentParentLane = laneAssignments[parentId]!!
-                    // If this child's lane is less than parent's current lane, reassign parent to leftmost
-                    if (lane < currentParentLane) {
-                        laneAssignments[parentId] = lane
-                        lane
-                    } else {
-                        currentParentLane
-                    }
-                } else {
-                    // Parent not yet assigned, assign based on whether it's first parent
-                    val newLane = if (parentId == entry.parentIds.firstOrNull()) {
-                        lane
-                    } else {
-                        maxLane.also { maxLane++ }
-                    }
-                    laneAssignments[parentId] = newLane
-                    newLane
-                }
-                // Track this child-parent relationship
-                childrenByParent.getOrPut(parentId) { mutableListOf() }.add(id to lane)
-
-                // If this child merges into a parent in a different lane, free this child's lane immediately
-                // BUT: Only free if this is NOT a leaf node (has children), because leaf merges
-                // should preserve lanes for visual clarity when multiple siblings merge consecutively
-                if (parentLane != lane) {
-                    val hasChildren = childrenByParent.containsKey(id)
-                    if (hasChildren) {
-                        availableLanes.add(lane)
-                    }
-                }
-
-                parentLane
-            }
-
-            graph[id] = Node(
-                id = id,
-                lane = lane,
-                color = color,
-                parentLanes = parentLanes,
-                passThroughLanes = passThroughLanes
+        // Convert RowLayout to Node
+        return layout.rows.associate { row ->
+            row.changeId.short to Node(
+                id = row.changeId.short,
+                lane = row.lane,
+                color = colorForLane(row.lane),
+                parentLanes = row.parentLanes,
+                passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
             )
         }
-
-        return graph
     }
 }
 
