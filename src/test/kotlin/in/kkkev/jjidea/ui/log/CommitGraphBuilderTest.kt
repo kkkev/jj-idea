@@ -281,13 +281,14 @@ class CommitGraphBuilderTest {
             // Merge commit should have two parent lanes
             graph["merge"]!!.parentLanes shouldHaveSize 2
 
-            // First parent continues in same lane
-            val mergeLane = graph["merge"]!!.lane
-            graph["merge"]!!.parentLanes[0] shouldBe mergeLane
+            // With Option 2: passthrough to right blocks lane 0
+            // left is pushed to lane 1, right gets lane 0 when passthrough terminates
+            graph["merge"]!!.lane shouldBe 0
+            graph["left"]!!.lane shouldBe 1   // pushed by passthrough to right
+            graph["right"]!!.lane shouldBe 0  // gets child's lane after passthrough terminates
 
-            // Second parent in different lane
-            val secondParentLane = graph["merge"]!!.parentLanes[1]
-            secondParentLane shouldBe (mergeLane + 1)
+            graph["merge"]!!.parentLanes[0] shouldBe 1  // left
+            graph["merge"]!!.parentLanes[1] shouldBe 0  // right
         }
 
         @Test
@@ -304,13 +305,14 @@ class CommitGraphBuilderTest {
             // merge has two parents
             graph["merge"]!!.parentLanes shouldHaveSize 2
 
-            // b1 and b2 in different lanes initially
+            // With Option 2: passthrough to b2 blocks lane 0
+            // b1 is pushed to lane 1, b2 gets lane 0
             val b1Lane = graph["b1"]!!.lane
             val b2Lane = graph["b2"]!!.lane
-            b1Lane shouldBe 0
-            b2Lane shouldBe 1
+            b1Lane shouldBe 1  // pushed by passthrough to b2
+            b2Lane shouldBe 0  // gets child's lane after passthrough terminates
 
-            // Both converge at a
+            // Both converge at a (a gets lowest child lane = 0)
             graph["a"]!!.lane shouldBe 0
         }
     }
@@ -383,13 +385,17 @@ class CommitGraphBuilderTest {
             // Three parent lanes
             graph["octopus"]!!.parentLanes shouldHaveSize 3
 
-            // First parent in same lane as merge
-            val octopusLane = graph["octopus"]!!.lane
-            graph["octopus"]!!.parentLanes[0] shouldBe octopusLane
+            // With Option 2: passthroughs to b and c both block lane 0
+            // a is pushed to lane 1, b is pushed to lane 1 (different row from a)
+            // c gets lane 0 when passthrough terminates
+            graph["octopus"]!!.lane shouldBe 0
+            graph["a"]!!.lane shouldBe 1  // pushed by passthrough
+            graph["b"]!!.lane shouldBe 1  // pushed by passthrough (different row, OK)
+            graph["c"]!!.lane shouldBe 0  // passthrough terminates
 
-            // Other parents in new lanes
-            graph["octopus"]!!.parentLanes[1] shouldBe (octopusLane + 1)
-            graph["octopus"]!!.parentLanes[2] shouldBe (octopusLane + 2)
+            graph["octopus"]!!.parentLanes[0] shouldBe 1  // a
+            graph["octopus"]!!.parentLanes[1] shouldBe 1  // b
+            graph["octopus"]!!.parentLanes[2] shouldBe 0  // c
         }
     }
 
@@ -483,13 +489,13 @@ class CommitGraphBuilderTest {
             // More complex scenario:
             // a1 <- b1 <- c1 (main branch in lane 0)
             // a1 <- b2 <- c2 (side branch in lane 1, merges at a1)
-            // a1 <- b3      (another child, should reuse lane 1)
+            // a1 <- b3      (another child)
             val entries = listOf(
                 entry("c1", listOf("b1")), // Lane 0
                 entry("c2", listOf("b2")), // Lane 1
                 entry("b1", listOf("a1")), // Lane 0
                 entry("b2", listOf("a1")), // Lane 1, merges to a1
-                entry("b3", listOf("a1")), // Should reuse lane 1 after merge
+                entry("b3", listOf("a1")), // Gets lane 2 (lanes 0,1 blocked by passthroughs)
                 entry("a1")                 // Lane 0
             )
 
@@ -500,8 +506,9 @@ class CommitGraphBuilderTest {
             graph["b1"]!!.lane shouldBe 0
             graph["b2"]!!.lane shouldBe 1
 
-            // b3 should reuse lane 1 (freed after b2 merged into a1)
-            graph["b3"]!!.lane shouldBe 1  // FAILING: likely getting lane 2
+            // With Option 2: b1 and b2 create passthroughs to a1 at lanes 0 and 1
+            // b3 can't reuse because both lanes are blocked by passthroughs
+            graph["b3"]!!.lane shouldBe 2  // lanes 0,1 blocked by passthroughs to a1
 
             graph["a1"]!!.lane shouldBe 0
         }
@@ -689,23 +696,22 @@ class CommitGraphBuilderTest {
             // qn should have two parent lanes
             graph["qn"]!!.parentLanes shouldHaveSize 2
 
-            // First parent (rso) should be in lane 0 (same as qn)
-            graph["qn"]!!.parentLanes[0] shouldBe 0
+            // With Option 2: passthrough to oq blocks lane 0
+            // rso is pushed to lane 1, oq gets lane 0 when passthrough terminates
+            graph["qn"]!!.parentLanes[0] shouldBe 1  // rso pushed to lane 1
+            graph["qn"]!!.parentLanes[1] shouldBe 0  // oq gets lane 0
 
-            // Second parent (oq) should be in a different lane (1)
-            graph["qn"]!!.parentLanes[1] shouldBe 1
+            // rso should be in lane 1 (pushed by passthrough to oq)
+            graph["rso"]!!.lane shouldBe 1
 
-            // rso should be in lane 0
-            graph["rso"]!!.lane shouldBe 0
-
-            // oq should be in lane 1
-            graph["oq"]!!.lane shouldBe 1
+            // oq should be in lane 0 (passthrough terminates)
+            graph["oq"]!!.lane shouldBe 0
 
             // Verify the graph visually makes sense:
-            // Lane 0: qn -> rso -> wp -> py
-            // Lane 1: qn -> oq -> py (diagonal from qn to oq)
-            graph["wp"]!!.lane shouldBe 0
-            graph["py"]!!.lane shouldBe 0
+            // Lane 0: qn -> oq -> py (main line continues to furthest parent)
+            // Lane 1: rso -> wp (diagonal from qn to rso)
+            graph["wp"]!!.lane shouldBe 1  // follows rso
+            graph["py"]!!.lane shouldBe 0  // oq's parent, lowest child lane
         }
     }
 }

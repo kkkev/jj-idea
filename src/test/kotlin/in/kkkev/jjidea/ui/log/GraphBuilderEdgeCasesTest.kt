@@ -48,7 +48,8 @@ class GraphBuilderEdgeCasesTest {
 
             graph shouldHaveSize 1
             graph["child"]!!.lane shouldBe 0
-            graph["child"]!!.parentLanes shouldHaveSize 1
+            // Missing parents have unknown lanes, so parentLanes is empty
+            graph["child"]!!.parentLanes shouldHaveSize 0
         }
     }
 

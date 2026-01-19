@@ -7,11 +7,8 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.JujutsuColors
-import java.awt.Component
-import java.awt.Font
-import java.awt.Graphics
-import java.awt.Graphics2D
-import java.awt.RenderingHints
+import `in`.kkkev.jjidea.ui.drawStringCentredVertically
+import java.awt.*
 import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
@@ -41,8 +38,10 @@ class JujutsuGraphAndDescriptionRenderer(
         private val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Graph.horizontalPadding", 4)
 
         // Tooltip text for status indicators
-        private const val CONFLICT_TOOLTIP = "<html><b>Conflict</b><br>This change has unresolved merge conflicts</html>"
-        private const val IMMUTABLE_TOOLTIP = "<html><b>Immutable</b><br>This change cannot be modified (protected commit)</html>"
+        private const val CONFLICT_TOOLTIP =
+            "<html><b>Conflict</b><br>This change has unresolved merge conflicts</html>"
+        private const val IMMUTABLE_TOOLTIP =
+            "<html><b>Immutable</b><br>This change cannot be modified (protected commit)</html>"
 
         // Lane colors - must match CommitGraphBuilder colors for consistent coloring
         private val LANE_COLORS = listOf(
@@ -156,8 +155,7 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // Calculate rightmost active lane for THIS ROW for text alignment
             val rightmostActiveLane = activeLanesInRow.maxOrNull() ?: graphNode.lane
-            val rightmostLaneX = graphStartX + laneWidth / 2 + rightmostActiveLane * laneWidth
-            var x = rightmostLaneX + laneWidth / 2 + horizontalPadding
+            var x = graphStartX + (rightmostActiveLane + 1) * laneWidth
 
             // 2. Draw status indicators (always shown)
             x = drawStatusIndicators(g2d, entry, x)
@@ -193,11 +191,29 @@ class JujutsuGraphAndDescriptionRenderer(
             val activeLanes = mutableSetOf<Int>()
 
             // Draw pass-through lines first (behind commit)
-            val passThroughLanes = drawPassThroughLines(g2d, node, startX, laneWidth)
+            val passThroughLanes = drawPassThroughLines(g2d, startX, laneWidth)
             activeLanes.addAll(passThroughLanes)
 
             // This commit's lane is active
             activeLanes.add(node.lane)
+
+            // Include lanes from children above (jj-idea-cjy)
+            // Incoming diagonal lines take visual space even without passthroughs
+            for (prevRow in 0 until row) {
+                val prevEntry = model.getEntry(prevRow) ?: continue
+                val prevNode = graphNodes[prevEntry.changeId] ?: continue
+                if (prevEntry.parentIds.contains(entry.changeId)) {
+                    activeLanes.add(prevNode.lane)
+                }
+            }
+
+            // Include lanes from merge parents (diagonal lines going down from this row)
+            // For merges, the cross-lane parent lines take visual space
+            for (parentLane in node.parentLanes) {
+                if (parentLane != node.lane) {
+                    activeLanes.add(parentLane)
+                }
+            }
 
             // Calculate commit position - center vertically for symmetric diagonals
             val commitX = startX + laneWidth / 2 + node.lane * laneWidth
@@ -212,9 +228,8 @@ class JujutsuGraphAndDescriptionRenderer(
             return activeLanes
         }
 
-        private fun drawPassThroughLines(g2d: Graphics2D, node: GraphNode, graphStartX: Int, laneWidth: Int): Set<Int> {
+        private fun drawPassThroughLines(g2d: Graphics2D, graphStartX: Int, laneWidth: Int): Set<Int> {
             val model = table.model as? JujutsuLogTableModel ?: return emptySet()
-            val currentEntry = model.getEntry(row) ?: return emptySet()
             val passThroughLanes = mutableSetOf<Int>()
 
             for (prevRow in 0 until row) {
@@ -233,22 +248,17 @@ class JujutsuGraphAndDescriptionRenderer(
                     if (parentRow > row) {
                         val childLane = prevNode.lane
                         val parentLane = prevNode.parentLanes.getOrNull(parentIndex) ?: childLane
-                        val passX = graphStartX + laneWidth / 2 + parentLane * laneWidth
-
-                        // Color logic matching outgoing:
-                        // - Fork (child has single parent, different lane): use CHILD's color
-                        // - Merge (child has multiple parents): use PARENT's color
-                        // - Same lane: use parent's lane color
                         val isCrossLane = parentLane != childLane
                         val isMerge = prevNode.parentLanes.size > 1 && isCrossLane
-                        g2d.color = when {
-                            isMerge -> colorForLane(parentLane)  // Merge: parent's lane color
-                            isCrossLane -> colorForLane(childLane)  // Fork: child's lane color
-                            else -> colorForLane(parentLane)  // Same lane
-                        }
+
+                        // FORK: passthrough stays in child's lane (diagonal at parent's row)
+                        // MERGE: passthrough stays in parent's lane (diagonal was at child's row)
+                        val passLane = if (isMerge) parentLane else childLane
+                        val passX = graphStartX + laneWidth / 2 + passLane * laneWidth
+
+                        g2d.color = colorForLane(passLane)
                         g2d.drawLine(passX, 0, passX, height)
-                        passThroughLanes.add(parentLane)
-                        // Continue to handle other parents (don't break)
+                        passThroughLanes.add(passLane)
                     }
                 }
             }
@@ -283,22 +293,8 @@ class JujutsuGraphAndDescriptionRenderer(
             val currentEntry = model.getEntry(currentRow) ?: return
 
             // Draw incoming lines from children
-            // First, find all cross-lane connections and which lanes they use
-            val crossLaneConnectionLanes = mutableSetOf<Int>()
-            for (prevRow in 0 until currentRow) {
-                val prevEntry = model.getEntry(prevRow) ?: continue
-                val prevNode = graphNodes[prevEntry.changeId] ?: continue
-                val parentIndex = prevEntry.parentIds.indexOf(currentEntry.changeId)
-                if (parentIndex >= 0) {
-                    val childLane = prevNode.lane
-                    val parentLane = prevNode.parentLanes.getOrNull(parentIndex) ?: childLane
-                    if (childLane != parentLane) {
-                        crossLaneConnectionLanes.add(parentLane)
-                    }
-                }
-            }
-
-            // Now draw incoming lines
+            // For FORKS (parent has multiple children): diagonal from child's lane at parent's row
+            // For MERGES (child has multiple parents): vertical from parent's lane (diagonal was at child's row)
             for (prevRow in 0 until currentRow) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
                 val prevNode = graphNodes[prevEntry.changeId] ?: continue
@@ -306,45 +302,38 @@ class JujutsuGraphAndDescriptionRenderer(
                 val parentIndex = prevEntry.parentIds.indexOf(currentEntry.changeId)
                 if (parentIndex >= 0) {
                     val childLane = prevNode.lane
-                    val parentLane = prevNode.parentLanes.getOrNull(parentIndex) ?: childLane
-                    val isCrossLane = childLane != parentLane
-
-                    // Skip same-lane incoming if there's a cross-lane at the same position
-                    // (the cross-lane will draw it with the correct color)
-                    if (!isCrossLane && crossLaneConnectionLanes.contains(parentLane)) {
-                        continue
-                    }
-
-                    val connectionX = graphStartX + laneWidth / 2 + parentLane * laneWidth
-                    // Color logic matching outgoing:
-                    // - Fork: use child's color
-                    // - Merge: use parent's color (this commit)
+                    val isCrossLane = childLane != node.lane
                     val isMerge = prevNode.parentLanes.size > 1 && isCrossLane
-                    g2d.color = when {
-                        isMerge -> colorForLane(parentLane)  // Merge: parent's lane color (this commit's expected lane)
-                        isCrossLane -> colorForLane(childLane)  // Fork: child's lane color
-                        else -> node.color  // Same lane
+
+                    if (isMerge) {
+                        // MERGE: line comes from parent's lane (vertical), diagonal was at child's row
+                        val connectionX = graphStartX + laneWidth / 2 + node.lane * laneWidth
+                        g2d.color = colorForLane(node.lane)
+                        g2d.drawLine(connectionX, 0, commitX, commitY)
+                    } else {
+                        // FORK or same-lane: line comes from child's lane (diagonal at parent's row)
+                        val connectionX = graphStartX + laneWidth / 2 + childLane * laneWidth
+                        g2d.color = colorForLane(childLane)
+                        g2d.drawLine(connectionX, 0, commitX, commitY)
                     }
-                    g2d.drawLine(connectionX, 0, commitX, commitY)
                 }
             }
 
-            // Draw outgoing lines to parents (each parent may be in a different lane)
+            // Draw outgoing lines to parents
             for (parentLane in node.parentLanes) {
                 val parentX = graphStartX + laneWidth / 2 + parentLane * laneWidth
-
-                // Color logic for cross-lane connections:
-                // - Fork (child in different lane than parent): use CHILD's color (node.lane)
-                // - Merge (child has multiple parents): use PARENT's color (parentLane)
-                // - Same lane: use node's color
                 val isCrossLane = parentLane != node.lane
                 val isMerge = node.parentLanes.size > 1 && isCrossLane
-                g2d.color = when {
-                    isMerge -> colorForLane(parentLane)  // Merge: use parent's lane color
-                    isCrossLane -> colorForLane(node.lane)  // Fork: use child's lane color
-                    else -> node.color  // Same lane: use node's color
+
+                if (isMerge) {
+                    // MERGE: diagonal at child's row to parent's lane, then vertical in parent's lane
+                    g2d.color = colorForLane(parentLane)
+                    g2d.drawLine(commitX, commitY, parentX, height)
+                } else {
+                    // FORK or same-lane: vertical down from commit (diagonal at parent's row)
+                    g2d.color = node.color
+                    g2d.drawLine(commitX, commitY, commitX, height)
                 }
-                g2d.drawLine(commitX, commitY, parentX, height)
             }
         }
 
@@ -353,17 +342,18 @@ class JujutsuGraphAndDescriptionRenderer(
             val centerY = height / 2
             val horizontalPadding = HORIZONTAL_PADDING.get()
 
+            // Immutable indicator - always reserve space for alignment consistency
+            // The lock icon is intended to annotate other icons - so it is painted only in the bottom-right corner.
+            val icon = if (entry.immutable) AllIcons.Nodes.Private else AllIcons.Nodes.Public
+            val iconY = centerY - icon.iconHeight / 2
+
+            icon.paintIcon(this, g2d, x, iconY)
+            // Always advance by icon width (placeholder for mutable commits)
+            x += icon.iconWidth + horizontalPadding
+
             // Conflict indicator
             if (entry.hasConflict) {
                 val icon = AllIcons.General.Warning
-                val iconY = centerY - icon.iconHeight / 2
-                icon.paintIcon(this, g2d, x, iconY)
-                x += icon.iconWidth + horizontalPadding
-            }
-
-            // Immutable indicator
-            if (entry.immutable) {
-                val icon = AllIcons.Nodes.Locked
                 val iconY = centerY - icon.iconHeight / 2
                 icon.paintIcon(this, g2d, x, iconY)
                 x += icon.iconWidth + horizontalPadding
@@ -376,7 +366,6 @@ class JujutsuGraphAndDescriptionRenderer(
         }
 
         private fun drawChangeId(g2d: Graphics2D, changeId: ChangeId, startX: Int): Int {
-            val centerY = height / 2
             val fontMetrics = g2d.fontMetrics
 
             // Draw short prefix in bold
@@ -385,7 +374,8 @@ class JujutsuGraphAndDescriptionRenderer(
             g2d.color = if (isSelected) table.selectionForeground else table.foreground
 
             var x = startX
-            g2d.drawString(changeId.short, x, centerY + fontMetrics.ascent / 2)
+
+            g2d.drawStringCentredVertically(changeId.short, x, height)
             x += fontMetrics.stringWidth(changeId.short)
 
             // Draw remainder in gray/small if present
@@ -395,7 +385,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 g2d.font = smallFont
                 g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
 
-                g2d.drawString(changeId.displayRemainder, x, centerY + fontMetrics.ascent / 2)
+                g2d.drawStringCentredVertically(changeId.displayRemainder, x, height)
                 x += g2d.fontMetrics.stringWidth(changeId.displayRemainder)
             }
 
@@ -406,7 +396,6 @@ class JujutsuGraphAndDescriptionRenderer(
         }
 
         private fun drawDescription(g2d: Graphics2D, entry: LogEntry, startX: Int, maxX: Int): Int {
-            val centerY = height / 2
             val baseFontMetrics = g2d.fontMetrics
 
             // Use shared style logic for font and color
@@ -441,7 +430,7 @@ class JujutsuGraphAndDescriptionRenderer(
 
             var x = startX
             if (displayText.isNotEmpty()) {
-                g2d.drawString(displayText, x, centerY + fontMetrics.ascent / 2)
+                g2d.drawStringCentredVertically(displayText, x, height)
                 x += fontMetrics.stringWidth(displayText)
             }
 
@@ -450,7 +439,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
                 g2d.font = baseFontMetrics.font.deriveFont(emptyStyle)
                 g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
-                g2d.drawString(emptyText, x, centerY + g2d.fontMetrics.ascent / 2)
+                g2d.drawStringCentredVertically(emptyText, x, height)
                 x += g2d.fontMetrics.stringWidth(emptyText)
             }
 
@@ -460,15 +449,15 @@ class JujutsuGraphAndDescriptionRenderer(
             return x
         }
 
-        private fun truncateText(text: String, fontMetrics: java.awt.FontMetrics, availableWidth: Int): String {
+        private fun truncateText(text: String, fontMetrics: FontMetrics, availableWidth: Int): String {
             if (fontMetrics.stringWidth(text) <= availableWidth) return text
 
             // Binary search for the right length
             var truncated = text
-            while (truncated.isNotEmpty() && fontMetrics.stringWidth(truncated + "...") > availableWidth) {
+            while (truncated.isNotEmpty() && fontMetrics.stringWidth("$truncated...") > availableWidth) {
                 truncated = truncated.dropLast(1)
             }
-            return if (truncated.isEmpty()) "" else truncated + "..."
+            return if (truncated.isEmpty()) "" else "$truncated..."
         }
 
         private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry, horizontalPadding: Int): Int {
@@ -482,7 +471,7 @@ class JujutsuGraphAndDescriptionRenderer(
             // Calculate bookmark widths using platform-style painter
             if (entry.bookmarks.isNotEmpty()) {
                 val painter = JujutsuLabelPainter(this, compact = false)
-                width += painter.calculateWidth(entry.bookmarks, fontMetrics)
+                width += painter.calculateWidth(entry.bookmarks)
             }
 
             // Calculate @ symbol width

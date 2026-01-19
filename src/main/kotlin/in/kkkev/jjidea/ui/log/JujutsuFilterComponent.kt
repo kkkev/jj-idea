@@ -18,6 +18,7 @@ import java.awt.event.*
 import javax.swing.BorderFactory
 import javax.swing.Box
 import javax.swing.BoxLayout
+import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.border.Border
 
@@ -315,9 +316,9 @@ abstract class JujutsuFilterComponent(
     /**
      * Inline icon button for dropdown/close icon.
      */
-    private class InlineIconButton(icon: javax.swing.Icon) : JComponent() {
-        private var icon: javax.swing.Icon = icon
-        private var hoveredIcon: javax.swing.Icon? = null
+    private class InlineIconButton(icon: Icon) : JComponent() {
+        private var icon: Icon = icon
+        private var hoveredIcon: Icon? = null
         private var isHovered = false
         private var actionListener: ActionListener? = null
 
@@ -346,7 +347,7 @@ abstract class JujutsuFilterComponent(
             })
         }
 
-        fun setIcon(icon: javax.swing.Icon) {
+        fun setIcon(icon: Icon) {
             this.icon = icon
             val size = Dimension(icon.iconWidth, icon.iconHeight)
             preferredSize = size
@@ -355,7 +356,7 @@ abstract class JujutsuFilterComponent(
             repaint()
         }
 
-        fun setHoveredIcon(icon: javax.swing.Icon) {
+        fun setHoveredIcon(icon: Icon) {
             this.hoveredIcon = icon
             repaint()
         }

@@ -14,23 +14,18 @@ interface LayoutCalculator {
 private data class ChildInfo(val changeId: ChangeId, val lane: Int)
 
 private data class Passthrough(
-    val lane: Int,
-    val targetParentId: ChangeId,
-    val sourceLane: Int
+    val lane: Int,  // The lane this passthrough blocks (child's lane)
+    val targetParentId: ChangeId
 )
 
 private data class State(
     val childrenByParent: Map<ChangeId, Set<ChildInfo>> = emptyMap(),
     val lanes: Map<ChangeId, Int> = emptyMap(),
-    val preAssignedLanes: Map<ChangeId, Int> = emptyMap(),  // lanes pre-assigned to parents by children
     val passthroughs: Set<Passthrough> = emptySet(),
     val passthroughsByRow: Map<Int, Set<Int>> = emptyMap(),  // row index -> set of passthrough lanes
 ) {
     // Pick lowest available lane not occupied by a passthrough
     fun laneFor(entry: GraphEntry, currentPassthroughLanes: Set<Int>): Int {
-        // If this entry was pre-assigned a lane by a child, use it
-        preAssignedLanes[entry.current]?.let { return it }
-
         val children = childrenByParent[entry.current]
         return if (children.isNullOrEmpty()) {
             // No children: pick lowest available lane
@@ -70,42 +65,14 @@ class LayoutCalculatorImpl : LayoutCalculator {
                 acc + (parentId to (existingChildren + ChildInfo(entry.current, lane)))
             }
 
-            // Step 4: Pre-assign lanes to parents (for merges, first parent gets same lane, others get new lanes)
-            // Also create passthroughs for parents not in the immediately next row
-            val occupiedLanes = currentPassthroughLanes + lane + state.preAssignedLanes.values.toSet()
-            var nextNewLane = generateSequence(0) { it + 1 }.first { it !in occupiedLanes }
-
-            data class ParentAssignment(val parentId: ChangeId, val assignedLane: Int, val needsPassthrough: Boolean)
-
-            val parentAssignments = entry.parents.mapIndexed { index, parentId ->
-                val parentRow = rowByChangeId[parentId]
-                val needsPassthrough = parentRow != null && parentRow > rowIndex + 1
-
-                // Check if parent already has a pre-assigned lane (from another child)
-                val existingLane = state.preAssignedLanes[parentId]
-                val assignedLane = when {
-                    existingLane != null -> existingLane  // Already assigned
-                    index == 0 -> lane  // First parent: same lane as child
-                    else -> {
-                        // Additional parents: allocate new lane
-                        val newLane = nextNewLane
-                        nextNewLane = generateSequence(newLane + 1) { it + 1 }
-                            .first { it !in occupiedLanes && it != newLane }
-                        newLane
-                    }
+            // Step 4: Create passthroughs for non-adjacent parents
+            // Passthroughs block the CHILD's lane (this entry's lane)
+            val newPassthroughs = entry.parents
+                .filter { parentId ->
+                    val parentRow = rowByChangeId[parentId]
+                    parentRow != null && parentRow > rowIndex + 1
                 }
-                ParentAssignment(parentId, assignedLane, needsPassthrough)
-            }
-
-            val updatedPreAssignedLanes = parentAssignments
-                .filter { state.preAssignedLanes[it.parentId] == null }  // Only add new assignments
-                .fold(state.preAssignedLanes) { acc, assignment ->
-                    acc + (assignment.parentId to assignment.assignedLane)
-                }
-
-            val newPassthroughs = parentAssignments
-                .filter { it.needsPassthrough }
-                .map { Passthrough(lane = it.assignedLane, targetParentId = it.parentId, sourceLane = lane) }
+                .map { parentId -> Passthrough(lane = lane, targetParentId = parentId) }
                 .toSet()
 
             // Update passthroughsByRow for rows between this entry and each non-adjacent parent
@@ -121,7 +88,6 @@ class LayoutCalculatorImpl : LayoutCalculator {
             State(
                 childrenByParent = updatedChildrenByParent,
                 lanes = state.lanes + (entry.current to lane),
-                preAssignedLanes = updatedPreAssignedLanes,
                 passthroughs = remainingPassthroughs + newPassthroughs,
                 passthroughsByRow = updatedPassthroughsByRow
             )

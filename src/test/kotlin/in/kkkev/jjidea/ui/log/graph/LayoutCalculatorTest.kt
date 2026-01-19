@@ -157,7 +157,8 @@ class LayoutCalculatorTest {
     }
 
     // 6. Simple merge
-    // First parent stays in same lane as child, additional parents get new lanes
+    // Passthrough to non-adjacent parent blocks child's lane.
+    // Adjacent parent is pushed to a new lane. Non-adjacent parent gets child's lane.
     @Test
     fun `merge - one child has two parents`() {
         val entries = listOf(
@@ -168,9 +169,9 @@ class LayoutCalculatorTest {
         val layout = calculator.calculate(entries)
 
         layout.rows[0].lane shouldBe 0
-        layout.rows[0].parentLanes shouldContainExactlyInAnyOrder listOf(0, 1)
-        layout.rows[1].lane shouldBe 0  // B (first parent) at lane 0 (same as A)
-        layout.rows[2].lane shouldBe 1  // C (second parent) at lane 1
+        layout.rows[0].parentLanes shouldContainExactlyInAnyOrder listOf(1, 0)
+        layout.rows[1].lane shouldBe 1  // B (first parent) pushed to lane 1 by passthrough to C
+        layout.rows[2].lane shouldBe 0  // C (second parent) at lane 0 (passthrough terminates)
     }
 
     // 7. Fork with passthrough
@@ -188,7 +189,9 @@ class LayoutCalculatorTest {
     }
 
     // 8. Diamond pattern (fork + merge)
-    // A merges B and E. First parent B stays in lane 0, second parent E goes to lane 1.
+    // A merges B and E. Passthrough to E blocks lane 0, so B branch goes to lane 1.
+    // Main line continues: A → E → F → G in lane 0.
+    // Side branch: B → C → D in lane 1.
     @Test
     fun `diamond pattern - fork at bottom, merge at top`() {
         val entries = listOf(
@@ -203,21 +206,21 @@ class LayoutCalculatorTest {
         val layout = calculator.calculate(entries)
 
         // Verify lane assignments
-        // First parent B gets lane 0 (same as A), second parent E gets lane 1
+        // Passthrough A→E at lane 0 pushes B branch to lane 1
         layout.rows[0].lane shouldBe 0  // A
-        layout.rows[1].lane shouldBe 0  // B (first parent, same lane as A)
-        layout.rows[2].lane shouldBe 0  // C (follows B)
-        layout.rows[3].lane shouldBe 0  // D (follows C)
-        layout.rows[4].lane shouldBe 1  // E (second parent, new lane)
-        layout.rows[5].lane shouldBe 1  // F (follows E)
+        layout.rows[1].lane shouldBe 1  // B (pushed by passthrough to E)
+        layout.rows[2].lane shouldBe 1  // C (follows B)
+        layout.rows[3].lane shouldBe 1  // D (follows C)
+        layout.rows[4].lane shouldBe 0  // E (passthrough terminates, gets child lane)
+        layout.rows[5].lane shouldBe 0  // F (follows E)
         layout.rows[6].lane shouldBe 0  // G (lowest child lane)
 
         // Verify passthroughs
-        layout.rows[1].passthroughLanes shouldBe setOf(1)  // A→E at lane 1
-        layout.rows[2].passthroughLanes shouldBe setOf(1)  // A→E at lane 1
-        layout.rows[3].passthroughLanes shouldBe setOf(1)  // A→E at lane 1
-        layout.rows[4].passthroughLanes shouldBe setOf(0)  // D→G at lane 0
-        layout.rows[5].passthroughLanes shouldBe setOf(0)  // D→G at lane 0
+        layout.rows[1].passthroughLanes shouldBe setOf(0)  // A→E at lane 0 (child's lane)
+        layout.rows[2].passthroughLanes shouldBe setOf(0)  // A→E at lane 0
+        layout.rows[3].passthroughLanes shouldBe setOf(0)  // A→E at lane 0
+        layout.rows[4].passthroughLanes shouldBe setOf(1)  // D→G at lane 1 (D's lane)
+        layout.rows[5].passthroughLanes shouldBe setOf(1)  // D→G at lane 1
     }
 
     // 9. Multiple independent branches

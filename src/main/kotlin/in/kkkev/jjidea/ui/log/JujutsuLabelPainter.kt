@@ -3,10 +3,10 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.ui.GraphicsConfig
 import com.intellij.ui.ExperimentalUI
 import com.intellij.ui.JBColor
-import com.intellij.ui.SimpleColoredComponent
 import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBValue
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.ui.drawStringCentredVertically
 import java.awt.Color
 import java.awt.Font
 import java.awt.Graphics2D
@@ -29,19 +29,19 @@ class JujutsuLabelPainter(
         private val RIGHT_PADDING = JBValue.UIInteger("VersionControl.Log.Commit.horizontalPadding", 4)
         private val COMPACT_MIDDLE_PADDING = JBValue.UIInteger("VersionControl.Log.Commit.compactSpacing", 2)
         private val MIDDLE_PADDING = JBValue.UIInteger("VersionControl.Log.Commit.spacing", 12)
-        private val ICON_TEXT_PADDING = JBValue.UIInteger("VersionControl.Log.Commit.iconTextSpacing", 1)
+        private val ICON_TEXT_PADDING = JBValue.UIInteger("VersionControl.Log.Commit.iconTextSpacing", 2)
         private val LABEL_ARC = JBValue.UIInteger("VersionControl.Log.Commit.labelArc", 6)
 
         private const val MAX_BOOKMARK_LENGTH = 22
         private const val ELLIPSIS = "..."
 
-        private fun getIconTextPadding() = if (ExperimentalUI.isNewUI()) ICON_TEXT_PADDING.get() else 0
+        private fun getIconTextPadding() = if (ExperimentalUI.isNewUI()) ICON_TEXT_PADDING.get() else 2
     }
 
     /**
      * Calculate total width needed to paint the given bookmarks.
      */
-    fun calculateWidth(bookmarks: List<Bookmark>, baseFontMetrics: java.awt.FontMetrics): Int {
+    fun calculateWidth(bookmarks: List<Bookmark>): Int {
         if (bookmarks.isEmpty()) return 0
 
         // Use smaller font metrics to match actual rendering
@@ -105,7 +105,6 @@ class JujutsuLabelPainter(
             val smallerFont = baseFont.deriveFont(baseFont.size2D * 0.9f)
             g2.font = smallerFont
             val fontMetrics = g2.fontMetrics
-            val baseLine = SimpleColoredComponent.getTextBaseLine(fontMetrics, height)
             val iconHeight = fontMetrics.height
 
             // Use grey text color (not orange) - matching IntelliJ's branch/tag rendering
@@ -128,7 +127,7 @@ class JujutsuLabelPainter(
 
                 // Paint text with grey color
                 g2.color = textColor
-                g2.drawString(text, currentX, y + baseLine)
+                g2.drawStringCentredVertically(text, currentX, height)
                 currentX += fontMetrics.stringWidth(text)
 
                 // Add spacing between labels
@@ -169,8 +168,7 @@ class JujutsuLabelPainter(
     ): Int {
         if (bookmarks.isEmpty()) return rightX
 
-        val fontMetrics = g2.fontMetrics
-        val totalWidth = calculateWidth(bookmarks, fontMetrics)
+        val totalWidth = calculateWidth(bookmarks)
         val startX = rightX - totalWidth
 
         paint(g2, startX, y, height, bookmarks, background, foreground, isSelected)

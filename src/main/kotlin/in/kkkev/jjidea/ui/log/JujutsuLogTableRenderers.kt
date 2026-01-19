@@ -362,7 +362,7 @@ class SeparateDescriptionCellRenderer(
         // Calculate bookmark widths using platform-style painter
         if (entry.bookmarks.isNotEmpty()) {
             val painter = JujutsuLabelPainter(this, compact = false)
-            width += painter.calculateWidth(entry.bookmarks, fontMetrics)
+            width += painter.calculateWidth(entry.bookmarks)
         }
 
         // Calculate @ symbol width
