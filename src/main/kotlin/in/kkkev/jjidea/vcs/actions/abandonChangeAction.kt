@@ -5,7 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.vcs.jujutsuVcs
+import `in`.kkkev.jjidea.jj.invalidate
 
 /**
  * Abandon change action.
@@ -17,9 +17,7 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
     AllIcons.General.Delete
 ) {
     // Check if confirmation is needed
-    val needsConfirmation = !target.isEmpty || !target.description.empty
-
-    if (needsConfirmation) {
+    if (!target.isEmpty || !target.description.empty) {
         // Build confirmation message based on what will be lost
         val confirmMessage = when {
             !target.isEmpty && !target.description.empty -> JujutsuBundle.message("log.action.abandon.confirm.both")
@@ -44,11 +42,10 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
     }
 
     // Execute abandon in background thread
-    project.jujutsuVcs.commandExecutor
-        .createCommand { abandon(target.changeId) }
+    val jujutsuRoot = target.repo
+    jujutsuRoot.commandExecutor.createCommand { abandon(target.changeId) }
         .onSuccess {
-            // Refresh all views via state model
-            project.refreshAfterVcsOperation(selectWorkingCopy = true)
+            jujutsuRoot.invalidate(true)
             log.info("Abandoned change ${target.changeId}")
         }.onFailureTellUser("log.action.abandon.error", project, log)
         .executeAsync()

@@ -10,12 +10,12 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.isJujutsu
+import `in`.kkkev.jjidea.vcs.jujutsuRoot
 
 /**
  * Action to compare current file with a bookmark, change, or revision
@@ -30,17 +30,13 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.file ?: return
+        val jujutsuRoot = file.jujutsuRoot
 
-        // Get VCS on background thread to avoid slow operations on EDT
-        ApplicationManager.getApplication().executeOnPooledThread {
-            JujutsuVcs.getVcsWithUserErrorHandling(project, "Compare with Branch")
-                ?.let { vcs ->
-                    ApplicationManager.getApplication().invokeLater {
-                        JujutsuCompareWithPopup.show(project, vcs) { chosen ->
-                            showDiffWithRevision(project, file, RevisionExpression(chosen), vcs)
-                        }
-                    }
-                }
+        // TODO Is this threading correct?
+        ApplicationManager.getApplication().invokeLater {
+            JujutsuCompareWithPopup.show(project, jujutsuRoot) { chosen ->
+                showDiffWithRevision(project, file, RevisionExpression(chosen), jujutsuRoot)
+            }
         }
     }
 
@@ -52,14 +48,14 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
         project: Project,
         file: VirtualFile,
         revision: Revision,
-        vcs: JujutsuVcs
+        repo: JujutsuRepository
     ) {
-        val filePath = vcs.getRelativePath(VcsUtil.getFilePath(file))
+        val filePath = repo.getRelativePath(file)
 
         // Load content in background to avoid EDT blocking
         ApplicationManager.getApplication().executeOnPooledThread {
             // Get file content at target revision
-            val revisionResult = vcs.commandExecutor.show(filePath, revision)
+            val revisionResult = repo.commandExecutor.show(filePath, revision)
             val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
             // Show diff on EDT
