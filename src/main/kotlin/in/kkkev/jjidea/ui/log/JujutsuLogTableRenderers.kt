@@ -19,7 +19,9 @@ import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
-abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
+abstract class TextCellRenderer<T> :
+    ColoredTableCellRenderer(),
+    TextCanvas {
     protected var isWorkingCopyRow = false
 
     override fun customizeCellRenderer(
@@ -40,15 +42,15 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
     abstract fun render(value: T)
 }
 
-/**
+/*
  * Cell renderers for JujutsuLogTable columns.
  * Phase 1: Simple text-based rendering
  * Phase 2: Add graph rendering
  * Phase 3: Add fancy icons and styling
+ *
+ * Note: Graph renderer is now in JujutsuGraphCellRenderer.kt
+ * It's set dynamically when graph data is loaded
  */
-
-// Graph renderer is now in JujutsuGraphCellRenderer.kt
-// It's set dynamically when graph data is loaded
 
 /**
  * Renderer for separate Status column (conflict/empty indicators).
@@ -65,11 +67,12 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
         val hasMultipleIndicators = listOf(value.hasConflict, value.isEmpty, value.immutable).count { it } > 1
 
         // Use bold attributes for working copy row
-        val textAttributes = if (value.isWorkingCopy) {
-            SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, SimpleTextAttributes.GRAYED_ATTRIBUTES.fgColor)
-        } else {
-            SimpleTextAttributes.GRAYED_ATTRIBUTES
-        }
+        val textAttributes =
+            if (value.isWorkingCopy) {
+                SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, SimpleTextAttributes.GRAYED_ATTRIBUTES.fgColor)
+            } else {
+                SimpleTextAttributes.GRAYED_ATTRIBUTES
+            }
 
         // Build tooltip parts
         val tooltipParts = mutableListOf<String>()
@@ -105,11 +108,12 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
         }
 
         // Set tooltip if any indicators present, clear if none
-        toolTipText = if (tooltipParts.isNotEmpty()) {
-            "<html>${tooltipParts.joinToString("<br>")}</html>"
-        } else {
-            null
-        }
+        toolTipText =
+            if (tooltipParts.isNotEmpty()) {
+                "<html>${tooltipParts.joinToString("<br>")}</html>"
+            } else {
+                null
+            }
     }
 }
 
@@ -158,7 +162,11 @@ class AuthorCellRenderer : TextCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
         // Use bold for working copy row
         val attributes =
-            if (isWorkingCopyRow) SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES else SimpleTextAttributes.REGULAR_ATTRIBUTES
+            if (isWorkingCopyRow) {
+                SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES
+            } else {
+                SimpleTextAttributes.REGULAR_ATTRIBUTES
+            }
         append(value.name, attributes)
     }
 }
@@ -171,7 +179,11 @@ class CommitterCellRenderer : TextCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
         // Use bold for working copy row
         val attributes =
-            if (isWorkingCopyRow) SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES else SimpleTextAttributes.REGULAR_ATTRIBUTES
+            if (isWorkingCopyRow) {
+                SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES
+            } else {
+                SimpleTextAttributes.REGULAR_ATTRIBUTES
+            }
         append(value.name, attributes)
     }
 }
@@ -218,8 +230,8 @@ class SeparateChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
  */
 class SeparateDescriptionCellRenderer(
     private val table: JTable
-) : JPanel(), TableCellRenderer {
-
+) : JPanel(),
+    TableCellRenderer {
     companion object {
         // HiDPI-aware padding using JBValue for proper scaling
         private val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Description.horizontalPadding", 4)
@@ -250,11 +262,12 @@ class SeparateDescriptionCellRenderer(
         this.isHovered = mousePos != null && table.rowAtPoint(mousePos) == row
 
         // Set background based on selection/hover state
-        background = when {
-            isSelected -> table.selectionBackground
-            isHovered -> UIUtil.getListBackground(true, false)
-            else -> table.background
-        }
+        background =
+            when {
+                isSelected -> table.selectionBackground
+                isHovered -> UIUtil.getListBackground(true, false)
+                else -> table.background
+            }
 
         // Set tooltip to full description with HTML formatting
         entry?.let { e ->
@@ -296,23 +309,25 @@ class SeparateDescriptionCellRenderer(
 
         // Calculate width needed for "(empty)" indicator if applicable
         val emptyText = " (empty)"
-        val emptyIndicatorWidth = if (entry.isEmpty) {
-            val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
-            g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
-        } else {
-            0
-        }
+        val emptyIndicatorWidth =
+            if (entry.isEmpty) {
+                val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
+                g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
+            } else {
+                0
+            }
 
         // Reduce available width for description to reserve space for "(empty)"
         val availableWidthForDescription = maxDescriptionWidth - emptyIndicatorWidth
 
         // Set color using shared logic
-        g2d.color = DescriptionRenderingStyle.getTextColor(
-            entry.description,
-            isSelected,
-            table.selectionForeground,
-            table.foreground
-        )
+        g2d.color =
+            DescriptionRenderingStyle.getTextColor(
+                entry.description,
+                isSelected,
+                table.selectionForeground,
+                table.foreground
+            )
 
         val text = entry.description.display
 
@@ -340,7 +355,11 @@ class SeparateDescriptionCellRenderer(
         drawDecorations(g2d, entry, width - horizontalPadding, horizontalPadding)
     }
 
-    private fun truncateText(text: String, fontMetrics: FontMetrics, availableWidth: Int): String {
+    private fun truncateText(
+        text: String,
+        fontMetrics: FontMetrics,
+        availableWidth: Int
+    ): String {
         if (fontMetrics.stringWidth(text) <= availableWidth) return text
 
         // Binary search for the right length
@@ -351,7 +370,11 @@ class SeparateDescriptionCellRenderer(
         return if (truncated.isEmpty()) "" else truncated + "..."
     }
 
-    private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry, horizontalPadding: Int): Int {
+    private fun calculateDecorationsWidth(
+        g2d: Graphics2D,
+        entry: LogEntry,
+        horizontalPadding: Int
+    ): Int {
         if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return 0
 
         val fontMetrics = g2d.fontMetrics
@@ -375,7 +398,12 @@ class SeparateDescriptionCellRenderer(
     }
 
     @Suppress("UNUSED_PARAMETER")
-    private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int, horizontalPadding: Int) {
+    private fun drawDecorations(
+        g2d: Graphics2D,
+        entry: LogEntry,
+        rightX: Int,
+        horizontalPadding: Int
+    ) {
         if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return
 
         val centerY = height / 2
@@ -387,24 +415,26 @@ class SeparateDescriptionCellRenderer(
         // Draw bookmarks using platform-style painter
         if (entry.bookmarks.isNotEmpty()) {
             val painter = JujutsuLabelPainter(this, compact = false)
-            val background = when {
-                isSelected -> table.selectionBackground
-                isHovered -> UIUtil.getListBackground(true, false)
-                else -> table.background
-            }
+            val background =
+                when {
+                    isSelected -> table.selectionBackground
+                    isHovered -> UIUtil.getListBackground(true, false)
+                    else -> table.background
+                }
             // Use grey text color (icon is orange, text is grey)
             val foreground = if (isSelected) table.selectionForeground else JBColor.GRAY
 
-            x = painter.paintRightAligned(
-                g2d,
-                x,
-                0,
-                height,
-                entry.bookmarks,
-                background,
-                foreground,
-                isSelected
-            )
+            x =
+                painter.paintRightAligned(
+                    g2d,
+                    x,
+                    0,
+                    height,
+                    entry.bookmarks,
+                    background,
+                    foreground,
+                    isSelected
+                )
         }
 
         // Draw @ symbol for working copy
@@ -422,11 +452,12 @@ class SeparateDescriptionCellRenderer(
 
     private fun formatDescriptionTooltip(description: String): String {
         // Convert to HTML and replace newlines with <br>
-        val htmlEscaped = description
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\n", "<br>")
+        val htmlEscaped =
+            description
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\n", "<br>")
 
         return "<html>$htmlEscaped</html>"
     }
@@ -485,16 +516,17 @@ class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
 /**
  * Default column widths (sensible defaults that can be overridden by user preferences).
  */
-private val DEFAULT_COLUMN_WIDTHS = mapOf(
-    JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION to 600,
-    JujutsuLogTableModel.COLUMN_STATUS to 50,
-    JujutsuLogTableModel.COLUMN_CHANGE_ID to 90,
-    JujutsuLogTableModel.COLUMN_DESCRIPTION to 500,
-    JujutsuLogTableModel.COLUMN_DECORATIONS to 120,
-    JujutsuLogTableModel.COLUMN_AUTHOR to 100,
-    JujutsuLogTableModel.COLUMN_COMMITTER to 100,
-    JujutsuLogTableModel.COLUMN_DATE to 120
-)
+private val DEFAULT_COLUMN_WIDTHS =
+    mapOf(
+        JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION to 600,
+        JujutsuLogTableModel.COLUMN_STATUS to 50,
+        JujutsuLogTableModel.COLUMN_CHANGE_ID to 90,
+        JujutsuLogTableModel.COLUMN_DESCRIPTION to 500,
+        JujutsuLogTableModel.COLUMN_DECORATIONS to 120,
+        JujutsuLogTableModel.COLUMN_AUTHOR to 100,
+        JujutsuLogTableModel.COLUMN_COMMITTER to 100,
+        JujutsuLogTableModel.COLUMN_DATE to 120
+    )
 
 /**
  * Install all custom renderers on the given table.

@@ -11,8 +11,9 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
  * Checkin environment for Jujutsu VCS
  * Currently read-only (for MVP)
  */
-class JujutsuCheckinEnvironment(private val vcs: JujutsuVcs) : CheckinEnvironment {
-
+class JujutsuCheckinEnvironment(
+    private val vcs: JujutsuVcs
+) : CheckinEnvironment {
     override fun getCheckinOperationName(): String = "Commit"
 
     override fun getHelpId(): String? = null

@@ -5,13 +5,6 @@ import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import `in`.kkkev.jjidea.jj.JujutsuStateModel
 
 /**
- * Actions against change objects.
- */
-object ChangeAction {
-
-}
-
-/**
  * Helper function to refresh all UI components after VCS state changes.
  * Invalidates the state model, which will notify all observers.
  *

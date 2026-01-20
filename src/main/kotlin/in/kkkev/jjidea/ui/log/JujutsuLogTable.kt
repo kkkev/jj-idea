@@ -28,7 +28,6 @@ class JujutsuLogTable(
     private val project: Project,
     val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
 ) : JBTable(JujutsuLogTableModel()) {
-
     // Graph nodes for rendering (populated when data is loaded)
     var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
         private set
@@ -57,47 +56,68 @@ class JujutsuLogTable(
         setStriped(true)
 
         // Enable hover effect - repaint on mouse movement
-        addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
-            override fun mouseMoved(e: java.awt.event.MouseEvent) {
-                repaint()
+        addMouseMotionListener(
+            object : java.awt.event.MouseMotionAdapter() {
+                override fun mouseMoved(e: java.awt.event.MouseEvent) {
+                    repaint()
+                }
             }
-        })
+        )
 
         // Add column model listener to persist column widths
-        columnModel.addColumnModelListener(object : TableColumnModelListener {
-            override fun columnMarginChanged(e: ChangeEvent) {
-                saveColumnWidths()
-            }
+        columnModel.addColumnModelListener(
+            object : TableColumnModelListener {
+                override fun columnMarginChanged(e: ChangeEvent) {
+                    saveColumnWidths()
+                }
 
-            override fun columnAdded(e: TableColumnModelEvent) {}
-            override fun columnRemoved(e: TableColumnModelEvent) {}
-            override fun columnMoved(e: TableColumnModelEvent) {}
-            override fun columnSelectionChanged(e: ListSelectionEvent) {}
-        })
+                override fun columnAdded(e: TableColumnModelEvent) {}
+
+                override fun columnRemoved(e: TableColumnModelEvent) {}
+
+                override fun columnMoved(e: TableColumnModelEvent) {}
+
+                override fun columnSelectionChanged(e: ListSelectionEvent) {}
+            }
+        )
 
         // Add context menu support
-        addMouseListener(object : PopupHandler() {
-            override fun invokePopup(comp: Component, x: Int, y: Int) {
-                showContextMenu(comp, x, y)
+        addMouseListener(
+            object : PopupHandler() {
+                override fun invokePopup(
+                    comp: Component,
+                    x: Int,
+                    y: Int
+                ) {
+                    showContextMenu(comp, x, y)
+                }
             }
-        })
+        )
 
         // Add component resize listener for dynamic column width adjustment
-        addComponentListener(object : ComponentAdapter() {
-            override fun componentResized(e: java.awt.event.ComponentEvent?) {
-                adjustDescriptionColumnWidth()
+        addComponentListener(
+            object : ComponentAdapter() {
+                override fun componentResized(e: java.awt.event.ComponentEvent?) {
+                    adjustDescriptionColumnWidth()
+                }
             }
-        })
+        )
     }
 
     /**
      * Show context menu at the given location.
      * Called when user right-clicks on the table.
      */
-    private fun showContextMenu(component: Component, x: Int, y: Int) {
+    private fun showContextMenu(
+        component: Component,
+        x: Int,
+        y: Int
+    ) {
         val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, selectedEntries)
-        val popupMenu = ActionManager.getInstance()
-            .createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
+        val popupMenu =
+            ActionManager
+                .getInstance()
+                .createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
         popupMenu.component.show(component, x, y)
     }
 
@@ -180,25 +200,28 @@ class JujutsuLogTable(
         if (columnModel.columnCount == 0) return
 
         // Find the description column (either combined or separate)
-        val descColumnIndex = if (columnManager.showDescriptionColumn) {
-            // Using separate description column
-            JujutsuLogTableModel.COLUMN_DESCRIPTION
-        } else {
-            // Using combined graph+description column
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
-        }
+        val descColumnIndex =
+            if (columnManager.showDescriptionColumn) {
+                // Using separate description column
+                JujutsuLogTableModel.COLUMN_DESCRIPTION
+            } else {
+                // Using combined graph+description column
+                JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
+            }
 
         // Find the actual column in the column model
-        val descColumn = (0 until columnModel.columnCount)
-            .map { columnModel.getColumn(it) }
-            .firstOrNull { it.modelIndex == descColumnIndex }
-            ?: return
+        val descColumn =
+            (0 until columnModel.columnCount)
+                .map { columnModel.getColumn(it) }
+                .firstOrNull { it.modelIndex == descColumnIndex }
+                ?: return
 
         // Calculate total width of other columns
-        val otherColumnsWidth = (0 until columnModel.columnCount)
-            .map { columnModel.getColumn(it) }
-            .filter { it != descColumn }
-            .sumOf { it.width }
+        val otherColumnsWidth =
+            (0 until columnModel.columnCount)
+                .map { columnModel.getColumn(it) }
+                .filter { it != descColumn }
+                .sumOf { it.width }
 
         // Calculate available width for description
         val availableWidth = width - otherColumnsWidth
@@ -225,7 +248,6 @@ class JujutsuLogTable(
  * 7. Date - Commit timestamp
  */
 class JujutsuLogTableModel : AbstractTableModel() {
-
     private val entries = mutableListOf<LogEntry>()
     private val filteredEntries = mutableListOf<LogEntry>()
     private var filterText: String = ""
@@ -257,7 +279,10 @@ class JujutsuLogTableModel : AbstractTableModel() {
     // No column headings - matches Git plugin
     override fun getColumnName(column: Int) = ""
 
-    override fun getValueAt(rowIndex: Int, columnIndex: Int): Any? {
+    override fun getValueAt(
+        rowIndex: Int,
+        columnIndex: Int
+    ): Any? {
         if (rowIndex < 0 || rowIndex >= filteredEntries.size) return null
 
         val entry = filteredEntries[rowIndex]
@@ -278,8 +303,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /**
      * Get the log entry at the given row.
      */
-    fun getEntry(row: Int): LogEntry? =
-        if (row in filteredEntries.indices) filteredEntries[row] else null
+    fun getEntry(row: Int): LogEntry? = if (row in filteredEntries.indices) filteredEntries[row] else null
 
     /**
      * Update the table with new log entries.
@@ -294,7 +318,12 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /**
      * Set the filter text and options, then update the filtered entries.
      */
-    fun setFilter(text: String, regex: Boolean = false, caseSensitive: Boolean = false, wholeWords: Boolean = false) {
+    fun setFilter(
+        text: String,
+        regex: Boolean = false,
+        caseSensitive: Boolean = false,
+        wholeWords: Boolean = false
+    ) {
         filterText = text
         useRegex = regex
         matchCase = caseSensitive
@@ -342,8 +371,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /**
      * Get all unique authors in the current entries (for filter UI).
      */
-    fun getAllAuthors(): List<String> =
-        entries.mapNotNull { it.author?.email }.distinct().sorted()
+    fun getAllAuthors(): List<String> = entries.mapNotNull { it.author?.email }.distinct().sorted()
 
     /**
      * Get all unique bookmarks in the current entries (for filter UI).
@@ -363,64 +391,72 @@ class JujutsuLogTableModel : AbstractTableModel() {
         filteredEntries.clear()
 
         // Build text matcher if text filter is active
-        val textMatcher: ((String) -> Boolean)? = if (filterText.isNotBlank()) {
-            if (useRegex) {
-                // Regex mode
-                try {
-                    val pattern = if (matchCase) {
-                        filterText.toRegex()
-                    } else {
-                        filterText.toRegex(RegexOption.IGNORE_CASE)
+        val textMatcher: ((String) -> Boolean)? =
+            if (filterText.isNotBlank()) {
+                if (useRegex) {
+                    // Regex mode
+                    try {
+                        val pattern =
+                            if (matchCase) {
+                                filterText.toRegex()
+                            } else {
+                                filterText.toRegex(RegexOption.IGNORE_CASE)
+                            }
+                        { text: String -> pattern.containsMatchIn(text) }
+                    } catch (_: Exception) {
+                        // Invalid regex - fall back to literal search
+                        createLiteralMatcher(filterText, matchCase, matchWholeWords)
                     }
-                    { text: String -> pattern.containsMatchIn(text) }
-                } catch (_: Exception) {
-                    // Invalid regex - fall back to literal search
+                } else {
+                    // Literal search
                     createLiteralMatcher(filterText, matchCase, matchWholeWords)
                 }
             } else {
-                // Literal search
-                createLiteralMatcher(filterText, matchCase, matchWholeWords)
+                null
             }
-        } else {
-            null
-        }
 
         // Filter entries by all active filters
-        filteredEntries.addAll(entries.filter { entry ->
-            // Text filter (if active)
-            val matchesText = textMatcher?.let { matcher ->
-                matcher(entry.description.summary) ||
-                        matcher(entry.changeId.toString()) ||
-                        entry.author?.name?.let(matcher) == true ||
-                        entry.author?.email?.let(matcher) == true
-            } ?: true
+        filteredEntries.addAll(
+            entries.filter { entry ->
+                // Text filter (if active)
+                val matchesText =
+                    textMatcher?.let { matcher ->
+                        matcher(entry.description.summary) ||
+                            matcher(entry.changeId.toString()) ||
+                            entry.author?.name?.let(matcher) == true ||
+                            entry.author?.email?.let(matcher) == true
+                    } ?: true
 
-            // Author filter (if active)
-            val matchesAuthor = if (authorFilter.isNotEmpty()) {
-                entry.author?.email?.let { authorFilter.contains(it) } == true
-            } else {
-                true
+                // Author filter (if active)
+                val matchesAuthor =
+                    if (authorFilter.isNotEmpty()) {
+                        entry.author?.email?.let { authorFilter.contains(it) } == true
+                    } else {
+                        true
+                    }
+
+                // Bookmark filter (if active) - filter by change ID
+                val matchesBookmark =
+                    if (bookmarkFilter.isNotEmpty()) {
+                        bookmarkFilter.contains(entry.changeId)
+                    } else {
+                        true
+                    }
+
+                // Date filter (if active)
+                val matchesDate =
+                    dateFilterCutoff?.let { cutoff ->
+                        val timestamp = entry.authorTimestamp ?: entry.committerTimestamp
+                        timestamp != null && timestamp >= cutoff
+                    } ?: true
+
+                // Paths filter (if active) - placeholder for now
+                // TODO: Implement path filtering once file changes are available in LogEntry
+                val matchesPaths = pathsFilter.isEmpty()
+
+                matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths
             }
-
-            // Bookmark filter (if active) - filter by change ID
-            val matchesBookmark = if (bookmarkFilter.isNotEmpty()) {
-                bookmarkFilter.contains(entry.changeId)
-            } else {
-                true
-            }
-
-            // Date filter (if active)
-            val matchesDate = dateFilterCutoff?.let { cutoff ->
-                val timestamp = entry.authorTimestamp ?: entry.committerTimestamp
-                timestamp != null && timestamp >= cutoff
-            } ?: true
-
-            // Paths filter (if active) - placeholder for now
-            // TODO: Implement path filtering once file changes are available in LogEntry
-            val matchesPaths = pathsFilter.isEmpty()
-
-            matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths
-        })
+        )
 
         fireTableDataChanged()
     }
@@ -428,14 +464,19 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /**
      * Create a literal string matcher with case sensitivity and whole word options.
      */
-    private fun createLiteralMatcher(filter: String, caseSensitive: Boolean, wholeWords: Boolean): (String) -> Boolean {
+    private fun createLiteralMatcher(
+        filter: String,
+        caseSensitive: Boolean,
+        wholeWords: Boolean
+    ): (String) -> Boolean {
         if (wholeWords) {
             // Match whole words only
-            val pattern = if (caseSensitive) {
-                "\\b${Regex.escape(filter)}\\b".toRegex()
-            } else {
-                "\\b${Regex.escape(filter)}\\b".toRegex(RegexOption.IGNORE_CASE)
-            }
+            val pattern =
+                if (caseSensitive) {
+                    "\\b${Regex.escape(filter)}\\b".toRegex()
+                } else {
+                    "\\b${Regex.escape(filter)}\\b".toRegex(RegexOption.IGNORE_CASE)
+                }
             return { text: String -> pattern.containsMatchIn(text) }
         }
 

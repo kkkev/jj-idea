@@ -15,7 +15,6 @@ import kotlinx.datetime.Instant
  * author.name() ++ "\0" ++ author.email() ++ "\0" ++ description.first_line() ++ "\0" ++ line
  */
 object AnnotationParser {
-
     private const val FIELD_SEPARATOR = "\u0000" // Null byte
     private const val FIELDS_PER_LINE = 8
 
@@ -32,7 +31,8 @@ object AnnotationParser {
      *
      * Note: In annotate context, use `commit` instead of `commit_id`
      */
-    val TEMPLATE = """
+    val TEMPLATE =
+        """
         commit.change_id() ++ "\0" ++
         commit.change_id().shortest() ++ "\0" ++
         commit.commit_id() ++ "\0" ++
@@ -41,7 +41,7 @@ object AnnotationParser {
         commit.author().timestamp().utc().format("%s") ++ "\0" ++
         commit.description() ++ "\0" ++
         content ++ "\0"
-    """.trimIndent().replace("\n", "")
+        """.trimIndent().replace("\n", "")
 
     /**
      * Parse jj file annotate output into annotation lines
@@ -56,8 +56,9 @@ object AnnotationParser {
         val fields = trimmed.split(FIELD_SEPARATOR)
 
         // Group into chunks of n fields per line
-        return fields.chunked(FIELDS_PER_LINE)
-            .filter { it.size == FIELDS_PER_LINE }  // Only complete lines
+        return fields
+            .chunked(FIELDS_PER_LINE)
+            .filter { it.size == FIELDS_PER_LINE } // Only complete lines
             .mapIndexed { index, chunk ->
                 parseAnnotationLine(chunk, index + 1)
             }
@@ -69,7 +70,10 @@ object AnnotationParser {
      * @param lineNumber Line number (1-indexed)
      * @return Parsed annotation line
      */
-    private fun parseAnnotationLine(chunk: List<String>, lineNumber: Int): AnnotationLine {
+    private fun parseAnnotationLine(
+        chunk: List<String>,
+        lineNumber: Int
+    ): AnnotationLine {
         require(chunk.size == FIELDS_PER_LINE) {
             "Invalid annotation line: expected $FIELDS_PER_LINE fields, got ${chunk.size}"
         }
@@ -90,7 +94,7 @@ object AnnotationParser {
             authorTimestamp = authorTimestamp,
             description = description,
             lineContent = lineContent,
-            lineNumber = lineNumber,
+            lineNumber = lineNumber
         )
     }
 }

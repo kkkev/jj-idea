@@ -19,8 +19,9 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * Modern file history handler for VCS Log integration.
  * Provides better UI with toolbar at top and details pane on right.
  */
-class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHistoryHandler {
-
+class JujutsuLogFileHistoryHandler(
+    private val project: Project
+) : VcsLogFileHistoryHandler {
     private val log = Logger.getInstance(javaClass)
 
     override val supportedVcs get() = JujutsuVcs.getKey()
@@ -99,7 +100,12 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
     }
 
     @Throws(VcsException::class)
-    override fun getRename(root: VirtualFile, filePath: FilePath, beforeHash: Hash, afterHash: Hash): Rename? {
+    override fun getRename(
+        root: VirtualFile,
+        filePath: FilePath,
+        beforeHash: Hash,
+        afterHash: Hash
+    ): Rename? {
         // TODO: Implement rename detection for file history (lower priority)
         return null
     }

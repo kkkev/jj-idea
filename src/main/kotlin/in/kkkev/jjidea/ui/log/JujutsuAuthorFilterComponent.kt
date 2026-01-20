@@ -1,10 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.actionSystem.*
 import `in`.kkkev.jjidea.JujutsuBundle
 
 /**
@@ -13,16 +9,14 @@ import `in`.kkkev.jjidea.JujutsuBundle
 class JujutsuAuthorFilterComponent(
     private val tableModel: JujutsuLogTableModel
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.author")) {
-
     private val selectedAuthors = mutableSetOf<String>()
 
-    override fun getCurrentText(): String {
-        return when (selectedAuthors.size) {
+    override fun getCurrentText(): String =
+        when (selectedAuthors.size) {
             0 -> ""
             1 -> selectedAuthors.first()
             else -> JujutsuBundle.message("log.filter.multiple", selectedAuthors.size)
         }
-    }
 
     override fun isValueSelected(): Boolean = selectedAuthors.isNotEmpty()
 
@@ -55,10 +49,15 @@ class JujutsuAuthorFilterComponent(
         notifyFilterChanged()
     }
 
-    private inner class ToggleAuthorAction(private val author: String) : ToggleAction(author) {
+    private inner class ToggleAuthorAction(
+        private val author: String
+    ) : ToggleAction(author) {
         override fun isSelected(e: AnActionEvent): Boolean = selectedAuthors.contains(author)
 
-        override fun setSelected(e: AnActionEvent, state: Boolean) {
+        override fun setSelected(
+            e: AnActionEvent,
+            state: Boolean
+        ) {
             if (state) {
                 selectedAuthors.add(author)
             } else {

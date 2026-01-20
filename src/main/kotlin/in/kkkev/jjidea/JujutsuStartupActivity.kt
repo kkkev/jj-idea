@@ -59,14 +59,16 @@ class JujutsuStartupActivity : ProjectActivity {
      */
     private fun installDefaultLogTabSuppressor(project: Project) {
         getVcsToolWindow(project)?.let { vcsToolWindow ->
-            vcsToolWindow.contentManager.addContentManagerListener(object : ContentManagerListener {
-                override fun contentAdded(event: ContentManagerEvent) {
-                    if (isDefaultLogTab(event.content.displayName)) {
-                        log.info("Suppressing default VCS log tab: ${event.content.displayName}")
-                        vcsToolWindow.contentManager.removeContent(event.content, true)
+            vcsToolWindow.contentManager.addContentManagerListener(
+                object : ContentManagerListener {
+                    override fun contentAdded(event: ContentManagerEvent) {
+                        if (isDefaultLogTab(event.content.displayName)) {
+                            log.info("Suppressing default VCS log tab: ${event.content.displayName}")
+                            vcsToolWindow.contentManager.removeContent(event.content, true)
+                        }
                     }
                 }
-            })
+            )
             log.debug("Installed default log tab suppressor")
         }
     }
@@ -92,21 +94,23 @@ class JujutsuStartupActivity : ProjectActivity {
     /**
      * Gets the VCS tool window for the project.
      */
-    private fun getVcsToolWindow(project: Project) = try {
-        ToolWindowManager.getInstance(project).getToolWindow("Version Control")
-            ?.also { log.debug("Found VCS tool window") }
-            ?: run {
-                log.debug("No VCS tool window found")
-                null
-            }
-    } catch (e: Exception) {
-        log.warn("Failed to get VCS tool window", e)
-        null
-    }
+    private fun getVcsToolWindow(project: Project) =
+        try {
+            ToolWindowManager
+                .getInstance(project)
+                .getToolWindow("Version Control")
+                ?.also { log.debug("Found VCS tool window") }
+                ?: run {
+                    log.debug("No VCS tool window found")
+                    null
+                }
+        } catch (e: Exception) {
+            log.warn("Failed to get VCS tool window", e)
+            null
+        }
 
     /**
      * Checks if a tab is a default VCS log tab that should be suppressed.
      */
-    private fun isDefaultLogTab(displayName: String?) =
-        displayName == "Log" && !displayName.contains("Jujutsu")
+    private fun isDefaultLogTab(displayName: String?) = displayName == "Log" && !displayName.contains("Jujutsu")
 }

@@ -13,8 +13,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Automatically invalidates when VCS changes occur
  */
 @Service(Service.Level.PROJECT)
-class LogCache(project: Project) : Disposable {
-
+class LogCache(
+    project: Project
+) : Disposable {
     private val log = Logger.getInstance(javaClass)
     private val cache = ConcurrentHashMap<String, CachedLogResult>()
 
@@ -25,16 +26,22 @@ class LogCache(project: Project) : Disposable {
 
     init {
         // Listen for VCS changes to invalidate cache
-        project.messageBus.connect(this).subscribe(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED, VcsListener {
-            log.debug("VCS configuration changed, clearing log cache")
-            clear()
-        })
+        project.messageBus.connect(this).subscribe(
+            ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED,
+            VcsListener {
+                log.debug("VCS configuration changed, clearing log cache")
+                clear()
+            }
+        )
     }
 
     /**
      * Get cached log entries or null if not cached
      */
-    fun get(revisions: Revset, filePaths: List<String> = emptyList()): List<LogEntry>? {
+    fun get(
+        revisions: Revset,
+        filePaths: List<String> = emptyList()
+    ): List<LogEntry>? {
         val key = cacheKey(revisions, filePaths)
         val cached = cache[key]
 
@@ -56,7 +63,11 @@ class LogCache(project: Project) : Disposable {
     /**
      * Store log entries in cache
      */
-    fun put(revisions: Revset, filePaths: List<String> = emptyList(), entries: List<LogEntry>) {
+    fun put(
+        revisions: Revset,
+        filePaths: List<String> = emptyList(),
+        entries: List<LogEntry>
+    ) {
         val key = cacheKey(revisions, filePaths)
         cache[key] = CachedLogResult(entries)
         log.debug("Cached ${entries.size} entries for $key")
@@ -70,15 +81,16 @@ class LogCache(project: Project) : Disposable {
         log.debug("Cleared log cache")
     }
 
-    private fun cacheKey(revisions: Revset, filePaths: List<String>): String =
-        "$revisions|${filePaths.sorted().joinToString(",")}"
+    private fun cacheKey(
+        revisions: Revset,
+        filePaths: List<String>
+    ): String = "$revisions|${filePaths.sorted().joinToString(",")}"
 
     override fun dispose() {
         clear()
     }
 
     companion object {
-        fun getInstance(project: Project): LogCache =
-            project.getService(LogCache::class.java)
+        fun getInstance(project: Project): LogCache = project.getService(LogCache::class.java)
     }
 }

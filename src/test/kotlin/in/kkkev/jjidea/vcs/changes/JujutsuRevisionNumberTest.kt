@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test
  * Tests for JujutsuRevisionNumber
  */
 class JujutsuRevisionNumberTest {
-
     @Test
     fun `revision number returns revision as string`() {
         val revNum = JujutsuRevisionNumber(CHANGE_ID)

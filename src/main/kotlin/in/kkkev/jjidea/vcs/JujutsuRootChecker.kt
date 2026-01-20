@@ -38,7 +38,8 @@ class JujutsuRootChecker : VcsRootChecker() {
          * Returns the directory containing the .jj directory, or null if not found.
          */
         fun findJujutsuRoot(startPath: String?): VirtualFile? =
-            startPath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+            startPath
+                ?.let { LocalFileSystem.getInstance().findFileByPath(it) }
                 ?.let { findJujutsuRoot(it) }
     }
 }

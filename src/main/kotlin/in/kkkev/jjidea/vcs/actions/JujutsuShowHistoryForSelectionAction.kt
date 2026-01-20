@@ -15,11 +15,12 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
  * Delegates to the platform's built-in SelectedBlockHistoryAction which handles
  * line-range history display using the VCS provider's history implementation.
  */
-class JujutsuShowHistoryForSelectionAction : DumbAwareAction(
-    JujutsuBundle.message("action.show.history.selection"),
-    JujutsuBundle.message("action.show.history.selection.description"),
-    AllIcons.Vcs.History
-) {
+class JujutsuShowHistoryForSelectionAction :
+    DumbAwareAction(
+        JujutsuBundle.message("action.show.history.selection"),
+        JujutsuBundle.message("action.show.history.selection.description"),
+        AllIcons.Vcs.History
+    ) {
     private val log = Logger.getInstance(javaClass)
 
     private val platformAction = SelectedBlockHistoryAction()
@@ -40,9 +41,9 @@ class JujutsuShowHistoryForSelectionAction : DumbAwareAction(
         val project = e.project
 
         e.presentation.isEnabledAndVisible = (project != null) &&
-                (editor != null) &&
-                (e.file != null) &&
-                editor.selectionModel.hasSelection() &&
-                project.isJujutsu
+            (editor != null) &&
+            (e.file != null) &&
+            editor.selectionModel.hasSelection() &&
+            project.isJujutsu
     }
 }

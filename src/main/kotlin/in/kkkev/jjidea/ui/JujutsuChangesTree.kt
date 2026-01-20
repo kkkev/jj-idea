@@ -13,7 +13,9 @@ import javax.swing.tree.DefaultTreeModel
  * Changes tree for Jujutsu tool window using IntelliJ's built-in changes tree infrastructure.
  * Provides grouping, speed search, and standard VCS actions.
  */
-class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(project, false, true) {
+class JujutsuChangesTree(
+    project: Project
+) : AsyncChangesTreeImpl.Changes(project, false, true) {
     init {
         // Use KEEP_NON_EMPTY strategy: preserves user's manual expansion/collapse actions
         // while expanding default nodes (including new ones) when tree is rebuilt
@@ -23,9 +25,7 @@ class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(projec
     override fun buildTreeModel(
         grouping: ChangesGroupingPolicyFactory,
         changes: List<Change>
-    ): DefaultTreeModel {
-        return TreeModelBuilder.buildFromChanges(myProject, grouping, changes, null)
-    }
+    ): DefaultTreeModel = TreeModelBuilder.buildFromChanges(myProject, grouping, changes, null)
 
     override fun installGroupingSupport(): ChangesGroupingSupport {
         val support = ChangesGroupingSupport(myProject, this, false)

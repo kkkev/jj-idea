@@ -14,26 +14,32 @@ import java.io.DataOutput
 class JujutsuLogRefManager : VcsLogRefManager {
     companion object {
         // Theme-aware colors with fallbacks to standard VCS log colors
-        private val BOOKMARK_COLOR = JBColor.namedColor(
-            "VersionControl.JujutsuLog.bookmarkIconColor",
-            VcsLogStandardColors.Refs.BRANCH
-        )
+        private val BOOKMARK_COLOR =
+            JBColor.namedColor(
+                "VersionControl.JujutsuLog.bookmarkIconColor",
+                VcsLogStandardColors.Refs.BRANCH
+            )
 
-        private val WORKING_COPY_COLOR = JBColor.namedColor(
-            "VersionControl.JujutsuLog.workingCopyIconColor",
-            VcsLogStandardColors.Refs.TIP
-        )
+        private val WORKING_COPY_COLOR =
+            JBColor.namedColor(
+                "VersionControl.JujutsuLog.workingCopyIconColor",
+                VcsLogStandardColors.Refs.TIP
+            )
 
         // Jujutsu ref types (bookmarks are like Git branches)
-        val BOOKMARK = object : VcsRefType {
-            override fun isBranch() = true
-            override fun getBackgroundColor() = BOOKMARK_COLOR
-        }
+        val BOOKMARK =
+            object : VcsRefType {
+                override fun isBranch() = true
 
-        val WORKING_COPY = object : VcsRefType {
-            override fun isBranch() = false
-            override fun getBackgroundColor() = WORKING_COPY_COLOR
-        }
+                override fun getBackgroundColor() = BOOKMARK_COLOR
+            }
+
+        val WORKING_COPY =
+            object : VcsRefType {
+                override fun isBranch() = false
+
+                override fun getBackgroundColor() = WORKING_COPY_COLOR
+            }
     }
 
     override fun groupForTable(
@@ -60,7 +66,10 @@ class JujutsuLogRefManager : VcsLogRefManager {
         return result
     }
 
-    override fun serialize(output: DataOutput, type: VcsRefType) {
+    override fun serialize(
+        output: DataOutput,
+        type: VcsRefType
+    ) {
         // Serialize ref type - for now just use a simple int
         when (type) {
             WORKING_COPY -> output.writeInt(0)
@@ -73,8 +82,10 @@ class JujutsuLogRefManager : VcsLogRefManager {
      * Comparator for sorting Jujutsu refs
      */
     object JujutsuRefComparator : Comparator<VcsRef> {
-
-        override fun compare(ref1: VcsRef, ref2: VcsRef): Int {
+        override fun compare(
+            ref1: VcsRef,
+            ref2: VcsRef
+        ): Int {
             val key1 = getRefSortKey(ref1)
             val key2 = getRefSortKey(ref2)
             return key1.compareTo(key2)
@@ -98,7 +109,10 @@ class JujutsuLogRefManager : VcsLogRefManager {
             return RefSortKey(2, name)
         }
 
-        data class RefSortKey(val priority: Int, val name: String) : Comparable<RefSortKey> {
+        data class RefSortKey(
+            val priority: Int,
+            val name: String
+        ) : Comparable<RefSortKey> {
             override fun compareTo(other: RefSortKey): Int {
                 val priorityCompare = priority.compareTo(other.priority)
                 if (priorityCompare != 0) return priorityCompare
@@ -107,8 +121,8 @@ class JujutsuLogRefManager : VcsLogRefManager {
         }
     }
 
-    override fun getBranchLayoutComparator(): Comparator<VcsRef?> {
-        return Comparator { ref1, ref2 ->
+    override fun getBranchLayoutComparator(): Comparator<VcsRef?> =
+        Comparator { ref1, ref2 ->
             when {
                 ref1 == null && ref2 == null -> 0
                 ref1 == null -> 1
@@ -116,10 +130,9 @@ class JujutsuLogRefManager : VcsLogRefManager {
                 else -> JujutsuRefComparator.compare(ref1, ref2)
             }
         }
-    }
 
-    override fun getLabelsOrderComparator(): Comparator<VcsRef?> {
-        return Comparator { ref1, ref2 ->
+    override fun getLabelsOrderComparator(): Comparator<VcsRef?> =
+        Comparator { ref1, ref2 ->
             when {
                 ref1 == null && ref2 == null -> 0
                 ref1 == null -> 1
@@ -127,7 +140,6 @@ class JujutsuLogRefManager : VcsLogRefManager {
                 else -> JujutsuRefComparator.compare(ref1, ref2)
             }
         }
-    }
 
     override fun groupForBranchFilter(refs: Collection<VcsRef?>): @Unmodifiable List<RefGroup?> {
         // Simple grouping - bookmarks together
@@ -138,20 +150,22 @@ class JujutsuLogRefManager : VcsLogRefManager {
         return if (bookmarks.isEmpty()) emptyList() else listOf(RefGroupImpl(true, "Bookmarks", bookmarks))
     }
 
-    override fun deserialize(input: DataInput): VcsRefType {
-        return when (input.readInt()) {
+    override fun deserialize(input: DataInput): VcsRefType =
+        when (input.readInt()) {
             0 -> WORKING_COPY
             1 -> BOOKMARK
             else -> BOOKMARK
         }
-    }
 
     override fun isFavorite(ref: VcsRef): Boolean {
         // No favorites support for now
         return false
     }
 
-    override fun setFavorite(ref: VcsRef, favorite: Boolean) {
+    override fun setFavorite(
+        ref: VcsRef,
+        favorite: Boolean
+    ) {
         // No favorites support for now
     }
 }
@@ -162,10 +176,12 @@ data class RefGroupImpl(
     private val name: String,
     private val refs: List<VcsRef>,
     private val colors: List<Color> = emptyList()
-) :
-    RefGroup {
+) : RefGroup {
     override fun isExpanded() = expanded
+
     override fun getName() = name
+
     override fun getRefs() = refs
+
     override fun getColors() = colors
 }

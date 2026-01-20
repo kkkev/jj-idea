@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test
  * Tests for ChangeId - JJ's change identifier with short prefix support.
  */
 class ChangeIdTest {
-
     @Test
     fun `constructor with full ID only`() {
         val changeId = ChangeId("qpvuntsm")

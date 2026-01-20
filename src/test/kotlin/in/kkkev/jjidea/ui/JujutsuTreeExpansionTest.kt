@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test
  * Tests for tree expansion logic - tracking user's explicit collapses
  */
 class JujutsuTreeExpansionTest {
-
     @Test
     fun `should track user collapse`() {
         val collapsedPaths = mutableSetOf<String>()
@@ -110,7 +109,7 @@ class JujutsuTreeExpansionTest {
 
         // Programmatic operation - ignore events
         ignoreEvents = true
-        handleExpand("src")  // Should be ignored
+        handleExpand("src") // Should be ignored
         handleExpand("test") // Should be ignored
 
         // Paths should still be in set
@@ -120,7 +119,7 @@ class JujutsuTreeExpansionTest {
 
         // User operation - process events
         ignoreEvents = false
-        handleExpand("src")  // Should be processed
+        handleExpand("src") // Should be processed
 
         // Now "src" should be removed
         collapsedPaths shouldNotContain "src"

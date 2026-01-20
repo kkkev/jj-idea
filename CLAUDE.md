@@ -369,8 +369,7 @@ src/main/kotlin/in/kkkev/jjidea/
 
 **Run Tests**:
 ```bash
-./gradlew simpleTest  # 85+ unit tests (no IntelliJ instrumentation)
-./gradlew test        # Full integration tests (disabled, needs IntelliJ test setup)
+./gradlew test  # Unit tests with IntelliJ Platform classes on classpath
 ```
 
 **Test Coverage**: Core domain types, log parsing, formatters, tree models, annotation parsing
@@ -494,7 +493,7 @@ When adding features or fixing bugs:
 3. Add tests (use Kotest assertions, MockK for mocking)
 4. Follow threading rules: I/O on background threads, UI on EDT
 5. Follow coding standards above
-6. Build and test before committing: `./gradlew build simpleTest`
+6. Build and test before committing: `./gradlew build test`
 
 ## References
 

@@ -13,8 +13,7 @@ import javax.swing.table.TableCellRenderer
  * Custom column for committer (may differ from author in JJ)
  */
 class CommitterColumnInfo : ColumnInfo<VcsFileRevision, String>("Committer") {
-    override fun valueOf(revision: VcsFileRevision): String =
-        (revision as? JujutsuFileRevision)?.getCommitter() ?: ""
+    override fun valueOf(revision: VcsFileRevision): String = (revision as? JujutsuFileRevision)?.getCommitter() ?: ""
 
     override fun getComparator(): Comparator<VcsFileRevision> =
         compareBy { (it as? JujutsuFileRevision)?.getCommitter() ?: "" }
@@ -28,14 +27,13 @@ class CommitterColumnInfo : ColumnInfo<VcsFileRevision, String>("Committer") {
  * Custom column for commit timestamp (committer timestamp)
  */
 class CommitTimestampColumnInfo : ColumnInfo<VcsFileRevision, Date?>("Commit Time") {
-    override fun valueOf(revision: VcsFileRevision): Date? =
-        (revision as? JujutsuFileRevision)?.getCommitterDate()
+    override fun valueOf(revision: VcsFileRevision): Date? = (revision as? JujutsuFileRevision)?.getCommitterDate()
 
     override fun getComparator(): Comparator<VcsFileRevision> =
         compareBy(nullsLast()) { (it as? JujutsuFileRevision)?.getCommitterDate() }
 
-    override fun getRenderer(revision: VcsFileRevision): TableCellRenderer {
-        return object : ColoredTableCellRenderer() {
+    override fun getRenderer(revision: VcsFileRevision): TableCellRenderer =
+        object : ColoredTableCellRenderer() {
             override fun customizeCellRenderer(
                 table: JTable,
                 value: Any?,
@@ -49,7 +47,6 @@ class CommitTimestampColumnInfo : ColumnInfo<VcsFileRevision, Date?>("Commit Tim
                 }
             }
         }
-    }
 
     override fun getPreferredStringValue() = "2025-12-15 12:00"
 

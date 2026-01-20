@@ -11,7 +11,6 @@ class JujutsuHistorySession(
     revisions: List<VcsFileRevision>,
     currentRevisionNumber: VcsRevisionNumber?
 ) : VcsAbstractHistorySession(revisions, currentRevisionNumber) {
-
     override fun calcCurrentRevisionNumber(): VcsRevisionNumber? = null
 
     override fun copy() = JujutsuHistorySession(revisionList, currentRevisionNumber)

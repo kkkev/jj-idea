@@ -14,11 +14,13 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
  * This is a toggle action with a checkmark to indicate whether annotations are shown.
  * No icon is used - the checkmark takes that space.
  */
-class JujutsuAnnotateAction : ToggleAction(
-    JujutsuBundle.message("action.annotate"),
-    JujutsuBundle.message("action.annotate.description"),
-    null  // No icon - the toggle checkmark uses this space
-), DumbAware {
+class JujutsuAnnotateAction :
+    ToggleAction(
+        JujutsuBundle.message("action.annotate"),
+        JujutsuBundle.message("action.annotate.description"),
+        null // No icon - the toggle checkmark uses this space
+    ),
+    DumbAware {
     private val log = Logger.getInstance(javaClass)
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
@@ -28,7 +30,10 @@ class JujutsuAnnotateAction : ToggleAction(
         return ANNOTATE_TOGGLE_ACTION.isSelected(e)
     }
 
-    override fun setSelected(e: AnActionEvent, state: Boolean) {
+    override fun setSelected(
+        e: AnActionEvent,
+        state: Boolean
+    ) {
         e.file?.let { file ->
             log.info("Triggering annotation toggle for file: ${file.path}")
 
@@ -42,7 +47,6 @@ class JujutsuAnnotateAction : ToggleAction(
         // Enable if we have a project, file, and it's under Jujutsu VCS
         e.presentation.isEnabledAndVisible = e.file?.isJujutsu ?: false
     }
-
 }
 
 private val ANNOTATE_TOGGLE_ACTION = AnnotateToggleAction()

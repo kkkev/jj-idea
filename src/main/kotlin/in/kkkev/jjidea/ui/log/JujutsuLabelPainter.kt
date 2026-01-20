@@ -9,6 +9,7 @@ import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.ui.drawStringCentredVertically
 import java.awt.Color
 import java.awt.Font
+import java.awt.FontMetrics
 import java.awt.Graphics2D
 import javax.swing.JComponent
 
@@ -108,11 +109,12 @@ class JujutsuLabelPainter(
             val iconHeight = fontMetrics.height
 
             // Use grey text color (not orange) - matching IntelliJ's branch/tag rendering
-            val textColor = if (isSelected) {
-                foreground
-            } else {
-                JBColor.GRAY
-            }
+            val textColor =
+                if (isSelected) {
+                    foreground
+                } else {
+                    JBColor.GRAY
+                }
 
             var currentX = x + LEFT_PADDING.get()
 
@@ -175,7 +177,10 @@ class JujutsuLabelPainter(
         return startX
     }
 
-    private fun shortenBookmarkName(name: String, fontMetrics: java.awt.FontMetrics): String {
+    private fun shortenBookmarkName(
+        name: String,
+        fontMetrics: FontMetrics
+    ): String {
         if (name.length <= MAX_BOOKMARK_LENGTH) return name
 
         // Simple truncation with ellipsis

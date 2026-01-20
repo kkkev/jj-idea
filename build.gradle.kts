@@ -4,6 +4,7 @@ plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
     id("org.jetbrains.intellij.platform") version "2.10.5"
+    id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
 }
 
 group = "in.kkkev"
@@ -46,7 +47,7 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.9")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    //testRuntimeOnly("idea:ideaIC:aarch64:2025.2")
+    // testRuntimeOnly("idea:ideaIC:aarch64:2025.2")
 }
 
 intellijPlatform {
@@ -79,28 +80,31 @@ kotlin {
     jvmToolchain(21)
 }
 
-// Disable the default test task - it's configured by IntelliJ Platform plugin with
-// JBR and coroutines agent that crash on macOS. Use unitTest task instead.
-tasks.test {
-    enabled = false
+ktlint {
+    version = "1.5.0"
+    // Clear and rebuild rules
+    enableExperimentalRules = false
 }
 
-// Create a clean test task that runs with IntelliJ Platform classes on classpath
+// Configure test task to run with IntelliJ Platform classes on classpath
 // but without the IDE bootstrap machinery (custom classloader, coroutines agent, etc.)
-tasks.register<Test>("unitTest") {
+// that the IntelliJ Platform plugin configures by default.
+tasks.test {
     useJUnitPlatform()
     testClassesDirs = sourceSets["test"].output.classesDirs
 
     // Use the test compile classpath which resolves IntelliJ Platform modules correctly
     classpath = configurations["testCompileClasspath"] +
-            configurations["testRuntimeClasspath"] +
-            sourceSets["test"].output +
-            sourceSets["main"].output
+        configurations["testRuntimeClasspath"] +
+        sourceSets["test"].output +
+        sourceSets["main"].output
 
     // Use standard JDK 21, not JBR
-    javaLauncher.set(javaToolchains.launcherFor {
-        languageVersion.set(JavaLanguageVersion.of(21))
-    })
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    )
 
     // JVM arguments required for IntelliJ Platform test framework
     jvmArgs(
@@ -115,7 +119,9 @@ tasks.register<Test>("unitTest") {
         "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/sun.font=ALL-UNNAMED"
     )
+}
 
-    description = "Run unit tests with IntelliJ Platform classes on classpath"
-    group = "verification"
+// Convenience task that runs both tests and linting
+tasks.named("check") {
+    dependsOn("test", "ktlintCheck")
 }

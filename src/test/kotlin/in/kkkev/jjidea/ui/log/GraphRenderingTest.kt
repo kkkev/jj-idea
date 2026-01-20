@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
@@ -16,7 +15,6 @@ import java.awt.Color
  * - Lines connect expected points
  */
 class GraphRenderingTest {
-
     companion object {
         private const val LANE_WIDTH = 16
         private const val ROW_HEIGHT = 22
@@ -26,7 +24,10 @@ class GraphRenderingTest {
     /**
      * Simple point in 2D space.
      */
-    data class Point(val x: Int, val y: Int) {
+    data class Point(
+        val x: Int,
+        val y: Int
+    ) {
         override fun toString() = "($x, $y)"
     }
 
@@ -39,22 +40,25 @@ class GraphRenderingTest {
         val color: Color
     ) {
         fun isVertical() = from.x == to.x
+
         fun isHorizontal() = from.y == to.y
+
         fun isDiagonal() = !isVertical() && !isHorizontal()
 
-        override fun toString() = "${from} -> ${to} [${colorName(color)}]"
+        override fun toString() = "$from -> $to [${colorName(color)}]"
 
-        private fun colorName(c: Color): String = when {
-            c == Color(0x4285F4) -> "Blue"
-            c == Color(0xEA4335) -> "Red"
-            c == Color(0xFBBC04) -> "Yellow"
-            c == Color(0x34A853) -> "Green"
-            c == Color(0xFF6D00) -> "Orange"
-            c == Color(0x9C27B0) -> "Purple"
-            c == Color(0x00ACC1) -> "Cyan"
-            c == Color(0x7CB342) -> "LightGreen"
-            else -> "Color(${c.rgb})"
-        }
+        private fun colorName(c: Color): String =
+            when {
+                c == Color(0x4285F4) -> "Blue"
+                c == Color(0xEA4335) -> "Red"
+                c == Color(0xFBBC04) -> "Yellow"
+                c == Color(0x34A853) -> "Green"
+                c == Color(0xFF6D00) -> "Orange"
+                c == Color(0x9C27B0) -> "Purple"
+                c == Color(0x00ACC1) -> "Cyan"
+                c == Color(0x7CB342) -> "LightGreen"
+                else -> "Color(${c.rgb})"
+            }
     }
 
     /**
@@ -63,7 +67,13 @@ class GraphRenderingTest {
     class Canvas {
         private val lines = mutableListOf<LineSegment>()
 
-        fun drawLine(x1: Int, y1: Int, x2: Int, y2: Int, color: Color) {
+        fun drawLine(
+            x1: Int,
+            y1: Int,
+            x2: Int,
+            y2: Int,
+            color: Color
+        ) {
             lines.add(LineSegment(Point(x1, y1), Point(x2, y2), color))
         }
 
@@ -87,7 +97,11 @@ class GraphRenderingTest {
         /**
          * Verify no broken lines - lines of same color should connect at cell boundaries.
          */
-        fun assertNoBrokenLines(color: Color, startRow: Int, endRow: Int) {
+        fun assertNoBrokenLines(
+            color: Color,
+            startRow: Int,
+            endRow: Int
+        ) {
             val colorLines = lines.filter { it.color == color }
             val rowTop = startRow * ROW_HEIGHT
             val rowBottom = endRow * ROW_HEIGHT + ROW_HEIGHT
@@ -115,22 +129,30 @@ class GraphRenderingTest {
         /**
          * Assert a line segment exists (approximately, allowing small differences).
          */
-        fun assertLineExists(from: Point, to: Point, color: Color) {
-            val exists = lines.any { line ->
-                line.color == color &&
-                        pointsClose(line.from, from) && pointsClose(line.to, to)
-            }
+        fun assertLineExists(
+            from: Point,
+            to: Point,
+            color: Color
+        ) {
+            val exists =
+                lines.any { line ->
+                    line.color == color &&
+                        pointsClose(line.from, from) &&
+                        pointsClose(line.to, to)
+                }
             if (!exists) {
-                println("Expected line not found: ${from} -> ${to} [color=${color}]")
+                println("Expected line not found: $from -> $to [color=$color]")
                 println("Available lines:")
                 printLines()
             }
             exists shouldBe true
         }
 
-        private fun pointsClose(p1: Point, p2: Point, tolerance: Int = 2): Boolean {
-            return Math.abs(p1.x - p2.x) <= tolerance && Math.abs(p1.y - p2.y) <= tolerance
-        }
+        private fun pointsClose(
+            p1: Point,
+            p2: Point,
+            tolerance: Int = 2
+        ): Boolean = Math.abs(p1.x - p2.x) <= tolerance && Math.abs(p1.y - p2.y) <= tolerance
     }
 
     /**
@@ -212,28 +234,28 @@ class GraphRenderingTest {
 
     @Nested
     inner class `Three Children in Different Lanes` {
-
         @Test
         fun `parent with three children - same lane child should have vertical line`() {
             // User's test case:
             // dd (lane 1) --> aa (lane 1) - vertical line is broken immediately above aa (BUG)
             // cc (lane 2) --> aa (lane 1) - should start vertical, then diagonal
             // bb (lane 3) --> aa (lane 1) - rendered perfectly
-            val entries = listOf(
-                entry("dd", listOf("aa")), // Lane 1 -> lane 1 (should be vertical)
-                entry("cc", listOf("aa")), // Lane 2 -> lane 1 (diagonal)
-                entry("bb", listOf("aa")), // Lane 3 -> lane 1 (diagonal)
-                entry("aa")                 // Lane 1
-            )
+            val entries =
+                listOf(
+                    entry("dd", listOf("aa")), // Lane 1 -> lane 1 (should be vertical)
+                    entry("cc", listOf("aa")), // Lane 2 -> lane 1 (diagonal)
+                    entry("bb", listOf("aa")), // Lane 3 -> lane 1 (diagonal)
+                    entry("aa") // Lane 1
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)
 
             // Verify lane assignments
-            graph["dd"]!!.lane shouldBe 0  // First child gets lane 0
-            graph["cc"]!!.lane shouldBe 1  // Second child gets lane 1
-            graph["bb"]!!.lane shouldBe 2  // Third child gets lane 2
-            graph["aa"]!!.lane shouldBe 0  // Parent continues in first child's lane
+            graph["dd"]!!.lane shouldBe 0 // First child gets lane 0
+            graph["cc"]!!.lane shouldBe 1 // Second child gets lane 1
+            graph["bb"]!!.lane shouldBe 2 // Third child gets lane 2
+            graph["aa"]!!.lane shouldBe 0 // Parent continues in first child's lane
 
             // Render to canvas
             val canvas = Canvas()
@@ -248,16 +270,16 @@ class GraphRenderingTest {
             // Row 3: aa at (8, 77) in lane 0
             // Should have continuous vertical line from dd to aa
 
-            val ddX = LANE_WIDTH / 2 + 0 * LANE_WIDTH  // Lane 0 = 8
-            val ddY = 0 * ROW_HEIGHT + ROW_HEIGHT / 2  // Row 0 middle = 11
+            val ddX = LANE_WIDTH / 2 + 0 * LANE_WIDTH // Lane 0 = 8
+            val ddY = 0 * ROW_HEIGHT + ROW_HEIGHT / 2 // Row 0 middle = 11
 
-            val aaX = LANE_WIDTH / 2 + 0 * LANE_WIDTH  // Lane 0 = 8
-            val aaY = 3 * ROW_HEIGHT + ROW_HEIGHT / 2  // Row 3 middle = 77
+            val aaX = LANE_WIDTH / 2 + 0 * LANE_WIDTH // Lane 0 = 8
+            val aaY = 3 * ROW_HEIGHT + ROW_HEIGHT / 2 // Row 3 middle = 77
 
             // From dd to bottom of row 0
             canvas.assertLineExists(
                 Point(ddX, ddY),
-                Point(ddX, ROW_HEIGHT),  // Should be vertical to bottom of cell
+                Point(ddX, ROW_HEIGHT), // Should be vertical to bottom of cell
                 graph["dd"]!!.color
             )
 
@@ -271,12 +293,13 @@ class GraphRenderingTest {
             // - Start vertical from cc
             // - Continue vertical through row with bb
             // - Then diagonal to aa
-            val entries = listOf(
-                entry("dd", listOf("aa")),
-                entry("cc", listOf("aa")),
-                entry("bb", listOf("aa")),
-                entry("aa")
-            )
+            val entries =
+                listOf(
+                    entry("dd", listOf("aa")),
+                    entry("cc", listOf("aa")),
+                    entry("bb", listOf("aa")),
+                    entry("aa")
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)
@@ -286,13 +309,14 @@ class GraphRenderingTest {
             renderer.render(canvas)
 
             // cc is in lane 1, aa is in lane 0
-            val ccX = LANE_WIDTH / 2 + 1 * LANE_WIDTH  // Lane 1
+            val ccX = LANE_WIDTH / 2 + 1 * LANE_WIDTH // Lane 1
             val ccY = 1 * ROW_HEIGHT + ROW_HEIGHT / 2
 
             // From cc, should go vertical first (in cc's lane)
-            val linesFromCc = canvas.getLines().filter {
-                it.from.x == ccX && it.from.y == ccY && it.color == graph["cc"]!!.color
-            }
+            val linesFromCc =
+                canvas.getLines().filter {
+                    it.from.x == ccX && it.from.y == ccY && it.color == graph["cc"]!!.color
+                }
 
             linesFromCc.shouldHaveSize(1)
 
@@ -301,12 +325,13 @@ class GraphRenderingTest {
 
         @Test
         fun `no broken lines - all lines should be continuous`() {
-            val entries = listOf(
-                entry("dd", listOf("aa")),
-                entry("cc", listOf("aa")),
-                entry("bb", listOf("aa")),
-                entry("aa")
-            )
+            val entries =
+                listOf(
+                    entry("dd", listOf("aa")),
+                    entry("cc", listOf("aa")),
+                    entry("bb", listOf("aa")),
+                    entry("aa")
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)

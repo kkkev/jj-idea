@@ -7,7 +7,10 @@ import com.intellij.vcs.log.impl.HashImpl
 For now, store as a string in reverse (z-k) hex form.
 Eventually, store in 2-long form and allow transforms to reverse and forward hex.
  */
-data class ChangeId(override val full: String, private val shortLength: Int? = null) : Revision {
+data class ChangeId(
+    override val full: String,
+    private val shortLength: Int? = null
+) : Revision {
     constructor(full: String, short: String) : this(full, calculateShortLength(full, short))
 
     /**
@@ -34,10 +37,11 @@ data class ChangeId(override val full: String, private val shortLength: Int? = n
     val displayRemainder: String
         get() {
             val maxLength = maxOf(8, shortLength ?: 0)
-            return if (full.length > maxLength)
+            return if (full.length > maxLength) {
                 full.drop(shortLength ?: 0).take(maxLength - (shortLength ?: 0))
-            else
+            } else {
                 remainder
+            }
         }
 
     /**
@@ -45,11 +49,13 @@ data class ChangeId(override val full: String, private val shortLength: Int? = n
      */
     val hexString: String
         get() {
-            val hex = full.map { char ->
-                val index = CHARS.indexOf(char)
-                require(index >= 0) { "Invalid character '$char' in change ID '$full'" }
-                HEX[index]
-            }.joinToString("")
+            val hex =
+                full
+                    .map { char ->
+                        val index = CHARS.indexOf(char)
+                        require(index >= 0) { "Invalid character '$char' in change ID '$full'" }
+                        HEX[index]
+                    }.joinToString("")
             return hex
         }
 
@@ -62,7 +68,10 @@ data class ChangeId(override val full: String, private val shortLength: Int? = n
     }
 
     companion object {
-        fun calculateShortLength(full: String, short: String): Int {
+        fun calculateShortLength(
+            full: String,
+            short: String
+        ): Int {
             require(full.indexOf(short) == 0) { "Invalid short change id $short (not prefix of $full)" }
             return short.length
         }
@@ -73,12 +82,12 @@ data class ChangeId(override val full: String, private val shortLength: Int? = n
         /**
          * Convert a hex string (from HashImpl) back to a JJ change ID
          */
-        fun fromHexString(hexString: String) = hexString
-            .map { hexChar ->
-                val hexIndex = HEX.indexOf(hexChar.lowercaseChar())
-                if (hexIndex >= 0) CHARS[hexIndex] else hexChar
-            }
-            .joinToString("")
-            .let(::ChangeId)
+        fun fromHexString(hexString: String) =
+            hexString
+                .map { hexChar ->
+                    val hexIndex = HEX.indexOf(hexChar.lowercaseChar())
+                    if (hexIndex >= 0) CHARS[hexIndex] else hexChar
+                }.joinToString("")
+                .let(::ChangeId)
     }
 }

@@ -1,14 +1,13 @@
 package `in`.kkkev.jjidea
 
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Disabled
+import org.junit.jupiter.api.Test
 
 /**
  * Test suite documenting all requirements from user specifications
  * These tests serve as documentation and integration test placeholders
  */
 class RequirementsTest {
-
     // ========== CORE VCS FUNCTIONALITY ==========
 
     @Test

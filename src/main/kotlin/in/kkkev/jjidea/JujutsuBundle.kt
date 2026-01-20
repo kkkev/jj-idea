@@ -18,7 +18,6 @@ import org.jetbrains.annotations.PropertyKey
 private const val BUNDLE = "messages.JujutsuBundle"
 
 object JujutsuBundle : DynamicBundle(BUNDLE) {
-
     /**
      * Get a localized message by key.
      *
@@ -27,8 +26,10 @@ object JujutsuBundle : DynamicBundle(BUNDLE) {
      * @return The localized message
      */
     @Nls
-    fun message(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any): String =
-        getMessage(key, *params)
+    fun message(
+        @PropertyKey(resourceBundle = BUNDLE) key: String,
+        vararg params: Any
+    ): String = getMessage(key, *params)
 
     /**
      * Get a localized message by key with a supplier (for lazy loading).
@@ -37,6 +38,8 @@ object JujutsuBundle : DynamicBundle(BUNDLE) {
      * @param params Optional parameters for message formatting
      * @return Supplier that provides the localized message
      */
-    fun messagePointer(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any) =
-        getLazyMessage(key, *params)
+    fun messagePointer(
+        @PropertyKey(resourceBundle = BUNDLE) key: String,
+        vararg params: Any
+    ) = getLazyMessage(key, *params)
 }

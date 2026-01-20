@@ -1,13 +1,13 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.vcs.log.impl.VcsUserImpl
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import org.junit.jupiter.api.Test
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.LogEntry
-import com.intellij.vcs.log.impl.VcsUserImpl
 import kotlinx.datetime.Instant
+import org.junit.jupiter.api.Test
 
 /**
  * Tests for column functionality in JujutsuLogTable.
@@ -34,7 +34,6 @@ import kotlinx.datetime.Instant
  * This test file covers table model functionality that can be tested in headless mode.
  */
 class JujutsuLogTableColumnTest {
-
     @Test
     fun `table model provides correct row count`() {
         val model = JujutsuLogTableModel()
@@ -44,10 +43,12 @@ class JujutsuLogTableColumnTest {
         model.setEntries(listOf(createTestEntry("abc123")))
         model.rowCount shouldBe 1
 
-        model.setEntries(listOf(
-            createTestEntry("abc123"),
-            createTestEntry("def456")
-        ))
+        model.setEntries(
+            listOf(
+                createTestEntry("abc123"),
+                createTestEntry("def456")
+            )
+        )
         model.rowCount shouldBe 2
     }
 
@@ -132,10 +133,12 @@ class JujutsuLogTableColumnTest {
     @Test
     fun `table model clear removes all entries`() {
         val model = JujutsuLogTableModel()
-        model.setEntries(listOf(
-            createTestEntry("abc123"),
-            createTestEntry("def456")
-        ))
+        model.setEntries(
+            listOf(
+                createTestEntry("abc123"),
+                createTestEntry("def456")
+            )
+        )
 
         model.rowCount shouldBe 2
 
@@ -150,10 +153,12 @@ class JujutsuLogTableColumnTest {
 
         model.rowCount shouldBe 1
 
-        model.appendEntries(listOf(
-            createTestEntry("def456"),
-            createTestEntry("ghi789")
-        ))
+        model.appendEntries(
+            listOf(
+                createTestEntry("def456"),
+                createTestEntry("ghi789")
+            )
+        )
 
         model.rowCount shouldBe 3
     }
@@ -186,28 +191,31 @@ class JujutsuLogTableColumnTest {
 
         // Default: graph, author, date
         var visible = manager.getVisibleColumns()
-        visible shouldContainExactly listOf(
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
-            JujutsuLogTableModel.COLUMN_AUTHOR,
-            JujutsuLogTableModel.COLUMN_DATE
-        )
+        visible shouldContainExactly
+            listOf(
+                JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
+                JujutsuLogTableModel.COLUMN_AUTHOR,
+                JujutsuLogTableModel.COLUMN_DATE
+            )
 
         // Hide author
         manager.showAuthorColumn = false
         visible = manager.getVisibleColumns()
-        visible shouldContainExactly listOf(
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
-            JujutsuLogTableModel.COLUMN_DATE
-        )
+        visible shouldContainExactly
+            listOf(
+                JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
+                JujutsuLogTableModel.COLUMN_DATE
+            )
 
         // Show change ID column
         manager.showChangeIdColumn = true
         visible = manager.getVisibleColumns()
-        visible shouldContainExactly listOf(
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
-            JujutsuLogTableModel.COLUMN_CHANGE_ID,
-            JujutsuLogTableModel.COLUMN_DATE
-        )
+        visible shouldContainExactly
+            listOf(
+                JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
+                JujutsuLogTableModel.COLUMN_CHANGE_ID,
+                JujutsuLogTableModel.COLUMN_DATE
+            )
     }
 
     @Test

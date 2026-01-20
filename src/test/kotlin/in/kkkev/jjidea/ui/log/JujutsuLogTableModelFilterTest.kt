@@ -5,9 +5,7 @@ import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldBeEmpty
-import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldContainExactly
-import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.BeforeEach
@@ -24,7 +22,6 @@ import org.junit.jupiter.api.Test
  * - Date filter (commits after a cutoff)
  */
 class JujutsuLogTableModelFilterTest {
-
     private lateinit var model: JujutsuLogTableModel
     private val alice = VcsUserImpl("Alice", "alice@example.com")
     private val bob = VcsUserImpl("Bob", "bob@example.com")
@@ -58,25 +55,28 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `Text filter` {
-
         @Test
         fun `no filter shows all entries`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "First commit"),
-                createEntry("def456", "Second commit"),
-                createEntry("ghi789", "Third commit")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First commit"),
+                    createEntry("def456", "Second commit"),
+                    createEntry("ghi789", "Third commit")
+                )
+            )
 
             model.rowCount shouldBe 3
         }
 
         @Test
         fun `filter by description matches`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Add new feature"),
-                createEntry("def456", "Fix bug"),
-                createEntry("ghi789", "Add another feature")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Add new feature"),
+                    createEntry("def456", "Fix bug"),
+                    createEntry("ghi789", "Add another feature")
+                )
+            )
 
             model.setFilter("feature")
 
@@ -87,11 +87,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter by change id matches`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "First"),
-                createEntry("def456", "Second"),
-                createEntry("ghi789", "Third")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First"),
+                    createEntry("def456", "Second"),
+                    createEntry("ghi789", "Third")
+                )
+            )
 
             model.setFilter("def")
 
@@ -101,11 +103,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter by author name matches`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", alice),
-                createEntry("def456", "Commit 2", bob),
-                createEntry("ghi789", "Commit 3", charlie)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", alice),
+                    createEntry("def456", "Commit 2", bob),
+                    createEntry("ghi789", "Commit 3", charlie)
+                )
+            )
 
             model.setFilter("Bob")
 
@@ -115,11 +119,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter by author email matches`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", alice),
-                createEntry("def456", "Commit 2", bob),
-                createEntry("ghi789", "Commit 3", charlie)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", alice),
+                    createEntry("def456", "Commit 2", bob),
+                    createEntry("ghi789", "Commit 3", charlie)
+                )
+            )
 
             model.setFilter("charlie@example.com")
 
@@ -129,11 +135,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter is case insensitive by default`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Add Feature"),
-                createEntry("def456", "fix bug"),
-                createEntry("ghi789", "FEATURE update")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Add Feature"),
+                    createEntry("def456", "fix bug"),
+                    createEntry("ghi789", "FEATURE update")
+                )
+            )
 
             model.setFilter("FEATURE")
 
@@ -142,11 +150,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter is case sensitive when enabled`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Add Feature"),
-                createEntry("def456", "fix bug"),
-                createEntry("ghi789", "feature update")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Add Feature"),
+                    createEntry("def456", "fix bug"),
+                    createEntry("ghi789", "feature update")
+                )
+            )
 
             model.setFilter("Feature", regex = false, caseSensitive = true)
 
@@ -156,11 +166,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter with whole words matches word boundaries`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "fix bug"),
-                createEntry("def456", "bugfix applied"),
-                createEntry("ghi789", "debug mode")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "fix bug"),
+                    createEntry("def456", "bugfix applied"),
+                    createEntry("ghi789", "debug mode")
+                )
+            )
 
             model.setFilter("bug", regex = false, caseSensitive = false, wholeWords = true)
 
@@ -170,10 +182,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `empty filter shows all entries`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "First"),
-                createEntry("def456", "Second")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First"),
+                    createEntry("def456", "Second")
+                )
+            )
 
             model.setFilter("")
 
@@ -182,10 +196,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `whitespace-only filter shows all entries`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "First"),
-                createEntry("def456", "Second")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First"),
+                    createEntry("def456", "Second")
+                )
+            )
 
             model.setFilter("   ")
 
@@ -195,14 +211,15 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `Regex filter` {
-
         @Test
         fun `regex matches pattern`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "feat(ui): add button"),
-                createEntry("def456", "fix(api): handle error"),
-                createEntry("ghi789", "chore: update deps")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "feat(ui): add button"),
+                    createEntry("def456", "fix(api): handle error"),
+                    createEntry("ghi789", "chore: update deps")
+                )
+            )
 
             model.setFilter("feat|fix", regex = true)
 
@@ -211,11 +228,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `regex with groups`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "feat(ui): add button"),
-                createEntry("def456", "fix(api): handle error"),
-                createEntry("ghi789", "chore: update deps")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "feat(ui): add button"),
+                    createEntry("def456", "fix(api): handle error"),
+                    createEntry("ghi789", "chore: update deps")
+                )
+            )
 
             model.setFilter("\\(.*\\):", regex = true)
 
@@ -224,10 +243,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `invalid regex falls back to literal search`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "test[bracket"),
-                createEntry("def456", "normal commit")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "test[bracket"),
+                    createEntry("def456", "normal commit")
+                )
+            )
 
             // Invalid regex - unclosed bracket
             model.setFilter("[bracket", regex = true)
@@ -239,10 +260,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `regex respects case sensitivity`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "FEATURE add"),
-                createEntry("def456", "feature update")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "FEATURE add"),
+                    createEntry("def456", "feature update")
+                )
+            )
 
             model.setFilter("FEATURE", regex = true, caseSensitive = true)
 
@@ -253,14 +276,15 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `Author filter` {
-
         @Test
         fun `filter by single author`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", alice),
-                createEntry("def456", "Commit 2", bob),
-                createEntry("ghi789", "Commit 3", alice)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", alice),
+                    createEntry("def456", "Commit 2", bob),
+                    createEntry("ghi789", "Commit 3", alice)
+                )
+            )
 
             model.setAuthorFilter(setOf("alice@example.com"))
 
@@ -271,11 +295,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter by multiple authors`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", alice),
-                createEntry("def456", "Commit 2", bob),
-                createEntry("ghi789", "Commit 3", charlie)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", alice),
+                    createEntry("def456", "Commit 2", bob),
+                    createEntry("ghi789", "Commit 3", charlie)
+                )
+            )
 
             model.setAuthorFilter(setOf("alice@example.com", "bob@example.com"))
 
@@ -284,10 +310,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `empty author filter shows all`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", alice),
-                createEntry("def456", "Commit 2", bob)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", alice),
+                    createEntry("def456", "Commit 2", bob)
+                )
+            )
 
             model.setAuthorFilter(emptySet())
 
@@ -296,10 +324,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `author filter excludes entries without author`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", alice),
-                createEntry("def456", "Commit 2", author = null)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", alice),
+                    createEntry("def456", "Commit 2", author = null)
+                )
+            )
 
             model.setAuthorFilter(setOf("alice@example.com"))
 
@@ -309,7 +339,6 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `Bookmark filter` {
-
         @Test
         fun `filter by bookmark change id`() {
             val entry1 = createEntry("abc123", "Main commit", bookmarks = listOf(Bookmark("main")))
@@ -340,10 +369,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `empty bookmark filter shows all`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1"),
-                createEntry("def456", "Commit 2")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1"),
+                    createEntry("def456", "Commit 2")
+                )
+            )
 
             model.setBookmarkFilter(emptySet())
 
@@ -353,17 +384,18 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `Date filter` {
-
         @Test
         fun `filter shows commits after cutoff`() {
             val old = Instant.fromEpochMilliseconds(1000000000L)
             val recent = Instant.fromEpochMilliseconds(2000000000L)
             val cutoff = Instant.fromEpochMilliseconds(1500000000L)
 
-            model.setEntries(listOf(
-                createEntry("abc123", "Old commit", timestamp = old),
-                createEntry("def456", "Recent commit", timestamp = recent)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Old commit", timestamp = old),
+                    createEntry("def456", "Recent commit", timestamp = recent)
+                )
+            )
 
             model.setDateFilter(cutoff)
 
@@ -375,9 +407,11 @@ class JujutsuLogTableModelFilterTest {
         fun `filter includes commits exactly at cutoff`() {
             val timestamp = Instant.fromEpochMilliseconds(1500000000L)
 
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit at cutoff", timestamp = timestamp)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit at cutoff", timestamp = timestamp)
+                )
+            )
 
             model.setDateFilter(timestamp)
 
@@ -386,10 +420,16 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `filter excludes commits without timestamp`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit with timestamp", timestamp = Instant.fromEpochMilliseconds(2000000000L)),
-                createEntry("def456", "Commit without timestamp", timestamp = null)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry(
+                        "abc123",
+                        "Commit with timestamp",
+                        timestamp = Instant.fromEpochMilliseconds(2000000000L)
+                    ),
+                    createEntry("def456", "Commit without timestamp", timestamp = null)
+                )
+            )
 
             model.setDateFilter(Instant.fromEpochMilliseconds(1500000000L))
 
@@ -399,10 +439,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `null date filter shows all`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Old commit", timestamp = Instant.fromEpochMilliseconds(1000000000L)),
-                createEntry("def456", "Recent commit", timestamp = Instant.fromEpochMilliseconds(2000000000L))
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Old commit", timestamp = Instant.fromEpochMilliseconds(1000000000L)),
+                    createEntry("def456", "Recent commit", timestamp = Instant.fromEpochMilliseconds(2000000000L))
+                )
+            )
 
             model.setDateFilter(null)
 
@@ -412,14 +454,15 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `Combined filters` {
-
         @Test
         fun `text and author filters combine with AND`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Add feature", alice),
-                createEntry("def456", "Add button", bob),
-                createEntry("ghi789", "Fix bug", alice)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Add feature", alice),
+                    createEntry("def456", "Add button", bob),
+                    createEntry("ghi789", "Fix bug", alice)
+                )
+            )
 
             model.setFilter("Add")
             model.setAuthorFilter(setOf("alice@example.com"))
@@ -433,11 +476,13 @@ class JujutsuLogTableModelFilterTest {
             val recent = Instant.fromEpochMilliseconds(2000000000L)
             val old = Instant.fromEpochMilliseconds(1000000000L)
 
-            model.setEntries(listOf(
-                createEntry("abc123", "Add feature", alice, timestamp = recent),
-                createEntry("def456", "Add button", bob, timestamp = recent),
-                createEntry("ghi789", "Add widget", alice, timestamp = old)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Add feature", alice, timestamp = recent),
+                    createEntry("def456", "Add button", bob, timestamp = recent),
+                    createEntry("ghi789", "Add widget", alice, timestamp = old)
+                )
+            )
 
             model.setFilter("Add")
             model.setAuthorFilter(setOf("alice@example.com"))
@@ -449,11 +494,13 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `resetting one filter keeps others`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Add feature", alice),
-                createEntry("def456", "Add button", bob),
-                createEntry("ghi789", "Fix bug", alice)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Add feature", alice),
+                    createEntry("def456", "Add button", bob),
+                    createEntry("ghi789", "Fix bug", alice)
+                )
+            )
 
             model.setFilter("Add")
             model.setAuthorFilter(setOf("alice@example.com"))
@@ -470,31 +517,35 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `getAllAuthors` {
-
         @Test
         fun `returns unique sorted authors`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", charlie),
-                createEntry("def456", "Commit 2", alice),
-                createEntry("ghi789", "Commit 3", bob),
-                createEntry("jkl012", "Commit 4", alice)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", charlie),
+                    createEntry("def456", "Commit 2", alice),
+                    createEntry("ghi789", "Commit 3", bob),
+                    createEntry("jkl012", "Commit 4", alice)
+                )
+            )
 
             val authors = model.getAllAuthors()
 
-            authors shouldContainExactly listOf(
-                "alice@example.com",
-                "bob@example.com",
-                "charlie@example.com"
-            )
+            authors shouldContainExactly
+                listOf(
+                    "alice@example.com",
+                    "bob@example.com",
+                    "charlie@example.com"
+                )
         }
 
         @Test
         fun `excludes entries without author`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", alice),
-                createEntry("def456", "Commit 2", author = null)
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", alice),
+                    createEntry("def456", "Commit 2", author = null)
+                )
+            )
 
             val authors = model.getAllAuthors()
 
@@ -504,14 +555,15 @@ class JujutsuLogTableModelFilterTest {
 
     @Nested
     inner class `getAllBookmarks` {
-
         @Test
         fun `returns unique sorted bookmarks`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1", bookmarks = listOf(Bookmark("main"), Bookmark("develop"))),
-                createEntry("def456", "Commit 2", bookmarks = listOf(Bookmark("feature"))),
-                createEntry("ghi789", "Commit 3", bookmarks = listOf(Bookmark("main")))
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1", bookmarks = listOf(Bookmark("main"), Bookmark("develop"))),
+                    createEntry("def456", "Commit 2", bookmarks = listOf(Bookmark("feature"))),
+                    createEntry("ghi789", "Commit 3", bookmarks = listOf(Bookmark("main")))
+                )
+            )
 
             val bookmarks = model.getAllBookmarks()
 
@@ -520,10 +572,12 @@ class JujutsuLogTableModelFilterTest {
 
         @Test
         fun `returns empty list when no bookmarks`() {
-            model.setEntries(listOf(
-                createEntry("abc123", "Commit 1"),
-                createEntry("def456", "Commit 2")
-            ))
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Commit 1"),
+                    createEntry("def456", "Commit 2")
+                )
+            )
 
             val bookmarks = model.getAllBookmarks()
 

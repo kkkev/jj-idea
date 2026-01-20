@@ -1,10 +1,8 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListPopup
 import com.intellij.ui.ClickListener
@@ -15,11 +13,7 @@ import com.intellij.util.ui.StartupUiUtil
 import com.intellij.util.ui.UIUtil
 import java.awt.*
 import java.awt.event.*
-import javax.swing.BorderFactory
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.Icon
-import javax.swing.JComponent
+import javax.swing.*
 import javax.swing.border.Border
 
 /**
@@ -33,7 +27,6 @@ import javax.swing.border.Border
 abstract class JujutsuFilterComponent(
     private val displayName: String
 ) : JBPanel<JujutsuFilterComponent>(null) {
-
     companion object {
         // Base values that will be scaled via JBUI.scale() for HiDPI support
         private const val GAP_BEFORE_ARROW_BASE = 3
@@ -42,8 +35,10 @@ abstract class JujutsuFilterComponent(
 
         // Use these scaled values in the UI
         private fun gapBeforeArrow() = JBUI.scale(GAP_BEFORE_ARROW_BASE)
-        private fun borderSize() = BORDER_SIZE_BASE  // Border size handled by JBUI.insets()
-        private fun arcSize() = ARC_SIZE_BASE  // Arc size handled in paintBorder
+
+        private fun borderSize() = BORDER_SIZE_BASE // Border size handled by JBUI.insets()
+
+        private fun arcSize() = ARC_SIZE_BASE // Arc size handled in paintBorder
     }
 
     private lateinit var nameLabel: JBLabel
@@ -173,10 +168,13 @@ abstract class JujutsuFilterComponent(
     private fun setForeground(isHovered: Boolean) {
         val isEnabled = isEnabled
         if (isEnabled && isHovered) {
-            nameLabel.foreground = if (StartupUiUtil.isUnderDarcula) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
-            valueLabel.foreground = if (StartupUiUtil.isUnderDarcula) UIUtil.getLabelForeground() else UIUtil.getTextFieldForeground()
+            nameLabel.foreground =
+                if (StartupUiUtil.isUnderDarcula) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
+            valueLabel.foreground =
+                if (StartupUiUtil.isUnderDarcula) UIUtil.getLabelForeground() else UIUtil.getTextFieldForeground()
         } else {
-            nameLabel.foreground = if (isEnabled) UIUtil.getLabelInfoForeground() else UIUtil.getLabelDisabledForeground()
+            nameLabel.foreground =
+                if (isEnabled) UIUtil.getLabelInfoForeground() else UIUtil.getLabelDisabledForeground()
             valueLabel.foreground = if (isEnabled) UIUtil.getLabelForeground() else UIUtil.getLabelDisabledForeground()
         }
     }
@@ -190,77 +188,86 @@ abstract class JujutsuFilterComponent(
         popup.showUnderneathOf(this)
     }
 
-    private fun createPopupMenu(): ListPopup = JBPopupFactory.getInstance().createActionGroupPopup(
-        null,
-        createActionGroup(),
-        com.intellij.ide.DataManager.getInstance().getDataContext(this),
-        JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
-        false
-    )
+    private fun createPopupMenu(): ListPopup =
+        JBPopupFactory.getInstance().createActionGroupPopup(
+            null,
+            createActionGroup(),
+            DataManager.getInstance().getDataContext(this),
+            JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+            false
+        )
 
     private fun createFocusedBorder(): Border =
         FilledRoundedBorder(UIUtil.getFocusedBorderColor(), arcSize(), borderSize(), false)
 
-    private fun createUnfocusedBorder(): Border =
-        JBUI.Borders.empty(borderSize())
+    private fun createUnfocusedBorder(): Border = JBUI.Borders.empty(borderSize())
 
     private fun wrapBorder(outerBorder: Border): Border =
         BorderFactory.createCompoundBorder(outerBorder, JBUI.Borders.empty(2))
 
     private fun indicateFocusing() {
-        addFocusListener(object : FocusAdapter() {
-            override fun focusGained(e: FocusEvent) {
-                if (!isEnabled) return
-                border = wrapBorder(createFocusedBorder())
-            }
+        addFocusListener(
+            object : FocusAdapter() {
+                override fun focusGained(e: FocusEvent) {
+                    if (!isEnabled) return
+                    border = wrapBorder(createFocusedBorder())
+                }
 
-            override fun focusLost(e: FocusEvent) {
-                border = wrapBorder(createUnfocusedBorder())
+                override fun focusLost(e: FocusEvent) {
+                    border = wrapBorder(createUnfocusedBorder())
+                }
             }
-        })
+        )
     }
 
     private fun showPopupMenuFromKeyboard() {
-        addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
-                if (!isEnabled) return
-                if (e.keyCode == KeyEvent.VK_ENTER || e.keyCode == KeyEvent.VK_DOWN) {
-                    showPopup()
-                }
-                if (e.keyCode == KeyEvent.VK_DELETE) {
-                    resetFilter()
+        addKeyListener(
+            object : KeyAdapter() {
+                override fun keyPressed(e: KeyEvent) {
+                    if (!isEnabled) return
+                    if (e.keyCode == KeyEvent.VK_ENTER || e.keyCode == KeyEvent.VK_DOWN) {
+                        showPopup()
+                    }
+                    if (e.keyCode == KeyEvent.VK_DELETE) {
+                        resetFilter()
+                    }
                 }
             }
-        })
+        )
     }
 
     private fun showPopupMenuOnClick() {
-        val clickListener = object : ClickListener() {
-            override fun onClick(event: MouseEvent, clickCount: Int): Boolean {
-                if (!isEnabled) return false
-                if (UIUtil.isCloseClick(event, MouseEvent.MOUSE_RELEASED)) {
-                    resetFilter()
-                } else {
-                    showPopup()
+        val clickListener =
+            object : ClickListener() {
+                override fun onClick(
+                    event: MouseEvent,
+                    clickCount: Int
+                ): Boolean {
+                    if (!isEnabled) return false
+                    if (UIUtil.isCloseClick(event, MouseEvent.MOUSE_RELEASED)) {
+                        resetFilter()
+                    } else {
+                        showPopup()
+                    }
+                    return true
                 }
-                return true
             }
-        }
         clickListener.installOn(this)
         clickListener.installOn(valueLabel)
         clickListener.installOn(nameLabel)
     }
 
     private fun indicateHovering() {
-        val mouseAdapter = object : MouseAdapter() {
-            override fun mouseEntered(e: MouseEvent) {
-                setOnHoverForeground()
-            }
+        val mouseAdapter =
+            object : MouseAdapter() {
+                override fun mouseEntered(e: MouseEvent) {
+                    setOnHoverForeground()
+                }
 
-            override fun mouseExited(e: MouseEvent) {
-                setDefaultForeground()
+                override fun mouseExited(e: MouseEvent) {
+                    setDefaultForeground()
+                }
             }
-        }
         addMouseListener(mouseAdapter)
         filterButton.addMouseListener(mouseAdapter)
         nameLabel.addMouseListener(mouseAdapter)
@@ -272,7 +279,9 @@ abstract class JujutsuFilterComponent(
      *
      * Note: getText() can be called during superclass initialization before textSupplier is assigned.
      */
-    private inner class DynamicLabel(private val textSupplier: () -> String) : JBLabel("") {
+    private inner class DynamicLabel(
+        private val textSupplier: () -> String
+    ) : JBLabel("") {
         override fun getText(): String {
             // Check for null - can be called during superclass initialization
             @Suppress("SENSELESS_COMPARISON")
@@ -295,7 +304,14 @@ abstract class JujutsuFilterComponent(
         private val thickness: Int,
         private val thinBorder: Boolean
     ) : Border {
-        override fun paintBorder(c: Component, g: Graphics, x: Int, y: Int, width: Int, height: Int) {
+        override fun paintBorder(
+            c: Component,
+            g: Graphics,
+            x: Int,
+            y: Int,
+            width: Int,
+            height: Int
+        ) {
             val g2d = g.create() as Graphics2D
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             g2d.color = color
@@ -310,13 +326,16 @@ abstract class JujutsuFilterComponent(
         }
 
         override fun getBorderInsets(c: Component): Insets = JBUI.insets(thickness)
+
         override fun isBorderOpaque(): Boolean = false
     }
 
     /**
      * Inline icon button for dropdown/close icon.
      */
-    private class InlineIconButton(icon: Icon) : JComponent() {
+    private class InlineIconButton(
+        icon: Icon
+    ) : JComponent() {
         private var icon: Icon = icon
         private var hoveredIcon: Icon? = null
         private var isHovered = false
@@ -328,23 +347,27 @@ abstract class JujutsuFilterComponent(
             minimumSize = size
             maximumSize = size
 
-            addMouseListener(object : MouseAdapter() {
-                override fun mouseEntered(e: MouseEvent) {
-                    isHovered = true
-                    repaint()
-                }
+            addMouseListener(
+                object : MouseAdapter() {
+                    override fun mouseEntered(e: MouseEvent) {
+                        isHovered = true
+                        repaint()
+                    }
 
-                override fun mouseExited(e: MouseEvent) {
-                    isHovered = false
-                    repaint()
-                }
+                    override fun mouseExited(e: MouseEvent) {
+                        isHovered = false
+                        repaint()
+                    }
 
-                override fun mouseClicked(e: MouseEvent) {
-                    if (isEnabled) {
-                        actionListener?.actionPerformed(ActionEvent(this@InlineIconButton, ActionEvent.ACTION_PERFORMED, "click"))
+                    override fun mouseClicked(e: MouseEvent) {
+                        if (isEnabled) {
+                            actionListener?.actionPerformed(
+                                ActionEvent(this@InlineIconButton, ActionEvent.ACTION_PERFORMED, "click")
+                            )
+                        }
                     }
                 }
-            })
+            )
         }
 
         fun setIcon(icon: Icon) {

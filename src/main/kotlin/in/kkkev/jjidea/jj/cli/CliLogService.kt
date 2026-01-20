@@ -8,13 +8,18 @@ import kotlinx.datetime.Instant
 interface LogSpec<T> {
     val spec: String
     val count: Int
+
     fun take(input: Iterator<String>): T
 }
 
-abstract class SingleField<T>(private val fieldName: String) : LogSpec<T> {
+abstract class SingleField<T>(
+    private val fieldName: String
+) : LogSpec<T> {
     override val spec get() = "$fieldName ++ \"\\0\""
     override val count get() = 1
+
     abstract fun parse(input: String): T
+
     override fun take(input: Iterator<String>) = parse(input.next())
 }
 
@@ -26,130 +31,165 @@ interface MultipleFields<T> : LogSpec<T> {
 }
 
 object LogTemplates {
-    fun <T> singleField(spec: String, parser: (String) -> T) = object : SingleField<T>(spec) {
+    fun <T> singleField(
+        spec: String,
+        parser: (String) -> T
+    ) = object : SingleField<T>(spec) {
         override fun parse(input: String) = parser(input)
     }
 
     fun stringField(spec: String) = singleField(spec) { it }
-    fun booleanField(spec: String) = singleField("""if($spec, "true", "false")""") { it.toBoolean() }
-    fun timestampField(spec: String) = singleField("""$spec.timestamp().utc().format("%s")""") {
-        Instant.fromEpochSeconds(it.toLong())
-    }
 
-    class SignatureFields(spec: String) : MultipleFields<Signature> {
+    fun booleanField(spec: String) = singleField("""if($spec, "true", "false")""") { it.toBoolean() }
+
+    fun timestampField(spec: String) =
+        singleField("""$spec.timestamp().utc().format("%s")""") {
+            Instant.fromEpochSeconds(it.toLong())
+        }
+
+    class SignatureFields(
+        spec: String
+    ) : MultipleFields<Signature> {
         val name = stringField("$spec.name()")
         val email = stringField("$spec.email()")
         val timestamp = timestampField(spec)
 
         override val fields: Array<LogSpec<*>> = arrayOf(name, email, timestamp)
-        override fun take(input: Iterator<String>) = Signature(
-            name.take(input),
-            email.take(input),
-            timestamp.take(input)
-        )
+
+        override fun take(input: Iterator<String>) =
+            Signature(
+                name.take(input),
+                email.take(input),
+                timestamp.take(input)
+            )
     }
 
-    val changeId = singleField("change_id ++ \"~\" ++ change_id.shortest()") {
-        val (full, short) = it.split("~")
-        ChangeId(full, short)
-    }
+    val changeId =
+        singleField("change_id ++ \"~\" ++ change_id.shortest()") {
+            val (full, short) = it.split("~")
+            ChangeId(full, short)
+        }
     val commitId = stringField("commit_id")
     val description = stringField("description")
     val currentWorkingCopy = booleanField("current_working_copy")
     val conflict = booleanField("conflict")
     val empty = booleanField("empty")
     val bookmarks = singleField("""bookmarks.map(|b| b.name()).join(",")""") { it.splitByComma(::Bookmark) }
-    val parents = singleField("""parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",")""") {
-        it.splitByComma(changeId::parse)
-    }
+    val parents =
+        singleField("""parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",")""") {
+            it.splitByComma(changeId::parse)
+        }
     val author = SignatureFields("author")
     val committer = SignatureFields("committer")
     val immutable = booleanField("immutable")
 
-    val basicLogTemplate = logTemplate(
-        changeId, commitId, description, bookmarks, parents, currentWorkingCopy, conflict, empty, immutable
-    ) {
-        LogEntry(
-            changeId.take(it),
-            commitId.take(it),
-            description.take(it),
-            bookmarks.take(it),
-            parents.take(it),
-            currentWorkingCopy.take(it),
-            conflict.take(it),
-            empty.take(it),
-            immutable = immutable.take(it)
-        )
-    }
+    val basicLogTemplate =
+        logTemplate(
+            changeId,
+            commitId,
+            description,
+            bookmarks,
+            parents,
+            currentWorkingCopy,
+            conflict,
+            empty,
+            immutable
+        ) {
+            LogEntry(
+                changeId.take(it),
+                commitId.take(it),
+                description.take(it),
+                bookmarks.take(it),
+                parents.take(it),
+                currentWorkingCopy.take(it),
+                conflict.take(it),
+                empty.take(it),
+                immutable = immutable.take(it)
+            )
+        }
 
-    val fullLogTemplate = logTemplate(basicLogTemplate, author, committer) {
-        val basic = basicLogTemplate.take(it)
-        val jjAuthor = author.take(it)
-        val jjCommitter = committer.take(it)
-        basic.copy(
-            authorTimestamp = jjAuthor.timestamp,
-            committerTimestamp = jjCommitter.timestamp,
-            author = jjAuthor.user,
-            committer = jjCommitter.user
-        )
-    }
+    val fullLogTemplate =
+        logTemplate(basicLogTemplate, author, committer) {
+            val basic = basicLogTemplate.take(it)
+            val jjAuthor = author.take(it)
+            val jjCommitter = committer.take(it)
+            basic.copy(
+                authorTimestamp = jjAuthor.timestamp,
+                committerTimestamp = jjCommitter.timestamp,
+                author = jjAuthor.user,
+                committer = jjCommitter.user
+            )
+        }
 
-    val refsLogTemplate = logTemplate(changeId, bookmarks, currentWorkingCopy) {
-        val changeId = changeId.take(it)
-        val bookmarks = bookmarks.take(it)
-        val currentWorkingCopy = currentWorkingCopy.take(it)
-        listOfNotNull(
-            listOf(WorkingCopy).takeIf { currentWorkingCopy },
-            bookmarks
-        ).flatten().map { ref -> RefAtRevision(changeId, ref) }
-    }
+    val refsLogTemplate =
+        logTemplate(changeId, bookmarks, currentWorkingCopy) {
+            val changeId = changeId.take(it)
+            val bookmarks = bookmarks.take(it)
+            val currentWorkingCopy = currentWorkingCopy.take(it)
+            listOfNotNull(
+                listOf(WorkingCopy).takeIf { currentWorkingCopy },
+                bookmarks
+            ).flatten().map { ref -> RefAtRevision(changeId, ref) }
+        }
 
-    val commitGraphLogTemplate = logTemplate(changeId, parents, committer.timestamp) {
-        CommitGraphNode(
-            changeId.take(it),
-            parents.take(it),
-            committer.timestamp.take(it)
-        )
-    }
+    val commitGraphLogTemplate =
+        logTemplate(changeId, parents, committer.timestamp) {
+            CommitGraphNode(
+                changeId.take(it),
+                parents.take(it),
+                committer.timestamp.take(it)
+            )
+        }
 
     /**
      * Template for bookmark list parsing
      * Uses: jj bookmark list -T 'name ++ "\0" ++ normal_target.change_id() ++ "~" ++ normal_target.change_id().shortest() ++ "\0"'
      */
-    val bookmarkListTemplate = object : LogTemplate<BookmarkItem>(
-        stringField("name"),
-        singleField("normal_target.change_id() ++ \"~\" ++ normal_target.change_id().shortest()") {
-            val (full, short) = it.split("~")
-            ChangeId(full, short)
+    val bookmarkListTemplate =
+        object : LogTemplate<BookmarkItem>(
+            stringField("name"),
+            singleField("normal_target.change_id() ++ \"~\" ++ normal_target.change_id().shortest()") {
+                val (full, short) = it.split("~")
+                ChangeId(full, short)
+            }
+        ) {
+            override fun take(input: Iterator<String>): BookmarkItem {
+                val name = fields[0].take(input) as String
+                val changeId = fields[1].take(input) as ChangeId
+                return BookmarkItem(Bookmark(name), changeId)
+            }
         }
-    ) {
-        override fun take(input: Iterator<String>): BookmarkItem {
-            val name = fields[0].take(input) as String
-            val changeId = fields[1].take(input) as ChangeId
-            return BookmarkItem(Bookmark(name), changeId)
-        }
-    }
 }
 
-abstract class LogTemplate<T>(override vararg val fields: LogSpec<*>) : MultipleFields<T>
+abstract class LogTemplate<T>(
+    override vararg val fields: LogSpec<*>
+) : MultipleFields<T>
 
-fun <T> logTemplate(vararg fields: LogSpec<*>, taker: (Iterator<String>) -> T) = object : LogTemplate<T>(*fields) {
+fun <T> logTemplate(
+    vararg fields: LogSpec<*>,
+    taker: (Iterator<String>) -> T
+) = object : LogTemplate<T>(*fields) {
     override fun take(input: Iterator<String>) = taker(input)
 }
-
 
 /**
  * CLI-based implementation of JujutsuLogService.
  * Centralizes all template generation and parsing logic.
  */
-class CliLogService(private val executor: CommandExecutor) : LogService {
+class CliLogService(
+    private val executor: CommandExecutor
+) : LogService {
     private val log = Logger.getInstance(javaClass)
 
-    override fun getLog(revset: Revset, filePaths: List<String>) =
-        getLog(LogTemplates.fullLogTemplate, revset, filePaths)
+    override fun getLog(
+        revset: Revset,
+        filePaths: List<String>
+    ) = getLog(LogTemplates.fullLogTemplate, revset, filePaths)
 
-    override fun getLogBasic(revset: Revset, filePaths: List<String>) =
-        getLog(LogTemplates.basicLogTemplate, revset, filePaths)
+    override fun getLogBasic(
+        revset: Revset,
+        filePaths: List<String>
+    ) = getLog(LogTemplates.basicLogTemplate, revset, filePaths)
 
     override fun getRefs(): Result<List<RefAtRevision>> = getLog(LogTemplates.refsLogTemplate).map { it.flatten() }
 
@@ -213,15 +253,16 @@ class CliLogService(private val executor: CommandExecutor) : LogService {
                 return@mapNotNull null
             }
 
-            val status = when (statusChar) {
-                'M' -> FileChangeStatus.MODIFIED
-                'A' -> FileChangeStatus.ADDED
-                'D' -> FileChangeStatus.DELETED
-                else -> {
-                    log.debug("Unknown file status '$statusChar' in line: $cleanLine")
-                    FileChangeStatus.UNKNOWN
+            val status =
+                when (statusChar) {
+                    'M' -> FileChangeStatus.MODIFIED
+                    'A' -> FileChangeStatus.ADDED
+                    'D' -> FileChangeStatus.DELETED
+                    else -> {
+                        log.debug("Unknown file status '$statusChar' in line: $cleanLine")
+                        FileChangeStatus.UNKNOWN
+                    }
                 }
-            }
 
             FileChange(filePath, status)
         }
@@ -249,10 +290,14 @@ class CliLogService(private val executor: CommandExecutor) : LogService {
         }
     }
 
-    private fun <T> parse(template: LogTemplate<T>, logOutput: String): List<T> {
+    private fun <T> parse(
+        template: LogTemplate<T>,
+        logOutput: String
+    ): List<T> {
         val fields = logOutput.trim().split(FIELD_SEPARATOR)
         val recordSize = template.count
-        return fields.chunked(recordSize)
+        return fields
+            .chunked(recordSize)
             .filter { it.size == recordSize }
             .map { chunk -> template.take(chunk.iterator()) }
     }

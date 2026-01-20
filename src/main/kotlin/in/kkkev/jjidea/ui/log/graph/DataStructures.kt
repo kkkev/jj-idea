@@ -2,14 +2,12 @@ package `in`.kkkev.jjidea.ui.log.graph
 
 import `in`.kkkev.jjidea.jj.ChangeId
 
-class Graph {
-}
-
 // === Input ===
 
 data class GraphEntry(
     val current: ChangeId,
-    val parents: List<ChangeId>  // Order matters: first parent is typically main branch
+    /** Order matters: first parent is typically main branch */
+    val parents: List<ChangeId>
 )
 
 // === Output ===
@@ -21,7 +19,10 @@ data class GraphLayout(
 data class RowLayout(
     val changeId: ChangeId,
     val lane: Int,
-    val childLanes: List<Int>,       // lanes of children (rows above with this as parent)
-    val parentLanes: List<Int>,      // lanes of parents (rows below)
-    val passthroughLanes: Set<Int>   // lanes with vertical passthroughs
+    /** lanes of children (rows above with this as parent) */
+    val childLanes: List<Int>,
+    /** lanes of parents (rows below) */
+    val parentLanes: List<Int>,
+    /** lanes with vertical passthroughs */
+    val passthroughLanes: Set<Int>
 )

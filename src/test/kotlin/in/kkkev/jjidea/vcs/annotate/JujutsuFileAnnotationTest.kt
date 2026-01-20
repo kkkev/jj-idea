@@ -30,7 +30,6 @@ import org.junit.jupiter.api.Test
  * 4. Verify no performance warnings in IDE log
  */
 class JujutsuFileAnnotationTest {
-
     @Test
     fun `JujutsuFileAnnotation class exists and compiles`() {
         // This test verifies that JujutsuFileAnnotation compiles correctly

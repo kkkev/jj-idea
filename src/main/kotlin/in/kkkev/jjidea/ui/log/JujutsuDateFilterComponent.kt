@@ -7,8 +7,6 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import `in`.kkkev.jjidea.JujutsuBundle
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration.Companion.days
 
 /**
@@ -17,7 +15,6 @@ import kotlin.time.Duration.Companion.days
 class JujutsuDateFilterComponent(
     private val tableModel: JujutsuLogTableModel
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.date")) {
-
     private var selectedPeriod: DatePeriod? = null
 
     override fun getCurrentText(): String = selectedPeriod?.displayName ?: ""
@@ -57,7 +54,9 @@ class JujutsuDateFilterComponent(
         tableModel.setDateFilter(cutoff)
     }
 
-    private inner class SelectPeriodAction(private val period: DatePeriod) : AnAction(period.displayName) {
+    private inner class SelectPeriodAction(
+        private val period: DatePeriod
+    ) : AnAction(period.displayName) {
         override fun actionPerformed(e: AnActionEvent) {
             selectedPeriod = period
             notifyFilterChanged()
@@ -70,7 +69,10 @@ class JujutsuDateFilterComponent(
         }
     }
 
-    enum class DatePeriod(val displayName: String, val days: Int) {
+    enum class DatePeriod(
+        val displayName: String,
+        val days: Int
+    ) {
         LAST_24_HOURS("Last 24 Hours", 1),
         LAST_7_DAYS("Last 7 Days", 7),
         LAST_30_DAYS("Last 30 Days", 30),

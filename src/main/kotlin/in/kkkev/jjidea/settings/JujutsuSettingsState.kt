@@ -9,7 +9,6 @@ data class JujutsuSettingsState(
     var showChangeIdsInShortFormat: Boolean = true,
     var logChangeLimit: Int = 50,
     var autoOpenCustomLogTab: Boolean = true,
-
     // Column widths for custom log table (column index -> width in pixels)
     var customLogColumnWidths: MutableMap<Int, Int> = mutableMapOf()
 )

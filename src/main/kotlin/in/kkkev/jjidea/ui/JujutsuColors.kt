@@ -9,7 +9,6 @@ import com.intellij.util.ui.UIUtil
  * Centralizes all color definitions to ensure consistency across the plugin.
  */
 object JujutsuColors {
-
     /**
      * Working copy indicator color (@).
      */
@@ -28,30 +27,25 @@ object JujutsuColors {
     /**
      * Get gray color as hex string (for HTML).
      */
-    fun getGrayHex(): String =
-        Integer.toHexString(UIUtil.getLabelDisabledForeground().rgb and 0xFFFFFF)
+    fun getGrayHex(): String = Integer.toHexString(UIUtil.getLabelDisabledForeground().rgb and 0xFFFFFF)
 
     /**
      * Get link color as hex string (for HTML).
      */
-    fun getLinkHex(): String =
-        Integer.toHexString(JBUI.CurrentTheme.Link.Foreground.ENABLED.rgb and 0xFFFFFF)
+    fun getLinkHex(): String = Integer.toHexString(JBUI.CurrentTheme.Link.Foreground.ENABLED.rgb and 0xFFFFFF)
 
     /**
      * Get working copy color as hex string (for HTML).
      */
-    fun getWorkingCopyHex(): String =
-        Integer.toHexString(WORKING_COPY.rgb and 0xFFFFFF)
+    fun getWorkingCopyHex(): String = Integer.toHexString(WORKING_COPY.rgb and 0xFFFFFF)
 
     /**
      * Get bookmark color as hex string (for HTML).
      */
-    fun getBookmarkHex(): String =
-        Integer.toHexString(BOOKMARK.rgb and 0xFFFFFF)
+    fun getBookmarkHex(): String = Integer.toHexString(BOOKMARK.rgb and 0xFFFFFF)
 
     /**
      * Get conflict color as hex string (for HTML).
      */
-    fun getConflictHex(): String =
-        Integer.toHexString(CONFLICT.rgb and 0xFFFFFF)
+    fun getConflictHex(): String = Integer.toHexString(CONFLICT.rgb and 0xFFFFFF)
 }

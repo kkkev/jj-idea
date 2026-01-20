@@ -17,8 +17,9 @@ import javax.swing.JComponent
 /**
  * Provides file history for the Jujutsu VCS
  */
-class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
-
+class JujutsuHistoryProvider(
+    private val vcs: JujutsuVcs
+) : VcsHistoryProvider {
     private val log = Logger.getInstance(javaClass)
 
     @RequiresBackgroundThread
@@ -33,10 +34,11 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
             // Use logService to get log entries for this file
             val result = vcs.logService.getLogBasic(Expression.ALL, listOf(relativePath))
 
-            val entries = result.getOrElse { error ->
-                log.error("Failed to get file history: ${error.message}")
-                throw VcsException("Failed to get file history: ${error.message}", error)
-            }
+            val entries =
+                result.getOrElse { error ->
+                    log.error("Failed to get file history: ${error.message}")
+                    throw VcsException("Failed to get file history: ${error.message}", error)
+                }
 
             log.info("Found ${entries.size} revisions for file: ${filePath.path}")
 
@@ -51,14 +53,16 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
             // Return history session
             val currentRevision = revisions.firstOrNull()?.revisionNumber
             return JujutsuHistorySession(revisions, currentRevision)
-
         } catch (e: Exception) {
             log.error("Error creating history session for ${filePath.path}", e)
             throw VcsException("Error creating history session: ${e.message}", e)
         }
     }
 
-    override fun reportAppendableHistory(filePath: FilePath, partner: VcsAppendableHistorySessionPartner) {
+    override fun reportAppendableHistory(
+        filePath: FilePath,
+        partner: VcsAppendableHistorySessionPartner
+    ) {
         log.info("reportAppendableHistory called for file: ${filePath.path}")
 
         // Step 1: Report empty session immediately (required by platform)
@@ -73,11 +77,12 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
             // Step 2: Load history
             val result = vcs.logService.getLog(Expression.ALL, listOf(relativePath))
 
-            val entries = result.getOrElse { error ->
-                log.error("Failed to get file history: ${error.message}")
-                partner.reportException(VcsException("Failed to get file history: ${error.message}", error))
-                return
-            }
+            val entries =
+                result.getOrElse { error ->
+                    log.error("Failed to get file history: ${error.message}")
+                    partner.reportException(VcsException("Failed to get file history: ${error.message}", error))
+                    return
+                }
 
             log.info("Found ${entries.size} revisions for file: ${filePath.path}")
 
@@ -86,7 +91,6 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
                 val revision = JujutsuFileRevision(entry, filePath, vcs)
                 partner.acceptRevision(revision)
             }
-
         } catch (e: Exception) {
             log.error("Error loading file history for ${filePath.path}", e)
             partner.reportException(VcsException("Error loading file history: ${e.message}", e))
@@ -97,17 +101,18 @@ class JujutsuHistoryProvider(private val vcs: JujutsuVcs) : VcsHistoryProvider {
 
     override fun supportsHistoryForDirectories() = false
 
-    override fun getUICustomization(session: VcsHistorySession, root: JComponent) =
-        VcsDependentHistoryComponents.createOnlyColumns(
-            arrayOf(CommitterColumnInfo(), CommitTimestampColumnInfo())
-        )
+    override fun getUICustomization(
+        session: VcsHistorySession,
+        root: JComponent
+    ) = VcsDependentHistoryComponents.createOnlyColumns(
+        arrayOf(CommitterColumnInfo(), CommitTimestampColumnInfo())
+    )
 
-    override fun getAdditionalActions(refresher: Runnable): Array<AnAction> {
-        return arrayOf(
+    override fun getAdditionalActions(refresher: Runnable): Array<AnAction> =
+        arrayOf(
             ShowAllAffectedGenericAction.getInstance(),
             ActionManager.getInstance().getAction(VcsActions.ACTION_COPY_REVISION_NUMBER)
         )
-    }
 
     override fun isDateOmittable() = false
 

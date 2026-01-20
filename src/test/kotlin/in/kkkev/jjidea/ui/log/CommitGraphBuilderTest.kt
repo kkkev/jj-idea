@@ -5,7 +5,6 @@ import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import java.awt.Color
 
 /**
  * TDD test suite for commit graph layout algorithm.
@@ -23,12 +22,10 @@ import java.awt.Color
  * It tests the algorithm logic using strings as commit IDs.
  */
 class CommitGraphBuilderTest {
-
     private val builder = GraphBuilder()
 
     @Nested
     inner class `1 Linear History` {
-
         @Test
         fun `single commit has lane 0`() {
             val entries = listOf(entry("aaa"))
@@ -44,10 +41,11 @@ class CommitGraphBuilderTest {
 
         @Test
         fun `two commits in sequence use same lane`() {
-            val entries = listOf(
-                entry("bbb", listOf("aaa")),
-                entry("aaa")
-            )
+            val entries =
+                listOf(
+                    entry("bbb", listOf("aaa")),
+                    entry("aaa")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -65,11 +63,12 @@ class CommitGraphBuilderTest {
 
         @Test
         fun `three commits in linear sequence`() {
-            val entries = listOf(
-                entry("ccc", listOf("bbb")),
-                entry("bbb", listOf("aaa")),
-                entry("aaa")
-            )
+            val entries =
+                listOf(
+                    entry("ccc", listOf("bbb")),
+                    entry("bbb", listOf("aaa")),
+                    entry("aaa")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -91,14 +90,14 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `2 Non-Adjacent Parents` {
-
         @Test
         fun `parent one row away creates pass-through lane`() {
-            val entries = listOf(
-                entry("ccc", listOf("aaa")), // parent is 2 rows away
-                entry("bbb"),                 // unrelated commit
-                entry("aaa")
-            )
+            val entries =
+                listOf(
+                    entry("ccc", listOf("aaa")), // parent is 2 rows away
+                    entry("bbb"), // unrelated commit
+                    entry("aaa")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -115,12 +114,13 @@ class CommitGraphBuilderTest {
 
         @Test
         fun `parent two rows away creates multiple pass-through lanes`() {
-            val entries = listOf(
-                entry("ddd", listOf("aaa")), // parent is 3 rows away
-                entry("ccc"),                 // unrelated
-                entry("bbb"),                 // unrelated
-                entry("aaa")
-            )
+            val entries =
+                listOf(
+                    entry("ddd", listOf("aaa")), // parent is 3 rows away
+                    entry("ccc"), // unrelated
+                    entry("bbb"), // unrelated
+                    entry("aaa")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -138,15 +138,15 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `3 Two Long-Running Branches` {
-
         @Test
         fun `two parallel branches use different lanes`() {
-            val entries = listOf(
-                entry("ddd", listOf("bbb")), // Branch 1
-                entry("ccc"),                 // Branch 2 (no parent)
-                entry("bbb", listOf("aaa")), // Branch 1
-                entry("aaa")                  // Branch 1
-            )
+            val entries =
+                listOf(
+                    entry("ddd", listOf("bbb")), // Branch 1
+                    entry("ccc"), // Branch 2 (no parent)
+                    entry("bbb", listOf("aaa")), // Branch 1
+                    entry("aaa") // Branch 1
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -167,11 +167,12 @@ class CommitGraphBuilderTest {
             // This is the bug described: ccc and bbb both descend from aaa
             // Sequence: ccc, bbb, aaa
             // ccc should take lane 0, bbb should take lane 1 (not 0, as 0 is still active)
-            val entries = listOf(
-                entry("ccc", listOf("aaa")),
-                entry("bbb", listOf("aaa")),
-                entry("aaa")
-            )
+            val entries =
+                listOf(
+                    entry("ccc", listOf("aaa")),
+                    entry("bbb", listOf("aaa")),
+                    entry("aaa")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -192,17 +193,17 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `4 Interweaving Branches` {
-
         @Test
         fun `alternating commits from two branches`() {
-            val entries = listOf(
-                entry("e1", listOf("d1")), // Branch 1
-                entry("e2", listOf("d2")), // Branch 2
-                entry("d1", listOf("c1")), // Branch 1
-                entry("d2", listOf("c2")), // Branch 2
-                entry("c1"),               // Branch 1
-                entry("c2")                // Branch 2
-            )
+            val entries =
+                listOf(
+                    entry("e1", listOf("d1")), // Branch 1
+                    entry("e2", listOf("d2")), // Branch 2
+                    entry("d1", listOf("c1")), // Branch 1
+                    entry("d2", listOf("c2")), // Branch 2
+                    entry("c1"), // Branch 1
+                    entry("c2") // Branch 2
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -229,29 +230,30 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `5 Multiple Branches` {
-
         @Test
         fun `three parallel branches`() {
-            val entries = listOf(
-                entry("c1", listOf("b1")), // Branch 1
-                entry("c2", listOf("b2")), // Branch 2
-                entry("c3", listOf("b3")), // Branch 3
-                entry("b1", listOf("a1")), // Branch 1
-                entry("b2", listOf("a2")), // Branch 2
-                entry("b3", listOf("a3")), // Branch 3
-                entry("a1"),               // Branch 1
-                entry("a2"),               // Branch 2
-                entry("a3")                // Branch 3
-            )
+            val entries =
+                listOf(
+                    entry("c1", listOf("b1")), // Branch 1
+                    entry("c2", listOf("b2")), // Branch 2
+                    entry("c3", listOf("b3")), // Branch 3
+                    entry("b1", listOf("a1")), // Branch 1
+                    entry("b2", listOf("a2")), // Branch 2
+                    entry("b3", listOf("a3")), // Branch 3
+                    entry("a1"), // Branch 1
+                    entry("a2"), // Branch 2
+                    entry("a3") // Branch 3
+                )
 
             val graph = builder.buildGraph(entries)
 
             // Three different lanes
-            val lanes = setOf(
-                graph["c1"]!!.lane,
-                graph["c2"]!!.lane,
-                graph["c3"]!!.lane
-            )
+            val lanes =
+                setOf(
+                    graph["c1"]!!.lane,
+                    graph["c2"]!!.lane,
+                    graph["c3"]!!.lane
+                )
             lanes shouldHaveSize 3
 
             // Each branch consistent in its lane
@@ -267,14 +269,14 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `6 Merges` {
-
         @Test
         fun `simple merge - commit with two parents`() {
-            val entries = listOf(
-                entry("merge", listOf("left", "right")),
-                entry("left"),
-                entry("right")
-            )
+            val entries =
+                listOf(
+                    entry("merge", listOf("left", "right")),
+                    entry("left"),
+                    entry("right")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -284,21 +286,22 @@ class CommitGraphBuilderTest {
             // With Option 2: passthrough to right blocks lane 0
             // left is pushed to lane 1, right gets lane 0 when passthrough terminates
             graph["merge"]!!.lane shouldBe 0
-            graph["left"]!!.lane shouldBe 1   // pushed by passthrough to right
-            graph["right"]!!.lane shouldBe 0  // gets child's lane after passthrough terminates
+            graph["left"]!!.lane shouldBe 1 // pushed by passthrough to right
+            graph["right"]!!.lane shouldBe 0 // gets child's lane after passthrough terminates
 
-            graph["merge"]!!.parentLanes[0] shouldBe 1  // left
-            graph["merge"]!!.parentLanes[1] shouldBe 0  // right
+            graph["merge"]!!.parentLanes[0] shouldBe 1 // left
+            graph["merge"]!!.parentLanes[1] shouldBe 0 // right
         }
 
         @Test
         fun `merge after parallel development`() {
-            val entries = listOf(
-                entry("merge", listOf("b1", "b2")),
-                entry("b1", listOf("a")),
-                entry("b2", listOf("a")),
-                entry("a")
-            )
+            val entries =
+                listOf(
+                    entry("merge", listOf("b1", "b2")),
+                    entry("b1", listOf("a")),
+                    entry("b2", listOf("a")),
+                    entry("a")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -309,8 +312,8 @@ class CommitGraphBuilderTest {
             // b1 is pushed to lane 1, b2 gets lane 0
             val b1Lane = graph["b1"]!!.lane
             val b2Lane = graph["b2"]!!.lane
-            b1Lane shouldBe 1  // pushed by passthrough to b2
-            b2Lane shouldBe 0  // gets child's lane after passthrough terminates
+            b1Lane shouldBe 1 // pushed by passthrough to b2
+            b2Lane shouldBe 0 // gets child's lane after passthrough terminates
 
             // Both converge at a (a gets lowest child lane = 0)
             graph["a"]!!.lane shouldBe 0
@@ -319,17 +322,17 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `7 Complex Scenarios` {
-
         @Test
         fun `lane reuse after branch completes`() {
-            val entries = listOf(
-                entry("e", listOf("d")),   // Main branch continues
-                entry("short"),             // Short branch (no parent, ends here)
-                entry("d", listOf("c")),   // Main branch
-                entry("c", listOf("b")),   // Main branch
-                entry("b", listOf("a")),   // Main branch
-                entry("a")                  // Main branch root
-            )
+            val entries =
+                listOf(
+                    entry("e", listOf("d")), // Main branch continues
+                    entry("short"), // Short branch (no parent, ends here)
+                    entry("d", listOf("c")), // Main branch
+                    entry("c", listOf("b")), // Main branch
+                    entry("b", listOf("a")), // Main branch
+                    entry("a") // Main branch root
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -348,16 +351,17 @@ class CommitGraphBuilderTest {
         @Test
         fun `complex interleaving with lane reuse`() {
             // Multiple branches with different lifetimes
-            val entries = listOf(
-                entry("f1", listOf("e1")),  // Branch 1 continues
-                entry("short2"),             // Branch 2 ends
-                entry("e1", listOf("d1")),  // Branch 1
-                entry("short1"),             // Branch 3 ends
-                entry("d1", listOf("c1")),  // Branch 1
-                entry("c1", listOf("b1")),  // Branch 1
-                entry("b1", listOf("a1")),  // Branch 1
-                entry("a1")                  // Branch 1 root
-            )
+            val entries =
+                listOf(
+                    entry("f1", listOf("e1")), // Branch 1 continues
+                    entry("short2"), // Branch 2 ends
+                    entry("e1", listOf("d1")), // Branch 1
+                    entry("short1"), // Branch 3 ends
+                    entry("d1", listOf("c1")), // Branch 1
+                    entry("c1", listOf("b1")), // Branch 1
+                    entry("b1", listOf("a1")), // Branch 1
+                    entry("a1") // Branch 1 root
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -368,17 +372,18 @@ class CommitGraphBuilderTest {
 
             // Short branches: short2 gets lane 1, short1 reuses it (lane reuse works!)
             graph["short2"]!!.lane shouldBe 1
-            graph["short1"]!!.lane shouldBe 1  // Reuses lane from short2 (has no parents)
+            graph["short1"]!!.lane shouldBe 1 // Reuses lane from short2 (has no parents)
         }
 
         @Test
         fun `octopus merge - commit with three parents`() {
-            val entries = listOf(
-                entry("octopus", listOf("a", "b", "c")),
-                entry("a"),
-                entry("b"),
-                entry("c")
-            )
+            val entries =
+                listOf(
+                    entry("octopus", listOf("a", "b", "c")),
+                    entry("a"),
+                    entry("b"),
+                    entry("c")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -389,27 +394,27 @@ class CommitGraphBuilderTest {
             // a is pushed to lane 1, b is pushed to lane 1 (different row from a)
             // c gets lane 0 when passthrough terminates
             graph["octopus"]!!.lane shouldBe 0
-            graph["a"]!!.lane shouldBe 1  // pushed by passthrough
-            graph["b"]!!.lane shouldBe 1  // pushed by passthrough (different row, OK)
-            graph["c"]!!.lane shouldBe 0  // passthrough terminates
+            graph["a"]!!.lane shouldBe 1 // pushed by passthrough
+            graph["b"]!!.lane shouldBe 1 // pushed by passthrough (different row, OK)
+            graph["c"]!!.lane shouldBe 0 // passthrough terminates
 
-            graph["octopus"]!!.parentLanes[0] shouldBe 1  // a
-            graph["octopus"]!!.parentLanes[1] shouldBe 1  // b
-            graph["octopus"]!!.parentLanes[2] shouldBe 0  // c
+            graph["octopus"]!!.parentLanes[0] shouldBe 1 // a
+            graph["octopus"]!!.parentLanes[1] shouldBe 1 // b
+            graph["octopus"]!!.parentLanes[2] shouldBe 0 // c
         }
     }
 
     @Nested
     inner class `8 Children Tracking` {
-
         @Test
         fun `track children for upward line drawing`() {
             // To draw lines from child to parent circles (not just top/bottom of cells),
             // we need to know which commits in the previous row are children
-            val entries = listOf(
-                entry("child", listOf("parent")),
-                entry("parent")
-            )
+            val entries =
+                listOf(
+                    entry("child", listOf("parent")),
+                    entry("parent")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -425,21 +430,21 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `9 Lane Reuse After Merge` {
-
         @Test
         fun `lane should be reused after merge completes`() {
             // Scenario from user feedback:
             // Lane 0: dd <- cc <- bb <- aa
             // Lane 1: ee <- cc (converges into lane 0)
             // Then: ff <- aa (should reuse lane 1, not create lane 2)
-            val entries = listOf(
-                entry("dd", listOf("cc")), // Lane 0
-                entry("ee", listOf("cc")), // Lane 1, converges to cc
-                entry("cc", listOf("bb")), // Lane 0 (continues from dd)
-                entry("bb", listOf("aa")), // Lane 0
-                entry("ff", listOf("aa")), // Should reuse lane 1 (freed after merge)
-                entry("aa")                 // Lane 0
-            )
+            val entries =
+                listOf(
+                    entry("dd", listOf("cc")), // Lane 0
+                    entry("ee", listOf("cc")), // Lane 1, converges to cc
+                    entry("cc", listOf("bb")), // Lane 0 (continues from dd)
+                    entry("bb", listOf("aa")), // Lane 0
+                    entry("ff", listOf("aa")), // Should reuse lane 1 (freed after merge)
+                    entry("aa") // Lane 0
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -456,7 +461,7 @@ class CommitGraphBuilderTest {
             graph["bb"]!!.lane shouldBe 0
 
             // ff should reuse lane 1 (freed after ee merged into cc)
-            graph["ff"]!!.lane shouldBe 1  // FAILING: getting lane 2
+            graph["ff"]!!.lane shouldBe 1 // FAILING: getting lane 2
 
             // aa in lane 0
             graph["aa"]!!.lane shouldBe 0
@@ -465,11 +470,12 @@ class CommitGraphBuilderTest {
         @Test
         fun `parent with two children has correct child lanes`() {
             // Test that we track both children for rendering upward lines
-            val entries = listOf(
-                entry("child1", listOf("parent")), // Lane 0
-                entry("child2", listOf("parent")), // Lane 1
-                entry("parent")                     // Lane 0
-            )
+            val entries =
+                listOf(
+                    entry("child1", listOf("parent")), // Lane 0
+                    entry("child2", listOf("parent")), // Lane 1
+                    entry("parent") // Lane 0
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -490,14 +496,15 @@ class CommitGraphBuilderTest {
             // a1 <- b1 <- c1 (main branch in lane 0)
             // a1 <- b2 <- c2 (side branch in lane 1, merges at a1)
             // a1 <- b3      (another child)
-            val entries = listOf(
-                entry("c1", listOf("b1")), // Lane 0
-                entry("c2", listOf("b2")), // Lane 1
-                entry("b1", listOf("a1")), // Lane 0
-                entry("b2", listOf("a1")), // Lane 1, merges to a1
-                entry("b3", listOf("a1")), // Gets lane 2 (lanes 0,1 blocked by passthroughs)
-                entry("a1")                 // Lane 0
-            )
+            val entries =
+                listOf(
+                    entry("c1", listOf("b1")), // Lane 0
+                    entry("c2", listOf("b2")), // Lane 1
+                    entry("b1", listOf("a1")), // Lane 0
+                    entry("b2", listOf("a1")), // Lane 1, merges to a1
+                    entry("b3", listOf("a1")), // Gets lane 2 (lanes 0,1 blocked by passthroughs)
+                    entry("a1") // Lane 0
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -508,7 +515,7 @@ class CommitGraphBuilderTest {
 
             // With Option 2: b1 and b2 create passthroughs to a1 at lanes 0 and 1
             // b3 can't reuse because both lanes are blocked by passthroughs
-            graph["b3"]!!.lane shouldBe 2  // lanes 0,1 blocked by passthroughs to a1
+            graph["b3"]!!.lane shouldBe 2 // lanes 0,1 blocked by passthroughs to a1
 
             graph["a1"]!!.lane shouldBe 0
         }
@@ -516,29 +523,29 @@ class CommitGraphBuilderTest {
 
     @Nested
     inner class `10 Parent Lane Selection` {
-
         @Test
         fun `parent with multiple children in non-sequential lanes uses leftmost`() {
             // Create scenario where children are in lanes 1, 2, 3 (not 0, 1, 2)
             // by having another commit occupy lane 0
-            val entries = listOf(
-                entry("xx", listOf("yy")),     // Occupies lane 0
-                entry("aa", listOf("parent")), // Gets lane 1
-                entry("bb", listOf("parent")), // Gets lane 2
-                entry("cc", listOf("parent")), // Gets lane 3
-                entry("yy"),                    // Lane 0 continues
-                entry("parent")                 // Should be lane 1 (leftmost child), not 1 (first child)
-            )
+            val entries =
+                listOf(
+                    entry("xx", listOf("yy")), // Occupies lane 0
+                    entry("aa", listOf("parent")), // Gets lane 1
+                    entry("bb", listOf("parent")), // Gets lane 2
+                    entry("cc", listOf("parent")), // Gets lane 3
+                    entry("yy"), // Lane 0 continues
+                    entry("parent") // Should be lane 1 (leftmost child), not 1 (first child)
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)
 
             graph["xx"]!!.lane shouldBe 0
-            graph["aa"]!!.lane shouldBe 1  // First child of parent
-            graph["bb"]!!.lane shouldBe 2  // Second child
-            graph["cc"]!!.lane shouldBe 3  // Third child
+            graph["aa"]!!.lane shouldBe 1 // First child of parent
+            graph["bb"]!!.lane shouldBe 2 // Second child
+            graph["cc"]!!.lane shouldBe 3 // Third child
             graph["yy"]!!.lane shouldBe 0
-            graph["parent"]!!.lane shouldBe 1  // Should use leftmost child lane (1)
+            graph["parent"]!!.lane shouldBe 1 // Should use leftmost child lane (1)
         }
 
         @Test
@@ -546,14 +553,15 @@ class CommitGraphBuilderTest {
             // Scenario where first child assigns parent to lane 2, but later child in lane 1
             // xx (lane 0) -> yy, aa (lane 2) -> parent, zz (lane 1) -> yy, bb (lane 1) -> parent
             // Parent should end up in lane 1 (from bb), not lane 2 (from aa)
-            val entries = listOf(
-                entry("xx", listOf("yy")),      // Lane 0
-                entry("aa", listOf("parent")),  // Lane 1, assigns parent to lane 1
-                entry("zz", listOf("yy")),      // Lane 2
-                entry("bb", listOf("parent")),  // Lane 3, parent already at lane 1
-                entry("yy"),                     // Lane 0
-                entry("parent")                  // Currently lane 1 (from aa), should stay lane 1
-            )
+            val entries =
+                listOf(
+                    entry("xx", listOf("yy")), // Lane 0
+                    entry("aa", listOf("parent")), // Lane 1, assigns parent to lane 1
+                    entry("zz", listOf("yy")), // Lane 2
+                    entry("bb", listOf("parent")), // Lane 3, parent already at lane 1
+                    entry("yy"), // Lane 0
+                    entry("parent") // Currently lane 1 (from aa), should stay lane 1
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)
@@ -571,7 +579,7 @@ class CommitGraphBuilderTest {
             // Actually, aa is first, gets lane 1, assigns parent to lane 1
             // bb is later, gets lane 3, parent already at lane 1
             // So parent stays at lane 1, which IS the leftmost (min(1, 3) = 1)
-            graph["parent"]!!.lane shouldBe 1  // Correct
+            graph["parent"]!!.lane shouldBe 1 // Correct
         }
 
         @Test
@@ -579,15 +587,16 @@ class CommitGraphBuilderTest {
             // Real test: aa (lane 3) processes first and assigns parent to lane 3
             // Then bb (lane 1) processes and should reassign parent to lane 1
             // To get aa in lane 3, we need lanes 0, 1, 2 occupied
-            val entries = listOf(
-                entry("x0", listOf("y")),       // Lane 0
-                entry("x1", listOf("y")),       // Lane 1
-                entry("x2", listOf("y")),       // Lane 2
-                entry("aa", listOf("parent")),  // Lane 3, assigns parent to lane 3
-                entry("bb", listOf("parent")),  // Lane 4, parent at lane 3, should check if bb < 3
-                entry("y"),                      // Lane 0
-                entry("parent")                  // Should be lane 3 (from aa)
-            )
+            val entries =
+                listOf(
+                    entry("x0", listOf("y")), // Lane 0
+                    entry("x1", listOf("y")), // Lane 1
+                    entry("x2", listOf("y")), // Lane 2
+                    entry("aa", listOf("parent")), // Lane 3, assigns parent to lane 3
+                    entry("bb", listOf("parent")), // Lane 4, parent at lane 3, should check if bb < 3
+                    entry("y"), // Lane 0
+                    entry("parent") // Should be lane 3 (from aa)
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)
@@ -601,7 +610,7 @@ class CommitGraphBuilderTest {
 
             // Currently: aa assigns parent to lane 3, bb gets lane 4
             // We want parent in min(3, 4) = lane 3
-            graph["parent"]!!.lane shouldBe 3  // This should pass (leftmost is 3)
+            graph["parent"]!!.lane shouldBe 3 // This should pass (leftmost is 3)
 
             // But what if we want bb to have a LOWER lane? We'd need lane reuse...
         }
@@ -613,24 +622,25 @@ class CommitGraphBuilderTest {
             // z1 (lane 1, leaf, frees lane 1)
             // aa (lane 2) -> parent (first child, assigns parent to lane 2)
             // bb (lane 1, reused) -> parent (second child, should reassign parent to lane 1)
-            val entries = listOf(
-                entry("x1", listOf("y1")),      // Lane 0, keeps it occupied
-                entry("z1"),                     // Lane 1, leaf, will free lane 1
-                entry("aa", listOf("parent")),  // Lane 2, assigns parent to lane 2
-                entry("bb", listOf("parent")),  // Lane 1 (reuses), parent should move to 1!
-                entry("y1"),                     // Lane 0 continues
-                entry("parent")                  // Should be lane 1 (min of aa=2, bb=1), currently 2
-            )
+            val entries =
+                listOf(
+                    entry("x1", listOf("y1")), // Lane 0, keeps it occupied
+                    entry("z1"), // Lane 1, leaf, will free lane 1
+                    entry("aa", listOf("parent")), // Lane 2, assigns parent to lane 2
+                    entry("bb", listOf("parent")), // Lane 1 (reuses), parent should move to 1!
+                    entry("y1"), // Lane 0 continues
+                    entry("parent") // Should be lane 1 (min of aa=2, bb=1), currently 2
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)
 
             graph["x1"]!!.lane shouldBe 0
-            graph["z1"]!!.lane shouldBe 1  // Freed (leaf)
-            graph["aa"]!!.lane shouldBe 1  // Reuses freed lane 1
-            graph["bb"]!!.lane shouldBe 2  // Gets new lane 2
+            graph["z1"]!!.lane shouldBe 1 // Freed (leaf)
+            graph["aa"]!!.lane shouldBe 1 // Reuses freed lane 1
+            graph["bb"]!!.lane shouldBe 2 // Gets new lane 2
             graph["y1"]!!.lane shouldBe 0
-            graph["parent"]!!.lane shouldBe 1  // Should be 1 (min(1,2)=1), already correct!
+            graph["parent"]!!.lane shouldBe 1 // Should be 1 (min(1,2)=1), already correct!
         }
 
         @Test
@@ -640,18 +650,19 @@ class CommitGraphBuilderTest {
             // aa (gets lane 3) -> parent (assigns parent to lane 3)
             // z2 (frees lane 2)
             // bb (reuses lane 2) -> parent (parent should be REASSIGNED to lane 2!)
-            val entries = listOf(
-                entry("x0", listOf("y0")),      // Lane 0
-                entry("x1", listOf("y1")),      // Lane 1
-                entry("x2", listOf("y2")),      // Lane 2
-                entry("aa", listOf("parent")),  // Lane 3, assigns parent to lane 3
-                entry("z2", listOf("y2")),      // Lane 4, second child of y2
-                entry("y2"),                     // Lane 2, frees z2's lane 4 (z2 is leaf that merged)
-                entry("bb", listOf("parent")),  // Lane 2 (reuses freed lane 2), parent should move to 2!
-                entry("y0"),                     // Lane 0
-                entry("y1"),                     // Lane 1
-                entry("parent")                  // Should be lane 2 (min(3,2)=2), currently 3
-            )
+            val entries =
+                listOf(
+                    entry("x0", listOf("y0")), // Lane 0
+                    entry("x1", listOf("y1")), // Lane 1
+                    entry("x2", listOf("y2")), // Lane 2
+                    entry("aa", listOf("parent")), // Lane 3, assigns parent to lane 3
+                    entry("z2", listOf("y2")), // Lane 4, second child of y2
+                    entry("y2"), // Lane 2, frees z2's lane 4 (z2 is leaf that merged)
+                    entry("bb", listOf("parent")), // Lane 2 (reuses freed lane 2), parent should move to 2!
+                    entry("y0"), // Lane 0
+                    entry("y1"), // Lane 1
+                    entry("parent") // Should be lane 2 (min(3,2)=2), currently 3
+                )
 
             val builder = GraphBuilder()
             val graph = builder.buildGraph(entries)
@@ -659,19 +670,18 @@ class CommitGraphBuilderTest {
             graph["x0"]!!.lane shouldBe 0
             graph["x1"]!!.lane shouldBe 1
             graph["x2"]!!.lane shouldBe 2
-            graph["aa"]!!.lane shouldBe 3  // Gets lane 3, assigns parent to lane 3
-            graph["z2"]!!.lane shouldBe 4  // Second child of y2
-            graph["y2"]!!.lane shouldBe 2  // Frees z2's lane 4
-            graph["bb"]!!.lane shouldBe 2  // Reuses lane 2 (wait, y2 freed lane 4, not lane 2!)
+            graph["aa"]!!.lane shouldBe 3 // Gets lane 3, assigns parent to lane 3
+            graph["z2"]!!.lane shouldBe 4 // Second child of y2
+            graph["y2"]!!.lane shouldBe 2 // Frees z2's lane 4
+            graph["bb"]!!.lane shouldBe 2 // Reuses lane 2 (wait, y2 freed lane 4, not lane 2!)
             graph["y0"]!!.lane shouldBe 0
             graph["y1"]!!.lane shouldBe 1
-            graph["parent"]!!.lane shouldBe 2  // SHOULD be 2 (leftmost), currently likely 3
+            graph["parent"]!!.lane shouldBe 2 // SHOULD be 2 (leftmost), currently likely 3
         }
     }
 
     @Nested
     inner class `11 Bug jj-idea-1f2 Merge Rendering` {
-
         @Test
         fun `merge commit qn with parents rso and oq`() {
             // Exact scenario from bug jj-idea-1f2:
@@ -680,13 +690,14 @@ class CommitGraphBuilderTest {
             // qn is the merge commit with two parents: rso and oq
             //
             // Log order (newest first, topologically sorted):
-            val entries = listOf(
-                entry("qn", listOf("rso", "oq")),  // Merge commit
-                entry("rso", listOf("wp")),        // First parent of qn
-                entry("oq", listOf("py")),         // Second parent of qn
-                entry("wp", listOf("py")),
-                entry("py")
-            )
+            val entries =
+                listOf(
+                    entry("qn", listOf("rso", "oq")), // Merge commit
+                    entry("rso", listOf("wp")), // First parent of qn
+                    entry("oq", listOf("py")), // Second parent of qn
+                    entry("wp", listOf("py")),
+                    entry("py")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -698,8 +709,8 @@ class CommitGraphBuilderTest {
 
             // With Option 2: passthrough to oq blocks lane 0
             // rso is pushed to lane 1, oq gets lane 0 when passthrough terminates
-            graph["qn"]!!.parentLanes[0] shouldBe 1  // rso pushed to lane 1
-            graph["qn"]!!.parentLanes[1] shouldBe 0  // oq gets lane 0
+            graph["qn"]!!.parentLanes[0] shouldBe 1 // rso pushed to lane 1
+            graph["qn"]!!.parentLanes[1] shouldBe 0 // oq gets lane 0
 
             // rso should be in lane 1 (pushed by passthrough to oq)
             graph["rso"]!!.lane shouldBe 1
@@ -710,8 +721,8 @@ class CommitGraphBuilderTest {
             // Verify the graph visually makes sense:
             // Lane 0: qn -> oq -> py (main line continues to furthest parent)
             // Lane 1: rso -> wp (diagonal from qn to rso)
-            graph["wp"]!!.lane shouldBe 1  // follows rso
-            graph["py"]!!.lane shouldBe 0  // oq's parent, lowest child lane
+            graph["wp"]!!.lane shouldBe 1 // follows rso
+            graph["py"]!!.lane shouldBe 0 // oq's parent, lowest child lane
         }
     }
 }

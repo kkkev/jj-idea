@@ -15,9 +15,10 @@ import java.util.concurrent.TimeUnit
 /**
  * CLI-based implementation of JujutsuCommandExecutor
  */
-class CliExecutor(private val root: VirtualFile, private val jjExecutable: String = "jj") :
-    CommandExecutor {
-
+class CliExecutor(
+    private val root: VirtualFile,
+    private val jjExecutable: String = "jj"
+) : CommandExecutor {
     private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
 
@@ -27,33 +28,42 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
 
     override fun diffSummary(revision: Revision) = execute(root, listOf("diff", "--summary", "-r", revision))
 
-    override fun show(filePath: String, revision: Revision) =
-        execute(root, listOf("file", "show", "-r", revision, filePath))
+    override fun show(
+        filePath: String,
+        revision: Revision
+    ) = execute(root, listOf("file", "show", "-r", revision, filePath))
 
-    override fun isAvailable() = try {
-        val result = execute(null, listOf("--version"))
-        result.isSuccess
-    } catch (e: Exception) {
-        log.warn("Failed to check jj availability", e)
-        false
-    }
+    override fun isAvailable() =
+        try {
+            val result = execute(null, listOf("--version"))
+            result.isSuccess
+        } catch (e: Exception) {
+            log.warn("Failed to check jj availability", e)
+            false
+        }
 
-    override fun version() = try {
-        val result = execute(null, listOf("--version"))
-        if (result.isSuccess) {
-            result.stdout.trim()
-        } else {
+    override fun version() =
+        try {
+            val result = execute(null, listOf("--version"))
+            if (result.isSuccess) {
+                result.stdout.trim()
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            log.warn("Failed to get jj version", e)
             null
         }
-    } catch (e: Exception) {
-        log.warn("Failed to get jj version", e)
-        null
-    }
 
-    override fun describe(description: Description, revision: Revision): CommandExecutor.CommandResult =
-        execute(root, listOf("describe", "-r", revision, "-m", description.actual))
+    override fun describe(
+        description: Description,
+        revision: Revision
+    ): CommandExecutor.CommandResult = execute(root, listOf("describe", "-r", revision, "-m", description.actual))
 
-    override fun new(description: Description, parentRevisions: List<Revision>): CommandExecutor.CommandResult {
+    override fun new(
+        description: Description,
+        parentRevisions: List<Revision>
+    ): CommandExecutor.CommandResult {
         val args = mutableListOf("new")
         if (!description.empty) {
             args.add("-m")
@@ -66,10 +76,13 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
     override fun abandon(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("abandon", "-r", revision))
 
-    override fun edit(revision: Revision): CommandExecutor.CommandResult =
-        execute(root, listOf("edit", revision))
+    override fun edit(revision: Revision): CommandExecutor.CommandResult = execute(root, listOf("edit", revision))
 
-    override fun log(revset: Revset, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
+    override fun log(
+        revset: Revset,
+        template: String?,
+        filePaths: List<String>
+    ): CommandExecutor.CommandResult {
         val args = mutableListOf("log", "-r", revset, "--no-graph")
         if (template != null) {
             args.add("-T")
@@ -79,7 +92,11 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         return execute(root, args)
     }
 
-    override fun annotate(filePath: String, revision: Revision, template: String?): CommandExecutor.CommandResult {
+    override fun annotate(
+        filePath: String,
+        revision: Revision,
+        template: String?
+    ): CommandExecutor.CommandResult {
         val args = mutableListOf("file", "annotate", "-r", revision)
         if (template != null) {
             args.add("-T")
@@ -106,9 +123,10 @@ class CliExecutor(private val root: VirtualFile, private val jjExecutable: Strin
         args: List<Any>,
         timeout: Long = defaultTimeout
     ): CommandExecutor.CommandResult {
-        val commandLine = GeneralCommandLine(jjExecutable)
-            .withParameters(args.map { it.toString() })
-            .withCharset(StandardCharsets.UTF_8)
+        val commandLine =
+            GeneralCommandLine(jjExecutable)
+                .withParameters(args.map { it.toString() })
+                .withCharset(StandardCharsets.UTF_8)
 
         workingDir?.let { commandLine.setWorkDirectory(it.path) }
 

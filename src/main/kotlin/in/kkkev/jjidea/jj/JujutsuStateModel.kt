@@ -17,8 +17,9 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * Holds current VCS state and notifies observers via MessageBus when state changes.
  */
 @Service(Service.Level.PROJECT)
-class JujutsuStateModel(private val project: Project) : Disposable {
-
+class JujutsuStateModel(
+    private val project: Project
+) : Disposable {
     private val log = Logger.getInstance(javaClass)
 
     // Current state (accessed from EDT)
@@ -31,8 +32,8 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     val fileChanges: List<Change> get() = _fileChanges
 
     @Volatile
-    private var _selectWorkingCopy: Boolean = false
-    val shouldSelectWorkingCopy: Boolean get() = _selectWorkingCopy
+    private var _shouldSelectWorkingCopy: Boolean = false
+    val shouldSelectWorkingCopy: Boolean get() = _shouldSelectWorkingCopy
 
     /**
      * Refresh the model from the VCS.
@@ -76,19 +77,21 @@ class JujutsuStateModel(private val project: Project) : Disposable {
      */
     fun invalidate(selectWorkingCopy: Boolean = false) {
         log.debug("State invalidated (selectWorkingCopy=$selectWorkingCopy), refreshing...")
-        _selectWorkingCopy = selectWorkingCopy
+        _shouldSelectWorkingCopy = selectWorkingCopy
         refresh()
     }
 
     private fun notifyWorkingCopyChanged() {
         log.debug("Publishing workingCopyChanged event")
-        project.messageBus.syncPublisher(JujutsuStateListener.TOPIC)
+        project.messageBus
+            .syncPublisher(JujutsuStateListener.TOPIC)
             .workingCopyChanged()
     }
 
     private fun notifyLogUpdated() {
         log.debug("Publishing logUpdated event")
-        project.messageBus.syncPublisher(JujutsuStateListener.TOPIC)
+        project.messageBus
+            .syncPublisher(JujutsuStateListener.TOPIC)
             .logUpdated()
     }
 

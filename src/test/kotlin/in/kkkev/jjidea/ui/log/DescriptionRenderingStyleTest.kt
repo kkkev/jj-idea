@@ -16,10 +16,8 @@ import java.awt.Font
  * for different combinations of empty/non-empty descriptions and working copy status.
  */
 class DescriptionRenderingStyleTest {
-
     @Nested
     inner class `getTextAttributes for Description` {
-
         @Test
         fun `empty description, not working copy - gray italic`() {
             val attrs = DescriptionRenderingStyle.getTextAttributes(Description(""), false)
@@ -52,7 +50,6 @@ class DescriptionRenderingStyleTest {
 
     @Nested
     inner class `getFontStyle for Description` {
-
         @Test
         fun `empty description, not working copy - italic`() {
             val style = DescriptionRenderingStyle.getFontStyle(Description(""), false)
@@ -84,54 +81,57 @@ class DescriptionRenderingStyleTest {
 
     @Nested
     inner class `getTextColor for Description` {
-
         private val selectionForeground = Color.WHITE
         private val defaultForeground = Color.BLACK
 
         @Test
         fun `empty description, not selected - gray`() {
-            val color = DescriptionRenderingStyle.getTextColor(
-                Description(""),
-                isSelected = false,
-                selectionForeground,
-                defaultForeground
-            )
+            val color =
+                DescriptionRenderingStyle.getTextColor(
+                    Description(""),
+                    isSelected = false,
+                    selectionForeground,
+                    defaultForeground
+                )
 
             color shouldBe JBColor.GRAY
         }
 
         @Test
         fun `empty description, selected - selection foreground`() {
-            val color = DescriptionRenderingStyle.getTextColor(
-                Description(""),
-                isSelected = true,
-                selectionForeground,
-                defaultForeground
-            )
+            val color =
+                DescriptionRenderingStyle.getTextColor(
+                    Description(""),
+                    isSelected = true,
+                    selectionForeground,
+                    defaultForeground
+                )
 
             color shouldBe selectionForeground
         }
 
         @Test
         fun `non-empty description, not selected - default foreground`() {
-            val color = DescriptionRenderingStyle.getTextColor(
-                Description("Test"),
-                isSelected = false,
-                selectionForeground,
-                defaultForeground
-            )
+            val color =
+                DescriptionRenderingStyle.getTextColor(
+                    Description("Test"),
+                    isSelected = false,
+                    selectionForeground,
+                    defaultForeground
+                )
 
             color shouldBe defaultForeground
         }
 
         @Test
         fun `non-empty description, selected - selection foreground`() {
-            val color = DescriptionRenderingStyle.getTextColor(
-                Description("Test"),
-                isSelected = true,
-                selectionForeground,
-                defaultForeground
-            )
+            val color =
+                DescriptionRenderingStyle.getTextColor(
+                    Description("Test"),
+                    isSelected = true,
+                    selectionForeground,
+                    defaultForeground
+                )
 
             color shouldBe selectionForeground
         }
@@ -139,7 +139,6 @@ class DescriptionRenderingStyleTest {
 
     @Nested
     inner class `getEmptyIndicatorFontStyle` {
-
         @Test
         fun `not working copy - italic only`() {
             val style = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(false)

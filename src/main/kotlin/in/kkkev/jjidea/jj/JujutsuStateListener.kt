@@ -11,10 +11,11 @@ import com.intellij.util.messages.Topic
 interface JujutsuStateListener {
     companion object {
         @Topic.ProjectLevel
-        val TOPIC = Topic.create(
-            "Jujutsu State Changes",
-            JujutsuStateListener::class.java
-        )
+        val TOPIC =
+            Topic.create(
+                "Jujutsu State Changes",
+                JujutsuStateListener::class.java
+            )
     }
 
     /**

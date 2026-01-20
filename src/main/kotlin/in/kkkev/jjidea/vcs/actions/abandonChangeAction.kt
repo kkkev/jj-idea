@@ -11,19 +11,25 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * Abandon change action.
  * Removes the change from the log with confirmation if it has file modifications or a description.
  */
-fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAction(
-    entry, "log.action.abandon", AllIcons.General.Delete
+fun abandonChangeAction(
+    project: Project,
+    entry: LogEntry?
+) = nullAndDumbAwareAction(
+    entry,
+    "log.action.abandon",
+    AllIcons.General.Delete
 ) {
     // Check if confirmation is needed
     val needsConfirmation = !target.isEmpty || !target.description.empty
 
     if (needsConfirmation) {
         // Build confirmation message based on what will be lost
-        val confirmMessage = when {
-            !target.isEmpty && !target.description.empty -> JujutsuBundle.message("log.action.abandon.confirm.both")
-            !target.isEmpty -> JujutsuBundle.message("log.action.abandon.confirm.files")
-            else -> JujutsuBundle.message("log.action.abandon.confirm.description")
-        }
+        val confirmMessage =
+            when {
+                !target.isEmpty && !target.description.empty -> JujutsuBundle.message("log.action.abandon.confirm.both")
+                !target.isEmpty -> JujutsuBundle.message("log.action.abandon.confirm.files")
+                else -> JujutsuBundle.message("log.action.abandon.confirm.description")
+            }
 
         val confirmTitle = JujutsuBundle.message("log.action.abandon.confirm.title", target.changeId.short)
 
@@ -42,12 +48,12 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
     }
 
     // Execute abandon in background thread
-    project.jujutsuVcs.commandExecutor.createCommand { abandon(target.changeId) }
+    project.jujutsuVcs.commandExecutor
+        .createCommand { abandon(target.changeId) }
         .onSuccess {
             // Refresh all views via state model
             project.refreshAfterVcsOperation(selectWorkingCopy = true)
             log.info("Abandoned change ${target.changeId}")
-        }
-        .onFailureTellUser("log.action.abandon.error", project, log)
+        }.onFailureTellUser("log.action.abandon.error", project, log)
         .executeAsync()
 }

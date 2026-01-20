@@ -22,16 +22,16 @@ class JujutsuBookmarkIcon(
     private val color: Color = BOOKMARK_COLOR,
     private val filled: Boolean = false
 ) : Icon {
-
     companion object {
         /**
          * Platform theme color for bookmark references.
          * Uses the same color as IntelliJ's VCS bookmarks.
          */
-        val BOOKMARK_COLOR: Color = JBColor.namedColor(
-            "VersionControl.RefLabel.bookmarkBackground",
-            JBColor(0xf4af3d, 0xd9a343)
-        )
+        val BOOKMARK_COLOR: Color =
+            JBColor.namedColor(
+                "VersionControl.RefLabel.bookmarkBackground",
+                JBColor(0xf4af3d, 0xd9a343)
+            )
 
         /** Width multiplier for icon sizing */
         private const val WIDTH_FACTOR = 3.5f
@@ -40,7 +40,12 @@ class JujutsuBookmarkIcon(
         private const val BASE_SIZE = 6.5f
     }
 
-    override fun paintIcon(c: Component?, g: Graphics, iconX: Int, iconY: Int) {
+    override fun paintIcon(
+        c: Component?,
+        g: Graphics,
+        iconX: Int,
+        iconY: Int
+    ) {
         val g2 = g as Graphics2D
         val config: GraphicsConfig = GraphicsUtil.setupAAPainting(g2)
 

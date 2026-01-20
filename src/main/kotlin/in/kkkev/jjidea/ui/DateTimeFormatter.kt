@@ -13,7 +13,6 @@ import java.util.*
  * - Localized date/time format for older commits
  */
 object DateTimeFormatter {
-
     /**
      * Format timestamp in Git plugin style with proper locale support.
      */
@@ -44,21 +43,27 @@ object DateTimeFormatter {
     /**
      * Check if two timestamps are on the same day.
      */
-    private fun isSameDay(millis1: Long, millis2: Long): Boolean {
+    private fun isSameDay(
+        millis1: Long,
+        millis2: Long
+    ): Boolean {
         val cal1 = Calendar.getInstance().apply { timeInMillis = millis1 }
         val cal2 = Calendar.getInstance().apply { timeInMillis = millis2 }
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
     }
 
     /**
      * Check if timestamp is yesterday relative to now.
      */
-    private fun isYesterday(now: Long, millis: Long): Boolean {
+    private fun isYesterday(
+        now: Long,
+        millis: Long
+    ): Boolean {
         val cal1 = Calendar.getInstance().apply { timeInMillis = now }
         val cal2 = Calendar.getInstance().apply { timeInMillis = millis }
         cal1.add(Calendar.DAY_OF_YEAR, -1)
         return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
-                cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+            cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
     }
 }

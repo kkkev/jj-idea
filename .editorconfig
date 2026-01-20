@@ -3,7 +3,7 @@ charset = utf-8
 end_of_line = lf
 indent_size = 4
 indent_style = space
-insert_final_newline = false
+insert_final_newline = true
 max_line_length = 120
 tab_width = 4
 ij_continuation_indent_size = 8
@@ -568,6 +568,18 @@ ij_html_space_inside_empty_tag = false
 ij_html_text_wrap = normal
 
 [{*.kt,*.kts}]
+# Disable package-name rule: `in` is a Kotlin keyword but a valid domain name
+ktlint_standard_package-name = disabled
+# Allow wildcard imports for IntelliJ platform APIs
+ktlint_standard_no-wildcard-imports = disabled
+# Allow lowercase filenames for action factory functions
+ktlint_standard_filename = disabled
+# Allow `val x = if (...)` on same line
+ktlint_standard_multiline-expression-wrapping = disabled
+# Allow class declarations with supertypes on same line if they fit
+ktlint_standard_class-signature = disabled
+# Allow function signatures on same line if they fit
+ktlint_standard_function-signature = disabled
 ij_kotlin_align_in_columns_case_branch = false
 ij_kotlin_align_multiline_binary_operation = false
 ij_kotlin_align_multiline_extends_list = false
@@ -592,9 +604,9 @@ ij_kotlin_blank_lines_around_block_when_branches = 0
 ij_kotlin_blank_lines_before_declaration_with_comment_or_annotation_on_separate_line = 1
 ij_kotlin_block_comment_add_space = false
 ij_kotlin_block_comment_at_first_column = true
-ij_kotlin_call_parameters_new_line_after_left_paren = true
-ij_kotlin_call_parameters_right_paren_on_new_line = true
-ij_kotlin_call_parameters_wrap = on_every_item
+ij_kotlin_call_parameters_new_line_after_left_paren = false
+ij_kotlin_call_parameters_right_paren_on_new_line = false
+ij_kotlin_call_parameters_wrap = normal
 ij_kotlin_catch_on_new_line = false
 ij_kotlin_class_annotation_wrap = split_into_lines
 ij_kotlin_code_style_defaults = KOTLIN_OFFICIAL
@@ -628,9 +640,9 @@ ij_kotlin_line_comment_add_space_on_reformat = false
 ij_kotlin_line_comment_at_first_column = true
 ij_kotlin_method_annotation_wrap = split_into_lines
 ij_kotlin_method_call_chain_wrap = normal
-ij_kotlin_method_parameters_new_line_after_left_paren = true
-ij_kotlin_method_parameters_right_paren_on_new_line = true
-ij_kotlin_method_parameters_wrap = on_every_item
+ij_kotlin_method_parameters_new_line_after_left_paren = false
+ij_kotlin_method_parameters_right_paren_on_new_line = false
+ij_kotlin_method_parameters_wrap = normal
 ij_kotlin_name_count_to_use_star_import = 5
 ij_kotlin_name_count_to_use_star_import_for_members = 3
 ij_kotlin_packages_to_use_import_on_demand = java.util.*,kotlinx.android.synthetic.**,io.ktor.**

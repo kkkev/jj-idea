@@ -27,7 +27,6 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     }
 
     companion object {
-        fun getInstance(project: Project): JujutsuSettings =
-            project.getService(JujutsuSettings::class.java)
+        fun getInstance(project: Project): JujutsuSettings = project.getService(JujutsuSettings::class.java)
     }
 }

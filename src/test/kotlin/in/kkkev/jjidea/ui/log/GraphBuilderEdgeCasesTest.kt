@@ -14,12 +14,10 @@ import org.junit.jupiter.api.Test
  * in real Jujutsu repositories.
  */
 class GraphBuilderEdgeCasesTest {
-
     private val builder = GraphBuilder()
 
     @Nested
     inner class `Empty and Single Entry Graphs` {
-
         @Test
         fun `empty entries produces empty graph`() {
             val graph = builder.buildGraph(emptyList())
@@ -55,13 +53,13 @@ class GraphBuilderEdgeCasesTest {
 
     @Nested
     inner class `Deep Linear Chains` {
-
         @Test
         fun `long linear chain uses single lane`() {
-            val entries = (0..9).map { i ->
-                val parentIds = if (i < 9) listOf("commit${i + 1}") else emptyList()
-                entry("commit$i", parentIds)
-            }
+            val entries =
+                (0..9).map { i ->
+                    val parentIds = if (i < 9) listOf("commit${i + 1}") else emptyList()
+                    entry("commit$i", parentIds)
+                }
 
             val graph = builder.buildGraph(entries)
 
@@ -73,11 +71,12 @@ class GraphBuilderEdgeCasesTest {
 
         @Test
         fun `no pass-through lanes in linear chain`() {
-            val entries = listOf(
-                entry("c", listOf("b")),
-                entry("b", listOf("a")),
-                entry("a")
-            )
+            val entries =
+                listOf(
+                    entry("c", listOf("b")),
+                    entry("b", listOf("a")),
+                    entry("a")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -90,28 +89,29 @@ class GraphBuilderEdgeCasesTest {
 
     @Nested
     inner class `Wide Branching` {
-
         @Test
         fun `many children from single parent`() {
-            val entries = listOf(
-                entry("child1", listOf("parent")),
-                entry("child2", listOf("parent")),
-                entry("child3", listOf("parent")),
-                entry("child4", listOf("parent")),
-                entry("child5", listOf("parent")),
-                entry("parent")
-            )
+            val entries =
+                listOf(
+                    entry("child1", listOf("parent")),
+                    entry("child2", listOf("parent")),
+                    entry("child3", listOf("parent")),
+                    entry("child4", listOf("parent")),
+                    entry("child5", listOf("parent")),
+                    entry("parent")
+                )
 
             val graph = builder.buildGraph(entries)
 
             // Each child should have a unique lane
-            val childLanes = setOf(
-                graph["child1"]!!.lane,
-                graph["child2"]!!.lane,
-                graph["child3"]!!.lane,
-                graph["child4"]!!.lane,
-                graph["child5"]!!.lane
-            )
+            val childLanes =
+                setOf(
+                    graph["child1"]!!.lane,
+                    graph["child2"]!!.lane,
+                    graph["child3"]!!.lane,
+                    graph["child4"]!!.lane,
+                    graph["child5"]!!.lane
+                )
             childLanes shouldHaveSize 5
 
             // Parent should be at the leftmost child's lane
@@ -120,12 +120,13 @@ class GraphBuilderEdgeCasesTest {
 
         @Test
         fun `children see parent lane as pass-through when parent not yet processed`() {
-            val entries = listOf(
-                entry("child1", listOf("parent")),
-                entry("child2", listOf("parent")),
-                entry("child3", listOf("parent")),
-                entry("parent")
-            )
+            val entries =
+                listOf(
+                    entry("child1", listOf("parent")),
+                    entry("child2", listOf("parent")),
+                    entry("child3", listOf("parent")),
+                    entry("parent")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -143,16 +144,16 @@ class GraphBuilderEdgeCasesTest {
 
     @Nested
     inner class `Diamond Patterns` {
-
         @Test
         fun `simple diamond merge`() {
             // Classic diamond: root -> left, right -> merge
-            val entries = listOf(
-                entry("merge", listOf("left", "right")),
-                entry("left", listOf("root")),
-                entry("right", listOf("root")),
-                entry("root")
-            )
+            val entries =
+                listOf(
+                    entry("merge", listOf("left", "right")),
+                    entry("left", listOf("root")),
+                    entry("right", listOf("root")),
+                    entry("root")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -168,14 +169,15 @@ class GraphBuilderEdgeCasesTest {
 
         @Test
         fun `nested diamonds share lanes correctly`() {
-            val entries = listOf(
-                entry("m2", listOf("m1", "b2")),
-                entry("m1", listOf("a1", "b1")),
-                entry("b2", listOf("b1")),
-                entry("a1", listOf("root")),
-                entry("b1", listOf("root")),
-                entry("root")
-            )
+            val entries =
+                listOf(
+                    entry("m2", listOf("m1", "b2")),
+                    entry("m1", listOf("a1", "b1")),
+                    entry("b2", listOf("b1")),
+                    entry("a1", listOf("root")),
+                    entry("b1", listOf("root")),
+                    entry("root")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -187,15 +189,15 @@ class GraphBuilderEdgeCasesTest {
 
     @Nested
     inner class `Octopus Merges` {
-
         @Test
         fun `three-parent octopus merge`() {
-            val entries = listOf(
-                entry("octopus", listOf("a", "b", "c")),
-                entry("a"),
-                entry("b"),
-                entry("c")
-            )
+            val entries =
+                listOf(
+                    entry("octopus", listOf("a", "b", "c")),
+                    entry("a"),
+                    entry("b"),
+                    entry("c")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -204,13 +206,14 @@ class GraphBuilderEdgeCasesTest {
 
         @Test
         fun `four-parent octopus merge`() {
-            val entries = listOf(
-                entry("octopus", listOf("a", "b", "c", "d")),
-                entry("a"),
-                entry("b"),
-                entry("c"),
-                entry("d")
-            )
+            val entries =
+                listOf(
+                    entry("octopus", listOf("a", "b", "c", "d")),
+                    entry("a"),
+                    entry("b"),
+                    entry("c"),
+                    entry("d")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -220,15 +223,15 @@ class GraphBuilderEdgeCasesTest {
 
     @Nested
     inner class `Lane Recycling` {
-
         @Test
         fun `lane freed when branch ends is reused`() {
-            val entries = listOf(
-                entry("main1", listOf("main2")),
-                entry("short"),  // Short branch, no parent - frees its lane
-                entry("main2", listOf("main3")),
-                entry("main3")
-            )
+            val entries =
+                listOf(
+                    entry("main1", listOf("main2")),
+                    entry("short"), // Short branch, no parent - frees its lane
+                    entry("main2", listOf("main3")),
+                    entry("main3")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -246,13 +249,14 @@ class GraphBuilderEdgeCasesTest {
 
         @Test
         fun `multiple short branches can reuse same lane`() {
-            val entries = listOf(
-                entry("main1", listOf("main2")),
-                entry("short1"),  // Lane 1, freed immediately
-                entry("main2", listOf("main3")),
-                entry("short2"),  // Should reuse lane 1
-                entry("main3")
-            )
+            val entries =
+                listOf(
+                    entry("main1", listOf("main2")),
+                    entry("short1"), // Lane 1, freed immediately
+                    entry("main2", listOf("main3")),
+                    entry("short2"), // Should reuse lane 1
+                    entry("main3")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -263,15 +267,15 @@ class GraphBuilderEdgeCasesTest {
 
     @Nested
     inner class `Color Assignment` {
-
         @Test
         fun `colors assigned by lane`() {
-            val entries = listOf(
-                entry("a", listOf("parent")),
-                entry("b", listOf("parent")),
-                entry("c", listOf("parent")),
-                entry("parent")
-            )
+            val entries =
+                listOf(
+                    entry("a", listOf("parent")),
+                    entry("b", listOf("parent")),
+                    entry("c", listOf("parent")),
+                    entry("parent")
+                )
 
             val graph = builder.buildGraph(entries)
 
@@ -289,8 +293,9 @@ class GraphBuilderEdgeCasesTest {
         @Test
         fun `colors cycle after palette exhausted`() {
             // Create 10 parallel branches (more than the 8-color palette)
-            val entries = (0..9).map { entry("child$it", listOf("parent")) } +
-                          listOf(entry("parent"))
+            val entries =
+                (0..9).map { entry("child$it", listOf("parent")) } +
+                    listOf(entry("parent"))
 
             val graph = builder.buildGraph(entries)
 

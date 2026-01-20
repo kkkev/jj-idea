@@ -4,6 +4,7 @@ import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
+import com.intellij.ide.CommonActionsManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
@@ -28,6 +29,7 @@ import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.*
 import java.awt.BorderLayout
+import java.awt.Component
 import javax.swing.JEditorPane
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -43,8 +45,8 @@ import javax.swing.text.html.HTMLEditorKit
 class JujutsuCommitDetailsPanel(
     private val project: Project,
     private val root: VirtualFile
-) : JPanel(BorderLayout()), Disposable {
-
+) : JPanel(BorderLayout()),
+    Disposable {
     private val log = Logger.getInstance(javaClass)
 
     private val metadataPanel = JPanel(BorderLayout())
@@ -76,10 +78,11 @@ class JujutsuCommitDetailsPanel(
         setupChangesPanel()
 
         // Create splitter: changes on top, metadata on bottom
-        splitter = OnePixelSplitter(true, 0.5f).apply {
-            firstComponent = changesPanel
-            secondComponent = metadataPanel
-        }
+        splitter =
+            OnePixelSplitter(true, 0.5f).apply {
+                firstComponent = changesPanel
+                secondComponent = metadataPanel
+            }
 
         add(splitter, BorderLayout.CENTER)
 
@@ -105,7 +108,7 @@ class JujutsuCommitDetailsPanel(
 
         // Tree expander actions (expand all / collapse all)
         val treeExpander = changesTree.treeExpander
-        val commonActionsManager = com.intellij.ide.CommonActionsManager.getInstance()
+        val commonActionsManager = CommonActionsManager.getInstance()
         group.add(commonActionsManager.createExpandAllAction(treeExpander, changesTree))
         group.add(commonActionsManager.createCollapseAllAction(treeExpander, changesTree))
 
@@ -114,13 +117,15 @@ class JujutsuCommitDetailsPanel(
         // Grouping actions
         group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
 
-        return ActionManager.getInstance().createActionToolbar(
-            "JujutsuCommitDetailsChangesToolbar",
-            group,
-            true
-        ).apply {
-            targetComponent = changesTree
-        }
+        return ActionManager
+            .getInstance()
+            .createActionToolbar(
+                "JujutsuCommitDetailsChangesToolbar",
+                group,
+                true
+            ).apply {
+                targetComponent = changesTree
+            }
     }
 
     private fun setupTreeInteractions() {
@@ -141,11 +146,17 @@ class JujutsuCommitDetailsPanel(
         }
 
         // Context menu
-        changesTree.addMouseListener(object : PopupHandler() {
-            override fun invokePopup(comp: java.awt.Component, x: Int, y: Int) {
-                showContextMenu(comp, x, y)
+        changesTree.addMouseListener(
+            object : PopupHandler() {
+                override fun invokePopup(
+                    comp: Component,
+                    x: Int,
+                    y: Int
+                ) {
+                    showContextMenu(comp, x, y)
+                }
             }
-        })
+        )
     }
 
     private fun showDiff(change: Change) {
@@ -169,25 +180,28 @@ class JujutsuCommitDetailsPanel(
                 val contentFactory = DiffContentFactory.getInstance()
                 val diffManager = DiffManager.getInstance()
 
-                val content1 = if (beforePath != null && beforeContent.isNotEmpty()) {
-                    contentFactory.create(project, beforeContent, beforePath.fileType)
-                } else {
-                    contentFactory.createEmpty()
-                }
+                val content1 =
+                    if (beforePath != null && beforeContent.isNotEmpty()) {
+                        contentFactory.create(project, beforeContent, beforePath.fileType)
+                    } else {
+                        contentFactory.createEmpty()
+                    }
 
-                val content2 = if (afterPath != null && afterContent.isNotEmpty()) {
-                    contentFactory.create(project, afterContent, afterPath.fileType)
-                } else {
-                    contentFactory.createEmpty()
-                }
+                val content2 =
+                    if (afterPath != null && afterContent.isNotEmpty()) {
+                        contentFactory.create(project, afterContent, afterPath.fileType)
+                    } else {
+                        contentFactory.createEmpty()
+                    }
 
-                val diffRequest = SimpleDiffRequest(
-                    fileName,
-                    content1,
-                    content2,
-                    "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} ($parentId)",
-                    "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} ($currentId)"
-                )
+                val diffRequest =
+                    SimpleDiffRequest(
+                        fileName,
+                        content1,
+                        content2,
+                        "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} ($parentId)",
+                        "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} ($currentId)"
+                    )
 
                 diffManager.showDiff(project, diffRequest)
             }
@@ -195,9 +209,10 @@ class JujutsuCommitDetailsPanel(
     }
 
     private fun openFile(change: Change) {
-        val virtualFile = change.afterRevision?.file?.virtualFile
-            ?: change.beforeRevision?.file?.virtualFile
-            ?: return
+        val virtualFile =
+            change.afterRevision?.file?.virtualFile
+                ?: change.beforeRevision?.file?.virtualFile
+                ?: return
 
         FileEditorManager.getInstance(project).openTextEditor(
             OpenFileDescriptor(project, virtualFile),
@@ -205,34 +220,44 @@ class JujutsuCommitDetailsPanel(
         )
     }
 
-    private fun showContextMenu(comp: java.awt.Component, x: Int, y: Int) {
+    private fun showContextMenu(
+        comp: Component,
+        x: Int,
+        y: Int
+    ) {
         val selectedChange = changesTree.selectedChanges.firstOrNull() ?: return
 
-        val actionGroup = DefaultActionGroup().apply {
-            add(object : DumbAwareAction(
-                JujutsuBundle.message("action.showdiff"),
-                null,
-                AllIcons.Actions.Diff
-            ) {
-                override fun actionPerformed(e: AnActionEvent) {
-                    showDiff(selectedChange)
-                }
-            })
-            add(object : DumbAwareAction(
-                JujutsuBundle.message("action.openfile"),
-                null,
-                AllIcons.Actions.EditSource
-            ) {
-                override fun actionPerformed(e: AnActionEvent) {
-                    openFile(selectedChange)
-                }
-            })
-        }
+        val actionGroup =
+            DefaultActionGroup().apply {
+                add(
+                    object : DumbAwareAction(
+                        JujutsuBundle.message("action.showdiff"),
+                        null,
+                        AllIcons.Actions.Diff
+                    ) {
+                        override fun actionPerformed(e: AnActionEvent) {
+                            showDiff(selectedChange)
+                        }
+                    }
+                )
+                add(
+                    object : DumbAwareAction(
+                        JujutsuBundle.message("action.openfile"),
+                        null,
+                        AllIcons.Actions.EditSource
+                    ) {
+                        override fun actionPerformed(e: AnActionEvent) {
+                            openFile(selectedChange)
+                        }
+                    }
+                )
+            }
 
-        val popupMenu = ActionManager.getInstance().createActionPopupMenu(
-            "JujutsuCommitDetailsChangesContextMenu",
-            actionGroup
-        )
+        val popupMenu =
+            ActionManager.getInstance().createActionPopupMenu(
+                "JujutsuCommitDetailsChangesContextMenu",
+                actionGroup
+            )
 
         popupMenu.component.show(comp, x, y)
     }
@@ -293,9 +318,7 @@ class JujutsuCommitDetailsPanel(
      */
     private fun buildCommitHtml(entry: LogEntry): String {
         val sb = StringBuilder()
-        val canvas = StringBuilderHtmlTextCanvas(
-            sb
-        )
+        val canvas = StringBuilderHtmlTextCanvas(sb)
         sb.append("<html><body style='${Formatters.getBodyStyle()}'>")
 
         // Commit line: Change ID + decorations
@@ -319,10 +342,22 @@ class JujutsuCommitDetailsPanel(
         // Status flags
         val statusParts = mutableListOf<String>()
         if (entry.isWorkingCopy) {
-            statusParts.add("<span style='color: #${JujutsuColors.getWorkingCopyHex()};'>@ ${JujutsuBundle.message("status.workingcopy")}</span>")
+            statusParts.add(
+                "<span style='color: #${JujutsuColors.getWorkingCopyHex()};'>@ ${
+                    JujutsuBundle.message(
+                        "status.workingcopy"
+                    )
+                }</span>"
+            )
         }
         if (entry.hasConflict) {
-            statusParts.add("<span style='color: #${JujutsuColors.getConflictHex()};'>${JujutsuBundle.message("status.conflict")}</span>")
+            statusParts.add(
+                "<span style='color: #${JujutsuColors.getConflictHex()};'>${
+                    JujutsuBundle.message(
+                        "status.conflict"
+                    )
+                }</span>"
+            )
         }
         if (entry.isEmpty) {
             statusParts.add(JujutsuBundle.message("status.empty"))
@@ -355,7 +390,9 @@ class JujutsuCommitDetailsPanel(
 
         sb.append("$authorName ")
         if (authorEmail.isNotEmpty()) {
-            sb.append("<a href='mailto:$authorEmail' style='color: #${JujutsuColors.getLinkHex()};'>&lt;$authorEmail&gt;</a> ")
+            sb.append(
+                "<a href='mailto:$authorEmail' style='color: #${JujutsuColors.getLinkHex()};'>&lt;$authorEmail&gt;</a> "
+            )
         }
         if (authorTime.isNotEmpty()) {
             sb.append("on $authorTime")
@@ -369,7 +406,9 @@ class JujutsuCommitDetailsPanel(
         if (committerName != null && committerName != authorName) {
             sb.append("<br/>committed by $committerName ")
             if (committerEmail != null && committerEmail.isNotEmpty()) {
-                sb.append("<a href='mailto:$committerEmail' style='color: #${JujutsuColors.getLinkHex()};'>&lt;$committerEmail&gt;</a> ")
+                sb.append(
+                    "<a href='mailto:$committerEmail' style='color: #${JujutsuColors.getLinkHex()};'>&lt;$committerEmail&gt;</a> "
+                )
             }
             if (committerTime != null) {
                 sb.append("on ${DateTimeFormatter.formatRelative(committerTime)}")
@@ -382,14 +421,18 @@ class JujutsuCommitDetailsPanel(
         if (entry.parentIds.isNotEmpty()) {
             sb.append("<p style='margin: 4px 0;'>")
             sb.append("Parents: ")
-            sb.append(entry.parentIds.joinToString(", ") {
-                htmlText { append(it) }
-            })
+            sb.append(
+                entry.parentIds.joinToString(", ") {
+                    htmlText { append(it) }
+                }
+            )
             sb.append("</p>")
         }
 
         // Commit ID (technical detail, smaller and grey)
-        sb.append("<p style='margin: 4px 0; color: #${JujutsuColors.getGrayHex()}; font-size: ${UIUtil.getLabelFont().size - 1}pt;'>")
+        sb.append(
+            "<p style='margin: 4px 0; color: #${JujutsuColors.getGrayHex()}; font-size: ${UIUtil.getLabelFont().size - 1}pt;'>"
+        )
         sb.append("Commit: <span style='font-family: monospace;'>${entry.commitId}</span>")
         sb.append("</p>")
 
@@ -402,8 +445,12 @@ class JujutsuCommitDetailsPanel(
      */
     private fun showEmptyState() {
         metadataPane.text = "<html><body style='${Formatters.getBodyStyle()} padding: 8px;'>" +
-                "<i style='color: #${JujutsuColors.getGrayHex()};'>${JujutsuBundle.message("details.empty.message")}</i>" +
-                "</body></html>"
+            "<i style='color: #${JujutsuColors.getGrayHex()};'>${
+                JujutsuBundle.message(
+                    "details.empty.message"
+                )
+            }</i>" +
+            "</body></html>"
     }
 
     override fun dispose() {

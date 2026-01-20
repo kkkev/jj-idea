@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Test
  * Tests for FileChange DTO and FileChangeStatus enum.
  */
 class FileChangeTest {
-
     @Test
     fun `create modified file change`() {
         val change = FileChange("src/Main.kt", FileChangeStatus.MODIFIED)
@@ -67,12 +66,13 @@ class FileChangeTest {
     fun `FileChangeStatus enum has all expected values`() {
         val values = FileChangeStatus.entries
 
-        values shouldBe listOf(
-            FileChangeStatus.MODIFIED,
-            FileChangeStatus.ADDED,
-            FileChangeStatus.DELETED,
-            FileChangeStatus.UNKNOWN
-        )
+        values shouldBe
+            listOf(
+                FileChangeStatus.MODIFIED,
+                FileChangeStatus.ADDED,
+                FileChangeStatus.DELETED,
+                FileChangeStatus.UNKNOWN
+            )
     }
 
     @Test

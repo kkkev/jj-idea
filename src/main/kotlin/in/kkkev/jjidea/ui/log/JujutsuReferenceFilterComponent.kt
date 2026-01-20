@@ -1,11 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.actionSystem.*
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
 import javax.swing.Icon
@@ -17,7 +13,6 @@ import javax.swing.Icon
 class JujutsuReferenceFilterComponent(
     private val tableModel: JujutsuLogTableModel
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.reference")) {
-
     private var selectedReference: String? = null
 
     override fun getCurrentText(): String = selectedReference ?: ""
@@ -113,14 +108,15 @@ class JujutsuReferenceFilterComponent(
         val toVisit = mutableSetOf<ChangeId>()
 
         // Find the commit with the reference
-        val referencedEntry = allEntries.find { entry ->
-            // Check if it's the working copy
-            if (referenceName == "@" && entry.isWorkingCopy) {
-                return@find true
-            }
-            // Check if it has the bookmark/tag
-            entry.bookmarks.any { it.name == referenceName }
-        } ?: return emptySet()
+        val referencedEntry =
+            allEntries.find { entry ->
+                // Check if it's the working copy
+                if (referenceName == "@" && entry.isWorkingCopy) {
+                    return@find true
+                }
+                // Check if it has the bookmark/tag
+                entry.bookmarks.any { it.name == referenceName }
+            } ?: return emptySet()
 
         // Start with the referenced commit
         toVisit.add(referencedEntry.changeId)
@@ -149,7 +145,10 @@ class JujutsuReferenceFilterComponent(
     ) : ToggleAction(reference, null, type.icon) {
         override fun isSelected(e: AnActionEvent): Boolean = selectedReference == reference
 
-        override fun setSelected(e: AnActionEvent, state: Boolean) {
+        override fun setSelected(
+            e: AnActionEvent,
+            state: Boolean
+        ) {
             selectedReference = if (state) reference else null
             notifyFilterChanged()
         }
@@ -167,9 +166,11 @@ class JujutsuReferenceFilterComponent(
         val tags: List<String>
     )
 
-    private enum class ReferenceType(val icon: Icon) {
-        WORKING_COPY(AllIcons.Vcs.Branch),  // @ symbol for working copy
+    private enum class ReferenceType(
+        val icon: Icon
+    ) {
+        WORKING_COPY(AllIcons.Vcs.Branch), // @ symbol for working copy
         BOOKMARK(AllIcons.Vcs.Branch),
-        TAG(AllIcons.Nodes.Tag)  // For future use when tags are supported
+        TAG(AllIcons.Nodes.Tag) // For future use when tags are supported
     }
 }

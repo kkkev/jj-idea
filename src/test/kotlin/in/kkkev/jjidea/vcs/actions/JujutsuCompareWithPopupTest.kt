@@ -16,15 +16,15 @@ import org.junit.jupiter.api.Test
  * Example output: "main\0mzmoywwptovqwlnzxvvsxknnruoypnxr~mz\0"
  */
 class JujutsuCompareWithPopupTest {
-
     /**
      * Parse bookmark list output matching the template format
      * Simulates what LogTemplates.bookmarkListTemplate does
      */
     private fun parseBookmarks(output: String): List<BookmarkItem> {
         val fields = output.trim().split("\u0000")
-        val recordSize = 2  // name + changeId
-        return fields.chunked(recordSize)
+        val recordSize = 2 // name + changeId
+        return fields
+            .chunked(recordSize)
             .filter { it.size == recordSize }
             .map { chunk ->
                 val name = chunk[0]
@@ -66,7 +66,10 @@ class JujutsuCompareWithPopupTest {
 
     @Test
     fun `parse bookmarks with dashes and underscores in names`() {
-        val output = "main-branch\u0000mzmoywwp~mz\u0000feature_v2\u0000vyrqzltx~vy\u0000bug-fix_123\u0000qrrpnylv~qr\u0000"
+        val output =
+            "main-branch\u0000mzmoywwp~mz\u0000" +
+                "feature_v2\u0000vyrqzltx~vy\u0000" +
+                "bug-fix_123\u0000qrrpnylv~qr\u0000"
 
         val result = parseBookmarks(output)
 

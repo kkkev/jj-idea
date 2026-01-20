@@ -10,32 +10,49 @@ import `in`.kkkev.jjidea.jj.Description
 import kotlinx.datetime.Instant
 
 interface TextCanvas {
-    fun append(text: String, style: SimpleTextAttributes = SimpleTextAttributes.REGULAR_ATTRIBUTES)
+    fun append(
+        text: String,
+        style: SimpleTextAttributes = SimpleTextAttributes.REGULAR_ATTRIBUTES
+    )
 }
 
-class HtmlTextCanvas(val richText: RichText = RichText()) : TextCanvas {
-    override fun append(text: String, style: SimpleTextAttributes) = richText.append(text, style)
+class HtmlTextCanvas(
+    val richText: RichText = RichText()
+) : TextCanvas {
+    override fun append(
+        text: String,
+        style: SimpleTextAttributes
+    ) = richText.append(text, style)
 }
 
-class StringBuilderHtmlTextCanvas(val sb: StringBuilder): TextCanvas {
-    override fun append(text: String, style: SimpleTextAttributes) {
+class StringBuilderHtmlTextCanvas(
+    val sb: StringBuilder
+) : TextCanvas {
+    override fun append(
+        text: String,
+        style: SimpleTextAttributes
+    ) {
         val canvas = HtmlTextCanvas()
         canvas.append(text, style)
         sb.append(canvas.richText.toString())
     }
 }
 
-fun htmlText(builder: (TextCanvas.()->Unit)): CharSequence {
+fun htmlText(builder: (TextCanvas.() -> Unit)): CharSequence {
     val sb = StringBuilder()
     val canvas = StringBuilderHtmlTextCanvas(sb)
     builder.invoke(canvas)
     return sb
 }
 
-class ComponentTextCanvas(val component: SimpleColoredComponent) : TextCanvas {
-    override fun append(text: String, style: SimpleTextAttributes) = component.append(text, style)
+class ComponentTextCanvas(
+    val component: SimpleColoredComponent
+) : TextCanvas {
+    override fun append(
+        text: String,
+        style: SimpleTextAttributes
+    ) = component.append(text, style)
 }
-
 
 fun TextCanvas.append(changeId: ChangeId) {
     append(changeId.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
@@ -47,17 +64,21 @@ fun TextCanvas.append(changeId: ChangeId) {
 }
 
 fun TextCanvas.append(description: Description) {
-    append(
-        description.display,
-        if (description.empty) SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES else SimpleTextAttributes.REGULAR_ATTRIBUTES
-    )
+    val style = if (description.empty) {
+        SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
+    } else {
+        SimpleTextAttributes.REGULAR_ATTRIBUTES
+    }
+    append(description.display, style)
 }
 
 fun TextCanvas.appendSummary(description: Description) {
-    append(
-        description.summary,
-        if (description.empty) SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES else SimpleTextAttributes.REGULAR_ATTRIBUTES
-    )
+    val style = if (description.empty) {
+        SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
+    } else {
+        SimpleTextAttributes.REGULAR_ATTRIBUTES
+    }
+    append(description.summary, style)
 }
 
 fun TextCanvas.append(user: VcsUser) {

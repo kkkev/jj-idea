@@ -21,7 +21,8 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
 class JujutsuAnnotationProvider(
     private val project: Project,
     private val vcs: JujutsuVcs
-) : AnnotationProvider, CacheableAnnotationProvider {
+) : AnnotationProvider,
+    CacheableAnnotationProvider {
     private val log = Logger.getInstance(javaClass)
     private val cache = mutableMapOf<VirtualFile, FileAnnotation>()
 
@@ -45,8 +46,10 @@ class JujutsuAnnotationProvider(
     /**
      * Annotate a file at a specific revision
      */
-    override fun annotate(file: VirtualFile, revision: VcsFileRevision?) =
-        annotateInternal(file, revision?.revisionNumber?.asString()?.let(::ChangeId) ?: WorkingCopy)
+    override fun annotate(
+        file: VirtualFile,
+        revision: VcsFileRevision?
+    ) = annotateInternal(file, revision?.revisionNumber?.asString()?.let(::ChangeId) ?: WorkingCopy)
 
     /**
      * Check if we can annotate this revision
@@ -56,17 +59,21 @@ class JujutsuAnnotationProvider(
     /**
      * Internal method to perform annotation
      */
-    private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
+    private fun annotateInternal(
+        file: VirtualFile,
+        revision: Revision
+    ): FileAnnotation {
         try {
             // Get the relative path from the root
             val relativePath = vcs.getRelativePath(VcsUtil.getFilePath(file))
 
             // Execute annotation command with template
-            val result = vcs.commandExecutor.annotate(
-                filePath = relativePath,
-                revision = revision,
-                template = AnnotationParser.TEMPLATE
-            )
+            val result =
+                vcs.commandExecutor.annotate(
+                    filePath = relativePath,
+                    revision = revision,
+                    template = AnnotationParser.TEMPLATE
+                )
 
             if (!result.isSuccess) {
                 log.warn("Failed to annotate file: ${result.stderr}")
@@ -88,7 +95,6 @@ class JujutsuAnnotationProvider(
                 annotationLines = annotationLines,
                 vcsKey = vcs.keyInstanceMethod
             )
-
         } catch (e: VcsException) {
             throw e
         } catch (e: Exception) {

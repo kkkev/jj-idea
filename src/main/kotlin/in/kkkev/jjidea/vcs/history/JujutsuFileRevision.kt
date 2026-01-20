@@ -11,7 +11,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
-import java.util.Date
+import java.util.*
 
 /**
  * Represents a single revision of a file in Jujutsu history
@@ -21,17 +21,19 @@ class JujutsuFileRevision(
     private val filePath: FilePath,
     private val vcs: JujutsuVcs
 ) : VcsFileRevisionEx() {
-
     private val log = Logger.getInstance(javaClass)
 
     /**
      * Lazy-loaded file status. Determines if this file was deleted in this revision.
      */
     private val fileStatus: FileChangeStatus? by lazy {
-        vcs.logService.getFileChanges(entry.changeId).getOrElse { error ->
-            log.debug("Error loading file changes for ${entry.changeId}: ${error.message}")
-            emptyList()
-        }.find { it.filePath == filePath.path }?.status
+        vcs.logService
+            .getFileChanges(entry.changeId)
+            .getOrElse { error ->
+                log.debug("Error loading file changes for ${entry.changeId}: ${error.message}")
+                emptyList()
+            }.find { it.filePath == filePath.path }
+            ?.status
     }
 
     override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.changeId)

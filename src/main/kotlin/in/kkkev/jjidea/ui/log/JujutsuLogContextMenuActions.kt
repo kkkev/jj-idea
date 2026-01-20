@@ -20,25 +20,27 @@ object JujutsuLogContextMenuActions {
      * Create the action group for the context menu.
      * Different actions are shown depending on whether the selected entry is the working copy.
      */
-    fun createActionGroup(project: Project, entries: List<LogEntry>): DefaultActionGroup = DefaultActionGroup().apply {
-        val entry = entries.singleOrNull()
-        add(copyChangeIdAction(entry?.changeId))
-        add(copyDescriptionAction(entry?.description?.actual))
-        addSeparator()
+    fun createActionGroup(
+        project: Project,
+        entries: List<LogEntry>
+    ): DefaultActionGroup =
+        DefaultActionGroup().apply {
+            val entry = entries.singleOrNull()
+            add(copyChangeIdAction(entry?.changeId))
+            add(copyDescriptionAction(entry?.description?.actual))
+            addSeparator()
 
-        // Always offer "New Change From This"
-        add(newChangeFromAction(project, entries.map { it.changeId }))
+            // Always offer "New Change From This"
+            add(newChangeFromAction(project, entries.map { it.changeId }))
 
-        // Offer "Edit" for non-working-copy, non-immutable changes
-        add(editChangeAction(project, entry?.takeIf { !it.isWorkingCopy && !it.immutable }?.changeId))
+            // Offer "Edit" for non-working-copy, non-immutable changes
+            add(editChangeAction(project, entry?.takeIf { !it.isWorkingCopy && !it.immutable }?.changeId))
 
-        // For working copy, also offer "Describe"
-        add(describeAction(project, entry?.changeId))
+            // For working copy, also offer "Describe"
+            add(describeAction(project, entry?.changeId))
 
-        // Can abandon any mutable change including working copy
-        // TODO Allow abandon on multiple if all entries are immutable
-        add(abandonChangeAction(project, entry?.takeIf { !it.immutable }))
-    }
+            // Can abandon any mutable change including working copy
+            // TODO Allow abandon on multiple if all entries are immutable
+            add(abandonChangeAction(project, entry?.takeIf { !it.immutable }))
+        }
 }
-
-

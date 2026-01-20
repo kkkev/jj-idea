@@ -13,11 +13,7 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.ComponentTextCanvas
-import `in`.kkkev.jjidea.ui.DescriptionRenderer
-import `in`.kkkev.jjidea.ui.StringBuilderHtmlTextCanvas
-import `in`.kkkev.jjidea.ui.append
-import `in`.kkkev.jjidea.ui.appendSummary
+import `in`.kkkev.jjidea.ui.*
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -40,13 +36,15 @@ import javax.swing.event.DocumentEvent
  * - Visual icons to distinguish bookmarks from changes
  */
 object JujutsuCompareWithPopup {
-
     private const val DEFAULT_LIMIT = 10
 
     /**
      * Item in the comparison popup
      */
-    sealed class CompareItem(open val displayName: String, open val revision: String) {
+    sealed class CompareItem(
+        open val displayName: String,
+        open val revision: String
+    ) {
         /** Recent change with description */
         data class Change(
             val entry: LogEntry,
@@ -79,13 +77,15 @@ object JujutsuCompareWithPopup {
         ApplicationManager.getApplication().invokeLater {
             val panel = createPopupPanel(project, vcs, onSelected)
 
-            val popup = JBPopupFactory.getInstance()
-                .createComponentPopupBuilder(panel, panel.searchField)
-                .setTitle("Select Branch or Change to Compare")
-                .setResizable(true)
-                .setMovable(true)
-                .setRequestFocus(true)
-                .createPopup()
+            val popup =
+                JBPopupFactory
+                    .getInstance()
+                    .createComponentPopupBuilder(panel, panel.searchField)
+                    .setTitle("Select Branch or Change to Compare")
+                    .setResizable(true)
+                    .setMovable(true)
+                    .setRequestFocus(true)
+                    .createPopup()
 
             // Set popup reference so panel can close it
             panel.setPopup(popup)
@@ -114,62 +114,63 @@ object JujutsuCompareWithPopup {
         private val vcs: JujutsuVcs,
         private val onSelected: (String) -> Unit
     ) : JPanel(BorderLayout()) {
-
-        val searchField = SearchTextField(false).apply {
-            textEditor.emptyText.text = "Search by change ID or description..."
-        }
+        val searchField =
+            SearchTextField(false).apply {
+                textEditor.emptyText.text = "Search by change ID or description..."
+            }
 
         private val listModel = DefaultListModel<CompareItem>()
-        private val list = object : JBList<CompareItem>(listModel) {
-            // Make list fill viewport width instead of expanding to content width
-            override fun getScrollableTracksViewportWidth() = true
+        private val list =
+            object : JBList<CompareItem>(listModel) {
+                // Make list fill viewport width instead of expanding to content width
+                override fun getScrollableTracksViewportWidth() = true
 
-            override fun getToolTipText(event: MouseEvent): String? {
-                val index = locationToIndex(event.point)
-                if (index < 0) return null
+                override fun getToolTipText(event: MouseEvent): String? {
+                    val index = locationToIndex(event.point)
+                    if (index < 0) return null
 
-                val item = model.getElementAt(index)
-                return when (item) {
-                    is CompareItem.Change -> {
-                        buildString {
-                            val canvas = StringBuilderHtmlTextCanvas(this)
+                    val item = model.getElementAt(index)
+                    return when (item) {
+                        is CompareItem.Change -> {
+                            buildString {
+                                val canvas = StringBuilderHtmlTextCanvas(this)
 
-                            append("<html>")
-                            canvas.append(item.entry.changeId)
-                            append("<br>")
-                            item.entry.author?.let {
-                                canvas.append(it)
+                                append("<html>")
+                                canvas.append(item.entry.changeId)
                                 append("<br>")
-                            }
-                            item.entry.authorTimestamp?.let { timestamp ->
-                                canvas.append(timestamp)
+                                item.entry.author?.let {
+                                    canvas.append(it)
+                                    append("<br>")
+                                }
+                                item.entry.authorTimestamp?.let { timestamp ->
+                                    canvas.append(timestamp)
+                                    append("<br>")
+                                }
                                 append("<br>")
+                                append(DescriptionRenderer.toHtml(item.entry.description, multiline = true))
+                                append("</html>")
                             }
-                            append("<br>")
-                            append(DescriptionRenderer.toHtml(item.entry.description, multiline = true))
-                            append("</html>")
                         }
-                    }
 
-                    is CompareItem.Bookmark -> {
-                        buildString {
-                            val canvas = StringBuilderHtmlTextCanvas(this)
+                        is CompareItem.Bookmark -> {
+                            buildString {
+                                val canvas = StringBuilderHtmlTextCanvas(this)
 
-                            append("<html>")
-                            append("<b>${item.item.bookmark.name}</b><br>")
-                            canvas.append(item.item.changeId)
-                            append("</html>")
+                                append("<html>")
+                                append("<b>${item.item.bookmark.name}</b><br>")
+                                canvas.append(item.item.changeId)
+                                append("</html>")
+                            }
                         }
-                    }
 
-                    else -> null
+                        else -> null
+                    }
                 }
+            }.apply {
+                selectionMode = ListSelectionModel.SINGLE_SELECTION
+                cellRenderer = CompareItemRenderer()
+                visibleRowCount = 15 // Show 15 items without scrolling
             }
-        }.apply {
-            selectionMode = ListSelectionModel.SINGLE_SELECTION
-            cellRenderer = CompareItemRenderer()
-            visibleRowCount = 15  // Show 15 items without scrolling
-        }
 
         private var currentPopup: JBPopup? = null
 
@@ -178,9 +179,10 @@ object JujutsuCompareWithPopup {
             add(searchField, BorderLayout.NORTH)
 
             // Results list - fills available panel space
-            val scrollPane = JBScrollPane(list).apply {
-                border = JBUI.Borders.empty()
-            }
+            val scrollPane =
+                JBScrollPane(list).apply {
+                    border = JBUI.Borders.empty()
+                }
             add(scrollPane, BorderLayout.CENTER)
 
             // Set preferred width only - let height be determined by list's visibleRowCount
@@ -192,61 +194,71 @@ object JujutsuCompareWithPopup {
                 )
 
             // Listen to search field changes
-            searchField.addDocumentListener(object : DocumentAdapter() {
-                override fun textChanged(e: DocumentEvent) {
-                    loadData(searchField.text)
+            searchField.addDocumentListener(
+                object : DocumentAdapter() {
+                    override fun textChanged(e: DocumentEvent) {
+                        loadData(searchField.text)
+                    }
                 }
-            })
+            )
 
             // Handle up/down keys in search field to navigate list
-            searchField.textEditor.addKeyListener(object : KeyAdapter() {
-                override fun keyPressed(e: KeyEvent) {
-                    when (e.keyCode) {
-                        KeyEvent.VK_DOWN -> {
-                            if (listModel.size() > 0) {
-                                val currentIndex = list.selectedIndex
-                                list.selectedIndex = if (currentIndex < listModel.size() - 1) currentIndex + 1 else 0
-                                list.ensureIndexIsVisible(list.selectedIndex)
-                                e.consume()
+            searchField.textEditor.addKeyListener(
+                object : KeyAdapter() {
+                    override fun keyPressed(e: KeyEvent) {
+                        when (e.keyCode) {
+                            KeyEvent.VK_DOWN -> {
+                                if (listModel.size() > 0) {
+                                    val currentIndex = list.selectedIndex
+                                    list.selectedIndex =
+                                        if (currentIndex < listModel.size() - 1) currentIndex + 1 else 0
+                                    list.ensureIndexIsVisible(list.selectedIndex)
+                                    e.consume()
+                                }
                             }
-                        }
 
-                        KeyEvent.VK_UP -> {
-                            if (listModel.size() > 0) {
-                                val currentIndex = list.selectedIndex
-                                list.selectedIndex = if (currentIndex > 0) currentIndex - 1 else listModel.size() - 1
-                                list.ensureIndexIsVisible(list.selectedIndex)
-                                e.consume()
+                            KeyEvent.VK_UP -> {
+                                if (listModel.size() > 0) {
+                                    val currentIndex = list.selectedIndex
+                                    list.selectedIndex =
+                                        if (currentIndex > 0) currentIndex - 1 else listModel.size() - 1
+                                    list.ensureIndexIsVisible(list.selectedIndex)
+                                    e.consume()
+                                }
                             }
-                        }
 
-                        KeyEvent.VK_ENTER -> {
-                            if (list.selectedValue != null) {
-                                selectItem(list.selectedValue)
-                                e.consume()
+                            KeyEvent.VK_ENTER -> {
+                                if (list.selectedValue != null) {
+                                    selectItem(list.selectedValue)
+                                    e.consume()
+                                }
                             }
                         }
                     }
                 }
-            })
+            )
 
             // Handle Enter key to select
-            list.addKeyListener(object : KeyAdapter() {
-                override fun keyPressed(e: KeyEvent) {
-                    if (e.keyCode == KeyEvent.VK_ENTER && list.selectedValue != null) {
-                        selectItem(list.selectedValue)
+            list.addKeyListener(
+                object : KeyAdapter() {
+                    override fun keyPressed(e: KeyEvent) {
+                        if (e.keyCode == KeyEvent.VK_ENTER && list.selectedValue != null) {
+                            selectItem(list.selectedValue)
+                        }
                     }
                 }
-            })
+            )
 
             // Handle double-click to select
-            list.addMouseListener(object : MouseAdapter() {
-                override fun mouseClicked(e: MouseEvent) {
-                    if (e.clickCount == 2 && list.selectedValue != null) {
-                        selectItem(list.selectedValue)
+            list.addMouseListener(
+                object : MouseAdapter() {
+                    override fun mouseClicked(e: MouseEvent) {
+                        if (e.clickCount == 2 && list.selectedValue != null) {
+                            selectItem(list.selectedValue)
+                        }
                     }
                 }
-            })
+            )
         }
 
         /**
@@ -326,7 +338,11 @@ object JujutsuCompareWithPopup {
      *
      * @param query Search query to filter changes by change ID or description
      */
-    private fun buildItemList(project: Project, vcs: JujutsuVcs, query: String): List<CompareItem> {
+    private fun buildItemList(
+        project: Project,
+        vcs: JujutsuVcs,
+        query: String
+    ): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
         val cache = LogCache.getInstance(project)
 
@@ -336,37 +352,41 @@ object JujutsuCompareWithPopup {
             val bookmarks = bookmarkResult.getOrNull() ?: emptyList()
 
             // Filter bookmarks by query
-            val filteredBookmarks = if (query.isEmpty()) {
-                bookmarks
-            } else {
-                bookmarks.filter { bookmark ->
-                    bookmark.bookmark.name.contains(query, ignoreCase = true) ||
+            val filteredBookmarks =
+                if (query.isEmpty()) {
+                    bookmarks
+                } else {
+                    bookmarks.filter { bookmark ->
+                        bookmark.bookmark.name.contains(query, ignoreCase = true) ||
                             bookmark.changeId.short.contains(query, ignoreCase = true)
+                    }
                 }
-            }
 
             items.addAll(filteredBookmarks.map { CompareItem.Bookmark(it) })
         }
 
         // Add recent changes - limit to DEFAULT_LIMIT and filter by query
         // Try to get from cache first
-        val entries = cache.get(Expression.ALL) ?: run {
-            // Not in cache, fetch from jj and cache it
-            val logResult = vcs.logService.getLogBasic(revset = Expression.ALL)
-            logResult.getOrNull()?.also { fetchedEntries ->
-                cache.put(Expression.ALL, emptyList(), fetchedEntries)
-            } ?: emptyList()
-        }
+        val entries =
+            cache.get(Expression.ALL) ?: run {
+                // Not in cache, fetch from jj and cache it
+                val logResult = vcs.logService.getLogBasic(revset = Expression.ALL)
+                logResult.getOrNull()?.also { fetchedEntries ->
+                    cache.put(Expression.ALL, emptyList(), fetchedEntries)
+                } ?: emptyList()
+            }
 
         // Filter changes by query
-        val filteredEntries = if (query.isEmpty()) {
-            entries.take(DEFAULT_LIMIT)
-        } else {
-            entries.filter { entry ->
-                entry.changeId.short.contains(query, ignoreCase = true) ||
-                        entry.description.display.contains(query, ignoreCase = true)
-            }.take(DEFAULT_LIMIT)
-        }
+        val filteredEntries =
+            if (query.isEmpty()) {
+                entries.take(DEFAULT_LIMIT)
+            } else {
+                entries
+                    .filter { entry ->
+                        entry.changeId.short.contains(query, ignoreCase = true) ||
+                            entry.description.display.contains(query, ignoreCase = true)
+                    }.take(DEFAULT_LIMIT)
+            }
 
         // Convert to CompareItems
         filteredEntries.forEach { entry ->

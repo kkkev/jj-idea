@@ -10,5 +10,6 @@ import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
  */
 class JujutsuEditorActionGroup : StandardVcsGroup() {
     override fun getVcs(project: Project?) = project?.possibleJujutsuVcs
+
     override fun getVcsName(project: Project?) = JujutsuVcs.VCS_NAME
 }

@@ -119,5 +119,4 @@ class RevsetTest {
         val grandparent = revision.parent.parent
         grandparent.toString() shouldBe "@--"
     }
-
 }

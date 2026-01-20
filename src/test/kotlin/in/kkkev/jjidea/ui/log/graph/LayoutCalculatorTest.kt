@@ -4,7 +4,6 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import kotlin.collections.emptyList
 
 /*
   #: 1
@@ -71,7 +70,6 @@ import kotlin.collections.emptyList
   9. Test 9 → Edge case with many parallel passthroughs
  */
 
-
 private val A = ChangeId("A")
 private val B = ChangeId("B")
 private val C = ChangeId("C")
@@ -98,26 +96,28 @@ class LayoutCalculatorTest {
     // 2. Linear parent-child
     @Test
     fun `two entries in parent-child relationship use same lane`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(B)),
-            GraphEntry(B, emptyList())
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(B)),
+                GraphEntry(B, emptyList())
+            )
         val layout = calculator.calculate(entries)
 
         layout.rows[0].lane shouldBe 0
-        layout.rows[0].parentLanes shouldBe listOf(0)  // B is at lane 0
+        layout.rows[0].parentLanes shouldBe listOf(0) // B is at lane 0
         layout.rows[1].lane shouldBe 0
-        layout.rows[1].childLanes shouldBe listOf(0)   // A is at lane 0
+        layout.rows[1].childLanes shouldBe listOf(0) // A is at lane 0
     }
 
     // 3. Linear chain
     @Test
     fun `linear chain of three entries all use lane 0`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(B)),
-            GraphEntry(B, listOf(C)),
-            GraphEntry(C, emptyList())
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(B)),
+                GraphEntry(B, listOf(C)),
+                GraphEntry(C, emptyList())
+            )
         val layout = calculator.calculate(entries)
 
         layout.rows.size shouldBe 3
@@ -127,32 +127,34 @@ class LayoutCalculatorTest {
     // 4. Gap creates passthrough
     @Test
     fun `parent two rows below creates passthrough in middle row`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(C)),
-            GraphEntry(B, emptyList()),  // unrelated
-            GraphEntry(C, emptyList())
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(C)),
+                GraphEntry(B, emptyList()), // unrelated
+                GraphEntry(C, emptyList())
+            )
         val layout = calculator.calculate(entries)
 
         layout.rows[0].lane shouldBe 0
-        layout.rows[1].lane shouldBe 1           // B pushed to lane 1
-        layout.rows[1].passthroughLanes shouldBe listOf(0)  // passthrough at lane 0
-        layout.rows[2].lane shouldBe 0           // C at lane 0
+        layout.rows[1].lane shouldBe 1 // B pushed to lane 1
+        layout.rows[1].passthroughLanes shouldBe listOf(0) // passthrough at lane 0
+        layout.rows[2].lane shouldBe 0 // C at lane 0
     }
 
     // 5. Simple fork
     @Test
     fun `fork - two children share one parent`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(C)),
-            GraphEntry(B, listOf(C)),
-            GraphEntry(C, emptyList())
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(C)),
+                GraphEntry(B, listOf(C)),
+                GraphEntry(C, emptyList())
+            )
         val layout = calculator.calculate(entries)
 
-        layout.rows[0].lane shouldBe 0           // A at lane 0
-        layout.rows[1].lane shouldBe 1           // B at lane 1 (0 has passthrough)
-        layout.rows[2].lane shouldBe 0           // C at lane 0 (lowest child lane)
+        layout.rows[0].lane shouldBe 0 // A at lane 0
+        layout.rows[1].lane shouldBe 1 // B at lane 1 (0 has passthrough)
+        layout.rows[2].lane shouldBe 0 // C at lane 0 (lowest child lane)
         layout.rows[2].childLanes shouldContainExactlyInAnyOrder listOf(0, 1)
     }
 
@@ -161,27 +163,29 @@ class LayoutCalculatorTest {
     // Adjacent parent is pushed to a new lane. Non-adjacent parent gets child's lane.
     @Test
     fun `merge - one child has two parents`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(B, C)),
-            GraphEntry(B, emptyList()),
-            GraphEntry(C, emptyList())
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(B, C)),
+                GraphEntry(B, emptyList()),
+                GraphEntry(C, emptyList())
+            )
         val layout = calculator.calculate(entries)
 
         layout.rows[0].lane shouldBe 0
         layout.rows[0].parentLanes shouldContainExactlyInAnyOrder listOf(1, 0)
-        layout.rows[1].lane shouldBe 1  // B (first parent) pushed to lane 1 by passthrough to C
-        layout.rows[2].lane shouldBe 0  // C (second parent) at lane 0 (passthrough terminates)
+        layout.rows[1].lane shouldBe 1 // B (first parent) pushed to lane 1 by passthrough to C
+        layout.rows[2].lane shouldBe 0 // C (second parent) at lane 0 (passthrough terminates)
     }
 
     // 7. Fork with passthrough
     @Test
     fun `fork where first child skips a row creates passthrough`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(C)),  // A's parent is C (skips B)
-            GraphEntry(B, listOf(C)),  // B's parent is C (adjacent)
-            GraphEntry(C, emptyList())
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(C)), // A's parent is C (skips B)
+                GraphEntry(B, listOf(C)), // B's parent is C (adjacent)
+                GraphEntry(C, emptyList())
+            )
         val layout = calculator.calculate(entries)
 
         // Same as test 5, validates passthrough handling
@@ -194,52 +198,54 @@ class LayoutCalculatorTest {
     // Side branch: B → C → D in lane 1.
     @Test
     fun `diamond pattern - fork at bottom, merge at top`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(B, E)),  // merge
-            GraphEntry(B, listOf(C)),
-            GraphEntry(C, listOf(D)),
-            GraphEntry(D, listOf(G)),
-            GraphEntry(E, listOf(F)),
-            GraphEntry(F, listOf(G)),
-            GraphEntry(G, emptyList())        // fork point
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(B, E)), // merge
+                GraphEntry(B, listOf(C)),
+                GraphEntry(C, listOf(D)),
+                GraphEntry(D, listOf(G)),
+                GraphEntry(E, listOf(F)),
+                GraphEntry(F, listOf(G)),
+                GraphEntry(G, emptyList()) // fork point
+            )
         val layout = calculator.calculate(entries)
 
         // Verify lane assignments
         // Passthrough A→E at lane 0 pushes B branch to lane 1
-        layout.rows[0].lane shouldBe 0  // A
-        layout.rows[1].lane shouldBe 1  // B (pushed by passthrough to E)
-        layout.rows[2].lane shouldBe 1  // C (follows B)
-        layout.rows[3].lane shouldBe 1  // D (follows C)
-        layout.rows[4].lane shouldBe 0  // E (passthrough terminates, gets child lane)
-        layout.rows[5].lane shouldBe 0  // F (follows E)
-        layout.rows[6].lane shouldBe 0  // G (lowest child lane)
+        layout.rows[0].lane shouldBe 0 // A
+        layout.rows[1].lane shouldBe 1 // B (pushed by passthrough to E)
+        layout.rows[2].lane shouldBe 1 // C (follows B)
+        layout.rows[3].lane shouldBe 1 // D (follows C)
+        layout.rows[4].lane shouldBe 0 // E (passthrough terminates, gets child lane)
+        layout.rows[5].lane shouldBe 0 // F (follows E)
+        layout.rows[6].lane shouldBe 0 // G (lowest child lane)
 
         // Verify passthroughs
-        layout.rows[1].passthroughLanes shouldBe setOf(0)  // A→E at lane 0 (child's lane)
-        layout.rows[2].passthroughLanes shouldBe setOf(0)  // A→E at lane 0
-        layout.rows[3].passthroughLanes shouldBe setOf(0)  // A→E at lane 0
-        layout.rows[4].passthroughLanes shouldBe setOf(1)  // D→G at lane 1 (D's lane)
-        layout.rows[5].passthroughLanes shouldBe setOf(1)  // D→G at lane 1
+        layout.rows[1].passthroughLanes shouldBe setOf(0) // A→E at lane 0 (child's lane)
+        layout.rows[2].passthroughLanes shouldBe setOf(0) // A→E at lane 0
+        layout.rows[3].passthroughLanes shouldBe setOf(0) // A→E at lane 0
+        layout.rows[4].passthroughLanes shouldBe setOf(1) // D→G at lane 1 (D's lane)
+        layout.rows[5].passthroughLanes shouldBe setOf(1) // D→G at lane 1
     }
 
     // 9. Multiple independent branches
     @Test
     fun `multiple independent branches with passthroughs`() {
-        val entries = listOf(
-            GraphEntry(A, listOf(D)),
-            GraphEntry(B, listOf(E)),
-            GraphEntry(C, listOf(F)),
-            GraphEntry(D, emptyList()),
-            GraphEntry(E, emptyList()),
-            GraphEntry(F, emptyList())
-        )
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(D)),
+                GraphEntry(B, listOf(E)),
+                GraphEntry(C, listOf(F)),
+                GraphEntry(D, emptyList()),
+                GraphEntry(E, emptyList()),
+                GraphEntry(F, emptyList())
+            )
         val layout = calculator.calculate(entries)
 
         // Each branch gets its own lane
-        layout.rows[0].lane shouldBe 0  // A
-        layout.rows[1].lane shouldBe 1  // B
-        layout.rows[2].lane shouldBe 2  // C
+        layout.rows[0].lane shouldBe 0 // A
+        layout.rows[1].lane shouldBe 1 // B
+        layout.rows[2].lane shouldBe 2 // C
 
         // Passthroughs accumulate
         layout.rows[1].passthroughLanes shouldBe listOf(0)
