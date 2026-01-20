@@ -14,11 +14,7 @@ interface CommandExecutor {
     /**
      * Result of a jujutsu command execution
      */
-    data class CommandResult(
-        val exitCode: Int,
-        val stdout: String,
-        val stderr: String
-    ) {
+    data class CommandResult(val exitCode: Int, val stdout: String, val stderr: String) {
         val isSuccess: Boolean get() = exitCode == 0
     }
 
@@ -48,10 +44,7 @@ interface CommandExecutor {
      * @param revision Revision (e.g., "@", "@-", commit hash)
      * @return File content
      */
-    fun show(
-        filePath: String,
-        revision: Revision
-    ): CommandResult
+    fun show(filePath: String, revision: Revision): CommandResult
 
     /**
      * Check if jujutsu is available and working
@@ -71,10 +64,7 @@ interface CommandExecutor {
      * @param revision The revision to describe (default: "@")
      * @return Command result
      */
-    fun describe(
-        description: Description,
-        revision: Revision = WorkingCopy
-    ): CommandResult
+    fun describe(description: Description, revision: Revision = WorkingCopy): CommandResult
 
     /**
      * Create a new change on top of the current one
@@ -82,10 +72,7 @@ interface CommandExecutor {
      * @param parentRevisions Optional parent revisions (default: current working copy)
      * @return Command result
      */
-    fun new(
-        description: Description,
-        parentRevisions: List<Revision> = listOf(WorkingCopy)
-    ): CommandResult
+    fun new(description: Description, parentRevisions: List<Revision> = listOf(WorkingCopy)): CommandResult
 
     /**
      * Abandon a change (remove it from the log)
@@ -121,11 +108,7 @@ interface CommandExecutor {
      * @param template Template for annotation output
      * @return Annotation output with change info per line
      */
-    fun annotate(
-        filePath: String,
-        revision: Revision = WorkingCopy,
-        template: String? = null
-    ): CommandResult
+    fun annotate(filePath: String, revision: Revision = WorkingCopy, template: String? = null): CommandResult
 
     /**
      * List all bookmarks in the repository
@@ -151,11 +134,7 @@ interface CommandExecutor {
 
         fun onFailure(callback: CommandResult.() -> Unit) = copy(onFailure = callback)
 
-        fun onFailureTellUser(
-            resourceKeyPrefix: String,
-            project: Project,
-            log: Logger
-        ) = onFailure {
+        fun onFailureTellUser(resourceKeyPrefix: String, project: Project, log: Logger) = onFailure {
             val message = JujutsuBundle.message("$resourceKeyPrefix.message", stderr)
             Messages.showErrorDialog(project, message, JujutsuBundle.message("$resourceKeyPrefix.title"))
             log.warn(message)

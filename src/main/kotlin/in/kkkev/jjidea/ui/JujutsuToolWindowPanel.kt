@@ -45,9 +45,7 @@ import javax.swing.tree.TreePath
  *
  * TODO: Localise strings in here
  */
-class JujutsuToolWindowPanel(
-    private val project: Project
-) : Disposable {
+class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     companion object {
         private const val COLLAPSED_PATHS_KEY_PREFIX = "JujutsuToolWindow.CollapsedPaths"
     }
@@ -66,41 +64,39 @@ class JujutsuToolWindowPanel(
     private lateinit var describeButton: JButton
     private lateinit var revertButton: JButton
 
-    private val descriptionArea =
-        JBTextArea().apply {
-            rows = 4 // Explicitly set number of visible rows
-            columns = 50
-            lineWrap = true
-            wrapStyleWord = true
-            isEditable = true
-            toolTipText = JujutsuBundle.message("toolwindow.description.tooltip")
-            // TODO Show "(empty)" in italics if empty - as a "default" or "exemplar" value
+    private val descriptionArea = JBTextArea().apply {
+        rows = 4 // Explicitly set number of visible rows
+        columns = 50
+        lineWrap = true
+        wrapStyleWord = true
+        isEditable = true
+        toolTipText = JujutsuBundle.message("toolwindow.description.tooltip")
+        // TODO Show "(empty)" in italics if empty - as a "default" or "exemplar" value
 
-            // Track modifications to show visual feedback
-            document.addDocumentListener(
-                object : javax.swing.event.DocumentListener {
-                    override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+        // Track modifications to show visual feedback
+        document.addDocumentListener(
+            object : javax.swing.event.DocumentListener {
+                override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
 
-                    override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+                override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
 
-                    override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+                override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
 
-                    private fun checkModified() {
-                        val newModified = text != persistedDescription.actual
-                        if (newModified != isDescriptionModified) {
-                            isDescriptionModified = newModified
-                            updateDescriptionLabel()
-                        }
+                private fun checkModified() {
+                    val newModified = text != persistedDescription.actual
+                    if (newModified != isDescriptionModified) {
+                        isDescriptionModified = newModified
+                        updateDescriptionLabel()
                     }
                 }
-            )
-        }
+            }
+        )
+    }
 
-    private val currentChangeLabel =
-        JBLabel(JujutsuBundle.message("toolwindow.workingcopy.label")).apply {
-            // TODO Pick font size according to IntelliJ appearance settings
-            font = font.deriveFont(13f)
-        }
+    private val currentChangeLabel = JBLabel(JujutsuBundle.message("toolwindow.workingcopy.label")).apply {
+        // TODO Pick font size according to IntelliJ appearance settings
+        font = font.deriveFont(13f)
+    }
 
     private val descriptionLabel = JBLabel(JujutsuBundle.message("toolwindow.description.label"))
 
@@ -141,12 +137,11 @@ class JujutsuToolWindowPanel(
             }
 
         val topPanel = JPanel(GridBagLayout())
-        val gbc =
-            GridBagConstraints().apply {
-                fill = GridBagConstraints.HORIZONTAL
-                anchor = GridBagConstraints.WEST
-                insets = JBUI.insets(1)
-            }
+        val gbc = GridBagConstraints().apply {
+            fill = GridBagConstraints.HORIZONTAL
+            anchor = GridBagConstraints.WEST
+            insets = JBUI.insets(1)
+        }
 
         // Current change label
         topPanel.add(
@@ -160,16 +155,15 @@ class JujutsuToolWindowPanel(
         )
 
         // Description label with inline action buttons
-        val descriptionHeaderPanel =
-            JPanel().apply {
-                layout = BoxLayout(this, BoxLayout.X_AXIS)
-                add(descriptionLabel)
-                add(Box.createHorizontalStrut(8))
-                add(createDescribeButton())
-                add(Box.createHorizontalStrut(4))
-                add(createRevertButton())
-                add(Box.createHorizontalGlue())
-            }
+        val descriptionHeaderPanel = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            add(descriptionLabel)
+            add(Box.createHorizontalStrut(8))
+            add(createDescribeButton())
+            add(Box.createHorizontalStrut(4))
+            add(createRevertButton())
+            add(Box.createHorizontalGlue())
+        }
 
         topPanel.add(
             descriptionHeaderPanel,
@@ -181,11 +175,10 @@ class JujutsuToolWindowPanel(
         )
 
         // Description text area with scroll pane
-        val scrollPane =
-            ScrollPaneFactory.createScrollPane(descriptionArea).apply {
-                minimumSize = JBUI.size(200, 70)
-                preferredSize = JBUI.size(400, 90)
-            }
+        val scrollPane = ScrollPaneFactory.createScrollPane(descriptionArea).apply {
+            minimumSize = JBUI.size(200, 70)
+            preferredSize = JBUI.size(400, 90)
+        }
         topPanel.add(
             scrollPane,
             gbc.apply {
@@ -206,10 +199,9 @@ class JujutsuToolWindowPanel(
         val changesPanel = JPanel(BorderLayout())
 
         // Toolbar
-        val toolbar =
-            createChangesToolbar().apply {
-                targetComponent = changesTree // Fix: Set target component to avoid warning
-            }
+        val toolbar = createChangesToolbar().apply {
+            targetComponent = changesTree // Fix: Set target component to avoid warning
+        }
         changesPanel.add(toolbar.component, BorderLayout.NORTH)
 
         // Tree
@@ -236,38 +228,31 @@ class JujutsuToolWindowPanel(
 
         // Placeholder for future actions: Edit, Abandon, Rebase, etc.
 
-        return ActionManager
-            .getInstance()
-            .createActionToolbar(
-                "JujutsuWorkingCopyToolbar",
-                group,
-                true
-            ).apply {
+        return ActionManager.getInstance()
+            .createActionToolbar("JujutsuWorkingCopyToolbar", group, true).apply {
                 targetComponent = owner
             }
     }
 
     private fun createDescribeButton(): JButton {
-        describeButton =
-            JButton(JujutsuBundle.message("button.describe")).apply {
-                toolTipText = JujutsuBundle.message("button.describe.tooltip")
-                icon = AllIcons.Actions.MenuSaveall
-                addActionListener { describeCurrentChange() }
-                // Start disabled, will be enabled when description is modified
-                isEnabled = false
-            }
+        describeButton = JButton(JujutsuBundle.message("button.describe")).apply {
+            toolTipText = JujutsuBundle.message("button.describe.tooltip")
+            icon = AllIcons.Actions.MenuSaveall
+            addActionListener { describeCurrentChange() }
+            // Start disabled, will be enabled when description is modified
+            isEnabled = false
+        }
         return describeButton
     }
 
     private fun createRevertButton(): JButton {
-        revertButton =
-            JButton("Revert").apply {
-                toolTipText = "Reload description from working copy"
-                icon = AllIcons.Actions.Rollback
-                addActionListener { revertDescription() }
-                // Start disabled, will be enabled when description is modified
-                isEnabled = false
-            }
+        revertButton = JButton("Revert").apply {
+            toolTipText = "Reload description from working copy"
+            icon = AllIcons.Actions.Rollback
+            addActionListener { revertDescription() }
+            // Start disabled, will be enabled when description is modified
+            isEnabled = false
+        }
         return revertButton
     }
 
@@ -306,10 +291,7 @@ class JujutsuToolWindowPanel(
     private fun setupTreeExpansionTracking() {
         changesTree.addTreeExpansionListener(
             object : TreeExpansionListener {
-                private fun update(
-                    event: TreeExpansionEvent,
-                    consumer: (String) -> Unit
-                ) {
+                private fun update(event: TreeExpansionEvent, consumer: (String) -> Unit) {
                     if (ignoreExpansionEvents) {
                         log.debug("Ignoring collapse (programmatic)")
                     } else {
@@ -335,17 +317,16 @@ class JujutsuToolWindowPanel(
         )
     }
 
-    private fun getPathIdentifier(treePath: TreePath) =
-        treePath.path
-            .drop(1) // Skip root
-            .mapNotNull { component ->
-                when (component) {
-                    is ChangesBrowserNode<*> -> component.textPresentation ?: component.toString()
-                    // is DefaultMutableTreeNode -> component.userObject?.toString()
-                    else -> null
-                }
-            }.takeIf { it.isNotEmpty() }
-            ?.joinToString("/")
+    private fun getPathIdentifier(treePath: TreePath) = treePath.path
+        .drop(1) // Skip root
+        .mapNotNull { component ->
+            when (component) {
+                is ChangesBrowserNode<*> -> component.textPresentation ?: component.toString()
+                // is DefaultMutableTreeNode -> component.userObject?.toString()
+                else -> null
+            }
+        }.takeIf { it.isNotEmpty() }
+        ?.joinToString("/")
 
     private fun setupVfsListener() {
         // Listen to ChangeListManager updates triggered by VCS change detection
@@ -418,11 +399,7 @@ class JujutsuToolWindowPanel(
         // Right-click context menu
         changesTree.addMouseListener(
             object : PopupHandler() {
-                override fun invokePopup(
-                    comp: Component,
-                    x: Int,
-                    y: Int
-                ) {
+                override fun invokePopup(comp: Component, x: Int, y: Int) {
                     showContextMenu(comp, x, y)
                 }
             }
@@ -513,47 +490,45 @@ class JujutsuToolWindowPanel(
         ApplicationManager.getApplication().executeOnPooledThread {
             val result = project.jujutsuVcs.logService.getLog(WorkingCopy)
             ApplicationManager.getApplication().invokeLater {
-                result
-                    .onSuccess { entries ->
-                        entries.firstOrNull()?.let { entry ->
-                            // Update the description text area
-                            persistedDescription = entry.description
-                            descriptionArea.text = persistedDescription.actual
-                            isDescriptionModified = false
-                            updateDescriptionLabel()
-                            updateWorkingCopyLabel(entry)
-                        }
-                    }.onFailure { error ->
-                        log.error("Failed to load current description", error)
+                result.onSuccess { entries ->
+                    entries.firstOrNull()?.let { entry ->
+                        // Update the description text area
+                        persistedDescription = entry.description
+                        descriptionArea.text = persistedDescription.actual
+                        isDescriptionModified = false
+                        updateDescriptionLabel()
+                        updateWorkingCopyLabel(entry)
                     }
+                }.onFailure { error ->
+                    log.error("Failed to load current description", error)
+                }
             }
         }
     }
 
     private fun updateWorkingCopyLabel(entry: LogEntry) {
         // Create HTML for label showing change ID, @ marker, and parents
-        val labelText =
-            buildString {
-                val canvas = StringBuilderHtmlTextCanvas(this)
+        val labelText = buildString {
+            val canvas = StringBuilderHtmlTextCanvas(this)
 
-                append("<html>")
-                canvas.append(entry.changeId)
+            append("<html>")
+            canvas.append(entry.changeId)
 
-                // Add parent IDs if present
-                if (entry.parentIds.isNotEmpty()) {
-                    append("<br>")
-                    append("<font size=-1>")
-                    append(JujutsuBundle.message("toolwindow.parents.label"))
-                    append(" ")
-                    entry.parentIds.forEachIndexed { index, parentId ->
-                        if (index > 0) append(", ")
-                        canvas.append(parentId)
-                    }
-                    append("</font>")
+            // Add parent IDs if present
+            if (entry.parentIds.isNotEmpty()) {
+                append("<br>")
+                append("<font size=-1>")
+                append(JujutsuBundle.message("toolwindow.parents.label"))
+                append(" ")
+                entry.parentIds.forEachIndexed { index, parentId ->
+                    if (index > 0) append(", ")
+                    canvas.append(parentId)
                 }
-
-                append("</html>")
+                append("</font>")
             }
+
+            append("</html>")
+        }
         currentChangeLabel.text = labelText
     }
 
@@ -620,12 +595,11 @@ class JujutsuToolWindowPanel(
             // Load content in background
             val beforeContent = change.beforeRevision?.content ?: ""
             val afterVirtualFile = afterPath?.let { LocalFileSystem.getInstance().findFileByPath(it.path) }
-            val afterContent =
-                if (afterVirtualFile == null) {
-                    change.afterRevision?.content ?: ""
-                } else {
-                    null // Will use VirtualFile directly
-                }
+            val afterContent = if (afterVirtualFile == null) {
+                change.afterRevision?.content ?: ""
+            } else {
+                null // Will use VirtualFile directly
+            }
 
             // Now show diff on EDT with loaded content
             ApplicationManager.getApplication().invokeLater {
@@ -633,34 +607,31 @@ class JujutsuToolWindowPanel(
                 val diffManager = DiffManager.getInstance()
 
                 // Create diff content - use string content only, not FilePath, to avoid re-reading
-                val content1 =
-                    if (beforePath != null && beforeContent.isNotEmpty()) {
-                        // Create content from string without FilePath to ensure we use loaded content
-                        contentFactory.create(project, beforeContent)
-                    } else if (beforePath != null) {
-                        contentFactory.createEmpty()
-                    } else {
-                        contentFactory.createEmpty()
-                    }
+                val content1 = if (beforePath != null && beforeContent.isNotEmpty()) {
+                    // Create content from string without FilePath to ensure we use loaded content
+                    contentFactory.create(project, beforeContent)
+                } else if (beforePath != null) {
+                    contentFactory.createEmpty()
+                } else {
+                    contentFactory.createEmpty()
+                }
 
-                val content2 =
-                    if (afterVirtualFile != null && afterVirtualFile.exists()) {
-                        // For working copy, use the actual file from disk to allow editing
-                        contentFactory.create(project, afterVirtualFile)
-                    } else if (afterPath != null && afterContent != null) {
-                        contentFactory.create(project, afterContent)
-                    } else {
-                        contentFactory.createEmpty()
-                    }
+                val content2 = if (afterVirtualFile != null && afterVirtualFile.exists()) {
+                    // For working copy, use the actual file from disk to allow editing
+                    contentFactory.create(project, afterVirtualFile)
+                } else if (afterPath != null && afterContent != null) {
+                    contentFactory.create(project, afterContent)
+                } else {
+                    contentFactory.createEmpty()
+                }
 
-                val diffRequest =
-                    SimpleDiffRequest(
-                        fileName,
-                        content1,
-                        content2,
-                        "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} (@-)",
-                        "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} (@)"
-                    )
+                val diffRequest = SimpleDiffRequest(
+                    fileName,
+                    content1,
+                    content2,
+                    "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} (@-)",
+                    "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} (@)"
+                )
 
                 diffManager.showDiff(project, diffRequest)
             }
@@ -687,48 +658,42 @@ class JujutsuToolWindowPanel(
         }
     }
 
-    private fun showContextMenu(
-        component: Component,
-        x: Int,
-        y: Int
-    ) {
+    private fun showContextMenu(component: Component, x: Int, y: Int) {
         val selectedChange = getSelectedChange() ?: return
 
         val actionManager = ActionManager.getInstance()
         val group = DefaultActionGroup()
 
         // Add common VCS actions with keyboard shortcuts displayed
-        val showDiffAction =
-            object : DumbAwareAction(
-                JujutsuBundle.message("action.show.diff"),
-                null,
-                AllIcons.Actions.Diff
-            ) {
-                override fun actionPerformed(e: AnActionEvent) {
-                    showDiff(selectedChange)
-                }
+        val showDiffAction = object : DumbAwareAction(
+            JujutsuBundle.message("action.show.diff"),
+            null,
+            AllIcons.Actions.Diff
+        ) {
+            override fun actionPerformed(e: AnActionEvent) {
+                showDiff(selectedChange)
             }
+        }
         group.add(showDiffAction)
 
-        val openFileAction =
-            object : DumbAwareAction(
-                JujutsuBundle.message("action.open.file"),
-                null,
-                AllIcons.Actions.EditSource
-            ) {
-                init {
-                    // Set keyboard shortcuts - will be displayed in menu
-                    shortcutSet =
-                        CustomShortcutSet(
-                            KeyboardShortcut(KeyStroke.getKeyStroke("F4"), null),
-                            KeyboardShortcut(KeyStroke.getKeyStroke("ENTER"), null)
-                        )
-                }
-
-                override fun actionPerformed(e: AnActionEvent) {
-                    openFilePermanent(selectedChange)
-                }
+        val openFileAction = object : DumbAwareAction(
+            JujutsuBundle.message("action.open.file"),
+            null,
+            AllIcons.Actions.EditSource
+        ) {
+            init {
+                // Set keyboard shortcuts - will be displayed in menu
+                shortcutSet =
+                    CustomShortcutSet(
+                        KeyboardShortcut(KeyStroke.getKeyStroke("F4"), null),
+                        KeyboardShortcut(KeyStroke.getKeyStroke("ENTER"), null)
+                    )
             }
+
+            override fun actionPerformed(e: AnActionEvent) {
+                openFilePermanent(selectedChange)
+            }
+        }
         group.add(openFileAction)
 
         val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.UNKNOWN, group)

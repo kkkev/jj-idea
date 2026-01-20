@@ -3,11 +3,7 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.ui.GraphicsConfig
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.GraphicsUtil
-import java.awt.BasicStroke
-import java.awt.Color
-import java.awt.Component
-import java.awt.Graphics
-import java.awt.Graphics2D
+import java.awt.*
 import java.awt.geom.Path2D
 import javax.swing.Icon
 
@@ -40,12 +36,7 @@ class JujutsuBookmarkIcon(
         private const val BASE_SIZE = 6.5f
     }
 
-    override fun paintIcon(
-        c: Component?,
-        g: Graphics,
-        iconX: Int,
-        iconY: Int
-    ) {
+    override fun paintIcon(c: Component?, g: Graphics, iconX: Int, iconY: Int) {
         val g2 = g as Graphics2D
         val config: GraphicsConfig = GraphicsUtil.setupAAPainting(g2)
 

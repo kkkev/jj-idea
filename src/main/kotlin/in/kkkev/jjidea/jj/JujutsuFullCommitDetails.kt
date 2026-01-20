@@ -13,11 +13,8 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * Full commit details for a Jujutsu commit including file changes.
  * Extends JujutsuCommitMetadataBase for common metadata handling.
  */
-class JujutsuFullCommitDetails(
-    entry: LogEntry,
-    root: VirtualFile,
-    private val changesList: Collection<Change>
-) : JujutsuCommitMetadataBase(entry, root),
+class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val changesList: Collection<Change>) :
+    JujutsuCommitMetadataBase(entry, root),
     VcsFullCommitDetails {
     override fun getChanges(): Collection<Change> = changesList
 
@@ -31,48 +28,38 @@ class JujutsuFullCommitDetails(
          * Create JujutsuFullCommitDetails by loading changes for the entry.
          * Must be called from a background thread.
          */
-        fun create(
-            entry: LogEntry,
-            root: VirtualFile
-        ): JujutsuFullCommitDetails {
+        fun create(entry: LogEntry, root: VirtualFile): JujutsuFullCommitDetails {
             val changes = loadChanges(entry, root)
             return JujutsuFullCommitDetails(entry, root, changes)
         }
 
-        private fun loadChanges(
-            entry: LogEntry,
-            root: VirtualFile
-        ): Collection<Change> {
+        private fun loadChanges(entry: LogEntry, root: VirtualFile): Collection<Change> {
             val vcs = root.jujutsuVcs
 
             // First, detect renames using git-format diff
             val renames = detectRenames(entry, vcs)
-            val renamedPaths =
-                renames
-                    .flatMap { (oldPath, newPath) ->
-                        listOf(oldPath, newPath)
-                    }.toSet()
+            val renamedPaths = renames
+                .flatMap { (oldPath, newPath) ->
+                    listOf(oldPath, newPath)
+                }.toSet()
 
             // Get regular file changes
             val result = vcs.logService.getFileChanges(entry.changeId)
 
-            val regularChanges =
-                result
-                    .getOrElse { error ->
-                        log.error("Error loading changes for ${entry.changeId}: ${error.message}", error)
-                        emptyList()
-                    }.filter { fileChange ->
-                        // Filter out files that are part of renames to avoid duplicates
-                        fileChange.filePath !in renamedPaths
-                    }.mapNotNull { fileChange ->
-                        convertToChange(fileChange, entry, root, vcs)
-                    }
+            val regularChanges = result.getOrElse { error ->
+                log.error("Error loading changes for ${entry.changeId}: ${error.message}", error)
+                emptyList()
+            }.filter { fileChange ->
+                // Filter out files that are part of renames to avoid duplicates
+                fileChange.filePath !in renamedPaths
+            }.mapNotNull { fileChange ->
+                convertToChange(fileChange, entry, root, vcs)
+            }
 
             // Create Change objects for renames
-            val renameChanges =
-                renames.map { (oldPath, newPath) ->
-                    createRenameChange(oldPath, newPath, entry, root, vcs)
-                }
+            val renameChanges = renames.map { (oldPath, newPath) ->
+                createRenameChange(oldPath, newPath, entry, root, vcs)
+            }
 
             return regularChanges + renameChanges
         }
@@ -81,10 +68,7 @@ class JujutsuFullCommitDetails(
          * Detect file renames using git-format diff.
          * Returns a list of (oldPath, newPath) pairs.
          */
-        private fun detectRenames(
-            entry: LogEntry,
-            vcs: JujutsuVcs
-        ): List<Pair<String, String>> {
+        private fun detectRenames(entry: LogEntry, vcs: JujutsuVcs): List<Pair<String, String>> {
             val result = vcs.commandExecutor.diffGit(entry.changeId)
 
             if (!result.isSuccess) {

@@ -9,15 +9,11 @@ import javax.swing.Icon
 /**
  * A [DumbAwareAction] that acts on a list of objects, and is disabled if that list is empty.
  */
-abstract class EmptyAndDumbAwareAction<T>(
-    val target: List<T>,
-    messageKey: String,
-    icon: Icon
-) : DumbAwareAction(
-        JujutsuBundle.message(messageKey),
-        JujutsuBundle.message("$messageKey.tooltip"),
-        icon
-    ) {
+abstract class EmptyAndDumbAwareAction<T>(val target: List<T>, messageKey: String, icon: Icon) : DumbAwareAction(
+    JujutsuBundle.message(messageKey),
+    JujutsuBundle.message("$messageKey.tooltip"),
+    icon
+) {
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabled = !target.isEmpty()
     }
@@ -26,11 +22,7 @@ abstract class EmptyAndDumbAwareAction<T>(
     override fun getActionUpdateThread() = super.getActionUpdateThread()
 }
 
-data class ActionContext<T>(
-    val target: T,
-    val event: AnActionEvent,
-    val log: Logger
-)
+data class ActionContext<T>(val target: T, val event: AnActionEvent, val log: Logger)
 
 fun <T> nullAndDumbAwareAction(
     target: T?,

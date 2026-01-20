@@ -20,10 +20,7 @@ import javax.swing.table.TableCellRenderer
 interface LogEntryCustomColumn<T> : VcsLogCustomColumn<T> {
     override val isDynamic get() = true
 
-    override fun getValue(
-        model: GraphTableModel,
-        row: VcsLogTableIndex
-    ): T? {
+    override fun getValue(model: GraphTableModel, row: VcsLogTableIndex): T? {
         val metadata = model.getCommitMetadata(row) as? JujutsuCommitMetadataBase
         return metadata?.entry?.let(this::getValue)
     }
@@ -35,20 +32,14 @@ interface LogEntryCustomColumn<T> : VcsLogCustomColumn<T> {
  * Description column with refs/bookmarks rendered using platform label painter.
  * Data class to hold description + refs for rendering.
  */
-data class DescriptionWithRefs(
-    val entry: LogEntry,
-    val refs: List<VcsRef>
-)
+data class DescriptionWithRefs(val entry: LogEntry, val refs: List<VcsRef>)
 
 class JujutsuDescriptionColumn : VcsLogCustomColumn<DescriptionWithRefs> {
     override val id = "Jujutsu.Description"
     override val localizedName = JujutsuBundle.message("column.description")
     override val isDynamic = true
 
-    override fun getValue(
-        model: GraphTableModel,
-        row: VcsLogTableIndex
-    ): DescriptionWithRefs? {
+    override fun getValue(model: GraphTableModel, row: VcsLogTableIndex): DescriptionWithRefs? {
         val metadata = model.getCommitMetadata(row) as? JujutsuCommitMetadataBase ?: return null
         val refs = model.getRefsAtRow(row)
         return DescriptionWithRefs(metadata.entry, refs)
@@ -56,18 +47,17 @@ class JujutsuDescriptionColumn : VcsLogCustomColumn<DescriptionWithRefs> {
 
     override fun createTableCellRenderer(table: VcsLogGraphTable): TableCellRenderer = JujutsuDescriptionRenderer
 
-    override fun getStubValue(model: GraphTableModel) =
-        DescriptionWithRefs(
-            entry =
-                LogEntry(
-                    changeId = ChangeId("q"),
-                    commitId = "",
-                    underlyingDescription = "",
-                    hasConflict = false,
-                    isEmpty = false
-                ),
-            refs = emptyList()
-        )
+    override fun getStubValue(model: GraphTableModel) = DescriptionWithRefs(
+        entry =
+            LogEntry(
+                changeId = ChangeId("q"),
+                commitId = "",
+                underlyingDescription = "",
+                hasConflict = false,
+                isEmpty = false
+            ),
+        refs = emptyList()
+    )
 }
 
 /**
@@ -129,52 +119,47 @@ class JujutsuStatusColumn : LogEntryCustomColumn<LogEntry?> {
     override fun getValue(logEntry: LogEntry): LogEntry? =
         if (logEntry.hasConflict || logEntry.isEmpty) logEntry else null
 
-    override fun createTableCellRenderer(table: VcsLogGraphTable) =
-        object : ColoredTableCellRenderer() {
-            override fun customizeCellRenderer(
-                table: JTable,
-                value: Any?,
-                selected: Boolean,
-                hasFocus: Boolean,
-                row: Int,
-                column: Int
-            ) {
-                if (value !is LogEntry) return
+    override fun createTableCellRenderer(table: VcsLogGraphTable) = object : ColoredTableCellRenderer() {
+        override fun customizeCellRenderer(
+            table: JTable,
+            value: Any?,
+            selected: Boolean,
+            hasFocus: Boolean,
+            row: Int,
+            column: Int
+        ) {
+            if (value !is LogEntry) return
 
-                // Show conflict icon
-                if (value.hasConflict) {
-                    icon = AllIcons.General.Warning
-                    append(" ")
-                }
-                // Show empty icon
-                if (value.isEmpty) {
-                    icon =
-                        if (value.hasConflict) {
-                            // Both indicators - use warning icon, add text
-                            append(JujutsuBundle.message("status.empty") + " ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                            AllIcons.General.Warning
-                        } else {
-                            AllIcons.General.BalloonInformation
-                        }
-                }
+            // Show conflict icon
+            if (value.hasConflict) {
+                icon = AllIcons.General.Warning
+                append(" ")
+            }
+            // Show empty icon
+            if (value.isEmpty) {
+                icon =
+                    if (value.hasConflict) {
+                        // Both indicators - use warning icon, add text
+                        append(JujutsuBundle.message("status.empty") + " ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                        AllIcons.General.Warning
+                    } else {
+                        AllIcons.General.BalloonInformation
+                    }
             }
         }
+    }
 
-    override fun getStubValue(model: GraphTableModel) =
-        LogEntry(
-            changeId = ChangeId("q"),
-            commitId = "",
-            underlyingDescription = "",
-            hasConflict = false,
-            isEmpty = false
-        )
+    override fun getStubValue(model: GraphTableModel) = LogEntry(
+        changeId = ChangeId("q"),
+        commitId = "",
+        underlyingDescription = "",
+        hasConflict = false,
+        isEmpty = false
+    )
 
     override fun isEnabledByDefault() = true
 
-    override fun isAvailable(
-        project: Project,
-        roots: Collection<VirtualFile>
-    ) = true
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>) = true
 }
 
 /**
@@ -211,10 +196,7 @@ class JujutsuChangeIdColumn : LogEntryCustomColumn<ChangeId> {
 
     override fun isEnabledByDefault(): Boolean = true
 
-    override fun isAvailable(
-        project: Project,
-        roots: Collection<VirtualFile>
-    ): Boolean = true
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean = true
 }
 
 /**
@@ -227,10 +209,7 @@ class JujutsuBookmarksColumn : VcsLogCustomColumn<String> {
 
     override val isDynamic: Boolean = true
 
-    override fun getValue(
-        model: GraphTableModel,
-        row: Int
-    ): String? {
+    override fun getValue(model: GraphTableModel, row: Int): String? {
         val metadata = model.getCommitMetadata(row) as? JujutsuCommitMetadataBase ?: return null
         val bookmarks = metadata.entry.bookmarks.joinToString(", ") { it.name }
         return if (bookmarks.isEmpty()) null else bookmarks
@@ -256,10 +235,7 @@ class JujutsuBookmarksColumn : VcsLogCustomColumn<String> {
 
     override fun isEnabledByDefault(): Boolean = true
 
-    override fun isAvailable(
-        project: Project,
-        roots: Collection<VirtualFile>
-    ): Boolean = true
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean = true
 }
 
 /**
@@ -272,10 +248,7 @@ class JujutsuCommitterColumn : VcsLogCustomColumn<String> {
 
     override val isDynamic: Boolean = true
 
-    override fun getValue(
-        model: GraphTableModel,
-        row: Int
-    ): String? {
+    override fun getValue(model: GraphTableModel, row: Int): String? {
         val metadata = model.getCommitMetadata(row) as? JujutsuCommitMetadataBase ?: return null
         return metadata.entry.committer?.name ?: metadata.entry.author?.name
     }
@@ -300,8 +273,5 @@ class JujutsuCommitterColumn : VcsLogCustomColumn<String> {
 
     override fun isEnabledByDefault(): Boolean = false // Hidden by default
 
-    override fun isAvailable(
-        project: Project,
-        roots: Collection<VirtualFile>
-    ): Boolean = true
+    override fun isAvailable(project: Project, roots: Collection<VirtualFile>): Boolean = true
 }

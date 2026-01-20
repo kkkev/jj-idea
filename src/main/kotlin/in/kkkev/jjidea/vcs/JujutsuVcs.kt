@@ -35,9 +35,7 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
 /**
  * Main VCS implementation for Jujutsu
  */
-class JujutsuVcs(
-    project: Project
-) : AbstractVcs(project, VCS_NAME) {
+class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     val commandExecutor: CommandExecutor by lazy {
         val settings = JujutsuSettings.getInstance(myProject)
         CliExecutor(root, settings.state.jjExecutablePath)
@@ -49,24 +47,23 @@ class JujutsuVcs(
     private val lazyHistoryProvider by lazy { JujutsuHistoryProvider(this) }
     private val lazyAnnotationProvider by lazy { JujutsuAnnotationProvider(myProject, this) }
 
-    private val fileListener =
-        object : BulkFileListener {
-            override fun after(events: List<VFileEvent>) {
-                val dirtyScopeManager = VcsDirtyScopeManager.getInstance(myProject)
+    private val fileListener = object : BulkFileListener {
+        override fun after(events: List<VFileEvent>) {
+            val dirtyScopeManager = VcsDirtyScopeManager.getInstance(myProject)
 
-                events.forEach { event ->
-                    when (event) {
-                        is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
-                            event.file?.let { file ->
-                                if (VfsUtil.isAncestor(root, file, false)) {
-                                    dirtyScopeManager.fileDirty(file)
-                                }
+            events.forEach { event ->
+                when (event) {
+                    is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
+                        event.file?.let { file ->
+                            if (VfsUtil.isAncestor(root, file, false)) {
+                                dirtyScopeManager.fileDirty(file)
                             }
                         }
                     }
                 }
             }
         }
+    }
 
     override fun getChangeProvider() = lazyChangeProvider
 
@@ -93,20 +90,16 @@ class JujutsuVcs(
     }
 
     val root: VirtualFile by lazy {
-        val foundRoot =
-            JujutsuRootChecker.findJujutsuRoot(project.basePath)
-                ?: throw VcsException(
-                    JujutsuBundle.message("vcs.error.not.in.repository", project.basePath ?: "unknown")
-                )
+        val foundRoot = JujutsuRootChecker.findJujutsuRoot(project.basePath)
+            ?: throw VcsException(
+                JujutsuBundle.message("vcs.error.not.in.repository", project.basePath ?: "unknown")
+            )
 
         log.info("Jujutsu root for project ${project.name}: $foundRoot")
         foundRoot
     }
 
-    fun createRevision(
-        filePath: FilePath,
-        revision: Revision
-    ) = JujutsuContentRevision(filePath, revision)
+    fun createRevision(filePath: FilePath, revision: Revision) = JujutsuContentRevision(filePath, revision)
 
     fun getRelativePath(filePath: FilePath): String {
         val absolutePath = filePath.path
@@ -122,10 +115,8 @@ class JujutsuVcs(
     /**
      * Represents the content of a file at a specific jujutsu revision
      */
-    inner class JujutsuContentRevision(
-        private val filePath: FilePath,
-        private val revision: Revision
-    ) : ContentRevision {
+    inner class JujutsuContentRevision(private val filePath: FilePath, private val revision: Revision) :
+        ContentRevision {
         override fun getContent(): String? {
             val result = commandExecutor.show(getRelativePath(filePath), revision)
             return if (result.isSuccess) result.stdout else null
@@ -160,10 +151,7 @@ class JujutsuVcs(
          * @param actionName Name of the action for logging (e.g., "New Change", "Compare with Branch")
          * @return JujutsuVcs instance or null if not found
          */
-        fun getVcsWithUserErrorHandling(
-            project: Project,
-            actionName: String
-        ) = project.possibleJujutsuVcs ?: run {
+        fun getVcsWithUserErrorHandling(project: Project, actionName: String) = project.possibleJujutsuVcs ?: run {
             log.info("User attempted '$actionName' in non-Jujutsu project: ${project.name}")
             ApplicationManager.getApplication().invokeLater {
                 showErrorDialog(

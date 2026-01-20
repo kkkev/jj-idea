@@ -17,9 +17,7 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * Holds current VCS state and notifies observers via MessageBus when state changes.
  */
 @Service(Service.Level.PROJECT)
-class JujutsuStateModel(
-    private val project: Project
-) : Disposable {
+class JujutsuStateModel(private val project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
 
     // Current state (accessed from EDT)

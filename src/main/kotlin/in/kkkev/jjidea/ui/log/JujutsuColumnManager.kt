@@ -70,18 +70,17 @@ class JujutsuColumnManager {
     /**
      * Check if a column should be visible.
      */
-    fun isColumnVisible(columnIndex: Int): Boolean =
-        when (columnIndex) {
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> true // Always visible
-            JujutsuLogTableModel.COLUMN_STATUS -> showStatusColumn
-            JujutsuLogTableModel.COLUMN_CHANGE_ID -> showChangeIdColumn
-            JujutsuLogTableModel.COLUMN_DESCRIPTION -> showDescriptionColumn
-            JujutsuLogTableModel.COLUMN_DECORATIONS -> showDecorationsColumn
-            JujutsuLogTableModel.COLUMN_AUTHOR -> showAuthorColumn
-            JujutsuLogTableModel.COLUMN_COMMITTER -> showCommitterColumn
-            JujutsuLogTableModel.COLUMN_DATE -> showDateColumn
-            else -> false
-        }
+    fun isColumnVisible(columnIndex: Int): Boolean = when (columnIndex) {
+        JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> true // Always visible
+        JujutsuLogTableModel.COLUMN_STATUS -> showStatusColumn
+        JujutsuLogTableModel.COLUMN_CHANGE_ID -> showChangeIdColumn
+        JujutsuLogTableModel.COLUMN_DESCRIPTION -> showDescriptionColumn
+        JujutsuLogTableModel.COLUMN_DECORATIONS -> showDecorationsColumn
+        JujutsuLogTableModel.COLUMN_AUTHOR -> showAuthorColumn
+        JujutsuLogTableModel.COLUMN_COMMITTER -> showCommitterColumn
+        JujutsuLogTableModel.COLUMN_DATE -> showDateColumn
+        else -> false
+    }
 
     companion object {
         /**

@@ -16,22 +16,12 @@ interface TextCanvas {
     )
 }
 
-class HtmlTextCanvas(
-    val richText: RichText = RichText()
-) : TextCanvas {
-    override fun append(
-        text: String,
-        style: SimpleTextAttributes
-    ) = richText.append(text, style)
+class HtmlTextCanvas(val richText: RichText = RichText()) : TextCanvas {
+    override fun append(text: String, style: SimpleTextAttributes) = richText.append(text, style)
 }
 
-class StringBuilderHtmlTextCanvas(
-    val sb: StringBuilder
-) : TextCanvas {
-    override fun append(
-        text: String,
-        style: SimpleTextAttributes
-    ) {
+class StringBuilderHtmlTextCanvas(val sb: StringBuilder) : TextCanvas {
+    override fun append(text: String, style: SimpleTextAttributes) {
         val canvas = HtmlTextCanvas()
         canvas.append(text, style)
         sb.append(canvas.richText.toString())
@@ -45,13 +35,8 @@ fun htmlText(builder: (TextCanvas.() -> Unit)): CharSequence {
     return sb
 }
 
-class ComponentTextCanvas(
-    val component: SimpleColoredComponent
-) : TextCanvas {
-    override fun append(
-        text: String,
-        style: SimpleTextAttributes
-    ) = component.append(text, style)
+class ComponentTextCanvas(val component: SimpleColoredComponent) : TextCanvas {
+    override fun append(text: String, style: SimpleTextAttributes) = component.append(text, style)
 }
 
 fun TextCanvas.append(changeId: ChangeId) {

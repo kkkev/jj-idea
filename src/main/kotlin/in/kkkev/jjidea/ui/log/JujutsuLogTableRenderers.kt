@@ -19,9 +19,7 @@ import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
-abstract class TextCellRenderer<T> :
-    ColoredTableCellRenderer(),
-    TextCanvas {
+abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
     protected var isWorkingCopyRow = false
 
     override fun customizeCellRenderer(
@@ -67,12 +65,11 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
         val hasMultipleIndicators = listOf(value.hasConflict, value.isEmpty, value.immutable).count { it } > 1
 
         // Use bold attributes for working copy row
-        val textAttributes =
-            if (value.isWorkingCopy) {
-                SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, SimpleTextAttributes.GRAYED_ATTRIBUTES.fgColor)
-            } else {
-                SimpleTextAttributes.GRAYED_ATTRIBUTES
-            }
+        val textAttributes = if (value.isWorkingCopy) {
+            SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, SimpleTextAttributes.GRAYED_ATTRIBUTES.fgColor)
+        } else {
+            SimpleTextAttributes.GRAYED_ATTRIBUTES
+        }
 
         // Build tooltip parts
         val tooltipParts = mutableListOf<String>()
@@ -108,12 +105,11 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
         }
 
         // Set tooltip if any indicators present, clear if none
-        toolTipText =
-            if (tooltipParts.isNotEmpty()) {
-                "<html>${tooltipParts.joinToString("<br>")}</html>"
-            } else {
-                null
-            }
+        toolTipText = if (tooltipParts.isNotEmpty()) {
+            "<html>${tooltipParts.joinToString("<br>")}</html>"
+        } else {
+            null
+        }
     }
 }
 
@@ -228,10 +224,7 @@ class SeparateChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
  * Renderer for separate Description column with right-aligned decorations.
  * Uses custom painting to position description left-aligned and bookmarks/@ right-aligned.
  */
-class SeparateDescriptionCellRenderer(
-    private val table: JTable
-) : JPanel(),
-    TableCellRenderer {
+class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), TableCellRenderer {
     companion object {
         // HiDPI-aware padding using JBValue for proper scaling
         private val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Description.horizontalPadding", 4)
@@ -355,11 +348,7 @@ class SeparateDescriptionCellRenderer(
         drawDecorations(g2d, entry, width - horizontalPadding, horizontalPadding)
     }
 
-    private fun truncateText(
-        text: String,
-        fontMetrics: FontMetrics,
-        availableWidth: Int
-    ): String {
+    private fun truncateText(text: String, fontMetrics: FontMetrics, availableWidth: Int): String {
         if (fontMetrics.stringWidth(text) <= availableWidth) return text
 
         // Binary search for the right length
@@ -370,11 +359,7 @@ class SeparateDescriptionCellRenderer(
         return if (truncated.isEmpty()) "" else truncated + "..."
     }
 
-    private fun calculateDecorationsWidth(
-        g2d: Graphics2D,
-        entry: LogEntry,
-        horizontalPadding: Int
-    ): Int {
+    private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry, horizontalPadding: Int): Int {
         if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return 0
 
         val fontMetrics = g2d.fontMetrics
@@ -398,12 +383,7 @@ class SeparateDescriptionCellRenderer(
     }
 
     @Suppress("UNUSED_PARAMETER")
-    private fun drawDecorations(
-        g2d: Graphics2D,
-        entry: LogEntry,
-        rightX: Int,
-        horizontalPadding: Int
-    ) {
+    private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int, horizontalPadding: Int) {
         if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return
 
         val centerY = height / 2
@@ -415,26 +395,24 @@ class SeparateDescriptionCellRenderer(
         // Draw bookmarks using platform-style painter
         if (entry.bookmarks.isNotEmpty()) {
             val painter = JujutsuLabelPainter(this, compact = false)
-            val background =
-                when {
-                    isSelected -> table.selectionBackground
-                    isHovered -> UIUtil.getListBackground(true, false)
-                    else -> table.background
-                }
+            val background = when {
+                isSelected -> table.selectionBackground
+                isHovered -> UIUtil.getListBackground(true, false)
+                else -> table.background
+            }
             // Use grey text color (icon is orange, text is grey)
             val foreground = if (isSelected) table.selectionForeground else JBColor.GRAY
 
-            x =
-                painter.paintRightAligned(
-                    g2d,
-                    x,
-                    0,
-                    height,
-                    entry.bookmarks,
-                    background,
-                    foreground,
-                    isSelected
-                )
+            x = painter.paintRightAligned(
+                g2d,
+                x,
+                0,
+                height,
+                entry.bookmarks,
+                background,
+                foreground,
+                isSelected
+            )
         }
 
         // Draw @ symbol for working copy
@@ -452,12 +430,11 @@ class SeparateDescriptionCellRenderer(
 
     private fun formatDescriptionTooltip(description: String): String {
         // Convert to HTML and replace newlines with <br>
-        val htmlEscaped =
-            description
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\n", "<br>")
+        val htmlEscaped = description
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\n", "<br>")
 
         return "<html>$htmlEscaped</html>"
     }

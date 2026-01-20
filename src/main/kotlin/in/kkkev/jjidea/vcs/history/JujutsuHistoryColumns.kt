@@ -32,21 +32,20 @@ class CommitTimestampColumnInfo : ColumnInfo<VcsFileRevision, Date?>("Commit Tim
     override fun getComparator(): Comparator<VcsFileRevision> =
         compareBy(nullsLast()) { (it as? JujutsuFileRevision)?.getCommitterDate() }
 
-    override fun getRenderer(revision: VcsFileRevision): TableCellRenderer =
-        object : ColoredTableCellRenderer() {
-            override fun customizeCellRenderer(
-                table: JTable,
-                value: Any?,
-                selected: Boolean,
-                hasFocus: Boolean,
-                row: Int,
-                column: Int
-            ) {
-                if (value is Date) {
-                    append(DateFormatUtil.formatPrettyDateTime(value), SimpleTextAttributes.REGULAR_ATTRIBUTES)
-                }
+    override fun getRenderer(revision: VcsFileRevision): TableCellRenderer = object : ColoredTableCellRenderer() {
+        override fun customizeCellRenderer(
+            table: JTable,
+            value: Any?,
+            selected: Boolean,
+            hasFocus: Boolean,
+            row: Int,
+            column: Int
+        ) {
+            if (value is Date) {
+                append(DateFormatUtil.formatPrettyDateTime(value), SimpleTextAttributes.REGULAR_ATTRIBUTES)
             }
         }
+    }
 
     override fun getPreferredStringValue() = "2025-12-15 12:00"
 

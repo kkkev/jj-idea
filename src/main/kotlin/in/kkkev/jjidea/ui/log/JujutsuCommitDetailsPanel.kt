@@ -42,11 +42,8 @@ import javax.swing.text.html.HTMLEditorKit
  * - TOP: Changed files tree
  * - BOTTOM: Commit metadata and description
  */
-class JujutsuCommitDetailsPanel(
-    private val project: Project,
-    private val root: VirtualFile
-) : JPanel(BorderLayout()),
-    Disposable {
+class JujutsuCommitDetailsPanel(private val project: Project, private val root: VirtualFile) :
+    JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
     private val metadataPanel = JPanel(BorderLayout())
@@ -209,10 +206,9 @@ class JujutsuCommitDetailsPanel(
     }
 
     private fun openFile(change: Change) {
-        val virtualFile =
-            change.afterRevision?.file?.virtualFile
-                ?: change.beforeRevision?.file?.virtualFile
-                ?: return
+        val virtualFile = change.afterRevision?.file?.virtualFile
+            ?: change.beforeRevision?.file?.virtualFile
+            ?: return
 
         FileEditorManager.getInstance(project).openTextEditor(
             OpenFileDescriptor(project, virtualFile),
@@ -220,44 +216,38 @@ class JujutsuCommitDetailsPanel(
         )
     }
 
-    private fun showContextMenu(
-        comp: Component,
-        x: Int,
-        y: Int
-    ) {
+    private fun showContextMenu(comp: Component, x: Int, y: Int) {
         val selectedChange = changesTree.selectedChanges.firstOrNull() ?: return
 
-        val actionGroup =
-            DefaultActionGroup().apply {
-                add(
-                    object : DumbAwareAction(
-                        JujutsuBundle.message("action.showdiff"),
-                        null,
-                        AllIcons.Actions.Diff
-                    ) {
-                        override fun actionPerformed(e: AnActionEvent) {
-                            showDiff(selectedChange)
-                        }
+        val actionGroup = DefaultActionGroup().apply {
+            add(
+                object : DumbAwareAction(
+                    JujutsuBundle.message("action.showdiff"),
+                    null,
+                    AllIcons.Actions.Diff
+                ) {
+                    override fun actionPerformed(e: AnActionEvent) {
+                        showDiff(selectedChange)
                     }
-                )
-                add(
-                    object : DumbAwareAction(
-                        JujutsuBundle.message("action.openfile"),
-                        null,
-                        AllIcons.Actions.EditSource
-                    ) {
-                        override fun actionPerformed(e: AnActionEvent) {
-                            openFile(selectedChange)
-                        }
-                    }
-                )
-            }
-
-        val popupMenu =
-            ActionManager.getInstance().createActionPopupMenu(
-                "JujutsuCommitDetailsChangesContextMenu",
-                actionGroup
+                }
             )
+            add(
+                object : DumbAwareAction(
+                    JujutsuBundle.message("action.openfile"),
+                    null,
+                    AllIcons.Actions.EditSource
+                ) {
+                    override fun actionPerformed(e: AnActionEvent) {
+                        openFile(selectedChange)
+                    }
+                }
+            )
+        }
+
+        val popupMenu = ActionManager.getInstance().createActionPopupMenu(
+            "JujutsuCommitDetailsChangesContextMenu",
+            actionGroup
+        )
 
         popupMenu.component.show(comp, x, y)
     }

@@ -12,9 +12,8 @@ import kotlin.time.Duration.Companion.days
 /**
  * Filter component for dates.
  */
-class JujutsuDateFilterComponent(
-    private val tableModel: JujutsuLogTableModel
-) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.date")) {
+class JujutsuDateFilterComponent(private val tableModel: JujutsuLogTableModel) :
+    JujutsuFilterComponent(JujutsuBundle.message("log.filter.date")) {
     private var selectedPeriod: DatePeriod? = null
 
     override fun getCurrentText(): String = selectedPeriod?.displayName ?: ""
@@ -54,9 +53,7 @@ class JujutsuDateFilterComponent(
         tableModel.setDateFilter(cutoff)
     }
 
-    private inner class SelectPeriodAction(
-        private val period: DatePeriod
-    ) : AnAction(period.displayName) {
+    private inner class SelectPeriodAction(private val period: DatePeriod) : AnAction(period.displayName) {
         override fun actionPerformed(e: AnActionEvent) {
             selectedPeriod = period
             notifyFilterChanged()

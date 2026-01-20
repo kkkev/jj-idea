@@ -13,9 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Automatically invalidates when VCS changes occur
  */
 @Service(Service.Level.PROJECT)
-class LogCache(
-    project: Project
-) : Disposable {
+class LogCache(project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
     private val cache = ConcurrentHashMap<String, CachedLogResult>()
 
@@ -38,10 +36,7 @@ class LogCache(
     /**
      * Get cached log entries or null if not cached
      */
-    fun get(
-        revisions: Revset,
-        filePaths: List<String> = emptyList()
-    ): List<LogEntry>? {
+    fun get(revisions: Revset, filePaths: List<String> = emptyList()): List<LogEntry>? {
         val key = cacheKey(revisions, filePaths)
         val cached = cache[key]
 
@@ -63,11 +58,7 @@ class LogCache(
     /**
      * Store log entries in cache
      */
-    fun put(
-        revisions: Revset,
-        filePaths: List<String> = emptyList(),
-        entries: List<LogEntry>
-    ) {
+    fun put(revisions: Revset, filePaths: List<String> = emptyList(), entries: List<LogEntry>) {
         val key = cacheKey(revisions, filePaths)
         cache[key] = CachedLogResult(entries)
         log.debug("Cached ${entries.size} entries for $key")
@@ -81,10 +72,8 @@ class LogCache(
         log.debug("Cleared log cache")
     }
 
-    private fun cacheKey(
-        revisions: Revset,
-        filePaths: List<String>
-    ): String = "$revisions|${filePaths.sorted().joinToString(",")}"
+    private fun cacheKey(revisions: Revset, filePaths: List<String>) =
+        "$revisions|${filePaths.sorted().joinToString(",")}"
 
     override fun dispose() {
         clear()

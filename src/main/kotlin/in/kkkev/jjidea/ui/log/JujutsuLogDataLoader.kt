@@ -31,10 +31,7 @@ class JujutsuLogDataLoader(
      * @param revset Revision expression to load (default: all commits)
      * @param selectWorkingCopy If true, select the working copy (@) after load completes
      */
-    fun loadCommits(
-        revset: Expression = Expression.ALL,
-        selectWorkingCopy: Boolean = false
-    ) {
+    fun loadCommits(revset: Expression = Expression.ALL, selectWorkingCopy: Boolean = false) {
         object : Task.Backgroundable(project, "Loading Jujutsu Commits", true) {
             private var entries: List<LogEntry> = emptyList()
             private var error: Throwable? = null
@@ -91,10 +88,9 @@ class JujutsuLogDataLoader(
      */
     private fun selectWorkingCopyInTable() {
         // Find the working copy entry in the table model
-        val workingCopyIndex =
-            (0 until tableModel.rowCount).firstOrNull { row ->
-                tableModel.getEntry(row)?.isWorkingCopy == true
-            }
+        val workingCopyIndex = (0 until tableModel.rowCount).firstOrNull { row ->
+            tableModel.getEntry(row)?.isWorkingCopy == true
+        }
 
         if (workingCopyIndex != null) {
             // Select the row

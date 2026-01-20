@@ -18,11 +18,8 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
 /**
  * Provides file annotations (blame) for Jujutsu files
  */
-class JujutsuAnnotationProvider(
-    private val project: Project,
-    private val vcs: JujutsuVcs
-) : AnnotationProvider,
-    CacheableAnnotationProvider {
+class JujutsuAnnotationProvider(private val project: Project, private val vcs: JujutsuVcs) :
+    AnnotationProvider, CacheableAnnotationProvider {
     private val log = Logger.getInstance(javaClass)
     private val cache = mutableMapOf<VirtualFile, FileAnnotation>()
 
@@ -46,10 +43,8 @@ class JujutsuAnnotationProvider(
     /**
      * Annotate a file at a specific revision
      */
-    override fun annotate(
-        file: VirtualFile,
-        revision: VcsFileRevision?
-    ) = annotateInternal(file, revision?.revisionNumber?.asString()?.let(::ChangeId) ?: WorkingCopy)
+    override fun annotate(file: VirtualFile, revision: VcsFileRevision?) =
+        annotateInternal(file, revision?.revisionNumber?.asString()?.let(::ChangeId) ?: WorkingCopy)
 
     /**
      * Check if we can annotate this revision
@@ -59,10 +54,7 @@ class JujutsuAnnotationProvider(
     /**
      * Internal method to perform annotation
      */
-    private fun annotateInternal(
-        file: VirtualFile,
-        revision: Revision
-    ): FileAnnotation {
+    private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
         try {
             // Get the relative path from the root
             val relativePath = vcs.getRelativePath(VcsUtil.getFilePath(file))

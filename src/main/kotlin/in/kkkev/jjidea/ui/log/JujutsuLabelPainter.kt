@@ -19,10 +19,7 @@ import javax.swing.JComponent
  * Adapted from IntelliJ Platform's internal LabelPainter (vcs-log-impl).
  * Renders bookmark labels with icons, text, and proper spacing/theming.
  */
-class JujutsuLabelPainter(
-    private val component: JComponent,
-    private val compact: Boolean = false
-) {
+class JujutsuLabelPainter(private val component: JComponent, private val compact: Boolean = false) {
     companion object {
         private val TOP_TEXT_PADDING = JBValue.UIInteger("VersionControl.Log.Commit.verticalPadding", 1)
         private val BOTTOM_TEXT_PADDING = JBValue.UIInteger("VersionControl.Log.Commit.verticalPadding", 2)
@@ -109,12 +106,11 @@ class JujutsuLabelPainter(
             val iconHeight = fontMetrics.height
 
             // Use grey text color (not orange) - matching IntelliJ's branch/tag rendering
-            val textColor =
-                if (isSelected) {
-                    foreground
-                } else {
-                    JBColor.GRAY
-                }
+            val textColor = if (isSelected) {
+                foreground
+            } else {
+                JBColor.GRAY
+            }
 
             var currentX = x + LEFT_PADDING.get()
 

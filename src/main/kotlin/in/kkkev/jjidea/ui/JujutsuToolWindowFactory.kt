@@ -10,21 +10,15 @@ import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 /**
  * Factory for creating the Jujutsu working copy tool window
  */
-class JujutsuToolWindowFactory :
-    ToolWindowFactory,
-    DumbAware {
-    override fun createToolWindowContent(
-        project: Project,
-        toolWindow: ToolWindow
-    ) {
+class JujutsuToolWindowFactory : ToolWindowFactory, DumbAware {
+    override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
         val jujutsuPanel = JujutsuToolWindowPanel(project)
 
-        val content =
-            ContentFactory.getInstance().createContent(
-                jujutsuPanel.getContent(),
-                "",
-                false
-            )
+        val content = ContentFactory.getInstance().createContent(
+            jujutsuPanel.getContent(),
+            "",
+            false
+        )
         content.setDisposer(jujutsuPanel)
         toolWindow.contentManager.addContent(content)
     }

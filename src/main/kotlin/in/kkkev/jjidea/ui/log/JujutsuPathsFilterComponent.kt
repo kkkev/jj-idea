@@ -21,12 +21,11 @@ class JujutsuPathsFilterComponent(
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.paths")) {
     private val selectedPaths = mutableSetOf<String>()
 
-    override fun getCurrentText(): String =
-        when (selectedPaths.size) {
-            0 -> ""
-            1 -> selectedPaths.first().substringAfterLast('/')
-            else -> JujutsuBundle.message("log.filter.multiple", selectedPaths.size)
-        }
+    override fun getCurrentText(): String = when (selectedPaths.size) {
+        0 -> ""
+        1 -> selectedPaths.first().substringAfterLast('/')
+        else -> JujutsuBundle.message("log.filter.multiple", selectedPaths.size)
+    }
 
     override fun isValueSelected(): Boolean = selectedPaths.isNotEmpty()
 
@@ -62,19 +61,17 @@ class JujutsuPathsFilterComponent(
 
     private inner class SelectPathAction : AnAction(JujutsuBundle.message("log.filter.paths.select")) {
         override fun actionPerformed(e: AnActionEvent) {
-            val descriptor =
-                FileChooserDescriptorFactory.createMultipleFilesNoJarsDescriptor().apply {
-                    title = JujutsuBundle.message("log.filter.paths.chooser.title")
-                    description = JujutsuBundle.message("log.filter.paths.chooser.description")
-                    roots = listOf(root)
-                }
+            val descriptor = FileChooserDescriptorFactory.createMultipleFilesNoJarsDescriptor().apply {
+                title = JujutsuBundle.message("log.filter.paths.chooser.title")
+                description = JujutsuBundle.message("log.filter.paths.chooser.description")
+                roots = listOf(root)
+            }
 
-            val dialog: FileChooserDialog =
-                FileChooserFactory.getInstance().createFileChooser(
-                    descriptor,
-                    project,
-                    null
-                )
+            val dialog: FileChooserDialog = FileChooserFactory.getInstance().createFileChooser(
+                descriptor,
+                project,
+                null
+            )
             val files = dialog.choose(project, root)
 
             files.forEach { file ->
@@ -90,9 +87,7 @@ class JujutsuPathsFilterComponent(
         }
     }
 
-    private inner class RemovePathAction(
-        private val path: String
-    ) : AnAction("Remove: $path") {
+    private inner class RemovePathAction(private val path: String) : AnAction("Remove: $path") {
         override fun actionPerformed(e: AnActionEvent) {
             selectedPaths.remove(path)
             notifyFilterChanged()

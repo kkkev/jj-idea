@@ -23,9 +23,7 @@ import `in`.kkkev.jjidea.vcs.jujutsuRoots
  * Built from scratch using JTable - no dependency on VcsLogUi.
  */
 @Service(Service.Level.PROJECT)
-class JujutsuCustomLogTabManager(
-    private val project: Project
-) : Disposable {
+class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
     private val openTabs = mutableListOf<Content>()
     private val openPanels = mutableListOf<JujutsuLogPanel>()
@@ -51,16 +49,14 @@ class JujutsuCustomLogTabManager(
             // Create content tab
             val changesViewContentManager = ChangesViewContentManager.getInstance(project)
             val contentFactory = ContentFactory.getInstance()
-            val content =
-                contentFactory
-                    .createContent(
-                        logPanel,
-                        "Jujutsu Log",
-                        false
-                    ).apply {
-                        isCloseable = true
-                        preferredFocusableComponent = logPanel
-                    }
+            val content = contentFactory.createContent(
+                logPanel,
+                "Jujutsu Log",
+                false
+            ).apply {
+                isCloseable = true
+                preferredFocusableComponent = logPanel
+            }
 
             // Add to changes view (Git tool window area)
             changesViewContentManager.addContent(content)

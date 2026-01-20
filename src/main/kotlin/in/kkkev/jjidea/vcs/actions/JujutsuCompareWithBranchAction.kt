@@ -20,12 +20,11 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
 /**
  * Action to compare current file with a bookmark, change, or revision
  */
-class JujutsuCompareWithBranchAction :
-    DumbAwareAction(
-        JujutsuBundle.message("action.compare.branch"),
-        JujutsuBundle.message("action.compare.branch.description"),
-        AllIcons.Actions.Diff
-    ) {
+class JujutsuCompareWithBranchAction : DumbAwareAction(
+    JujutsuBundle.message("action.compare.branch"),
+    JujutsuBundle.message("action.compare.branch.description"),
+    AllIcons.Actions.Diff
+) {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -34,8 +33,7 @@ class JujutsuCompareWithBranchAction :
 
         // Get VCS on background thread to avoid slow operations on EDT
         ApplicationManager.getApplication().executeOnPooledThread {
-            JujutsuVcs
-                .getVcsWithUserErrorHandling(project, "Compare with Branch")
+            JujutsuVcs.getVcsWithUserErrorHandling(project, "Compare with Branch")
                 ?.let { vcs ->
                     ApplicationManager.getApplication().invokeLater {
                         JujutsuCompareWithPopup.show(project, vcs) { chosen ->
@@ -71,21 +69,19 @@ class JujutsuCompareWithBranchAction :
 
                 // Create diff content
                 val content1 = contentFactory.create(project, revisionContent)
-                val content2 =
-                    if (file.exists()) {
-                        contentFactory.create(project, file)
-                    } else {
-                        contentFactory.createEmpty()
-                    }
+                val content2 = if (file.exists()) {
+                    contentFactory.create(project, file)
+                } else {
+                    contentFactory.createEmpty()
+                }
 
-                val diffRequest =
-                    SimpleDiffRequest(
-                        JujutsuBundle.message("diff.title.compare", file.name, revision.toString()),
-                        content1,
-                        content2,
-                        revision.toString(),
-                        JujutsuBundle.message("diff.label.current")
-                    )
+                val diffRequest = SimpleDiffRequest(
+                    JujutsuBundle.message("diff.title.compare", file.name, revision.toString()),
+                    content1,
+                    content2,
+                    revision.toString(),
+                    JujutsuBundle.message("diff.label.current")
+                )
 
                 diffManager.showDiff(project, diffRequest)
             }

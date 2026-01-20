@@ -90,12 +90,11 @@ class JujutsuGraphAndDescriptionRenderer(
             graphNode = entry?.let { graphNodes[it.changeId] }
 
             // Set background based on selection/hover state
-            background =
-                when {
-                    isSelected -> table.selectionBackground
-                    isHovered -> UIUtil.getListBackground(true, false)
-                    else -> table.background
-                }
+            background = when {
+                isSelected -> table.selectionBackground
+                isHovered -> UIUtil.getListBackground(true, false)
+                else -> table.background
+            }
 
             // Set tooltip with description and status indicators
             entry?.let { e ->
@@ -122,12 +121,11 @@ class JujutsuGraphAndDescriptionRenderer(
                 if (parts.isNotEmpty()) {
                     parts.add("<hr>")
                 }
-                val htmlEscaped =
-                    entry.description.actual
-                        .replace("&", "&amp;")
-                        .replace("<", "&lt;")
-                        .replace(">", "&gt;")
-                        .replace("\n", "<br>")
+                val htmlEscaped = entry.description.actual
+                    .replace("&", "&amp;")
+                    .replace("<", "&lt;")
+                    .replace(">", "&gt;")
+                    .replace("\n", "<br>")
                 parts.add(htmlEscaped)
             }
 
@@ -185,12 +183,7 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
-        private fun drawGraph(
-            g2d: Graphics2D,
-            node: GraphNode,
-            startX: Int,
-            laneWidth: Int
-        ): Set<Int> {
+        private fun drawGraph(g2d: Graphics2D, node: GraphNode, startX: Int, laneWidth: Int): Set<Int> {
             val model = table.model as? JujutsuLogTableModel ?: return emptySet()
             val entry = model.getEntry(row) ?: return emptySet()
 
@@ -235,11 +228,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return activeLanes
         }
 
-        private fun drawPassThroughLines(
-            g2d: Graphics2D,
-            graphStartX: Int,
-            laneWidth: Int
-        ): Set<Int> {
+        private fun drawPassThroughLines(g2d: Graphics2D, graphStartX: Int, laneWidth: Int): Set<Int> {
             val model = table.model as? JujutsuLogTableModel ?: return emptySet()
             val passThroughLanes = mutableSetOf<Int>()
 
@@ -285,12 +274,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return passThroughLanes
         }
 
-        private fun drawCommitCircle(
-            g2d: Graphics2D,
-            node: GraphNode,
-            x: Int,
-            y: Int
-        ) {
+        private fun drawCommitCircle(g2d: Graphics2D, node: GraphNode, x: Int, y: Int) {
             val commitRadius = COMMIT_RADIUS.get()
 
             // Fill circle with branch color
@@ -377,11 +361,7 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
-        private fun drawStatusIndicators(
-            g2d: Graphics2D,
-            entry: LogEntry,
-            startX: Int
-        ): Int {
+        private fun drawStatusIndicators(g2d: Graphics2D, entry: LogEntry, startX: Int): Int {
             var x = startX
             val centerY = height / 2
             val horizontalPadding = HORIZONTAL_PADDING.get()
@@ -409,11 +389,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return x
         }
 
-        private fun drawChangeId(
-            g2d: Graphics2D,
-            changeId: ChangeId,
-            startX: Int
-        ): Int {
+        private fun drawChangeId(g2d: Graphics2D, changeId: ChangeId, startX: Int): Int {
             val fontMetrics = g2d.fontMetrics
 
             // Draw short prefix in bold
@@ -443,12 +419,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return x + HORIZONTAL_PADDING.get() * 2
         }
 
-        private fun drawDescription(
-            g2d: Graphics2D,
-            entry: LogEntry,
-            startX: Int,
-            maxX: Int
-        ): Int {
+        private fun drawDescription(g2d: Graphics2D, entry: LogEntry, startX: Int, maxX: Int): Int {
             val baseFontMetrics = g2d.fontMetrics
 
             // Use shared style logic for font and color
@@ -458,25 +429,23 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // Calculate width needed for "(empty)" indicator if applicable
             val emptyText = " (empty)"
-            val emptyIndicatorWidth =
-                if (entry.isEmpty) {
-                    val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
-                    g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
-                } else {
-                    0
-                }
+            val emptyIndicatorWidth = if (entry.isEmpty) {
+                val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
+                g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
+            } else {
+                0
+            }
 
             // Reduce available width for description to reserve space for "(empty)"
             val availableWidthForDescription = maxX - startX - emptyIndicatorWidth
 
             // Set color using shared logic
-            g2d.color =
-                DescriptionRenderingStyle.getTextColor(
-                    entry.description,
-                    isSelected,
-                    table.selectionForeground,
-                    table.foreground
-                )
+            g2d.color = DescriptionRenderingStyle.getTextColor(
+                entry.description,
+                isSelected,
+                table.selectionForeground,
+                table.foreground
+            )
 
             val text = entry.description.summary
 
@@ -504,11 +473,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return x
         }
 
-        private fun truncateText(
-            text: String,
-            fontMetrics: FontMetrics,
-            availableWidth: Int
-        ): String {
+        private fun truncateText(text: String, fontMetrics: FontMetrics, availableWidth: Int): String {
             if (fontMetrics.stringWidth(text) <= availableWidth) return text
 
             // Binary search for the right length
@@ -519,11 +484,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return if (truncated.isEmpty()) "" else "$truncated..."
         }
 
-        private fun calculateDecorationsWidth(
-            g2d: Graphics2D,
-            entry: LogEntry,
-            horizontalPadding: Int
-        ): Int {
+        private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry, horizontalPadding: Int): Int {
             if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return 0
 
             val fontMetrics = g2d.fontMetrics
@@ -546,12 +507,7 @@ class JujutsuGraphAndDescriptionRenderer(
             return width
         }
 
-        private fun drawDecorations(
-            g2d: Graphics2D,
-            entry: LogEntry,
-            rightX: Int,
-            horizontalPadding: Int
-        ) {
+        private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int, horizontalPadding: Int) {
             if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return
 
             val centerY = height / 2
@@ -563,26 +519,24 @@ class JujutsuGraphAndDescriptionRenderer(
             // Draw bookmarks using platform-style painter
             if (entry.bookmarks.isNotEmpty()) {
                 val painter = JujutsuLabelPainter(this, compact = false)
-                val background =
-                    when {
-                        isSelected -> table.selectionBackground
-                        isHovered -> UIUtil.getListBackground(true, false)
-                        else -> table.background
-                    }
+                val background = when {
+                    isSelected -> table.selectionBackground
+                    isHovered -> UIUtil.getListBackground(true, false)
+                    else -> table.background
+                }
                 // Use grey text color (icon is orange, text is grey)
                 val foreground = if (isSelected) table.selectionForeground else JBColor.GRAY
 
-                x =
-                    painter.paintRightAligned(
-                        g2d,
-                        x,
-                        0,
-                        height,
-                        entry.bookmarks,
-                        background,
-                        foreground,
-                        isSelected
-                    )
+                x = painter.paintRightAligned(
+                    g2d,
+                    x,
+                    0,
+                    height,
+                    entry.bookmarks,
+                    background,
+                    foreground,
+                    isSelected
+                )
             }
 
             // Draw @ symbol for working copy
@@ -599,20 +553,19 @@ class JujutsuGraphAndDescriptionRenderer(
             g2d.font = fontMetrics.font
         }
 
-        override fun getPreferredSize() =
-            super.getPreferredSize().apply {
-                val laneWidth = LANE_WIDTH.get()
-                val horizontalPadding = HORIZONTAL_PADDING.get()
+        override fun getPreferredSize() = super.getPreferredSize().apply {
+            val laneWidth = LANE_WIDTH.get()
+            val horizontalPadding = HORIZONTAL_PADDING.get()
 
-                // Calculate width based on graph + content
-                val maxLane = graphNodes.values.maxOfOrNull { it.lane } ?: 0
-                val graphWidth = (maxLane + 1) * laneWidth + laneWidth
+            // Calculate width based on graph + content
+            val maxLane = graphNodes.values.maxOfOrNull { it.lane } ?: 0
+            val graphWidth = (maxLane + 1) * laneWidth + laneWidth
 
-                // Minimum width for description area
-                val contentWidth = 400
+            // Minimum width for description area
+            val contentWidth = 400
 
-                width = horizontalPadding + graphWidth + horizontalPadding * 2 + contentWidth
-                height = ROW_HEIGHT.get()
-            }
+            width = horizontalPadding + graphWidth + horizontalPadding * 2 + contentWidth
+            height = ROW_HEIGHT.get()
+        }
     }
 }

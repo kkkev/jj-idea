@@ -37,11 +37,8 @@ import javax.swing.table.TableColumn
  *
  * Built from scratch - no dependency on IntelliJ's VCS log UI.
  */
-class JujutsuLogPanel(
-    private val project: Project,
-    private val root: VirtualFile
-) : JPanel(BorderLayout()),
-    Disposable {
+class JujutsuLogPanel(private val project: Project, private val root: VirtualFile) :
+    JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
     // Column manager for controlling column visibility
@@ -68,30 +65,29 @@ class JujutsuLogPanel(
     private var matchWholeWords = false
 
     // Base search field with history
-    private val searchTextField =
-        SearchTextField(true).apply {
-            textEditor.emptyText.text = JujutsuBundle.message("log.filter.text.placeholder")
-            toolTipText = JujutsuBundle.message("log.filter.text.tooltip")
+    private val searchTextField = SearchTextField(true).apply {
+        textEditor.emptyText.text = JujutsuBundle.message("log.filter.text.placeholder")
+        toolTipText = JujutsuBundle.message("log.filter.text.tooltip")
 
-            // Listen for text changes
-            textEditor.document.addDocumentListener(
-                object : DocumentListener {
-                    override fun insertUpdate(e: DocumentEvent?) = applyFilter()
+        // Listen for text changes
+        textEditor.document.addDocumentListener(
+            object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent?) = applyFilter()
 
-                    override fun removeUpdate(e: DocumentEvent?) = applyFilter()
+                override fun removeUpdate(e: DocumentEvent?) = applyFilter()
 
-                    override fun changedUpdate(e: DocumentEvent?) = applyFilter()
-                }
-            )
+                override fun changedUpdate(e: DocumentEvent?) = applyFilter()
+            }
+        )
 
-            // Add Enter key listener to save search to history
-            textEditor.addActionListener {
-                val text = text?.trim()
-                if (!text.isNullOrEmpty()) {
-                    addCurrentTextToHistory()
-                }
+        // Add Enter key listener to save search to history
+        textEditor.addActionListener {
+            val text = text?.trim()
+            if (!text.isNullOrEmpty()) {
+                addCurrentTextToHistory()
             }
         }
+    }
 
     // Filter panel using SearchFieldWithExtension
     private val filterField: SearchFieldWithExtension
@@ -154,46 +150,41 @@ class JujutsuLogPanel(
     /**
      * Create a panel containing the table with its toolbar.
      */
-    private fun createTablePanel() =
-        JPanel(BorderLayout()).apply {
-            // Add toolbar at the top
-            add(createToolbar(), BorderLayout.NORTH)
+    private fun createTablePanel() = JPanel(BorderLayout()).apply {
+        // Add toolbar at the top
+        add(createToolbar(), BorderLayout.NORTH)
 
-            // Add table scroll pane in the center
-            add(ScrollPaneFactory.createScrollPane(logTable), BorderLayout.CENTER)
-        }
+        // Add table scroll pane in the center
+        add(ScrollPaneFactory.createScrollPane(logTable), BorderLayout.CENTER)
+    }
 
     /**
      * Create a splitter with the given orientation.
      * @param tablePanel The panel containing the table and toolbar
      * @param horizontal True to position details on right, false for bottom
      */
-    private fun createSplitter(
-        tablePanel: JPanel,
-        horizontal: Boolean
-    ) = OnePixelSplitter(!horizontal, if (horizontal) 0.7f else 0.7f).apply {
-        firstComponent = tablePanel
-        secondComponent = detailsPanel
-    }
+    private fun createSplitter(tablePanel: JPanel, horizontal: Boolean) =
+        OnePixelSplitter(!horizontal, if (horizontal) 0.7f else 0.7f).apply {
+            firstComponent = tablePanel
+            secondComponent = detailsPanel
+        }
 
     private fun createToolbar() =
         JPanel(BorderLayout()).apply {
             // Create left-side panel with text filter and dropdown filters
-            val leftPanel =
-                JPanel().apply {
-                    layout = BoxLayout(this, BoxLayout.X_AXIS)
-                    add(filterField)
-                    add(Box.createHorizontalStrut(5))
-                    add(createFilterComponents())
-                }
+            val leftPanel = JPanel().apply {
+                layout = BoxLayout(this, BoxLayout.X_AXIS)
+                add(filterField)
+                add(Box.createHorizontalStrut(5))
+                add(createFilterComponents())
+            }
 
             // Create main toolbar with actions on the right
-            val toolbar =
-                ActionManager.getInstance().createActionToolbar(
-                    "JujutsuLogToolbar",
-                    createActionGroup(),
-                    true
-                )
+            val toolbar = ActionManager.getInstance().createActionToolbar(
+                "JujutsuLogToolbar",
+                createActionGroup(),
+                true
+            )
             toolbar.targetComponent = this@JujutsuLogPanel
 
             add(leftPanel, BorderLayout.WEST)
@@ -249,35 +240,33 @@ class JujutsuLogPanel(
      */
     private fun createFilterField(): SearchFieldWithExtension {
         // Create action group with toggle buttons
-        val filterActionsGroup =
-            DefaultActionGroup().apply {
-                add(RegexFilterAction())
-                add(MatchCaseAction())
-                add(MatchWholeWordsAction())
-            }
+        val filterActionsGroup = DefaultActionGroup().apply {
+            add(RegexFilterAction())
+            add(MatchCaseAction())
+            add(MatchWholeWordsAction())
+        }
 
         // Create custom toolbar that uses toggle-aware action buttons
-        val toolbar =
-            object : ActionToolbarImpl(
-                "JujutsuLogFilter",
-                filterActionsGroup,
-                true, // horizontal
-                false, // decorateButtons
-                true // customizable
-            ) {
-                override fun createToolbarButton(
-                    action: AnAction,
-                    look: ActionButtonLook?,
-                    place: String,
-                    presentation: Presentation,
-                    minimumSize: java.util.function.Supplier<out Dimension?>
-                ): ActionButton {
-                    val button = ToggleAwareActionButton(action, presentation)
-                    button.isFocusable = true
-                    applyToolbarLook(look, presentation, button)
-                    return button
-                }
+        val toolbar = object : ActionToolbarImpl(
+            "JujutsuLogFilter",
+            filterActionsGroup,
+            true, // horizontal
+            false, // decorateButtons
+            true // customizable
+        ) {
+            override fun createToolbarButton(
+                action: AnAction,
+                look: ActionButtonLook?,
+                place: String,
+                presentation: Presentation,
+                minimumSize: java.util.function.Supplier<out Dimension?>
+            ): ActionButton {
+                val button = ToggleAwareActionButton(action, presentation)
+                button.isFocusable = true
+                applyToolbarLook(look, presentation, button)
+                return button
             }
+        }
 
         toolbar.apply {
             targetComponent = searchTextField.textEditor
@@ -288,22 +277,20 @@ class JujutsuLogPanel(
         return SearchFieldWithExtension(toolbar.component, searchTextField)
     }
 
-    private fun createActionGroup() =
-        DefaultActionGroup().apply {
-            add(RefreshAction())
-            add(ColumnsAction())
-            add(DetailsPositionAction())
-        }
+    private fun createActionGroup() = DefaultActionGroup().apply {
+        add(RefreshAction())
+        add(ColumnsAction())
+        add(DetailsPositionAction())
+    }
 
     /**
      * Refresh action - reload commits.
      */
-    private inner class RefreshAction :
-        AnAction(
-            JujutsuBundle.message("log.action.refresh"),
-            JujutsuBundle.message("log.action.refresh.tooltip"),
-            AllIcons.Actions.Refresh
-        ) {
+    private inner class RefreshAction : AnAction(
+        JujutsuBundle.message("log.action.refresh"),
+        JujutsuBundle.message("log.action.refresh.tooltip"),
+        AllIcons.Actions.Refresh
+    ) {
         override fun actionPerformed(e: AnActionEvent) {
             log.info("Refresh action triggered")
             dataLoader.refresh()
@@ -354,10 +341,7 @@ class JujutsuLogPanel(
     private inner class DetailsOnBottomAction : ToggleAction(JujutsuBundle.message("log.action.details.bottom")) {
         override fun isSelected(e: AnActionEvent) = !detailsOnRight
 
-        override fun setSelected(
-            e: AnActionEvent,
-            state: Boolean
-        ) {
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
             if (state && detailsOnRight) {
                 toggleDetailsPosition()
             }
@@ -367,18 +351,14 @@ class JujutsuLogPanel(
     /**
      * Toggle regex filter mode.
      */
-    private inner class RegexFilterAction :
-        ToggleAction(
-            JujutsuBundle.message("log.filter.regex"),
-            JujutsuBundle.message("log.filter.regex.tooltip"),
-            AllIcons.Actions.RegexHovered
-        ) {
+    private inner class RegexFilterAction : ToggleAction(
+        JujutsuBundle.message("log.filter.regex"),
+        JujutsuBundle.message("log.filter.regex.tooltip"),
+        AllIcons.Actions.RegexHovered
+    ) {
         override fun isSelected(e: AnActionEvent) = useRegex
 
-        override fun setSelected(
-            e: AnActionEvent,
-            state: Boolean
-        ) {
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
             useRegex = state
             applyFilter()
         }
@@ -395,10 +375,7 @@ class JujutsuLogPanel(
         ) {
         override fun isSelected(e: AnActionEvent) = matchCase
 
-        override fun setSelected(
-            e: AnActionEvent,
-            state: Boolean
-        ) {
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
             matchCase = state
             applyFilter()
         }
@@ -407,12 +384,11 @@ class JujutsuLogPanel(
     /**
      * Toggle match whole words in filter.
      */
-    private inner class MatchWholeWordsAction :
-        ToggleAction(
-            JujutsuBundle.message("log.filter.words"),
-            JujutsuBundle.message("log.filter.words.tooltip"),
-            AllIcons.Actions.Words
-        ) {
+    private inner class MatchWholeWordsAction : ToggleAction(
+        JujutsuBundle.message("log.filter.words"),
+        JujutsuBundle.message("log.filter.words.tooltip"),
+        AllIcons.Actions.Words
+    ) {
         override fun isSelected(e: AnActionEvent) = matchWholeWords
 
         override fun setSelected(
@@ -424,59 +400,58 @@ class JujutsuLogPanel(
         }
     }
 
-    private fun createColumnsActionGroup() =
-        DefaultActionGroup().apply {
-            add(
-                ToggleColumnAction(
-                    JujutsuBundle.message("log.column.toggle.status"),
-                    getter = { columnManager.showStatusColumn },
-                    setter = { columnManager.showStatusColumn = it }
-                )
+    private fun createColumnsActionGroup() = DefaultActionGroup().apply {
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.status"),
+                getter = { columnManager.showStatusColumn },
+                setter = { columnManager.showStatusColumn = it }
             )
-            add(
-                ToggleColumnAction(
-                    JujutsuBundle.message("log.column.toggle.changeid"),
-                    getter = { columnManager.showChangeIdColumn },
-                    setter = { columnManager.showChangeIdColumn = it }
-                )
+        )
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.changeid"),
+                getter = { columnManager.showChangeIdColumn },
+                setter = { columnManager.showChangeIdColumn = it }
             )
-            add(
-                ToggleColumnAction(
-                    JujutsuBundle.message("log.column.toggle.description"),
-                    getter = { columnManager.showDescriptionColumn },
-                    setter = { columnManager.showDescriptionColumn = it }
-                )
+        )
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.description"),
+                getter = { columnManager.showDescriptionColumn },
+                setter = { columnManager.showDescriptionColumn = it }
             )
-            add(
-                ToggleColumnAction(
-                    JujutsuBundle.message("log.column.toggle.decorations"),
-                    getter = { columnManager.showDecorationsColumn },
-                    setter = { columnManager.showDecorationsColumn = it }
-                )
+        )
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.decorations"),
+                getter = { columnManager.showDecorationsColumn },
+                setter = { columnManager.showDecorationsColumn = it }
             )
-            addSeparator()
-            add(
-                ToggleColumnAction(
-                    JujutsuBundle.message("log.column.toggle.author"),
-                    getter = { columnManager.showAuthorColumn },
-                    setter = { columnManager.showAuthorColumn = it }
-                )
+        )
+        addSeparator()
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.author"),
+                getter = { columnManager.showAuthorColumn },
+                setter = { columnManager.showAuthorColumn = it }
             )
-            add(
-                ToggleColumnAction(
-                    JujutsuBundle.message("log.column.toggle.committer"),
-                    getter = { columnManager.showCommitterColumn },
-                    setter = { columnManager.showCommitterColumn = it }
-                )
+        )
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.committer"),
+                getter = { columnManager.showCommitterColumn },
+                setter = { columnManager.showCommitterColumn = it }
             )
-            add(
-                ToggleColumnAction(
-                    JujutsuBundle.message("log.column.toggle.date"),
-                    getter = { columnManager.showDateColumn },
-                    setter = { columnManager.showDateColumn = it }
-                )
+        )
+        add(
+            ToggleColumnAction(
+                JujutsuBundle.message("log.column.toggle.date"),
+                getter = { columnManager.showDateColumn },
+                setter = { columnManager.showDateColumn = it }
             )
-        }
+        )
+    }
 
     /**
      * Toggle action for a single column.
@@ -488,10 +463,7 @@ class JujutsuLogPanel(
     ) : ToggleAction(columnName) {
         override fun isSelected(e: AnActionEvent) = getter()
 
-        override fun setSelected(
-            e: AnActionEvent,
-            state: Boolean
-        ) {
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
             setter(state)
             updateColumnVisibility()
             logTable.updateGraph(logTable.graphNodes) // Refresh rendering
@@ -611,9 +583,6 @@ class JujutsuLogPanel(
         /**
          * Create a new log panel for the given project and root.
          */
-        fun create(
-            project: Project,
-            root: VirtualFile
-        ) = JujutsuLogPanel(project, root)
+        fun create(project: Project, root: VirtualFile) = JujutsuLogPanel(project, root)
     }
 }

@@ -30,10 +30,7 @@ class JujutsuAnnotateAction :
         return ANNOTATE_TOGGLE_ACTION.isSelected(e)
     }
 
-    override fun setSelected(
-        e: AnActionEvent,
-        state: Boolean
-    ) {
+    override fun setSelected(e: AnActionEvent, state: Boolean) {
         e.file?.let { file ->
             log.info("Triggering annotation toggle for file: ${file.path}")
 

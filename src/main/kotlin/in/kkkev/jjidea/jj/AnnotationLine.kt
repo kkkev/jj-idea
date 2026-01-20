@@ -19,26 +19,22 @@ data class AnnotationLine(
     /**
      * Get a tooltip-friendly display of this annotation
      */
-    fun getTooltip(): String =
-        buildString {
-            append("Change: ${changeId.display}\n")
-            append("Commit: ${commitId.take(12)}\n")
-            append("Author: ${author.name}")
-            if (author.email.isNotEmpty()) {
-                append(" <${author.email}>")
-            }
-            append("\n")
-            append(description.display)
+    fun getTooltip(): String = buildString {
+        append("Change: ${changeId.display}\n")
+        append("Commit: ${commitId.take(12)}\n")
+        append("Author: ${author.name}")
+        if (author.email.isNotEmpty()) {
+            append(" <${author.email}>")
         }
+        append("\n")
+        append(description.display)
+    }
 
     companion object {
         /**
          * Create an empty/null annotation line for lines with no annotation data
          */
-        fun empty(
-            lineNumber: Int,
-            lineContent: String
-        ) = AnnotationLine(
+        fun empty(lineNumber: Int, lineContent: String) = AnnotationLine(
             changeId = ChangeId(""),
             commitId = "",
             author = VcsUserImpl("", ""),

@@ -11,9 +11,7 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
  * Checkin environment for Jujutsu VCS
  * Currently read-only (for MVP)
  */
-class JujutsuCheckinEnvironment(
-    private val vcs: JujutsuVcs
-) : CheckinEnvironment {
+class JujutsuCheckinEnvironment(private val vcs: JujutsuVcs) : CheckinEnvironment {
     override fun getCheckinOperationName(): String = "Commit"
 
     override fun getHelpId(): String? = null
@@ -23,13 +21,9 @@ class JujutsuCheckinEnvironment(
         return null
     }
 
-    override fun commit(
-        changes: List<Change>,
-        preparedComment: String
-    ): List<VcsException>? {
-        // TODO: Implement actual commit using jj describe + jj commit
-        return listOf(VcsException("Commit operation not yet implemented"))
-    }
+    // TODO: Implement actual commit using jj describe + jj commit
+    override fun commit(changes: List<Change>, preparedComment: String) =
+        listOf(VcsException("Commit operation not yet implemented"))
 
     override fun scheduleMissingFileForDeletion(files: List<FilePath>): List<VcsException>? {
         // Not supported yet

@@ -13,9 +13,7 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
 /**
  * Provides change information for jujutsu working copy
  */
-class JujutsuChangeProvider(
-    private val vcs: JujutsuVcs
-) : ChangeProvider {
+class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     private val log = Logger.getInstance(javaClass)
 
     override fun getChanges(
@@ -55,11 +53,7 @@ class JujutsuChangeProvider(
      * A file2.txt
      * D file3.txt
      */
-    private fun parseStatus(
-        output: String,
-        root: VirtualFile,
-        builder: ChangelistBuilder
-    ) {
+    private fun parseStatus(output: String, root: VirtualFile, builder: ChangelistBuilder) {
         val lines = output.lines()
         var inWorkingCopy = false
 
@@ -88,11 +82,7 @@ class JujutsuChangeProvider(
      * Parse a single status line
      * Format: "M path/to/file.txt" or "A path/to/file.txt", etc.
      */
-    private fun parseStatusLine(
-        line: String,
-        root: VirtualFile,
-        builder: ChangelistBuilder
-    ) {
+    private fun parseStatusLine(line: String, root: VirtualFile, builder: ChangelistBuilder) {
         if (line.length < 3) return
 
         val status = line[0]
@@ -134,10 +124,7 @@ class JujutsuChangeProvider(
         }
     }
 
-    private fun addModifiedChange(
-        path: FilePath,
-        builder: ChangelistBuilder
-    ) {
+    private fun addModifiedChange(path: FilePath, builder: ChangelistBuilder) {
         val beforeRevision = vcs.createRevision(path, WorkingCopy.parent) // Parent commit
         val afterRevision = CurrentContentRevision(path)
 
@@ -147,10 +134,7 @@ class JujutsuChangeProvider(
         )
     }
 
-    private fun addAddedChange(
-        path: FilePath,
-        builder: ChangelistBuilder
-    ) {
+    private fun addAddedChange(path: FilePath, builder: ChangelistBuilder) {
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -159,10 +143,7 @@ class JujutsuChangeProvider(
         )
     }
 
-    private fun addDeletedChange(
-        path: FilePath,
-        builder: ChangelistBuilder
-    ) {
+    private fun addDeletedChange(path: FilePath, builder: ChangelistBuilder) {
         val beforeRevision = vcs.createRevision(path, WorkingCopy.parent)
 
         builder.processChange(
@@ -175,11 +156,7 @@ class JujutsuChangeProvider(
      * Parse rename status and add change
      * Format: "{oldname => newname}"
      */
-    private fun addRenamedChange(
-        renameSpec: String,
-        root: VirtualFile,
-        builder: ChangelistBuilder
-    ) {
+    private fun addRenamedChange(renameSpec: String, root: VirtualFile, builder: ChangelistBuilder) {
         // Remove braces and parse
         val spec = renameSpec.trim().removeSurrounding("{", "}")
         val parts = spec.split(" => ")

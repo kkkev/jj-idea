@@ -94,20 +94,19 @@ class JujutsuStartupActivity : ProjectActivity {
     /**
      * Gets the VCS tool window for the project.
      */
-    private fun getVcsToolWindow(project: Project) =
-        try {
-            ToolWindowManager
-                .getInstance(project)
-                .getToolWindow("Version Control")
-                ?.also { log.debug("Found VCS tool window") }
-                ?: run {
-                    log.debug("No VCS tool window found")
-                    null
-                }
-        } catch (e: Exception) {
-            log.warn("Failed to get VCS tool window", e)
-            null
-        }
+    private fun getVcsToolWindow(project: Project) = try {
+        ToolWindowManager
+            .getInstance(project)
+            .getToolWindow("Version Control")
+            ?.also { log.debug("Found VCS tool window") }
+            ?: run {
+                log.debug("No VCS tool window found")
+                null
+            }
+    } catch (e: Exception) {
+        log.warn("Failed to get VCS tool window", e)
+        null
+    }
 
     /**
      * Checks if a tab is a default VCS log tab that should be suppressed.

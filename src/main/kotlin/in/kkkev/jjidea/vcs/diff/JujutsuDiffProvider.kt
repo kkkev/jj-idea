@@ -15,9 +15,7 @@ import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 /**
  * Provides diff functionality for jujutsu files
  */
-class JujutsuDiffProvider(
-    private val vcs: JujutsuVcs
-) : DiffProvider {
+class JujutsuDiffProvider(private val vcs: JujutsuVcs) : DiffProvider {
     private val log = Logger.getInstance(javaClass)
 
     override fun getLastRevision(file: VirtualFile): ItemLatestState {
@@ -37,10 +35,7 @@ class JujutsuDiffProvider(
         return ItemLatestState(revision.revisionNumber, true, true)
     }
 
-    override fun createFileContent(
-        revisionNumber: VcsRevisionNumber?,
-        file: VirtualFile
-    ) = revisionNumber?.let {
+    override fun createFileContent(revisionNumber: VcsRevisionNumber?, file: VirtualFile) = revisionNumber?.let {
         vcs.createRevision(VcsUtil.getFilePath(file), RevisionExpression(it.toString()))
     }
 

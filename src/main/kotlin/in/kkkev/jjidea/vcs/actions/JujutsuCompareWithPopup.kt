@@ -41,10 +41,7 @@ object JujutsuCompareWithPopup {
     /**
      * Item in the comparison popup
      */
-    sealed class CompareItem(
-        open val displayName: String,
-        open val revision: String
-    ) {
+    sealed class CompareItem(open val displayName: String, open val revision: String) {
         /** Recent change with description */
         data class Change(
             val entry: LogEntry,
@@ -68,24 +65,19 @@ object JujutsuCompareWithPopup {
      * Features search field with dynamic filtering
      * Loads data in background to avoid EDT blocking
      */
-    fun show(
-        project: Project,
-        vcs: JujutsuVcs,
-        onSelected: (String) -> Unit
-    ) {
+    fun show(project: Project, vcs: JujutsuVcs, onSelected: (String) -> Unit) {
         // Create UI on EDT
         ApplicationManager.getApplication().invokeLater {
             val panel = createPopupPanel(project, vcs, onSelected)
 
-            val popup =
-                JBPopupFactory
-                    .getInstance()
-                    .createComponentPopupBuilder(panel, panel.searchField)
-                    .setTitle("Select Branch or Change to Compare")
-                    .setResizable(true)
-                    .setMovable(true)
-                    .setRequestFocus(true)
-                    .createPopup()
+            val popup = JBPopupFactory
+                .getInstance()
+                .createComponentPopupBuilder(panel, panel.searchField)
+                .setTitle("Select Branch or Change to Compare")
+                .setResizable(true)
+                .setMovable(true)
+                .setRequestFocus(true)
+                .createPopup()
 
             // Set popup reference so panel can close it
             panel.setPopup(popup)
@@ -100,11 +92,8 @@ object JujutsuCompareWithPopup {
     /**
      * Create the popup panel with search field and list
      */
-    private fun createPopupPanel(
-        project: Project,
-        vcs: JujutsuVcs,
-        onSelected: (String) -> Unit
-    ): PopupPanel = PopupPanel(project, vcs, onSelected)
+    private fun createPopupPanel(project: Project, vcs: JujutsuVcs, onSelected: (String) -> Unit) =
+        PopupPanel(project, vcs, onSelected)
 
     /**
      * Panel containing search field and results list
@@ -114,63 +103,61 @@ object JujutsuCompareWithPopup {
         private val vcs: JujutsuVcs,
         private val onSelected: (String) -> Unit
     ) : JPanel(BorderLayout()) {
-        val searchField =
-            SearchTextField(false).apply {
-                textEditor.emptyText.text = "Search by change ID or description..."
-            }
+        val searchField = SearchTextField(false).apply {
+            textEditor.emptyText.text = "Search by change ID or description..."
+        }
 
         private val listModel = DefaultListModel<CompareItem>()
-        private val list =
-            object : JBList<CompareItem>(listModel) {
-                // Make list fill viewport width instead of expanding to content width
-                override fun getScrollableTracksViewportWidth() = true
+        private val list = object : JBList<CompareItem>(listModel) {
+            // Make list fill viewport width instead of expanding to content width
+            override fun getScrollableTracksViewportWidth() = true
 
-                override fun getToolTipText(event: MouseEvent): String? {
-                    val index = locationToIndex(event.point)
-                    if (index < 0) return null
+            override fun getToolTipText(event: MouseEvent): String? {
+                val index = locationToIndex(event.point)
+                if (index < 0) return null
 
-                    val item = model.getElementAt(index)
-                    return when (item) {
-                        is CompareItem.Change -> {
-                            buildString {
-                                val canvas = StringBuilderHtmlTextCanvas(this)
+                val item = model.getElementAt(index)
+                return when (item) {
+                    is CompareItem.Change -> {
+                        buildString {
+                            val canvas = StringBuilderHtmlTextCanvas(this)
 
-                                append("<html>")
-                                canvas.append(item.entry.changeId)
+                            append("<html>")
+                            canvas.append(item.entry.changeId)
+                            append("<br>")
+                            item.entry.author?.let {
+                                canvas.append(it)
                                 append("<br>")
-                                item.entry.author?.let {
-                                    canvas.append(it)
-                                    append("<br>")
-                                }
-                                item.entry.authorTimestamp?.let { timestamp ->
-                                    canvas.append(timestamp)
-                                    append("<br>")
-                                }
+                            }
+                            item.entry.authorTimestamp?.let { timestamp ->
+                                canvas.append(timestamp)
                                 append("<br>")
-                                append(DescriptionRenderer.toHtml(item.entry.description, multiline = true))
-                                append("</html>")
                             }
+                            append("<br>")
+                            append(DescriptionRenderer.toHtml(item.entry.description, multiline = true))
+                            append("</html>")
                         }
-
-                        is CompareItem.Bookmark -> {
-                            buildString {
-                                val canvas = StringBuilderHtmlTextCanvas(this)
-
-                                append("<html>")
-                                append("<b>${item.item.bookmark.name}</b><br>")
-                                canvas.append(item.item.changeId)
-                                append("</html>")
-                            }
-                        }
-
-                        else -> null
                     }
+
+                    is CompareItem.Bookmark -> {
+                        buildString {
+                            val canvas = StringBuilderHtmlTextCanvas(this)
+
+                            append("<html>")
+                            append("<b>${item.item.bookmark.name}</b><br>")
+                            canvas.append(item.item.changeId)
+                            append("</html>")
+                        }
+                    }
+
+                    else -> null
                 }
-            }.apply {
-                selectionMode = ListSelectionModel.SINGLE_SELECTION
-                cellRenderer = CompareItemRenderer()
-                visibleRowCount = 15 // Show 15 items without scrolling
             }
+        }.apply {
+            selectionMode = ListSelectionModel.SINGLE_SELECTION
+            cellRenderer = CompareItemRenderer()
+            visibleRowCount = 15 // Show 15 items without scrolling
+        }
 
         private var currentPopup: JBPopup? = null
 
@@ -179,19 +166,17 @@ object JujutsuCompareWithPopup {
             add(searchField, BorderLayout.NORTH)
 
             // Results list - fills available panel space
-            val scrollPane =
-                JBScrollPane(list).apply {
-                    border = JBUI.Borders.empty()
-                }
+            val scrollPane = JBScrollPane(list).apply {
+                border = JBUI.Borders.empty()
+            }
             add(scrollPane, BorderLayout.CENTER)
 
             // Set preferred width only - let height be determined by list's visibleRowCount
             // Add small buffer for borders and padding
-            preferredSize =
-                Dimension(
-                    JBUI.scale(700),
-                    scrollPane.preferredSize.height + searchField.preferredSize.height + JBUI.scale(12)
-                )
+            preferredSize = Dimension(
+                JBUI.scale(700),
+                scrollPane.preferredSize.height + searchField.preferredSize.height + JBUI.scale(12)
+            )
 
             // Listen to search field changes
             searchField.addDocumentListener(
@@ -338,11 +323,7 @@ object JujutsuCompareWithPopup {
      *
      * @param query Search query to filter changes by change ID or description
      */
-    private fun buildItemList(
-        project: Project,
-        vcs: JujutsuVcs,
-        query: String
-    ): List<CompareItem> {
+    private fun buildItemList(project: Project, vcs: JujutsuVcs, query: String): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
         val cache = LogCache.getInstance(project)
 
@@ -352,41 +333,38 @@ object JujutsuCompareWithPopup {
             val bookmarks = bookmarkResult.getOrNull() ?: emptyList()
 
             // Filter bookmarks by query
-            val filteredBookmarks =
-                if (query.isEmpty()) {
-                    bookmarks
-                } else {
-                    bookmarks.filter { bookmark ->
-                        bookmark.bookmark.name.contains(query, ignoreCase = true) ||
-                            bookmark.changeId.short.contains(query, ignoreCase = true)
-                    }
+            val filteredBookmarks = if (query.isEmpty()) {
+                bookmarks
+            } else {
+                bookmarks.filter { bookmark ->
+                    bookmark.bookmark.name.contains(query, ignoreCase = true) ||
+                        bookmark.changeId.short.contains(query, ignoreCase = true)
                 }
+            }
 
             items.addAll(filteredBookmarks.map { CompareItem.Bookmark(it) })
         }
 
         // Add recent changes - limit to DEFAULT_LIMIT and filter by query
         // Try to get from cache first
-        val entries =
-            cache.get(Expression.ALL) ?: run {
-                // Not in cache, fetch from jj and cache it
-                val logResult = vcs.logService.getLogBasic(revset = Expression.ALL)
-                logResult.getOrNull()?.also { fetchedEntries ->
-                    cache.put(Expression.ALL, emptyList(), fetchedEntries)
-                } ?: emptyList()
-            }
+        val entries = cache.get(Expression.ALL) ?: run {
+            // Not in cache, fetch from jj and cache it
+            val logResult = vcs.logService.getLogBasic(revset = Expression.ALL)
+            logResult.getOrNull()?.also { fetchedEntries ->
+                cache.put(Expression.ALL, emptyList(), fetchedEntries)
+            } ?: emptyList()
+        }
 
         // Filter changes by query
-        val filteredEntries =
-            if (query.isEmpty()) {
-                entries.take(DEFAULT_LIMIT)
-            } else {
-                entries
-                    .filter { entry ->
-                        entry.changeId.short.contains(query, ignoreCase = true) ||
-                            entry.description.display.contains(query, ignoreCase = true)
-                    }.take(DEFAULT_LIMIT)
-            }
+        val filteredEntries = if (query.isEmpty()) {
+            entries.take(DEFAULT_LIMIT)
+        } else {
+            entries
+                .filter { entry ->
+                    entry.changeId.short.contains(query, ignoreCase = true) ||
+                        entry.description.display.contains(query, ignoreCase = true)
+                }.take(DEFAULT_LIMIT)
+        }
 
         // Convert to CompareItems
         filteredEntries.forEach { entry ->
