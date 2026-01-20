@@ -59,6 +59,14 @@ interface CommandExecutor {
     fun version(): String?
 
     /**
+     * Initialises a JJ repo with the Git back end.
+     * @param colocate whether or not to colocate, i.e. create the Git back end in .git so that git commands can be used
+     * in the same directory.
+     * @return command result
+     */
+    fun gitInit(colocate: Boolean): CommandResult
+
+    /**
      * Set the description for a commit (default: working copy @)
      * @param description The description message
      * @param revision The revision to describe (default: "@")
