@@ -21,42 +21,46 @@ private data class Passthrough(
     val targetParentId: ChangeId
 )
 
+private data class Lanes(val contents: Set<Int>) {
+    fun firstFree() = generateSequence(0) { it + 1 }.first { it !in contents }
+
+    fun firstFreePreferring(preference: Int) = if (preference in contents) firstFree() else preference
+
+    operator fun plus(lane: Int) = Lanes(contents + lane)
+
+    operator fun plus(lanes: Iterable<Int>) = Lanes(contents + lanes)
+}
+
+private data class Passthroughs(val contents: Set<Passthrough> = emptySet()) {
+    fun lanes() = Lanes(contents.map { it.lane }.toSet())
+
+    fun withoutParent(parent: ChangeId) = Passthroughs(contents.filterNot { it.targetParentId == parent }.toSet())
+
+    operator fun plus(passthroughs: Iterable<Passthrough>) = Passthroughs(contents + passthroughs)
+}
+
 private data class State(
     val childrenByParent: Map<ChangeId, Set<ChildInfo>> = emptyMap(),
     val lanes: Map<ChangeId, Int> = emptyMap(),
-    val passthroughs: Set<Passthrough> = emptySet(),
+    val passthroughs: Passthroughs = Passthroughs(),
     /** row index -> set of passthrough lanes */
     val passthroughsByRow: Map<Int, Set<Int>> = emptyMap(),
     /** Reserved lanes for pure merge parents (parent ID -> reserved lane) */
     val reservedLanes: Map<ChangeId, Int> = emptyMap()
 ) {
     // Pick lowest available lane not occupied by a passthrough or reservation
-    fun laneFor(
-        entry: GraphEntry,
-        currentPassthroughLanes: Set<Int>
-    ): Int {
+    fun laneFor(entry: GraphEntry, currentPassthroughLanes: Lanes): Int {
         // If a lane was reserved for this entry (pure merge target), use it
         reservedLanes[entry.current]?.let { return it }
 
         val children = childrenByParent[entry.current]
         return if (children.isNullOrEmpty()) {
             // No children: pick lowest available lane
-            generateSequence(0) { it + 1 }.first { it !in currentPassthroughLanes }
+            currentPassthroughLanes.firstFree()
         } else {
             // Has children: pick lowest child lane, unless occupied by passthrough
-            val lowestChildLane = children.minOf { it.lane }
-            if (lowestChildLane !in currentPassthroughLanes) {
-                lowestChildLane
-            } else {
-                generateSequence(0) { it + 1 }.first { it !in currentPassthroughLanes }
-            }
+            currentPassthroughLanes.firstFreePreferring(children.minOf { it.lane })
         }
-    }
-
-    /** Get the next available lane not blocked by passthroughs or reservations */
-    fun nextAvailableLane(currentPassthroughLanes: Set<Int>): Int {
-        val usedLanes = currentPassthroughLanes + reservedLanes.values.toSet()
-        return generateSequence(0) { it + 1 }.first { it !in usedLanes }
     }
 }
 
@@ -68,103 +72,95 @@ class LayoutCalculatorImpl : LayoutCalculator {
         val initialState = State()
 
         // First pass: assign lanes, track children, manage passthroughs
-        val finalState =
-            entries.foldIndexed(initialState) { rowIndex, state, entry ->
-                // Step 2: Terminate passthroughs that end at this entry
-                val terminatingPassthroughs = state.passthroughs.filter { it.targetParentId == entry.current }
-                val remainingPassthroughs = state.passthroughs - terminatingPassthroughs.toSet()
+        val finalState = entries.foldIndexed(initialState) { rowIndex, state, entry ->
+            // Step 2: Terminate passthroughs that end at this entry
+            val remainingPassthroughs = state.passthroughs.withoutParent(entry.current)
 
-                // Step 1: Determine lane (after terminating passthroughs so lane may become available)
-                val currentPassthroughLanes = remainingPassthroughs.map { it.lane }.toSet()
-                val lane = state.laneFor(entry, currentPassthroughLanes)
+            // Step 1: Determine lane (after terminating passthroughs so lane may become available)
+            val currentPassthroughLanes = remainingPassthroughs.lanes()
+            val lane = state.laneFor(entry, currentPassthroughLanes)
 
-                // If this entry used a reserved lane, remove the reservation
-                val usedReservedLane = state.reservedLanes[entry.current]
-                val clearedReservedLanes = if (usedReservedLane != null) {
-                    state.reservedLanes - entry.current
-                } else {
-                    state.reservedLanes
-                }
-
-                // Step 3: Register this entry as a child of each of its parents
-                val updatedChildrenByParent =
-                    entry.parents.fold(state.childrenByParent) { acc, parentId ->
-                        val existingChildren = acc[parentId] ?: emptySet()
-                        acc + (parentId to (existingChildren + ChildInfo(entry.current, lane)))
-                    }
-
-                // Step 4: Create passthroughs for non-adjacent parents
-                // Classify each connection:
-                //   - Fork+Merge: parent already has children → use child's lane
-                //   - Pure Merge: parent has no other children → use NEW lane, reserve it for parent
-                val nonAdjacentParents =
-                    entry.parents.filter { parentId ->
-                        val parentRow = rowByChangeId[parentId]
-                        parentRow != null && parentRow > rowIndex + 1
-                    }
-
-                // Track which lanes are already used (passthroughs + this entry's lane + remaining reservations)
-                var usedLanes = currentPassthroughLanes + lane + clearedReservedLanes.values.toSet()
-                val newPassthroughs = mutableSetOf<Passthrough>()
-                var newReservedLanes = clearedReservedLanes
-
-                val childHasMultipleParents = entry.parents.size > 1
-
-                for (parentId in nonAdjacentParents) {
-                    val parentHasOtherChildren = updatedChildrenByParent[parentId]
-                        ?.any { it.changeId != entry.current } == true
-
-                    // Classification:
-                    // - Not a merge (child has 1 parent): use child's lane (simple/fork)
-                    // - Fork+Merge (merge + parent has other children): use child's lane
-                    // - Pure Merge (merge + parent has no other children): use NEW lane
-                    val passLane =
-                        if (!childHasMultipleParents || parentHasOtherChildren) {
-                            // Simple, Fork, or Fork+Merge: use child's lane
-                            lane
-                        } else {
-                            // Pure Merge: allocate new lane, reserve it for parent
-                            val newLane = generateSequence(0) { it + 1 }.first { it !in usedLanes }
-                            usedLanes = usedLanes + newLane
-                            newReservedLanes = newReservedLanes + (parentId to newLane)
-                            newLane
-                        }
-                    newPassthroughs.add(Passthrough(lane = passLane, targetParentId = parentId))
-                }
-
-                // Update passthroughsByRow for rows between this entry and each non-adjacent parent
-                val updatedPassthroughsByRow =
-                    newPassthroughs.fold(state.passthroughsByRow) { acc, pt ->
-                        val parentRow = rowByChangeId[pt.targetParentId] ?: return@fold acc
-                        // Add passthrough lane to all rows between current row and parent row
-                        ((rowIndex + 1) until parentRow).fold(acc) { innerAcc, row ->
-                            val existing = innerAcc[row] ?: emptySet()
-                            innerAcc + (row to (existing + pt.lane))
-                        }
-                    }
-
-                State(
-                    childrenByParent = updatedChildrenByParent,
-                    lanes = state.lanes + (entry.current to lane),
-                    passthroughs = remainingPassthroughs + newPassthroughs,
-                    passthroughsByRow = updatedPassthroughsByRow,
-                    reservedLanes = newReservedLanes
-                )
+            // If this entry used a reserved lane, remove the reservation
+            val usedReservedLane = state.reservedLanes[entry.current]
+            val clearedReservedLanes = if (usedReservedLane != null) {
+                state.reservedLanes - entry.current
+            } else {
+                state.reservedLanes
             }
+
+            // Step 3: Register this entry as a child of each of its parents
+            val updatedChildrenByParent = entry.parents.fold(state.childrenByParent) { acc, parentId ->
+                val existingChildren = acc[parentId] ?: emptySet()
+                acc + (parentId to (existingChildren + ChildInfo(entry.current, lane)))
+            }
+
+            // Step 4: Create passthroughs for non-adjacent parents
+            // Classify each connection:
+            //   - Fork+Merge: parent already has children → use child's lane
+            //   - Pure Merge: parent has no other children → use NEW lane, reserve it for parent
+            val nonAdjacentParents = entry.parents.filter { parentId ->
+                val parentRow = rowByChangeId[parentId]
+                parentRow != null && parentRow > rowIndex + 1
+            }
+
+            // Track which lanes are already used (passthroughs + this entry's lane + remaining reservations)
+            var usedLanes = currentPassthroughLanes + lane + clearedReservedLanes.values.toSet()
+            val newPassthroughs = mutableSetOf<Passthrough>()
+            var newReservedLanes = clearedReservedLanes
+
+            val childHasMultipleParents = entry.parents.size > 1
+
+            for (parentId in nonAdjacentParents) {
+                val parentHasOtherChildren = updatedChildrenByParent[parentId]
+                    ?.any { it.changeId != entry.current } == true
+
+                // Classification:
+                // - Not a merge (child has 1 parent): use child's lane (simple/fork)
+                // - Fork+Merge (merge + parent has other children): use child's lane
+                // - Pure Merge (merge + parent has no other children): use NEW lane
+                val passLane = if (!childHasMultipleParents || parentHasOtherChildren) {
+                    // Simple, Fork, or Fork+Merge: use child's lane
+                    lane
+                } else {
+                    // Pure Merge: allocate new lane, reserve it for parent
+                    val newLane = usedLanes.firstFree()
+                    usedLanes = usedLanes + newLane
+                    newReservedLanes = newReservedLanes + (parentId to newLane)
+                    newLane
+                }
+                newPassthroughs.add(Passthrough(lane = passLane, targetParentId = parentId))
+            }
+
+            // Update passthroughsByRow for rows between this entry and each non-adjacent parent
+            val updatedPassthroughsByRow = newPassthroughs.fold(state.passthroughsByRow) { acc, pt ->
+                val parentRow = rowByChangeId[pt.targetParentId] ?: return@fold acc
+                // Add passthrough lane to all rows between current row and parent row
+                ((rowIndex + 1) until parentRow).fold(acc) { innerAcc, row ->
+                    val existing = innerAcc[row] ?: emptySet()
+                    innerAcc + (row to (existing + pt.lane))
+                }
+            }
+
+            State(
+                childrenByParent = updatedChildrenByParent,
+                lanes = state.lanes + (entry.current to lane),
+                passthroughs = remainingPassthroughs + newPassthroughs,
+                passthroughsByRow = updatedPassthroughsByRow,
+                reservedLanes = newReservedLanes
+            )
+        }
 
         // Second pass: build RowLayout for each entry
-        val rows =
-            entries.mapIndexed { rowIndex, entry ->
-                val lane = finalState.lanes[entry.current] ?: 0
-                val childLanes =
-                    finalState.childrenByParent[entry.current]
-                        ?.map { it.lane }
-                        ?: emptyList()
-                val parentLanes = entry.parents.mapNotNull { finalState.lanes[it] }
-                val passthroughLanes = finalState.passthroughsByRow[rowIndex] ?: emptySet()
+        val rows = entries.mapIndexed { rowIndex, entry ->
+            val lane = finalState.lanes[entry.current] ?: 0
+            val childLanes = finalState.childrenByParent[entry.current]
+                ?.map { it.lane }
+                ?: emptyList()
+            val parentLanes = entry.parents.mapNotNull { finalState.lanes[it] }
+            val passthroughLanes = finalState.passthroughsByRow[rowIndex] ?: emptySet()
 
-                RowLayout(entry.current, lane, childLanes, parentLanes, passthroughLanes)
-            }
+            RowLayout(entry.current, lane, childLanes, parentLanes, passthroughLanes)
+        }
 
         return GraphLayout(rows)
     }
