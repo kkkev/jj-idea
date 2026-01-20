@@ -57,7 +57,7 @@
             id="Working copy"
             anchor="left"
             icon="AllIcons.Vcs.Branch"
-            factoryClass="in.kkkev.jjidea.ui.JujutsuToolWindowFactory"
+            factoryClass="in.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory"
         />
     </extensions>
 

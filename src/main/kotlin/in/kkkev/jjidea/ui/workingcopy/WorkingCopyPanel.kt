@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.workingcopy
 
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
@@ -26,15 +26,19 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.vcs.actions.refreshAfterVcsOperation
+import `in`.kkkev.jjidea.ui.JujutsuChangesTree
+import `in`.kkkev.jjidea.ui.StringBuilderHtmlTextCanvas
+import `in`.kkkev.jjidea.ui.append
 import `in`.kkkev.jjidea.vcs.actions.requestDescription
-import `in`.kkkev.jjidea.vcs.jujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
+import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
+import javax.swing.event.DocumentEvent
+import javax.swing.event.DocumentListener
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeExpansionListener
 import javax.swing.tree.TreePath
@@ -45,14 +49,14 @@ import javax.swing.tree.TreePath
  *
  * TODO: Localise strings in here
  */
-class JujutsuToolWindowPanel(private val project: Project) : Disposable {
+class WorkingCopyPanel(private val project: Project, val repo: JujutsuRepository) : Disposable {
     companion object {
         private const val COLLAPSED_PATHS_KEY_PREFIX = "JujutsuToolWindow.CollapsedPaths"
     }
 
     private val log = Logger.getInstance(javaClass)
 
-    private val collapsedPathsKey = "$COLLAPSED_PATHS_KEY_PREFIX.${project.locationHash}"
+    private val collapsedPathsKey = "$COLLAPSED_PATHS_KEY_PREFIX.${project.locationHash}:${repo.relativePath}"
 
     private val panel = JPanel(BorderLayout())
 
@@ -75,12 +79,12 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
         // Track modifications to show visual feedback
         document.addDocumentListener(
-            object : javax.swing.event.DocumentListener {
-                override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+            object : DocumentListener {
+                override fun insertUpdate(e: DocumentEvent?) = checkModified()
 
-                override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+                override fun removeUpdate(e: DocumentEvent?) = checkModified()
 
-                override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = checkModified()
+                override fun changedUpdate(e: DocumentEvent?) = checkModified()
 
                 private fun checkModified() {
                     val newModified = text != persistedDescription.actual
@@ -119,7 +123,6 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         setupTreeInteractions()
         setupTreeExpansionTracking()
         setupVfsListener()
-        setupStateListener()
     }
 
     private fun createUI() {
@@ -131,10 +134,9 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         mainPanel.add(workingCopyToolbar.component, BorderLayout.NORTH)
 
         // Middle section: Current change info and description
-        val infoPanel =
-            JPanel(BorderLayout()).apply {
-                border = JBUI.Borders.empty(0, 8)
-            }
+        val infoPanel = JPanel(BorderLayout()).apply {
+            border = JBUI.Borders.empty(0, 8)
+        }
 
         val topPanel = JPanel(GridBagLayout())
         val gbc = GridBagConstraints().apply {
@@ -229,7 +231,11 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         // Placeholder for future actions: Edit, Abandon, Rebase, etc.
 
         return ActionManager.getInstance()
-            .createActionToolbar("JujutsuWorkingCopyToolbar", group, true).apply {
+            .createActionToolbar(
+                "JujutsuWorkingCopyToolbar",
+                group,
+                true
+            ).apply {
                 targetComponent = owner
             }
     }
@@ -291,7 +297,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     private fun setupTreeExpansionTracking() {
         changesTree.addTreeExpansionListener(
             object : TreeExpansionListener {
-                private fun update(event: TreeExpansionEvent, consumer: (String) -> Unit) {
+                private fun update(
+                    event: TreeExpansionEvent,
+                    consumer: (String) -> Unit
+                ) {
                     if (ignoreExpansionEvents) {
                         log.debug("Ignoring collapse (programmatic)")
                     } else {
@@ -317,16 +326,17 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         )
     }
 
-    private fun getPathIdentifier(treePath: TreePath) = treePath.path
-        .drop(1) // Skip root
-        .mapNotNull { component ->
-            when (component) {
-                is ChangesBrowserNode<*> -> component.textPresentation ?: component.toString()
-                // is DefaultMutableTreeNode -> component.userObject?.toString()
-                else -> null
-            }
-        }.takeIf { it.isNotEmpty() }
-        ?.joinToString("/")
+    private fun getPathIdentifier(treePath: TreePath) =
+        treePath.path
+            .drop(1) // Skip root
+            .mapNotNull { component ->
+                when (component) {
+                    is ChangesBrowserNode<*> -> component.textPresentation ?: component.toString()
+                    // is DefaultMutableTreeNode -> component.userObject?.toString()
+                    else -> null
+                }
+            }.takeIf { it.isNotEmpty() }
+            ?.joinToString("/")
 
     private fun setupVfsListener() {
         // Listen to ChangeListManager updates triggered by VCS change detection
@@ -340,38 +350,27 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         )
     }
 
-    private fun setupStateListener() {
-        // Subscribe to state changes from the model (MVC pattern)
-        project.messageBus.connect(this).subscribe(
-            JujutsuStateListener.TOPIC,
-            object : JujutsuStateListener {
-                private fun updateDescription() {
-                    ApplicationManager.getApplication().invokeLater {
-                        // Update description and label from model
-                        val model = JujutsuStateModel.getInstance(project)
-                        model.workingCopy?.let { entry ->
-                            persistedDescription = entry.description
-                            descriptionArea.text = persistedDescription.actual
-                            isDescriptionModified = false
-                            updateDescriptionLabel()
-                            updateWorkingCopyLabel(entry)
-                        }
-                        // Update file changes
-                        updateChangesView(model.fileChanges)
-                    }
-                }
+    /**
+     * Update description and label from model.
+     */
+    fun update(logEntry: LogEntry) {
+        ApplicationManager.getApplication().invokeLater {
+            persistedDescription = logEntry.description
+            descriptionArea.text = persistedDescription.actual
+            isDescriptionModified = false
+            updateDescriptionLabel()
+            updateWorkingCopyLabel(logEntry)
 
-                override fun workingCopyChanged() = updateDescription()
-
-                override fun logUpdated() = updateDescription()
-            }
-        )
+            // Update file changes
+        }
+        // TODO What about file changes?
+        // updateChangesView(model.fileChanges)
     }
 
     private fun setupTreeInteractions() {
         // Single-click: open file in preview tab (only on user clicks, not selection changes)
         changesTree.addMouseListener(
-            object : java.awt.event.MouseAdapter() {
+            object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.clickCount == 1 && !e.isPopupTrigger) {
                         getSelectedChange()?.let { openFileInPreview(it) }
@@ -399,7 +398,11 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         // Right-click context menu
         changesTree.addMouseListener(
             object : PopupHandler() {
-                override fun invokePopup(comp: Component, x: Int, y: Int) {
+                override fun invokePopup(
+                    comp: Component,
+                    x: Int,
+                    y: Int
+                ) {
                     showContextMenu(comp, x, y)
                 }
             }
@@ -425,7 +428,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
     private fun describeCurrentChange() {
         val description = Description(descriptionArea.text.trim())
 
-        project.jujutsuVcs.commandExecutor
+        repo.commandExecutor
             .createCommand { describe(description) }
             .onSuccess {
                 // Update persisted description and reset modified flag
@@ -433,7 +436,8 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                 isDescriptionModified = false
                 updateDescriptionLabel()
 
-                project.refreshAfterVcsOperation(true)
+                // TODO Should this select?
+                repo.invalidate()
             }.onFailure {
                 JOptionPane.showMessageDialog(
                     panel,
@@ -441,32 +445,32 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
                     JujutsuBundle.message("dialog.describe.error.title"),
                     JOptionPane.ERROR_MESSAGE
                 )
-            }
+            }.executeAsync()
     }
 
     private fun createNewChange() {
         // Show modal dialog to get description for the new change
         val description = project.requestDescription("dialog.newchange.input") ?: return
 
-        project.jujutsuVcs.commandExecutor
-            .createCommand {
-                new(description = description)
-            }.onSuccess {
-                // Clear the description area since we've created a new change
-                persistedDescription = Description.EMPTY
-                descriptionArea.text = ""
-                isDescriptionModified = false
-                updateDescriptionLabel()
+        repo.commandExecutor.createCommand {
+            new(description = description)
+        }.onSuccess {
+            // Clear the description area since we've created a new change
+            persistedDescription = Description.EMPTY
+            descriptionArea.text = ""
+            isDescriptionModified = false
+            updateDescriptionLabel()
 
-                project.refreshAfterVcsOperation(true)
-            }.onFailure {
-                JOptionPane.showMessageDialog(
-                    panel,
-                    JujutsuBundle.message("dialog.newchange.error.message", stderr),
-                    JujutsuBundle.message("dialog.newchange.error.title"),
-                    JOptionPane.ERROR_MESSAGE
-                )
-            }.executeAsync()
+            // TODO Should this also select?
+            repo.invalidate()
+        }.onFailure {
+            JOptionPane.showMessageDialog(
+                panel,
+                JujutsuBundle.message("dialog.newchange.error.message", stderr),
+                JujutsuBundle.message("dialog.newchange.error.title"),
+                JOptionPane.ERROR_MESSAGE
+            )
+        }.executeAsync()
     }
 
     fun getContent(): JComponent = panel
@@ -488,7 +492,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
 
     private fun loadCurrentDescription() {
         ApplicationManager.getApplication().executeOnPooledThread {
-            val result = project.jujutsuVcs.logService.getLog(WorkingCopy)
+            val result = repo.logService.getLog(WorkingCopy)
             ApplicationManager.getApplication().invokeLater {
                 result.onSuccess { entries ->
                     entries.firstOrNull()?.let { entry ->
@@ -532,10 +536,7 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         currentChangeLabel.text = labelText
     }
 
-    private fun getWorkingCopyChanges(): List<Change> {
-        val changeListManager = ChangeListManager.getInstance(project)
-        return changeListManager.allChanges.toList()
-    }
+    private fun getWorkingCopyChanges() = ChangeListManager.getInstance(project).allChanges.toList()
 
     private fun updateChangesView(changes: List<Change>) {
         if (changes != changesTree.changes) {
@@ -665,15 +666,16 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         val group = DefaultActionGroup()
 
         // Add common VCS actions with keyboard shortcuts displayed
-        val showDiffAction = object : DumbAwareAction(
-            JujutsuBundle.message("action.show.diff"),
-            null,
-            AllIcons.Actions.Diff
-        ) {
-            override fun actionPerformed(e: AnActionEvent) {
-                showDiff(selectedChange)
+        val showDiffAction =
+            object : DumbAwareAction(
+                JujutsuBundle.message("action.show.diff"),
+                null,
+                AllIcons.Actions.Diff
+            ) {
+                override fun actionPerformed(e: AnActionEvent) {
+                    showDiff(selectedChange)
+                }
             }
-        }
         group.add(showDiffAction)
 
         val openFileAction = object : DumbAwareAction(
@@ -683,11 +685,10 @@ class JujutsuToolWindowPanel(private val project: Project) : Disposable {
         ) {
             init {
                 // Set keyboard shortcuts - will be displayed in menu
-                shortcutSet =
-                    CustomShortcutSet(
-                        KeyboardShortcut(KeyStroke.getKeyStroke("F4"), null),
-                        KeyboardShortcut(KeyStroke.getKeyStroke("ENTER"), null)
-                    )
+                shortcutSet = CustomShortcutSet(
+                    KeyboardShortcut(KeyStroke.getKeyStroke("F4"), null),
+                    KeyboardShortcut(KeyStroke.getKeyStroke("ENTER"), null)
+                )
             }
 
             override fun actionPerformed(e: AnActionEvent) {
