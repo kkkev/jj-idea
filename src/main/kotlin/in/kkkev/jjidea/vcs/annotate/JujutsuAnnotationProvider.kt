@@ -14,11 +14,13 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.jujutsuRoot
 
 /**
  * Provides file annotations (blame) for Jujutsu files
  */
-class JujutsuAnnotationProvider(private val project: Project, private val vcs: JujutsuVcs) : AnnotationProvider,
+class JujutsuAnnotationProvider(private val project: Project, private val vcs: JujutsuVcs) :
+    AnnotationProvider,
     CacheableAnnotationProvider {
     private val log = Logger.getInstance(javaClass)
     private val cache = mutableMapOf<VirtualFile, FileAnnotation>()
@@ -56,16 +58,17 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      */
     private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
         try {
+            val jujutsuRoot = file.jujutsuRoot
+
             // Get the relative path from the root
-            val relativePath = vcs.getRelativePath(VcsUtil.getFilePath(file))
+            val relativePath = jujutsuRoot.getRelativePath(file)
 
             // Execute annotation command with template
-            val result =
-                vcs.commandExecutor.annotate(
-                    filePath = relativePath,
-                    revision = revision,
-                    template = AnnotationParser.TEMPLATE
-                )
+            val result = jujutsuRoot.commandExecutor.annotate(
+                filePath = relativePath,
+                revision = revision,
+                template = AnnotationParser.TEMPLATE
+            )
 
             if (!result.isSuccess) {
                 log.warn("Failed to annotate file: ${result.stderr}")

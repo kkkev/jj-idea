@@ -12,6 +12,8 @@ import com.intellij.vcs.log.ui.table.VcsLogTableIndex
 import com.intellij.vcs.log.ui.table.column.VcsLogCustomColumn
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeStatus
+import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuCommitMetadataBase
 import `in`.kkkev.jjidea.jj.LogEntry
 import javax.swing.JTable
@@ -32,7 +34,7 @@ interface LogEntryCustomColumn<T> : VcsLogCustomColumn<T> {
  * Description column with refs/bookmarks rendered using platform label painter.
  * Data class to hold description + refs for rendering.
  */
-data class DescriptionWithRefs(val entry: LogEntry, val refs: List<VcsRef>)
+data class DescriptionWithRefs(val description: Description, val refs: List<VcsRef>)
 
 class JujutsuDescriptionColumn : VcsLogCustomColumn<DescriptionWithRefs> {
     override val id = "Jujutsu.Description"
@@ -42,22 +44,12 @@ class JujutsuDescriptionColumn : VcsLogCustomColumn<DescriptionWithRefs> {
     override fun getValue(model: GraphTableModel, row: VcsLogTableIndex): DescriptionWithRefs? {
         val metadata = model.getCommitMetadata(row) as? JujutsuCommitMetadataBase ?: return null
         val refs = model.getRefsAtRow(row)
-        return DescriptionWithRefs(metadata.entry, refs)
+        return DescriptionWithRefs(metadata.entry.description, refs)
     }
 
     override fun createTableCellRenderer(table: VcsLogGraphTable): TableCellRenderer = JujutsuDescriptionRenderer
 
-    override fun getStubValue(model: GraphTableModel) = DescriptionWithRefs(
-        entry =
-            LogEntry(
-                changeId = ChangeId("q"),
-                commitId = "",
-                underlyingDescription = "",
-                hasConflict = false,
-                isEmpty = false
-            ),
-        refs = emptyList()
-    )
+    override fun getStubValue(model: GraphTableModel) = DescriptionWithRefs(Description.EMPTY, emptyList())
 }
 
 /**
@@ -73,15 +65,15 @@ private object JujutsuDescriptionRenderer : ColoredTableCellRenderer() {
         column: Int
     ) {
         val data = value as? DescriptionWithRefs ?: return
-        val entry = data.entry
+        val description = data.description
 
         // Append description with formatting for empty
-        val style = if (entry.description.empty) {
+        val style = if (description.empty) {
             SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES
         } else {
             SimpleTextAttributes.REGULAR_ATTRIBUTES
         }
-        append(entry.description.summary, style)
+        append(description.summary, style)
 
         // Append refs/bookmarks on the right
         if (data.refs.isNotEmpty()) {
@@ -103,8 +95,8 @@ private object JujutsuDescriptionRenderer : ColoredTableCellRenderer() {
         }
 
         // Set tooltip to full description
-        if (!entry.description.empty) {
-            toolTipText = entry.description.actual
+        if (!description.empty) {
+            toolTipText = description.actual
         }
     }
 }
@@ -112,50 +104,44 @@ private object JujutsuDescriptionRenderer : ColoredTableCellRenderer() {
 /**
  * Custom Status column for Jujutsu VCS Log - shows conflict/empty indicators
  */
-class JujutsuStatusColumn : LogEntryCustomColumn<LogEntry?> {
+class JujutsuStatusColumn : LogEntryCustomColumn<ChangeStatus> {
+
     override val id = "Jujutsu.Status"
     override val localizedName = JujutsuBundle.message("column.status")
 
-    override fun getValue(logEntry: LogEntry): LogEntry? =
-        if (logEntry.hasConflict || logEntry.isEmpty) logEntry else null
+    override fun getValue(logEntry: LogEntry) = logEntry
 
-    override fun createTableCellRenderer(table: VcsLogGraphTable) = object : ColoredTableCellRenderer() {
-        override fun customizeCellRenderer(
-            table: JTable,
-            value: Any?,
-            selected: Boolean,
-            hasFocus: Boolean,
-            row: Int,
-            column: Int
-        ) {
-            if (value !is LogEntry) return
+    override fun createTableCellRenderer(table: VcsLogGraphTable) =
+        object : ColoredTableCellRenderer() {
+            override fun customizeCellRenderer(
+                table: JTable,
+                value: Any?,
+                selected: Boolean,
+                hasFocus: Boolean,
+                row: Int,
+                column: Int
+            ) {
+                if (value !is ChangeStatus) return
 
-            // Show conflict icon
-            if (value.hasConflict) {
-                icon = AllIcons.General.Warning
-                append(" ")
-            }
-            // Show empty icon
-            if (value.isEmpty) {
-                icon =
-                    if (value.hasConflict) {
+                // Show conflict icon
+                if (value.hasConflict) {
+                    icon = AllIcons.General.Warning
+                    append(" ")
+                }
+                // Show empty icon
+                if (value.isEmpty) {
+                    icon = if (value.hasConflict) {
                         // Both indicators - use warning icon, add text
                         append(JujutsuBundle.message("status.empty") + " ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                         AllIcons.General.Warning
                     } else {
                         AllIcons.General.BalloonInformation
                     }
+                }
             }
         }
-    }
 
-    override fun getStubValue(model: GraphTableModel) = LogEntry(
-        changeId = ChangeId("q"),
-        commitId = "",
-        underlyingDescription = "",
-        hasConflict = false,
-        isEmpty = false
-    )
+    override fun getStubValue(model: GraphTableModel) = ChangeStatus.Default
 
     override fun isEnabledByDefault() = true
 

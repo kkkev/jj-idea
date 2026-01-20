@@ -5,10 +5,10 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.vcsUtil.VcsUtil
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.jujutsuRoot
 
 /**
  * Provides change information for jujutsu working copy
@@ -24,25 +24,23 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     ) {
         log.debug("Getting changes for dirty scope")
 
-        val vcsRoot = getVcsRoot(dirtyScope) ?: return
+        dirtyScope.affectedContentRoots.map { it.jujutsuRoot }.forEach { jujutsuRoot ->
+            try {
+                val result = jujutsuRoot.commandExecutor.status()
 
-        try {
-            val result = vcs.commandExecutor.status()
+                if (!result.isSuccess) {
+                    log.warn("Failed to get jj status: ${result.stderr}")
+                    return // TODO Proper error handling
+                }
 
-            if (!result.isSuccess) {
-                log.warn("Failed to get jj status: ${result.stderr}")
-                return
+                parseStatus(result.stdout, jujutsuRoot, builder)
+            } catch (e: Exception) {
+                log.error("Error getting changes", e)
             }
-
-            parseStatus(result.stdout, vcsRoot, builder)
-        } catch (e: Exception) {
-            log.error("Error getting changes", e)
         }
     }
 
     override fun isModifiedDocumentTrackingRequired() = true
-
-    private fun getVcsRoot(dirtyScope: VcsDirtyScope): VirtualFile? = dirtyScope.affectedContentRoots.firstOrNull()
 
     /**
      * Parse jj status output and add changes to the builder
@@ -53,7 +51,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
      * A file2.txt
      * D file3.txt
      */
-    private fun parseStatus(output: String, root: VirtualFile, builder: ChangelistBuilder) {
+    private fun parseStatus(output: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
         val lines = output.lines()
         var inWorkingCopy = false
 
@@ -73,7 +71,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
             // If we're in the working copy section, parse file statuses
             if (inWorkingCopy) {
-                parseStatusLine(trimmed, root, builder)
+                parseStatusLine(trimmed, repo, builder)
             }
         }
     }
@@ -82,7 +80,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
      * Parse a single status line
      * Format: "M path/to/file.txt" or "A path/to/file.txt", etc.
      */
-    private fun parseStatusLine(line: String, root: VirtualFile, builder: ChangelistBuilder) {
+    private fun parseStatusLine(line: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
         if (line.length < 3) return
 
         val status = line[0]
@@ -90,8 +88,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
         if (filePath.isEmpty()) return
 
-        val file = root.findFileByRelativePath(filePath)
-        val path = VcsUtil.getFilePath(root.path + "/" + filePath, false)
+        val file = repo.directory.findFileByRelativePath(filePath)
+        val path = repo.getPath(filePath)
 
         when (status) {
             'M' -> {
@@ -115,7 +113,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
             'R' -> {
                 // Renamed file: format is "R {oldname => newname}"
-                addRenamedChange(filePath, root, builder)
+                addRenamedChange(filePath, repo, builder)
             }
 
             else -> {
@@ -125,7 +123,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addModifiedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = vcs.createRevision(path, WorkingCopy.parent) // Parent commit
+        val beforeRevision = path.jujutsuRoot.createRevision(path, WorkingCopy.parent) // Parent commit
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -144,7 +142,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addDeletedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = vcs.createRevision(path, WorkingCopy.parent)
+        val beforeRevision = path.jujutsuRoot.createRevision(path, WorkingCopy.parent)
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),
@@ -156,7 +154,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
      * Parse rename status and add change
      * Format: "{oldname => newname}"
      */
-    private fun addRenamedChange(renameSpec: String, root: VirtualFile, builder: ChangelistBuilder) {
+    private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
         // Remove braces and parse
         val spec = renameSpec.trim().removeSurrounding("{", "}")
         val parts = spec.split(" => ")
@@ -172,11 +170,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         log.info("Detected rename: $oldPath => $newPath")
 
         // Create file paths
-        val beforePath = VcsUtil.getFilePath(root.path + "/" + oldPath, false)
-        val afterPath = VcsUtil.getFilePath(root.path + "/" + newPath, false)
+        val beforePath = repo.getPath(oldPath)
+        val afterPath = repo.getPath(newPath)
 
         // Create revisions
-        val beforeRevision = vcs.createRevision(beforePath, WorkingCopy.parent)
+        val beforeRevision = repo.createRevision(beforePath, WorkingCopy.parent)
         val afterRevision = CurrentContentRevision(afterPath)
 
         // Create change with MODIFIED status (IntelliJ shows renames as modifications)
