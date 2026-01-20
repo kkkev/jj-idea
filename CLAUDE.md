@@ -165,6 +165,9 @@ bd stats                                # Project statistics
 - **P3**: Minor improvements (visual tweaks, edge cases)
 - **P4**: Future releases (advanced operations, major new features)
 
+## Developer Guidelines
+See [here](contributing.md).
+
 ## Architecture
 
 ### Core Components
