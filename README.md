@@ -9,28 +9,6 @@ A plugin that integrates [Jujutsu](https://github.com/martinvonz/jj) version con
 - **VCS Root Detection**: Automatically detects jujutsu repositories (`.jj` directory)
 - **Read-only Operations**: Safe exploration of your repository state
 
-## Architecture
-
-The plugin is designed with a clean separation between the VCS operations and their implementation:
-
-- **`JujutsuCommandExecutor`** interface: Abstraction for jj operations
-- **`JujutsuCliExecutor`**: CLI-based implementation (current)
-- Future-ready for native library integration
-
-## Building
-
-```bash
-./gradlew build
-```
-
-## Running in Development
-
-```bash
-./gradlew runIde
-```
-
-This will launch a new IntelliJ IDEA instance with the plugin installed.
-
 ## Installing
 
 ### Option 1: From Custom Repository (Recommended - Auto Updates)
@@ -78,4 +56,4 @@ Future updates will be automatically detected and available through the normal p
 
 ## Contributing
 
-See [ROADMAP.md](docs/ROADMAP.md) for planned features and [CLAUDE.md](CLAUDE.md) for development guidelines.
+See [ROADMAP.md](docs/ROADMAP.md) for planned features and [contributing.md](contributing.md) for development guidelines.
