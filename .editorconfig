@@ -6,7 +6,7 @@ indent_style = space
 insert_final_newline = true
 max_line_length = 120
 tab_width = 4
-ij_continuation_indent_size = 8
+ij_continuation_indent_size = 4
 ij_formatter_off_tag = @formatter:off
 ij_formatter_on_tag = @formatter:on
 ij_formatter_tags_enabled = true
@@ -580,6 +580,14 @@ ktlint_standard_multiline-expression-wrapping = disabled
 ktlint_standard_class-signature = disabled
 # Allow function signatures on same line if they fit
 ktlint_standard_function-signature = disabled
+# Don't require blank lines before every declaration (IntelliJ doesn't insert them)
+ktlint_standard_blank-line-before-declaration = disabled
+# Allow .onSuccess { }.onFailure { } chain style (dot at end of previous line)
+ktlint_standard_chain-method-continuation = disabled
+# Disable parameter wrapping enforcement (IntelliJ handles wrapping differently)
+ktlint_standard_parameter-list-wrapping = disabled
+# Allow // comments adjacent to KDoc (e.g., TODOs before class KDoc)
+ktlint_standard_no-consecutive-comments = disabled
 ij_kotlin_align_in_columns_case_branch = false
 ij_kotlin_align_multiline_binary_operation = false
 ij_kotlin_align_multiline_extends_list = false
@@ -640,9 +648,9 @@ ij_kotlin_line_comment_add_space_on_reformat = false
 ij_kotlin_line_comment_at_first_column = true
 ij_kotlin_method_annotation_wrap = split_into_lines
 ij_kotlin_method_call_chain_wrap = normal
-ij_kotlin_method_parameters_new_line_after_left_paren = false
-ij_kotlin_method_parameters_right_paren_on_new_line = false
-ij_kotlin_method_parameters_wrap = normal
+ij_kotlin_method_parameters_new_line_after_left_paren = true
+ij_kotlin_method_parameters_right_paren_on_new_line = true
+ij_kotlin_method_parameters_wrap = on_every_item
 ij_kotlin_name_count_to_use_star_import = 5
 ij_kotlin_name_count_to_use_star_import_for_members = 3
 ij_kotlin_packages_to_use_import_on_demand = java.util.*,kotlinx.android.synthetic.**,io.ktor.**

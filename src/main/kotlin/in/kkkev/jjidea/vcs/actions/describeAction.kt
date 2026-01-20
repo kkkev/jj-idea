@@ -10,14 +10,11 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * Describe action.
  * Opens a dialog to edit the description of a revision.
  */
-fun describeAction(
-    project: Project,
-    revision: Revision?
-) = nullAndDumbAwareAction(revision, "log.action.describe", AllIcons.Actions.Edit) {
-    val commandExecutor = project.jujutsuVcs.commandExecutor
+fun describeAction(project: Project, revision: Revision?) =
+    nullAndDumbAwareAction(revision, "log.action.describe", AllIcons.Actions.Edit) {
+        val commandExecutor = project.jujutsuVcs.commandExecutor
 
-    commandExecutor
-        .createCommand {
+        commandExecutor.createCommand {
             log(target, "description")
         }.onSuccess { currentDescription ->
             val newDescription =
@@ -34,4 +31,4 @@ fun describeAction(
                 }.onFailureTellUser("log.action.describe.error", project, log)
                 .executeAsync()
         }.executeAsync()
-}
+    }

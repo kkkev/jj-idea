@@ -13,10 +13,7 @@ import com.intellij.util.xmlb.XmlSerializerUtil
  * Access via: `project.getService(JujutsuSettings::class.java)`
  */
 @Service(Service.Level.PROJECT)
-@State(
-    name = "JujutsuSettings",
-    storages = [Storage("jujutsu.xml")]
-)
+@State(name = "JujutsuSettings", storages = [Storage("jujutsu.xml")])
 class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     private var state = JujutsuSettingsState()
 

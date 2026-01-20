@@ -17,23 +17,17 @@ sealed interface Revision : Revset {
 sealed interface Ref : Revision
 
 @JvmInline
-value class Bookmark(
-    val name: String
-) : Ref {
+value class Bookmark(val name: String) : Ref {
     override fun toString() = name
 }
 
 @JvmInline
-value class Tag(
-    val name: String
-) : Ref {
+value class Tag(val name: String) : Ref {
     override fun toString() = name
 }
 
 @JvmInline
-value class Expression(
-    val value: String
-) : Revset {
+value class Expression(val value: String) : Revset {
     override fun toString() = value
 
     companion object {
@@ -45,9 +39,7 @@ value class Expression(
  * An expression that points to a single revision
  */
 @JvmInline
-value class RevisionExpression(
-    val value: String
-) : Revision {
+value class RevisionExpression(val value: String) : Revision {
     override fun toString() = value
 }
 
@@ -56,7 +48,4 @@ object WorkingCopy : Ref {
     override fun toString() = "@"
 }
 
-data class RefAtRevision(
-    val changeId: ChangeId,
-    val ref: Ref
-)
+data class RefAtRevision(val changeId: ChangeId, val ref: Ref)

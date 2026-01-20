@@ -7,10 +7,8 @@ import com.intellij.openapi.vcs.history.VcsRevisionNumber
 /**
  * Represents a history session for a file, holding all revisions
  */
-class JujutsuHistorySession(
-    revisions: List<VcsFileRevision>,
-    currentRevisionNumber: VcsRevisionNumber?
-) : VcsAbstractHistorySession(revisions, currentRevisionNumber) {
+class JujutsuHistorySession(revisions: List<VcsFileRevision>, currentRevisionNumber: VcsRevisionNumber?) :
+    VcsAbstractHistorySession(revisions, currentRevisionNumber) {
     override fun calcCurrentRevisionNumber(): VcsRevisionNumber? = null
 
     override fun copy() = JujutsuHistorySession(revisionList, currentRevisionNumber)

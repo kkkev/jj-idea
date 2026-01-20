@@ -13,21 +13,19 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
  * This provides full control over the log UI, allowing customizations not
  * possible with standard VCS log extension points.
  */
-class OpenJujutsuLogTabAction :
-    DumbAwareAction(
-        JujutsuBundle.message("action.open.log"),
-        null,
-        AllIcons.Vcs.History
-    ) {
+class OpenJujutsuLogTabAction : DumbAwareAction(
+    JujutsuBundle.message("action.open.log"),
+    null,
+    AllIcons.Vcs.History
+) {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         JujutsuCustomLogTabManager.getInstance(project).openCustomLogTab()
     }
 
-    override fun update(e: AnActionEvent) =
-        with(e.presentation) {
-            // Always visible in menus, but only enabled when in a Jujutsu project
-            isVisible = true
-            isEnabled = e.project?.isJujutsu ?: false
-        }
+    override fun update(e: AnActionEvent) = with(e.presentation) {
+        // Always visible in menus, but only enabled when in a Jujutsu project
+        isVisible = true
+        isEnabled = e.project?.isJujutsu ?: false
+    }
 }

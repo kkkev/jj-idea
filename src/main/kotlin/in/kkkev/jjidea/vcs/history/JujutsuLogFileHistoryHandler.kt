@@ -19,9 +19,7 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * Modern file history handler for VCS Log integration.
  * Provides better UI with toolbar at top and details pane on right.
  */
-class JujutsuLogFileHistoryHandler(
-    private val project: Project
-) : VcsLogFileHistoryHandler {
+class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHistoryHandler {
     private val log = Logger.getInstance(javaClass)
 
     override val supportedVcs get() = JujutsuVcs.getKey()

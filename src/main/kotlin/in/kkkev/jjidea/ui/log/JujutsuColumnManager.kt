@@ -70,8 +70,7 @@ class JujutsuColumnManager {
     /**
      * Check if a column should be visible.
      */
-    fun isColumnVisible(columnIndex: Int): Boolean =
-        when (columnIndex) {
+    fun isColumnVisible(columnIndex: Int): Boolean = when (columnIndex) {
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> true // Always visible
             JujutsuLogTableModel.COLUMN_STATUS -> showStatusColumn
             JujutsuLogTableModel.COLUMN_CHANGE_ID -> showChangeIdColumn

@@ -48,17 +48,16 @@ interface GraphableEntry {
  */
 class CommitGraphBuilder {
     // Graph colors with light/dark theme variants for good contrast
-    private val colors: List<Color> =
-        listOf(
-            JBColor(0x4285F4, 0x6AA1FF), // Blue
-            JBColor(0xEA4335, 0xFF6B5E), // Red
-            JBColor(0xC99700, 0xE0B800), // Yellow (darker for light theme visibility)
-            JBColor(0x34A853, 0x5DCD73), // Green
-            JBColor(0xFF6D00, 0xFF8A3D), // Orange
-            JBColor(0x9C27B0, 0xC25ED0), // Purple
-            JBColor(0x00ACC1, 0x4DD0E1), // Cyan
-            JBColor(0x689F38, 0x8BC34A) // Light green (darker for light theme)
-        )
+    private val colors: List<Color> = listOf(
+        JBColor(0x4285F4, 0x6AA1FF), // Blue
+        JBColor(0xEA4335, 0xFF6B5E), // Red
+        JBColor(0xC99700, 0xE0B800), // Yellow (darker for light theme visibility)
+        JBColor(0x34A853, 0x5DCD73), // Green
+        JBColor(0xFF6D00, 0xFF8A3D), // Orange
+        JBColor(0x9C27B0, 0xC25ED0), // Purple
+        JBColor(0x00ACC1, 0x4DD0E1), // Cyan
+        JBColor(0x689F38, 0x8BC34A) // Light green (darker for light theme)
+    )
 
     private val layoutCalculator = LayoutCalculatorImpl()
 
@@ -79,14 +78,13 @@ class CommitGraphBuilder {
 
         // Convert RowLayout to GraphNode
         return layout.rows.associate { row ->
-            row.changeId to
-                GraphNode(
-                    lane = row.lane,
-                    color = colorForLane(row.lane),
-                    parentLanes = row.parentLanes,
-                    childLanes = row.childLanes,
-                    passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
-                )
+            row.changeId to GraphNode(
+                lane = row.lane,
+                color = colorForLane(row.lane),
+                parentLanes = row.parentLanes,
+                childLanes = row.childLanes,
+                passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
+            )
         }
     }
 
@@ -96,11 +94,10 @@ class CommitGraphBuilder {
      */
     fun buildSimpleGraph(entries: List<LogEntry>): Map<ChangeId, GraphNode> =
         entries.associate { entry ->
-            entry.changeId to
-                GraphNode(
-                    lane = 0,
-                    color = colors[0],
-                    parentLanes = entry.parentIds.indices.map { 0 }
-                )
+            entry.changeId to GraphNode(
+                lane = 0,
+                color = colors[0],
+                parentLanes = entry.parentIds.indices.map { 0 }
+            )
         }
 }

@@ -30,10 +30,9 @@ class JujutsuFileAnnotation(
 
     override fun getFile() = file
 
-    override fun getLineRevisionNumber(lineNumber: Int) =
-        getAnnotationLine(lineNumber)
-            ?.changeId
-            ?.let(::JujutsuRevisionNumber)
+    override fun getLineRevisionNumber(lineNumber: Int) = getAnnotationLine(lineNumber)
+        ?.changeId
+        ?.let(::JujutsuRevisionNumber)
 
     override fun getToolTip(lineNumber: Int) = getAnnotationLine(lineNumber)?.getTooltip()
 
@@ -41,13 +40,12 @@ class JujutsuFileAnnotation(
 
     override fun getVcsKey() = vcsKey
 
-    override fun getAspects(): Array<LineAnnotationAspect> =
-        arrayOf(
-            ChangeIdAspect(),
-            AuthorAspect(),
-            AuthorInstantAspect(),
-            DescriptionAspect()
-        )
+    override fun getAspects(): Array<LineAnnotationAspect> = arrayOf(
+        ChangeIdAspect(),
+        AuthorAspect(),
+        AuthorInstantAspect(),
+        DescriptionAspect()
+    )
 
     override fun getLineCount() = annotationLines.size
 
@@ -105,38 +103,34 @@ class JujutsuFileAnnotation(
         }
     }
 
-    private inner class ChangeIdAspect :
-        Aspect(
-            "change-id",
-            JujutsuBundle.message("annotation.aspect.change"),
-            false,
-            { it.changeId.short }
-        )
+    private inner class ChangeIdAspect : Aspect(
+        "change-id",
+        JujutsuBundle.message("annotation.aspect.change"),
+        false,
+        { it.changeId.short }
+    )
 
-    private inner class AuthorAspect :
-        Aspect(
-            "author",
-            JujutsuBundle.message("annotation.aspect.author"),
-            true,
-            { it.author.name }
-        )
+    private inner class AuthorAspect : Aspect(
+        "author",
+        JujutsuBundle.message("annotation.aspect.author"),
+        true,
+        { it.author.name }
+    )
 
-    private inner class AuthorInstantAspect :
-        Aspect(
-            "author-instant",
-            JujutsuBundle.message("annotation.aspect.authordate"),
-            true,
-            { it.authorTimestamp?.let(DateTimeFormatter::formatAbsolute) }
-        )
+    private inner class AuthorInstantAspect : Aspect(
+        "author-instant",
+        JujutsuBundle.message("annotation.aspect.authordate"),
+        true,
+        { it.authorTimestamp?.let(DateTimeFormatter::formatAbsolute) }
+    )
 
-    private inner class DescriptionAspect :
-        Aspect(
-            "description",
-            JujutsuBundle.message("annotation.aspect.description"),
-            false,
-            { it.description.summary },
-            JujutsuBundle.message("description.empty")
-        )
+    private inner class DescriptionAspect : Aspect(
+        "description",
+        JujutsuBundle.message("annotation.aspect.description"),
+        false,
+        { it.description.summary },
+        JujutsuBundle.message("description.empty")
+    )
 }
 
 // TODO Use standard formatter

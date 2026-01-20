@@ -17,18 +17,16 @@ import org.jetbrains.annotations.SystemIndependent
  * Use when VCS might not be available (e.g., general actions that could run in any context).
  */
 val Project.possibleJujutsuVcs
-    get() =
-        ProjectLevelVcsManager
-            .getInstance(this)
-            .getVcsFor(
-                this.basePath?.let<
-                    @SystemIndependent @NonNls
-                    String,
-                    VirtualFile?
+    get() = ProjectLevelVcsManager.getInstance(this)
+        .getVcsFor(
+            this.basePath?.let<
+                @SystemIndependent @NonNls
+                String,
+                VirtualFile?
                 > {
-                    LocalFileSystem.getInstance().findFileByPath(it)
-                }
-            ) as? JujutsuVcs
+                LocalFileSystem.getInstance().findFileByPath(it)
+            }
+        ) as? JujutsuVcs
 
 /**
  * Find JujutsuVcs for a project, throwing if not found.
@@ -49,12 +47,11 @@ val Project.jujutsuRoots get() = ProjectLevelVcsManager.getInstance(this).allVcs
  * Use when VCS might not be available.
  */
 val VirtualFile.possibleJujutsuVcs
-    get() =
-        ProjectLocator
-            .getInstance()
-            .guessProjectForFile(this)
-            ?.let(ProjectLevelVcsManager::getInstance)
-            ?.getVcsFor(this) as? JujutsuVcs
+    get() = ProjectLocator
+        .getInstance()
+        .guessProjectForFile(this)
+        ?.let(ProjectLevelVcsManager::getInstance)
+        ?.getVcsFor(this) as? JujutsuVcs
 
 /**
  * Find JujutsuVcs for a project, throwing if not found.
@@ -62,16 +59,14 @@ val VirtualFile.possibleJujutsuVcs
  * @throws VcsException if Jujutsu VCS is not configured for this project
  */
 val VirtualFile.jujutsuVcs
-    get() =
-        this.possibleJujutsuVcs
-            ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
+    get() = this.possibleJujutsuVcs
+        ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
 
 val VirtualFile.isJujutsu get() = this.possibleJujutsuVcs != null
 
 val VirtualFile.jujutsuProject
-    get() =
-        ReadAction.compute<Project?, RuntimeException> {
-            ProjectManager.getInstance().openProjects.firstOrNull { project ->
-                project.jujutsuRoots.any { it.path == this }
-            }
-        } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${this.path}")
+    get() = ReadAction.compute<Project?, RuntimeException> {
+        ProjectManager.getInstance().openProjects.firstOrNull { project ->
+            project.jujutsuRoots.any { it.path == this }
+        }
+    } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${this.path}")

@@ -43,10 +43,9 @@ class JujutsuLogProvider : VcsLogProvider {
         // Use logService to get log entries
         val result = root.jujutsuVcs.logService.getLog(Expression.ALL)
 
-        val entries =
-            result.getOrElse {
-                throw VcsException("Failed to read commits: ${it.message}")
-            }
+        val entries = result.getOrElse {
+            throw VcsException("Failed to read commits: ${it.message}")
+        }
 
         // Take only the requested number of commits
         val limit = requirements.commitCount
@@ -84,28 +83,23 @@ class JujutsuLogProvider : VcsLogProvider {
         }
     }
 
-    override fun readAllHashes(
-        root: VirtualFile,
-        consumer: Consumer<in TimedVcsCommit>
-    ): VcsLogProvider.LogData {
+    override fun readAllHashes(root: VirtualFile, consumer: Consumer<in TimedVcsCommit>): VcsLogProvider.LogData {
         log.debug("Reading all commit hashes for root: ${root.path}")
 
         // Use logService to get commit graph
         val result = root.jujutsuVcs.logService.getCommitGraph(Expression.ALL)
 
-        result
-            .getOrElse {
-                log.error("Failed to read commit hashes: ${it.message}")
-                return LogDataImpl.EMPTY
-            }.forEach { node ->
-                val commit =
-                    JujutsuTimedCommit(
-                        changeId = node.changeId,
-                        parentIds = node.parentIds,
-                        timestamp = node.timestamp.toEpochMilliseconds()
-                    )
-                consumer.consume(commit)
-            }
+        result.getOrElse {
+            log.error("Failed to read commit hashes: ${it.message}")
+            return LogDataImpl.EMPTY
+        }.forEach { node ->
+            val commit = JujutsuTimedCommit(
+                changeId = node.changeId,
+                parentIds = node.parentIds,
+                timestamp = node.timestamp.toEpochMilliseconds()
+            )
+            consumer.consume(commit)
+        }
 
         // Read refs
         val refs = readAllRefsInternal(root)
@@ -147,11 +141,7 @@ class JujutsuLogProvider : VcsLogProvider {
         }
     }
 
-    override fun readMetadata(
-        root: VirtualFile,
-        hashes: List<String>,
-        consumer: Consumer<in VcsCommitMetadata>
-    ) {
+    override fun readMetadata(root: VirtualFile, hashes: List<String>, consumer: Consumer<in VcsCommitMetadata>) {
         log.debug("Reading metadata for ${hashes.size} commits: ${hashes.take(3).joinToString(", ")}...")
         // Reuse readFullDetails since JJ loads everything anyway
         readFullDetails(root, hashes, Consumer { consumer.consume(it) })
@@ -162,11 +152,7 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun getSupportedVcs() = JujutsuVcs.getKey()
 
     // TODO This looks wrong - when is it called? Does this work for multi-root projects?
-    override fun getVcsRoot(
-        project: Project,
-        root: VirtualFile,
-        path: FilePath
-    ): VirtualFile {
+    override fun getVcsRoot(project: Project, root: VirtualFile, path: FilePath): VirtualFile {
         log.debug("getVcsRoot() called for path: ${path.path}, root: ${root.path}")
         return root
     }
@@ -177,25 +163,24 @@ class JujutsuLogProvider : VcsLogProvider {
         // Use logService to get refs
         val result = root.jujutsuVcs.logService.getRefs()
 
-        val refs =
-            result
-                .getOrElse {
-                    log.error("Failed to read refs: ${it.message}")
-                    return emptySet()
-                }.map { refAtChange ->
-                    val refType =
-                        when (refAtChange.ref) {
-                            WorkingCopy -> JujutsuLogRefManager.WORKING_COPY
-                            is Bookmark -> JujutsuLogRefManager.BOOKMARK
-                            // TODO Is this a sensible default?
-                            // TODO What about tags?
-                            else -> JujutsuLogRefManager.BOOKMARK
-                        }
+        val refs = result
+            .getOrElse {
+                log.error("Failed to read refs: ${it.message}")
+                return emptySet()
+            }.map { refAtChange ->
+                val refType =
+                    when (refAtChange.ref) {
+                        WorkingCopy -> JujutsuLogRefManager.WORKING_COPY
+                        is Bookmark -> JujutsuLogRefManager.BOOKMARK
+                        // TODO Is this a sensible default?
+                        // TODO What about tags?
+                        else -> JujutsuLogRefManager.BOOKMARK
+                    }
 
-                    // We have no choice but to use this implementation here - anything else breaks IntelliJ during serde
-                    @Suppress("UnstableApiUsage")
-                    VcsRefImpl(refAtChange.changeId.hash, refAtChange.ref.toString(), refType, root)
-                }.toSet()
+                // We have no choice but to use this implementation here - anything else breaks IntelliJ during serde
+                @Suppress("UnstableApiUsage")
+                VcsRefImpl(refAtChange.changeId.hash, refAtChange.ref.toString(), refType, root)
+            }.toSet()
 
         log.debug("Found ${refs.size} refs")
         return refs
@@ -223,31 +208,24 @@ class JujutsuLogProvider : VcsLogProvider {
         return if (maxCount > 0) commits.take(maxCount) else commits
     }
 
-    override fun subscribeToRootRefreshEvents(
-        roots: Collection<VirtualFile>,
-        refresher: VcsLogRefresher
-    ): Disposable {
+    override fun subscribeToRootRefreshEvents(roots: Collection<VirtualFile>, refresher: VcsLogRefresher): Disposable {
         // TODO: Subscribe to file system events to refresh when .jj directory changes
         log.debug("Subscribed to refresh events for ${roots.size} roots")
         return Disposable { }
     }
 
-    override fun getContainingBranches(
-        root: VirtualFile,
-        hash: Hash
-    ): Collection<String?> {
+    override fun getContainingBranches(root: VirtualFile, hash: Hash): Collection<String?> {
         // Return empty for now - this would require checking which bookmarks contain this commit
         return emptyList()
     }
 
     @Suppress("UNCHECKED_CAST")
-    override fun <T : Any?> getPropertyValue(property: VcsLogProperty<T?>?): T? =
-        when (property) {
-            VcsLogProperties.LIGHTWEIGHT_BRANCHES -> true as T
-            VcsLogProperties.SUPPORTS_INDEXING -> false as T
-            VcsLogProperties.SUPPORTS_LOG_DIRECTORY_HISTORY -> false as T
-            else -> null
-        }
+    override fun <T : Any?> getPropertyValue(property: VcsLogProperty<T?>?): T? = when (property) {
+        VcsLogProperties.LIGHTWEIGHT_BRANCHES -> true as T
+        VcsLogProperties.SUPPORTS_INDEXING -> false as T
+        VcsLogProperties.SUPPORTS_LOG_DIRECTORY_HISTORY -> false as T
+        else -> null
+    }
 
     override fun getCurrentBranch(root: VirtualFile): String? {
         // Return null - JJ uses bookmarks instead of a current branch concept
@@ -360,14 +338,13 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
                             contentFactory.createEmpty()
                         }
 
-                    val diffRequest =
-                        SimpleDiffRequest(
-                            fileName,
-                            content1,
-                            content2,
-                            changeId.short,
-                            JujutsuBundle.message("diff.label.local")
-                        )
+                    val diffRequest = SimpleDiffRequest(
+                        fileName,
+                        content1,
+                        content2,
+                        changeId.short,
+                        JujutsuBundle.message("diff.label.local")
+                    )
 
                     diffManager.showDiff(project, diffRequest)
                 }
@@ -401,10 +378,7 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         }
     }
 
-    override fun createContentRevision(
-        filePath: FilePath,
-        hash: Hash
-    ): ContentRevision {
+    override fun createContentRevision(filePath: FilePath, hash: Hash): ContentRevision {
         // Convert hash back to ChangeId
         val changeId = ChangeId.fromHexString(hash.asString())
 

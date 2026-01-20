@@ -10,9 +10,8 @@ import javax.swing.Icon
  * Filter component for references (bookmarks, tags, and @).
  * When a reference is selected, includes all parent commits of that reference.
  */
-class JujutsuReferenceFilterComponent(
-    private val tableModel: JujutsuLogTableModel
-) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.reference")) {
+class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableModel) :
+    JujutsuFilterComponent(JujutsuBundle.message("log.filter.reference")) {
     private var selectedReference: String? = null
 
     override fun getCurrentText(): String = selectedReference ?: ""
@@ -108,15 +107,14 @@ class JujutsuReferenceFilterComponent(
         val toVisit = mutableSetOf<ChangeId>()
 
         // Find the commit with the reference
-        val referencedEntry =
-            allEntries.find { entry ->
-                // Check if it's the working copy
-                if (referenceName == "@" && entry.isWorkingCopy) {
-                    return@find true
-                }
-                // Check if it has the bookmark/tag
-                entry.bookmarks.any { it.name == referenceName }
-            } ?: return emptySet()
+        val referencedEntry = allEntries.find { entry ->
+            // Check if it's the working copy
+            if (referenceName == "@" && entry.isWorkingCopy) {
+                return@find true
+            }
+            // Check if it has the bookmark/tag
+            entry.bookmarks.any { it.name == referenceName }
+        } ?: return emptySet()
 
         // Start with the referenced commit
         toVisit.add(referencedEntry.changeId)
@@ -160,15 +158,9 @@ class JujutsuReferenceFilterComponent(
         }
     }
 
-    private data class References(
-        val workingCopy: String?,
-        val bookmarks: List<String>,
-        val tags: List<String>
-    )
+    private data class References(val workingCopy: String?, val bookmarks: List<String>, val tags: List<String>)
 
-    private enum class ReferenceType(
-        val icon: Icon
-    ) {
+    private enum class ReferenceType(val icon: Icon) {
         WORKING_COPY(AllIcons.Vcs.Branch), // @ symbol for working copy
         BOOKMARK(AllIcons.Vcs.Branch),
         TAG(AllIcons.Nodes.Tag) // For future use when tags are supported

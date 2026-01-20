@@ -10,13 +10,12 @@ object Formatters {
     /**
      * Escape HTML special characters.
      */
-    fun escapeHtml(text: String): String =
-        text
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\"", "&quot;")
-            .replace("\n", "<br/>")
+    fun escapeHtml(text: String): String = text
+        .replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("\n", "<br/>")
 
     /**
      * Get base font styling for HTML body.

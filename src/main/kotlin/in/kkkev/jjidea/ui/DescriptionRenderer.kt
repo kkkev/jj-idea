@@ -14,13 +14,9 @@ object DescriptionRenderer {
      * @param multiline If true, convert newlines to <br> tags
      * @return HTML-formatted description
      */
-    fun toHtml(
-        description: Description,
-        multiline: Boolean = true
-    ): String =
-        when {
-            description.empty -> "<i>${JujutsuBundle.message("description.empty")}</i>"
-            multiline -> description.actual.replace("\n", "<br>")
-            else -> description.summary
-        }
+    fun toHtml(description: Description, multiline: Boolean = true): String = when {
+        description.empty -> "<i>${JujutsuBundle.message("description.empty")}</i>"
+        multiline -> description.actual.replace("\n", "<br>")
+        else -> description.summary
+    }
 }
