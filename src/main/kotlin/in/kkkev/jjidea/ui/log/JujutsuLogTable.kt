@@ -113,8 +113,7 @@ class JujutsuLogTable(
      */
     private fun showContextMenu(component: Component, x: Int, y: Int) {
         val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, selectedEntries)
-        val popupMenu = ActionManager.getInstance()
-            .createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
+        val popupMenu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
         popupMenu.component.show(component, x, y)
     }
 
@@ -311,12 +310,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /**
      * Set the filter text and options, then update the filtered entries.
      */
-    fun setFilter(
-        text: String,
-        regex: Boolean = false,
-        caseSensitive: Boolean = false,
-        wholeWords: Boolean = false
-    ) {
+    fun setFilter(text: String, regex: Boolean = false, caseSensitive: Boolean = false, wholeWords: Boolean = false) {
         filterText = text
         useRegex = regex
         matchCase = caseSensitive

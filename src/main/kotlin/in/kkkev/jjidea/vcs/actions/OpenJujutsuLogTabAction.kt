@@ -4,7 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.ui.JujutsuCustomLogTabManager
+import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.vcs.isJujutsu
 
 /**

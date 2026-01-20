@@ -7,17 +7,14 @@ import com.intellij.openapi.actionSystem.ex.ActionButtonLook
 import com.intellij.openapi.actionSystem.impl.ActionButton
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.actionSystem.impl.FieldInplaceActionButtonLook
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.SearchFieldWithExtension
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.JujutsuStateListener
-import `in`.kkkev.jjidea.jj.JujutsuStateModel
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.stateModel
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.Box
@@ -37,18 +34,18 @@ import javax.swing.table.TableColumn
  *
  * Built from scratch - no dependency on IntelliJ's VCS log UI.
  */
-class JujutsuLogPanel(private val project: Project, private val root: VirtualFile) : JPanel(BorderLayout()),
-    Disposable {
+class JujutsuLogPanel(private val root: JujutsuRepository) :
+    JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
     // Column manager for controlling column visibility
     private val columnManager = JujutsuColumnManager()
 
     // Table showing commits
-    private val logTable = JujutsuLogTable(project, columnManager)
+    private val logTable = JujutsuLogTable(root.project, columnManager)
 
     // Details panel showing selected commit info
-    private val detailsPanel = JujutsuCommitDetailsPanel(project, root)
+    private val detailsPanel = JujutsuCommitDetailsPanel(root)
 
     // Splitter for table and details panel
     private var splitter: OnePixelSplitter
@@ -57,7 +54,7 @@ class JujutsuLogPanel(private val project: Project, private val root: VirtualFil
     private var detailsOnRight = true
 
     // Data loader for background loading
-    private val dataLoader = JujutsuLogDataLoader(project, root, logTable.logModel, logTable)
+    private val dataLoader = JujutsuLogDataLoader(root, logTable.logModel, logTable)
 
     // Filter options state
     private var useRegex = false
@@ -126,25 +123,24 @@ class JujutsuLogPanel(private val project: Project, private val root: VirtualFil
         // Load initial data
         dataLoader.loadCommits()
 
-        log.info("JujutsuLogPanel initialized for root: ${root.path}")
+        log.info("JujutsuLogPanel initialized for root: $root")
     }
 
     private fun setupStateListener() {
-        project.messageBus.connect(this).subscribe(
-            JujutsuStateListener.TOPIC,
-            object : JujutsuStateListener {
-                override fun workingCopyChanged() {
-                    // Minor update, might not need full refresh
-                }
-
-                override fun logUpdated() {
-                    ApplicationManager.getApplication().invokeLater {
-                        val model = JujutsuStateModel.getInstance(project)
-                        refresh(selectWorkingCopy = model.shouldSelectWorkingCopy)
-                    }
+        with(root.project.stateModel) {
+            // TODO Actually, should be against the whole log
+            workingCopies.connect(this@JujutsuLogPanel) { old, new ->
+                // These comparisons are painful - finer-grained messages would be better
+                if (old.filter { it.repo == root } != new.filter { it.repo == root }) {
+                    refresh()
                 }
             }
-        )
+            workingCopySelector.connect(this@JujutsuLogPanel) { roots ->
+                if (root in roots) {
+                    selectWorkingCopyInTable() // Already on EDT
+                }
+            }
+        }
     }
 
     /**
@@ -227,7 +223,7 @@ class JujutsuLogPanel(private val project: Project, private val root: VirtualFil
 
             // Paths filter
             add(
-                JujutsuPathsFilterComponent(project, root, logTable.logModel).apply {
+                JujutsuPathsFilterComponent(root, logTable.logModel).apply {
                     initUi()
                     initialize()
                 }
@@ -542,12 +538,15 @@ class JujutsuLogPanel(private val project: Project, private val root: VirtualFil
     /**
      * Refresh the log data from the VCS.
      * Reloads all commits and updates the display.
-     *
-     * @param selectWorkingCopy If true, select the working copy (@) after refresh completes
      */
-    fun refresh(selectWorkingCopy: Boolean = false) {
-        log.info("Refreshing log panel (selectWorkingCopy=$selectWorkingCopy)")
-        dataLoader.refresh(selectWorkingCopy)
+    fun refresh() {
+        log.info("Refreshing log panel")
+        dataLoader.refresh()
+    }
+
+    // TODO Is this a useful proxy?
+    private fun selectWorkingCopyInTable() {
+        dataLoader.selectWorkingCopyInTable()
     }
 
     override fun dispose() {
@@ -577,12 +576,5 @@ class JujutsuLogPanel(private val project: Project, private val root: VirtualFil
             }
             return super.getIcon()
         }
-    }
-
-    companion object {
-        /**
-         * Create a new log panel for the given project and root.
-         */
-        fun create(project: Project, root: VirtualFile) = JujutsuLogPanel(project, root)
     }
 }

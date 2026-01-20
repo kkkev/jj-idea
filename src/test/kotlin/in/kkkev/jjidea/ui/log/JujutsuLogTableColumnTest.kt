@@ -2,10 +2,12 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.mockk.mockk
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
 
@@ -299,6 +301,7 @@ class JujutsuLogTableColumnTest {
         hasConflict: Boolean = false,
         isEmpty: Boolean = false
     ) = LogEntry(
+        repo = mockk<JujutsuRepository>(),
         changeId = ChangeId(changeId),
         commitId = "0000000000000000000000000000000000000000",
         underlyingDescription = description,

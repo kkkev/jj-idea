@@ -15,9 +15,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -26,6 +24,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.*
 import java.awt.BorderLayout
@@ -42,7 +41,7 @@ import javax.swing.text.html.HTMLEditorKit
  * - TOP: Changed files tree
  * - BOTTOM: Commit metadata and description
  */
-class JujutsuCommitDetailsPanel(private val project: Project, private val root: VirtualFile) : JPanel(BorderLayout()),
+class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) : JPanel(BorderLayout()),
     Disposable {
     private val log = Logger.getInstance(javaClass)
 
@@ -54,7 +53,7 @@ class JujutsuCommitDetailsPanel(private val project: Project, private val root: 
     private val metadataPane = JEditorPane()
 
     // Changes tree
-    private val changesTree = JujutsuChangesTree(project)
+    private val changesTree = JujutsuChangesTree(repo.project)
 
     // Current selected entry
     private var currentEntry: LogEntry? = null
@@ -179,14 +178,14 @@ class JujutsuCommitDetailsPanel(private val project: Project, private val root: 
 
                 val content1 =
                     if (beforePath != null && beforeContent.isNotEmpty()) {
-                        contentFactory.create(project, beforeContent, beforePath.fileType)
+                        contentFactory.create(repo.project, beforeContent, beforePath.fileType)
                     } else {
                         contentFactory.createEmpty()
                     }
 
                 val content2 =
                     if (afterPath != null && afterContent.isNotEmpty()) {
-                        contentFactory.create(project, afterContent, afterPath.fileType)
+                        contentFactory.create(repo.project, afterContent, afterPath.fileType)
                     } else {
                         contentFactory.createEmpty()
                     }
@@ -200,7 +199,7 @@ class JujutsuCommitDetailsPanel(private val project: Project, private val root: 
                         "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} ($currentId)"
                     )
 
-                diffManager.showDiff(project, diffRequest)
+                diffManager.showDiff(repo.project, diffRequest)
             }
         }
     }
@@ -210,8 +209,8 @@ class JujutsuCommitDetailsPanel(private val project: Project, private val root: 
             ?: change.beforeRevision?.file?.virtualFile
             ?: return
 
-        FileEditorManager.getInstance(project).openTextEditor(
-            OpenFileDescriptor(project, virtualFile),
+        FileEditorManager.getInstance(repo.project).openTextEditor(
+            OpenFileDescriptor(repo.project, virtualFile),
             true
         )
     }
@@ -280,7 +279,7 @@ class JujutsuCommitDetailsPanel(private val project: Project, private val root: 
     private fun loadChanges(entry: LogEntry) {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val fullDetails = JujutsuFullCommitDetails.create(entry, root)
+                val fullDetails = JujutsuFullCommitDetails.create(entry, repo.directory)
                 val changes = fullDetails.changes.toList()
 
                 ApplicationManager.getApplication().invokeLater {

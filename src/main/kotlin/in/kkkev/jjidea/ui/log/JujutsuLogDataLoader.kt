@@ -4,11 +4,9 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.Expression
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.vcs.jujutsuVcs
 
 /**
  * Loads commit log data in the background and updates the table model on EDT.
@@ -17,8 +15,7 @@ import `in`.kkkev.jjidea.vcs.jujutsuVcs
  * IntelliJ's VcsLogData.
  */
 class JujutsuLogDataLoader(
-    private val project: Project,
-    private val root: VirtualFile,
+    private val repo: JujutsuRepository,
     private val tableModel: JujutsuLogTableModel,
     private val table: JujutsuLogTable
 ) {
@@ -29,10 +26,9 @@ class JujutsuLogDataLoader(
      * Load commits in the background.
      *
      * @param revset Revision expression to load (default: all commits)
-     * @param selectWorkingCopy If true, select the working copy (@) after load completes
      */
-    fun loadCommits(revset: Expression = Expression.ALL, selectWorkingCopy: Boolean = false) {
-        object : Task.Backgroundable(project, "Loading Jujutsu Commits", true) {
+    fun loadCommits(revset: Expression = Expression.ALL) {
+        object : Task.Backgroundable(repo.project, "Loading Jujutsu Commits", true) {
             private var entries: List<LogEntry> = emptyList()
             private var error: Throwable? = null
 
@@ -42,16 +38,15 @@ class JujutsuLogDataLoader(
 
                 try {
                     // Load log entries using our existing LogService
-                    val result = root.jujutsuVcs.logService.getLog(revset)
+                    val result = repo.logService.getLog(revset)
 
-                    result
-                        .onSuccess { loadedEntries ->
-                            entries = loadedEntries
-                            log.info("Loaded ${entries.size} commits")
-                        }.onFailure { e ->
-                            error = e
-                            log.error("Failed to load commits", e)
-                        }
+                    result.onSuccess { loadedEntries ->
+                        entries = loadedEntries
+                        log.info("Loaded ${entries.size} commits")
+                    }.onFailure { e ->
+                        error = e
+                        log.error("Failed to load commits", e)
+                    }
                 } catch (e: Exception) {
                     error = e
                     log.error("Exception loading commits", e)
@@ -68,11 +63,6 @@ class JujutsuLogDataLoader(
                         tableModel.setEntries(entries)
                         table.updateGraph(graphNodes)
                         log.info("Table updated with ${entries.size} commits and graph layout")
-
-                        // Select working copy if requested
-                        if (selectWorkingCopy) {
-                            selectWorkingCopyInTable()
-                        }
                     }
                 }
             }
@@ -86,7 +76,7 @@ class JujutsuLogDataLoader(
     /**
      * Select the working copy (@) entry in the table and scroll it into view.
      */
-    private fun selectWorkingCopyInTable() {
+    fun selectWorkingCopyInTable() {
         // Find the working copy entry in the table model
         val workingCopyIndex = (0 until tableModel.rowCount).firstOrNull { row ->
             tableModel.getEntry(row)?.isWorkingCopy == true
@@ -107,12 +97,10 @@ class JujutsuLogDataLoader(
 
     /**
      * Refresh the log - reload all commits.
-     *
-     * @param selectWorkingCopy If true, select the working copy (@) after refresh completes
      */
-    fun refresh(selectWorkingCopy: Boolean = false) {
-        log.info("Refreshing log (selectWorkingCopy=$selectWorkingCopy)")
-        loadCommits(selectWorkingCopy = selectWorkingCopy)
+    fun refresh() {
+        log.info("Refreshing log")
+        loadCommits()
     }
 
     /**

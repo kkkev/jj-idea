@@ -8,11 +8,12 @@ import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
 import `in`.kkkev.jjidea.settings.JujutsuSettings
-import `in`.kkkev.jjidea.ui.JujutsuCustomLogTabManager
+import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.vcs.isJujutsu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+// TODO This shouldn't be on startup any more - should be a listener on the state model
 /**
  * Startup activity that automatically opens the custom Jujutsu log tab
  * when a Jujutsu project is detected.

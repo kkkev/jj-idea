@@ -28,7 +28,9 @@
         <logProvider implementation="in.kkkev.jjidea.vcs.JujutsuLogProvider" />
 
         <!-- Startup activity to automatically open custom log tab -->
-        <postStartupActivity implementation="in.kkkev.jjidea.JujutsuStartupActivity" />
+        <!--<postStartupActivity implementation="in.kkkev.jjidea.JujutsuStartupActivity" />-->
+
+        <!--<postStartupActivity implementation="in.kkkev.jjidea.ui.workingcopy.ToolWindowEnabler" />-->
 
         <!-- Modern file history handler (toolbar at top, details on right) -->
         <vcsLogFileHistoryHandler implementation="in.kkkev.jjidea.vcs.history.JujutsuLogFileHistoryHandler" order="first" />
@@ -42,7 +44,7 @@
         <!-- Services -->
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
         <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel" />
-        <projectService serviceImplementation="in.kkkev.jjidea.ui.JujutsuCustomLogTabManager" />
+        <projectService serviceImplementation="in.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager" />
         <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings" />
 
         <!-- Settings -->
@@ -79,4 +81,11 @@
             <add-to-group group-id="VcsGroup" anchor="last"/>
         </group>
     </actions>
+
+    <projectListeners>
+        <listener class="in.kkkev.jjidea.ui.ToolWindowEnabler"
+                  topic="com.intellij.dvcs.repo.VcsRepositoryMappingListener"
+                  activeInHeadlessMode="false" activeInTestMode="false"/>
+
+    </projectListeners>
 </idea-plugin>
