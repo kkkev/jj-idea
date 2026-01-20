@@ -78,44 +78,57 @@ This document captures essential architecture, implementation decisions, and dev
 44. ✅ Auto-refresh log and working copy after VCS operations
 45. ✅ Smart selection: select working copy (@) after "new change" operations
 
-### Phase 10: Core VCS Operations (1.0 Blockers) - IN PROGRESS
-**P0 - Release Blockers (6 issues)**
-- **jj-idea-43o**: Add edit function - Essential operation to move working copy to selected change
-- **jj-idea-p1q**: Add abandon function - Core workflow operation to remove changes
-- **jj-idea-0ex**: Add icons for all custom actions - UI consistency and professionalism
-- **jj-idea-4eq**: Handle non-JJ repositories gracefully - Critical stability issue
-- **jj-idea-omi**: Create marketing materials - Required for JetBrains Marketplace listing
-- **jj-idea-qvf**: Comprehensive testing - Stability and quality assurance
+### Phase 10: Release Blockers (1.0) - IN PROGRESS
+**P0 - Release Blockers (2 open issues)**
+- ✅ ~~**jj-idea-43o**: Add edit function~~ - Complete
+- ✅ ~~**jj-idea-p1q**: Add abandon function~~ - Complete
+- ✅ ~~**jj-idea-0ex**: Add icons for all custom actions~~ - Complete
+- ✅ ~~**jj-idea-qvf**: Comprehensive testing~~ - Complete
+- **jj-idea-4eq**: Allow to initialize a jj root - Handle non-JJ repositories gracefully
+- **jj-idea-t9y**: Prepare JetBrains Marketplace listing materials
 
-**Prioritization Rationale**: These operations complete the essential JJ workflow. Power users need edit (navigate history) and abandon (clean up unwanted changes) as core operations. Without these, users must switch to CLI for basic tasks, defeating the purpose of IDE integration.
+**Prioritization Rationale**: Core VCS operations are complete. Remaining blockers are stability (graceful non-JJ handling) and marketplace requirements.
 
 ### Phase 11: Quality & Polish (1.0 High Priority)
-**P1 - High Priority (9 issues)**
-- Performance fixes (slow annotations - **jj-idea-xpe**, annotation display bugs - **jj-idea-4ly**)
-- Discoverability (VCS menu visibility - **jj-idea-c9c**, keyboard shortcuts - **jj-idea-78i**)
-- Testing infrastructure (feature parity tests - **jj-idea-kem**, fuller test suite - **jj-idea-nk3**)
-- Visual polish (themes, scaling, tooltips - **jj-idea-ckl**)
-- Implementation completion (Show Changes action - **jj-idea-6b4**)
-- Documentation (CLAUDE.md architecture - **jj-idea-035**)
+**P1 - High Priority (9 open issues)**
+- Core operations: Revert action (**jj-idea-55k**), file actions (**jj-idea-v5x**)
+- Bug fixes: Annotation display bugs (**jj-idea-4ly**)
+- Discoverability: VCS menu visibility (**jj-idea-c9c**), keyboard shortcuts (**jj-idea-78i**)
+- Testing infrastructure: Feature parity tests (**jj-idea-kem**), fuller test suite (**jj-idea-nk3**)
+- Implementation completion: VcsLogDiffHandler (**jj-idea-4fv**)
+- Documentation: CLAUDE.md architecture (**jj-idea-035**)
 
-**Prioritization Rationale**: These improve quality and user experience but aren't blocking. Performance issues affect usability but have workarounds. Documentation and testing ensure maintainability.
+**Prioritization Rationale**: These complete the 1.0 feature set (revert, file actions) and ensure quality through testing and bug fixes.
 
-### Phase 12: Enhanced Custom Log (Post-1.0)
-**P2 - Nice to Have (selected issues)**
-- Custom log improvements (multi-select - **jj-idea-fpc**, sorting - **jj-idea-d6g**, filtering - **jj-idea-ncg**, graph enhancements)
-- File history enhancements (details pane, mini diff viewer, remote links)
-- UI refinements (empty change indicators - **jj-idea-am3**, visual polish)
+### Phase 12: Nice to Have (1.0)
+**P2 - Nice to Have (8 open issues)**
+- UI polish: Tooltip fix (**jj-idea-ydb**), multi-select files (**jj-idea-pa3**)
+- Consistency: File history view (**jj-idea-0ya**), HTML rendering DRY (**jj-idea-1rl**)
+- UX improvements: Clickable change IDs (**jj-idea-791**), multi-select UI design (**jj-idea-c9d**)
+- Configuration: Custom vs standard log (**jj-idea-3rq**)
+- Marketing: Promotional materials (**jj-idea-dih**)
 
-**Prioritization Rationale**: These enhance the experience but power users can navigate effectively with current log functionality. Better to ensure core operations work flawlessly first.
+**Prioritization Rationale**: These enhance the experience but aren't blocking for a solid 1.0 release.
 
-### Phase 13+: Advanced Operations (Post-1.0)
-**P3-P4 - Future Releases**
-- **jj-idea-r8h**, **jj-idea-un5**: Enhanced describe/new commands with validation (P4)
-- **jj-idea-qgz**, **jj-idea-ww5**: Bookmark management, file ignoring (P4)
-- **jj-idea-9q7**, **jj-idea-noc**: Git remote operations and management (P4)
-- **jj-idea-ah6**, **jj-idea-cgx**: Rebase/squash operations UI, conflict resolution (P4)
+### Phase 13: Post-1.0 Enhancements
+**P3 - Post-1.0 (21 open issues)**
+- Custom log enhancements: Sorting, branches panel, custom columns, graph collapsing
+- File history enhancements: Details pane, mini diff viewer, remote links, ref filters
+- Annotations: Old revision annotate, highlight lines
+- UI refinements: Empty commit indicators, hover effects, icon consistency
+- Infrastructure: UI integration tests, migration path, remote repository integration
 
-**Prioritization Rationale**: Power users perform these operations via CLI comfortably. Adding UI for these requires careful design and testing. Better to nail the describe-first workflow first, gather user feedback, then expand to advanced operations.
+**Prioritization Rationale**: Power users can work effectively with current functionality. These enhance the experience post-1.0.
+
+### Phase 14+: Advanced Operations (Future Releases)
+**P4 - Future Releases (9 open issues)**
+- **jj-idea-un5**: Enhanced new change command with options
+- **jj-idea-qgz**, **jj-idea-ww5**: Bookmark management, file ignoring
+- **jj-idea-9q7**, **jj-idea-noc**: Git remote operations and management
+- **jj-idea-ah6**, **jj-idea-cgx**: Rebase/squash operations UI, conflict resolution
+- Multi-change operations: Abandon multiple (**jj-idea-thk**), bookmark display (**jj-idea-15z**)
+
+**Prioritization Rationale**: Power users perform these operations via CLI comfortably. Better to nail the describe-first workflow first, gather user feedback, then expand.
 
 ## Product Direction & Prioritization Strategy
 
