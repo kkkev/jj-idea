@@ -33,8 +33,8 @@ object JujutsuLogContextMenuActions {
             // Offer "Describe" for mutable changes
             add(describeAction(project, entry?.takeUnless { it.immutable }))
 
-        // Can abandon any mutable change including working copy
-        // TODO Allow abandon on multiple if all entries are immutable
-        add(abandonChangeAction(project, entry?.takeIf { !it.immutable }))
-    }
+            // Can abandon any mutable change including working copy
+            // TODO Allow abandon on multiple if all entries are immutable
+            add(abandonChangeAction(project, entry?.takeIf { !it.immutable }))
+        }
 }

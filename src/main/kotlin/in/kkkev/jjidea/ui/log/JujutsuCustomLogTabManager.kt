@@ -75,7 +75,6 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
 
                             openTabs.put(root, content)
                             openPanels.add(logPanel)
-
                         }
                     }
                 }

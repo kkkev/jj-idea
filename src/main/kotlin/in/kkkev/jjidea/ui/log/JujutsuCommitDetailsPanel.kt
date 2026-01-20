@@ -41,7 +41,8 @@ import javax.swing.text.html.HTMLEditorKit
  * - TOP: Changed files tree
  * - BOTTOM: Commit metadata and description
  */
-class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) : JPanel(BorderLayout()),
+class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
+    JPanel(BorderLayout()),
     Disposable {
     private val log = Logger.getInstance(javaClass)
 
@@ -244,9 +245,9 @@ class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) : JPanel(Bo
         }
 
         val popupMenu = ActionManager.getInstance().createActionPopupMenu(
-                "JujutsuCommitDetailsChangesContextMenu",
-                actionGroup
-            )
+            "JujutsuCommitDetailsChangesContextMenu",
+            actionGroup
+        )
 
         popupMenu.component.show(comp, x, y)
     }

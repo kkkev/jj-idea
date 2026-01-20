@@ -105,7 +105,6 @@ private object JujutsuDescriptionRenderer : ColoredTableCellRenderer() {
  * Custom Status column for Jujutsu VCS Log - shows conflict/empty indicators
  */
 class JujutsuStatusColumn : LogEntryCustomColumn<ChangeStatus> {
-
     override val id = "Jujutsu.Status"
     override val localizedName = JujutsuBundle.message("column.status")
 

@@ -45,12 +45,12 @@ class ChangeListCellRenderer(private val project: Project) : ColoredListCellRend
     }
 
     private fun getFileStatus(change: Change): FileStatus = when (change.type) {
-            Change.Type.MODIFICATION -> FileStatus.MODIFIED
-            Change.Type.NEW -> FileStatus.ADDED
-            Change.Type.DELETED -> FileStatus.DELETED
-            Change.Type.MOVED -> FileStatus.MODIFIED
-            else -> FileStatus.NOT_CHANGED
-        }
+        Change.Type.MODIFICATION -> FileStatus.MODIFIED
+        Change.Type.NEW -> FileStatus.ADDED
+        Change.Type.DELETED -> FileStatus.DELETED
+        Change.Type.MOVED -> FileStatus.MODIFIED
+        else -> FileStatus.NOT_CHANGED
+    }
 
     private fun getTextAttributes(status: FileStatus): SimpleTextAttributes =
         SimpleTextAttributes(SimpleTextAttributes.STYLE_PLAIN, status.color)
