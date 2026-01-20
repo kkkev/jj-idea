@@ -17,12 +17,25 @@ This document describes the algorithm for drawing commit graphs in the custom lo
 - The lane determines the horizontal position of the entry's circle
 - Each lane has a designated color
 
+### Connection Classification
+
+Each connection from a child to a non-adjacent parent is classified as one of:
+
+| Type | Condition | Passthrough Lane | Visual Behavior |
+|------|-----------|------------------|-----------------|
+| **Simple/Fork** | Child has 1 parent | Child's lane | Vertical in child's lane, diagonal at parent's row |
+| **Fork+Merge** | Child has multiple parents AND parent has multiple children | Child's lane | Vertical in child's lane, diagonal at parent's row |
+| **Pure Merge** | Child has multiple parents AND parent has only this child | NEW lane (reserved for parent) | Diagonal at child's row, vertical in parent's lane |
+
+The key insight is that fork+merge connections are treated like forks (visual line stays in child's lane), while pure merges get a dedicated lane for the merge line.
+
 ### Passthroughs
 
 - A passthrough represents a parent-child connection that spans intermediate rows
 - When a child is above and its parent is more than one row below, the rows in between have a passthrough
 - A passthrough occupies a lane and draws a vertical line through that row
-- A passthrough uses the child's lane (the lane is established when the child is processed and maintained until the passthrough terminates at the parent)
+- For simple/fork connections: passthrough uses child's lane
+- For pure merge connections: passthrough uses a NEW lane (which the parent will inherit)
 
 ### Passthrough Data Structure
 
@@ -75,7 +88,8 @@ For each row, processed top to bottom:
 
 #### Step 1: Determine this entry's lane
 
-- Look up children of this entry in `childrenByParent`
+- **If a lane was reserved for this entry** (from a pure merge passthrough): use that lane
+- Otherwise, look up children of this entry in `childrenByParent`
 - **If no children exist**: pick the lowest available lane (leftmost lane not occupied by a passthrough)
 - **If children exist**: pick the lane of the child with the lowest lane number, unless that lane is occupied by a passthrough, in which case pick the lowest available lane
 
@@ -92,12 +106,16 @@ For each row, processed top to bottom:
 
 #### Step 4: Create passthroughs for parents not in the next row
 
-- For each parent of this entry:
-  - If the parent is not in the immediately next row:
-    - Create a passthrough with:
-      - `lane`: this entry's lane
-      - `targetParentId`: the parent's change ID
-      - `sourceLane`: this entry's lane
+- For each parent of this entry that is not in the immediately next row:
+  - Classify the connection:
+    - **If this entry has only 1 parent**: Simple/Fork → passthrough uses child's lane
+    - **If this entry has multiple parents**:
+      - Check if the parent already has other children (from earlier rows)
+      - **If parent has other children**: Fork+Merge → passthrough uses child's lane
+      - **If parent has no other children**: Pure Merge → passthrough uses a NEW lane (reserve it for the parent)
+  - Create a passthrough with:
+    - `lane`: determined by classification above
+    - `targetParentId`: the parent's change ID
 
 #### Step 5: Pass active passthroughs to the next row
 
@@ -156,17 +174,17 @@ Row 5: F (parents: G)
 Row 6: G (no parents)      ← FORK POINT: common ancestor
 ```
 
-**Processing:**
+**Processing with Fork+Merge Classification:**
 
-| Row | Entry | Children | Lane Selection | Passthroughs Created | Active Passthroughs |
-|-----|-------|----------|----------------|---------------------|---------------------|
-| 0 | A | none | 0 (lowest available) | E not next row → `{lane:0, target:E}` | `[{0,E}]` |
-| 1 | B | A@0 | 0 occupied by passthrough → 1 | C is next row → none | `[{0,E}]` |
-| 2 | C | B@1 | 1 (follow child) | D is next row → none | `[{0,E}]` |
-| 3 | D | C@1 | 1 (follow child) | G not next row → `{lane:1, target:G}` | `[{0,E}, {1,G}]` |
-| 4 | E | A@0 | 0 (passthrough terminates here) | F is next row → none | `[{1,G}]` |
-| 5 | F | E@0 | 0 (follow child) | G is next row → none | `[{1,G}]` |
-| 6 | G | D@1, F@0 | 0 (lowest child lane); passthrough terminates | none | `[]` |
+| Row | Entry | Children | Lane Selection | Classification | Passthroughs |
+|-----|-------|----------|----------------|----------------|--------------|
+| 0 | A | none | 0 (lowest available) | E: pure merge (E has no other children) | `{lane:1, target:E}` (new lane, reserved) |
+| 1 | B | A@0 | 0 (not blocked, passthrough is at lane 1) | C is adjacent | none |
+| 2 | C | B@0 | 0 (follow child) | D is adjacent | none |
+| 3 | D | C@0 | 0 (follow child) | G: simple (D has 1 parent) | `{lane:0, target:G}` |
+| 4 | E | A@0 | 1 (reserved lane) | F is adjacent | none |
+| 5 | F | E@1 | 1 (follow child) | G is adjacent | none |
+| 6 | G | D@0, F@1 | 0 (lowest child lane) | | |
 
 **Result:**
 
@@ -175,33 +193,29 @@ Lane:  0   1
 
        ●───┐   ← A (merge commit: parents B and E)
        │   │
-       │   ●   ← B
+       ●   │   ← B (stays in lane 0, not pushed)
        │   │
-       │   ●   ← C
+       ●   │   ← C
        │   │
-       │   ●   ← D
+       ●   │   ← D
        │   │
-       ●   │   ← E
+       │   ●   ← E (reserved lane 1 from pure merge)
        │   │
-       ●   │   ← F
+       │   ●   ← F
        │   │
        ●───┘   ← G (fork point: ancestor of both branches)
 ```
 
 **Line details:**
 
-| From | To | Type | Color |
-|------|-----|------|-------|
-| A | B | Diagonal down-right (lane 0 → 1) | Lane 1 (B's lane) |
-| A | E | Vertical down via passthrough | Lane 0 (E's lane) |
-| B | C | Vertical | Lane 1 |
-| C | D | Vertical | Lane 1 |
-| D | G | Vertical via passthrough, diagonal at G | Lane 0 (G's lane) |
-| E | F | Vertical | Lane 0 |
-| F | G | Vertical | Lane 0 |
+| From | To | Classification | Passthrough Lane | Color |
+|------|-----|---------------|------------------|-------|
+| A | B | Adjacent (no passthrough) | - | Lane 0 |
+| A | E | Pure merge | Lane 1 (reserved for E) | Lane 1 |
+| B | C | Adjacent | - | Lane 0 |
+| C | D | Adjacent | - | Lane 0 |
+| D | G | Simple (D has 1 parent) | Lane 0 (child's lane) | Lane 0 |
+| E | F | Adjacent | - | Lane 1 |
+| F | G | Adjacent | - | Lane 1 |
 
-**Passthrough visualization:**
-
-- **Rows 1-3**: Lane 0 has a passthrough connecting A to E (vertical line)
-- **Rows 4-5**: Lane 1 has a passthrough connecting D to G (vertical line)
-- **Row 6**: Passthrough from lane 1 terminates with diagonal to lane 0 (where G is)
+**Key observation:** With the fork+merge classification, the first branch (B, C, D) stays in lane 0 because the passthrough to E uses a new lane (1) instead of blocking lane 0. This results in a more compact layout where the main branch stays in lane 0

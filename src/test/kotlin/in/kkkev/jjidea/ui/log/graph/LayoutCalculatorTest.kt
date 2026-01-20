@@ -158,9 +158,10 @@ class LayoutCalculatorTest {
         layout.rows[2].childLanes shouldContainExactlyInAnyOrder listOf(0, 1)
     }
 
-    // 6. Simple merge
-    // Passthrough to non-adjacent parent blocks child's lane.
-    // Adjacent parent is pushed to a new lane. Non-adjacent parent gets child's lane.
+    // 6. Simple merge (pure merge case)
+    // A has two parents B and C. Neither parent has other children, so both are "pure merge".
+    // Adjacent parent B is not blocked (passthrough to C uses new lane, not child's lane).
+    // Non-adjacent parent C gets the reserved new lane.
     @Test
     fun `merge - one child has two parents`() {
         val entries =
@@ -172,9 +173,9 @@ class LayoutCalculatorTest {
         val layout = calculator.calculate(entries)
 
         layout.rows[0].lane shouldBe 0
-        layout.rows[0].parentLanes shouldContainExactlyInAnyOrder listOf(1, 0)
-        layout.rows[1].lane shouldBe 1 // B (first parent) pushed to lane 1 by passthrough to C
-        layout.rows[2].lane shouldBe 0 // C (second parent) at lane 0 (passthrough terminates)
+        layout.rows[0].parentLanes shouldContainExactlyInAnyOrder listOf(0, 1)
+        layout.rows[1].lane shouldBe 0 // B can use lane 0 (passthrough to C is at lane 1)
+        layout.rows[2].lane shouldBe 1 // C at lane 1 (reserved by pure merge passthrough)
     }
 
     // 7. Fork with passthrough
@@ -193,9 +194,9 @@ class LayoutCalculatorTest {
     }
 
     // 8. Diamond pattern (fork + merge)
-    // A merges B and E. Passthrough to E blocks lane 0, so B branch goes to lane 1.
-    // Main line continues: A → E → F → G in lane 0.
-    // Side branch: B → C → D in lane 1.
+    // A merges B and E. E is a pure merge (no other children) so passthrough to E
+    // goes to lane 1, NOT blocking lane 0. B branch continues in lane 0.
+    // D→G passthrough uses lane 0 (D has 1 parent, not a merge).
     @Test
     fun `diamond pattern - fork at bottom, merge at top`() {
         val entries =
@@ -211,21 +212,22 @@ class LayoutCalculatorTest {
         val layout = calculator.calculate(entries)
 
         // Verify lane assignments
-        // Passthrough A→E at lane 0 pushes B branch to lane 1
+        // E is pure merge, so passthrough at lane 1 (reserved for E)
+        // B branch not blocked, continues in lane 0
         layout.rows[0].lane shouldBe 0 // A
-        layout.rows[1].lane shouldBe 1 // B (pushed by passthrough to E)
-        layout.rows[2].lane shouldBe 1 // C (follows B)
-        layout.rows[3].lane shouldBe 1 // D (follows C)
-        layout.rows[4].lane shouldBe 0 // E (passthrough terminates, gets child lane)
-        layout.rows[5].lane shouldBe 0 // F (follows E)
+        layout.rows[1].lane shouldBe 0 // B (not blocked, passthrough to E is at lane 1)
+        layout.rows[2].lane shouldBe 0 // C (follows B)
+        layout.rows[3].lane shouldBe 0 // D (follows C)
+        layout.rows[4].lane shouldBe 1 // E (reserved lane from pure merge)
+        layout.rows[5].lane shouldBe 1 // F (follows E)
         layout.rows[6].lane shouldBe 0 // G (lowest child lane)
 
         // Verify passthroughs
-        layout.rows[1].passthroughLanes shouldBe setOf(0) // A→E at lane 0 (child's lane)
-        layout.rows[2].passthroughLanes shouldBe setOf(0) // A→E at lane 0
-        layout.rows[3].passthroughLanes shouldBe setOf(0) // A→E at lane 0
-        layout.rows[4].passthroughLanes shouldBe setOf(1) // D→G at lane 1 (D's lane)
-        layout.rows[5].passthroughLanes shouldBe setOf(1) // D→G at lane 1
+        layout.rows[1].passthroughLanes shouldBe setOf(1) // A→E at lane 1 (pure merge)
+        layout.rows[2].passthroughLanes shouldBe setOf(1) // A→E at lane 1
+        layout.rows[3].passthroughLanes shouldBe setOf(1) // A→E at lane 1
+        layout.rows[4].passthroughLanes shouldBe setOf(0) // D→G at lane 0 (D's lane)
+        layout.rows[5].passthroughLanes shouldBe setOf(0) // D→G at lane 0
     }
 
     // 9. Multiple independent branches
@@ -250,5 +252,103 @@ class LayoutCalculatorTest {
         // Passthroughs accumulate
         layout.rows[1].passthroughLanes shouldBe listOf(0)
         layout.rows[2].passthroughLanes shouldBe listOf(0, 1)
+    }
+
+    // 10. Fork+Merge classification
+    // When a connection is both a fork (parent has multiple children) AND a merge
+    // (child has multiple parents), treat it as a fork: passthrough stays in child's lane.
+    // Pure merges (parent has only one child) get a NEW lane.
+    //
+    // Scenario:
+    //   Row 0: A (zks) → D (ozu)         - creates passthrough in lane 0
+    //   Row 1: B (zqkz) → D (ozu), E (nwu) - merge commit
+    //   Row 2: C (intermediate)           - unrelated
+    //   Row 3: D (ozu)                    - fork point (children: A, B)
+    //   Row 4: E (nwu)                    - only child: B
+    //
+    // Connection classification:
+    //   A→D: simple (A has 1 parent, D will have 2 children but we see A first)
+    //   B→D: fork+merge (D already has child A, B has multiple parents)
+    //   B→E: pure merge (E has no other children, B has multiple parents)
+    //
+    // Expected passthrough lanes:
+    //   A→D: lane 0 (A's lane)
+    //   B→D: lane 1 (B's lane, fork+merge → child's lane)
+    //   B→E: lane 2 (NEW lane, pure merge → new lane, E inherits it)
+    @Test
+    fun `fork+merge uses child lane, pure merge uses new lane`() {
+        val entries =
+            listOf(
+                GraphEntry(A, listOf(D)), // Row 0: A → D
+                GraphEntry(B, listOf(D, E)), // Row 1: B → D, E (merge)
+                GraphEntry(C, emptyList()), // Row 2: C (unrelated)
+                GraphEntry(D, emptyList()), // Row 3: D (fork point)
+                GraphEntry(E, emptyList()) // Row 4: E
+            )
+        val layout = calculator.calculate(entries)
+
+        // Lane assignments
+        layout.rows[0].lane shouldBe 0 // A at lane 0
+        layout.rows[1].lane shouldBe 1 // B blocked by A→D passthrough, takes lane 1
+        layout.rows[3].lane shouldBe 0 // D at lane 0 (lowest child lane: A)
+        layout.rows[4].lane shouldBe 2 // E at lane 2 (reserved by pure merge passthrough)
+
+        // Passthroughs at row 2 (intermediate)
+        // A→D passthrough at lane 0
+        // B→D passthrough at lane 1 (fork+merge: child's lane)
+        // B→E passthrough at lane 2 (pure merge: new lane)
+        layout.rows[2].passthroughLanes shouldBe setOf(0, 1, 2)
+
+        // C is pushed to lane 3 (lanes 0, 1, 2 all blocked)
+        layout.rows[2].lane shouldBe 3
+
+        // Verify parent lanes for B
+        layout.rows[1].parentLanes shouldContainExactlyInAnyOrder listOf(0, 2) // D at 0, E at 2
+    }
+
+    // 11. Reserved lane release
+    // When an entry uses its reserved lane, that lane should be available for new reservations.
+    //
+    // Scenario (from bug report):
+    //   Row 0: pp → ou, xs (merge)
+    //   Row 1: ou → qn
+    //   Row 2: ut → qn
+    //   Row 3: xs → qn
+    //   Row 4: qn → rso, oq (merge)
+    //   Row 5: rso
+    //   Row 6: oq
+    //
+    // pp→xs creates passthrough at lane 1 (pure merge, reserved for xs)
+    // When xs is processed at row 3, it uses lane 1 and the reservation should be cleared.
+    // When qn creates passthrough for oq, lane 1 should be available.
+    @Test
+    fun `reserved lane is released when used, allowing reuse`() {
+        val pp = ChangeId("pp")
+        val ou = ChangeId("ou")
+        val ut = ChangeId("ut")
+        val xs = ChangeId("xs")
+        val qn = ChangeId("qn")
+        val rso = ChangeId("rso")
+        val oq = ChangeId("oq")
+
+        val entries =
+            listOf(
+                GraphEntry(pp, listOf(ou, xs)), // Row 0: merge
+                GraphEntry(ou, listOf(qn)), // Row 1
+                GraphEntry(ut, listOf(qn)), // Row 2
+                GraphEntry(xs, listOf(qn)), // Row 3
+                GraphEntry(qn, listOf(rso, oq)), // Row 4: merge
+                GraphEntry(rso, emptyList()), // Row 5
+                GraphEntry(oq, emptyList()) // Row 6
+            )
+        val layout = calculator.calculate(entries)
+
+        // pp at lane 0, xs reserved for lane 1
+        layout.rows[0].lane shouldBe 0 // pp
+        layout.rows[3].lane shouldBe 1 // xs uses reserved lane 1
+
+        // When qn creates passthrough to oq, lane 1 should now be available
+        // oq should get lane 1, not lane 2
+        layout.rows[6].lane shouldBe 1 // oq at lane 1 (reservation was cleared)
     }
 }

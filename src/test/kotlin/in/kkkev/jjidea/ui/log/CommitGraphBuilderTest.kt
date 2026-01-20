@@ -283,14 +283,14 @@ class CommitGraphBuilderTest {
             // Merge commit should have two parent lanes
             graph["merge"]!!.parentLanes shouldHaveSize 2
 
-            // With Option 2: passthrough to right blocks lane 0
-            // left is pushed to lane 1, right gets lane 0 when passthrough terminates
+            // Pure merge: passthrough to right uses NEW lane (1), not blocking left
+            // left can use lane 0, right gets reserved lane 1
             graph["merge"]!!.lane shouldBe 0
-            graph["left"]!!.lane shouldBe 1 // pushed by passthrough to right
-            graph["right"]!!.lane shouldBe 0 // gets child's lane after passthrough terminates
+            graph["left"]!!.lane shouldBe 0 // not blocked (passthrough is at lane 1)
+            graph["right"]!!.lane shouldBe 1 // reserved lane from pure merge
 
-            graph["merge"]!!.parentLanes[0] shouldBe 1 // left
-            graph["merge"]!!.parentLanes[1] shouldBe 0 // right
+            graph["merge"]!!.parentLanes[0] shouldBe 0 // left
+            graph["merge"]!!.parentLanes[1] shouldBe 1 // right
         }
 
         @Test
@@ -308,12 +308,12 @@ class CommitGraphBuilderTest {
             // merge has two parents
             graph["merge"]!!.parentLanes shouldHaveSize 2
 
-            // With Option 2: passthrough to b2 blocks lane 0
-            // b1 is pushed to lane 1, b2 gets lane 0
+            // Pure merge: passthrough to b2 uses NEW lane (1), not blocking b1
+            // b1 can use lane 0, b2 gets reserved lane 1
             val b1Lane = graph["b1"]!!.lane
             val b2Lane = graph["b2"]!!.lane
-            b1Lane shouldBe 1 // pushed by passthrough to b2
-            b2Lane shouldBe 0 // gets child's lane after passthrough terminates
+            b1Lane shouldBe 0 // not blocked (passthrough is at lane 1)
+            b2Lane shouldBe 1 // reserved lane from pure merge
 
             // Both converge at a (a gets lowest child lane = 0)
             graph["a"]!!.lane shouldBe 0
@@ -390,17 +390,17 @@ class CommitGraphBuilderTest {
             // Three parent lanes
             graph["octopus"]!!.parentLanes shouldHaveSize 3
 
-            // With Option 2: passthroughs to b and c both block lane 0
-            // a is pushed to lane 1, b is pushed to lane 1 (different row from a)
-            // c gets lane 0 when passthrough terminates
+            // Pure merge: passthroughs to b and c use NEW lanes (1 and 2)
+            // a is not blocked and can use lane 0
+            // b and c get their reserved lanes
             graph["octopus"]!!.lane shouldBe 0
-            graph["a"]!!.lane shouldBe 1 // pushed by passthrough
-            graph["b"]!!.lane shouldBe 1 // pushed by passthrough (different row, OK)
-            graph["c"]!!.lane shouldBe 0 // passthrough terminates
+            graph["a"]!!.lane shouldBe 0 // not blocked (passthroughs at lanes 1, 2)
+            graph["b"]!!.lane shouldBe 1 // reserved lane from pure merge
+            graph["c"]!!.lane shouldBe 2 // reserved lane from pure merge
 
-            graph["octopus"]!!.parentLanes[0] shouldBe 1 // a
+            graph["octopus"]!!.parentLanes[0] shouldBe 0 // a
             graph["octopus"]!!.parentLanes[1] shouldBe 1 // b
-            graph["octopus"]!!.parentLanes[2] shouldBe 0 // c
+            graph["octopus"]!!.parentLanes[2] shouldBe 2 // c
         }
     }
 
@@ -707,22 +707,22 @@ class CommitGraphBuilderTest {
             // qn should have two parent lanes
             graph["qn"]!!.parentLanes shouldHaveSize 2
 
-            // With Option 2: passthrough to oq blocks lane 0
-            // rso is pushed to lane 1, oq gets lane 0 when passthrough terminates
-            graph["qn"]!!.parentLanes[0] shouldBe 1 // rso pushed to lane 1
-            graph["qn"]!!.parentLanes[1] shouldBe 0 // oq gets lane 0
+            // Pure merge: passthrough to oq uses NEW lane (1), not blocking rso
+            // rso can use lane 0, oq gets reserved lane 1
+            graph["qn"]!!.parentLanes[0] shouldBe 0 // rso at lane 0
+            graph["qn"]!!.parentLanes[1] shouldBe 1 // oq at reserved lane 1
 
-            // rso should be in lane 1 (pushed by passthrough to oq)
-            graph["rso"]!!.lane shouldBe 1
+            // rso should be in lane 0 (not blocked)
+            graph["rso"]!!.lane shouldBe 0
 
-            // oq should be in lane 0 (passthrough terminates)
-            graph["oq"]!!.lane shouldBe 0
+            // oq should be in lane 1 (reserved lane from pure merge)
+            graph["oq"]!!.lane shouldBe 1
 
             // Verify the graph visually makes sense:
-            // Lane 0: qn -> oq -> py (main line continues to furthest parent)
-            // Lane 1: rso -> wp (diagonal from qn to rso)
-            graph["wp"]!!.lane shouldBe 1 // follows rso
-            graph["py"]!!.lane shouldBe 0 // oq's parent, lowest child lane
+            // Lane 0: qn -> rso -> wp -> py (main line continues through first parent)
+            // Lane 1: oq (diagonal from qn, then vertical to py via passthrough)
+            graph["wp"]!!.lane shouldBe 0 // follows rso
+            graph["py"]!!.lane shouldBe 0 // lowest child lane
         }
     }
 }
