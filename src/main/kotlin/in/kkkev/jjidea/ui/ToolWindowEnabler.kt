@@ -97,7 +97,11 @@ class ToolWindowEnabler(val project: Project) : VcsRepositoryMappingListener {
                     override fun contentAdded(event: ContentManagerEvent) {
                         if (isDefaultLogTab(event.content.displayName)) {
                             log.info("Suppressing default VCS log tab: ${event.content.displayName}")
-                            vcsToolWindow.contentManager.removeContent(event.content, true)
+                            // Defer removal to allow the platform to complete initialization
+                            // Removing synchronously causes disposal errors (IncorrectOperationException)
+                            ApplicationManager.getApplication().invokeLater {
+                                vcsToolWindow.contentManager.removeContent(event.content, true)
+                            }
                         }
                     }
                 }
