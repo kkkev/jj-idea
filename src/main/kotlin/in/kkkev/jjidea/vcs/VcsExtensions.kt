@@ -12,8 +12,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
-import org.jetbrains.annotations.NonNls
-import org.jetbrains.annotations.SystemIndependent
 
 /**
  * Find JujutsuVcs for a project. Returns null if not found.

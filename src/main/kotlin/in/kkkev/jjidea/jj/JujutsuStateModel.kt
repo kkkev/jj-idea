@@ -14,6 +14,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.wm.ToolWindowManager
 import `in`.kkkev.jjidea.jj.util.notifiableState
 import `in`.kkkev.jjidea.jj.util.simpleNotifier
+import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
 import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 
 /**
@@ -89,8 +90,9 @@ class JujutsuStateModel(private val project: Project) {
 
         // Update tool window availability when initializedRoots changes
         initializedRoots.connect(project) { _, new ->
-            // TODO hard-coded id
-            ToolWindowManager.getInstance(project).getToolWindow("Working copy")?.isAvailable = new.isNotEmpty()
+            ToolWindowManager.getInstance(project)
+                .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
+                ?.isAvailable = new.isNotEmpty()
         }
     }
 }

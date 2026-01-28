@@ -9,6 +9,7 @@ import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
+import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
 
 /**
  * VCS listener to check for Jujutsu roots to determine whether to show/hide the various tool windows and tabs
@@ -35,8 +36,9 @@ class ToolWindowEnabler(val project: Project) : VcsRepositoryMappingListener {
     private fun handleRootsChange(showToolWindows: Boolean) {
         ApplicationManager.getApplication().invokeLater {
             // Firstly, enable tool window if we have a JJ repo
-            // TODO hard-coded id
-            ToolWindowManager.getInstance(project).getToolWindow("Working copy")?.isAvailable = showToolWindows
+            ToolWindowManager.getInstance(project)
+                .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
+                ?.isAvailable = showToolWindows
 
             if (showToolWindows) {
                 log.info("Jujutsu project detected, replacing standard VCS log with custom implementation")

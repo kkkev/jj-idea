@@ -16,6 +16,10 @@ import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
  * Factory for creating the Jujutsu working copy tool window
  */
 class WorkingCopyToolWindowFactory : ToolWindowFactory, DumbAware, Disposable.Default {
+    companion object {
+        /** Tool window ID - must match the id in plugin.xml */
+        const val TOOL_WINDOW_ID = "Working copy"
+    }
     private data class PanelAndContent(val panel: WorkingCopyPanel, val content: Content)
 
     // TODO Key by repo, make repos sortable by name (relative path)
