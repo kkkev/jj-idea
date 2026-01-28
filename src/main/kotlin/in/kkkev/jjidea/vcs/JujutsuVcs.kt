@@ -7,15 +7,7 @@ import com.intellij.openapi.ui.Messages.showErrorDialog
 import com.intellij.openapi.vcs.AbstractVcs
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsKey
-import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
-import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.vfs.newvfs.BulkFileListener
-import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
-import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
-import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
-import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -35,24 +27,6 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     private val lazyHistoryProvider by lazy { JujutsuHistoryProvider() }
     private val lazyAnnotationProvider by lazy { JujutsuAnnotationProvider(myProject, this) }
 
-    private val fileListener = object : BulkFileListener {
-        override fun after(events: List<VFileEvent>) {
-            val dirtyScopeManager = VcsDirtyScopeManager.getInstance(myProject)
-
-            events.forEach { event ->
-                when (event) {
-                    is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
-                        event.file?.let { file ->
-                            if (roots.any { VfsUtil.isAncestor(it, file, false) }) {
-                                dirtyScopeManager.fileDirty(file)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     override fun getChangeProvider() = lazyChangeProvider
 
     override fun getDiffProvider() = lazyDiffProvider
@@ -68,8 +42,6 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun activate() {
         log.info("Jujutsu VCS activated for project: ${myProject.name}")
         super.activate()
-        myProject.messageBus.connect(myProject).subscribe(VirtualFileManager.VFS_CHANGES, fileListener)
-        log.debug("File listener registered for auto-refresh")
     }
 
     override fun deactivate() {
@@ -78,7 +50,15 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     }
 
     /**
+     * Returns true to indicate Jujutsu supports nested repositories.
+     * This also bypasses a slow FileIndexFacade.isValidAncestor() check in MappingsToRoots
+     * that would otherwise cause EDT slow operation warnings.
+     */
+    override fun allowsNestedRoots() = true
+
+    /**
      * The roots for this VCS.
+     * Note: This calls ProjectLevelVcsManager which may be slow - avoid calling on EDT.
      */
     val roots: List<VirtualFile>
         get() = ProjectLevelVcsManager.getInstance(myProject).getRootsUnderVcs(this).toList()

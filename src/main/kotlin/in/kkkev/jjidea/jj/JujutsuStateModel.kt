@@ -3,8 +3,11 @@ package `in`.kkkev.jjidea.jj
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
@@ -48,13 +51,32 @@ class JujutsuStateModel(private val project: Project) {
     val workingCopySelector = simpleNotifier<Set<JujutsuRepository>>(project, "Jujutsu Working Copy Selector")
 
     init {
-        // Watch for .jj directory changes to update initializedRoots
+        // Watch for file changes to mark files dirty and detect .jj directory changes
         project.messageBus.connect(project).subscribe(
             VirtualFileManager.VFS_CHANGES,
             object : BulkFileListener {
                 override fun after(events: List<VFileEvent>) {
+                    // Check for .jj directory changes to update initializedRoots
                     if (events.any { isJjDirectoryEvent(it) }) {
                         initializedRoots.invalidate()
+                    }
+
+                    // Mark changed files as dirty for VCS refresh
+                    // Uses cached initializedRoots to avoid EDT slow operations
+                    val repos = initializedRoots.value
+                    if (repos.isEmpty()) return
+
+                    val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
+                    events.forEach { event ->
+                        when (event) {
+                            is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
+                                event.file?.let { file ->
+                                    if (repos.any { VfsUtil.isAncestor(it.directory, file, false) }) {
+                                        dirtyScopeManager.fileDirty(file)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 

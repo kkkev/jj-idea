@@ -49,8 +49,13 @@ class JujutsuLogProvider : VcsLogProvider {
         val limit = requirements.commitCount
         val limitedEntries = if (limit > 0) entries.take(limit) else entries
 
-        // Convert to VcsCommitMetadata
+        // Convert to VcsCommitMetadata, deduplicating by hash
+        // (JJ can have multiple change IDs for the same commit)
+        // TODO It is not as simple as the comment above implies. When we deal with conflicts, we will need to
+        // distinguish by commit id. Here, the id is actually the hash of the change id, so is no better than the change
+        // id.
         val commits = limitedEntries.map { entry -> JujutsuCommitMetadata(entry, root) }
+            .distinctBy { it.id.asString() }
 
         // Read refs
         val refs = readAllRefsInternal(root)
@@ -87,16 +92,23 @@ class JujutsuLogProvider : VcsLogProvider {
         // Use logService to get commit graph
         val result = root.jujutsuRoot.logService.getCommitGraph(Expression.ALL)
 
+        // Track seen hashes to deduplicate (JJ can have multiple change IDs for the same commit)
+        val seenHashes = mutableSetOf<String>()
+
         result.getOrElse {
             log.error("Failed to read commit hashes: ${it.message}")
             return LogDataImpl.EMPTY
         }.forEach { node ->
-            val commit = JujutsuTimedCommit(
-                changeId = node.changeId,
-                parentIds = node.parentIds,
-                timestamp = node.timestamp.toEpochMilliseconds()
-            )
-            consumer.consume(commit)
+            val hashString = node.changeId.hexString
+            if (hashString !in seenHashes) {
+                seenHashes.add(hashString)
+                val commit = JujutsuTimedCommit(
+                    changeId = node.changeId,
+                    parentIds = node.parentIds,
+                    timestamp = node.timestamp.toEpochMilliseconds()
+                )
+                consumer.consume(commit)
+            }
         }
 
         // Read refs

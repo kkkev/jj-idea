@@ -23,11 +23,7 @@ import org.jetbrains.annotations.SystemIndependent
 val Project.possibleJujutsuVcs
     get() = ProjectLevelVcsManager.getInstance(this)
         .getVcsFor(
-            this.basePath?.let<
-                @SystemIndependent @NonNls
-                String,
-                VirtualFile?
-                > {
+            this.basePath?.let {
                 LocalFileSystem.getInstance().findFileByPath(it)
             }
         ) as? JujutsuVcs

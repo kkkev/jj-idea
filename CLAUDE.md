@@ -470,6 +470,14 @@ bd close <id>            # Close completed issue
 - **Single return point**: Avoid multiple return points where possible
   - Instead of early returns, chain calls with `?.let`
   - Example: `vcs?.let { executeOperation(it) }` instead of `if (vcs == null) return; executeOperation(vcs)`
+- **`equals` with `when` expression**: Use `when` expression style for `equals` overrides:
+  ```kotlin
+  override fun equals(other: Any?) = when {
+      this === other -> true
+      other !is MyClass -> false
+      else -> field == other.field
+  }
+  ```
 - **Imports**: Always use imports over fully-qualified symbols
 - **Optimize imports**: Always optimize imports (remove unused, organize)
 
