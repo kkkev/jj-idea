@@ -29,8 +29,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
                 val result = jujutsuRoot.commandExecutor.status()
 
                 if (!result.isSuccess) {
-                    log.warn("Failed to get jj status: ${result.stderr}")
-                    return // TODO Proper error handling
+                    log.warn("Failed to get jj status for ${jujutsuRoot.relativePath}: ${result.stderr}")
+                    return@forEach // Continue to next root instead of returning from entire method
                 }
 
                 parseStatus(result.stdout, jujutsuRoot, builder)

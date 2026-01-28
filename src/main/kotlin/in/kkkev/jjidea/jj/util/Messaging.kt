@@ -58,7 +58,11 @@ class SimpleNotifiableState<T : Any>(
 
     override fun connect(parent: Disposable, handler: NotifiableState.Listener<T>) {
         project.messageBus.connect(parent).subscribe(topic, handler)
-        notify(handler, startValue, value)
+        // Only notify immediately if value differs from startValue (meaning load completed)
+        // Otherwise, the load completion will trigger notification via invalidate()
+        if (value != startValue) {
+            notify(handler, startValue, value)
+        }
     }
 
     fun notify(listener: NotifiableState.Listener<T>, oldValue: T, newValue: T) {

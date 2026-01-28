@@ -32,11 +32,9 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
         val file = e.file ?: return
         val jujutsuRoot = file.jujutsuRoot
 
-        // TODO Is this threading correct?
-        ApplicationManager.getApplication().invokeLater {
-            JujutsuCompareWithPopup.show(project, jujutsuRoot) { chosen ->
-                showDiffWithRevision(project, file, RevisionExpression(chosen), jujutsuRoot)
-            }
+        // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
+        JujutsuCompareWithPopup.show(project, jujutsuRoot) { chosen ->
+            showDiffWithRevision(project, file, RevisionExpression(chosen), jujutsuRoot)
         }
     }
 

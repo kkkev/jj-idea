@@ -26,19 +26,24 @@ class WorkingCopyToolWindowFactory : ToolWindowFactory, DumbAware, Disposable.De
     private val panels = sortedMapOf<String, PanelAndContent>()
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        // Clear any stale state from previous tool window creations
+        panels.clear()
+
         project.stateModel.workingCopies.connect(this) { old, new ->
             val oldByRoot = old.associateBy { it.repo }
             val newByRoot = new.associateBy { it.repo }
 
             // First, look for removals
             (oldByRoot.keys - newByRoot.keys).forEach { removedRoot ->
-                panels[removedRoot.relativePath]?.let {
+                panels.remove(removedRoot.relativePath)?.let {
                     toolWindow.contentManager.removeContent(it.content, true)
                 }
             }
 
-            // And additions
-            (newByRoot.keys - oldByRoot.keys).forEach { addedRoot -> add(project, toolWindow, addedRoot) }
+            // And additions (process in sorted order to maintain consistent tab ordering)
+            (newByRoot.keys - oldByRoot.keys)
+                .sortedBy { it.relativePath }
+                .forEach { addedRoot -> add(project, toolWindow, addedRoot) }
 
             // Now figure out the changed log entries, and notify the relevant panel
             new.forEach { newEntry ->
@@ -55,12 +60,9 @@ class WorkingCopyToolWindowFactory : ToolWindowFactory, DumbAware, Disposable.De
         val content = ContentFactory.getInstance().createContent(panel.getContent(), title, false)
         content.setDisposer(panel)
 
-        val old = panels.put(title, PanelAndContent(panel, content))
-        if (old != null) {
-            toolWindow.contentManager.removeContent(old.content, true)
-        }
-        val newPosition = panels.keys.indexOf(title)
-        toolWindow.contentManager.addContent(content, newPosition)
+        panels[title] = PanelAndContent(panel, content)
+        // Additions are processed in sorted order, so just append
+        toolWindow.contentManager.addContent(content)
     }
 
     // Check for .jj directory directly - this is a quick filesystem check that's safe on EDT
