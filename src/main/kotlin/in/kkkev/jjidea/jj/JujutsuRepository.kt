@@ -13,18 +13,36 @@ import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 
-// TODO Should map to a VCS root allocated to Jujutsu
-// TODO Figure out what to do for an uninitialised root (probably do something special here)
 /**
  * A (possible) JJ repository. "Possible" because the directory could be uninitialised, as this class allows
  * repository initialisation as well as access to all JJ actions.
  */
 data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
-    val commandExecutor: CommandExecutor by lazy {
+    private val executor: CommandExecutor by lazy {
         val settings = JujutsuSettings.getInstance(project)
         CliExecutor(directory, settings.state.jjExecutablePath)
     }
+
+    /**
+     * Command executor for initialized repositories. Throws if repository is not initialized.
+     * Use [initExecutor] for initialization commands.
+     */
+    val commandExecutor: CommandExecutor
+        get() {
+            requireInitialised()
+            return executor
+        }
+
+    /**
+     * Command executor for initialization operations (gitInit). Does not require repository to be initialized.
+     */
+    val initExecutor: CommandExecutor get() = executor
+
     val logService: LogService by lazy { CliLogService(this) }
+
+    private fun requireInitialised() {
+        check(isInitialised) { "Repository at ${directory.path} is not initialized. Use initExecutor for gitInit." }
+    }
 
     /**
      * Path of this root, relative to the project directory.

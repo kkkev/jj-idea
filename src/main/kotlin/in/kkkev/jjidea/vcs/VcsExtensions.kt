@@ -38,12 +38,12 @@ val Project.jujutsuVcs
 
 val Project.isJujutsu get() = this.stateModel.isJujutsu
 
-// TODO This is silly - why not just the paths?
+/** All VCS roots in the project that are managed by Jujutsu. Returns VcsRoot objects (not just paths) since callers often need the full root info. */
 val Project.jujutsuRoots get() = ProjectLevelVcsManager.getInstance(this).allVcsRoots.filter { it.vcs is JujutsuVcs }
 
 fun Project.jujutsuRepositoryFor(directory: VirtualFile) = JujutsuRepository(this, directory)
 
-// TODO Repositories? Roots? Which is it?
+/** JujutsuRepository instances for all Jujutsu roots in the project. Use this when you need to work with JJ commands. */
 val Project.jujutsuRepositories get() = this.jujutsuRoots.map { this.jujutsuRepositoryFor(it.path) }
 
 /**

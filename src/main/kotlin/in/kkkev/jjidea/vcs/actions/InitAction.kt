@@ -49,8 +49,8 @@ class InitAction : DumbAwareAction(
         val newRoot = dialog.selectedDirectory ?: return
         val colocate = dialog.isColocate
 
-        // Run init in background
-        val commandExecutor = project.jujutsuRepositoryFor(newRoot).commandExecutor
+        // Run init in background - use initExecutor since repo isn't initialized yet
+        val commandExecutor = project.jujutsuRepositoryFor(newRoot).initExecutor
 
         commandExecutor.createCommand {
             val result = gitInit(colocate)

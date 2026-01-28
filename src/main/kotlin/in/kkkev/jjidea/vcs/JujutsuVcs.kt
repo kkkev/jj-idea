@@ -80,7 +80,6 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
 
         fun getKey(): VcsKey = KEY
 
-        // TODO Move this error-handling logic to JJ root
         /**
          * Get VCS with user-friendly error handling.
          * Use in user-facing actions where VCS might not be configured (e.g., context menus, toolbar actions).
