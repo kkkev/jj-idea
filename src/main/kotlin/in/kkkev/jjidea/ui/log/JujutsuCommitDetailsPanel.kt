@@ -15,6 +15,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
@@ -24,7 +25,6 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
-import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.*
 import java.awt.BorderLayout
@@ -40,10 +40,11 @@ import javax.swing.text.html.HTMLEditorKit
  * Layout matches Git plugin:
  * - TOP: Changed files tree
  * - BOTTOM: Commit metadata and description
+ *
+ * Note: This panel works with entries from any repository. The repository context
+ * is obtained from the `LogEntry.repo` field when needed.
  */
-class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
-    JPanel(BorderLayout()),
-    Disposable {
+class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
     private val metadataPanel = JPanel(BorderLayout())
@@ -54,7 +55,7 @@ class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
     private val metadataPane = JEditorPane()
 
     // Changes tree
-    private val changesTree = JujutsuChangesTree(repo.project)
+    private val changesTree = JujutsuChangesTree(project)
 
     // Current selected entry
     private var currentEntry: LogEntry? = null
@@ -75,11 +76,10 @@ class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
         setupChangesPanel()
 
         // Create splitter: changes on top, metadata on bottom
-        splitter =
-            OnePixelSplitter(true, 0.5f).apply {
-                firstComponent = changesPanel
-                secondComponent = metadataPanel
-            }
+        splitter = OnePixelSplitter(true, 0.5f).apply {
+            firstComponent = changesPanel
+            secondComponent = metadataPanel
+        }
 
         add(splitter, BorderLayout.CENTER)
 
@@ -114,13 +114,8 @@ class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
         // Grouping actions
         group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
 
-        return ActionManager
-            .getInstance()
-            .createActionToolbar(
-                "JujutsuCommitDetailsChangesToolbar",
-                group,
-                true
-            ).apply {
+        return ActionManager.getInstance()
+            .createActionToolbar("JujutsuCommitDetailsChangesToolbar", group, true).apply {
                 targetComponent = changesTree
             }
     }
@@ -177,30 +172,27 @@ class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
                 val contentFactory = DiffContentFactory.getInstance()
                 val diffManager = DiffManager.getInstance()
 
-                val content1 =
-                    if (beforePath != null && beforeContent.isNotEmpty()) {
-                        contentFactory.create(repo.project, beforeContent, beforePath.fileType)
-                    } else {
-                        contentFactory.createEmpty()
-                    }
+                val content1 = if (beforePath != null && beforeContent.isNotEmpty()) {
+                    contentFactory.create(project, beforeContent, beforePath.fileType)
+                } else {
+                    contentFactory.createEmpty()
+                }
 
-                val content2 =
-                    if (afterPath != null && afterContent.isNotEmpty()) {
-                        contentFactory.create(repo.project, afterContent, afterPath.fileType)
-                    } else {
-                        contentFactory.createEmpty()
-                    }
+                val content2 = if (afterPath != null && afterContent.isNotEmpty()) {
+                    contentFactory.create(project, afterContent, afterPath.fileType)
+                } else {
+                    contentFactory.createEmpty()
+                }
 
-                val diffRequest =
-                    SimpleDiffRequest(
-                        fileName,
-                        content1,
-                        content2,
-                        "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} ($parentId)",
-                        "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} ($currentId)"
-                    )
+                val diffRequest = SimpleDiffRequest(
+                    fileName,
+                    content1,
+                    content2,
+                    "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} ($parentId)",
+                    "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} ($currentId)"
+                )
 
-                diffManager.showDiff(repo.project, diffRequest)
+                diffManager.showDiff(project, diffRequest)
             }
         }
     }
@@ -210,10 +202,7 @@ class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
             ?: change.beforeRevision?.file?.virtualFile
             ?: return
 
-        FileEditorManager.getInstance(repo.project).openTextEditor(
-            OpenFileDescriptor(repo.project, virtualFile),
-            true
-        )
+        FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, virtualFile), true)
     }
 
     private fun showContextMenu(comp: Component, x: Int, y: Int) {
@@ -280,7 +269,7 @@ class JujutsuCommitDetailsPanel(private val repo: JujutsuRepository) :
     private fun loadChanges(entry: LogEntry) {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val fullDetails = JujutsuFullCommitDetails.create(entry, repo.directory)
+                val fullDetails = JujutsuFullCommitDetails.create(entry, entry.repo.directory)
                 val changes = fullDetails.changes.toList()
 
                 ApplicationManager.getApplication().invokeLater {

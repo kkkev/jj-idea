@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.impl.ActionButton
 import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.actionSystem.impl.FieldInplaceActionButtonLook
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.Project
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.SearchTextField
@@ -15,6 +16,7 @@ import com.intellij.ui.components.SearchFieldWithExtension
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.Box
@@ -26,15 +28,18 @@ import javax.swing.event.DocumentListener
 import javax.swing.table.TableColumn
 
 /**
- * Main panel for Jujutsu commit log UI.
+ * Unified panel for Jujutsu commit log UI that shows commits from all repositories.
  *
  * Layout:
- * - NORTH: Toolbar (refresh, filters)
+ * - NORTH: Toolbar (refresh, filters including root filter)
  * - CENTER: Splitter with log table (top) and details panel (bottom)
  *
- * Built from scratch - no dependency on IntelliJ's VCS log UI.
+ * Unlike the single-root JujutsuLogPanel, this panel:
+ * - Loads commits from all configured JJ repositories
+ * - Provides a root filter to show/hide commits by repository
+ * - Displays root indicators in the log entries
  */
-class JujutsuLogPanel(private val root: JujutsuRepository) :
+class UnifiedJujutsuLogPanel(private val project: Project) :
     JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
@@ -42,10 +47,10 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
     private val columnManager = JujutsuColumnManager()
 
     // Table showing commits
-    private val logTable = JujutsuLogTable(root.project, columnManager)
+    private val logTable = JujutsuLogTable(project, columnManager)
 
     // Details panel showing selected commit info
-    private val detailsPanel = JujutsuCommitDetailsPanel(root.project)
+    private val detailsPanel = JujutsuCommitDetailsPanel(project)
 
     // Splitter for table and details panel
     private var splitter: OnePixelSplitter
@@ -53,8 +58,17 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
     // Details panel position (true = right, false = bottom)
     private var detailsOnRight = true
 
-    // Data loader for background loading
-    private val dataLoader = JujutsuLogDataLoader(root, logTable.logModel, logTable)
+    // Root filter component (created lazily, only shown if multiple roots)
+    private var rootFilterComponent: JujutsuRootFilterComponent? = null
+
+    // Data loader for background loading from all repositories
+    private val dataLoader = UnifiedJujutsuLogDataLoader(
+        project,
+        { project.jujutsuRepositories },
+        logTable.logModel,
+        logTable,
+        onDataLoaded = { updateRootFilterVisibility() }
+    )
 
     // Filter options state
     private var useRegex = false
@@ -117,28 +131,49 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
             }
         }
 
-        // Subscribe to state changes (MVC pattern)
+        // Subscribe to state changes from all repositories
         setupStateListener()
 
         // Load initial data
         dataLoader.loadCommits()
 
-        log.info("JujutsuLogPanel initialized for root: $root")
+        log.info("UnifiedJujutsuLogPanel initialized for project: ${project.name}")
     }
 
     private fun setupStateListener() {
-        with(root.project.stateModel) {
-            repositoryStates.connect(this@JujutsuLogPanel) { old, new ->
-                // These comparisons are painful - finer-grained messages would be better
-                if (old.filter { it.repo == root } != new.filter { it.repo == root }) {
+        with(project.stateModel) {
+            // Listen for changes in any repository
+            repositoryStates.connect(this@UnifiedJujutsuLogPanel) { old, new ->
+                if (old != new) {
                     refresh()
+                    // Update root filter visibility after data loads
+                    updateRootFilterVisibility()
                 }
             }
-            workingCopySelector.connect(this@JujutsuLogPanel) { roots ->
-                if (root in roots) {
-                    selectWorkingCopyInTable() // Already on EDT
-                }
+            workingCopySelector.connect(this@UnifiedJujutsuLogPanel) { _ ->
+                selectWorkingCopyInTable() // Already on EDT
             }
+        }
+    }
+
+    /**
+     * Update root filter and gutter visibility based on whether there are multiple roots.
+     */
+    private fun updateRootFilterVisibility() {
+        val hasMultipleRoots = logTable.logModel.getAllRoots().size > 1
+
+        // Update root filter visibility
+        rootFilterComponent?.let { component ->
+            component.isVisible = hasMultipleRoots
+        }
+
+        // Update gutter column visibility
+        val wasGutterVisible = columnManager.showRootGutterColumn
+        columnManager.showRootGutterColumn = hasMultipleRoots
+
+        // Rebuild column visibility if gutter state changed
+        if (wasGutterVisible != hasMultipleRoots) {
+            updateColumnVisibility()
         }
     }
 
@@ -180,18 +215,28 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
                 createActionGroup(),
                 true
             )
-            toolbar.targetComponent = this@JujutsuLogPanel
+            toolbar.targetComponent = this@UnifiedJujutsuLogPanel
 
             add(leftPanel, BorderLayout.WEST)
             add(toolbar.component, BorderLayout.EAST)
         }
 
     /**
-     * Create the filter components panel (Bookmark, Author, Date, Paths).
+     * Create the filter components panel (Root, Reference, Author, Date, Paths).
      */
     private fun createFilterComponents() =
         JPanel().apply {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
+
+            // Root filter (only shown when multiple roots)
+            rootFilterComponent = JujutsuRootFilterComponent(logTable.logModel).apply {
+                initUi()
+                initialize()
+                // Initially hidden, will show when data loads if multiple roots
+                isVisible = false
+            }
+            add(rootFilterComponent)
+            add(Box.createHorizontalStrut(5))
 
             // Reference filter (bookmarks, tags, @)
             add(
@@ -218,15 +263,7 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
                     initialize()
                 }
             )
-            add(Box.createHorizontalStrut(5))
-
-            // Paths filter
-            add(
-                JujutsuPathsFilterComponent(root, logTable.logModel).apply {
-                    initUi()
-                    initialize()
-                }
-            )
+            // Note: Paths filter is omitted in unified mode as it requires a single root
         }
 
     /**
@@ -279,7 +316,7 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
     }
 
     /**
-     * Refresh action - reload commits.
+     * Refresh action - reload commits from all repositories.
      */
     private inner class RefreshAction : AnAction(
         JujutsuBundle.message("log.action.refresh"),
@@ -535,21 +572,20 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
     }
 
     /**
-     * Refresh the log data from the VCS.
+     * Refresh the log data from all VCS roots.
      * Reloads all commits and updates the display.
      */
     fun refresh() {
-        log.info("Refreshing log panel")
+        log.info("Refreshing unified log panel")
         dataLoader.refresh()
     }
 
-    // TODO Is this a useful proxy?
     private fun selectWorkingCopyInTable() {
         dataLoader.selectWorkingCopyInTable()
     }
 
     override fun dispose() {
-        log.info("JujutsuLogPanel disposed")
+        log.info("UnifiedJujutsuLogPanel disposed")
         detailsPanel.dispose()
         // Other cleanup will happen automatically
     }

@@ -5,13 +5,16 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.table.JBTable
+import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import kotlinx.datetime.Instant
 import java.awt.Component
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
+import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.ListSelectionModel
@@ -34,6 +37,58 @@ class JujutsuLogTable(
     // Graph nodes for rendering (populated when data is loaded)
     var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
         private set
+
+    // Root gutter state: true = expanded (shows repo name), false = collapsed (just colored strip)
+    var isRootGutterExpanded: Boolean = false
+        private set
+
+    // Callback when gutter expansion changes (for column width adjustment)
+    var onGutterExpansionChanged: (() -> Unit)? = null
+
+    /**
+     * Width of the gutter strip when collapsed.
+     */
+    val gutterCollapsedWidth: Int get() = JBUI.scale(8)
+
+    /**
+     * Width of the gutter when expanded (includes repo name).
+     * Calculated based on longest repo name.
+     */
+    val gutterExpandedWidth: Int
+        get() {
+            val fm = getFontMetrics(font)
+            val maxWidth = logModel.getAllRoots().maxOfOrNull { fm.stringWidth(it.displayName) } ?: 0
+            return maxWidth + 16 // padding
+        }
+
+    /**
+     * Toggle the root gutter expansion state.
+     */
+    fun toggleRootGutter() {
+        isRootGutterExpanded = !isRootGutterExpanded
+        updateGutterColumnWidth()
+        onGutterExpansionChanged?.invoke()
+    }
+
+    /**
+     * Update the gutter column width based on current expansion state.
+     */
+    private fun updateGutterColumnWidth() {
+        for (i in 0 until columnModel.columnCount) {
+            val column = columnModel.getColumn(i)
+            if (column.modelIndex == JujutsuLogTableModel.COLUMN_ROOT_GUTTER) {
+                val newWidth = if (isRootGutterExpanded) gutterExpandedWidth else gutterCollapsedWidth
+                column.minWidth = newWidth
+                column.maxWidth = newWidth
+                column.preferredWidth = newWidth
+                column.width = newWidth
+                break
+            }
+        }
+        // Force table to recalculate layout
+        revalidate()
+        repaint()
+    }
 
     init {
         // Single selection mode for now
@@ -63,6 +118,23 @@ class JujutsuLogTable(
             object : MouseMotionAdapter() {
                 override fun mouseMoved(e: MouseEvent) {
                     repaint()
+                }
+            }
+        )
+
+        // Handle clicks on the gutter column to toggle expansion
+        addMouseListener(
+            object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) {
+                    // Check if click is on the gutter column
+                    val viewColumn = columnAtPoint(e.point)
+                    if (viewColumn >= 0) {
+                        val modelColumn = convertColumnIndexToModel(viewColumn)
+                        if (modelColumn == JujutsuLogTableModel.COLUMN_ROOT_GUTTER) {
+                            toggleRootGutter()
+                            e.consume()
+                        }
+                    }
                 }
             }
         )
@@ -142,9 +214,13 @@ class JujutsuLogTable(
     fun updateGraph(nodes: Map<ChangeId, GraphNode>) {
         graphNodes = nodes
         // Refresh combined graph+description column rendering with column manager
-        if (columnModel.columnCount > 0) {
-            columnModel.getColumn(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION).cellRenderer =
-                JujutsuGraphAndDescriptionRenderer(graphNodes, columnManager)
+        // Find the column by model index, not view index
+        for (i in 0 until columnModel.columnCount) {
+            val column = columnModel.getColumn(i)
+            if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
+                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(graphNodes, columnManager)
+                break
+            }
         }
         repaint()
     }
@@ -233,14 +309,15 @@ class JujutsuLogTable(
  * Table model for Jujutsu commit log.
  *
  * Columns:
- * 0. Graph+Description - Combined column (optional elements controlled by column manager)
- * 1. Status - Conflict/empty indicators (optional)
- * 2. Change ID - Separate column (optional)
- * 3. Description - Separate column (optional)
- * 4. Decorations - Separate column for bookmarks/tags (optional)
- * 5. Author - Author name
- * 6. Committer - Committer name (optional)
- * 7. Date - Commit timestamp
+ * 0. Root Gutter - Colored strip showing repository (only visible with multiple roots)
+ * 1. Graph+Description - Combined column (optional elements controlled by column manager)
+ * 2. Status - Conflict/empty indicators (optional)
+ * 3. Change ID - Separate column (optional)
+ * 4. Description - Separate column (optional)
+ * 5. Decorations - Separate column for bookmarks/tags (optional)
+ * 6. Author - Author name
+ * 7. Committer - Committer name (optional)
+ * 8. Date - Commit timestamp
  */
 class JujutsuLogTableModel : AbstractTableModel() {
     private val entries = mutableListOf<LogEntry>()
@@ -253,18 +330,20 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var bookmarkFilter: Set<ChangeId> = emptySet() // Filter by bookmark change IDs (includes ancestors)
     private var dateFilterCutoff: Instant? = null // Filter by date (show commits after cutoff)
     private var pathsFilter: Set<String> = emptySet() // Filter by paths
+    private var rootFilter: Set<JujutsuRepository> = emptySet() // Filter by repository root
 
     companion object {
-        const val COLUMN_GRAPH_AND_DESCRIPTION = 0
-        const val COLUMN_STATUS = 1
-        const val COLUMN_CHANGE_ID = 2
-        const val COLUMN_DESCRIPTION = 3
-        const val COLUMN_DECORATIONS = 4
-        const val COLUMN_AUTHOR = 5
-        const val COLUMN_COMMITTER = 6
-        const val COLUMN_DATE = 7
+        const val COLUMN_ROOT_GUTTER = 0
+        const val COLUMN_GRAPH_AND_DESCRIPTION = 1
+        const val COLUMN_STATUS = 2
+        const val COLUMN_CHANGE_ID = 3
+        const val COLUMN_DESCRIPTION = 4
+        const val COLUMN_DECORATIONS = 5
+        const val COLUMN_AUTHOR = 6
+        const val COLUMN_COMMITTER = 7
+        const val COLUMN_DATE = 8
 
-        const val NUM_COLUMNS = 8
+        const val NUM_COLUMNS = 9
     }
 
     override fun getRowCount() = filteredEntries.size
@@ -280,6 +359,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
         val entry = filteredEntries[rowIndex]
 
         return when (columnIndex) {
+            COLUMN_ROOT_GUTTER -> entry // Return full entry for gutter renderer
             COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
             COLUMN_STATUS -> if (entry.hasConflict || entry.isEmpty || entry.immutable) entry else null
             COLUMN_CHANGE_ID -> entry.changeId
@@ -356,6 +436,20 @@ class JujutsuLogTableModel : AbstractTableModel() {
     }
 
     /**
+     * Set the root filter (by repository).
+     * Empty set means no root filtering (show all roots).
+     */
+    fun setRootFilter(roots: Set<JujutsuRepository>) {
+        rootFilter = roots
+        applyFilter()
+    }
+
+    /**
+     * Get all unique roots in the current entries (for filter UI).
+     */
+    fun getAllRoots(): List<JujutsuRepository> = entries.map { it.repo }.distinct()
+
+    /**
      * Get all unique authors in the current entries (for filter UI).
      */
     fun getAllAuthors(): List<String> = entries.mapNotNull { it.author?.email }.distinct().sorted()
@@ -405,8 +499,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
         filteredEntries.addAll(
             entries.filter { entry ->
                 // Text filter (if active)
-                val matchesText =
-                    textMatcher?.let { matcher ->
+                val matchesText = textMatcher?.let { matcher ->
                         matcher(entry.description.summary) ||
                             matcher(entry.changeId.toString()) ||
                             entry.author?.name?.let(matcher) == true ||
@@ -437,7 +530,10 @@ class JujutsuLogTableModel : AbstractTableModel() {
                 // TODO: Implement path filtering once file changes are available in LogEntry
                 val matchesPaths = pathsFilter.isEmpty()
 
-                matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths
+                // Root filter (if active)
+                val matchesRoot = rootFilter.isEmpty() || rootFilter.contains(entry.repo)
+
+                matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths && matchesRoot
             }
         )
 

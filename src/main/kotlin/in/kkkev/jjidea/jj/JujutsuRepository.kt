@@ -48,6 +48,12 @@ data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
      * Path of this root, relative to the project directory.
      */
     val relativePath get() = project.guessProjectDir()?.let { directory.pathRelativeTo(it) } ?: directory.path
+
+    /**
+     * Display name for UI. Shows the directory name, or "root" if it's the project root.
+     */
+    val displayName: String get() = relativePath.ifEmpty { directory.name }
+
     val isInitialised get() = JujutsuRootChecker.isJujutsuRoot(directory)
 
     override fun toString() = "Repository:$relativePath"

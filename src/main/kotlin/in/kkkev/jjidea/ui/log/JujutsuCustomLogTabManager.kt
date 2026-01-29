@@ -10,16 +10,13 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
-import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 
 /**
  * Service that manages opening custom Jujutsu log tabs.
  *
- * Creates custom log tabs with full control over:
- * - Column visibility and ordering
- * - Custom rendering (refs, icons, alignment)
- * - Custom filters and actions
+ * Creates a unified log tab that shows commits from all JJ repositories
+ * with filtering capability by root.
  *
  * Built from scratch using JTable - no dependency on VcsLogUi.
  */
@@ -27,74 +24,70 @@ import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
 
-    // Tabs keyed by VCS root path
-    private val openTabs = mutableMapOf<JujutsuRepository, Content>()
-    private val openPanels = mutableListOf<JujutsuLogPanel>()
+    // Single unified log tab content
+    private var unifiedLogContent: Content? = null
+    private var unifiedLogPanel: UnifiedJujutsuLogPanel? = null
 
     /**
-     * Opens a new custom Jujutsu log tab.
+     * Opens the unified Jujutsu log tab.
      *
-     * Creates a tab with our custom table-based log UI.
+     * Creates a single tab showing commits from all JJ repositories
+     * with a root filter for multi-root projects.
      */
     fun openCustomLogTab() {
-        log.info("Opening custom Jujutsu log tab")
+        log.info("Opening unified Jujutsu log tab")
 
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                // TODO Each root should have a short name: the directory name if unique, otherwise enough of the parent path up to the project root to guarantee uniqueness
                 val roots = project.jujutsuRepositories
 
-                // "content" is the tab to add to the tool window
-                // the "panel" is the stuff that goes within it
+                if (roots.isEmpty()) {
+                    log.info("No Jujutsu repositories found, skipping log tab creation")
+                    return@executeOnPooledThread
+                }
 
                 val contentFactory = ContentFactory.getInstance()
                 val changesViewContentManager = ChangesViewContentManager.getInstance(project)
 
                 ApplicationManager.getApplication().invokeLater {
-                    roots.forEach { root ->
-                        if (!openTabs.contains(root)) {
-                            // Create our custom log panel
-                            val logPanel = JujutsuLogPanel(root)
+                    // Only create one unified tab if not already open
+                    if (unifiedLogContent == null) {
+                        // Create unified log panel for all roots
+                        val logPanel = UnifiedJujutsuLogPanel(project)
 
-                            // Register for disposal
-                            Disposer.register(this, logPanel)
+                        // Register for disposal
+                        Disposer.register(this, logPanel)
 
-                            // Create content tab
-                            // TODO Localise
-                            val displayName =
-                                "Jujutsu Log" + root.relativePath.let { if (it.isEmpty()) "" else ": $it" }
-                            val content = contentFactory.createContent(logPanel, displayName, false)
-                                .apply {
-                                    isCloseable = false
-                                    preferredFocusableComponent = logPanel
-                                }
+                        // Create content tab
+                        val content = contentFactory.createContent(logPanel, "Jujutsu Log", false)
+                            .apply {
+                                isCloseable = false
+                                preferredFocusableComponent = logPanel
+                            }
 
-                            // Add to changes view (Git tool window area)
-                            changesViewContentManager.addContent(content)
-                            changesViewContentManager.setSelectedContent(content)
+                        // Add to changes view (Git tool window area)
+                        changesViewContentManager.addContent(content)
+                        changesViewContentManager.setSelectedContent(content)
 
-                            openTabs.put(root, content)
-                            openPanels.add(logPanel)
-                        }
+                        unifiedLogContent = content
+                        unifiedLogPanel = logPanel
+                    } else {
+                        // Tab already exists, just select it
+                        unifiedLogContent?.let { changesViewContentManager.setSelectedContent(it) }
                     }
                 }
-                openTabs.filterNot { (root, _) -> root in roots }
-                    .forEach { (root, content) ->
-                        changesViewContentManager.removeContent(content)
-                        openTabs.remove(root)
-                    }
 
-                log.info("Custom Jujutsu log tab opened successfully")
+                log.info("Unified Jujutsu log tab opened successfully")
             } catch (e: Exception) {
-                log.error("Failed to open custom Jujutsu log tab", e)
+                log.error("Failed to open unified Jujutsu log tab", e)
             }
         }
     }
 
     override fun dispose() {
         log.info("Disposing JujutsuCustomLogTabManager")
-        openTabs.clear()
-        openPanels.clear()
+        unifiedLogContent = null
+        unifiedLogPanel = null
         // Cleanup happens automatically via Disposer
     }
 

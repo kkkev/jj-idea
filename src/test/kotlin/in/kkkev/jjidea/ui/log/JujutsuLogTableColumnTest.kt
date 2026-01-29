@@ -58,8 +58,9 @@ class JujutsuLogTableColumnTest {
     fun `table model provides correct column count`() {
         val model = JujutsuLogTableModel()
 
-        // Always 8 columns in the model (visibility controlled separately)
-        model.columnCount shouldBe 8
+        // Always 9 columns in the model (visibility controlled separately)
+        // Columns: Root Gutter, Graph+Desc, Status, ChangeID, Desc, Decorations, Author, Committer, Date
+        model.columnCount shouldBe 9
     }
 
     @Test
