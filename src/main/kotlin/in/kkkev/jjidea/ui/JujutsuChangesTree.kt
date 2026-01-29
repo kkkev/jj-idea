@@ -6,6 +6,7 @@ import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.DIRECTORY_GROUPING
+import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.REPOSITORY_GROUPING
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
 import javax.swing.tree.DefaultTreeModel
 
@@ -26,8 +27,8 @@ class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(projec
     override fun installGroupingSupport(): ChangesGroupingSupport {
         val support = ChangesGroupingSupport(myProject, this, false)
 
-        // Initialize with directory grouping by default
-        val defaultGrouping = setOf(DIRECTORY_GROUPING)
+        // Initialize with directory and repository grouping by default for multi-root support
+        val defaultGrouping = setOf(DIRECTORY_GROUPING, REPOSITORY_GROUPING)
         support.setGroupingKeysOrSkip(defaultGrouping)
 
         return support
