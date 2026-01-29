@@ -40,8 +40,7 @@ class JujutsuStateModel(private val project: Project) {
      */
     val isJujutsu: Boolean get() = initializedRoots.value.isNotEmpty()
 
-    // TODO This invalidates the entire state even if a single repo changed
-    val workingCopies = notifiableState(project, "Jujutsu Working Copies", emptySet()) {
+    val repositoryStates = notifiableState(project, "Jujutsu Repository States", emptySet()) {
         project.jujutsuRepositories.mapNotNull {
             it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
         }.sortedBy {
@@ -101,7 +100,7 @@ val Project.stateModel: JujutsuStateModel get() = service()
 
 fun JujutsuRepository.invalidate(select: Boolean = false) {
     val stateModel = project.stateModel
-    stateModel.workingCopies.invalidate()
+    stateModel.repositoryStates.invalidate()
     if (select) {
         stateModel.workingCopySelector.notify(setOf(this))
     }

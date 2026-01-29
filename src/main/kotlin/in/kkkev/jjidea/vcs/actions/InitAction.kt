@@ -62,7 +62,7 @@ class InitAction : DumbAwareAction(
 
             result
         }.onSuccess {
-            project.stateModel.workingCopies.invalidate()
+            project.stateModel.repositoryStates.invalidate()
         }.onFailureTellUser("action.init.error", project, log)
             .executeAsync()
     }

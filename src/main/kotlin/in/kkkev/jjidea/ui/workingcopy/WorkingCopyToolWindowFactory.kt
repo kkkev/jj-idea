@@ -29,7 +29,7 @@ class WorkingCopyToolWindowFactory : ToolWindowFactory, DumbAware, Disposable.De
         // Clear any stale state from previous tool window creations
         panels.clear()
 
-        project.stateModel.workingCopies.connect(this) { old, new ->
+        project.stateModel.repositoryStates.connect(this) { old, new ->
             val oldByRoot = old.associateBy { it.repo }
             val newByRoot = new.associateBy { it.repo }
 

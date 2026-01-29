@@ -128,8 +128,7 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
 
     private fun setupStateListener() {
         with(root.project.stateModel) {
-            // TODO Actually, should be against the whole log
-            workingCopies.connect(this@JujutsuLogPanel) { old, new ->
+            repositoryStates.connect(this@JujutsuLogPanel) { old, new ->
                 // These comparisons are painful - finer-grained messages would be better
                 if (old.filter { it.repo == root } != new.filter { it.repo == root }) {
                     refresh()
