@@ -58,6 +58,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
 
     // UI Components
     private val repoSelector = JComboBox<RepoItem>().apply {
+        isVisible = false // Hidden until we know there are multiple repos
         renderer = object : DefaultListCellRenderer() {
             override fun getListCellRendererComponent(
                 list: JList<*>?,
