@@ -60,12 +60,13 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     // Root filter component (created lazily, only shown if multiple roots)
     private var rootFilterComponent: JujutsuRootFilterComponent? = null
 
-    // Data loader for background loading from all repositories
+    // Data loader for background loading from all repositories (subscribes to changeSelection)
     private val dataLoader = UnifiedJujutsuLogDataLoader(
         project,
         { project.jujutsuRepositories },
         logTable.logModel,
         logTable,
+        parentDisposable = this,
         onDataLoaded = { updateRootFilterVisibility() }
     )
 
@@ -140,18 +141,12 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     }
 
     private fun setupStateListener() {
-        with(project.stateModel) {
-            // Listen for changes in any repository
-            repositoryStates.connect(this@UnifiedJujutsuLogPanel) { old, new ->
-                if (old != new) {
-                    refresh()
-                    // Update root filter visibility after data loads
-                    updateRootFilterVisibility()
-                }
-            }
-            workingCopySelector.connect(this@UnifiedJujutsuLogPanel) { _ ->
-                // Set pending flag - selection will happen after data loads
-                dataLoader.pendingSelectWorkingCopy = true
+        // Listen for repository state changes to refresh
+        // (Selection handling is done by the data loader)
+        project.stateModel.repositoryStates.connect(this) { old, new ->
+            if (old != new) {
+                refresh()
+                updateRootFilterVisibility()
             }
         }
     }
@@ -578,10 +573,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     fun refresh() {
         log.info("Refreshing unified log panel")
         dataLoader.refresh()
-    }
-
-    private fun selectWorkingCopyInTable() {
-        dataLoader.selectWorkingCopyInTable()
     }
 
     override fun dispose() {

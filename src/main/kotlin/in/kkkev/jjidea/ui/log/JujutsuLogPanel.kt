@@ -53,8 +53,8 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
     // Details panel position (true = right, false = bottom)
     private var detailsOnRight = true
 
-    // Data loader for background loading
-    private val dataLoader = JujutsuLogDataLoader(root, logTable.logModel, logTable)
+    // Data loader for background loading (subscribes to changeSelection)
+    private val dataLoader = JujutsuLogDataLoader(root, logTable.logModel, logTable, this)
 
     // Filter options state
     private var useRegex = false
@@ -127,18 +127,11 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
     }
 
     private fun setupStateListener() {
-        with(root.project.stateModel) {
-            repositoryStates.connect(this@JujutsuLogPanel) { old, new ->
-                // These comparisons are painful - finer-grained messages would be better
-                if (old.filter { it.repo == root } != new.filter { it.repo == root }) {
-                    refresh()
-                }
-            }
-            workingCopySelector.connect(this@JujutsuLogPanel) { roots ->
-                if (root in roots) {
-                    // Set pending flag - selection will happen after data loads
-                    dataLoader.pendingSelectWorkingCopy = true
-                }
+        // Listen for repository state changes to refresh when this repo changes
+        // (Selection handling is done by the data loader)
+        root.project.stateModel.repositoryStates.connect(this) { old, new ->
+            if (old.filter { it.repo == root } != new.filter { it.repo == root }) {
+                refresh()
             }
         }
     }
@@ -542,11 +535,6 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
     fun refresh() {
         log.info("Refreshing log panel")
         dataLoader.refresh()
-    }
-
-    // TODO Is this a useful proxy?
-    private fun selectWorkingCopyInTable() {
-        dataLoader.selectWorkingCopyInTable()
     }
 
     override fun dispose() {

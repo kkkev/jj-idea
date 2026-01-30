@@ -48,7 +48,11 @@ class JujutsuStateModel(private val project: Project) {
         }.toSet()
     }
 
-    val workingCopySelector = simpleNotifier<Set<JujutsuRepository>>(project, "Jujutsu Working Copy Selector")
+    /**
+     * Change selection notifier. Actions use this to request a specific change be selected.
+     * Log panels and data loaders listen and select the matching entry if it belongs to their repo.
+     */
+    val changeSelection = simpleNotifier<ChangeKey>(project, "Jujutsu Change Selection")
 
     init {
         // Watch for file changes to mark files dirty and detect .jj directory changes
@@ -93,15 +97,37 @@ class JujutsuStateModel(private val project: Project) {
                 .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
                 ?.isAvailable = new.isNotEmpty()
         }
+
+        // When repository states change (VCS operations completed), mark directories dirty
+        // to trigger ChangeProvider refresh for file changes
+        repositoryStates.connect(project) { _, new ->
+            if (new.isNotEmpty()) {
+                val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
+                new.forEach { entry ->
+                    dirtyScopeManager.dirDirtyRecursively(entry.repo.directory)
+                }
+            }
+        }
     }
 }
 
 val Project.stateModel: JujutsuStateModel get() = service()
 
-fun JujutsuRepository.invalidate(select: Boolean = false) {
+/**
+ * Invalidate cached repository state and optionally request a change selection.
+ *
+ * @param select The revision to select after refresh, or null for no selection change.
+ *
+ * Use cases:
+ * - `invalidate()` - just refresh, no selection change
+ * - `invalidate(changeId)` - refresh and select specific change (e.g., after `jj edit`)
+ * - `invalidate(WorkingCopy)` - refresh and select working copy (e.g., after `jj new`)
+ * - `invalidate(bookmark)` - refresh and select a bookmark
+ */
+fun JujutsuRepository.invalidate(select: Revision? = null) {
     val stateModel = project.stateModel
     stateModel.repositoryStates.invalidate()
-    if (select) {
-        stateModel.workingCopySelector.notify(setOf(this))
+    if (select != null) {
+        stateModel.changeSelection.notify(ChangeKey(this, select))
     }
 }

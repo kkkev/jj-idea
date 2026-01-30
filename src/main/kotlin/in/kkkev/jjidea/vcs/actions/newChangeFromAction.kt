@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
 
 /**
@@ -23,7 +24,8 @@ fun newChangeFromAction(project: Project, repo: JujutsuRepository?, changeIds: L
         target.commandExecutor.createCommand {
             new(description = description, parentRevisions = changeIds)
         }.onSuccess {
-            target.invalidate(true)
+            // The new change becomes the working copy - select it
+            target.invalidate(select = WorkingCopy)
             log.info("Created new change from $changeIds with description: $description")
         }.onFailureTellUser("log.action.new.error", project, log)
             .executeAsync()

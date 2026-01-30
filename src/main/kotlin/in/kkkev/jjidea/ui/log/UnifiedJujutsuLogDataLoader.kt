@@ -1,13 +1,19 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.stateModel
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -19,23 +25,36 @@ import java.util.concurrent.TimeUnit
  * - Loads commits from all provided repositories concurrently
  * - Merges results into a single list sorted by timestamp (newest first)
  * - Updates the table model and graph on EDT
+ * - Subscribes to changeSelection for handling selection requests
  */
 class UnifiedJujutsuLogDataLoader(
     private val project: Project,
     private val repositories: () -> List<JujutsuRepository>,
     private val tableModel: JujutsuLogTableModel,
     private val table: JujutsuLogTable,
+    parentDisposable: Disposable,
     private val onDataLoaded: (() -> Unit)? = null
 ) {
     private val log = Logger.getInstance(javaClass)
     private val graphBuilder = CommitGraphBuilder()
 
     /**
-     * Flag to track if working copy selection is pending.
-     * Set when a selection is requested before data is loaded.
+     * Pending selection to apply after data loads.
      */
     @Volatile
-    var pendingSelectWorkingCopy = false
+    private var pendingSelection: ChangeKey? = null
+
+    @Volatile
+    private var hasPendingSelection = false
+
+    init {
+        // Listen for change selection requests
+        project.stateModel.changeSelection.connect(parentDisposable) { key ->
+            if (key.revision != null) {
+                requestSelection(key)
+            }
+        }
+    }
 
     /**
      * Load commits from all repositories in the background.
@@ -117,14 +136,15 @@ class UnifiedJujutsuLogDataLoader(
                     table.updateGraph(graphNodes)
                     log.info("Table updated with ${allEntries.size} commits and graph layout")
 
-                    // Handle pending working copy selection
-                    if (pendingSelectWorkingCopy) {
-                        pendingSelectWorkingCopy = false
-                        selectWorkingCopyInTable()
-                    }
-
-                    // Notify callback
+                    // Notify callback (e.g., update root filter visibility)
                     onDataLoaded?.invoke()
+
+                    // Handle pending selection LAST - explicit selection wins over implicit
+                    if (hasPendingSelection) {
+                        hasPendingSelection = false
+                        pendingSelection?.let { selectEntry(it.repo, it.revision!!) }
+                        pendingSelection = null
+                    }
                 }
             }
 
@@ -135,33 +155,61 @@ class UnifiedJujutsuLogDataLoader(
     }
 
     /**
-     * Select the working copy (@) entry in the table and scroll it into view.
-     * For multi-root, selects the first working copy found.
+     * Select an entry in the table by repo and revision, scrolling it into view.
+     * Matches by repo to ensure correct selection in multi-root.
+     *
+     * @param repo The repository containing the entry
+     * @param revision The revision to select ([ChangeId] or [WorkingCopy])
      */
-    fun selectWorkingCopyInTable() {
-        // Find the first working copy entry in the table model
-        val workingCopyIndex = (0 until tableModel.rowCount).firstOrNull { row ->
-            tableModel.getEntry(row)?.isWorkingCopy == true
+    private fun selectEntry(repo: JujutsuRepository, revision: Revision) {
+        val rowIndex = when (revision) {
+            is ChangeId -> (0 until tableModel.rowCount).firstOrNull { row ->
+                val entry = tableModel.getEntry(row)
+                entry?.repo == repo && entry.changeId == revision
+            }
+            WorkingCopy -> (0 until tableModel.rowCount).firstOrNull { row ->
+                val entry = tableModel.getEntry(row)
+                entry?.repo == repo && entry.isWorkingCopy
+            }
+            else -> {
+                log.warn("Unsupported revision type for selection: $revision")
+                null
+            }
         }
 
-        if (workingCopyIndex != null) {
-            // Select the row
-            table.setRowSelectionInterval(workingCopyIndex, workingCopyIndex)
-
-            // Scroll to the selected row
-            table.scrollRectToVisible(table.getCellRect(workingCopyIndex, 0, true))
-
-            log.info("Selected working copy at row $workingCopyIndex")
+        if (rowIndex != null) {
+            table.setRowSelectionInterval(rowIndex, rowIndex)
+            table.scrollRectToVisible(table.getCellRect(rowIndex, 0, true))
+            log.info("Selected entry at row $rowIndex (${repo.relativePath}:$revision)")
         } else {
-            log.warn("Working copy not found in table after refresh")
+            log.warn("Entry not found: ${repo.relativePath}:$revision")
         }
     }
 
     /**
-     * Refresh the log - reload all commits from all repositories.
+     * Request selection of an entry. If data is loading, defers until load completes.
+     */
+    private fun requestSelection(key: ChangeKey) {
+        pendingSelection = key
+        hasPendingSelection = true
+    }
+
+    /**
+     * Refresh the log - reload all commits from all repositories, preserving current selection.
+     * Does not override explicit selection requests from changeSelection.
      */
     fun refresh() {
         log.info("Refreshing unified log")
+        // Save current selection to restore after refresh (unless an explicit selection is pending)
+        val savedSelection = if (!hasPendingSelection) {
+            table.selectedEntry?.let { ChangeKey(it.repo, it.changeId) }
+        } else null
+
         loadCommits()
+
+        // Restore selection only if no explicit selection is pending
+        if (savedSelection != null && !hasPendingSelection) {
+            requestSelection(savedSelection)
+        }
     }
 }

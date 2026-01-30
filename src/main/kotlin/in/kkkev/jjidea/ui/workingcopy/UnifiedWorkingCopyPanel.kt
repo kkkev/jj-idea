@@ -20,7 +20,9 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -217,14 +219,12 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             }
         }
 
-        // Subscribe to working copy selector for programmatic selection
-        project.stateModel.workingCopySelector.connect(this) { repos ->
-            repos.firstOrNull()?.let { repo ->
-                controlsPanel.boundRepository = repo
-                // Also update from state model
-                project.stateModel.repositoryStates.value.find { it.repo == repo }?.let {
-                    controlsPanel.update(it)
-                }
+        // Subscribe to change selection for programmatic repo selection
+        project.stateModel.changeSelection.connect(this) { key ->
+            controlsPanel.boundRepository = key.repo
+            // Also update from state model
+            project.stateModel.repositoryStates.value.find { it.repo == key.repo }?.let {
+                controlsPanel.update(it)
             }
         }
     }
@@ -270,7 +270,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             ChangeListListener.TOPIC,
             object : ChangeListListener {
                 override fun changeListUpdateDone() {
-                    refresh()
+                    reloadChangesFromCache()
                 }
             }
         )
@@ -312,11 +312,34 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     private fun getSelectedChange() = changesTree.selectedChanges.firstOrNull()
 
+    /**
+     * Refresh button handler - triggers full refresh including external changes.
+     *
+     * Steps:
+     * 1. VFS sync to detect external file changes
+     * 2. Mark all repo directories dirty to trigger ChangeProvider
+     * 3. Reload from cache (the listener chain may also trigger reloadChangesFromCache)
+     */
     fun refresh() {
-        loadCurrentChanges()
+        val repos = project.stateModel.initializedRoots.value.map { it.directory }
+        if (repos.isNotEmpty()) {
+            // Sync VFS for external changes (async)
+            VfsUtil.markDirtyAndRefresh(true, true, true, *repos.toTypedArray())
+
+            // Mark all repo directories dirty to trigger ChangeProvider refresh
+            val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
+            repos.forEach { dir -> dirtyScopeManager.dirDirtyRecursively(dir) }
+        }
+
+        // Also reload directly - the listener chain may be slow or not fire
+        reloadChangesFromCache()
     }
 
-    private fun loadCurrentChanges() {
+    /**
+     * Called by ChangeListListener when changes are detected.
+     * Reads from ChangeListManager cache and updates the UI.
+     */
+    private fun reloadChangesFromCache() {
         ApplicationManager.getApplication().executeOnPooledThread {
             val changes = ChangeListManager.getInstance(project).allChanges.toList()
 

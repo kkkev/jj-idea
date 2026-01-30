@@ -13,11 +13,13 @@ import `in`.kkkev.jjidea.jj.invalidate
 fun editChangeAction(project: Project, logEntry: LogEntry?) =
     nullAndDumbAwareAction(logEntry, "log.action.edit", AllIcons.Actions.Edit) {
         val jujutsuRoot = target.repo
+        val changeId = target.changeId
         jujutsuRoot.commandExecutor
-            .createCommand { edit(target.changeId) }
+            .createCommand { edit(changeId) }
             .onSuccess {
-                jujutsuRoot.invalidate(select = true)
-                log.info("Edited change ${target.changeId}")
+                // The edited change becomes the working copy - select it
+                jujutsuRoot.invalidate(select = changeId)
+                log.info("Edited change $changeId")
             }.onFailureTellUser("log.action.edit.error", project, log)
             .executeAsync()
     }

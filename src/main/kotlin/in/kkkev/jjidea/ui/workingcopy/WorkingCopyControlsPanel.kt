@@ -342,7 +342,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             descriptionArea.text = ""
             isDescriptionModified = false
             updateDescriptionLabel()
-            repo.invalidate(select = true)
+            repo.invalidate(select = WorkingCopy)
         }.onFailure {
             JOptionPane.showMessageDialog(
                 this@WorkingCopyControlsPanel,

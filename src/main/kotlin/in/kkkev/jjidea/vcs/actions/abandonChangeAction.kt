@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
 
 /**
@@ -45,7 +46,8 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
     val jujutsuRoot = target.repo
     jujutsuRoot.commandExecutor.createCommand { abandon(target.changeId) }
         .onSuccess {
-            jujutsuRoot.invalidate(true)
+            // Select the working copy (may have changed if we abandoned the old working copy)
+            jujutsuRoot.invalidate(select = WorkingCopy)
             log.info("Abandoned change ${target.changeId}")
         }.onFailureTellUser("log.action.abandon.error", project, log)
         .executeAsync()

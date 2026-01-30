@@ -1,41 +1,62 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.stateModel
 
 /**
  * Loads commit log data in the background and updates the table model on EDT.
  *
  * Uses our existing JujutsuLogProvider infrastructure - no dependency on
  * IntelliJ's VcsLogData.
+ *
+ * Subscribes to the state model's changeSelection notifier to handle selection
+ * requests for this repository.
  */
 class JujutsuLogDataLoader(
     private val repo: JujutsuRepository,
     private val tableModel: JujutsuLogTableModel,
     private val table: JujutsuLogTable,
+    parentDisposable: Disposable,
     private val onDataLoaded: (() -> Unit)? = null
 ) {
     private val log = Logger.getInstance(javaClass)
     private val graphBuilder = CommitGraphBuilder()
 
     /**
-     * Flag to track if working copy selection is pending.
-     * Set when a selection is requested before data is loaded.
+     * Pending selection to apply after data loads.
      */
     @Volatile
-    var pendingSelectWorkingCopy = false
+    private var pendingSelection: Revision? = null
+
+    @Volatile
+    private var hasPendingSelection = false
+
+    init {
+        // Listen for change selection requests for this repository
+        repo.project.stateModel.changeSelection.connect(parentDisposable) { key ->
+            if (key.repo == repo && key.revision != null) {
+                requestSelection(key.revision)
+            }
+        }
+    }
 
     /**
      * Load commits in the background.
      *
      * @param revset Revision expression to load (default: all commits)
+     * @param onLoaded Optional callback invoked after data is loaded (on EDT)
      */
-    fun loadCommits(revset: Expression = Expression.ALL) {
+    fun loadCommits(revset: Expression = Expression.ALL, onLoaded: (() -> Unit)? = null) {
         object : Task.Backgroundable(repo.project, "Loading Jujutsu Commits", true) {
             private var entries: List<LogEntry> = emptyList()
             private var error: Throwable? = null
@@ -72,14 +93,18 @@ class JujutsuLogDataLoader(
                         table.updateGraph(graphNodes)
                         log.info("Table updated with ${entries.size} commits and graph layout")
 
-                        // Handle pending working copy selection
-                        if (pendingSelectWorkingCopy) {
-                            pendingSelectWorkingCopy = false
-                            selectWorkingCopyInTable()
-                        }
-
-                        // Notify callback
+                        // Notify class-level callback
                         onDataLoaded?.invoke()
+
+                        // Notify per-call callback (e.g., refresh restoring selection)
+                        onLoaded?.invoke()
+
+                        // Handle pending selection LAST - explicit selection wins over implicit
+                        if (hasPendingSelection) {
+                            hasPendingSelection = false
+                            pendingSelection?.let { selectEntry(it) }
+                            pendingSelection = null
+                        }
                     }
                 }
             }
@@ -91,33 +116,59 @@ class JujutsuLogDataLoader(
     }
 
     /**
-     * Select the working copy (@) entry in the table and scroll it into view.
+     * Select an entry in the table by revision and scroll it into view.
+     *
+     * @param revision The revision to select. Supports:
+     *   - [ChangeId] to select a specific commit
+     *   - [WorkingCopy] to select the working copy (@)
+     *   - Other [Revision] types for future bookmark/tag support
      */
-    fun selectWorkingCopyInTable() {
-        // Find the working copy entry in the table model
-        val workingCopyIndex = (0 until tableModel.rowCount).firstOrNull { row ->
-            tableModel.getEntry(row)?.isWorkingCopy == true
+    fun selectEntry(revision: Revision) {
+        val rowIndex = when (revision) {
+            is ChangeId -> (0 until tableModel.rowCount).firstOrNull { row ->
+                tableModel.getEntry(row)?.changeId == revision
+            }
+            WorkingCopy -> (0 until tableModel.rowCount).firstOrNull { row ->
+                tableModel.getEntry(row)?.isWorkingCopy == true
+            }
+            else -> {
+                log.warn("Unsupported revision type for selection: $revision")
+                null
+            }
         }
 
-        if (workingCopyIndex != null) {
-            // Select the row
-            table.setRowSelectionInterval(workingCopyIndex, workingCopyIndex)
-
-            // Scroll to the selected row
-            table.scrollRectToVisible(table.getCellRect(workingCopyIndex, 0, true))
-
-            log.info("Selected working copy at row $workingCopyIndex")
+        if (rowIndex != null) {
+            table.setRowSelectionInterval(rowIndex, rowIndex)
+            table.scrollRectToVisible(table.getCellRect(rowIndex, 0, true))
+            log.info("Selected entry at row $rowIndex ($revision)")
         } else {
-            log.warn("Working copy not found in table after refresh")
+            log.warn("Entry not found: $revision")
         }
     }
 
     /**
-     * Refresh the log - reload all commits.
+     * Request selection of an entry. If data is loading, defers until load completes.
+     */
+    private fun requestSelection(revision: Revision) {
+        pendingSelection = revision
+        hasPendingSelection = true
+    }
+
+    /**
+     * Refresh the log - reload all commits, preserving current selection.
+     * Does not override explicit selection requests from changeSelection.
      */
     fun refresh() {
         log.info("Refreshing log")
-        loadCommits()
+        // Save current selection to restore after refresh (unless an explicit selection is pending)
+        val savedSelection = if (!hasPendingSelection) table.selectedEntry?.changeId else null
+
+        loadCommits(onLoaded = {
+            // Only restore if no explicit selection has been requested
+            if (savedSelection != null && !hasPendingSelection) {
+                selectEntry(savedSelection)
+            }
+        })
     }
 
     /**
