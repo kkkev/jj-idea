@@ -31,6 +31,13 @@ class UnifiedJujutsuLogDataLoader(
     private val graphBuilder = CommitGraphBuilder()
 
     /**
+     * Flag to track if working copy selection is pending.
+     * Set when a selection is requested before data is loaded.
+     */
+    @Volatile
+    var pendingSelectWorkingCopy = false
+
+    /**
      * Load commits from all repositories in the background.
      *
      * @param revset Revision expression to load (default: all commits)
@@ -108,8 +115,16 @@ class UnifiedJujutsuLogDataLoader(
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.setEntries(allEntries)
                     table.updateGraph(graphNodes)
-                    onDataLoaded?.invoke()
                     log.info("Table updated with ${allEntries.size} commits and graph layout")
+
+                    // Handle pending working copy selection
+                    if (pendingSelectWorkingCopy) {
+                        pendingSelectWorkingCopy = false
+                        selectWorkingCopyInTable()
+                    }
+
+                    // Notify callback
+                    onDataLoaded?.invoke()
                 }
             }
 

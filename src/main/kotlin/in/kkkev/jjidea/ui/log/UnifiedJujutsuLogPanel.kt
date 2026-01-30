@@ -150,7 +150,8 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
                 }
             }
             workingCopySelector.connect(this@UnifiedJujutsuLogPanel) { _ ->
-                selectWorkingCopyInTable() // Already on EDT
+                // Set pending flag - selection will happen after data loads
+                dataLoader.pendingSelectWorkingCopy = true
             }
         }
     }

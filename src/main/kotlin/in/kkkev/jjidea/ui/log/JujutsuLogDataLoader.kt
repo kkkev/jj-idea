@@ -17,10 +17,18 @@ import `in`.kkkev.jjidea.jj.LogEntry
 class JujutsuLogDataLoader(
     private val repo: JujutsuRepository,
     private val tableModel: JujutsuLogTableModel,
-    private val table: JujutsuLogTable
+    private val table: JujutsuLogTable,
+    private val onDataLoaded: (() -> Unit)? = null
 ) {
     private val log = Logger.getInstance(javaClass)
     private val graphBuilder = CommitGraphBuilder()
+
+    /**
+     * Flag to track if working copy selection is pending.
+     * Set when a selection is requested before data is loaded.
+     */
+    @Volatile
+    var pendingSelectWorkingCopy = false
 
     /**
      * Load commits in the background.
@@ -63,6 +71,15 @@ class JujutsuLogDataLoader(
                         tableModel.setEntries(entries)
                         table.updateGraph(graphNodes)
                         log.info("Table updated with ${entries.size} commits and graph layout")
+
+                        // Handle pending working copy selection
+                        if (pendingSelectWorkingCopy) {
+                            pendingSelectWorkingCopy = false
+                            selectWorkingCopyInTable()
+                        }
+
+                        // Notify callback
+                        onDataLoaded?.invoke()
                     }
                 }
             }

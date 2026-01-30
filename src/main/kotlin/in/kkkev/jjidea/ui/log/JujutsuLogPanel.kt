@@ -136,7 +136,8 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
             }
             workingCopySelector.connect(this@JujutsuLogPanel) { roots ->
                 if (root in roots) {
-                    selectWorkingCopyInTable() // Already on EDT
+                    // Set pending flag - selection will happen after data loads
+                    dataLoader.pendingSelectWorkingCopy = true
                 }
             }
         }

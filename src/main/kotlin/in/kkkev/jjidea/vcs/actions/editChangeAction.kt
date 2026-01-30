@@ -16,7 +16,7 @@ fun editChangeAction(project: Project, logEntry: LogEntry?) =
         jujutsuRoot.commandExecutor
             .createCommand { edit(target.changeId) }
             .onSuccess {
-                jujutsuRoot.invalidate()
+                jujutsuRoot.invalidate(select = true)
                 log.info("Edited change ${target.changeId}")
             }.onFailureTellUser("log.action.edit.error", project, log)
             .executeAsync()
