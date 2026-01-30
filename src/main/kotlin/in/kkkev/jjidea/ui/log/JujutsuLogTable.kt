@@ -500,11 +500,11 @@ class JujutsuLogTableModel : AbstractTableModel() {
             entries.filter { entry ->
                 // Text filter (if active)
                 val matchesText = textMatcher?.let { matcher ->
-                        matcher(entry.description.summary) ||
-                            matcher(entry.changeId.toString()) ||
-                            entry.author?.name?.let(matcher) == true ||
-                            entry.author?.email?.let(matcher) == true
-                    } ?: true
+                    matcher(entry.description.summary) ||
+                        matcher(entry.changeId.toString()) ||
+                        entry.author?.name?.let(matcher) == true ||
+                        entry.author?.email?.let(matcher) == true
+                } ?: true
 
                 // Author filter (if active)
                 val matchesAuthor = if (authorFilter.isNotEmpty()) {

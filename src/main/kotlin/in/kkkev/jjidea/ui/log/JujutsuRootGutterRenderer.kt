@@ -139,7 +139,14 @@ class JujutsuRootGutterRenderer : TableCellRenderer {
                 g2d.fillRect(0, rectY + rectHeight - CORNER_RADIUS, clipWidth, CORNER_RADIUS)
             } else if (roundBottom) {
                 g2d.fillRect(0, rectY, clipWidth, CORNER_RADIUS)
-                g2d.fillRoundRect(0, rectY - CORNER_RADIUS, clipWidth, rectHeight + CORNER_RADIUS, CORNER_RADIUS * 2, CORNER_RADIUS * 2)
+                g2d.fillRoundRect(
+                    0,
+                    rectY - CORNER_RADIUS,
+                    clipWidth,
+                    rectHeight + CORNER_RADIUS,
+                    CORNER_RADIUS * 2,
+                    CORNER_RADIUS * 2
+                )
             } else {
                 g2d.fillRect(0, rectY, clipWidth, rectHeight)
             }
@@ -154,7 +161,14 @@ class JujutsuRootGutterRenderer : TableCellRenderer {
                 g2d.fillRect(0, rectY + rectHeight - CORNER_RADIUS, accentWidth, CORNER_RADIUS)
             } else if (roundBottom) {
                 g2d.fillRect(0, rectY, accentWidth, CORNER_RADIUS)
-                g2d.fillRoundRect(0, rectY - CORNER_RADIUS, accentWidth, rectHeight + CORNER_RADIUS, CORNER_RADIUS, CORNER_RADIUS)
+                g2d.fillRoundRect(
+                    0,
+                    rectY - CORNER_RADIUS,
+                    accentWidth,
+                    rectHeight + CORNER_RADIUS,
+                    CORNER_RADIUS,
+                    CORNER_RADIUS
+                )
             } else {
                 g2d.fillRect(0, rectY, accentWidth, rectHeight)
             }

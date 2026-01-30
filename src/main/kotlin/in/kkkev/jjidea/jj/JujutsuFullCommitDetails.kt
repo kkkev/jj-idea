@@ -42,7 +42,9 @@ class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val c
             val result = jujutsuRoot.logService.getFileChanges(entry.changeId)
 
             val regularChanges = result.getOrElse { error ->
-                log.error("Error loading changes for ${entry.changeId}: ${error.message}", error)
+                // This can happen when a commit is removed during loading (e.g., abandon, empty commit auto-removed).
+                // Log at info level since this is an expected scenario, not a programming error.
+                log.info("Error loading changes for ${entry.changeId.short}: ${error.message}")
                 emptyList()
             }.filter { fileChange ->
                 // Filter out files that are part of renames to avoid duplicates

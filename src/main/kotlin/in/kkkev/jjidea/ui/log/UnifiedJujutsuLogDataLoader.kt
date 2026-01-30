@@ -67,7 +67,11 @@ class UnifiedJujutsuLogDataLoader(
 
                             result.onSuccess { loadedEntries ->
                                 entriesByRepo[repo] = loadedEntries
-                                log.info("Loaded ${loadedEntries.size} commits from ${repo.relativePath.ifEmpty { "root" }}")
+                                log.info(
+                                    "Loaded ${loadedEntries.size} commits from ${repo.relativePath.ifEmpty {
+                                        "root"
+                                    }}"
+                                )
                             }.onFailure { e ->
                                 errors[repo] = e
                                 log.error("Failed to load commits from ${repo.relativePath}", e)

@@ -282,9 +282,16 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
                     }
                 }
             } catch (e: Exception) {
-                log.error("Failed to load changes for ${entry.changeId}", e)
+                // This can happen when a commit is removed (e.g., by abandon, or empty commit auto-removed).
+                // Treat this as "no commit selected" rather than an error.
+                log.info(
+                    "Change ${entry.changeId.short} no longer exists (likely abandoned or auto-removed): ${e.message}"
+                )
                 ApplicationManager.getApplication().invokeLater {
                     if (currentEntry == entry) {
+                        // Clear the selection state since this commit no longer exists
+                        currentEntry = null
+                        showEmptyState()
                         changesTree.setChangesToDisplay(emptyList())
                     }
                 }
