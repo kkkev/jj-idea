@@ -7,6 +7,7 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.ui.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.jujutsuRoot
 
@@ -25,6 +26,13 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         log.debug("Getting changes for dirty scope")
 
         dirtyScope.affectedContentRoots.map { it.jujutsuRoot }.forEach { jujutsuRoot ->
+            // Handle uninitialized roots (e.g., .jj directory was deleted)
+            if (!jujutsuRoot.isInitialised) {
+                log.info("Root configured for Jujutsu but not initialized: ${jujutsuRoot.relativePath}")
+                JujutsuNotifications.notifyUninitializedRoot(vcs.project, jujutsuRoot)
+                return@forEach
+            }
+
             try {
                 val result = jujutsuRoot.commandExecutor.status()
 

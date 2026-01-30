@@ -43,6 +43,9 @@
         <projectService serviceImplementation="in.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager" />
         <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings" />
 
+        <!-- Notifications -->
+        <notificationGroup id="Jujutsu" displayType="BALLOON" />
+
         <!-- Settings -->
         <projectConfigurable
             id="vcs.Jujutsu"
