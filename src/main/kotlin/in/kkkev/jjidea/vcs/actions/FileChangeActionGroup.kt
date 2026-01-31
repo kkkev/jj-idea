@@ -1,0 +1,33 @@
+package `in`.kkkev.jjidea.vcs.actions
+
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+
+/**
+ * Builds a context menu action group for file changes.
+ *
+ * Includes:
+ * - Show Diff (Jujutsu.ShowChangesDiff)
+ * - Open File (Jujutsu.OpenChangeFile)
+ * - Separator
+ * - Restore (Jujutsu.RestoreFile) - visible in working copy context
+ * - Restore to This (Jujutsu.RestoreToChange) - visible in historical context
+ *
+ * Actions self-filter their visibility based on the data context
+ * (specifically [JujutsuDataKeys.LOG_ENTRY]).
+ */
+fun fileChangeActionGroup(): DefaultActionGroup {
+    val actionManager = ActionManager.getInstance()
+    val group = DefaultActionGroup()
+
+    actionManager.getAction("Jujutsu.ShowChangesDiff")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.OpenChangeFile")?.let { group.add(it) }
+
+    group.addSeparator()
+
+    // These actions self-filter: RestoreFile visible for working copy, RestoreToChange for historical
+    actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.RestoreToChange")?.let { group.add(it) }
+
+    return group
+}

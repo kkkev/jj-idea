@@ -66,6 +66,13 @@ class RestoreSelectionAction : DumbAwareAction(
 
     override fun update(e: AnActionEvent) {
         val files = e.files
-        e.presentation.isEnabled = (e.project != null) && files.isNotEmpty() && (files.singleJujutsuRepository != null)
+        val entry = e.logEntry
+
+        // Hide when in historical context (entry is present and not working copy)
+        // In that case, RestoreToChangeAction should be used instead
+        val isHistoricalContext = entry != null && !entry.isWorkingCopy
+        val hasValidFiles = e.project != null && files.isNotEmpty() && files.singleJujutsuRepository != null
+
+        e.presentation.isEnabledAndVisible = !isHistoricalContext && hasValidFiles
     }
 }

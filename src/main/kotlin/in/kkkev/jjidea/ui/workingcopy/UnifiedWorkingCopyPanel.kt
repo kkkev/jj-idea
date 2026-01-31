@@ -1,16 +1,16 @@
 package `in`.kkkev.jjidea.ui.workingcopy
 
-import com.intellij.diff.DiffContentFactory
-import com.intellij.diff.DiffManager
-import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.ide.CommonActionsManager
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAwareAction
@@ -21,7 +21,6 @@ import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.PopupHandler
@@ -31,6 +30,8 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.JujutsuChangesTree
+import `in`.kkkev.jjidea.vcs.actions.fileChangeActionGroup
+import `in`.kkkev.jjidea.vcs.actions.showChangesDiff
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.CardLayout
@@ -40,7 +41,6 @@ import java.awt.event.MouseEvent
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JPanel
-import javax.swing.KeyStroke
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeExpansionListener
 import javax.swing.tree.TreePath
@@ -290,18 +290,18 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             }
         })
 
-        // Double-click: show diff
+        // Double-click: show diff (working copy context, no logEntry)
         changesTree.setDoubleClickHandler { _ ->
             getSelectedChange()?.let {
-                showDiff(it)
+                showChangesDiff(project, it, null)
                 true
             } ?: false
         }
 
-        // Enter key: show diff
+        // Enter key: show diff (working copy context, no logEntry)
         changesTree.setEnterKeyHandler {
             getSelectedChange()?.let {
-                showDiff(it)
+                showChangesDiff(project, it, null)
                 true
             } ?: false
         }
@@ -396,51 +396,6 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         }
     }
 
-    private fun showDiff(change: Change) {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val beforePath = change.beforeRevision?.file
-            val afterPath = change.afterRevision?.file
-            val fileName = afterPath?.name ?: beforePath?.name ?: JujutsuBundle.message("diff.title.unknown")
-
-            val beforeContent = change.beforeRevision?.content ?: ""
-            val afterVirtualFile = afterPath?.let { LocalFileSystem.getInstance().findFileByPath(it.path) }
-            val afterContent = if (afterVirtualFile == null) {
-                change.afterRevision?.content ?: ""
-            } else {
-                null
-            }
-
-            ApplicationManager.getApplication().invokeLater {
-                val contentFactory = DiffContentFactory.getInstance()
-                val diffManager = DiffManager.getInstance()
-
-                val content1 = if (beforePath != null && beforeContent.isNotEmpty()) {
-                    contentFactory.create(project, beforeContent)
-                } else {
-                    contentFactory.createEmpty()
-                }
-
-                val content2 = if (afterVirtualFile != null && afterVirtualFile.exists()) {
-                    contentFactory.create(project, afterVirtualFile)
-                } else if (afterPath != null && afterContent != null) {
-                    contentFactory.create(project, afterContent)
-                } else {
-                    contentFactory.createEmpty()
-                }
-
-                val diffRequest = SimpleDiffRequest(
-                    fileName,
-                    content1,
-                    content2,
-                    "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} (@-)",
-                    "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} (@)"
-                )
-
-                diffManager.showDiff(project, diffRequest)
-            }
-        }
-    }
-
     private fun openFileInPreview(change: Change) {
         val virtualFile = change.filePath?.virtualFile ?: return
         ApplicationManager.getApplication().invokeLater {
@@ -448,51 +403,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         }
     }
 
-    private fun openFilePermanent(change: Change) {
-        val virtualFile = change.filePath?.virtualFile ?: return
-        ApplicationManager.getApplication().invokeLater {
-            val fileEditorManager = FileEditorManager.getInstance(project)
-            fileEditorManager.openFile(virtualFile, true)
-            OpenFileDescriptor(project, virtualFile).navigate(true)
-        }
-    }
-
     private fun showContextMenu(component: Component, x: Int, y: Int) {
-        val selectedChange = getSelectedChange() ?: return
+        if (getSelectedChange() == null) return
 
         val actionManager = ActionManager.getInstance()
-        val group = DefaultActionGroup()
-
-        val showDiffAction = object : DumbAwareAction(
-            JujutsuBundle.message("action.show.diff"),
-            null,
-            AllIcons.Actions.Diff
-        ) {
-            override fun actionPerformed(e: AnActionEvent) {
-                showDiff(selectedChange)
-            }
-        }
-        group.add(showDiffAction)
-
-        val openFileAction = object : DumbAwareAction(
-            JujutsuBundle.message("action.open.file"),
-            null,
-            AllIcons.Actions.EditSource
-        ) {
-            init {
-                shortcutSet = CustomShortcutSet(
-                    KeyboardShortcut(KeyStroke.getKeyStroke("F4"), null),
-                    KeyboardShortcut(KeyStroke.getKeyStroke("ENTER"), null)
-                )
-            }
-
-            override fun actionPerformed(e: AnActionEvent) {
-                openFilePermanent(selectedChange)
-            }
-        }
-        group.add(openFileAction)
-
-        actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
+        val group = fileChangeActionGroup()
 
         val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.CHANGES_VIEW_POPUP, group)
         popupMenu.setTargetComponent(changesTree)

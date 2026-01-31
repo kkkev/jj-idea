@@ -18,6 +18,12 @@ import javax.swing.tree.DefaultTreeModel
  * Provides grouping, speed search, and standard VCS actions.
  */
 class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(project, false, true) {
+    /**
+     * Optional additional data provider to inject context-specific data keys.
+     * Called from [uiDataSnapshot] to allow parent panels to provide context like [JujutsuDataKeys.LOG_ENTRY].
+     */
+    var additionalDataProvider: ((DataSink) -> Unit)? = null
+
     init {
         // Use KEEP_NON_EMPTY strategy: preserves user's manual expansion/collapse actions
         // while expanding default nodes (including new ones) when tree is rebuilt
@@ -43,5 +49,6 @@ class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(projec
         super.uiDataSnapshot(sink)
         sink[VcsDataKeys.CHANGES] = selectedChanges.toTypedArray()
         sink[CommonDataKeys.VIRTUAL_FILE_ARRAY] = selectedChanges.mapNotNull { it.virtualFile }.toTypedArray()
+        additionalDataProvider?.invoke(sink)
     }
 }
