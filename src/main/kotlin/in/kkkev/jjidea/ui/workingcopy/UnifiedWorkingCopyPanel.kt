@@ -31,6 +31,7 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.JujutsuChangesTree
+import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Component
@@ -438,16 +439,14 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun openFileInPreview(change: Change) {
-        val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
-        val virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath.path) ?: return
+        val virtualFile = change.filePath?.virtualFile ?: return
         ApplicationManager.getApplication().invokeLater {
             OpenFileDescriptor(project, virtualFile).navigate(true)
         }
     }
 
     private fun openFilePermanent(change: Change) {
-        val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
-        val virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath.path) ?: return
+        val virtualFile = change.filePath?.virtualFile ?: return
         ApplicationManager.getApplication().invokeLater {
             val fileEditorManager = FileEditorManager.getInstance(project)
             fileEditorManager.openFile(virtualFile, true)

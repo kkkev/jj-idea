@@ -15,7 +15,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.vcs.isJujutsu
-import `in`.kkkev.jjidea.vcs.jujutsuRoot
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Action to compare current file with a bookmark, change, or revision
@@ -30,7 +30,7 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.file ?: return
-        val jujutsuRoot = file.jujutsuRoot
+        val jujutsuRoot = file.jujutsuRepository
 
         // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
         JujutsuCompareWithPopup.show(project, jujutsuRoot) { chosen ->

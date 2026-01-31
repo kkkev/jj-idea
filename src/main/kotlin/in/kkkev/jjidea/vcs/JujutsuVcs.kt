@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages.showErrorDialog
 import com.intellij.openapi.vcs.AbstractVcs
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vfs.VirtualFile
@@ -68,6 +69,14 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
      */
     fun jujutsuRepositoryFor(file: VirtualFile): JujutsuRepository? {
         val root = VcsUtil.getVcsRootFor(project, file)
+        return root?.let { project.jujutsuRepositoryFor(it) }
+    }
+
+    /**
+     * Determines the repository that contains the specified file path.
+     */
+    fun jujutsuRepositoryFor(filePath: FilePath): JujutsuRepository? {
+        val root = VcsUtil.getVcsRootFor(project, filePath)
         return root?.let { project.jujutsuRepositoryFor(it) }
     }
 

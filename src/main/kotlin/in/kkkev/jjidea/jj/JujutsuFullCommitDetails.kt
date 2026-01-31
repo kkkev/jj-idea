@@ -6,7 +6,7 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.log.VcsFullCommitDetails
 import com.intellij.vcsUtil.VcsUtil
-import `in`.kkkev.jjidea.vcs.jujutsuRoot
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Full commit details for a Jujutsu commit including file changes.
@@ -32,7 +32,7 @@ class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val c
         }
 
         private fun loadChanges(entry: LogEntry, root: VirtualFile): Collection<Change> {
-            val jujutsuRoot = root.jujutsuRoot
+            val jujutsuRoot = root.jujutsuRepository
 
             // First, detect renames using git-format diff
             val renames = detectRenames(entry, jujutsuRoot.commandExecutor)

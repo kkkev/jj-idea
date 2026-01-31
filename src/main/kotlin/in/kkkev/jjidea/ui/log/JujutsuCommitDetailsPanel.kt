@@ -27,6 +27,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.*
+import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.JEditorPane
@@ -198,9 +199,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
     }
 
     private fun openFile(change: Change) {
-        val virtualFile = change.afterRevision?.file?.virtualFile
-            ?: change.beforeRevision?.file?.virtualFile
-            ?: return
+        val virtualFile = change.filePath?.virtualFile ?: return
 
         FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, virtualFile), true)
     }

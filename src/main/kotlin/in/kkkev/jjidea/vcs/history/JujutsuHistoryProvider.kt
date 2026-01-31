@@ -11,7 +11,7 @@ import com.intellij.openapi.vcs.history.*
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.vcs.jujutsuRoot
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 import javax.swing.JComponent
 
 /**
@@ -25,14 +25,14 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
         log.info("Creating history session for file: ${filePath.path}")
 
         try {
-            val jujutsuRoot = filePath.jujutsuRoot
+            val jujutsuRepository = filePath.jujutsuRepository
 
             // Get relative path from repository root
-            val relativePath = jujutsuRoot.getRelativePath(filePath)
+            val relativePath = jujutsuRepository.getRelativePath(filePath)
             log.debug("Fetching history for file: $relativePath (absolute: ${filePath.path})")
 
             // Use logService to get log entries for this file
-            val logService = jujutsuRoot.logService
+            val logService = jujutsuRepository.logService
             val result = logService.getLogBasic(Expression.ALL, listOf(relativePath))
 
             val entries = result.getOrElse { error ->
@@ -48,7 +48,7 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
             }
 
             // Convert to VcsFileRevision objects
-            val revisions = entries.map { entry -> JujutsuFileRevision(entry, filePath, jujutsuRoot) }
+            val revisions = entries.map { entry -> JujutsuFileRevision(entry, filePath, jujutsuRepository) }
 
             // Return history session
             val currentRevision = revisions.firstOrNull()?.revisionNumber
@@ -59,10 +59,7 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
         }
     }
 
-    override fun reportAppendableHistory(
-        filePath: FilePath,
-        partner: VcsAppendableHistorySessionPartner
-    ) {
+    override fun reportAppendableHistory(filePath: FilePath, partner: VcsAppendableHistorySessionPartner) {
         log.info("reportAppendableHistory called for file: ${filePath.path}")
 
         // Step 1: Report empty session immediately (required by platform)
@@ -70,14 +67,14 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
         partner.reportCreatedEmptySession(emptySession)
 
         try {
-            val jujutsuRoot = filePath.jujutsuRoot
+            val jujutsuRepository = filePath.jujutsuRepository
 
             // Get relative path from repository root
-            val relativePath = jujutsuRoot.getRelativePath(filePath)
+            val relativePath = jujutsuRepository.getRelativePath(filePath)
             log.debug("Fetching history for file: $relativePath (absolute: ${filePath.path})")
 
             // Step 2: Load history
-            val logService = jujutsuRoot.logService
+            val logService = jujutsuRepository.logService
             val result = logService.getLog(Expression.ALL, listOf(relativePath))
 
             val entries = result.getOrElse { error ->
@@ -90,7 +87,7 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
 
             // Step 3: Stream each revision to the partner
             entries.forEach { entry ->
-                val revision = JujutsuFileRevision(entry, filePath, jujutsuRoot)
+                val revision = JujutsuFileRevision(entry, filePath, jujutsuRepository)
                 partner.acceptRevision(revision)
             }
         } catch (e: Exception) {
@@ -104,9 +101,7 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
     override fun supportsHistoryForDirectories() = false
 
     override fun getUICustomization(session: VcsHistorySession, root: JComponent) =
-        VcsDependentHistoryComponents.createOnlyColumns(
-            arrayOf(CommitterColumnInfo(), CommitTimestampColumnInfo())
-        )
+        VcsDependentHistoryComponents.createOnlyColumns(arrayOf(CommitterColumnInfo(), CommitTimestampColumnInfo()))
 
     override fun getAdditionalActions(refresher: Runnable): Array<AnAction> =
         arrayOf(
