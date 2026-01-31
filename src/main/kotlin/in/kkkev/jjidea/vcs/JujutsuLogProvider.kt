@@ -19,6 +19,7 @@ import com.intellij.vcs.log.graph.PermanentGraph
 import com.intellij.vcs.log.impl.VcsRefImpl
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 
 /**
  * Provides repository-wide log for Jujutsu VCS
@@ -380,8 +381,31 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
     }
 
     override fun createContentRevision(filePath: FilePath, hash: Hash): ContentRevision {
-        // Convert hash back to ChangeId
+        // Convert hash back to ChangeId - this is a quick operation
         val changeId = ChangeId.fromHexString(hash.asString())
-        return filePath.jujutsuRepository.createRevision(filePath, changeId)
+        // Return a lazy content revision that defers repository lookup to getContent()
+        // This avoids slow operations on EDT since getContent() is called off EDT
+        return LazyJujutsuContentRevision(filePath, changeId)
     }
+}
+
+/**
+ * Lazy content revision that defers repository lookup to getContent().
+ * This avoids slow operations on EDT since createContentRevision is called on EDT
+ * but getContent() is called off EDT by the platform.
+ */
+private class LazyJujutsuContentRevision(
+    private val filePath: FilePath,
+    private val changeId: ChangeId
+) : ContentRevision {
+    override fun getContent(): String? {
+        // This is called off EDT, so repository lookup is safe here
+        val repo = filePath.jujutsuRepository
+        val result = repo.commandExecutor.show(repo.getRelativePath(filePath), changeId)
+        return result.stdout.takeIf { result.isSuccess }
+    }
+
+    override fun getFile() = filePath
+
+    override fun getRevisionNumber() = JujutsuRevisionNumber(changeId)
 }

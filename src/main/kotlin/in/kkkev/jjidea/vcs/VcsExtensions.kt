@@ -73,9 +73,9 @@ val VirtualFile.jujutsuRepository
         )
     )
 
-val List<VirtualFile>.singleJujutsuRoot get() = this.map { it.jujutsuRepository }.toSet().singleOrNull()
+val List<VirtualFile>.singleJujutsuRepository get() = this.map { it.jujutsuRepository }.toSet().singleOrNull()
 
-val VirtualFile.isJujutsu get() = jujutsuVcs.jujutsuRepositoryFor(this) != null
+val VirtualFile.isJujutsu get() = possibleJujutsuVcs?.jujutsuRepositoryFor(this) != null
 
 val VirtualFile.jujutsuProject
     get() = ReadAction.compute<Project?, RuntimeException> {
@@ -104,13 +104,17 @@ val FilePath.possibleJujutsuVcs
 val FilePath.jujutsuVcs
     get() = this.possibleJujutsuVcs ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
 
+val FilePath.possibleJujutsuRepository get() = this.possibleJujutsuVcs?.jujutsuRepositoryFor(this)
+
 val FilePath.jujutsuRepository
-    get() = jujutsuVcs.jujutsuRepositoryFor(this) ?: throw VcsException(
+    get() = this.possibleJujutsuRepository ?: throw VcsException(
         JujutsuBundle.message(
             "vcs.error.no.root",
             this.path
         )
     )
+
+val FilePath.isJujutsu get() = this.possibleJujutsuRepository != null
 
 fun FilePath.relativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
 

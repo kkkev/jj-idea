@@ -1,6 +1,9 @@
 package `in`.kkkev.jjidea.ui
 
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
@@ -35,4 +38,10 @@ class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(projec
     }
 
     override fun getToggleClickCount(): Int = 2 // Double-click to toggle
+
+    override fun uiDataSnapshot(sink: DataSink) {
+        super.uiDataSnapshot(sink)
+        sink[VcsDataKeys.CHANGES] = selectedChanges.toTypedArray()
+        sink[CommonDataKeys.VIRTUAL_FILE_ARRAY] = selectedChanges.mapNotNull { it.virtualFile }.toTypedArray()
+    }
 }

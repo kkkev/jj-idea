@@ -13,7 +13,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.vcs.isJujutsu
 import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
@@ -34,7 +33,7 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
 
         // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
         JujutsuCompareWithPopup.show(project, jujutsuRoot) { chosen ->
-            showDiffWithRevision(project, file, RevisionExpression(chosen), jujutsuRoot)
+            showDiffWithRevision(project, file, chosen, jujutsuRoot)
         }
     }
 
