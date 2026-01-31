@@ -211,7 +211,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         val actionGroup = DefaultActionGroup().apply {
             add(
                 object : DumbAwareAction(
-                    JujutsuBundle.message("action.showdiff"),
+                    JujutsuBundle.message("action.show.diff"),
                     null,
                     AllIcons.Actions.Diff
                 ) {
@@ -222,7 +222,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
             )
             add(
                 object : DumbAwareAction(
-                    JujutsuBundle.message("action.openfile"),
+                    JujutsuBundle.message("action.open.file"),
                     null,
                     AllIcons.Actions.EditSource
                 ) {
