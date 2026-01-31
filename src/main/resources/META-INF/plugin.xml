@@ -41,6 +41,7 @@
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
         <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel" />
         <projectService serviceImplementation="in.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager" />
+        <projectService serviceImplementation="in.kkkev.jjidea.ui.ToolWindowEnabler" preload="true" />
         <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings" />
 
         <!-- Notifications -->
@@ -88,10 +89,4 @@
         </group>
     </actions>
 
-    <projectListeners>
-        <listener class="in.kkkev.jjidea.ui.ToolWindowEnabler"
-                  topic="com.intellij.dvcs.repo.VcsRepositoryMappingListener"
-                  activeInHeadlessMode="false" activeInTestMode="false"/>
-
-    </projectListeners>
 </idea-plugin>

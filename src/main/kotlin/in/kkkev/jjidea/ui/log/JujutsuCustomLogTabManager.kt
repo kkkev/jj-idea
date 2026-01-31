@@ -84,6 +84,28 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
         }
     }
 
+    /**
+     * Closes the unified Jujutsu log tab.
+     *
+     * Called when JJ roots are removed from the project, allowing the native VCS log to return.
+     */
+    fun closeCustomLogTab() {
+        log.info("Closing unified Jujutsu log tab")
+
+        ApplicationManager.getApplication().invokeLater {
+            unifiedLogContent?.let { content ->
+                try {
+                    ChangesViewContentManager.getInstance(project).removeContent(content)
+                    log.info("Unified Jujutsu log tab closed successfully")
+                } catch (e: Exception) {
+                    log.warn("Failed to close unified Jujutsu log tab", e)
+                }
+            }
+            unifiedLogContent = null
+            unifiedLogPanel = null
+        }
+    }
+
     override fun dispose() {
         log.info("Disposing JujutsuCustomLogTabManager")
         unifiedLogContent = null

@@ -41,10 +41,10 @@ class JujutsuStateModel(private val project: Project) {
     val isJujutsu: Boolean get() = initializedRoots.value.isNotEmpty()
 
     val repositoryStates = notifiableState(project, "Jujutsu Repository States", emptySet()) {
-        project.jujutsuRepositories.mapNotNull {
+        // Use initializedRoots.value to only load state for initialized repositories
+        // This avoids errors from uninitialized JJ VCS mappings
+        initializedRoots.value.mapNotNull {
             it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
-        }.sortedBy {
-            it.repo.relativePath
         }.toSet()
     }
 
@@ -92,10 +92,14 @@ class JujutsuStateModel(private val project: Project) {
         )
 
         // Update tool window availability when initializedRoots changes
+        // Also invalidate repositoryStates since it depends on initializedRoots
         initializedRoots.connect(project) { _, new ->
             ToolWindowManager.getInstance(project)
                 .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
                 ?.isAvailable = new.isNotEmpty()
+
+            // Reload repository states now that we have the current roots
+            repositoryStates.invalidate()
         }
 
         // When repository states change (VCS operations completed), mark directories dirty

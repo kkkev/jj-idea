@@ -167,17 +167,18 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     fun updateAvailableRepositories(repos: List<JujutsuRepository>) {
         updatingDropdown = true
         try {
-            val selectedRepo = boundRepository
+            var selectedRepo = boundRepository
             repoSelector.removeAllItems()
             repos.forEach { repo ->
                 repoSelector.addItem(RepoItem(repo))
             }
+            if ((selectedRepo == null) || (selectedRepo !in repos)) {
+                selectedRepo = repos.first()
+            }
             // Hide dropdown if only one repo
             repoSelector.isVisible = repos.size > 1
             // Restore selection
-            if (selectedRepo != null) {
-                updateDropdownSelection(selectedRepo)
-            }
+            updateDropdownSelection(selectedRepo)
         } finally {
             updatingDropdown = false
         }

@@ -318,7 +318,8 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      * Steps:
      * 1. VFS sync to detect external file changes
      * 2. Mark all repo directories dirty to trigger ChangeProvider
-     * 3. Reload from cache (the listener chain may also trigger reloadChangesFromCache)
+     * 3. Invalidate repositoryStates to reload descriptions
+     * 4. Reload from cache (the listener chain may also trigger reloadChangesFromCache)
      */
     fun refresh() {
         val repos = project.stateModel.initializedRoots.value.map { it.directory }
@@ -331,7 +332,10 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             repos.forEach { dir -> dirtyScopeManager.dirDirtyRecursively(dir) }
         }
 
-        // Also reload directly - the listener chain may be slow or not fire
+        // Invalidate repositoryStates to reload descriptions and change IDs
+        project.stateModel.repositoryStates.invalidate()
+
+        // Also reload changes directly - the listener chain may be slow or not fire
         reloadChangesFromCache()
     }
 
