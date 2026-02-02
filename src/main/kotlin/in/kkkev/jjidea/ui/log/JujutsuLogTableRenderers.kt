@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
@@ -495,6 +496,7 @@ class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
  */
 private val DEFAULT_COLUMN_WIDTHS =
     mapOf(
+        JujutsuLogTableModel.COLUMN_ROOT_GUTTER to 8, // Will be scaled with JBUI
         JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION to 600,
         JujutsuLogTableModel.COLUMN_STATUS to 50,
         JujutsuLogTableModel.COLUMN_CHANGE_ID to 90,
@@ -511,6 +513,7 @@ private val DEFAULT_COLUMN_WIDTHS =
  * Only installs renderers for columns that are actually present in the column model.
  */
 fun JujutsuLogTable.installRenderers() {
+    val rootGutterRenderer = JujutsuRootGutterRenderer()
     val statusRenderer = SeparateStatusCellRenderer()
     val changeIdRenderer = SeparateChangeIdCellRenderer()
     val descriptionRenderer = SeparateDescriptionCellRenderer(this)
@@ -528,6 +531,16 @@ fun JujutsuLogTable.installRenderers() {
         val defaultWidth = DEFAULT_COLUMN_WIDTHS[modelIndex] ?: 100
 
         when (modelIndex) {
+            JujutsuLogTableModel.COLUMN_ROOT_GUTTER -> {
+                column.cellRenderer = rootGutterRenderer
+                // Use a small fixed width for the collapsed gutter
+                val gutterWidth = JBUI.scale(8)
+                column.preferredWidth = gutterWidth
+                column.width = gutterWidth
+                column.minWidth = gutterWidth
+                column.maxWidth = gutterWidth
+            }
+
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 // Will be set when graph data is loaded via updateGraph()
                 column.preferredWidth = defaultWidth

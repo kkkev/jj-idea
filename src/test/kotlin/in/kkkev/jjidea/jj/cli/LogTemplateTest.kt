@@ -2,10 +2,7 @@ package `in`.kkkev.jjidea.jj.cli
 
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.cli.LogTemplates.basicLogTemplate
-import `in`.kkkev.jjidea.jj.cli.LogTemplates.commitGraphLogTemplate
-import `in`.kkkev.jjidea.jj.cli.LogTemplates.fullLogTemplate
-import `in`.kkkev.jjidea.jj.cli.LogTemplates.refsLogTemplate
+import `in`.kkkev.jjidea.jj.mockRepo
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -16,9 +13,11 @@ import org.junit.jupiter.api.Test
  * Tests for LogTemplate integration and parsing
  */
 class LogTemplateTest {
-    companion object {
-        const val Z = "\u0000"
-    }
+    private val cliLogService = CliLogService(mockRepo)
+    private val basicLogTemplate = cliLogService.logTemplates.basicLogTemplate
+    private val fullLogTemplate = cliLogService.logTemplates.fullLogTemplate
+    private val refsLogTemplate = cliLogService.logTemplates.refsLogTemplate
+    private val commitGraphLogTemplate = cliLogService.logTemplates.commitGraphLogTemplate
 
     @Test
     fun `basicLogTemplate generates correct spec string`() {

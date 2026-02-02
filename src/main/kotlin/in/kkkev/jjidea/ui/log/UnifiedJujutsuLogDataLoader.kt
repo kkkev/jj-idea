@@ -1,0 +1,215 @@
+package `in`.kkkev.jjidea.ui.log
+
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.Task
+import com.intellij.openapi.project.Project
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.Expression
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.stateModel
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+/**
+ * Loads commit log data from multiple repositories in parallel and updates the table model on EDT.
+ *
+ * Unified loader that:
+ * - Loads commits from all provided repositories concurrently
+ * - Merges results into a single list sorted by timestamp (newest first)
+ * - Updates the table model and graph on EDT
+ * - Subscribes to changeSelection for handling selection requests
+ */
+class UnifiedJujutsuLogDataLoader(
+    private val project: Project,
+    private val repositories: () -> List<JujutsuRepository>,
+    private val tableModel: JujutsuLogTableModel,
+    private val table: JujutsuLogTable,
+    parentDisposable: Disposable,
+    private val onDataLoaded: (() -> Unit)? = null
+) {
+    private val log = Logger.getInstance(javaClass)
+    private val graphBuilder = CommitGraphBuilder()
+
+    /**
+     * Pending selection to apply after data loads.
+     */
+    @Volatile
+    private var pendingSelection: ChangeKey? = null
+
+    @Volatile
+    private var hasPendingSelection = false
+
+    init {
+        // Listen for change selection requests
+        project.stateModel.changeSelection.connect(parentDisposable) { key ->
+            if (key.revision != null) {
+                requestSelection(key)
+            }
+        }
+    }
+
+    /**
+     * Load commits from all repositories in the background.
+     *
+     * @param revset Revision expression to load (default: all commits)
+     */
+    fun loadCommits(revset: Expression = Expression.ALL) {
+        val repos = repositories()
+        if (repos.isEmpty()) {
+            log.info("No repositories to load commits from")
+            ApplicationManager.getApplication().invokeLater {
+                tableModel.setEntries(emptyList())
+                table.updateGraph(emptyMap())
+            }
+            return
+        }
+
+        object : Task.Backgroundable(project, "Loading Jujutsu Commits", true) {
+            private val entriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
+            private val errors = ConcurrentHashMap<JujutsuRepository, Throwable>()
+
+            override fun run(indicator: ProgressIndicator) {
+                indicator.text = "Loading commits from ${repos.size} repositories..."
+                indicator.isIndeterminate = false
+
+                val latch = CountDownLatch(repos.size)
+                val totalRepos = repos.size
+
+                repos.forEachIndexed { index, repo ->
+                    ApplicationManager.getApplication().executeOnPooledThread {
+                        try {
+                            indicator.text2 = "Loading from ${repo.relativePath.ifEmpty { "root" }}..."
+                            indicator.fraction = index.toDouble() / totalRepos
+
+                            val result = repo.logService.getLog(revset)
+
+                            result.onSuccess { loadedEntries ->
+                                entriesByRepo[repo] = loadedEntries
+                                log.info(
+                                    "Loaded ${loadedEntries.size} commits from ${repo.relativePath.ifEmpty {
+                                        "root"
+                                    }}"
+                                )
+                            }.onFailure { e ->
+                                errors[repo] = e
+                                log.error("Failed to load commits from ${repo.relativePath}", e)
+                            }
+                        } catch (e: Exception) {
+                            errors[repo] = e
+                            log.error("Exception loading commits from ${repo.relativePath}", e)
+                        } finally {
+                            latch.countDown()
+                        }
+                    }
+                }
+
+                // Wait for all repositories to finish loading
+                latch.await(5, TimeUnit.MINUTES)
+            }
+
+            override fun onSuccess() {
+                if (entriesByRepo.isEmpty() && errors.isNotEmpty()) {
+                    log.error("All repositories failed to load")
+                    return
+                }
+
+                // Merge all entries and sort by timestamp (newest first)
+                val allEntries = entriesByRepo.values.flatten()
+                    .sortedByDescending { it.authorTimestamp ?: it.committerTimestamp }
+
+                log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
+
+                // Build graph layout with full branching/merging support
+                val graphNodes = graphBuilder.buildGraph(allEntries)
+
+                // Update table model and graph on EDT
+                ApplicationManager.getApplication().invokeLater {
+                    tableModel.setEntries(allEntries)
+                    table.updateGraph(graphNodes)
+                    log.info("Table updated with ${allEntries.size} commits and graph layout")
+
+                    // Notify callback (e.g., update root filter visibility)
+                    onDataLoaded?.invoke()
+
+                    // Handle pending selection LAST - explicit selection wins over implicit
+                    if (hasPendingSelection) {
+                        hasPendingSelection = false
+                        pendingSelection?.let { selectEntry(it.repo, it.revision!!) }
+                        pendingSelection = null
+                    }
+                }
+            }
+
+            override fun onThrowable(throwable: Throwable) {
+                log.error("Background task failed", throwable)
+            }
+        }.queue()
+    }
+
+    /**
+     * Select an entry in the table by repo and revision, scrolling it into view.
+     * Matches by repo to ensure correct selection in multi-root.
+     *
+     * @param repo The repository containing the entry
+     * @param revision The revision to select ([ChangeId] or [WorkingCopy])
+     */
+    private fun selectEntry(repo: JujutsuRepository, revision: Revision) {
+        val rowIndex = when (revision) {
+            is ChangeId -> (0 until tableModel.rowCount).firstOrNull { row ->
+                val entry = tableModel.getEntry(row)
+                entry?.repo == repo && entry.changeId == revision
+            }
+            WorkingCopy -> (0 until tableModel.rowCount).firstOrNull { row ->
+                val entry = tableModel.getEntry(row)
+                entry?.repo == repo && entry.isWorkingCopy
+            }
+            else -> {
+                log.warn("Unsupported revision type for selection: $revision")
+                null
+            }
+        }
+
+        if (rowIndex != null) {
+            table.setRowSelectionInterval(rowIndex, rowIndex)
+            table.scrollRectToVisible(table.getCellRect(rowIndex, 0, true))
+            log.info("Selected entry at row $rowIndex (${repo.relativePath}:$revision)")
+        } else {
+            log.warn("Entry not found: ${repo.relativePath}:$revision")
+        }
+    }
+
+    /**
+     * Request selection of an entry. If data is loading, defers until load completes.
+     */
+    private fun requestSelection(key: ChangeKey) {
+        pendingSelection = key
+        hasPendingSelection = true
+    }
+
+    /**
+     * Refresh the log - reload all commits from all repositories, preserving current selection.
+     * Does not override explicit selection requests from changeSelection.
+     */
+    fun refresh() {
+        log.info("Refreshing unified log")
+        // Save current selection to restore after refresh (unless an explicit selection is pending)
+        val savedSelection = if (!hasPendingSelection) {
+            table.selectedEntry?.let { ChangeKey(it.repo, it.changeId) }
+        } else null
+
+        loadCommits()
+
+        // Restore selection only if no explicit selection is pending
+        if (savedSelection != null && !hasPendingSelection) {
+            requestSelection(savedSelection)
+        }
+    }
+}

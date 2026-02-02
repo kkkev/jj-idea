@@ -32,4 +32,13 @@ abstract class JujutsuCommitMetadataBase(
     override fun getAuthorTime() = entry.authorTimestamp!!.toEpochMilliseconds()
 
     override fun getRoot() = root
+
+    // Required for IntelliJ's TopCommitsCache.containsValue() duplicate detection
+    override fun equals(other: Any?) = when {
+        this === other -> true
+        other !is JujutsuCommitMetadataBase -> false
+        else -> entry.changeId == other.entry.changeId && root == other.root
+    }
+
+    override fun hashCode() = 31 * id.hashCode() + root.hashCode()
 }

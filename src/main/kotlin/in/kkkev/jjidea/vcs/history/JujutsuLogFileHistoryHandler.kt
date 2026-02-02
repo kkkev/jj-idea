@@ -13,13 +13,14 @@ import com.intellij.vcs.log.VcsLogFilterCollection
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.jujutsuVcs
+import `in`.kkkev.jjidea.vcs.jujutsuRoot
 
 /**
  * Modern file history handler for VCS Log integration.
  * Provides better UI with toolbar at top and details pane on right.
  */
-class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHistoryHandler {
+// TODO Can this constructor tolerate a lack of project?
+class JujutsuLogFileHistoryHandler(project: Project) : VcsLogFileHistoryHandler {
     private val log = Logger.getInstance(javaClass)
 
     override val supportedVcs get() = JujutsuVcs.getKey()
@@ -43,12 +44,13 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
         commitCount: Int,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        val vcs = root.jujutsuVcs
+        val jujutsuRoot = root.jujutsuRoot
 
-        val relativePath = vcs.getRelativePath(filePath)
+        val relativePath = jujutsuRoot.getRelativePath(filePath)
 
         // Use Expression.ALL for now (could support hash-based starting point later)
-        val result: Result<List<LogEntry>> = vcs.logService.getLog(Expression.ALL, listOf(relativePath))
+        val logService = jujutsuRoot.logService
+        val result: Result<List<LogEntry>> = logService.getLog(Expression.ALL, listOf(relativePath))
 
         result.fold(
             onSuccess = { entries: List<LogEntry> ->
@@ -57,7 +59,7 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
                 log.info("Fast history loaded ${limited.size} entries for ${filePath.path}")
 
                 limited.forEach { entry: LogEntry ->
-                    consumer(JujutsuFileRevision(entry, filePath, vcs))
+                    consumer(JujutsuFileRevision(entry, filePath, jujutsuRoot))
                 }
             },
             onFailure = { error: Throwable ->
@@ -75,19 +77,20 @@ class JujutsuLogFileHistoryHandler(private val project: Project) : VcsLogFileHis
         filters: VcsLogFilterCollection,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        val vcs = root.jujutsuVcs
+        val jujutsuRoot = root.jujutsuRoot
 
-        val relativePath = vcs.getRelativePath(filePath)
+        val relativePath = jujutsuRoot.getRelativePath(filePath)
 
         // Use Expression.ALL for full history
-        val result: Result<List<LogEntry>> = vcs.logService.getLog(Expression.ALL, listOf(relativePath))
+        val logService = jujutsuRoot.logService
+        val result: Result<List<LogEntry>> = logService.getLog(Expression.ALL, listOf(relativePath))
 
         result.fold(
             onSuccess = { entries: List<LogEntry> ->
                 log.info("Collected ${entries.size} history entries for ${filePath.path}")
 
                 entries.forEach { entry: LogEntry ->
-                    consumer(JujutsuFileRevision(entry, filePath, vcs))
+                    consumer(JujutsuFileRevision(entry, filePath, jujutsuRoot))
                 }
             },
             onFailure = { error: Throwable ->

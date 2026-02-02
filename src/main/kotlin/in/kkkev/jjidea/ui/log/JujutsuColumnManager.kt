@@ -8,6 +8,9 @@ package `in`.kkkev.jjidea.ui.log
  * 2. What elements are shown in the combined graph column (when not using separate columns)
  */
 class JujutsuColumnManager {
+    // Root gutter column (visible when multiple roots)
+    var showRootGutterColumn: Boolean = false
+
     // Separate columns (mutually exclusive with showing in graph column)
     var showStatusColumn: Boolean = false
     var showChangeIdColumn: Boolean = false
@@ -31,10 +34,16 @@ class JujutsuColumnManager {
 
     /**
      * Get list of visible columns (indices).
-     * Column 0 (graph) is always visible.
+     * Graph column is always visible. Root gutter is visible when showRootGutterColumn is true.
      */
     fun getVisibleColumns(): List<Int> {
-        val columns = mutableListOf(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
+        val columns = mutableListOf<Int>()
+
+        if (showRootGutterColumn) {
+            columns.add(JujutsuLogTableModel.COLUMN_ROOT_GUTTER)
+        }
+
+        columns.add(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
 
         if (showStatusColumn) {
             columns.add(JujutsuLogTableModel.COLUMN_STATUS)
@@ -71,6 +80,7 @@ class JujutsuColumnManager {
      * Check if a column should be visible.
      */
     fun isColumnVisible(columnIndex: Int): Boolean = when (columnIndex) {
+        JujutsuLogTableModel.COLUMN_ROOT_GUTTER -> showRootGutterColumn
         JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> true // Always visible
         JujutsuLogTableModel.COLUMN_STATUS -> showStatusColumn
         JujutsuLogTableModel.COLUMN_CHANGE_ID -> showChangeIdColumn

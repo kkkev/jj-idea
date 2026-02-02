@@ -14,7 +14,6 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.*
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter
@@ -65,10 +64,10 @@ object JujutsuCompareWithPopup {
      * Features search field with dynamic filtering
      * Loads data in background to avoid EDT blocking
      */
-    fun show(project: Project, vcs: JujutsuVcs, onSelected: (String) -> Unit) {
+    fun show(project: Project, repo: JujutsuRepository, onSelected: (String) -> Unit) {
         // Create UI on EDT
         ApplicationManager.getApplication().invokeLater {
-            val panel = createPopupPanel(project, vcs, onSelected)
+            val panel = createPopupPanel(project, repo, onSelected)
 
             val popup = JBPopupFactory
                 .getInstance()
@@ -92,15 +91,15 @@ object JujutsuCompareWithPopup {
     /**
      * Create the popup panel with search field and list
      */
-    private fun createPopupPanel(project: Project, vcs: JujutsuVcs, onSelected: (String) -> Unit) =
-        PopupPanel(project, vcs, onSelected)
+    private fun createPopupPanel(project: Project, repo: JujutsuRepository, onSelected: (String) -> Unit): PopupPanel =
+        PopupPanel(project, repo, onSelected)
 
     /**
      * Panel containing search field and results list
      */
     private class PopupPanel(
         private val project: Project,
-        private val vcs: JujutsuVcs,
+        private val repo: JujutsuRepository,
         private val onSelected: (String) -> Unit
     ) : JPanel(BorderLayout()) {
         val searchField = SearchTextField(false).apply {
@@ -251,7 +250,7 @@ object JujutsuCompareWithPopup {
          */
         fun loadData(query: String) {
             ApplicationManager.getApplication().executeOnPooledThread {
-                val items = buildItemList(project, vcs, query.trim())
+                val items = buildItemList(project, repo, query.trim())
 
                 ApplicationManager.getApplication().invokeLater {
                     listModel.clear()
@@ -323,12 +322,13 @@ object JujutsuCompareWithPopup {
      *
      * @param query Search query to filter changes by change ID or description
      */
-    private fun buildItemList(project: Project, vcs: JujutsuVcs, query: String): List<CompareItem> {
+    private fun buildItemList(project: Project, repo: JujutsuRepository, query: String): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
         val cache = LogCache.getInstance(project)
 
         // Add bookmarks - always show all bookmarks filtered by query
-        val bookmarkResult = vcs.logService.getBookmarks()
+        val logService = repo.logService
+        val bookmarkResult = logService.getBookmarks()
         if (bookmarkResult.isSuccess) {
             val bookmarks = bookmarkResult.getOrNull() ?: emptyList()
 
@@ -349,7 +349,7 @@ object JujutsuCompareWithPopup {
         // Try to get from cache first
         val entries = cache.get(Expression.ALL) ?: run {
             // Not in cache, fetch from jj and cache it
-            val logResult = vcs.logService.getLogBasic(revset = Expression.ALL)
+            val logResult = logService.getLogBasic(revset = Expression.ALL)
             logResult.getOrNull()?.also { fetchedEntries ->
                 cache.put(Expression.ALL, emptyList(), fetchedEntries)
             } ?: emptyList()

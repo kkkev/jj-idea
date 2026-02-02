@@ -7,8 +7,8 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.history.VcsFileRevisionEx
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.jj.FileChangeStatus
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import java.util.*
@@ -19,7 +19,7 @@ import java.util.*
 class JujutsuFileRevision(
     private val entry: LogEntry,
     private val filePath: FilePath,
-    private val vcs: JujutsuVcs
+    private val repo: JujutsuRepository
 ) : VcsFileRevisionEx() {
     private val log = Logger.getInstance(javaClass)
 
@@ -27,8 +27,8 @@ class JujutsuFileRevision(
      * Lazy-loaded file status. Determines if this file was deleted in this revision.
      */
     private val fileStatus: FileChangeStatus? by lazy {
-        vcs.logService
-            .getFileChanges(entry.changeId)
+        val logService = repo.logService
+        logService.getFileChanges(entry.changeId)
             .getOrElse { error ->
                 log.debug("Error loading file changes for ${entry.changeId}: ${error.message}")
                 emptyList()
@@ -73,8 +73,8 @@ class JujutsuFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val relativePath = vcs.getRelativePath(filePath)
-        val result = vcs.commandExecutor.show(relativePath, entry.changeId)
+        val relativePath = repo.getRelativePath(filePath)
+        val result = repo.commandExecutor.show(relativePath, entry.changeId)
         if (!result.isSuccess) {
             throw VcsException("Failed to load file content at revision ${entry.changeId}: ${result.stderr}")
         }

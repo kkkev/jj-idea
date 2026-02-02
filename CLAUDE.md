@@ -470,8 +470,39 @@ bd close <id>            # Close completed issue
 - **Single return point**: Avoid multiple return points where possible
   - Instead of early returns, chain calls with `?.let`
   - Example: `vcs?.let { executeOperation(it) }` instead of `if (vcs == null) return; executeOperation(vcs)`
+- **`equals` with `when` expression**: Use `when` expression style for `equals` overrides:
+  ```kotlin
+  override fun equals(other: Any?) = when {
+      this === other -> true
+      other !is MyClass -> false
+      else -> field == other.field
+  }
+  ```
 - **Imports**: Always use imports over fully-qualified symbols
 - **Optimize imports**: Always optimize imports (remove unused, organize)
+
+### Error Handling Philosophy
+**Never fail silently** - silent failures lead to unexpected outcomes that are difficult to debug. Fail fast and make errors obvious.
+
+Distinguish between **user errors** and **system errors**:
+
+1. **System errors** (coding bugs, internal inconsistencies, invariant violations):
+   - Throw exceptions immediately - let them bubble up
+   - Use `!!` when something absolutely must exist (e.g., registered action, required service)
+   - Use `check()` / `require()` for invariants
+   - Example: `ActionManager.getInstance().getAction("Jujutsu.Init")!!` - if this is null, it's a bug
+
+2. **User errors** (misconfiguration, invalid input, missing prerequisites):
+   - Show a helpful message explaining what happened
+   - Tell the user how to fix it, or better, provide a direct UX to fix it
+   - Example: VCS root configured but .jj missing → show notification with "Initialize" and "Configure VCS" buttons
+   - Use `JujutsuNotifications` for balloon notifications with action buttons
+
+**Anti-patterns to avoid**:
+- `if (x != null) { ... }` with no else clause when null indicates a bug
+- `?.let { }` that silently does nothing on null when null is unexpected
+- Empty catch blocks
+- Logging errors but continuing as if nothing happened
 
 ### VCS Integration Constraints
 - **HashImpl requirement**: You **cannot** use custom implementation of `com.intellij.vcs.log.Hash`

@@ -16,4 +16,13 @@ class JujutsuTimedCommit(
     override fun getParents() = parentIds.map { it.hash }
 
     override fun getTimestamp() = timestamp
+
+    // Required for IntelliJ's cache duplicate detection
+    override fun equals(other: Any?) = when {
+        this === other -> true
+        other !is JujutsuTimedCommit -> false
+        else -> changeId == other.changeId
+    }
+
+    override fun hashCode() = id.hashCode()
 }

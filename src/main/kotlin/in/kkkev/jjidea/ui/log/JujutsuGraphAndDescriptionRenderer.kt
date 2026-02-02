@@ -105,6 +105,12 @@ class JujutsuGraphAndDescriptionRenderer(
         private fun buildTooltip(entry: LogEntry): String? {
             val parts = mutableListOf<String>()
 
+            // Add root indicator for multi-root projects
+            val rootName = entry.repo.displayName
+            if (rootName.isNotEmpty()) {
+                parts.add("<b>📁 $rootName</b>")
+            }
+
             // Add status indicators
             if (entry.hasConflict) {
                 parts.add("<b>⚠ Conflict</b> - This change has unresolved merge conflicts")

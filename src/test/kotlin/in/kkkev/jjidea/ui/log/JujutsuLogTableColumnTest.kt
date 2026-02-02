@@ -2,10 +2,12 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.mockk.mockk
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
 
@@ -56,8 +58,9 @@ class JujutsuLogTableColumnTest {
     fun `table model provides correct column count`() {
         val model = JujutsuLogTableModel()
 
-        // Always 8 columns in the model (visibility controlled separately)
-        model.columnCount shouldBe 8
+        // Always 9 columns in the model (visibility controlled separately)
+        // Columns: Root Gutter, Graph+Desc, Status, ChangeID, Desc, Decorations, Author, Committer, Date
+        model.columnCount shouldBe 9
     }
 
     @Test
@@ -299,6 +302,7 @@ class JujutsuLogTableColumnTest {
         hasConflict: Boolean = false,
         isEmpty: Boolean = false
     ) = LogEntry(
+        repo = mockk<JujutsuRepository>(),
         changeId = ChangeId(changeId),
         commitId = "0000000000000000000000000000000000000000",
         underlyingDescription = description,

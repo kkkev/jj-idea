@@ -5,20 +5,16 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
-import com.intellij.openapi.fileChooser.FileChooserDialog
 import com.intellij.openapi.fileChooser.FileChooserFactory
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.vcs.pathRelativeTo
 
 /**
  * Filter component for paths.
  */
-class JujutsuPathsFilterComponent(
-    private val project: Project,
-    private val root: VirtualFile,
-    private val tableModel: JujutsuLogTableModel
-) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.paths")) {
+class JujutsuPathsFilterComponent(private val repo: JujutsuRepository, private val tableModel: JujutsuLogTableModel) :
+    JujutsuFilterComponent(JujutsuBundle.message("log.filter.paths")) {
     private val selectedPaths = mutableSetOf<String>()
 
     override fun getCurrentText(): String = when (selectedPaths.size) {
@@ -64,18 +60,14 @@ class JujutsuPathsFilterComponent(
             val descriptor = FileChooserDescriptorFactory.createMultipleFilesNoJarsDescriptor().apply {
                 title = JujutsuBundle.message("log.filter.paths.chooser.title")
                 description = JujutsuBundle.message("log.filter.paths.chooser.description")
-                roots = listOf(root)
+                roots = listOf(repo.directory)
             }
 
-            val dialog: FileChooserDialog = FileChooserFactory.getInstance().createFileChooser(
-                descriptor,
-                project,
-                null
-            )
-            val files = dialog.choose(project, root)
+            val dialog = FileChooserFactory.getInstance().createFileChooser(descriptor, repo.project, null)
+            val files = dialog.choose(repo.project, repo.directory)
 
             files.forEach { file ->
-                val relativePath = file.path.removePrefix(root.path).removePrefix("/")
+                val relativePath = file.pathRelativeTo(repo.directory)
                 if (relativePath.isNotEmpty()) {
                     selectedPaths.add(relativePath)
                 }

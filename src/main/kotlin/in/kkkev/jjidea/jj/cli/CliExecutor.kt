@@ -55,10 +55,11 @@ class CliExecutor(
             null
         }
 
-    override fun describe(
-        description: Description,
-        revision: Revision
-    ): CommandExecutor.CommandResult = execute(root, listOf("describe", "-r", revision, "-m", description.actual))
+    override fun gitInit(colocate: Boolean) =
+        execute(root, listOfNotNull("git", "init", "--colocate".takeIf { colocate }))
+
+    override fun describe(description: Description, revision: Revision) =
+        execute(root, listOf("describe", "-r", revision, "-m", description.actual))
 
     override fun new(
         description: Description,

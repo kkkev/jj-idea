@@ -50,7 +50,7 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
      */
     fun initUi(): JComponent {
         // Create labels
-        nameLabel = DynamicLabel { if (isValueSelected()) "$displayName: " else displayName }
+        nameLabel = DynamicLabel { "$displayName: " }
         valueLabel = DynamicLabel { getCurrentText() }
 
         // Create button

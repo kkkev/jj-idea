@@ -3,10 +3,12 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.mockk.mockk
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -39,6 +41,7 @@ class JujutsuLogTableModelFilterTest {
         timestamp: Instant? = Instant.fromEpochMilliseconds(1000000000L),
         bookmarks: List<Bookmark> = emptyList()
     ) = LogEntry(
+        repo = mockk<JujutsuRepository>(),
         changeId = ChangeId(changeId),
         commitId = "0000000000000000000000000000000000000000",
         underlyingDescription = description,
@@ -516,7 +519,7 @@ class JujutsuLogTableModelFilterTest {
     }
 
     @Nested
-    inner class `getAllAuthors` {
+    inner class GetAllAuthors {
         @Test
         fun `returns unique sorted authors`() {
             model.setEntries(
@@ -554,7 +557,7 @@ class JujutsuLogTableModelFilterTest {
     }
 
     @Nested
-    inner class `getAllBookmarks` {
+    inner class GetAllBookmarks {
         @Test
         fun `returns unique sorted bookmarks`() {
             model.setEntries(
