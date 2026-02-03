@@ -6,14 +6,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.ChangeKey
-import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.jj.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -94,9 +87,11 @@ class UnifiedJujutsuLogDataLoader(
                             result.onSuccess { loadedEntries ->
                                 entriesByRepo[repo] = loadedEntries
                                 log.info(
-                                    "Loaded ${loadedEntries.size} commits from ${repo.relativePath.ifEmpty {
-                                        "root"
-                                    }}"
+                                    "Loaded ${loadedEntries.size} commits from ${
+                                        repo.relativePath.ifEmpty {
+                                            "root"
+                                        }
+                                    }"
                                 )
                             }.onFailure { e ->
                                 errors[repo] = e
@@ -167,10 +162,12 @@ class UnifiedJujutsuLogDataLoader(
                 val entry = tableModel.getEntry(row)
                 entry?.repo == repo && entry.changeId == revision
             }
+
             WorkingCopy -> (0 until tableModel.rowCount).firstOrNull { row ->
                 val entry = tableModel.getEntry(row)
                 entry?.repo == repo && entry.isWorkingCopy
             }
+
             else -> {
                 log.warn("Unsupported revision type for selection: $revision")
                 null
@@ -201,9 +198,9 @@ class UnifiedJujutsuLogDataLoader(
     fun refresh() {
         log.info("Refreshing unified log")
         // Save current selection to restore after refresh (unless an explicit selection is pending)
-        val savedSelection = if (!hasPendingSelection) {
-            table.selectedEntry?.let { ChangeKey(it.repo, it.changeId) }
-        } else null
+        val savedSelection = table.takeIf { !hasPendingSelection }
+            ?.selectedEntry
+            ?.let { ChangeKey(it.repo, it.changeId) }
 
         loadCommits()
 

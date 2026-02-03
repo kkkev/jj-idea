@@ -15,7 +15,6 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
 
 /**
  * Service that enables/disables Jujutsu tool windows based on VCS roots.
@@ -60,7 +59,9 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
             val totalVcsRoots = allVcsRoots.size
             val allRootsAreJj = hasJjRoots && jjRoots.size == totalVcsRoots
 
-            log.debug("Roots changed: jjRoots=${jjRoots.size}, totalVcsRoots=$totalVcsRoots, allRootsAreJj=$allRootsAreJj")
+            log.debug(
+                "Roots changed: jjRoots=${jjRoots.size}, totalVcsRoots=$totalVcsRoots, allRootsAreJj=$allRootsAreJj"
+            )
 
             // Enable working copy tool window if we have any JJ repos
             ToolWindowManager.getInstance(project)
