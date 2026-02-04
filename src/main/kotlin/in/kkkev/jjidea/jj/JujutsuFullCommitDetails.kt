@@ -39,12 +39,12 @@ class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val c
             val renamedPaths = renames.flatMap { (oldPath, newPath) -> listOf(oldPath, newPath) }.toSet()
 
             // Get regular file changes
-            val result = jujutsuRoot.logService.getFileChanges(entry.changeId)
+            val result = jujutsuRoot.logService.getFileChanges(entry.id)
 
             val regularChanges = result.getOrElse { error ->
                 // This can happen when a commit is removed during loading (e.g., abandon, empty commit auto-removed).
                 // Log at info level since this is an expected scenario, not a programming error.
-                log.info("Error loading changes for ${entry.changeId.short}: ${error.message}")
+                log.info("Error loading changes for ${entry.id}: ${error.message}")
                 emptyList()
             }.filter { fileChange ->
                 // Filter out files that are part of renames to avoid duplicates
@@ -66,10 +66,10 @@ class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val c
          * Returns a list of (oldPath, newPath) pairs.
          */
         private fun detectRenames(entry: LogEntry, commandExecutor: CommandExecutor): List<Pair<String, String>> {
-            val result = commandExecutor.diffGit(entry.changeId)
+            val result = commandExecutor.diffGit(entry.id)
 
             if (!result.isSuccess) {
-                log.debug("Failed to get git diff for ${entry.changeId}: ${result.stderr}")
+                log.debug("Failed to get git diff for ${entry.id}: ${result.stderr}")
                 return emptyList()
             }
 
@@ -123,7 +123,7 @@ class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val c
             val afterPath = repo.getPath(newPath)
 
             val beforeRevision = entry.parentIds.firstOrNull()?.let { repo.createRevision(beforePath, it) }
-            val afterRevision = repo.createRevision(afterPath, entry.changeId)
+            val afterRevision = repo.createRevision(afterPath, entry.id)
 
             return Change(beforeRevision, afterRevision, FileStatus.MODIFIED).apply {
                 this.isIsReplaced = true
@@ -143,12 +143,12 @@ class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val c
             return when (fileChange.status) {
                 FileChangeStatus.MODIFIED -> {
                     val beforeRevision = parentRevision?.let { repo.createRevision(path, it) }
-                    val afterRevision = repo.createRevision(path, entry.changeId)
+                    val afterRevision = repo.createRevision(path, entry.id)
                     Change(beforeRevision, afterRevision, FileStatus.MODIFIED)
                 }
 
                 FileChangeStatus.ADDED -> {
-                    val afterRevision = repo.createRevision(path, entry.changeId)
+                    val afterRevision = repo.createRevision(path, entry.id)
                     Change(null, afterRevision, FileStatus.ADDED)
                 }
 

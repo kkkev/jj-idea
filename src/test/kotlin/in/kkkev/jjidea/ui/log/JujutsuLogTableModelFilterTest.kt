@@ -2,11 +2,7 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
-import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -44,7 +40,7 @@ class JujutsuLogTableModelFilterTest {
         bookmarks: List<Bookmark> = emptyList()
     ) = LogEntry(
         repo = mockk<JujutsuRepository>(),
-        changeId = ChangeId(changeId),
+        id = ChangeId(changeId, changeId, null),
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = description,
         bookmarks = bookmarks,
@@ -86,8 +82,8 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("feature")
 
             model.rowCount shouldBe 2
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
-            model.getEntry(1)?.changeId?.short shouldBe "ghi789"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "ghi789"
         }
 
         @Test
@@ -103,7 +99,7 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("def")
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "def456"
+            model.getEntry(0)?.id?.short shouldBe "def456"
         }
 
         @Test
@@ -119,7 +115,7 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("Bob")
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "def456"
+            model.getEntry(0)?.id?.short shouldBe "def456"
         }
 
         @Test
@@ -135,7 +131,7 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("charlie@example.com")
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "ghi789"
+            model.getEntry(0)?.id?.short shouldBe "ghi789"
         }
 
         @Test
@@ -166,7 +162,7 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("Feature", regex = false, caseSensitive = true)
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
 
         @Test
@@ -182,7 +178,7 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("bug", regex = false, caseSensitive = false, wholeWords = true)
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
 
         @Test
@@ -260,7 +256,7 @@ class JujutsuLogTableModelFilterTest {
 
             // Should fall back to literal match
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
 
         @Test
@@ -275,7 +271,7 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("FEATURE", regex = true, caseSensitive = true)
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
     }
 
@@ -294,8 +290,8 @@ class JujutsuLogTableModelFilterTest {
             model.setAuthorFilter(setOf("alice@example.com"))
 
             model.rowCount shouldBe 2
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
-            model.getEntry(1)?.changeId?.short shouldBe "ghi789"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "ghi789"
         }
 
         @Test
@@ -353,10 +349,10 @@ class JujutsuLogTableModelFilterTest {
             model.setEntries(listOf(entry1, entry2, entry3))
 
             // Filter to show only the main bookmark and its ancestors
-            model.setBookmarkFilter(setOf(ChangeId("abc123")))
+            model.setBookmarkFilter(setOf(ChangeId("abc123", "ab", null)))
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
 
         @Test
@@ -367,7 +363,12 @@ class JujutsuLogTableModelFilterTest {
 
             model.setEntries(listOf(entry1, entry2, entry3))
 
-            model.setBookmarkFilter(setOf(ChangeId("abc123"), ChangeId("def456")))
+            model.setBookmarkFilter(
+                setOf(
+                    ChangeId("abc123", "ab", null),
+                    ChangeId("def456", "de", null)
+                )
+            )
 
             model.rowCount shouldBe 2
         }
@@ -405,7 +406,7 @@ class JujutsuLogTableModelFilterTest {
             model.setDateFilter(cutoff)
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "def456"
+            model.getEntry(0)?.id?.short shouldBe "def456"
         }
 
         @Test
@@ -439,7 +440,7 @@ class JujutsuLogTableModelFilterTest {
             model.setDateFilter(Instant.fromEpochMilliseconds(1500000000L))
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
 
         @Test
@@ -473,7 +474,7 @@ class JujutsuLogTableModelFilterTest {
             model.setAuthorFilter(setOf("alice@example.com"))
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
 
         @Test
@@ -494,7 +495,7 @@ class JujutsuLogTableModelFilterTest {
             model.setDateFilter(Instant.fromEpochMilliseconds(1500000000L))
 
             model.rowCount shouldBe 1
-            model.getEntry(0)?.changeId?.short shouldBe "abc123"
+            model.getEntry(0)?.id?.short shouldBe "abc123"
         }
 
         @Test

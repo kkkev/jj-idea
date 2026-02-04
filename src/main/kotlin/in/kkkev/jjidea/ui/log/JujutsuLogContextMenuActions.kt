@@ -18,14 +18,14 @@ object JujutsuLogContextMenuActions {
     fun createActionGroup(project: Project, entries: List<LogEntry>): DefaultActionGroup =
         DefaultActionGroup().apply {
             val entry = entries.singleOrNull()
-            add(copyChangeIdAction(entry?.changeId))
+            entry?.run { add(copyIdAction(id)) }
             add(copyDescriptionAction(entry?.description?.actual))
             addSeparator()
 
             // Offer "New Change From This/These" if all entries are in the same root
             val uniqueRoot = entries.map { it.repo }.toSet().singleOrNull()
 
-            add(newChangeFromAction(project, uniqueRoot, entries.map { it.changeId }))
+            add(newChangeFromAction(project, uniqueRoot, entries.map { it.id }))
 
             // Offer "Edit" for non-working-copy, non-immutable changes
             add(editChangeAction(project, entry?.takeIf { !it.isWorkingCopy && !it.immutable }))

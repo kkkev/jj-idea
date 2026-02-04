@@ -28,32 +28,28 @@ class CliExecutor(
 
     override fun diffSummary(revision: Revision) = execute(root, listOf("diff", "--summary", "-r", revision))
 
-    override fun show(
-        filePath: String,
-        revision: Revision
-    ) = execute(root, listOf("file", "show", "-r", revision, filePath))
+    override fun show(filePath: String, revision: Revision) =
+        execute(root, listOf("file", "show", "-r", revision, filePath))
 
-    override fun isAvailable() =
-        try {
-            val result = execute(null, listOf("--version"))
-            result.isSuccess
-        } catch (e: Exception) {
-            log.warn("Failed to check jj availability", e)
-            false
-        }
+    override fun isAvailable() = try {
+        val result = execute(null, listOf("--version"))
+        result.isSuccess
+    } catch (e: Exception) {
+        log.warn("Failed to check jj availability", e)
+        false
+    }
 
-    override fun version() =
-        try {
-            val result = execute(null, listOf("--version"))
-            if (result.isSuccess) {
-                result.stdout.trim()
-            } else {
-                null
-            }
-        } catch (e: Exception) {
-            log.warn("Failed to get jj version", e)
+    override fun version() = try {
+        val result = execute(null, listOf("--version"))
+        if (result.isSuccess) {
+            result.stdout.trim()
+        } else {
             null
         }
+    } catch (e: Exception) {
+        log.warn("Failed to get jj version", e)
+        null
+    }
 
     override fun gitInit(colocate: Boolean) =
         execute(root, listOfNotNull("git", "init", "--colocate".takeIf { colocate }))
@@ -61,10 +57,7 @@ class CliExecutor(
     override fun describe(description: Description, revision: Revision) =
         execute(root, listOf("describe", "-r", revision, "-m", description.actual))
 
-    override fun new(
-        description: Description,
-        parentRevisions: List<Revision>
-    ): CommandExecutor.CommandResult {
+    override fun new(description: Description, parentRevisions: List<Revision>): CommandExecutor.CommandResult {
         val args = mutableListOf("new")
         if (!description.empty) {
             args.add("-m")
@@ -79,11 +72,7 @@ class CliExecutor(
 
     override fun edit(revision: Revision): CommandExecutor.CommandResult = execute(root, listOf("edit", revision))
 
-    override fun log(
-        revset: Revset,
-        template: String?,
-        filePaths: List<String>
-    ): CommandExecutor.CommandResult {
+    override fun log(revset: Revset, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
         val args = mutableListOf("log", "-r", revset, "--no-graph")
         if (template != null) {
             args.add("-T")
@@ -93,11 +82,7 @@ class CliExecutor(
         return execute(root, args)
     }
 
-    override fun annotate(
-        filePath: String,
-        revision: Revision,
-        template: String?
-    ): CommandExecutor.CommandResult {
+    override fun annotate(filePath: String, revision: Revision, template: String?): CommandExecutor.CommandResult {
         val args = mutableListOf("file", "annotate", "-r", revision)
         if (template != null) {
             args.add("-T")
@@ -127,10 +112,9 @@ class CliExecutor(
         args: List<Any>,
         timeout: Long = defaultTimeout
     ): CommandExecutor.CommandResult {
-        val commandLine =
-            GeneralCommandLine(jjExecutable)
-                .withParameters(args.map { it.toString() })
-                .withCharset(StandardCharsets.UTF_8)
+        val commandLine = GeneralCommandLine(jjExecutable)
+            .withParameters(args.map { it.toString() })
+            .withCharset(StandardCharsets.UTF_8)
 
         workingDir?.let { commandLine.setWorkDirectory(it.path) }
 
@@ -142,10 +126,6 @@ class CliExecutor(
         val processHandler = CapturingProcessHandler(commandLine)
         val output: ProcessOutput = processHandler.runProcess(timeout.toInt())
 
-        return CommandExecutor.CommandResult(
-            exitCode = output.exitCode,
-            stdout = output.stdout,
-            stderr = output.stderr
-        )
+        return CommandExecutor.CommandResult(exitCode = output.exitCode, stdout = output.stdout, stderr = output.stderr)
     }
 }

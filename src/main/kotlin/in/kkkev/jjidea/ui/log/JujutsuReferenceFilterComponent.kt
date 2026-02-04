@@ -62,7 +62,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
     private fun applyFilter() {
         if (selectedReference != null) {
             // Get all change IDs that are ancestors of the selected reference
-            val ancestorIds = getAncestorChangeIds(selectedReference!!)
+            val ancestorIds = getAncestorIds(selectedReference!!)
             tableModel.setBookmarkFilter(ancestorIds)
         } else {
             tableModel.setBookmarkFilter(emptySet())
@@ -98,10 +98,10 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
     }
 
     /**
-     * Get all change IDs that are ancestors of the given reference.
+     * Get all IDs that are ancestors of the given reference.
      * This includes the commit with the reference and all its parents recursively.
      */
-    private fun getAncestorChangeIds(referenceName: String): Set<ChangeId> {
+    private fun getAncestorIds(referenceName: String): Set<ChangeId> {
         val allEntries = tableModel.getAllEntries()
         val result = mutableSetOf<ChangeId>()
         val toVisit = mutableSetOf<ChangeId>()
@@ -117,21 +117,18 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
         } ?: return emptySet()
 
         // Start with the referenced commit
-        toVisit.add(referencedEntry.changeId)
+        toVisit.add(referencedEntry.id)
 
         // BFS to collect all ancestors
         while (toVisit.isNotEmpty()) {
             val current = toVisit.first()
             toVisit.remove(current)
 
-            if (result.contains(current)) continue
-            result.add(current)
+            if (current !in result) {
+                result.add(current)
 
-            // Find entry for current changeId
-            val entry = allEntries.find { it.changeId == current } ?: continue
-
-            // Add parents to visit
-            toVisit.addAll(entry.parentIds)
+                allEntries.find { it.id == current }?.let { toVisit.addAll(it.parentIds) }
+            }
         }
 
         return result
@@ -143,10 +140,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
     ) : ToggleAction(reference, null, type.icon) {
         override fun isSelected(e: AnActionEvent): Boolean = selectedReference == reference
 
-        override fun setSelected(
-            e: AnActionEvent,
-            state: Boolean
-        ) {
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
             selectedReference = if (state) reference else null
             notifyFilterChanged()
         }

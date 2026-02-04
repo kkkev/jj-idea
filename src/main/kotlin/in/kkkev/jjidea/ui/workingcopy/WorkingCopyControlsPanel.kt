@@ -360,8 +360,8 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
 
             append("<html>")
             // Show repo:changeId format
-            append("<b>${entry.repo.relativePath}</b>:")
-            canvas.append(entry.changeId)
+            append("<b>${entry.repo.displayName}</b>:")
+            canvas.append(entry.id)
             append(" (")
             canvas.append(entry.commitId)
             append(")")

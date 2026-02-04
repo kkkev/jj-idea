@@ -169,7 +169,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
             // Get parent and current change IDs for titles
             val entry = currentEntry
             val parentId = entry?.parentIds?.firstOrNull()?.short ?: "parent"
-            val currentId = entry?.changeId?.short ?: "current"
+            val currentId = entry?.id?.short ?: "current"
 
             // Create diff UI on EDT with loaded content
             ApplicationManager.getApplication().invokeLater {
@@ -259,25 +259,25 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
     private fun restoreToRevision(change: Change, entry: LogEntry) {
         val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
         val fileName = filePath.name
-        val changeId = entry.changeId
+        val id = entry.id
         val repo = entry.repo
 
         // Show confirmation dialog
-        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileName, changeId.short)
-        val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", changeId.short)
+        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileName, id.short)
+        val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", id.short)
         if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
             return
         }
 
         repo.commandExecutor.createCommand {
-            restore(listOf(repo.getRelativePath(filePath)), changeId)
+            restore(listOf(repo.getRelativePath(filePath)), id)
         }
             .onSuccess {
                 filePath.virtualFile?.let { vf ->
                     VfsUtil.markDirtyAndRefresh(false, false, true, vf)
                 }
                 repo.invalidate()
-                log.info("Restored $fileName to revision ${changeId.short}")
+                log.info("Restored $fileName to revision ${id.short}")
             }
             .onFailureTellUser("action.restore.to.revision.error", project, log)
             .executeAsync()
@@ -326,9 +326,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
             } catch (e: Exception) {
                 // This can happen when a commit is removed (e.g., by abandon, or empty commit auto-removed).
                 // Treat this as "no commit selected" rather than an error.
-                log.info(
-                    "Change ${entry.changeId.short} no longer exists (likely abandoned or auto-removed): ${e.message}"
-                )
+                log.info("Change ${entry.id} no longer exists (likely abandoned or auto-removed): ${e.message}")
                 ApplicationManager.getApplication().invokeLater {
                     if (currentEntry == entry) {
                         // Clear the selection state since this commit no longer exists
@@ -352,11 +350,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         // Commit line: Change ID + decorations
         sb.append("<p style='margin: 0; padding-bottom: 4px;'>")
 
-        // Change ID using standard formatter
-        canvas.append(entry.changeId)
-        sb.append(" (")
-        canvas.append(entry.commitId)
-        sb.append(")")
+        canvas.append(entry.id)
 
         // Bookmarks with branch icon (⎇ symbol - JEditorPane doesn't support icon data URIs reliably)
         if (entry.bookmarks.isNotEmpty()) {
@@ -400,50 +394,28 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
 
         sb.append("</p>")
 
+        sb.append("<p style='margin: 4px 0;'>")
+        sb.append(JujutsuBundle.message("details.commitid.label"))
+        canvas.append(entry.commitId)
+        sb.append("</p>")
+
         // Description or (no description) in italics
-        if (entry.description.empty) {
-            sb.append("<p style='margin: 8px 0; font-style: italic; color: #${JujutsuColors.getGrayHex()};'>")
-            sb.append(JujutsuBundle.message("description.empty"))
-            sb.append("</p>")
-        } else {
-            sb.append("<p style='margin: 8px 0;'>")
-            sb.append(Formatters.escapeHtml(entry.description.actual))
-            sb.append("</p>")
-        }
+        sb.append("<p style='margin: 8px 0;'>${htmlText { append(entry.description) }}</p>")
 
         // Author and committer info (Git style with formatted dates)
         sb.append("<p style='margin: 4px 0;'>")
 
         // Author line
-        val authorName = entry.author?.name ?: "Unknown"
-        val authorEmail = entry.author?.email ?: ""
-        val authorTime = entry.authorTimestamp?.let { DateTimeFormatter.formatRelative(it) } ?: ""
-
-        sb.append("$authorName ")
-        if (authorEmail.isNotEmpty()) {
-            sb.append(
-                "<a href='mailto:$authorEmail' style='color: #${JujutsuColors.getLinkHex()};'>&lt;$authorEmail&gt;</a> "
-            )
-        }
-        if (authorTime.isNotEmpty()) {
-            sb.append("on $authorTime")
+        // TODO Localise
+        sb.append(entry.author?.let { htmlText { append(it) } } ?: "Unknown")
+        entry.authorTimestamp?.also {
+            sb.append("on ${htmlText { append(it) }}")
         }
 
         // Committer line (if different from author)
-        val committerName = entry.committer?.name
-        val committerEmail = entry.committer?.email
-        val committerTime = entry.committerTimestamp
-
-        if (committerName != null && committerName != authorName) {
-            sb.append("<br/>committed by $committerName ")
-            if (committerEmail != null && committerEmail.isNotEmpty()) {
-                sb.append(
-                    "<a href='mailto:$committerEmail' style='color: #${JujutsuColors.getLinkHex()};'>&lt;$committerEmail&gt;</a> "
-                )
-            }
-            if (committerTime != null) {
-                sb.append("on ${DateTimeFormatter.formatRelative(committerTime)}")
-            }
+        val committer = entry.committer
+        if (committer != null && committer != entry.author) {
+            sb.append("<br/>committed by ${htmlText { append(committer) }} ")
         }
 
         sb.append("</p>")
@@ -452,21 +424,9 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         if (entry.parentIds.isNotEmpty()) {
             sb.append("<p style='margin: 4px 0;'>")
             sb.append("Parents: ")
-            sb.append(
-                entry.parentIds.joinToString(", ") {
-                    htmlText { append(it) }
-                }
-            )
+            sb.append(entry.parentIds.joinToString(", ") { htmlText { append(it) } })
             sb.append("</p>")
         }
-
-        // Commit ID (technical detail, smaller and grey)
-        sb.append(
-            "<p style='margin: 4px 0; color: #${JujutsuColors.getGrayHex()}; font-size: ${UIUtil.getLabelFont().size - 1}pt;'>"
-        )
-        // TODO CommitId to HTML
-        sb.append("Commit: <span style='font-family: monospace;'>${entry.commitId}</span>")
-        sb.append("</p>")
 
         sb.append("</body></html>")
         return sb.toString()
