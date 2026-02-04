@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.util.Alarm
 import `in`.kkkev.jjidea.jj.util.notifiableState
 import `in`.kkkev.jjidea.jj.util.simpleNotifier
 import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
@@ -54,6 +55,8 @@ class JujutsuStateModel(private val project: Project) {
      */
     val changeSelection = simpleNotifier<ChangeKey>(project, "Jujutsu Change Selection")
 
+    private val repositoryStateAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, project)
+
     init {
         // Watch for file changes to mark files dirty and detect .jj directory changes
         project.messageBus.connect(project).subscribe(
@@ -71,16 +74,23 @@ class JujutsuStateModel(private val project: Project) {
                     if (repos.isEmpty()) return
 
                     val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
+                    var hasRepoChanges = false
                     events.forEach { event ->
                         when (event) {
                             is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
                                 event.file?.let { file ->
                                     if (repos.any { VfsUtil.isAncestor(it.directory, file, false) }) {
                                         dirtyScopeManager.fileDirty(file)
+                                        hasRepoChanges = true
                                     }
                                 }
                             }
                         }
+                    }
+
+                    if (hasRepoChanges) {
+                        repositoryStateAlarm.cancelAllRequests()
+                        repositoryStateAlarm.addRequest({ repositoryStates.invalidate() }, 300)
                     }
                 }
 

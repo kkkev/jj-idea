@@ -86,5 +86,4 @@ class RestoreToRevisionAction : DumbAwareAction(
 
         e.presentation.isEnabledAndVisible = enabled
     }
-
 }
