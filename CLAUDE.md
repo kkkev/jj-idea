@@ -365,6 +365,60 @@ fun editChangeAction(project: Project, changeId: ChangeId?) =
 
 **See**: `vcs/actions/` package
 
+#### 9. Custom Log Architecture
+The custom log replaces IntelliJ's built-in VCS log entirely (avoiding `HashImpl` constraints, see §2) and is built from `JBTable`, `AbstractTableModel`, and custom `TableCellRenderer` implementations.
+
+**Component Hierarchy**:
+```
+JujutsuCustomLogTabManager (@Service — tab lifecycle, singleton Content in ChangesViewContentManager)
+└── UnifiedJujutsuLogPanel (multi-root) or JujutsuLogPanel (single-root)
+    ├── Toolbar (filters: search, root, reference, author, date; column menu)
+    ├── OnePixelSplitter
+    │   ├── JujutsuLogTable (JBTable + JujutsuLogTableModel)
+    │   └── JujutsuCommitDetailsPanel
+    └── JujutsuColumnManager (visibility + inlining state)
+```
+The two panel classes are parallel implementations (not related by inheritance) sharing sub-components. `JujutsuLogPanel` adds a Paths filter; `UnifiedJujutsuLogPanel` adds a root filter and root gutter column.
+
+**Data Flow**:
+```
+jj log (CLI) → CliLogService (template + null-byte parse) → List<LogEntry>
+  → DataLoader (background thread) → CommitGraphBuilder → LayoutCalculatorImpl
+  → EDT: tableModel.setEntries() + table.updateGraph(graphNodes)
+```
+Graph layout is computed alongside data load (not on demand). `LayoutCalculatorImpl` uses a two-pass `foldIndexed` over entries: pass 1 assigns lanes and tracks parent-child relationships; pass 2 builds `RowLayout` objects. Lane assignment prefers staying in a child's lane for continuity.
+
+**Template-Based Log Parsing** (`CliLogService.kt`):
+The `LogSpec<T>` interface forms a composable parser algebra:
+- `SingleField<T>` — one null-byte-terminated field with a typed parser
+- `MultipleFields<T>` / `LogTemplate<T>` — composite specs that nest other specs
+
+Templates compose: `fullLogTemplate` contains `basicLogTemplate` as a sub-field, calling `basicLogTemplate.take(it)` first then extending with `copy(author=..., committer=...)`. The `LogFields` factory provides typed constructors (`stringField`, `booleanField`, `timestampField`, `SignatureFields`).
+
+Uses `++` concatenation (not `separate()`) in JJ templates because `separate()` skips empty values, which would misalign field positions. Null byte separator handles descriptions with newlines/special characters.
+
+**Multi-Repository Support**:
+`UnifiedJujutsuLogDataLoader` loads all repos in parallel via `CountDownLatch(repos.size)` + `ConcurrentHashMap`. Results merge by timestamp: `flatten().sortedByDescending { authorTimestamp ?: committerTimestamp }`. Every `LogEntry` carries its `JujutsuRepository` reference; selection matching in multi-root mode requires both `repo` and `revision` to prevent cross-repo mismatches. The root gutter column and root filter auto-hide for single-root projects.
+
+**State Management & Reactive Refresh** (`JujutsuStateModel.kt`, `Messaging.kt`):
+`JujutsuStateModel` (project-level `@Service`) provides:
+1. `initializedRoots: NotifiableState<Set<JujutsuRepository>>` — cached roots with `.jj` dirs, invalidated by `BulkFileListener`
+2. `repositoryStates: NotifiableState<Set<LogEntry>>` — working copy entries per root, cascades from `initializedRoots`
+3. `changeSelection: Notifier<ChangeKey>` — fire-and-forget selection requests
+
+`NotifiableState<T>` wraps `MessageBus` topics: `invalidate()` runs a loader on a pooled thread; if the value changes, publishes on EDT. File changes trigger `repositoryStates.invalidate()` with a 300ms debounce via `Alarm`. Cascading: `initializedRoots` → `repositoryStates` → `VcsDirtyScopeManager.dirDirtyRecursively()`.
+
+Both data loaders use a **pending selection** pattern (volatile `pendingSelection` + `hasPendingSelection` flags) to defer selection requests that arrive during background loading, resolving the race between VCS operation completion and refresh data arrival.
+
+**Column Inlining into Graph** (`JujutsuColumnManager.kt`):
+When a column (Change ID, Description, Decorations) is hidden as a separate table column, its content is automatically rendered inside the graph column via computed properties:
+```kotlin
+val showChangeId: Boolean get() = !showChangeIdColumn && showChangeIdInGraph
+```
+Toggling a separate column ON removes that element from the graph column; toggling it OFF adds it back. `JujutsuGraphAndDescriptionRenderer` reads these flags in `paintComponent()` to conditionally draw change ID, description, and decoration elements after the graph lines.
+
+**See**: `ui/log/` package, `jj/JujutsuStateModel.kt`, `jj/util/Messaging.kt`, `jj/cli/CliLogService.kt`
+
 ## File Structure
 
 ```
