@@ -2,9 +2,9 @@ package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.AnnotationLine
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.ChangeId
 import kotlinx.datetime.Instant
 
 /**
@@ -17,7 +17,7 @@ import kotlinx.datetime.Instant
  */
 object AnnotationParser {
     private const val FIELD_SEPARATOR = "\u0000" // Null byte
-    private const val FIELDS_PER_LINE = 9
+    private const val FIELDS_PER_LINE = 10
 
     /**
      * Template to use with `jj file annotate -T`
@@ -36,6 +36,7 @@ object AnnotationParser {
         """
         commit.change_id() ++ "\0" ++
         commit.change_id().shortest() ++ "\0" ++
+        if(commit.divergent(), commit.change_offset(), "") ++ "\0" ++
         commit.commit_id() ++ "\0" ++
         commit.commit_id().shortest() ++ "\0" ++
         commit.author().name() ++ "\0" ++
@@ -79,16 +80,17 @@ object AnnotationParser {
 
         val fullChangeId = chunk[0]
         val shortChangeId = chunk[1]
-        val fullCommitId = chunk[2]
-        val shortCommitId = chunk[3]
-        val authorName = chunk[4]
-        val authorEmail = chunk[5]
-        val authorTimestamp = chunk[6].toLongOrNull()?.let(Instant::fromEpochSeconds)
-        val description = Description(chunk[7])
-        val lineContent = chunk[8]
+        val changeOffset = chunk[2]
+        val fullCommitId = chunk[3]
+        val shortCommitId = chunk[4]
+        val authorName = chunk[5]
+        val authorEmail = chunk[6]
+        val authorTimestamp = chunk[7].toLongOrNull()?.let(Instant::fromEpochSeconds)
+        val description = Description(chunk[8])
+        val lineContent = chunk[9]
 
         return AnnotationLine(
-            changeId = ChangeId(fullChangeId, shortChangeId),
+            id = ChangeId(fullChangeId, shortChangeId, changeOffset),
             commitId = CommitId(fullCommitId, shortCommitId),
             author = VcsUserImpl(authorName, authorEmail),
             authorTimestamp = authorTimestamp,

@@ -1,24 +1,19 @@
 package `in`.kkkev.jjidea.ui.log.graph
 
-import `in`.kkkev.jjidea.jj.ChangeId
-
 /**
  * Calculates the layout for a commit graph.
  *
  * @see <a href="../../../../../../../docs/LOG_GRAPH_ALGORITHM.md">Log Graph Algorithm</a>
  */
-interface LayoutCalculator {
-    fun calculate(entries: List<GraphEntry>): GraphLayout
+interface LayoutCalculator<I : Any> {
+    fun calculate(entries: List<GraphEntry<I>>): GraphLayout<I>
 }
 
-private data class ChildInfo(
-    val changeId: ChangeId,
-    val lane: Int
-)
+private data class ChildInfo<I : Any>(val id: I, val lane: Int)
 
-private data class Passthrough(
+private data class Passthrough<I : Any>(
     val lane: Int, // The lane this passthrough blocks
-    val targetParentId: ChangeId
+    val targetParentId: I
 )
 
 private data class Lanes(val contents: Set<Int>) {
@@ -31,25 +26,25 @@ private data class Lanes(val contents: Set<Int>) {
     operator fun plus(lanes: Iterable<Int>) = Lanes(contents + lanes)
 }
 
-private data class Passthroughs(val contents: Set<Passthrough> = emptySet()) {
+private data class Passthroughs<I : Any>(val contents: Set<Passthrough<I>> = emptySet()) {
     fun lanes() = Lanes(contents.map { it.lane }.toSet())
 
-    fun withoutParent(parent: ChangeId) = Passthroughs(contents.filterNot { it.targetParentId == parent }.toSet())
+    fun withoutParent(parent: I) = Passthroughs(contents.filterNot { it.targetParentId == parent }.toSet())
 
-    operator fun plus(passthroughs: Iterable<Passthrough>) = Passthroughs(contents + passthroughs)
+    operator fun plus(passthroughs: Iterable<Passthrough<I>>) = Passthroughs(contents + passthroughs)
 }
 
-private data class State(
-    val childrenByParent: Map<ChangeId, Set<ChildInfo>> = emptyMap(),
-    val lanes: Map<ChangeId, Int> = emptyMap(),
-    val passthroughs: Passthroughs = Passthroughs(),
+private data class State<I : Any>(
+    val childrenByParent: Map<I, Set<ChildInfo<I>>> = emptyMap(),
+    val lanes: Map<I, Int> = emptyMap(),
+    val passthroughs: Passthroughs<I> = Passthroughs<I>(),
     /** row index -> set of passthrough lanes */
     val passthroughsByRow: Map<Int, Set<Int>> = emptyMap(),
     /** Reserved lanes for pure merge parents (parent ID -> reserved lane) */
-    val reservedLanes: Map<ChangeId, Int> = emptyMap()
+    val reservedLanes: Map<I, Int> = emptyMap()
 ) {
     // Pick lowest available lane not occupied by a passthrough or reservation
-    fun laneFor(entry: GraphEntry, currentPassthroughLanes: Lanes): Int {
+    fun laneFor(entry: GraphEntry<I>, currentPassthroughLanes: Lanes): Int {
         // If a lane was reserved for this entry (pure merge target), use it
         reservedLanes[entry.current]?.let { return it }
 
@@ -64,12 +59,12 @@ private data class State(
     }
 }
 
-class LayoutCalculatorImpl : LayoutCalculator {
-    override fun calculate(entries: List<GraphEntry>): GraphLayout {
+class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
+    override fun calculate(entries: List<GraphEntry<I>>): GraphLayout<I> {
         // Pre-compute row index for each entry (needed to determine if parent is adjacent)
         val rowByChangeId = entries.withIndex().associate { (index, entry) -> entry.current to index }
 
-        val initialState = State()
+        val initialState = State<I>()
 
         // First pass: assign lanes, track children, manage passthroughs
         val finalState = entries.foldIndexed(initialState) { rowIndex, state, entry ->
@@ -105,14 +100,14 @@ class LayoutCalculatorImpl : LayoutCalculator {
 
             // Track which lanes are already used (passthroughs + this entry's lane + remaining reservations)
             var usedLanes = currentPassthroughLanes + lane + clearedReservedLanes.values.toSet()
-            val newPassthroughs = mutableSetOf<Passthrough>()
+            val newPassthroughs = mutableSetOf<Passthrough<I>>()
             var newReservedLanes = clearedReservedLanes
 
             val childHasMultipleParents = entry.parents.size > 1
 
             for (parentId in nonAdjacentParents) {
                 val parentHasOtherChildren = updatedChildrenByParent[parentId]
-                    ?.any { it.changeId != entry.current } == true
+                    ?.any { it.id != entry.current } == true
 
                 // Classification:
                 // - Not a merge (child has 1 parent): use child's lane (simple/fork)

@@ -1,24 +1,34 @@
 package `in`.kkkev.jjidea.jj
 
-/*
-For now, store as a string in reverse (z-k) hex form.
-Eventually, store in 2-long form and allow transforms to reverse and forward hex.
+/**
+ * A change id qualified with an optional offset. This uniquely identifies a commit, even if the change has become
+ * conflicted.
  */
-class ChangeId(full: String, shortLength: Int? = null) : ShortenableId(full, shortLength) {
-    constructor(full: String, short: String) : this(full, calculateShortLength(full, short))
+class ChangeId(full: String, short: String? = null, val offset: Int? = null) : Revision {
+    constructor(full: String, short: String, offset: String) : this(
+        full,
+        short,
+        offset.takeIf { offset.isNotEmpty() }?.toInt()
+    )
 
-    /**
-     * Convert to hex format (0-9a-f) for Hash compatibility
-     */
-    val hexString: String
-        get() = full.map { char ->
-            val index = CHARS.indexOf(char)
-            require(index >= 0) { "Invalid character '$char' in change ID '$full'" }
-            HEX[index]
-        }.joinToString("")
+    override fun toString() = full
+
+    override fun equals(other: Any?) = when {
+        this === other -> true
+        other !is ChangeId -> false
+        else -> this.full == other.full
+    }
+
+    override fun hashCode() = full.hashCode()
+
+    val shortenable = Shortenable(full, short)
+    val full get() = "${shortenable.full}$optionalOffset"
+    override val short get() = "${shortenable.short}$optionalOffset"
+    val remainder get() = shortenable.remainder
+    val divergent get() = offset != null
+    val optionalOffset get() = offset?.let { "/$it" } ?: ""
 
     companion object {
-        const val CHARS = "zyxwvutsrqponmlk"
-        const val HEX = "0123456789abcdef"
+        val EMPTY = ChangeId("", "")
     }
 }

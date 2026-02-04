@@ -139,7 +139,7 @@ class JujutsuColumnManagerTest {
         val visible = manager.getVisibleColumns()
 
         visible shouldContain JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
-        visible shouldContain JujutsuLogTableModel.COLUMN_CHANGE_ID
+        visible shouldContain JujutsuLogTableModel.COLUMN_ID
         visible shouldContain JujutsuLogTableModel.COLUMN_DESCRIPTION
         visible shouldContain JujutsuLogTableModel.COLUMN_DECORATIONS
         visible shouldContain JujutsuLogTableModel.COLUMN_AUTHOR

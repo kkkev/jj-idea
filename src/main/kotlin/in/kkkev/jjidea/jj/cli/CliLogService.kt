@@ -197,11 +197,11 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
-        val changeId = singleField("change_id ++ \"~\" ++ change_id.shortest()") {
-            val (full, short) = it.split("~")
-            ChangeId(full, short)
+        val changeId = singleField(TemplateParts.qualifiedChangeId()) {
+            val (full, short, offset) = it.split("~")
+            ChangeId(full, short, offset)
         }
-        val commitId = singleField("commit_id ++ \"~\" ++ commit_id.shortest()") {
+        val commitId = singleField(TemplateParts.commitId()) {
             val (full, short) = it.split("~")
             CommitId(full, short)
         }
@@ -211,7 +211,12 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val empty = booleanField("empty")
         val bookmarks = singleField("""bookmarks.map(|b| b.name()).join(",")""") { it.splitByComma(::Bookmark) }
         val parents = singleField(
-            """parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest() ++ "|" ++ c.commit_id() ++ "~" ++ c.commit_id().shortest()).join(",")"""
+            """
+                |parents.map(|c|
+                | ${TemplateParts.qualifiedChangeId("c")} ++ "|" ++
+                | ${TemplateParts.commitId("c")}
+                |).join(",")
+            """.trimMargin()
         ) {
             it.splitByComma { p ->
                 val (changeIdParts, commitIdParts) = p.split("|")
@@ -275,7 +280,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val commitGraphLogTemplate = logTemplate(commitId, parents, committer.timestamp) {
             JujutsuTimedCommit(
                 commitId.take(it),
-                parents.take(it).map { it.commitId },
+                parents.take(it).map { parentIds -> parentIds.commitId },
                 committer.timestamp.take(it)
             )
         }
@@ -284,20 +289,18 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
          * Template for bookmark list parsing
          * Uses: jj bookmark list -T 'name ++ "\0" ++ normal_target.change_id() ++ "~" ++ normal_target.change_id().shortest() ++ "\0"'
          */
-        val bookmarkListTemplate =
-            object : LogTemplate<BookmarkItem>(
-                stringField("name"),
-                singleField("normal_target.change_id() ++ \"~\" ++ normal_target.change_id().shortest()") {
-                    val (full, short) = it.split("~")
-                    ChangeId(full, short)
-                }
-            ) {
-                override fun take(input: Iterator<String>): BookmarkItem {
-                    val name = fields[0].take(input) as String
-                    val changeId = fields[1].take(input) as ChangeId
-                    return BookmarkItem(Bookmark(name), changeId)
-                }
+        val bookmarkListTemplate = object : LogTemplate<BookmarkItem>(
+            stringField("name"),
+            singleField(TemplateParts.qualifiedChangeId("normal_target")) {
+                changeId.parse(it)
             }
+        ) {
+            override fun take(input: Iterator<String>): BookmarkItem {
+                val name = fields[0].take(input) as String
+                val id = fields[1].take(input) as ChangeId
+                return BookmarkItem(Bookmark(name), id)
+            }
+        }
     }
 
     companion object {

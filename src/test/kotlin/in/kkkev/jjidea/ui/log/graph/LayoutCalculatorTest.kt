@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log.graph
 
-import `in`.kkkev.jjidea.jj.ChangeId
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -70,16 +69,16 @@ import org.junit.jupiter.api.Test
   9. Test 9 → Edge case with many parallel passthroughs
  */
 
-private val A = ChangeId("A")
-private val B = ChangeId("B")
-private val C = ChangeId("C")
-private val D = ChangeId("D")
-private val E = ChangeId("E")
-private val F = ChangeId("F")
-private val G = ChangeId("G")
+private val A = "A"
+private val B = "B"
+private val C = "C"
+private val D = "D"
+private val E = "E"
+private val F = "F"
+private val G = "G"
 
 class LayoutCalculatorTest {
-    private val calculator = LayoutCalculatorImpl()
+    private val calculator = LayoutCalculatorImpl<String>()
 
     // 1. Single entry - baseline
     @Test
@@ -323,24 +322,23 @@ class LayoutCalculatorTest {
     // When qn creates passthrough for oq, lane 1 should be available.
     @Test
     fun `reserved lane is released when used, allowing reuse`() {
-        val pp = ChangeId("pp")
-        val ou = ChangeId("ou")
-        val ut = ChangeId("ut")
-        val xs = ChangeId("xs")
-        val qn = ChangeId("qn")
-        val rso = ChangeId("rso")
-        val oq = ChangeId("oq")
+        val pp = "pp"
+        val ou = "ou"
+        val ut = "ut"
+        val xs = "xs"
+        val qn = "qn"
+        val rso = "rso"
+        val oq = "oq"
 
-        val entries =
-            listOf(
-                GraphEntry(pp, listOf(ou, xs)), // Row 0: merge
-                GraphEntry(ou, listOf(qn)), // Row 1
-                GraphEntry(ut, listOf(qn)), // Row 2
-                GraphEntry(xs, listOf(qn)), // Row 3
-                GraphEntry(qn, listOf(rso, oq)), // Row 4: merge
-                GraphEntry(rso, emptyList()), // Row 5
-                GraphEntry(oq, emptyList()) // Row 6
-            )
+        val entries = listOf(
+            GraphEntry(pp, listOf(ou, xs)), // Row 0: merge
+            GraphEntry(ou, listOf(qn)), // Row 1
+            GraphEntry(ut, listOf(qn)), // Row 2
+            GraphEntry(xs, listOf(qn)), // Row 3
+            GraphEntry(qn, listOf(rso, oq)), // Row 4: merge
+            GraphEntry(rso, emptyList()), // Row 5
+            GraphEntry(oq, emptyList()) // Row 6
+        )
         val layout = calculator.calculate(entries)
 
         // pp at lane 0, xs reserved for lane 1

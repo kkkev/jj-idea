@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
@@ -161,22 +162,17 @@ class GraphRenderingTest {
      */
     class GraphRenderer(
         private val graph: Map<String, GraphBuilder.Node>,
-        private val entries: List<GraphBuilder.Entry>
+        private val entries: List<GraphEntry<String>>
     ) {
         fun render(canvas: Canvas) {
             // Render each row
             for ((rowIndex, entry) in entries.withIndex()) {
-                val node = graph[entry.id] ?: continue
+                val node = graph[entry.current] ?: continue
                 renderRow(canvas, rowIndex, entry, node)
             }
         }
 
-        private fun renderRow(
-            canvas: Canvas,
-            row: Int,
-            entry: GraphBuilder.Entry,
-            node: GraphBuilder.Node
-        ) {
+        private fun renderRow(canvas: Canvas, row: Int, entry: GraphEntry<String>, node: GraphBuilder.Node) {
             val rowTop = row * ROW_HEIGHT
             val rowBottom = rowTop + ROW_HEIGHT
             val rowMiddle = rowTop + ROW_HEIGHT / 2
@@ -185,11 +181,11 @@ class GraphRenderingTest {
             // Look at all previous commits (children) that have parents in rows after this one
             for (prevRowIndex in 0 until row) {
                 val prevEntry = entries[prevRowIndex]
-                val prevNode = graph[prevEntry.id] ?: continue
+                val prevNode = graph[prevEntry.current] ?: continue
 
                 // Check if this child has a parent that comes after this row
-                for (parentId in prevEntry.parentIds) {
-                    val parentRowIndex = entries.indexOfFirst { it.id == parentId }
+                for (parentId in prevEntry.parents) {
+                    val parentRowIndex = entries.indexOfFirst { it.current == parentId }
                     if (parentRowIndex > row) {
                         // This child's line passes through this row in the child's lane
                         val childLane = prevNode.lane
@@ -208,10 +204,10 @@ class GraphRenderingTest {
             // Look through ALL previous rows to find children that have this commit as a parent
             for (prevRowIndex in 0 until row) {
                 val prevEntry = entries[prevRowIndex]
-                val prevNode = graph[prevEntry.id] ?: continue
+                val prevNode = graph[prevEntry.current] ?: continue
 
                 // Check if this previous commit has current commit as a parent
-                val parentIndex = prevEntry.parentIds.indexOf(entry.id)
+                val parentIndex = prevEntry.parents.indexOf(entry.current)
                 if (parentIndex >= 0) {
                     // Draw from CHILD's lane at TOP of THIS row to THIS commit's center
                     // The line travels in the child's lane through pass-through rows,

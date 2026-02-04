@@ -11,11 +11,9 @@ import com.intellij.vcs.log.ui.table.VcsLogGraphTable
 import com.intellij.vcs.log.ui.table.VcsLogTableIndex
 import com.intellij.vcs.log.ui.table.column.VcsLogCustomColumn
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.ChangeStatus
-import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.JujutsuCommitMetadataBase
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.append
+import `in`.kkkev.jjidea.ui.log.TextCellRenderer
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
@@ -154,30 +152,15 @@ class JujutsuChangeIdColumn : LogEntryCustomColumn<ChangeId> {
     override val id = "Jujutsu.ChangeId"
     override val localizedName = JujutsuBundle.message("column.changeid")
 
-    override fun getValue(logEntry: LogEntry) = logEntry.changeId
+    override fun getValue(logEntry: LogEntry) = logEntry.id
 
-    override fun createTableCellRenderer(table: VcsLogGraphTable) =
-        object : ColoredTableCellRenderer() {
-            override fun customizeCellRenderer(
-                table: JTable,
-                value: Any?,
-                selected: Boolean,
-                hasFocus: Boolean,
-                row: Int,
-                column: Int
-            ) {
-                if (value is ChangeId) {
-                    // Show JJ's dynamic short prefix in bold
-                    append(value.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-                    // Show remainder up to display limit in gray/small
-                    if (value.displayRemainder.isNotEmpty()) {
-                        append(value.displayRemainder, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
-                    }
-                }
-            }
+    override fun createTableCellRenderer(table: VcsLogGraphTable) = object : TextCellRenderer<ChangeId>() {
+        override fun render(value: ChangeId) {
+            append(value)
         }
+    }
 
-    override fun getStubValue(model: GraphTableModel) = ChangeId("q")
+    override fun getStubValue(model: GraphTableModel) = ChangeId.EMPTY
 
     override fun isEnabledByDefault(): Boolean = true
 

@@ -1,12 +1,12 @@
 package `in`.kkkev.jjidea.jj
 
-import `in`.kkkev.jjidea.jj.ShortenableId.Companion.calculateShortLength
+import `in`.kkkev.jjidea.jj.Shortenable.Companion.calculateShortLength
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * Tests for ChangeId - JJ's change identifier with short prefix support.
+ * Tests for [ChangeId] - JJ's change identifier with short prefix support.
  */
 class ChangeIdTest {
     @Test
@@ -17,16 +17,6 @@ class ChangeIdTest {
         changeId.short shouldBe "qpvuntsm"
         changeId.remainder shouldBe ""
         changeId.toString() shouldBe "qpvuntsm"
-    }
-
-    @Test
-    fun `constructor with full and short length`() {
-        val changeId = ChangeId("qpvuntsm", 2)
-
-        changeId.full shouldBe "qpvuntsm"
-        changeId.short shouldBe "qp"
-        changeId.remainder shouldBe "vuntsm"
-        changeId.toString() shouldBe "qp"
     }
 
     @Test
@@ -61,7 +51,7 @@ class ChangeIdTest {
 
     @Test
     fun `short length equal to full length`() {
-        val changeId = ChangeId("qpvuntsm", 8)
+        val changeId = ChangeId("qpvuntsm")
 
         changeId.short shouldBe "qpvuntsm"
         changeId.remainder shouldBe ""
@@ -70,23 +60,18 @@ class ChangeIdTest {
 
     @Test
     fun `data class equality`() {
-        val id1 = ChangeId("qpvuntsm", 2)
-        val id2 = ChangeId("qpvuntsm", 2)
-        val id3 = ChangeId("qpvuntsm", 3)
-        val id4 = ChangeId("different", 2)
+        val id1 = ChangeId("qpvuntsm", "qp")
+        val id2 = ChangeId("qpvuntsm", "qp")
+        val id3 = ChangeId("qpvuntsm", "qpv")
+        val id4 = ChangeId("different", "di")
+        val id5 = ChangeId("qpvuntsm", "qp", 0)
+        val id6 = ChangeId("qpvuntsm", "qp", 2)
 
         id1 shouldBe id2
         id1 shouldBe id3
         (id1 == id4) shouldBe false
-    }
-
-    @Test
-    fun `CHARS constant has correct reverse hex mapping`() {
-        ChangeId.CHARS shouldBe "zyxwvutsrqponmlk"
-    }
-
-    @Test
-    fun `HEX constant has correct hex digits`() {
-        ChangeId.HEX shouldBe "0123456789abcdef"
+        (id1 == id5) shouldBe false
+        (id1 == id6) shouldBe false
+        (id5 == id6) shouldBe false
     }
 }

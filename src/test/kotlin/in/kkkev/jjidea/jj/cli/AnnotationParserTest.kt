@@ -10,14 +10,14 @@ import org.junit.jupiter.api.Test
 class AnnotationParserTest {
     @Test
     fun `parse single line annotation`() {
-        val output = "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
             "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 1
-        result[0].changeId.full shouldBe "mnopqrst"
-        result[0].changeId.short shouldBe "mnop"
+        result[0].id.full shouldBe "mnopqrst"
+        result[0].id.short shouldBe "mnop"
         result[0].commitId.full shouldBe "abc123"
         result[0].commitId.short shouldBe "ab"
         result[0].author.name shouldBe "John Doe"
@@ -29,26 +29,24 @@ class AnnotationParserTest {
 
     @Test
     fun `parse multiple lines`() {
-        val line1 =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000Initial commit\u0000println(\"Hello\")"
-        val line2 =
-            "uvwxyzab\u0000uvwx\u0000def456\u0000d\u0000Jane Smith\u0000jane@example.com\u0000" +
-                "1768575623\u0000Add feature\u0000return 42"
+        val line1 = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000Initial commit\u0000println(\"Hello\")"
+        val line2 = "uvwxyzab\u0000uvwx\u00005\u0000def456\u0000d\u0000Jane Smith\u0000jane@example.com\u0000" +
+            "1768575623\u0000Add feature\u0000return 42"
         val output = "$line1\u0000$line2"
 
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 2
 
-        result[0].changeId.short shouldBe "mnop"
+        result[0].id.short shouldBe "mnop"
         result[0].commitId.full shouldBe "abc123"
         result[0].commitId.short shouldBe "ab"
         result[0].author.name shouldBe "John Doe"
         result[0].lineContent shouldBe "println(\"Hello\")"
         result[0].lineNumber shouldBe 1
 
-        result[1].changeId.short shouldBe "uvwx"
+        result[1].id.short shouldBe "uvwx/5"
         result[1].commitId.full shouldBe "def456"
         result[1].commitId.short shouldBe "d"
         result[1].author.name shouldBe "Jane Smith"
@@ -58,9 +56,8 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with empty description`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000\u0000println(\"Hello\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
 
@@ -71,9 +68,8 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with empty author email`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000\u0000" +
-                "1768575623\u0000Initial commit\u0000println(\"Hello\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000\u0000" +
+            "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
 
@@ -84,9 +80,8 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with empty author name`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000\u0000john@example.com\u0000" +
-                "1768575623\u0000Initial commit\u0000println(\"Hello\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000\u0000john@example.com\u0000" +
+            "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
 
@@ -97,9 +92,8 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with special characters in line content`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000Fix bug\u0000val x = \"hello|world\""
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000Fix bug\u0000val x = \"hello|world\""
 
         val result = AnnotationParser.parse(output)
 
@@ -109,9 +103,8 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with special characters in description`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000Fix: use grep | sort\u0000println(\"Hello\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000Fix: use grep | sort\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
 
@@ -135,9 +128,8 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with whitespace in fields`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000  John Doe  \u0000  john@example.com  \u0000" +
-                "  1768575623  \u0000  Initial commit  \u0000  println(\"Hello\")  "
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000  John Doe  \u0000  john@example.com  \u0000" +
+            "  1768575623  \u0000  Initial commit  \u0000  println(\"Hello\")  "
 
         val result = AnnotationParser.parse(output)
 
@@ -149,9 +141,8 @@ class AnnotationParserTest {
 
     @Test
     fun `annotation line tooltip contains key information`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123def456\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000Initial commit\u0000println(\"Hello\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123def456\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
         val tooltip = result[0].getTooltip()
@@ -165,9 +156,8 @@ class AnnotationParserTest {
 
     @Test
     fun `annotation line tooltip handles empty description`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000\u0000println(\"Hello\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
         val tooltip = result[0].getTooltip()
@@ -177,9 +167,8 @@ class AnnotationParserTest {
 
     @Test
     fun `annotation line tooltip handles missing email`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000\u0000" +
-                "1768575623\u0000Initial commit\u0000println(\"Hello\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000\u0000" +
+            "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
         val tooltip = result[0].getTooltip()
@@ -191,9 +180,8 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with unicode characters`() {
-        val output =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000José García\u0000jose@example.com\u0000" +
-                "1768575623\u0000Añadir función\u0000println(\"¡Hola!\")"
+        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000José García\u0000jose@example.com\u0000" +
+            "1768575623\u0000Añadir función\u0000println(\"¡Hola!\")"
 
         val result = AnnotationParser.parse(output)
 
@@ -226,15 +214,12 @@ class AnnotationParserTest {
 
     @Test
     fun `line numbers are sequential starting from 1`() {
-        val line1 =
-            "mnopqrst\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000First\u0000line 1"
-        val line2 =
-            "uvwxyzab\u0000uvwx\u0000def456\u0000de\u0000Jane Smith\u0000jane@example.com\u0000" +
-                "1768575623\u0000Second\u0000line 2"
-        val line3 =
-            "cdefghij\u0000cdef\u0000f001a4\u0000f\u0000Bob Jones\u0000bob@example.com\u0000" +
-                "1768575623\u0000Third\u0000line 3"
+        val line1 = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000First\u0000line 1"
+        val line2 = "uvwxyzab\u0000uvwx\u0000\u0000def456\u0000de\u0000Jane Smith\u0000jane@example.com\u0000" +
+            "1768575623\u0000Second\u0000line 2"
+        val line3 = "cdefghij\u0000cdef\u0000\u0000f001a4\u0000f\u0000Bob Jones\u0000bob@example.com\u0000" +
+            "1768575623\u0000Third\u0000line 3"
         val output = "$line1\u0000$line2\u0000$line3"
 
         val result = AnnotationParser.parse(output)
@@ -248,15 +233,14 @@ class AnnotationParserTest {
     @Test
     fun `parse annotation with very long change ID`() {
         val longChangeId = "mnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
-        val output =
-            "$longChangeId\u0000mnop\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-                "1768575623\u0000Initial commit\u0000println(\"Hello\")"
+        val output = "$longChangeId\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
+            "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 1
-        result[0].changeId.full shouldBe longChangeId
-        result[0].changeId.short shouldBe "mnop"
+        result[0].id.full shouldBe longChangeId
+        result[0].id.short shouldBe "mnop"
     }
 
     @Test
@@ -265,7 +249,7 @@ class AnnotationParserTest {
 
         emptyLine.lineNumber shouldBe 42
         emptyLine.lineContent shouldBe "some content"
-        emptyLine.changeId.full shouldBe ""
+        emptyLine.id.full shouldBe ""
         emptyLine.commitId shouldBe CommitId("")
         emptyLine.author.name shouldBe ""
         emptyLine.author.email shouldBe ""

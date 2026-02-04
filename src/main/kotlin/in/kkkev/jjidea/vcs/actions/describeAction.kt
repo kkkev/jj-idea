@@ -16,13 +16,13 @@ fun describeAction(project: Project, logEntry: LogEntry?) =
         val commandExecutor = jujutsuRoot.commandExecutor
 
         commandExecutor.createCommand {
-            log(target.changeId, "description")
+            log(target.id, "description")
         }.onSuccess { currentDescription ->
             val newDescription =
                 project.requestDescription("dialog.describe.input", Description(currentDescription))
                     ?: return@onSuccess
             // If that was null, the user cancelled
-            commandExecutor.createCommand { describe(newDescription, target.changeId) }
+            commandExecutor.createCommand { describe(newDescription, target.id) }
                 .onSuccess {
                     jujutsuRoot.invalidate()
 

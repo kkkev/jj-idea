@@ -8,9 +8,9 @@ import java.awt.datatransfer.StringSelection
 /**
  * Copy Change ID to clipboard.
  */
-fun copyChangeIdAction(changeId: ChangeId?) =
-    nullAndDumbAwareAction(changeId, "log.action.copy.changeid", AllIcons.Actions.Copy) {
-        val selection = StringSelection(changeId.toString())
+fun copyIdAction(id: ChangeId?) =
+    nullAndDumbAwareAction(id, "log.action.copy.changeid", AllIcons.Actions.Copy) {
+        val selection = StringSelection(id.toString())
         CopyPasteManager.getInstance().setContents(selection)
-        log.info("Copied change ID to clipboard: $changeId")
+        log.info("Copied change ID to clipboard: $id")
     }

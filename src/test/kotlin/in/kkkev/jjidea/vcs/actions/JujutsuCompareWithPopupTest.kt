@@ -47,8 +47,8 @@ class JujutsuCompareWithPopupTest {
 
         result shouldHaveSize 1
         result[0].bookmark.name shouldBe "main"
-        result[0].changeId.full shouldBe "mzmoywwptovqwlnzxvvsxknnruoypnxr"
-        result[0].changeId.short shouldBe "mz"
+        result[0].id.full shouldBe "mzmoywwptovqwlnzxvvsxknnruoypnxr"
+        result[0].id.short shouldBe "mz"
     }
 
     @Test
@@ -59,9 +59,9 @@ class JujutsuCompareWithPopupTest {
 
         result shouldHaveSize 3
         result.map { it.bookmark.name } shouldBe listOf("main", "feature", "bugfix")
-        result[0].changeId.short shouldBe "mz"
-        result[1].changeId.short shouldBe "vy"
-        result[2].changeId.short shouldBe "qr"
+        result[0].id.short shouldBe "mz"
+        result[1].id.short shouldBe "vy"
+        result[2].id.short shouldBe "qr"
     }
 
     @Test
@@ -83,8 +83,8 @@ class JujutsuCompareWithPopupTest {
         val result = parseBookmarks(output)
 
         result shouldHaveSize 1
-        result[0].changeId.full shouldBe "mzmoywwptovqwlnzxvvsxknnruoypnxr"
-        result[0].changeId.short shouldBe "mz"
+        result[0].id.full shouldBe "mzmoywwptovqwlnzxvvsxknnruoypnxr"
+        result[0].id.short shouldBe "mz"
     }
 
     @Test
@@ -94,7 +94,7 @@ class JujutsuCompareWithPopupTest {
         val result = parseBookmarks(output)
 
         result shouldHaveSize 2
-        result[0].changeId.short shouldBe "mzmoywwp"
-        result[1].changeId.short shouldBe "vy"
+        result[0].id.short shouldBe "mzmoywwp"
+        result[1].id.short shouldBe "vy"
     }
 }

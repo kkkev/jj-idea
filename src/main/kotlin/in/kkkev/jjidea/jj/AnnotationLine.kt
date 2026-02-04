@@ -2,13 +2,15 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
+import `in`.kkkev.jjidea.ui.append
+import `in`.kkkev.jjidea.ui.buildText
 import kotlinx.datetime.Instant
 
 /**
  * Represents a single line of annotation (blame) information from jj file annotate
  */
 data class AnnotationLine(
-    val changeId: ChangeId,
+    val id: ChangeId,
     val commitId: CommitId,
     val author: VcsUser,
     val authorTimestamp: Instant?,
@@ -19,15 +21,21 @@ data class AnnotationLine(
     /**
      * Get a tooltip-friendly display of this annotation
      */
-    fun getTooltip(): String = buildString {
-        append("Change: ${changeId.display}\n")
-        append("Commit: ${commitId.full}\n")
+    fun getTooltip(): String = buildText {
+        append("Change: ")
+        append(id.full)
+        append("\n")
+
+        append("Commit: ")
+        append(commitId.full)
+        append("\n")
+
         append("Author: ${author.name}")
         if (author.email.isNotEmpty()) {
             append(" <${author.email}>")
         }
         append("\n")
-        append(description.display)
+        append(description)
     }
 
     companion object {
@@ -35,7 +43,7 @@ data class AnnotationLine(
          * Create an empty/null annotation line for lines with no annotation data
          */
         fun empty(lineNumber: Int, lineContent: String) = AnnotationLine(
-            changeId = ChangeId(""),
+            id = ChangeId.EMPTY,
             commitId = CommitId(""),
             author = VcsUserImpl("", ""),
             authorTimestamp = null,

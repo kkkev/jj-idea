@@ -12,7 +12,7 @@ import kotlinx.datetime.Instant
  */
 data class LogEntry(
     val repo: JujutsuRepository,
-    override val changeId: ChangeId,
+    override val id: ChangeId,
     val commitId: CommitId,
     private val underlyingDescription: String,
     val bookmarks: List<Bookmark> = emptyList(),
@@ -28,7 +28,7 @@ data class LogEntry(
 ) : GraphableEntry, ChangeStatus {
     val description = Description(underlyingDescription)
 
-    override val parentIds get() = parentIdentifiers.map { it.changeId }
+    override val parentIds: List<ChangeId> get() = parentIdentifiers.map { it.changeId }
 
     data class Identifiers(val changeId: ChangeId, val commitId: CommitId)
 }

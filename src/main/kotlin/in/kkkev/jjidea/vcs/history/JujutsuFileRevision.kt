@@ -28,15 +28,15 @@ class JujutsuFileRevision(
      */
     private val fileStatus: FileChangeStatus? by lazy {
         val logService = repo.logService
-        logService.getFileChanges(entry.changeId)
+        logService.getFileChanges(entry.id)
             .getOrElse { error ->
-                log.debug("Error loading file changes for ${entry.changeId}: ${error.message}")
+                log.debug("Error loading file changes for ${entry.id}: ${error.message}")
                 emptyList()
             }.find { it.filePath == filePath.path }
             ?.status
     }
 
-    override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.changeId)
+    override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.id)
 
     override fun getBranchName(): String = entry.bookmarks.firstOrNull()?.name ?: ""
 
@@ -74,9 +74,9 @@ class JujutsuFileRevision(
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
         val relativePath = repo.getRelativePath(filePath)
-        val result = repo.commandExecutor.show(relativePath, entry.changeId)
+        val result = repo.commandExecutor.show(relativePath, entry.id)
         if (!result.isSuccess) {
-            throw VcsException("Failed to load file content at revision ${entry.changeId}: ${result.stderr}")
+            throw VcsException("Failed to load file content at revision ${entry.id}: ${result.stderr}")
         }
         return result.stdout.toByteArray()
     }

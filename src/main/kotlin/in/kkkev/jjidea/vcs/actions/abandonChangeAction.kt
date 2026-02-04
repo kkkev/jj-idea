@@ -26,7 +26,7 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
             else -> JujutsuBundle.message("log.action.abandon.confirm.description")
         }
 
-        val confirmTitle = JujutsuBundle.message("log.action.abandon.confirm.title", target.changeId.short)
+        val confirmTitle = JujutsuBundle.message("log.action.abandon.confirm.title", target.id.short)
 
         // Show yes/no confirmation dialog
         // If user selected No or cancelled, don't proceed
@@ -37,18 +37,18 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
                 Messages.getWarningIcon()
             ) != Messages.YES
         ) {
-            log.info("User cancelled abandon of ${target.changeId}")
+            log.info("User cancelled abandon of ${target.id}")
             return@nullAndDumbAwareAction
         }
     }
 
     // Execute abandon in background thread
     val jujutsuRoot = target.repo
-    jujutsuRoot.commandExecutor.createCommand { abandon(target.changeId) }
+    jujutsuRoot.commandExecutor.createCommand { abandon(target.id) }
         .onSuccess {
             // Select the working copy (may have changed if we abandoned the old working copy)
             jujutsuRoot.invalidate(select = WorkingCopy)
-            log.info("Abandoned change ${target.changeId}")
+            log.info("Abandoned change ${target.id}")
         }.onFailureTellUser("log.action.abandon.error", project, log)
         .executeAsync()
 }

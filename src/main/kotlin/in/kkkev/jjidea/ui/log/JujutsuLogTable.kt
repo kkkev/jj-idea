@@ -6,17 +6,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import kotlinx.datetime.Instant
 import java.awt.Component
-import java.awt.event.ComponentAdapter
-import java.awt.event.ComponentEvent
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
-import java.awt.event.MouseMotionAdapter
+import java.awt.event.*
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ListSelectionEvent
@@ -327,7 +323,8 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var matchCase: Boolean = false
     private var matchWholeWords: Boolean = false
     private var authorFilter: Set<String> = emptySet() // Filter by author email
-    private var bookmarkFilter: Set<ChangeId> = emptySet() // Filter by bookmark change IDs (includes ancestors)
+    private var bookmarkFilter: Set<ChangeId> =
+        emptySet() // Filter by bookmark change IDs (includes ancestors)
     private var dateFilterCutoff: Instant? = null // Filter by date (show commits after cutoff)
     private var pathsFilter: Set<String> = emptySet() // Filter by paths
     private var rootFilter: Set<JujutsuRepository> = emptySet() // Filter by repository root
@@ -336,7 +333,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
         const val COLUMN_ROOT_GUTTER = 0
         const val COLUMN_GRAPH_AND_DESCRIPTION = 1
         const val COLUMN_STATUS = 2
-        const val COLUMN_CHANGE_ID = 3
+        const val COLUMN_ID = 3
         const val COLUMN_DESCRIPTION = 4
         const val COLUMN_DECORATIONS = 5
         const val COLUMN_AUTHOR = 6
@@ -362,7 +359,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
             COLUMN_ROOT_GUTTER -> entry // Return full entry for gutter renderer
             COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
             COLUMN_STATUS -> if (entry.hasConflict || entry.isEmpty || entry.immutable) entry else null
-            COLUMN_CHANGE_ID -> entry.changeId
+            COLUMN_ID -> entry.id
             COLUMN_DESCRIPTION -> entry.description
             COLUMN_DECORATIONS -> entry // Return full entry to access both isWorkingCopy and bookmarks
             COLUMN_AUTHOR -> entry.author
@@ -412,8 +409,8 @@ class JujutsuLogTableModel : AbstractTableModel() {
      * Empty set means no bookmark filtering.
      * The set should include all ancestors of the selected bookmark.
      */
-    fun setBookmarkFilter(changeIds: Set<ChangeId>) {
-        bookmarkFilter = changeIds
+    fun setBookmarkFilter(ids: Set<ChangeId>) {
+        bookmarkFilter = ids
         applyFilter()
     }
 
@@ -501,7 +498,8 @@ class JujutsuLogTableModel : AbstractTableModel() {
                 // Text filter (if active)
                 val matchesText = textMatcher?.let { matcher ->
                     matcher(entry.description.summary) ||
-                        matcher(entry.changeId.toString()) ||
+                        matcher(entry.id.short) ||
+                        matcher(entry.id.full) ||
                         entry.author?.name?.let(matcher) == true ||
                         entry.author?.email?.let(matcher) == true
                 } ?: true
@@ -515,7 +513,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
                 // Bookmark filter (if active) - filter by change ID
                 val matchesBookmark = if (bookmarkFilter.isNotEmpty()) {
-                    bookmarkFilter.contains(entry.changeId)
+                    bookmarkFilter.contains(entry.id)
                 } else {
                     true
                 }

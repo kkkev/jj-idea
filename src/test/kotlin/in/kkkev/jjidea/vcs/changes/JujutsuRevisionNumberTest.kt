@@ -11,9 +11,9 @@ import org.junit.jupiter.api.Test
 class JujutsuRevisionNumberTest {
     @Test
     fun `revision number returns revision as string`() {
-        val revNum = JujutsuRevisionNumber(CHANGE_ID)
+        val revNum = JujutsuRevisionNumber(QUALIFIED_CHANGE_ID)
 
-        revNum.asString() shouldBe "7a8b6"
+        revNum.asString() shouldBe "sprottynpurq/7"
     }
 
     @Test
@@ -32,16 +32,16 @@ class JujutsuRevisionNumberTest {
 
     @Test
     fun `equal revisions compare as 0`() {
-        val rev1 = JujutsuRevisionNumber(CHANGE_ID)
-        val rev2 = JujutsuRevisionNumber(CHANGE_ID)
+        val rev1 = JujutsuRevisionNumber(QUALIFIED_CHANGE_ID)
+        val rev2 = JujutsuRevisionNumber(QUALIFIED_CHANGE_ID)
 
         rev1.compareTo(rev2) shouldBe 0
     }
 
     @Test
     fun `different revisions compare by string`() {
-        val rev1 = JujutsuRevisionNumber(ChangeId("vvv"))
-        val rev2 = JujutsuRevisionNumber(ChangeId("www"))
+        val rev1 = JujutsuRevisionNumber(ChangeId("vvv", "v"))
+        val rev2 = JujutsuRevisionNumber(ChangeId("www", "w"))
 
         (rev1.compareTo(rev2) < 0) shouldBe true
         (rev2.compareTo(rev1) > 0) shouldBe true
@@ -55,6 +55,6 @@ class JujutsuRevisionNumberTest {
     }
 
     companion object {
-        val CHANGE_ID = ChangeId("sprot")
+        val QUALIFIED_CHANGE_ID = ChangeId("sprottynpurq", "sprot", 7)
     }
 }

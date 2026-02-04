@@ -31,7 +31,7 @@ class JujutsuFileAnnotation(
     override fun getFile() = file
 
     override fun getLineRevisionNumber(lineNumber: Int) = getAnnotationLine(lineNumber)
-        ?.changeId
+        ?.id
         ?.let(::JujutsuRevisionNumber)
 
     override fun getToolTip(lineNumber: Int) = getAnnotationLine(lineNumber)?.getTooltip()
@@ -107,7 +107,7 @@ class JujutsuFileAnnotation(
         "change-id",
         JujutsuBundle.message("annotation.aspect.change"),
         false,
-        { it.changeId.short }
+        { it.id.short }
     )
 
     private inner class AuthorAspect : Aspect(

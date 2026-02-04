@@ -1,9 +1,6 @@
 package `in`.kkkev.jjidea.jj.cli
 
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.mockRepo
+import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -22,22 +19,21 @@ class LogTemplateTest {
 
     @Test
     fun `basicLogTemplate parses simple entry`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "Add new feature",
-                "",
-                "",
-                "false",
-                "false",
-                "false",
-                "false"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~3",
+            "abc123def456~ab",
+            "Add new feature",
+            "",
+            "",
+            "false",
+            "false",
+            "false",
+            "false"
+        )
 
         val entry = basicLogTemplate.take(fields.iterator())
 
-        entry.changeId shouldBe ChangeId("qpvuntsm", "q")
+        entry.id shouldBe ChangeId("qpvuntsm", "q", 3)
         entry.commitId shouldBe CommitId("abc123def456", "ab")
         entry.description.display shouldBe "Add new feature"
         entry.bookmarks.shouldBeEmpty()
@@ -50,18 +46,17 @@ class LogTemplateTest {
 
     @Test
     fun `basicLogTemplate parses entry with bookmarks`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "Feature work",
-                "main,feature",
-                "",
-                "true",
-                "false",
-                "false",
-                "false"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Feature work",
+            "main,feature",
+            "",
+            "true",
+            "false",
+            "false",
+            "false"
+        )
 
         val entry = basicLogTemplate.take(fields.iterator())
 
@@ -72,40 +67,38 @@ class LogTemplateTest {
 
     @Test
     fun `basicLogTemplate parses entry with parents`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "Merge commit",
-                "",
-                "plkvukqt~p|bcd123~bc,rlvkpnrz~rl|cde234~cde",
-                "false",
-                "false",
-                "false",
-                "false"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Merge commit",
+            "",
+            "plkvukqt~p~|bcd123~bc,rlvkpnrz~rl~34|cde234~cde",
+            "false",
+            "false",
+            "false",
+            "false"
+        )
 
         val entry = basicLogTemplate.take(fields.iterator())
 
         entry.parentIds shouldHaveSize 2
-        entry.parentIds[0] shouldBe ChangeId("plkvukqt", "p")
-        entry.parentIds[1] shouldBe ChangeId("rlvkpnrz", "rl")
+        entry.parentIds[0] shouldBe ChangeId("plkvukqt", "p", null)
+        entry.parentIds[1] shouldBe ChangeId("rlvkpnrz", "rl", 34)
     }
 
     @Test
     fun `basicLogTemplate parses entry with multi-line description`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "First line\nSecond line\nThird line",
-                "",
-                "",
-                "false",
-                "false",
-                "false",
-                "false"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "First line\nSecond line\nThird line",
+            "",
+            "",
+            "false",
+            "false",
+            "false",
+            "false"
+        )
 
         val entry = basicLogTemplate.take(fields.iterator())
 
@@ -114,18 +107,17 @@ class LogTemplateTest {
 
     @Test
     fun `basicLogTemplate parses empty commit`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "",
-                "",
-                "",
-                "false",
-                "false",
-                "true",
-                "false"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "",
+            "",
+            "",
+            "false",
+            "false",
+            "true",
+            "false"
+        )
 
         val entry = basicLogTemplate.take(fields.iterator())
 
@@ -135,18 +127,17 @@ class LogTemplateTest {
 
     @Test
     fun `basicLogTemplate parses undescribed commit`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~abc",
-                "", // Empty description
-                "",
-                "",
-                "false",
-                "false",
-                "false", // Not empty
-                "false"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~abc",
+            "", // Empty description
+            "",
+            "",
+            "false",
+            "false",
+            "false", // Not empty
+            "false"
+        )
 
         val entry = basicLogTemplate.take(fields.iterator())
 
@@ -157,18 +148,17 @@ class LogTemplateTest {
 
     @Test
     fun `basicLogTemplate parses conflict commit`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "Conflicted change",
-                "",
-                "",
-                "false",
-                "true",
-                "false",
-                "false"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Conflicted change",
+            "",
+            "",
+            "false",
+            "true",
+            "false",
+            "false"
+        )
 
         val entry = basicLogTemplate.take(fields.iterator())
 
@@ -177,28 +167,27 @@ class LogTemplateTest {
 
     @Test
     fun `fullLogTemplate parses complete entry`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "Add new feature",
-                "",
-                "",
-                "false",
-                "false",
-                "false",
-                "false",
-                "Test Author",
-                "author@example.com",
-                "1234567890",
-                "Test Committer",
-                "committer@example.com",
-                "1234567890"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Add new feature",
+            "",
+            "",
+            "false",
+            "false",
+            "false",
+            "false",
+            "Test Author",
+            "author@example.com",
+            "1234567890",
+            "Test Committer",
+            "committer@example.com",
+            "1234567890"
+        )
 
         val entry = fullLogTemplate.take(fields.iterator())
 
-        entry.changeId shouldBe ChangeId("qpvuntsm", "q")
+        entry.id shouldBe ChangeId("qpvuntsm", "q")
         entry.commitId shouldBe CommitId("abc123def456", "ab")
         entry.description shouldBe Description("Add new feature")
         entry.author!!.name shouldBe "Test Author"
@@ -211,24 +200,23 @@ class LogTemplateTest {
 
     @Test
     fun `fullLogTemplate parses entry with different author and committer`() {
-        val fields =
-            listOf(
-                "qpvuntsm~q",
-                "abc123def456~ab",
-                "Cherry-picked commit",
-                "",
-                "",
-                "false",
-                "false",
-                "false",
-                "false",
-                "Original Author",
-                "original@example.com",
-                "1000000000",
-                "Cherry Picker",
-                "picker@example.com",
-                "2000000000"
-            )
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Cherry-picked commit",
+            "",
+            "",
+            "false",
+            "false",
+            "false",
+            "false",
+            "Original Author",
+            "original@example.com",
+            "1000000000",
+            "Cherry Picker",
+            "picker@example.com",
+            "2000000000"
+        )
 
         val entry = fullLogTemplate.take(fields.iterator())
 
@@ -284,7 +272,7 @@ class LogTemplateTest {
 
     @Test
     fun `commitGraphLogTemplate parses graph node`() {
-        val fields = listOf("123abc~12", "qvuntsm~qv|234bcd~23", "1234567890")
+        val fields = listOf("123abc~12", "qvuntsm~qv~|234bcd~23~34", "1234567890")
 
         val node = commitGraphLogTemplate.take(fields.iterator())
 
@@ -296,7 +284,7 @@ class LogTemplateTest {
 
     @Test
     fun `commitGraphLogTemplate parses merge node`() {
-        val fields = listOf("123abc~12", "qvuntsm~qv|234bcd~23,ruvvqw~ru|135abc~135", "1234567890")
+        val fields = listOf("123abc~12", "qvuntsm~qv~|234bcd~23,ruvvqw~ru~|135abc~135", "1234567890")
 
         val node = commitGraphLogTemplate.take(fields.iterator())
 

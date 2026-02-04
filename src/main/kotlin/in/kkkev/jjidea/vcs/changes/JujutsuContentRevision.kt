@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.vcs.changes
 
 import com.intellij.openapi.vcs.history.ShortVcsRevisionNumber
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Revision
 
 /**
@@ -13,7 +12,8 @@ class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumber {
      * Returns hex format when used with VCS Log (Hash compatibility),
      * otherwise returns JJ change ID format
      */
-    override fun asString() = (revision as? ChangeId)?.hexString ?: revision.full
+    // TODO Where is this used? What happens if a QCI is passed?
+    override fun asString() = revision.toString()
 
     override fun toShortString() = revision.short
 
@@ -29,6 +29,6 @@ class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumber {
     override fun compareTo(other: VcsRevisionNumber?) = if (other !is JujutsuRevisionNumber) {
         0
     } else {
-        revision.full.compareTo(other.revision.full)
+        revision.toString().compareTo(other.revision.toString())
     }
 }

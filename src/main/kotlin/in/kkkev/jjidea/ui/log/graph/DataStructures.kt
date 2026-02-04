@@ -1,23 +1,21 @@
 package `in`.kkkev.jjidea.ui.log.graph
 
-import `in`.kkkev.jjidea.jj.ChangeId
-
 // === Input ===
 
-data class GraphEntry(
-    val current: ChangeId,
+data class GraphEntry<I : Any>(
+    val current: I,
     /** Order matters: first parent is typically main branch */
-    val parents: List<ChangeId>
+    val parents: List<I>
 )
 
 // === Output ===
 
-data class GraphLayout(
-    val rows: List<RowLayout>
+data class GraphLayout<I : Any>(
+    val rows: List<RowLayout<I>>
 )
 
-data class RowLayout(
-    val changeId: ChangeId,
+data class RowLayout<I : Any>(
+    val id: I,
     val lane: Int,
     /** lanes of children (rows above with this as parent) */
     val childLanes: List<Int>,

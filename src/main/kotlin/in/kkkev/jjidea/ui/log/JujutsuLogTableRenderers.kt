@@ -8,8 +8,8 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.ui.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.JujutsuColors
 import `in`.kkkev.jjidea.ui.TextCanvas
@@ -115,23 +115,6 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
 }
 
 /**
- * Renderer for the Change ID column.
- */
-class ChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
-    override fun render(value: ChangeId) {
-        // Use bold for working copy row
-        if (isWorkingCopyRow) {
-            append(value.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-            if (value.displayRemainder.isNotEmpty()) {
-                append(value.displayRemainder, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
-            }
-        } else {
-            append(value)
-        }
-    }
-}
-
-/**
  * Renderer for the Description column.
  * Phase 1: Just show description text
  * Phase 3: Add right-aligned refs with fancy icons
@@ -205,19 +188,12 @@ class DateCellRenderer : TextCellRenderer<Instant>() {
 }
 
 /**
- * Renderer for separate Change ID column.
+ * Renderer for separate ID column.
  */
-class SeparateChangeIdCellRenderer : TextCellRenderer<ChangeId>() {
+class SeparateIdCellRenderer : TextCellRenderer<ChangeId>() {
     override fun render(value: ChangeId) {
-        // Use bold for working copy row
-        if (isWorkingCopyRow) {
-            append(value.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-            if (value.displayRemainder.isNotEmpty()) {
-                append(value.displayRemainder, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
-            }
-        } else {
-            append(value)
-        }
+        // TODO Should we embolden the working copy row? How would we do that and still use the append method?
+        append(value)
     }
 }
 
@@ -315,13 +291,12 @@ class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), Tab
         val availableWidthForDescription = maxDescriptionWidth - emptyIndicatorWidth
 
         // Set color using shared logic
-        g2d.color =
-            DescriptionRenderingStyle.getTextColor(
-                entry.description,
-                isSelected,
-                table.selectionForeground,
-                table.foreground
-            )
+        g2d.color = DescriptionRenderingStyle.getTextColor(
+            entry.description,
+            isSelected,
+            table.selectionForeground,
+            table.foreground
+        )
 
         val text = entry.description.display
 
@@ -499,7 +474,7 @@ private val DEFAULT_COLUMN_WIDTHS =
         JujutsuLogTableModel.COLUMN_ROOT_GUTTER to 8, // Will be scaled with JBUI
         JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION to 600,
         JujutsuLogTableModel.COLUMN_STATUS to 50,
-        JujutsuLogTableModel.COLUMN_CHANGE_ID to 90,
+        JujutsuLogTableModel.COLUMN_ID to 90,
         JujutsuLogTableModel.COLUMN_DESCRIPTION to 500,
         JujutsuLogTableModel.COLUMN_DECORATIONS to 120,
         JujutsuLogTableModel.COLUMN_AUTHOR to 100,
@@ -515,7 +490,7 @@ private val DEFAULT_COLUMN_WIDTHS =
 fun JujutsuLogTable.installRenderers() {
     val rootGutterRenderer = JujutsuRootGutterRenderer()
     val statusRenderer = SeparateStatusCellRenderer()
-    val changeIdRenderer = SeparateChangeIdCellRenderer()
+    val changeIdRenderer = SeparateIdCellRenderer()
     val descriptionRenderer = SeparateDescriptionCellRenderer(this)
     val decorationsRenderer = SeparateDecorationsCellRenderer()
     val authorRenderer = AuthorCellRenderer()
@@ -555,7 +530,7 @@ fun JujutsuLogTable.installRenderers() {
                 column.minWidth = 40
             }
 
-            JujutsuLogTableModel.COLUMN_CHANGE_ID -> {
+            JujutsuLogTableModel.COLUMN_ID -> {
                 column.cellRenderer = changeIdRenderer
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth

@@ -35,7 +35,7 @@ data class GraphNode(
  * This allows testing without depending on full LogEntry with IntelliJ Platform classes.
  */
 interface GraphableEntry {
-    val changeId: ChangeId
+    val id: ChangeId
     val parentIds: List<ChangeId>
 }
 
@@ -58,7 +58,7 @@ class CommitGraphBuilder {
         JBColor(0x689F38, 0x8BC34A) // Light green (darker for light theme)
     )
 
-    private val layoutCalculator = LayoutCalculatorImpl()
+    private val layoutCalculator = LayoutCalculatorImpl<ChangeId>()
 
     private fun colorForLane(lane: Int): Color = colors[lane % colors.size]
 
@@ -70,14 +70,14 @@ class CommitGraphBuilder {
      */
     fun buildGraph(entries: List<GraphableEntry>): Map<ChangeId, GraphNode> {
         // Convert to GraphEntry for the layout calculator
-        val graphEntries = entries.map { GraphEntry(it.changeId, it.parentIds) }
+        val graphEntries = entries.map { GraphEntry(it.id, it.parentIds) }
 
         // Calculate layout using the algorithm
         val layout = layoutCalculator.calculate(graphEntries)
 
         // Convert RowLayout to GraphNode
         return layout.rows.associate { row ->
-            row.changeId to GraphNode(
+            row.id to GraphNode(
                 lane = row.lane,
                 color = colorForLane(row.lane),
                 parentLanes = row.parentLanes,

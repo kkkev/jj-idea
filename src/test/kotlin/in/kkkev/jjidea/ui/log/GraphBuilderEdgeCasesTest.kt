@@ -65,7 +65,7 @@ class GraphBuilderEdgeCasesTest {
 
             // All commits should be in lane 0
             entries.forEach { entry ->
-                graph[entry.id]!!.lane shouldBe 0
+                graph[entry.current]!!.lane shouldBe 0
             }
         }
 

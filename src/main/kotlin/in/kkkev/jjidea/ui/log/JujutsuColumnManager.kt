@@ -50,7 +50,7 @@ class JujutsuColumnManager {
         }
 
         if (showChangeIdColumn) {
-            columns.add(JujutsuLogTableModel.COLUMN_CHANGE_ID)
+            columns.add(JujutsuLogTableModel.COLUMN_ID)
         }
 
         if (showDescriptionColumn) {
@@ -83,7 +83,7 @@ class JujutsuColumnManager {
         JujutsuLogTableModel.COLUMN_ROOT_GUTTER -> showRootGutterColumn
         JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> true // Always visible
         JujutsuLogTableModel.COLUMN_STATUS -> showStatusColumn
-        JujutsuLogTableModel.COLUMN_CHANGE_ID -> showChangeIdColumn
+        JujutsuLogTableModel.COLUMN_ID -> showChangeIdColumn
         JujutsuLogTableModel.COLUMN_DESCRIPTION -> showDescriptionColumn
         JujutsuLogTableModel.COLUMN_DECORATIONS -> showDecorationsColumn
         JujutsuLogTableModel.COLUMN_AUTHOR -> showAuthorColumn

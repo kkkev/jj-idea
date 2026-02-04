@@ -42,11 +42,7 @@ class UnifiedJujutsuLogDataLoader(
 
     init {
         // Listen for change selection requests
-        project.stateModel.changeSelection.connect(parentDisposable) { key ->
-            if (key.revision != null) {
-                requestSelection(key)
-            }
-        }
+        project.stateModel.changeSelection.connect(parentDisposable) { key -> requestSelection(key) }
     }
 
     /**
@@ -137,7 +133,7 @@ class UnifiedJujutsuLogDataLoader(
                     // Handle pending selection LAST - explicit selection wins over implicit
                     if (hasPendingSelection) {
                         hasPendingSelection = false
-                        pendingSelection?.let { selectEntry(it.repo, it.revision!!) }
+                        pendingSelection?.let { selectEntry(it.repo, it.revision) }
                         pendingSelection = null
                     }
                 }
@@ -160,7 +156,7 @@ class UnifiedJujutsuLogDataLoader(
         val rowIndex = when (revision) {
             is ChangeId -> (0 until tableModel.rowCount).firstOrNull { row ->
                 val entry = tableModel.getEntry(row)
-                entry?.repo == repo && entry.changeId == revision
+                entry?.repo == repo && entry.id == revision
             }
 
             WorkingCopy -> (0 until tableModel.rowCount).firstOrNull { row ->
@@ -200,7 +196,7 @@ class UnifiedJujutsuLogDataLoader(
         // Save current selection to restore after refresh (unless an explicit selection is pending)
         val savedSelection = table.takeIf { !hasPendingSelection }
             ?.selectedEntry
-            ?.let { ChangeKey(it.repo, it.changeId) }
+            ?.let { ChangeKey(it.repo, it.id) }
 
         loadCommits()
 

@@ -8,8 +8,8 @@ import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
@@ -45,7 +45,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      * Annotate a file at a specific revision
      */
     override fun annotate(file: VirtualFile, revision: VcsFileRevision?) =
-        annotateInternal(file, revision?.revisionNumber?.asString()?.let(::ChangeId) ?: WorkingCopy)
+        annotateInternal(file, revision?.revisionNumber?.asString()?.let(::RevisionExpression) ?: WorkingCopy)
 
     /**
      * Check if we can annotate this revision
@@ -63,11 +63,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
             val relativePath = jujutsuRoot.getRelativePath(file)
 
             // Execute annotation command with template
-            val result = jujutsuRoot.commandExecutor.annotate(
-                filePath = relativePath,
-                revision = revision,
-                template = AnnotationParser.TEMPLATE
-            )
+            val result = jujutsuRoot.commandExecutor.annotate(relativePath, revision, AnnotationParser.TEMPLATE)
 
             if (!result.isSuccess) {
                 log.warn("Failed to annotate file: ${result.stderr}")

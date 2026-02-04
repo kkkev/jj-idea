@@ -1,11 +1,7 @@
 package `in`.kkkev.jjidea.ui
 
 import com.intellij.vcs.log.impl.VcsUserImpl
-import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -17,7 +13,7 @@ import org.junit.jupiter.api.Test
  */
 class JujutsuLogEntryTest {
     companion object {
-        val CHANGE_ID = ChangeId("qpvuntsm", 2)
+        val CHANGE_ID = ChangeId("qpvuntsm", "qp", 2)
         val COMMIT_ID = CommitId("abc123", 2)
 
         val JUJUTSU_ROOT = mockk<JujutsuRepository>()
@@ -34,13 +30,13 @@ class JujutsuLogEntryTest {
 
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = commitId,
             underlyingDescription = description,
             bookmarks = bookmarks
         )
 
-        entry.changeId shouldBe CHANGE_ID
+        entry.id shouldBe CHANGE_ID
         entry.commitId shouldBe commitId
         entry.description.actual shouldBe description
         entry.bookmarks shouldContain Bookmark("main")
@@ -51,7 +47,7 @@ class JujutsuLogEntryTest {
     fun `working copy entry has special marker`() {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = COMMIT_ID,
             underlyingDescription = "Work in progress",
             isWorkingCopy = true
@@ -64,7 +60,7 @@ class JujutsuLogEntryTest {
     fun `conflict entry has marker`() {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = COMMIT_ID,
             underlyingDescription = "Conflicted change",
             hasConflict = true
@@ -77,7 +73,7 @@ class JujutsuLogEntryTest {
     fun `empty commit has marker`() {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = COMMIT_ID,
             underlyingDescription = "",
             isEmpty = true
@@ -90,7 +86,7 @@ class JujutsuLogEntryTest {
     fun `undescribed commit has marker`() {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = COMMIT_ID,
             underlyingDescription = ""
         )
@@ -102,7 +98,7 @@ class JujutsuLogEntryTest {
     fun `entry with author and committer information`() {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = COMMIT_ID,
             underlyingDescription = "Test",
             author = ALICE,
@@ -119,7 +115,7 @@ class JujutsuLogEntryTest {
         val committerTime = Instant.fromEpochMilliseconds(1638361000000L)
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = COMMIT_ID,
             underlyingDescription = "Test",
             authorTimestamp = authorTime,
@@ -135,7 +131,7 @@ class JujutsuLogEntryTest {
         val multiLineDesc = "First line\n\nSecond paragraph\nThird line"
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
-            changeId = CHANGE_ID,
+            id = CHANGE_ID,
             commitId = COMMIT_ID,
             underlyingDescription = multiLineDesc
         )

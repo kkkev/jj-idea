@@ -84,12 +84,6 @@ class RevsetTest {
     }
 
     @Test
-    fun `Revision full returns toString result`() {
-        val revision = RevisionExpression("abc123")
-        revision.full shouldBe "abc123"
-    }
-
-    @Test
     fun `Revision short returns toString result`() {
         val revision = RevisionExpression("longrevision")
         revision.short shouldBe "longrevision"

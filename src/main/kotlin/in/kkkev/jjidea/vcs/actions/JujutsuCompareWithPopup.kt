@@ -44,17 +44,17 @@ object JujutsuCompareWithPopup {
         /** Recent change with description */
         data class Change(
             val entry: LogEntry,
-            override val displayName: String = "${entry.changeId.short} ${entry.description.summary}",
-            override val revision: Revision = entry.changeId
+            override val displayName: String = "${entry.id.short} ${entry.description.summary}",
+            override val revision: Revision = entry.id
         ) : CompareItem(displayName, revision) {
-            val changeId: ChangeId get() = entry.changeId
+            val id: ChangeId get() = entry.id
             val description: Description get() = entry.description
         }
 
         /** Named bookmark with change ID */
         data class Bookmark(
             val item: BookmarkItem,
-            override val displayName: String = "${item.bookmark.name} (${item.changeId.short})",
+            override val displayName: String = "${item.bookmark.name} (${item.id.short})",
             override val revision: Revision = item.bookmark
         ) : CompareItem(displayName, revision)
     }
@@ -125,7 +125,7 @@ object JujutsuCompareWithPopup {
                             val canvas = StringBuilderHtmlTextCanvas(this)
 
                             append("<html>")
-                            canvas.append(item.entry.changeId)
+                            canvas.append(item.entry.id)
                             append(" (")
                             canvas.append(item.entry.commitId)
                             append(")")
@@ -150,7 +150,7 @@ object JujutsuCompareWithPopup {
 
                             append("<html>")
                             append("<b>${item.item.bookmark.name}</b><br>")
-                            canvas.append(item.item.changeId)
+                            canvas.append(item.item.id)
                             append("</html>")
                         }
                     }
@@ -304,13 +304,13 @@ object JujutsuCompareWithPopup {
                     icon = AllIcons.Vcs.Branch
                     append(value.item.bookmark.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
                     append(" (", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                    canvas.append(value.item.changeId)
+                    canvas.append(value.item.id)
                     append(")", SimpleTextAttributes.GRAYED_ATTRIBUTES)
                 }
 
                 is CompareItem.Change -> {
                     icon = AllIcons.Vcs.CommitNode
-                    canvas.append(value.changeId)
+                    canvas.append(value.id)
                     append(" ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
 
                     ComponentTextCanvas(this).appendSummary(value.description)
@@ -344,7 +344,8 @@ object JujutsuCompareWithPopup {
             } else {
                 bookmarks.filter { bookmark ->
                     bookmark.bookmark.name.contains(query, ignoreCase = true) ||
-                        bookmark.changeId.short.contains(query, ignoreCase = true)
+                        bookmark.id.full.contains(query, ignoreCase = true) ||
+                        bookmark.id.short.contains(query, ignoreCase = true)
                 }
             }
 
@@ -367,7 +368,8 @@ object JujutsuCompareWithPopup {
         } else {
             entries
                 .filter { entry ->
-                    entry.changeId.short.contains(query, ignoreCase = true) ||
+                    entry.id.short.contains(query, ignoreCase = true) ||
+                        entry.id.full.contains(query, ignoreCase = true) ||
                         entry.description.display.contains(query, ignoreCase = true)
                 }.take(DEFAULT_LIMIT)
         }

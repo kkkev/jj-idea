@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
 import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
 import java.awt.Color
@@ -25,7 +24,7 @@ class GraphBuilder {
             Color(0x7CB342) // Light green
         )
 
-    private val layoutCalculator = LayoutCalculatorImpl()
+    private val layoutCalculator = LayoutCalculatorImpl<String>()
 
     private fun colorForLane(lane: Int): Color = colors[lane % colors.size]
 
@@ -37,28 +36,19 @@ class GraphBuilder {
         val passThroughLanes: Map<Int, Color>
     )
 
-    data class Entry(
-        val id: String,
-        val parentIds: List<String>
-    )
-
-    fun buildGraph(entries: List<Entry>): Map<String, Node> {
-        // Convert to GraphEntry for the layout calculator
-        val graphEntries = entries.map { GraphEntry(ChangeId(it.id), it.parentIds.map { p -> ChangeId(p) }) }
-
+    fun buildGraph(entries: List<GraphEntry<String>>): Map<String, Node> {
         // Calculate layout using the algorithm
-        val layout = layoutCalculator.calculate(graphEntries)
+        val layout = layoutCalculator.calculate(entries)
 
         // Convert RowLayout to Node
         return layout.rows.associate { row ->
-            row.changeId.short to
-                Node(
-                    id = row.changeId.short,
-                    lane = row.lane,
-                    color = colorForLane(row.lane),
-                    parentLanes = row.parentLanes,
-                    passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
-                )
+            row.id to Node(
+                id = row.id,
+                lane = row.lane,
+                color = colorForLane(row.lane),
+                parentLanes = row.parentLanes,
+                passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
+            )
         }
     }
 }
@@ -66,10 +56,4 @@ class GraphBuilder {
 /**
  * Helper to create a test entry.
  */
-fun entry(
-    id: String,
-    parentIds: List<String> = emptyList()
-) = GraphBuilder.Entry(
-    id = id,
-    parentIds = parentIds
-)
+fun entry(id: String, parentIds: List<String> = emptyList()) = GraphEntry(current = id, parents = parentIds)

@@ -1,12 +1,12 @@
 package `in`.kkkev.jjidea.ui
 
-import com.intellij.codeInsight.codeVision.ui.model.richText.RichText
 import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.ShortenableId
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Shortenable
 import kotlinx.datetime.Instant
 
 interface TextCanvas {
@@ -14,18 +14,6 @@ interface TextCanvas {
         text: String,
         style: SimpleTextAttributes = SimpleTextAttributes.REGULAR_ATTRIBUTES
     )
-}
-
-class HtmlTextCanvas(val richText: RichText = RichText()) : TextCanvas {
-    override fun append(text: String, style: SimpleTextAttributes) = richText.append(text, style)
-}
-
-class StringBuilderHtmlTextCanvas(val sb: StringBuilder) : TextCanvas {
-    override fun append(text: String, style: SimpleTextAttributes) {
-        val canvas = HtmlTextCanvas()
-        canvas.append(text, style)
-        sb.append(canvas.richText.toString())
-    }
 }
 
 fun htmlText(builder: (TextCanvas.() -> Unit)): CharSequence {
@@ -39,12 +27,20 @@ class ComponentTextCanvas(val component: SimpleColoredComponent) : TextCanvas {
     override fun append(text: String, style: SimpleTextAttributes) = component.append(text, style)
 }
 
-fun TextCanvas.append(id: ShortenableId) {
-    append(id.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-    with(id.displayRemainder) {
+fun TextCanvas.append(shortenable: Shortenable) {
+    append(shortenable.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+    with(shortenable.displayRemainder) {
         if (isNotEmpty()) {
             append(this, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
         }
+    }
+}
+
+fun TextCanvas.append(qci: ChangeId) {
+    append(qci.shortenable)
+
+    qci.offset?.let {
+        append(qci.optionalOffset, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
     }
 }
 
@@ -67,9 +63,11 @@ fun TextCanvas.appendSummary(description: Description) {
 }
 
 fun TextCanvas.append(user: VcsUser) {
-    append("${user.name} &lt;")
-    append("user.email", SimpleTextAttributes.LINK_ATTRIBUTES)
-    append("&lt;")
+    append(user.name)
+    append(" <")
+    // TODO Make a mailto link
+    append(user.email, SimpleTextAttributes.LINK_ATTRIBUTES)
+    append(">")
 }
 
 fun TextCanvas.append(instant: Instant) {

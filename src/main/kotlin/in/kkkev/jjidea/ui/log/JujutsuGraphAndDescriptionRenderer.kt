@@ -2,11 +2,14 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
+import com.intellij.ui.SimpleColoredComponent.getTextBaseLine
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.ui.GraphicsTextCanvas
 import `in`.kkkev.jjidea.ui.JujutsuColors
+import `in`.kkkev.jjidea.ui.append
 import `in`.kkkev.jjidea.ui.drawStringCentredVertically
 import java.awt.*
 import javax.swing.JPanel
@@ -87,7 +90,7 @@ class JujutsuGraphAndDescriptionRenderer(
             // Get entry and graph node for this row
             val model = table.model as? JujutsuLogTableModel
             entry = model?.getEntry(row)
-            graphNode = entry?.let { graphNodes[it.changeId] }
+            graphNode = entry?.let { graphNodes[it.id] }
 
             // Set background based on selection/hover state
             background = when {
@@ -167,7 +170,7 @@ class JujutsuGraphAndDescriptionRenderer(
 
             // 3. Draw change ID (optional)
             if (columnManager.showChangeId) {
-                x = drawChangeId(g2d, entry.changeId, x)
+                x = drawQualifiedChangeId(g2d, entry.id, x)
             }
 
             // 4. Draw description (optional)
@@ -207,8 +210,8 @@ class JujutsuGraphAndDescriptionRenderer(
             // Incoming diagonal lines take visual space even without passthroughs
             for (prevRow in 0 until row) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
-                val prevNode = graphNodes[prevEntry.changeId] ?: continue
-                if (prevEntry.parentIds.contains(entry.changeId)) {
+                val prevNode = graphNodes[prevEntry.id] ?: continue
+                if (prevEntry.parentIds.contains(entry.id)) {
                     activeLanes.add(prevNode.lane)
                 }
             }
@@ -240,12 +243,12 @@ class JujutsuGraphAndDescriptionRenderer(
 
             for (prevRow in 0 until row) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
-                val prevNode = graphNodes[prevEntry.changeId] ?: continue
+                val prevNode = graphNodes[prevEntry.id] ?: continue
 
                 for ((parentIndex, parentId) in prevEntry.parentIds.withIndex()) {
                     var parentRow = -1
                     for (r in row + 1 until model.rowCount) {
-                        if (model.getEntry(r)?.changeId == parentId) {
+                        if (model.getEntry(r)?.id == parentId) {
                             parentRow = r
                             break
                         }
@@ -312,9 +315,9 @@ class JujutsuGraphAndDescriptionRenderer(
             // - Pure Merge (child has multiple parents, parent has one child): vertical from parent's lane
             for (prevRow in 0 until currentRow) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
-                val prevNode = graphNodes[prevEntry.changeId] ?: continue
+                val prevNode = graphNodes[prevEntry.id] ?: continue
 
-                val parentIndex = prevEntry.parentIds.indexOf(currentEntry.changeId)
+                val parentIndex = prevEntry.parentIds.indexOf(currentEntry.id)
                 if (parentIndex >= 0) {
                     val childLane = prevNode.lane
                     val isCrossLane = childLane != node.lane
@@ -395,34 +398,14 @@ class JujutsuGraphAndDescriptionRenderer(
             return x
         }
 
-        private fun drawChangeId(g2d: Graphics2D, changeId: ChangeId, startX: Int): Int {
-            val fontMetrics = g2d.fontMetrics
-
-            // Draw short prefix in bold
-            val boldFont = fontMetrics.font.deriveFont(Font.BOLD)
-            g2d.font = boldFont
+        private fun drawQualifiedChangeId(g2d: Graphics2D, id: ChangeId, startX: Int): Int {
+            // TODO Need to handle selected better
             g2d.color = if (isSelected) table.selectionForeground else table.foreground
 
-            var x = startX
+            val textCanvas = GraphicsTextCanvas(g2d, startX, getTextBaseLine(g2d.fontMetrics, height))
+            textCanvas.append(id)
 
-            g2d.drawStringCentredVertically(changeId.short, x, height)
-            x += fontMetrics.stringWidth(changeId.short)
-
-            // Draw remainder in gray/small if present
-            if (changeId.displayRemainder.isNotEmpty()) {
-                val regularFont = fontMetrics.font.deriveFont(Font.PLAIN)
-                val smallFont = regularFont.deriveFont(regularFont.size2D * 0.85f)
-                g2d.font = smallFont
-                g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
-
-                g2d.drawStringCentredVertically(changeId.displayRemainder, x, height)
-                x += g2d.fontMetrics.stringWidth(changeId.displayRemainder)
-            }
-
-            // Reset font
-            g2d.font = fontMetrics.font
-
-            return x + HORIZONTAL_PADDING.get() * 2
+            return textCanvas.cursor.x + HORIZONTAL_PADDING.get()
         }
 
         private fun drawDescription(g2d: Graphics2D, entry: LogEntry, startX: Int, maxX: Int): Int {

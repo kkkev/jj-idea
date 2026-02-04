@@ -1,10 +1,10 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.impl.VcsUserImpl
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.ChangeId
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -80,8 +80,8 @@ class JujutsuLogTableColumnTest {
         val entry = createTestEntry("abc123")
         model.setEntries(listOf(entry))
 
-        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_CHANGE_ID)
-        value shouldBe entry.changeId
+        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_ID)
+        value shouldBe entry.id
     }
 
     @Test
@@ -217,7 +217,7 @@ class JujutsuLogTableColumnTest {
         visible shouldContainExactly
             listOf(
                 JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
-                JujutsuLogTableModel.COLUMN_CHANGE_ID,
+                JujutsuLogTableModel.COLUMN_ID,
                 JujutsuLogTableModel.COLUMN_DATE
             )
     }
@@ -304,7 +304,7 @@ class JujutsuLogTableColumnTest {
         isEmpty: Boolean = false
     ) = LogEntry(
         repo = mockk<JujutsuRepository>(),
-        changeId = ChangeId(changeId),
+        id = ChangeId(changeId, changeId, null),
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = description,
         bookmarks = emptyList(),

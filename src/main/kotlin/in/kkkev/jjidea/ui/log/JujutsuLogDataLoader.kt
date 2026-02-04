@@ -5,13 +5,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.jj.*
 
 /**
  * Loads commit log data in the background and updates the table model on EDT.
@@ -44,7 +38,7 @@ class JujutsuLogDataLoader(
     init {
         // Listen for change selection requests for this repository
         repo.project.stateModel.changeSelection.connect(parentDisposable) { key ->
-            if (key.repo == repo && key.revision != null) {
+            if (key.repo == repo) {
                 requestSelection(key.revision)
             }
         }
@@ -126,11 +120,13 @@ class JujutsuLogDataLoader(
     fun selectEntry(revision: Revision) {
         val rowIndex = when (revision) {
             is ChangeId -> (0 until tableModel.rowCount).firstOrNull { row ->
-                tableModel.getEntry(row)?.changeId == revision
+                tableModel.getEntry(row)?.id == revision
             }
+
             WorkingCopy -> (0 until tableModel.rowCount).firstOrNull { row ->
                 tableModel.getEntry(row)?.isWorkingCopy == true
             }
+
             else -> {
                 log.warn("Unsupported revision type for selection: $revision")
                 null
@@ -161,7 +157,7 @@ class JujutsuLogDataLoader(
     fun refresh() {
         log.info("Refreshing log")
         // Save current selection to restore after refresh (unless an explicit selection is pending)
-        val savedSelection = if (!hasPendingSelection) table.selectedEntry?.changeId else null
+        val savedSelection = if (!hasPendingSelection) table.selectedEntry?.id else null
 
         loadCommits(onLoaded = {
             // Only restore if no explicit selection has been requested
