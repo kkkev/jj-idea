@@ -9,7 +9,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.ui.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.jujutsuRoot
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Provides change information for jujutsu working copy
@@ -25,7 +25,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     ) {
         log.debug("Getting changes for dirty scope")
 
-        dirtyScope.affectedContentRoots.map { it.jujutsuRoot }.forEach { jujutsuRoot ->
+        dirtyScope.affectedContentRoots.map { it.jujutsuRepository }.forEach { jujutsuRoot ->
             // Handle uninitialized roots (e.g., .jj directory was deleted)
             if (!jujutsuRoot.isInitialised) {
                 log.info("Root configured for Jujutsu but not initialized: ${jujutsuRoot.relativePath}")
@@ -131,7 +131,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addModifiedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = path.jujutsuRoot.createRevision(path, WorkingCopy.parent) // Parent commit
+        val beforeRevision = path.jujutsuRepository.createRevision(path, WorkingCopy.parent) // Parent commit
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -150,7 +150,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addDeletedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = path.jujutsuRoot.createRevision(path, WorkingCopy.parent)
+        val beforeRevision = path.jujutsuRepository.createRevision(path, WorkingCopy.parent)
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),

@@ -13,7 +13,7 @@ import com.intellij.vcs.log.VcsLogFilterCollection
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.jujutsuRoot
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Modern file history handler for VCS Log integration.
@@ -44,7 +44,7 @@ class JujutsuLogFileHistoryHandler(project: Project) : VcsLogFileHistoryHandler 
         commitCount: Int,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        val jujutsuRoot = root.jujutsuRoot
+        val jujutsuRoot = root.jujutsuRepository
 
         val relativePath = jujutsuRoot.getRelativePath(filePath)
 
@@ -77,7 +77,7 @@ class JujutsuLogFileHistoryHandler(project: Project) : VcsLogFileHistoryHandler 
         filters: VcsLogFilterCollection,
         consumer: (VcsFileRevision) -> Unit
     ) {
-        val jujutsuRoot = root.jujutsuRoot
+        val jujutsuRoot = root.jujutsuRepository
 
         val relativePath = jujutsuRoot.getRelativePath(filePath)
 

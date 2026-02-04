@@ -16,7 +16,9 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -26,7 +28,9 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.*
+import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.JEditorPane
@@ -198,20 +202,19 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
     }
 
     private fun openFile(change: Change) {
-        val virtualFile = change.afterRevision?.file?.virtualFile
-            ?: change.beforeRevision?.file?.virtualFile
-            ?: return
+        val virtualFile = change.filePath?.virtualFile ?: return
 
         FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, virtualFile), true)
     }
 
     private fun showContextMenu(comp: Component, x: Int, y: Int) {
         val selectedChange = changesTree.selectedChanges.firstOrNull() ?: return
+        val entry = currentEntry ?: return
 
         val actionGroup = DefaultActionGroup().apply {
             add(
                 object : DumbAwareAction(
-                    JujutsuBundle.message("action.showdiff"),
+                    JujutsuBundle.message("action.show.diff"),
                     null,
                     AllIcons.Actions.Diff
                 ) {
@@ -222,12 +225,24 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
             )
             add(
                 object : DumbAwareAction(
-                    JujutsuBundle.message("action.openfile"),
+                    JujutsuBundle.message("action.open.file"),
                     null,
                     AllIcons.Actions.EditSource
                 ) {
                     override fun actionPerformed(e: AnActionEvent) {
                         openFile(selectedChange)
+                    }
+                }
+            )
+            addSeparator()
+            add(
+                object : DumbAwareAction(
+                    JujutsuBundle.message("action.restore.to.revision"),
+                    JujutsuBundle.message("action.restore.to.revision.description"),
+                    AllIcons.Actions.Rollback
+                ) {
+                    override fun actionPerformed(e: AnActionEvent) {
+                        restoreToRevision(selectedChange, entry)
                     }
                 }
             )
@@ -239,6 +254,33 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         )
 
         popupMenu.component.show(comp, x, y)
+    }
+
+    private fun restoreToRevision(change: Change, entry: LogEntry) {
+        val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
+        val fileName = filePath.name
+        val changeId = entry.changeId
+        val repo = entry.repo
+
+        // Show confirmation dialog
+        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileName, changeId.short)
+        val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", changeId.short)
+        if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
+            return
+        }
+
+        repo.commandExecutor.createCommand {
+            restore(listOf(repo.getRelativePath(filePath)), changeId)
+        }
+            .onSuccess {
+                filePath.virtualFile?.let { vf ->
+                    VfsUtil.markDirtyAndRefresh(false, false, true, vf)
+                }
+                repo.invalidate()
+                log.info("Restored $fileName to revision ${changeId.short}")
+            }
+            .onFailureTellUser("action.restore.to.revision.error", project, log)
+            .executeAsync()
     }
 
     /**

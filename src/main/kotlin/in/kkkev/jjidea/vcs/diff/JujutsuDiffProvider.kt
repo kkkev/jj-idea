@@ -10,7 +10,7 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
-import `in`.kkkev.jjidea.vcs.jujutsuRoot
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Provides diff functionality for jujutsu files
@@ -22,7 +22,7 @@ class JujutsuDiffProvider() : DiffProvider {
         log.debug("Getting last revision for VirtualFile: ${file.path}")
 
         val filePath = VcsUtil.getFilePath(file)
-        val revision = filePath.jujutsuRoot.createRevision(filePath, WorkingCopy.parent)
+        val revision = filePath.jujutsuRepository.createRevision(filePath, WorkingCopy.parent)
 
         return ItemLatestState(revision.revisionNumber, true, true)
     }
@@ -30,13 +30,13 @@ class JujutsuDiffProvider() : DiffProvider {
     override fun getLastRevision(filePath: FilePath): ItemLatestState {
         log.debug("Getting last revision for FilePath: ${filePath.path}")
 
-        val revision = filePath.jujutsuRoot.createRevision(filePath, WorkingCopy.parent)
+        val revision = filePath.jujutsuRepository.createRevision(filePath, WorkingCopy.parent)
 
         return ItemLatestState(revision.revisionNumber, true, true)
     }
 
     override fun createFileContent(revisionNumber: VcsRevisionNumber?, file: VirtualFile) = revisionNumber?.let {
-        file.jujutsuRoot.createRevision(VcsUtil.getFilePath(file), RevisionExpression(it.toString()))
+        file.jujutsuRepository.createRevision(VcsUtil.getFilePath(file), RevisionExpression(it.toString()))
     }
 
     // TODO When addressing jj-idea-3jo, ensure that these return the correct change ids

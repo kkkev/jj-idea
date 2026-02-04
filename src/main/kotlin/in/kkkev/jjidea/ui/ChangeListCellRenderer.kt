@@ -6,6 +6,7 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.SimpleTextAttributes
+import `in`.kkkev.jjidea.vcs.filePath
 import java.io.File
 import javax.swing.JList
 
@@ -23,7 +24,7 @@ class ChangeListCellRenderer(private val project: Project) : ColoredListCellRend
     ) {
         if (value == null) return
 
-        val filePath = value.afterRevision?.file?.path ?: value.beforeRevision?.file?.path ?: return
+        val filePath = value.filePath?.path ?: return
         val fileName = File(filePath).name
 
         // Get file icon based on file type

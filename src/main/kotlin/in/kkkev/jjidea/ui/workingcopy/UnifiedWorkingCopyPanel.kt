@@ -31,12 +31,16 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.JujutsuChangesTree
+import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Component
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import javax.swing.*
+import javax.swing.Box
+import javax.swing.BoxLayout
+import javax.swing.JPanel
+import javax.swing.KeyStroke
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeExpansionListener
 import javax.swing.tree.TreePath
@@ -172,13 +176,13 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             border = JBUI.Borders.empty(20)
 
             val label = JBLabel(JujutsuBundle.message("workingcopy.empty.message"))
-            label.alignmentX = Component.CENTER_ALIGNMENT
+            label.alignmentX = CENTER_ALIGNMENT
             add(label)
 
             add(Box.createVerticalStrut(8))
 
             val link = HyperlinkLabel(JujutsuBundle.message("workingcopy.empty.link"))
-            link.alignmentX = Component.CENTER_ALIGNMENT
+            link.alignmentX = CENTER_ALIGNMENT
             link.addHyperlinkListener {
                 ShowSettingsUtil.getInstance().showSettingsDialog(
                     project,
@@ -438,16 +442,14 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun openFileInPreview(change: Change) {
-        val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
-        val virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath.path) ?: return
+        val virtualFile = change.filePath?.virtualFile ?: return
         ApplicationManager.getApplication().invokeLater {
             OpenFileDescriptor(project, virtualFile).navigate(true)
         }
     }
 
     private fun openFilePermanent(change: Change) {
-        val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
-        val virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath.path) ?: return
+        val virtualFile = change.filePath?.virtualFile ?: return
         ApplicationManager.getApplication().invokeLater {
             val fileEditorManager = FileEditorManager.getInstance(project)
             fileEditorManager.openFile(virtualFile, true)
@@ -490,7 +492,10 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         }
         group.add(openFileAction)
 
-        val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.UNKNOWN, group)
+        actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
+
+        val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.CHANGES_VIEW_POPUP, group)
+        popupMenu.setTargetComponent(changesTree)
         popupMenu.component.show(component, x, y)
     }
 

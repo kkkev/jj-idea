@@ -28,8 +28,9 @@
         <logProvider implementation="in.kkkev.jjidea.vcs.JujutsuLogProvider" />
 
 
-        <!-- Modern file history handler (toolbar at top, details on right) -->
-        <vcsLogFileHistoryHandler implementation="in.kkkev.jjidea.vcs.history.JujutsuLogFileHistoryHandler" order="first" />
+        <!-- Disabled: VCS Log file history handler shows Git actions in popup menu -->
+        <!-- Use older VcsHistoryProvider instead for cleaner JJ-only UI -->
+        <!-- <vcsLogFileHistoryHandler implementation="in.kkkev.jjidea.vcs.history.JujutsuLogFileHistoryHandler" order="first" /> -->
 
         <!-- Custom VCS Log columns (order affects default layout) -->
         <vcsLogCustomColumn implementation="in.kkkev.jjidea.vcs.log.JujutsuStatusColumn" />
@@ -84,9 +85,16 @@
             <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.vcs.actions.JujutsuCompareWithBranchAction"/>
             <reference ref="Vcs.ShowTabbedFileHistory"/>
             <action id="Jujutsu.ShowHistoryForSelection" class="in.kkkev.jjidea.vcs.actions.JujutsuShowHistoryForSelectionAction"/>
+            <action id="Jujutsu.RestoreFile" class="in.kkkev.jjidea.vcs.actions.RestoreSelectionAction"/>
             <!--<add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu.GoToMenu"/>-->
             <add-to-group group-id="VcsGroup" anchor="last"/>
         </group>
+
+        <!-- Restore to revision action for VCS Log changes browser and file history -->
+        <action id="Jujutsu.RestoreToRevision" class="in.kkkev.jjidea.vcs.actions.RestoreToRevisionAction">
+            <add-to-group group-id="Vcs.Log.ChangesBrowser.Popup" anchor="last"/>
+            <add-to-group group-id="Vcs.FileHistory.ContextMenu" anchor="last"/>
+        </action>
     </actions>
 
 </idea-plugin>

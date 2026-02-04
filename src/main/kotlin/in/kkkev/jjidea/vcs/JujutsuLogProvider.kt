@@ -19,6 +19,7 @@ import com.intellij.vcs.log.graph.PermanentGraph
 import com.intellij.vcs.log.impl.VcsRefImpl
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 
 /**
  * Provides repository-wide log for Jujutsu VCS
@@ -39,7 +40,7 @@ class JujutsuLogProvider : VcsLogProvider {
         log.debug("Reading first block of commits for root: ${root.path}")
 
         // Use logService to get log entries
-        val result = root.jujutsuRoot.logService.getLog(Expression.ALL)
+        val result = root.jujutsuRepository.logService.getLog(Expression.ALL)
 
         val entries = result.getOrElse {
             throw VcsException("Failed to read commits: ${it.message}")
@@ -90,7 +91,7 @@ class JujutsuLogProvider : VcsLogProvider {
         log.debug("Reading all commit hashes for root: ${root.path}")
 
         // Use logService to get commit graph
-        val result = root.jujutsuRoot.logService.getCommitGraph(Expression.ALL)
+        val result = root.jujutsuRepository.logService.getCommitGraph(Expression.ALL)
 
         // Track seen hashes to deduplicate (JJ can have multiple change IDs for the same commit)
         val seenHashes = mutableSetOf<String>()
@@ -120,7 +121,7 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun readFullDetails(root: VirtualFile, hashes: List<String>, consumer: Consumer<in VcsFullCommitDetails>) {
         log.debug("Reading full details for ${hashes.size} commits")
 
-        val logService = root.jujutsuRoot.logService
+        val logService = root.jujutsuRepository.logService
 
         hashes.forEach { hexHash ->
             try {
@@ -165,7 +166,7 @@ class JujutsuLogProvider : VcsLogProvider {
         log.debug("Reading all refs for root: ${root.path}")
 
         // Use logService to get refs
-        val result = root.jujutsuRoot.logService.getRefs()
+        val result = root.jujutsuRepository.logService.getRefs()
 
         val refs = result.getOrElse {
             log.error("Failed to read refs: ${it.message}")
@@ -261,7 +262,7 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         // Load content in background thread to avoid EDT blocking
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val commandExecutor = root.jujutsuRoot.commandExecutor
+                val commandExecutor = root.jujutsuRepository.commandExecutor
                 val leftChangeId = ChangeId.fromHexString(leftHash.asString())
                 val rightChangeId = ChangeId.fromHexString(rightHash.asString())
 
@@ -314,7 +315,7 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
         // Load content in background thread to avoid EDT blocking
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val jujutsuRoot = root.jujutsuRoot
+                val jujutsuRoot = root.jujutsuRepository
                 val changeId = ChangeId.fromHexString(hash.asString())
 
                 // Get relative path for jj commands
@@ -380,8 +381,31 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
     }
 
     override fun createContentRevision(filePath: FilePath, hash: Hash): ContentRevision {
-        // Convert hash back to ChangeId
+        // Convert hash back to ChangeId - this is a quick operation
         val changeId = ChangeId.fromHexString(hash.asString())
-        return filePath.jujutsuRoot.createRevision(filePath, changeId)
+        // Return a lazy content revision that defers repository lookup to getContent()
+        // This avoids slow operations on EDT since getContent() is called off EDT
+        return LazyJujutsuContentRevision(filePath, changeId)
     }
+}
+
+/**
+ * Lazy content revision that defers repository lookup to getContent().
+ * This avoids slow operations on EDT since createContentRevision is called on EDT
+ * but getContent() is called off EDT by the platform.
+ */
+private class LazyJujutsuContentRevision(
+    private val filePath: FilePath,
+    private val changeId: ChangeId
+) : ContentRevision {
+    override fun getContent(): String? {
+        // This is called off EDT, so repository lookup is safe here
+        val repo = filePath.jujutsuRepository
+        val result = repo.commandExecutor.show(repo.getRelativePath(filePath), changeId)
+        return result.stdout.takeIf { result.isSuccess }
+    }
+
+    override fun getFile() = filePath
+
+    override fun getRevisionNumber() = JujutsuRevisionNumber(changeId)
 }

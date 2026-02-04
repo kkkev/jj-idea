@@ -282,7 +282,44 @@ Modern IntelliJ Platform API for file change detection. Processes changes in bat
 
 **See**: `JujutsuStartupActivity.kt`
 
-#### 7. Action Factory Pattern for VCS Operations
+#### 7. Reusing Actions in Custom Context Menus via uiDataSnapshot
+When adding context menus to custom tree components (like `JujutsuChangesTree`), **do not** duplicate action logic or create static helpers. Instead:
+
+1. **Override `uiDataSnapshot`** on the tree component to populate the data context with standard keys:
+   ```kotlin
+   override fun uiDataSnapshot(sink: DataSink) {
+       super.uiDataSnapshot(sink)
+       sink[VcsDataKeys.CHANGES] = selectedChanges.toTypedArray()
+       sink[CommonDataKeys.VIRTUAL_FILE_ARRAY] = selectedChanges.mapNotNull { it.virtualFile }.toTypedArray()
+   }
+   ```
+
+2. **Look up registered actions** via `ActionManager` and add them to the popup group:
+   ```kotlin
+   actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
+   ```
+
+3. **Set the tree as the target component** so the action's data context flows through `uiDataSnapshot`:
+   ```kotlin
+   val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.CHANGES_VIEW_POPUP, group)
+   popupMenu.setTargetComponent(changesTree)
+   ```
+
+4. **Actions use `AnActionEvent` extension properties** (in `ActionEventExtensions.kt`) that read from these standard keys:
+   ```kotlin
+   val AnActionEvent.files: List<VirtualFile>
+       get() = getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()
+           ?: changes.map { it.afterRevision?.file ?: it.beforeRevision?.file }
+               .mapNotNull { it?.virtualFile }
+   ```
+
+**Rationale**: Any action that works on files/changes (restore, compare, etc.) automatically works in any context where the tree provides data — no duplication, no companion object helpers, no local action wrappers.
+
+**Anti-pattern**: Don't create companion objects with static helpers like `restoreToParent()` or wrap registered actions in local `DumbAwareAction` subclasses that capture state. This duplicates logic and bypasses the platform's data context mechanism.
+
+**See**: `ui/JujutsuChangesTree.kt`, `vcs/actions/ActionEventExtensions.kt`, `ui/workingcopy/UnifiedWorkingCopyPanel.kt`
+
+#### 8. Action Factory Pattern for VCS Operations
 VCS actions (edit, abandon, describe, etc.) use factory functions that return `AnAction` instances:
 
 ```kotlin
@@ -345,7 +382,7 @@ src/main/kotlin/in/kkkev/jjidea/
 ├── vcs/                         # IntelliJ VCS integration
 │   ├── JujutsuVcs.kt
 │   ├── JujutsuLogProvider.kt
-│   ├── actions/                 # VCS operation actions (see pattern §7)
+│   ├── actions/                 # VCS operation actions (see patterns §7, §8)
 │   ├── changes/
 │   ├── diff/
 │   └── history/

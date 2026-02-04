@@ -7,6 +7,7 @@ import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
+import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -51,8 +52,7 @@ val Project.jujutsuRepositories get() = this.jujutsuRoots.map { this.jujutsuRepo
  * Use when VCS might not be available.
  */
 val VirtualFile.possibleJujutsuVcs
-    get() = ProjectLocator
-        .getInstance()
+    get() = ProjectLocator.getInstance()
         .guessProjectForFile(this)
         ?.let(ProjectLevelVcsManager::getInstance)
         ?.getVcsFor(this) as? JujutsuVcs
@@ -65,10 +65,17 @@ val VirtualFile.possibleJujutsuVcs
 val VirtualFile.jujutsuVcs
     get() = this.possibleJujutsuVcs ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
 
-val VirtualFile.jujutsuRoot get() = jujutsuVcs.jujutsuRepositoryFor(this)
-    ?: throw VcsException(JujutsuBundle.message("vcs.error.no.root", this.path))
+val VirtualFile.jujutsuRepository
+    get() = jujutsuVcs.jujutsuRepositoryFor(this) ?: throw VcsException(
+        JujutsuBundle.message(
+            "vcs.error.no.root",
+            this.path
+        )
+    )
 
-val VirtualFile.isJujutsu get() = jujutsuVcs.jujutsuRepositoryFor(this) != null
+val List<VirtualFile>.singleJujutsuRepository get() = this.map { it.jujutsuRepository }.toSet().singleOrNull()
+
+val VirtualFile.isJujutsu get() = possibleJujutsuVcs?.jujutsuRepositoryFor(this) != null
 
 val VirtualFile.jujutsuProject
     get() = ReadAction.compute<Project?, RuntimeException> {
@@ -79,5 +86,40 @@ val VirtualFile.jujutsuProject
 
 fun VirtualFile.pathRelativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
 
-val FilePath.jujutsuRoot get() = this.virtualFile!!.jujutsuRoot
+val FilePath.possibleJujutsuProject: Project?
+    get() {
+        // Search up the directory structure, as this path may represent a deleted file
+        var path: FilePath? = this
+        var file: VirtualFile? = null
+        while ((file == null) && (path != null)) {
+            path = path.parentPath
+            file = path?.virtualFile
+        }
+        return file?.jujutsuProject
+    }
+
+val FilePath.possibleJujutsuVcs
+    get() = this.possibleJujutsuProject?.let(ProjectLevelVcsManager::getInstance)?.getVcsFor(this) as? JujutsuVcs
+
+val FilePath.jujutsuVcs
+    get() = this.possibleJujutsuVcs ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
+
+val FilePath.possibleJujutsuRepository get() = this.possibleJujutsuVcs?.jujutsuRepositoryFor(this)
+
+val FilePath.jujutsuRepository
+    get() = this.possibleJujutsuRepository ?: throw VcsException(
+        JujutsuBundle.message(
+            "vcs.error.no.root",
+            this.path
+        )
+    )
+
+val FilePath.isJujutsu get() = this.possibleJujutsuRepository != null
+
 fun FilePath.relativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
+
+/**
+ * File path associated with the change. For an update, the only file path, for a rename, the target, for a delete, the
+ * old file path. This is useful for finding the path of a file on which to act, given a change.
+ */
+val Change.filePath get() = this.afterRevision?.file ?: this.beforeRevision?.file

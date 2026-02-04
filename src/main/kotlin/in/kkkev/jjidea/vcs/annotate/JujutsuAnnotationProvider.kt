@@ -13,7 +13,7 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.jujutsuRoot
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Provides file annotations (blame) for Jujutsu files
@@ -57,7 +57,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      */
     private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
         try {
-            val jujutsuRoot = file.jujutsuRoot
+            val jujutsuRoot = file.jujutsuRepository
 
             // Get the relative path from the root
             val relativePath = jujutsuRoot.getRelativePath(file)

@@ -40,12 +40,12 @@ object JujutsuCompareWithPopup {
     /**
      * Item in the comparison popup
      */
-    sealed class CompareItem(open val displayName: String, open val revision: String) {
+    sealed class CompareItem(open val displayName: String, open val revision: Revision) {
         /** Recent change with description */
         data class Change(
             val entry: LogEntry,
             override val displayName: String = "${entry.changeId.short} ${entry.description.summary}",
-            override val revision: String = entry.changeId.toString()
+            override val revision: Revision = entry.changeId
         ) : CompareItem(displayName, revision) {
             val changeId: ChangeId get() = entry.changeId
             val description: Description get() = entry.description
@@ -55,7 +55,7 @@ object JujutsuCompareWithPopup {
         data class Bookmark(
             val item: BookmarkItem,
             override val displayName: String = "${item.bookmark.name} (${item.changeId.short})",
-            override val revision: String = item.bookmark.name
+            override val revision: Revision = item.bookmark
         ) : CompareItem(displayName, revision)
     }
 
@@ -64,7 +64,7 @@ object JujutsuCompareWithPopup {
      * Features search field with dynamic filtering
      * Loads data in background to avoid EDT blocking
      */
-    fun show(project: Project, repo: JujutsuRepository, onSelected: (String) -> Unit) {
+    fun show(project: Project, repo: JujutsuRepository, onSelected: (Revision) -> Unit) {
         // Create UI on EDT
         ApplicationManager.getApplication().invokeLater {
             val panel = createPopupPanel(project, repo, onSelected)
@@ -91,8 +91,11 @@ object JujutsuCompareWithPopup {
     /**
      * Create the popup panel with search field and list
      */
-    private fun createPopupPanel(project: Project, repo: JujutsuRepository, onSelected: (String) -> Unit): PopupPanel =
-        PopupPanel(project, repo, onSelected)
+    private fun createPopupPanel(
+        project: Project,
+        repo: JujutsuRepository,
+        onSelected: (Revision) -> Unit
+    ) = PopupPanel(project, repo, onSelected)
 
     /**
      * Panel containing search field and results list
@@ -100,7 +103,7 @@ object JujutsuCompareWithPopup {
     private class PopupPanel(
         private val project: Project,
         private val repo: JujutsuRepository,
-        private val onSelected: (String) -> Unit
+        private val onSelected: (Revision) -> Unit
     ) : JPanel(BorderLayout()) {
         val searchField = SearchTextField(false).apply {
             textEditor.emptyText.text = "Search by change ID or description..."

@@ -132,6 +132,11 @@ interface CommandExecutor {
      */
     fun diffGit(revision: Revision): CommandResult
 
+    /**
+     * Restore the specified files to the specified revision.
+     */
+    fun restore(filePaths: List<String>, revision: Revision): CommandResult
+
     data class Command(
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,

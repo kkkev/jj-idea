@@ -119,6 +119,9 @@ class CliExecutor(
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("diff", "--git", "-r", revision))
 
+    override fun restore(filePaths: List<String>, revision: Revision): CommandExecutor.CommandResult =
+        execute(root, listOf("restore", "-f", revision) + filePaths)
+
     private fun execute(
         workingDir: VirtualFile?,
         args: List<Any>,
