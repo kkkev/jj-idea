@@ -112,6 +112,7 @@ tasks.test {
         "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
         "--add-opens=java.base/java.io=ALL-UNNAMED",
         "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.fs=ALL-UNNAMED",
         "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/java.awt.event=ALL-UNNAMED",
         "--add-opens=java.desktop/javax.swing=ALL-UNNAMED",
@@ -119,6 +120,13 @@ tasks.test {
         "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
         "--add-opens=java.desktop/sun.font=ALL-UNNAMED"
     )
+
+    // Remove jvmArgumentProviders injected by the IntelliJ Platform Gradle Plugin
+    // that are incompatible with our test setup (coroutines debug agent, system classloader, etc.)
+    // Must use doFirst because the plugin adds providers after this configuration block.
+    doFirst {
+        jvmArgumentProviders.clear()
+    }
 }
 
 // Convenience task that runs both tests and linting
