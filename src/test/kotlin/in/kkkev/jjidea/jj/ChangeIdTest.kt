@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
+import `in`.kkkev.jjidea.jj.ShortenableId.Companion.calculateShortLength
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
@@ -47,45 +48,15 @@ class ChangeIdTest {
 
     @Test
     fun `calculateShortLength validates prefix`() {
-        val length = ChangeId.calculateShortLength("qpvuntsm", "qp")
+        val length = calculateShortLength("qpvuntsm", "qp")
         length shouldBe 2
     }
 
     @Test
     fun `calculateShortLength throws on invalid prefix`() {
         shouldThrow<IllegalArgumentException> {
-            ChangeId.calculateShortLength("qpvuntsm", "xy")
+            calculateShortLength("qpvuntsm", "xy")
         }
-    }
-
-    @Test
-    fun `fromHexString converts hex to JJ change ID format`() {
-        // JJ uses reverse hex: z=0, y=1, x=2, etc.
-        val jjId = ChangeId.fromHexString("0123456789abcdef")
-
-        jjId.full shouldBe "zyxwvutsrqponmlk"
-    }
-
-    @Test
-    fun `fromHexString handles uppercase hex`() {
-        val jjId = ChangeId.fromHexString("ABCDEF")
-
-        jjId.full shouldBe "ponmlk"
-    }
-
-    @Test
-    fun `fromHexString handles mixed case`() {
-        val jjId = ChangeId.fromHexString("0aF3")
-
-        jjId.full shouldBe "zpkw"
-    }
-
-    @Test
-    fun `fromHexString preserves non-hex characters`() {
-        // If there are non-hex characters, they should be preserved
-        val jjId = ChangeId.fromHexString("0-1")
-
-        jjId.full shouldBe "z-y"
     }
 
     @Test
@@ -105,7 +76,7 @@ class ChangeIdTest {
         val id4 = ChangeId("different", 2)
 
         id1 shouldBe id2
-        (id1 == id3) shouldBe false
+        id1 shouldBe id3
         (id1 == id4) shouldBe false
     }
 

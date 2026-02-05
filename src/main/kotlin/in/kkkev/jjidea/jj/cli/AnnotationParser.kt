@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj.cli
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.AnnotationLine
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import kotlinx.datetime.Instant
 
@@ -16,7 +17,7 @@ import kotlinx.datetime.Instant
  */
 object AnnotationParser {
     private const val FIELD_SEPARATOR = "\u0000" // Null byte
-    private const val FIELDS_PER_LINE = 8
+    private const val FIELDS_PER_LINE = 9
 
     /**
      * Template to use with `jj file annotate -T`
@@ -36,6 +37,7 @@ object AnnotationParser {
         commit.change_id() ++ "\0" ++
         commit.change_id().shortest() ++ "\0" ++
         commit.commit_id() ++ "\0" ++
+        commit.commit_id().shortest() ++ "\0" ++
         commit.author().name() ++ "\0" ++
         commit.author().email() ++ "\0" ++
         commit.author().timestamp().utc().format("%s") ++ "\0" ++
@@ -70,26 +72,24 @@ object AnnotationParser {
      * @param lineNumber Line number (1-indexed)
      * @return Parsed annotation line
      */
-    private fun parseAnnotationLine(
-        chunk: List<String>,
-        lineNumber: Int
-    ): AnnotationLine {
+    private fun parseAnnotationLine(chunk: List<String>, lineNumber: Int): AnnotationLine {
         require(chunk.size == FIELDS_PER_LINE) {
             "Invalid annotation line: expected $FIELDS_PER_LINE fields, got ${chunk.size}"
         }
 
         val fullChangeId = chunk[0]
         val shortChangeId = chunk[1]
-        val commitId = chunk[2]
-        val authorName = chunk[3]
-        val authorEmail = chunk[4]
-        val authorTimestamp = chunk[5].toLongOrNull()?.let(Instant::fromEpochSeconds)
-        val description = Description(chunk[6])
-        val lineContent = chunk[7]
+        val fullCommitId = chunk[2]
+        val shortCommitId = chunk[3]
+        val authorName = chunk[4]
+        val authorEmail = chunk[5]
+        val authorTimestamp = chunk[6].toLongOrNull()?.let(Instant::fromEpochSeconds)
+        val description = Description(chunk[7])
+        val lineContent = chunk[8]
 
         return AnnotationLine(
             changeId = ChangeId(fullChangeId, shortChangeId),
-            commitId = commitId,
+            commitId = CommitId(fullCommitId, shortCommitId),
             author = VcsUserImpl(authorName, authorEmail),
             authorTimestamp = authorTimestamp,
             description = description,

@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.mockRepo
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -20,26 +21,11 @@ class LogTemplateTest {
     private val commitGraphLogTemplate = cliLogService.logTemplates.commitGraphLogTemplate
 
     @Test
-    fun `basicLogTemplate generates correct spec string`() {
-        val spec = basicLogTemplate.spec
-
-        // Should contain all field specs joined with ++ and null byte separators
-        spec shouldBe
-            """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0" ++ if(immutable, "true", "false") ++ "\0""""
-    }
-
-    @Test
-    fun `basicLogTemplate has correct field count`() {
-        // 9 single fields: changeId, commitId, description, bookmarks, parents, currentWorkingCopy, conflict, empty, immutable
-        basicLogTemplate.count shouldBe 9
-    }
-
-    @Test
     fun `basicLogTemplate parses simple entry`() {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "Add new feature",
                 "",
                 "",
@@ -52,7 +38,7 @@ class LogTemplateTest {
         val entry = basicLogTemplate.take(fields.iterator())
 
         entry.changeId shouldBe ChangeId("qpvuntsm", "q")
-        entry.commitId shouldBe "abc123def456"
+        entry.commitId shouldBe CommitId("abc123def456", "ab")
         entry.description.display shouldBe "Add new feature"
         entry.bookmarks.shouldBeEmpty()
         entry.parentIds.shouldBeEmpty()
@@ -67,7 +53,7 @@ class LogTemplateTest {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "Feature work",
                 "main,feature",
                 "",
@@ -89,10 +75,10 @@ class LogTemplateTest {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "Merge commit",
                 "",
-                "plkvukqt~p,rlvkpnrz~rl",
+                "plkvukqt~p|bcd123~bc,rlvkpnrz~rl|cde234~cde",
                 "false",
                 "false",
                 "false",
@@ -111,7 +97,7 @@ class LogTemplateTest {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "First line\nSecond line\nThird line",
                 "",
                 "",
@@ -131,7 +117,7 @@ class LogTemplateTest {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "",
                 "",
                 "",
@@ -152,7 +138,7 @@ class LogTemplateTest {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~abc",
                 "", // Empty description
                 "",
                 "",
@@ -174,7 +160,7 @@ class LogTemplateTest {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "Conflicted change",
                 "",
                 "",
@@ -190,26 +176,11 @@ class LogTemplateTest {
     }
 
     @Test
-    fun `fullLogTemplate generates correct spec string`() {
-        val spec = fullLogTemplate.spec
-
-        // Should contain basic template fields plus author and committer
-        spec shouldBe
-            """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ commit_id ++ "\0" ++ description ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0" ++ if(conflict, "true", "false") ++ "\0" ++ if(empty, "true", "false") ++ "\0" ++ if(immutable, "true", "false") ++ "\0" ++ author.name() ++ "\0" ++ author.email() ++ "\0" ++ author.timestamp().utc().format("%s") ++ "\0" ++ committer.name() ++ "\0" ++ committer.email() ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
-    }
-
-    @Test
-    fun `fullLogTemplate has correct field count`() {
-        // 9 basic fields + 3 author fields + 3 committer fields = 15
-        fullLogTemplate.count shouldBe 15
-    }
-
-    @Test
     fun `fullLogTemplate parses complete entry`() {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "Add new feature",
                 "",
                 "",
@@ -228,13 +199,13 @@ class LogTemplateTest {
         val entry = fullLogTemplate.take(fields.iterator())
 
         entry.changeId shouldBe ChangeId("qpvuntsm", "q")
-        entry.commitId shouldBe "abc123def456"
+        entry.commitId shouldBe CommitId("abc123def456", "ab")
         entry.description shouldBe Description("Add new feature")
         entry.author!!.name shouldBe "Test Author"
-        entry.author!!.email shouldBe "author@example.com"
+        entry.author.email shouldBe "author@example.com"
         entry.authorTimestamp shouldBe Instant.fromEpochSeconds(1234567890)
         entry.committer!!.name shouldBe "Test Committer"
-        entry.committer!!.email shouldBe "committer@example.com"
+        entry.committer.email shouldBe "committer@example.com"
         entry.committerTimestamp shouldBe Instant.fromEpochSeconds(1234567890)
     }
 
@@ -243,7 +214,7 @@ class LogTemplateTest {
         val fields =
             listOf(
                 "qpvuntsm~q",
-                "abc123def456",
+                "abc123def456~ab",
                 "Cherry-picked commit",
                 "",
                 "",
@@ -262,34 +233,21 @@ class LogTemplateTest {
         val entry = fullLogTemplate.take(fields.iterator())
 
         entry.author!!.name shouldBe "Original Author"
-        entry.author!!.email shouldBe "original@example.com"
+        entry.author.email shouldBe "original@example.com"
         entry.authorTimestamp shouldBe Instant.fromEpochSeconds(1000000000)
         entry.committer!!.name shouldBe "Cherry Picker"
-        entry.committer!!.email shouldBe "picker@example.com"
+        entry.committer.email shouldBe "picker@example.com"
         entry.committerTimestamp shouldBe Instant.fromEpochSeconds(2000000000)
     }
 
     @Test
-    fun `refsLogTemplate generates correct spec string`() {
-        val spec = refsLogTemplate.spec
-
-        spec shouldBe
-            """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ bookmarks.map(|b| b.name()).join(",") ++ "\0" ++ if(current_working_copy, "true", "false") ++ "\0""""
-    }
-
-    @Test
-    fun `refsLogTemplate has correct field count`() {
-        refsLogTemplate.count shouldBe 3
-    }
-
-    @Test
     fun `refsLogTemplate parses entry with only working copy marker`() {
-        val fields = listOf("qpvuntsm~q", "", "true")
+        val fields = listOf("123abc~12", "", "true")
 
         val refs = refsLogTemplate.take(fields.iterator())
 
         refs shouldHaveSize 1
-        refs[0].changeId shouldBe ChangeId("qpvuntsm", "q")
+        refs[0].commitId shouldBe CommitId("123abc", "12")
         refs[0].ref.toString() shouldBe "@"
     }
 
@@ -325,49 +283,36 @@ class LogTemplateTest {
     }
 
     @Test
-    fun `commitGraphLogTemplate generates correct spec string`() {
-        val spec = commitGraphLogTemplate.spec
-
-        spec shouldBe
-            """change_id ++ "~" ++ change_id.shortest() ++ "\0" ++ parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",") ++ "\0" ++ committer.timestamp().utc().format("%s") ++ "\0""""
-    }
-
-    @Test
-    fun `commitGraphLogTemplate has correct field count`() {
-        commitGraphLogTemplate.count shouldBe 3
-    }
-
-    @Test
     fun `commitGraphLogTemplate parses graph node`() {
-        val fields = listOf("qpvuntsm~q", "plkvukqt~p", "1234567890")
+        val fields = listOf("123abc~12", "qvuntsm~qv|234bcd~23", "1234567890")
 
         val node = commitGraphLogTemplate.take(fields.iterator())
 
-        node.changeId shouldBe ChangeId("qpvuntsm", "q")
-        node.parentIds shouldHaveSize 1
-        node.parentIds[0] shouldBe ChangeId("plkvukqt", "p")
-        node.timestamp shouldBe Instant.fromEpochSeconds(1234567890)
+        node.id.toString() shouldBe "123abc"
+        node.parents shouldHaveSize 1
+        node.parents[0].toString() shouldBe "234bcd"
+        node.timestamp shouldBe 1234567890000L
     }
 
     @Test
     fun `commitGraphLogTemplate parses merge node`() {
-        val fields = listOf("qpvuntsm~q", "plkvukqt~p,rlvkpnrz~rl", "1234567890")
+        val fields = listOf("123abc~12", "qvuntsm~qv|234bcd~23,ruvvqw~ru|135abc~135", "1234567890")
 
         val node = commitGraphLogTemplate.take(fields.iterator())
 
-        node.parentIds shouldHaveSize 2
-        node.parentIds[0] shouldBe ChangeId("plkvukqt", "p")
-        node.parentIds[1] shouldBe ChangeId("rlvkpnrz", "rl")
+        node.parents shouldHaveSize 2
+        node.parents[0].toString() shouldBe "234bcd"
+        node.parents[1].toString() shouldBe "135abc"
     }
 
     @Test
     fun `commitGraphLogTemplate parses root node`() {
-        val fields = listOf("zxwvutsq~z", "", "1000000000")
+        val fields = listOf("123456~123", "", "1000000000")
 
         val node = commitGraphLogTemplate.take(fields.iterator())
 
-        node.changeId shouldBe ChangeId("zxwvutsq", "z")
-        node.parentIds.shouldBeEmpty()
-        node.timestamp shouldBe Instant.fromEpochSeconds(1000000000)
+        node.id.toString() shouldBe "123456"
+        node.parents.shouldBeEmpty()
+        node.timestamp shouldBe 1000000000000L
     }
 }

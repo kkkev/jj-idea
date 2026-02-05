@@ -9,7 +9,7 @@ import kotlinx.datetime.Instant
  */
 data class AnnotationLine(
     val changeId: ChangeId,
-    val commitId: String,
+    val commitId: CommitId,
     val author: VcsUser,
     val authorTimestamp: Instant?,
     val description: Description,
@@ -21,7 +21,7 @@ data class AnnotationLine(
      */
     fun getTooltip(): String = buildString {
         append("Change: ${changeId.display}\n")
-        append("Commit: ${commitId.take(12)}\n")
+        append("Commit: ${commitId.full}\n")
         append("Author: ${author.name}")
         if (author.email.isNotEmpty()) {
             append(" <${author.email}>")
@@ -36,7 +36,7 @@ data class AnnotationLine(
          */
         fun empty(lineNumber: Int, lineContent: String) = AnnotationLine(
             changeId = ChangeId(""),
-            commitId = "",
+            commitId = CommitId(""),
             author = VcsUserImpl("", ""),
             authorTimestamp = null,
             description = Description.EMPTY,

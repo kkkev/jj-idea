@@ -10,7 +10,7 @@ import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.vcs.log.VcsLogDataKeys
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.isJujutsu
@@ -47,27 +47,27 @@ class RestoreToRevisionAction : DumbAwareAction(
         val fileName = filePath.name
 
         // Convert hash to ChangeId
-        val changeId = ChangeId.fromHexString(selectedCommit.hash.asString())
+        val commitId = CommitId(selectedCommit.hash.asString())
 
         // Get repository from file
         val repo = filePath.jujutsuRepository
 
         // Show confirmation dialog
-        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileName, changeId.short)
-        val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", changeId.short)
+        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileName, commitId.short)
+        val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", commitId.short)
         if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
             return
         }
 
         repo.commandExecutor.createCommand {
-            restore(listOf(repo.getRelativePath(filePath)), changeId)
+            restore(listOf(repo.getRelativePath(filePath)), commitId)
         }
             .onSuccess {
                 filePath.virtualFile?.let { vf ->
                     VfsUtil.markDirtyAndRefresh(false, false, true, vf)
                 }
                 repo.invalidate()
-                log.info("Restored $fileName to revision ${changeId.short}")
+                log.info("Restored $fileName to revision ${commitId.short}")
             }
             .onFailureTellUser("action.restore.to.revision.error", project, log)
             .executeAsync()

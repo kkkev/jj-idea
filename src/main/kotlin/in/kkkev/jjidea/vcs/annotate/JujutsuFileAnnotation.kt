@@ -71,9 +71,9 @@ class JujutsuFileAnnotation(
      */
     fun handleAnnotationClick(lineNumber: Int) {
         getAnnotationLine(lineNumber)?.let { line ->
-            log.info("Annotation clicked for line $lineNumber, change ID: ${line.changeId}")
+            log.info("Annotation clicked for line $lineNumber, commit ID: ${line.commitId}")
 
-            jumpToRevisionAsync(project, file, line.changeId.hash, VcsUtil.getFilePath(file.path, false))
+            jumpToRevisionAsync(project, file, line.commitId.hash, VcsUtil.getFilePath(file.path, false))
         }
     }
 

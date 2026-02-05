@@ -1,8 +1,10 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -37,16 +39,16 @@ class JujutsuLogTableModelFilterTest {
     private fun createEntry(
         changeId: String,
         description: String = "Test commit",
-        author: com.intellij.vcs.log.VcsUser? = alice,
+        author: VcsUser? = alice,
         timestamp: Instant? = Instant.fromEpochMilliseconds(1000000000L),
         bookmarks: List<Bookmark> = emptyList()
     ) = LogEntry(
         repo = mockk<JujutsuRepository>(),
         changeId = ChangeId(changeId),
-        commitId = "0000000000000000000000000000000000000000",
+        commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = description,
         bookmarks = bookmarks,
-        parentIds = emptyList(),
+        parentIdentifiers = emptyList(),
         isWorkingCopy = false,
         hasConflict = false,
         isEmpty = false,
