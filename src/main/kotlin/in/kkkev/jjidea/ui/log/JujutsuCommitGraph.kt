@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.ui.JBColor
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
 import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
 import java.awt.Color
@@ -88,16 +87,4 @@ class CommitGraphBuilder {
         }
     }
 
-    /**
-     * Simplified version that assigns sequential lanes.
-     * Use this if the full algorithm is too complex initially.
-     */
-    fun buildSimpleGraph(entries: List<LogEntry>): Map<ChangeId, GraphNode> =
-        entries.associate { entry ->
-            entry.changeId to GraphNode(
-                lane = 0,
-                color = colors[0],
-                parentLanes = entry.parentIds.indices.map { 0 }
-            )
-        }
 }

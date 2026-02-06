@@ -9,6 +9,7 @@ import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -80,7 +81,7 @@ val VirtualFile.isJujutsu get() = possibleJujutsuVcs?.jujutsuRepositoryFor(this)
 val VirtualFile.jujutsuProject
     get() = ReadAction.compute<Project?, RuntimeException> {
         ProjectManager.getInstance().openProjects.firstOrNull { project ->
-            project.jujutsuRoots.any { it.path == this }
+            project.jujutsuRoots.any { it.path == this || VfsUtilCore.isAncestor(it.path, this, false) }
         }
     } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${this.path}")
 
