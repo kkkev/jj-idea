@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldContainExactly
@@ -304,10 +305,10 @@ class JujutsuLogTableColumnTest {
     ) = LogEntry(
         repo = mockk<JujutsuRepository>(),
         changeId = ChangeId(changeId),
-        commitId = "0000000000000000000000000000000000000000",
+        commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = description,
         bookmarks = emptyList(),
-        parentIds = emptyList(),
+        parentIdentifiers = emptyList(),
         isWorkingCopy = false,
         hasConflict = hasConflict,
         isEmpty = isEmpty,

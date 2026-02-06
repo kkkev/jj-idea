@@ -362,6 +362,9 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             // Show repo:changeId format
             append("<b>${entry.repo.relativePath}</b>:")
             canvas.append(entry.changeId)
+            append(" (")
+            canvas.append(entry.commitId)
+            append(")")
 
             if (entry.parentIds.isNotEmpty()) {
                 append("<br>")

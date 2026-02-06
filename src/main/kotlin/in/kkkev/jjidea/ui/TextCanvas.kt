@@ -5,8 +5,8 @@ import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.ShortenableId
 import kotlinx.datetime.Instant
 
 interface TextCanvas {
@@ -39,9 +39,9 @@ class ComponentTextCanvas(val component: SimpleColoredComponent) : TextCanvas {
     override fun append(text: String, style: SimpleTextAttributes) = component.append(text, style)
 }
 
-fun TextCanvas.append(changeId: ChangeId) {
-    append(changeId.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-    with(changeId.displayRemainder) {
+fun TextCanvas.append(id: ShortenableId) {
+    append(id.short, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+    with(id.displayRemainder) {
         if (isNotEmpty()) {
             append(this, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
         }

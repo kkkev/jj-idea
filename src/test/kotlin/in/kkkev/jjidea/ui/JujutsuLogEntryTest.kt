@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui
 import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import io.kotest.matchers.collections.shouldContain
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test
 class JujutsuLogEntryTest {
     companion object {
         val CHANGE_ID = ChangeId("qpvuntsm", 2)
+        val COMMIT_ID = CommitId("abc123", 2)
 
         val JUJUTSU_ROOT = mockk<JujutsuRepository>()
 
@@ -26,7 +28,7 @@ class JujutsuLogEntryTest {
 
     @Test
     fun `parse log entry with all fields`() {
-        val commitId = "abc123def456"
+        val commitId = CommitId("abc123def456")
         val description = "Add new feature"
         val bookmarks = listOf(Bookmark("main"), Bookmark("feature-branch"))
 
@@ -50,7 +52,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
             changeId = CHANGE_ID,
-            commitId = "abc123",
+            commitId = COMMIT_ID,
             underlyingDescription = "Work in progress",
             isWorkingCopy = true
         )
@@ -63,7 +65,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
             changeId = CHANGE_ID,
-            commitId = "abc123",
+            commitId = COMMIT_ID,
             underlyingDescription = "Conflicted change",
             hasConflict = true
         )
@@ -76,7 +78,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
             changeId = CHANGE_ID,
-            commitId = "abc123",
+            commitId = COMMIT_ID,
             underlyingDescription = "",
             isEmpty = true
         )
@@ -89,7 +91,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
             changeId = CHANGE_ID,
-            commitId = "abc123",
+            commitId = COMMIT_ID,
             underlyingDescription = ""
         )
 
@@ -101,7 +103,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
             changeId = CHANGE_ID,
-            commitId = "abc123",
+            commitId = COMMIT_ID,
             underlyingDescription = "Test",
             author = ALICE,
             committer = BOB
@@ -118,7 +120,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
             changeId = CHANGE_ID,
-            commitId = "abc123",
+            commitId = COMMIT_ID,
             underlyingDescription = "Test",
             authorTimestamp = authorTime,
             committerTimestamp = committerTime
@@ -134,7 +136,7 @@ class JujutsuLogEntryTest {
         val entry = LogEntry(
             repo = JUJUTSU_ROOT,
             changeId = CHANGE_ID,
-            commitId = "abc123",
+            commitId = COMMIT_ID,
             underlyingDescription = multiLineDesc
         )
 

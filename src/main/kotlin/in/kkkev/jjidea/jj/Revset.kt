@@ -48,4 +48,4 @@ object WorkingCopy : Ref {
     override fun toString() = "@"
 }
 
-data class RefAtRevision(val changeId: ChangeId, val ref: Ref)
+data class RefAtCommit(val commitId: CommitId, val ref: Ref)

@@ -126,6 +126,9 @@ object JujutsuCompareWithPopup {
 
                             append("<html>")
                             canvas.append(item.entry.changeId)
+                            append(" (")
+                            canvas.append(item.entry.commitId)
+                            append(")")
                             append("<br>")
                             item.entry.author?.let {
                                 canvas.append(it)

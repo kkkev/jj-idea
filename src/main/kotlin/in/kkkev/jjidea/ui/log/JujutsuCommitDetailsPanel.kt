@@ -354,6 +354,9 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
 
         // Change ID using standard formatter
         canvas.append(entry.changeId)
+        sb.append(" (")
+        canvas.append(entry.commitId)
+        sb.append(")")
 
         // Bookmarks with branch icon (⎇ symbol - JEditorPane doesn't support icon data URIs reliably)
         if (entry.bookmarks.isNotEmpty()) {
@@ -461,6 +464,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         sb.append(
             "<p style='margin: 4px 0; color: #${JujutsuColors.getGrayHex()}; font-size: ${UIUtil.getLabelFont().size - 1}pt;'>"
         )
+        // TODO CommitId to HTML
         sb.append("Commit: <span style='font-family: monospace;'>${entry.commitId}</span>")
         sb.append("</p>")
 

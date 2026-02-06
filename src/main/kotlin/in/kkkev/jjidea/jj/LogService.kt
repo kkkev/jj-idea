@@ -1,5 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
+import `in`.kkkev.jjidea.vcs.JujutsuTimedCommit
+
 /**
  * Service for querying Jujutsu log and change information.
  * Encapsulates template generation, command execution, and parsing.
@@ -27,7 +29,7 @@ interface LogService {
      * Get refs (bookmarks and working copy marker) for all commits
      * @return List of refs
      */
-    fun getRefs(): Result<List<RefAtRevision>>
+    fun getRefs(): Result<List<RefAtCommit>>
 
     /**
      * Get minimal commit information (change IDs and parent relationships only)
@@ -35,7 +37,7 @@ interface LogService {
      * @param revset Revset to query (default: "all()")
      * @return List of minimal commit info
      */
-    fun getCommitGraph(revset: Revset = Expression.ALL): Result<List<CommitGraphNode>>
+    fun getCommitGraph(revset: Revset = Expression.ALL): Result<List<JujutsuTimedCommit>>
 
     /**
      * Get file changes for a specific revision

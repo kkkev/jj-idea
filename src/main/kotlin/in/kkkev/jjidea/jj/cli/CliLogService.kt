@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj.cli
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.vcs.JujutsuTimedCommit
 import kotlinx.datetime.Instant
 
 interface LogSpec<T> {
@@ -57,7 +58,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     override fun getLogBasic(revset: Revset, filePaths: List<String>) =
         getLog(logTemplates.basicLogTemplate, revset, filePaths)
 
-    override fun getRefs(): Result<List<RefAtRevision>> = getLog(logTemplates.refsLogTemplate).map { it.flatten() }
+    override fun getRefs(): Result<List<RefAtCommit>> = getLog(logTemplates.refsLogTemplate).map { it.flatten() }
 
     override fun getCommitGraph(revset: Revset) = getLog(logTemplates.commitGraphLogTemplate, revset)
 
@@ -196,25 +197,32 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
-        val changeId =
-            singleField("change_id ++ \"~\" ++ change_id.shortest()") {
-                val (full, short) = it.split("~")
-                ChangeId(full, short)
-            }
-        val commitId = stringField("commit_id")
+        val changeId = singleField("change_id ++ \"~\" ++ change_id.shortest()") {
+            val (full, short) = it.split("~")
+            ChangeId(full, short)
+        }
+        val commitId = singleField("commit_id ++ \"~\" ++ commit_id.shortest()") {
+            val (full, short) = it.split("~")
+            CommitId(full, short)
+        }
         val description = stringField("description")
         val currentWorkingCopy = booleanField("current_working_copy")
         val conflict = booleanField("conflict")
         val empty = booleanField("empty")
         val bookmarks = singleField("""bookmarks.map(|b| b.name()).join(",")""") { it.splitByComma(::Bookmark) }
-        val parents =
-            singleField("""parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest()).join(",")""") {
-                it.splitByComma(changeId::parse)
+        val parents = singleField(
+            """parents.map(|c| c.change_id() ++ "~" ++ c.change_id().shortest() ++ "|" ++ c.commit_id() ++ "~" ++ c.commit_id().shortest()).join(",")"""
+        ) {
+            it.splitByComma { p ->
+                val (changeIdParts, commitIdParts) = p.split("|")
+                LogEntry.Identifiers(changeId.parse(changeIdParts), commitId.parse(commitIdParts))
             }
+        }
         val author = SignatureFields("author")
         val committer = SignatureFields("committer")
         val immutable = booleanField("immutable")
     }
+
     inner class LogTemplates : LogFields() {
         val basicLogTemplate =
             logTemplate(
@@ -254,20 +262,20 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
-        val refsLogTemplate = logTemplate(changeId, bookmarks, currentWorkingCopy) {
-            val changeId = changeId.take(it)
+        val refsLogTemplate = logTemplate(commitId, bookmarks, currentWorkingCopy) {
+            val commitId = commitId.take(it)
             val bookmarks = bookmarks.take(it)
             val currentWorkingCopy = currentWorkingCopy.take(it)
             listOfNotNull(
                 listOf(WorkingCopy).takeIf { currentWorkingCopy },
                 bookmarks
-            ).flatten().map { ref -> RefAtRevision(changeId, ref) }
+            ).flatten().map { ref -> RefAtCommit(commitId, ref) }
         }
 
-        val commitGraphLogTemplate = logTemplate(changeId, parents, committer.timestamp) {
-            CommitGraphNode(
-                changeId.take(it),
-                parents.take(it),
+        val commitGraphLogTemplate = logTemplate(commitId, parents, committer.timestamp) {
+            JujutsuTimedCommit(
+                commitId.take(it),
+                parents.take(it).map { it.commitId },
                 committer.timestamp.take(it)
             )
         }

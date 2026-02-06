@@ -11,9 +11,9 @@ abstract class JujutsuCommitMetadataBase(
     val entry: LogEntry, // Public to allow column rendering access
     private val root: VirtualFile
 ) : VcsCommitMetadata {
-    override fun getId() = entry.changeId.hash
+    override fun getId() = entry.commitId.hash
 
-    override fun getParents() = entry.parentIds.map { it.hash }
+    override fun getParents() = entry.parentIdentifiers.map { it.commitId.hash }
 
     // TODO What if null?
     override fun getCommitTime() = entry.committerTimestamp!!.toEpochMilliseconds()
