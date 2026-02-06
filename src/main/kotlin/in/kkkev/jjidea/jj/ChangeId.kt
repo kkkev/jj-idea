@@ -20,6 +20,5 @@ class ChangeId(full: String, shortLength: Int? = null) : ShortenableId(full, sho
     companion object {
         const val CHARS = "zyxwvutsrqponmlk"
         const val HEX = "0123456789abcdef"
-
     }
 }
