@@ -34,6 +34,10 @@ class JujutsuLogTable(
     var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
         private set
 
+    // Currently hovered row for targeted repaint
+    var hoveredRow: Int = -1
+        private set
+
     // Root gutter state: true = expanded (shows repo name), false = collapsed (just colored strip)
     var isRootGutterExpanded: Boolean = false
         private set
@@ -94,9 +98,6 @@ class JujutsuLogTable(
         tableHeader.reorderingAllowed = true
         tableHeader.resizingAllowed = true
 
-        // Enable column sorting
-        autoCreateRowSorter = true
-
         // Ensure header is visible even with empty column names
         tableHeader.preferredSize = java.awt.Dimension(tableHeader.preferredSize.width, 24)
 
@@ -109,11 +110,17 @@ class JujutsuLogTable(
         // Striped rows for better readability
         setStriped(true)
 
-        // Enable hover effect - repaint on mouse movement
+        // Enable hover effect - repaint only affected rows on mouse movement
         addMouseMotionListener(
             object : MouseMotionAdapter() {
                 override fun mouseMoved(e: MouseEvent) {
-                    repaint()
+                    val newRow = rowAtPoint(e.point)
+                    if (newRow != hoveredRow) {
+                        val oldRow = hoveredRow
+                        hoveredRow = newRow
+                        if (oldRow >= 0) repaintRow(oldRow)
+                        if (newRow >= 0) repaintRow(newRow)
+                    }
                 }
             }
         )
@@ -207,6 +214,12 @@ class JujutsuLogTable(
      * Update graph nodes and refresh graph+description column.
      * Called after data is loaded.
      */
+    private fun repaintRow(row: Int) {
+        val rect = getCellRect(row, 0, true)
+        rect.width = width
+        repaint(rect)
+    }
+
     fun updateGraph(nodes: Map<ChangeId, GraphNode>) {
         graphNodes = nodes
         // Refresh combined graph+description column rendering with column manager

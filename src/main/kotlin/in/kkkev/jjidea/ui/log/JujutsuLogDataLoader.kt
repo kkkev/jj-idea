@@ -6,6 +6,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import `in`.kkkev.jjidea.jj.*
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Loads commit log data in the background and updates the table model on EDT.
@@ -25,6 +27,10 @@ class JujutsuLogDataLoader(
 ) {
     private val log = Logger.getInstance(javaClass)
     private val graphBuilder = CommitGraphBuilder()
+
+    private val loading = AtomicBoolean(false)
+    private val pendingRefresh = AtomicBoolean(false)
+    private val currentIndicator = AtomicReference<ProgressIndicator?>(null)
 
     /**
      * Pending selection to apply after data loads.
@@ -51,21 +57,32 @@ class JujutsuLogDataLoader(
      * @param onLoaded Optional callback invoked after data is loaded (on EDT)
      */
     fun loadCommits(revset: Expression = Expression.ALL, onLoaded: (() -> Unit)? = null) {
+        if (!loading.compareAndSet(false, true)) {
+            // A load is already in progress; mark pending so we reload when it finishes
+            pendingRefresh.set(true)
+            return
+        }
+
+        // Cancel any previous load that hasn't started its EDT callback yet
+        currentIndicator.get()?.cancel()
+
         object : Task.Backgroundable(repo.project, "Loading Jujutsu Commits", true) {
             private var entries: List<LogEntry> = emptyList()
+            private var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
             private var error: Throwable? = null
 
             override fun run(indicator: ProgressIndicator) {
+                currentIndicator.set(indicator)
                 indicator.text = "Loading commits from Jujutsu..."
                 indicator.isIndeterminate = false
 
                 try {
-                    // Load log entries using our existing LogService
                     val result = repo.logService.getLog(revset)
 
                     result.onSuccess { loadedEntries ->
                         entries = loadedEntries
                         log.info("Loaded ${entries.size} commits")
+                        graphNodes = graphBuilder.buildGraph(entries)
                     }.onFailure { e ->
                         error = e
                         log.error("Failed to load commits", e)
@@ -77,23 +94,18 @@ class JujutsuLogDataLoader(
             }
 
             override fun onSuccess() {
-                if (error == null) {
-                    // Build graph layout with full branching/merging support
-                    val graphNodes = graphBuilder.buildGraph(entries)
+                loading.set(false)
+                currentIndicator.set(null)
 
-                    // Update table model and graph on EDT
+                if (error == null) {
                     ApplicationManager.getApplication().invokeLater {
                         tableModel.setEntries(entries)
                         table.updateGraph(graphNodes)
                         log.info("Table updated with ${entries.size} commits and graph layout")
 
-                        // Notify class-level callback
                         onDataLoaded?.invoke()
-
-                        // Notify per-call callback (e.g., refresh restoring selection)
                         onLoaded?.invoke()
 
-                        // Handle pending selection LAST - explicit selection wins over implicit
                         if (hasPendingSelection) {
                             hasPendingSelection = false
                             pendingSelection?.let { selectEntry(it) }
@@ -101,10 +113,21 @@ class JujutsuLogDataLoader(
                         }
                     }
                 }
+
+                // If a refresh was requested while we were loading, re-run
+                if (pendingRefresh.compareAndSet(true, false)) {
+                    loadCommits(revset)
+                }
             }
 
             override fun onThrowable(throwable: Throwable) {
+                loading.set(false)
+                currentIndicator.set(null)
                 log.error("Background task failed", throwable)
+
+                if (pendingRefresh.compareAndSet(true, false)) {
+                    loadCommits(revset)
+                }
             }
         }.queue()
     }

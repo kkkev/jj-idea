@@ -10,6 +10,8 @@ import `in`.kkkev.jjidea.jj.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Loads commit log data from multiple repositories in parallel and updates the table model on EDT.
@@ -30,6 +32,10 @@ class UnifiedJujutsuLogDataLoader(
 ) {
     private val log = Logger.getInstance(javaClass)
     private val graphBuilder = CommitGraphBuilder()
+
+    private val loading = AtomicBoolean(false)
+    private val pendingRefresh = AtomicBoolean(false)
+    private val currentIndicator = AtomicReference<ProgressIndicator?>(null)
 
     /**
      * Pending selection to apply after data loads.
@@ -61,11 +67,21 @@ class UnifiedJujutsuLogDataLoader(
             return
         }
 
+        if (!loading.compareAndSet(false, true)) {
+            pendingRefresh.set(true)
+            return
+        }
+
+        currentIndicator.get()?.cancel()
+
         object : Task.Backgroundable(project, "Loading Jujutsu Commits", true) {
             private val entriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
             private val errors = ConcurrentHashMap<JujutsuRepository, Throwable>()
+            private var allEntries: List<LogEntry> = emptyList()
+            private var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
 
             override fun run(indicator: ProgressIndicator) {
+                currentIndicator.set(indicator)
                 indicator.text = "Loading commits from ${repos.size} repositories..."
                 indicator.isIndeterminate = false
 
@@ -84,9 +100,7 @@ class UnifiedJujutsuLogDataLoader(
                                 entriesByRepo[repo] = loadedEntries
                                 log.info(
                                     "Loaded ${loadedEntries.size} commits from ${
-                                        repo.relativePath.ifEmpty {
-                                            "root"
-                                        }
+                                        repo.relativePath.ifEmpty { "root" }
                                     }"
                                 )
                             }.onFailure { e ->
@@ -102,45 +116,52 @@ class UnifiedJujutsuLogDataLoader(
                     }
                 }
 
-                // Wait for all repositories to finish loading
                 latch.await(5, TimeUnit.MINUTES)
-            }
 
-            override fun onSuccess() {
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) {
                     log.error("All repositories failed to load")
                     return
                 }
 
-                // Merge all entries and sort by timestamp (newest first)
-                val allEntries = entriesByRepo.values.flatten()
+                allEntries = entriesByRepo.values.flatten()
                     .sortedByDescending { it.authorTimestamp ?: it.committerTimestamp }
 
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
+                graphNodes = graphBuilder.buildGraph(allEntries)
+            }
 
-                // Build graph layout with full branching/merging support
-                val graphNodes = graphBuilder.buildGraph(allEntries)
+            override fun onSuccess() {
+                loading.set(false)
+                currentIndicator.set(null)
 
-                // Update table model and graph on EDT
+                if (entriesByRepo.isEmpty() && errors.isNotEmpty()) {
+                    if (pendingRefresh.compareAndSet(true, false)) loadCommits(revset)
+                    return
+                }
+
                 ApplicationManager.getApplication().invokeLater {
                     tableModel.setEntries(allEntries)
                     table.updateGraph(graphNodes)
                     log.info("Table updated with ${allEntries.size} commits and graph layout")
 
-                    // Notify callback (e.g., update root filter visibility)
                     onDataLoaded?.invoke()
 
-                    // Handle pending selection LAST - explicit selection wins over implicit
                     if (hasPendingSelection) {
                         hasPendingSelection = false
                         pendingSelection?.let { selectEntry(it.repo, it.revision) }
                         pendingSelection = null
                     }
                 }
+
+                if (pendingRefresh.compareAndSet(true, false)) loadCommits(revset)
             }
 
             override fun onThrowable(throwable: Throwable) {
+                loading.set(false)
+                currentIndicator.set(null)
                 log.error("Background task failed", throwable)
+
+                if (pendingRefresh.compareAndSet(true, false)) loadCommits(revset)
             }
         }.queue()
     }

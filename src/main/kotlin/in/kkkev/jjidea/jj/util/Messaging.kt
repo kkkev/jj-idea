@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.util.messages.Topic
+import java.util.concurrent.atomic.AtomicBoolean
 
 inline fun <reified L> topic(displayName: String) = Topic.create(displayName, L::class.java)
 
@@ -37,6 +38,8 @@ class SimpleNotifiableState<T : Any>(
     val topic = topic<NotifiableState.Listener<T>>(topicDisplayName)
 
     private val publisher = project.messageBus.syncPublisher(topic)
+    private val loading = AtomicBoolean(false)
+    private val invalidatedWhileLoading = AtomicBoolean(false)
 
     @Volatile
     override var value: T = startValue
@@ -46,12 +49,25 @@ class SimpleNotifiableState<T : Any>(
     }
 
     override fun invalidate() {
+        if (!loading.compareAndSet(false, true)) {
+            // A load is already in progress; mark that we need to reload when it finishes
+            invalidatedWhileLoading.set(true)
+            return
+        }
         ApplicationManager.getApplication().executeOnPooledThread {
-            val newValue = loader()
-            if (value != newValue) {
-                val oldValue = value
-                value = newValue
-                notify(publisher, oldValue, newValue)
+            try {
+                val newValue = loader()
+                if (value != newValue) {
+                    val oldValue = value
+                    value = newValue
+                    notify(publisher, oldValue, newValue)
+                }
+            } finally {
+                loading.set(false)
+                // If invalidated while loading, re-run to pick up latest state
+                if (invalidatedWhileLoading.compareAndSet(true, false)) {
+                    invalidate()
+                }
             }
         }
     }
