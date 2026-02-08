@@ -95,6 +95,11 @@
             <add-to-group group-id="Vcs.Log.ChangesBrowser.Popup" anchor="last"/>
             <add-to-group group-id="Vcs.FileHistory.ContextMenu" anchor="last"/>
         </action>
+
+        <!-- File change context menu actions for custom panels -->
+        <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.vcs.actions.ShowChangesDiffAction"/>
+        <action id="Jujutsu.OpenChangeFile" class="in.kkkev.jjidea.vcs.actions.OpenChangeFileAction"/>
+        <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.vcs.actions.RestoreToChangeAction"/>
     </actions>
 
 </idea-plugin>

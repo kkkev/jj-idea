@@ -1,24 +1,14 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.diff.DiffContentFactory
-import com.intellij.diff.DiffManager
-import com.intellij.diff.requests.SimpleDiffRequest
-import com.intellij.icons.AllIcons
 import com.intellij.ide.CommonActionsManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.ActionToolbar
-import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileEditor.FileEditorManager
-import com.intellij.openapi.fileEditor.OpenFileDescriptor
-import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.vcs.changes.Change
-import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -28,9 +18,10 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.*
-import `in`.kkkev.jjidea.vcs.filePath
+import `in`.kkkev.jjidea.vcs.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.vcs.actions.fileChangeActionGroup
+import `in`.kkkev.jjidea.vcs.actions.showChangesDiff
 import java.awt.BorderLayout
 import java.awt.Component
 import javax.swing.JEditorPane
@@ -78,6 +69,11 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
 
         // Setup changes panel with tree and toolbar
         setupChangesPanel()
+
+        // Inject LOG_ENTRY into data context for actions to determine working copy vs historical
+        changesTree.additionalDataProvider = { sink ->
+            currentEntry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+        }
 
         // Create splitter: changes on top, metadata on bottom
         splitter = OnePixelSplitter(true, 0.5f).apply {
@@ -128,7 +124,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         // Double-click to show diff
         changesTree.setDoubleClickHandler {
             changesTree.selectedChanges.firstOrNull()?.let { change ->
-                showDiff(change)
+                showChangesDiff(project, change, currentEntry)
                 true
             } ?: false
         }
@@ -136,7 +132,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         // Enter key to show diff
         changesTree.setEnterKeyHandler {
             changesTree.selectedChanges.firstOrNull()?.let { change ->
-                showDiff(change)
+                showChangesDiff(project, change, currentEntry)
                 true
             } ?: false
         }
@@ -155,132 +151,15 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         )
     }
 
-    private fun showDiff(change: Change) {
-        // Load content in background thread to avoid EDT blocking
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val beforePath = change.beforeRevision?.file
-            val afterPath = change.afterRevision?.file
-            val fileName = afterPath?.name ?: beforePath?.name ?: JujutsuBundle.message("diff.title.unknown")
-
-            // Load revision content in background
-            val beforeContent = change.beforeRevision?.content ?: ""
-            val afterContent = change.afterRevision?.content ?: ""
-
-            // Get parent and current change IDs for titles
-            val entry = currentEntry
-            val parentId = entry?.parentIds?.firstOrNull()?.short ?: "parent"
-            val currentId = entry?.id?.short ?: "current"
-
-            // Create diff UI on EDT with loaded content
-            ApplicationManager.getApplication().invokeLater {
-                val contentFactory = DiffContentFactory.getInstance()
-                val diffManager = DiffManager.getInstance()
-
-                val content1 = if (beforePath != null && beforeContent.isNotEmpty()) {
-                    contentFactory.create(project, beforeContent, beforePath.fileType)
-                } else {
-                    contentFactory.createEmpty()
-                }
-
-                val content2 = if (afterPath != null && afterContent.isNotEmpty()) {
-                    contentFactory.create(project, afterContent, afterPath.fileType)
-                } else {
-                    contentFactory.createEmpty()
-                }
-
-                val diffRequest = SimpleDiffRequest(
-                    fileName,
-                    content1,
-                    content2,
-                    "${beforePath?.name ?: JujutsuBundle.message("diff.title.before")} ($parentId)",
-                    "${afterPath?.name ?: JujutsuBundle.message("diff.title.after")} ($currentId)"
-                )
-
-                diffManager.showDiff(project, diffRequest)
-            }
-        }
-    }
-
-    private fun openFile(change: Change) {
-        val virtualFile = change.filePath?.virtualFile ?: return
-
-        FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, virtualFile), true)
-    }
-
     private fun showContextMenu(comp: Component, x: Int, y: Int) {
-        val selectedChange = changesTree.selectedChanges.firstOrNull() ?: return
-        val entry = currentEntry ?: return
+        if (changesTree.selectedChanges.isEmpty()) return
 
-        val actionGroup = DefaultActionGroup().apply {
-            add(
-                object : DumbAwareAction(
-                    JujutsuBundle.message("action.show.diff"),
-                    null,
-                    AllIcons.Actions.Diff
-                ) {
-                    override fun actionPerformed(e: AnActionEvent) {
-                        showDiff(selectedChange)
-                    }
-                }
-            )
-            add(
-                object : DumbAwareAction(
-                    JujutsuBundle.message("action.open.file"),
-                    null,
-                    AllIcons.Actions.EditSource
-                ) {
-                    override fun actionPerformed(e: AnActionEvent) {
-                        openFile(selectedChange)
-                    }
-                }
-            )
-            addSeparator()
-            add(
-                object : DumbAwareAction(
-                    JujutsuBundle.message("action.restore.to.revision"),
-                    JujutsuBundle.message("action.restore.to.revision.description"),
-                    AllIcons.Actions.Rollback
-                ) {
-                    override fun actionPerformed(e: AnActionEvent) {
-                        restoreToRevision(selectedChange, entry)
-                    }
-                }
-            )
-        }
+        val actionManager = ActionManager.getInstance()
+        val group = fileChangeActionGroup()
 
-        val popupMenu = ActionManager.getInstance().createActionPopupMenu(
-            "JujutsuCommitDetailsChangesContextMenu",
-            actionGroup
-        )
-
+        val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.CHANGES_VIEW_POPUP, group)
+        popupMenu.setTargetComponent(changesTree)
         popupMenu.component.show(comp, x, y)
-    }
-
-    private fun restoreToRevision(change: Change, entry: LogEntry) {
-        val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
-        val fileName = filePath.name
-        val id = entry.id
-        val repo = entry.repo
-
-        // Show confirmation dialog
-        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileName, id.short)
-        val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", id.short)
-        if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
-            return
-        }
-
-        repo.commandExecutor.createCommand {
-            restore(listOf(repo.getRelativePath(filePath)), id)
-        }
-            .onSuccess {
-                filePath.virtualFile?.let { vf ->
-                    VfsUtil.markDirtyAndRefresh(false, false, true, vf)
-                }
-                repo.invalidate()
-                log.info("Restored $fileName to revision ${id.short}")
-            }
-            .onFailureTellUser("action.restore.to.revision.error", project, log)
-            .executeAsync()
     }
 
     /**
