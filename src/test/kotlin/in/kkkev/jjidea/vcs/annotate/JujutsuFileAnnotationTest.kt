@@ -25,7 +25,7 @@ import org.junit.jupiter.api.Test
  *
  * Manual testing verification:
  * 1. Open a file in the editor
- * 2. Right-click → Annotate (or use JujutsuAnnotateAction)
+ * 2. Right-click → Annotate (uses platform's Annotate action)
  * 3. Verify annotations display without "Slow operations are prohibited on EDT" errors
  * 4. Verify no performance warnings in IDE log
  */

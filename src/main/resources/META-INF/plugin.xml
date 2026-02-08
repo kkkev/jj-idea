@@ -80,11 +80,15 @@
         </action>
 
         <!-- Show Diff action - defined before EditorGroup so it can be referenced -->
-        <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.vcs.actions.ShowChangesDiffAction"/>
+        <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.vcs.actions.ShowChangesDiffAction">
+            <keyboard-shortcut first-keystroke="control D" keymap="$default"/>
+            <keyboard-shortcut first-keystroke="command D" keymap="Mac OS X"/>
+            <keyboard-shortcut first-keystroke="command D" keymap="Mac OS X 10.5+"/>
+        </action>
 
         <!-- Jujutsu action group in editor context menu -->
         <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.vcs.actions.JujutsuEditorActionGroup" popup="true">
-            <action id="Jujutsu.EditorAnnotate" class="in.kkkev.jjidea.vcs.actions.JujutsuAnnotateAction"/>
+            <reference ref="Annotate"/>
             <reference ref="Jujutsu.ShowChangesDiff"/>
             <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.vcs.actions.JujutsuCompareWithBranchAction"/>
             <reference ref="Vcs.ShowTabbedFileHistory"/>
