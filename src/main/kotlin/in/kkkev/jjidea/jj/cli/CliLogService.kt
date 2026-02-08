@@ -209,7 +209,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val currentWorkingCopy = booleanField("current_working_copy")
         val conflict = booleanField("conflict")
         val empty = booleanField("empty")
-        val bookmarks = singleField("""bookmarks.map(|b| b.name()).join(",")""") { it.splitByComma(::Bookmark) }
+        val bookmarks = singleField(
+            """bookmarks.map(|b| if(b.remote(), b.name() ++ "@" ++ b.remote(), b.name())).join(",")"""
+        ) { it.splitByComma(::Bookmark) }
         val parents = singleField(
             """
                 |parents.map(|c|
