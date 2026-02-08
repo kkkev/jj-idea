@@ -7,15 +7,26 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ApplicationManager.getApplication
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RevisionExpression
+import `in`.kkkev.jjidea.vcs.isJujutsu
+import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Action to show diff for selected file changes.
+ *
+ * Works in three contexts:
+ * 1. Working copy changes view: shows diff between @- and @ (editable)
+ * 2. Historical log changes view: shows diff between parent and revision (read-only)
+ * 3. Project view/editor: shows diff between @- and local file (editable)
+ *
  * Registered in plugin.xml and used via ActionManager lookup.
  */
 class ShowChangesDiffAction : DumbAwareAction(
@@ -27,14 +38,58 @@ class ShowChangesDiffAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val change = e.changes.firstOrNull() ?: return
+        val change = e.changes.firstOrNull()
         val logEntry = e.logEntry
 
-        showChangesDiff(project, change, logEntry)
+        if (change != null) {
+            // Changes context (working copy or historical)
+            showChangesDiff(project, change, logEntry)
+        } else {
+            // Project view/editor context - show diff for selected file
+            val file = e.file ?: return
+            showFileDiff(project, file)
+        }
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabled = e.project != null && e.changes.isNotEmpty()
+        val hasChanges = e.changes.isNotEmpty()
+        val hasJujutsuFile = e.file?.isJujutsu == true
+
+        // Show in changes context OR when in a jj project with a file selected
+        e.presentation.isEnabledAndVisible = hasChanges || hasJujutsuFile
+    }
+}
+
+/**
+ * Show diff for a file in project view/editor context.
+ * Compares file at @- with the local working copy (editable).
+ */
+fun showFileDiff(project: Project, file: VirtualFile) {
+    val parentRevision = RevisionExpression("@-")
+    getApplication().executeOnPooledThread {
+        val repo = file.jujutsuRepository
+        val relPath = repo.getRelativePath(file)
+        val revisionResult = repo.commandExecutor.show(relPath, parentRevision)
+        val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
+
+        getApplication().invokeLater {
+            val contentFactory = DiffContentFactory.getInstance()
+            val localContent = if (file.exists()) {
+                contentFactory.create(project, file)
+            } else {
+                contentFactory.createEmpty()
+            }
+
+            val diffRequest = SimpleDiffRequest(
+                file.name,
+                contentFactory.create(project, revisionContent, file.fileType),
+                localContent,
+                "${file.name} (@-)",
+                "${file.name} (@)"
+            )
+
+            DiffManager.getInstance().showDiff(project, diffRequest)
+        }
     }
 }
 
@@ -82,8 +137,8 @@ fun showChangesDiff(project: Project, change: Change, logEntry: LogEntry?) {
             val afterName = afterPath?.name ?: JujutsuBundle.message("diff.title.after")
             "$beforeName (@-)" to "$afterName (@)"
         } else {
-            val parentId = logEntry?.parentIds?.firstOrNull()?.short ?: "parent"
-            val currentId = logEntry?.id?.short ?: "current"
+            val parentId = logEntry.parentIds.firstOrNull()?.short ?: "parent"
+            val currentId = logEntry.id.short
             val beforeName = beforePath?.name ?: JujutsuBundle.message("diff.title.before")
             val afterName = afterPath?.name ?: JujutsuBundle.message("diff.title.after")
             "$beforeName ($parentId)" to "$afterName ($currentId)"

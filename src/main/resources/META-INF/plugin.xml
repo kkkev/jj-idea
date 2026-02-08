@@ -79,9 +79,13 @@
             <!-- Not added to VcsGroup to avoid StandardVcsGroup requirement -->
         </action>
 
+        <!-- Show Diff action - defined before EditorGroup so it can be referenced -->
+        <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.vcs.actions.ShowChangesDiffAction"/>
+
         <!-- Jujutsu action group in editor context menu -->
         <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.vcs.actions.JujutsuEditorActionGroup" popup="true">
             <action id="Jujutsu.EditorAnnotate" class="in.kkkev.jjidea.vcs.actions.JujutsuAnnotateAction"/>
+            <reference ref="Jujutsu.ShowChangesDiff"/>
             <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.vcs.actions.JujutsuCompareWithBranchAction"/>
             <reference ref="Vcs.ShowTabbedFileHistory"/>
             <action id="Jujutsu.ShowHistoryForSelection" class="in.kkkev.jjidea.vcs.actions.JujutsuShowHistoryForSelectionAction"/>
@@ -97,9 +101,11 @@
         </action>
 
         <!-- File change context menu actions for custom panels -->
-        <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.vcs.actions.ShowChangesDiffAction"/>
         <action id="Jujutsu.OpenChangeFile" class="in.kkkev.jjidea.vcs.actions.OpenChangeFileAction"/>
         <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.vcs.actions.RestoreToChangeAction"/>
+        <action id="Jujutsu.CompareWithLocal" class="in.kkkev.jjidea.vcs.actions.CompareWithLocalAction"/>
+        <action id="Jujutsu.CompareBeforeWithLocal" class="in.kkkev.jjidea.vcs.actions.CompareBeforeWithLocalAction"/>
+        <action id="Jujutsu.OpenRepositoryVersion" class="in.kkkev.jjidea.vcs.actions.OpenRepositoryVersionAction"/>
     </actions>
 
 </idea-plugin>
