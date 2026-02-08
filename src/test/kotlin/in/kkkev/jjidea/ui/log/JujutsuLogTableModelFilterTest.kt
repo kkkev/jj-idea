@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
+import io.mockk.every
 import io.mockk.mockk
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.BeforeEach
@@ -588,6 +589,221 @@ class JujutsuLogTableModelFilterTest {
             val bookmarks = model.getAllBookmarks()
 
             bookmarks.shouldBeEmpty()
+        }
+    }
+
+    @Nested
+    inner class `Root filter` {
+        private lateinit var repo1: JujutsuRepository
+        private lateinit var repo2: JujutsuRepository
+        private lateinit var repo3: JujutsuRepository
+
+        @BeforeEach
+        fun setupRepos() {
+            repo1 = mockk<JujutsuRepository> {
+                every { displayName } returns "frontend"
+            }
+            repo2 = mockk<JujutsuRepository> {
+                every { displayName } returns "backend"
+            }
+            repo3 = mockk<JujutsuRepository> {
+                every { displayName } returns "shared"
+            }
+        }
+
+        private fun createEntryInRepo(
+            changeId: String,
+            repo: JujutsuRepository,
+            description: String = "Test commit"
+        ) = LogEntry(
+            repo = repo,
+            id = ChangeId(changeId, changeId, null),
+            commitId = CommitId("0000000000000000000000000000000000000000"),
+            underlyingDescription = description,
+            bookmarks = emptyList(),
+            parentIdentifiers = emptyList(),
+            isWorkingCopy = false,
+            hasConflict = false,
+            isEmpty = false,
+            authorTimestamp = Instant.fromEpochMilliseconds(1000000000L),
+            committerTimestamp = null,
+            author = alice,
+            committer = null
+        )
+
+        @Test
+        fun `filter by single root`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Frontend commit 1"),
+                    createEntryInRepo("def456", repo2, "Backend commit"),
+                    createEntryInRepo("ghi789", repo1, "Frontend commit 2")
+                )
+            )
+
+            model.setRootFilter(setOf(repo1))
+
+            model.rowCount shouldBe 2
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "ghi789"
+        }
+
+        @Test
+        fun `filter by multiple roots`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Frontend commit"),
+                    createEntryInRepo("def456", repo2, "Backend commit"),
+                    createEntryInRepo("ghi789", repo3, "Shared commit")
+                )
+            )
+
+            model.setRootFilter(setOf(repo1, repo2))
+
+            model.rowCount shouldBe 2
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "def456"
+        }
+
+        @Test
+        fun `empty root filter shows all entries`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Frontend commit"),
+                    createEntryInRepo("def456", repo2, "Backend commit"),
+                    createEntryInRepo("ghi789", repo3, "Shared commit")
+                )
+            )
+
+            model.setRootFilter(emptySet())
+
+            model.rowCount shouldBe 3
+        }
+
+        @Test
+        fun `getAllRoots returns unique roots`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Frontend commit 1"),
+                    createEntryInRepo("def456", repo2, "Backend commit"),
+                    createEntryInRepo("ghi789", repo1, "Frontend commit 2"),
+                    createEntryInRepo("jkl012", repo3, "Shared commit")
+                )
+            )
+
+            val roots = model.getAllRoots()
+
+            roots.size shouldBe 3
+            roots.toSet() shouldBe setOf(repo1, repo2, repo3)
+        }
+
+        @Test
+        fun `getAllRoots preserves order of first occurrence`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo2, "Backend commit"),
+                    createEntryInRepo("def456", repo1, "Frontend commit"),
+                    createEntryInRepo("ghi789", repo2, "Backend commit 2")
+                )
+            )
+
+            val roots = model.getAllRoots()
+
+            // distinct() preserves order of first occurrence
+            roots shouldContainExactly listOf(repo2, repo1)
+        }
+
+        @Test
+        fun `root filter combines with other filters`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Add feature"),
+                    createEntryInRepo("def456", repo1, "Fix bug"),
+                    createEntryInRepo("ghi789", repo2, "Add widget")
+                )
+            )
+
+            model.setRootFilter(setOf(repo1))
+            model.setFilter("Add")
+
+            model.rowCount shouldBe 1
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+        }
+
+        @Test
+        fun `clearing root filter restores filtered entries`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Frontend commit"),
+                    createEntryInRepo("def456", repo2, "Backend commit")
+                )
+            )
+
+            model.setRootFilter(setOf(repo1))
+            model.rowCount shouldBe 1
+
+            model.setRootFilter(emptySet())
+            model.rowCount shouldBe 2
+        }
+    }
+
+    @Nested
+    inner class `Sorting` {
+        @Test
+        fun `entries maintain insertion order when no explicit sort`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First"),
+                    createEntry("def456", "Second"),
+                    createEntry("ghi789", "Third")
+                )
+            )
+
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "def456"
+            model.getEntry(2)?.id?.short shouldBe "ghi789"
+        }
+
+        @Test
+        fun `filtered entries maintain relative order`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "Feature one"),
+                    createEntry("def456", "Bug fix"),
+                    createEntry("ghi789", "Feature two"),
+                    createEntry("jkl012", "Another fix")
+                )
+            )
+
+            model.setFilter("Feature")
+
+            // Filtered entries should maintain their relative order
+            model.rowCount shouldBe 2
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "ghi789"
+        }
+
+        @Test
+        fun `appendEntries preserves existing order and adds at end`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First"),
+                    createEntry("def456", "Second")
+                )
+            )
+
+            model.appendEntries(
+                listOf(
+                    createEntry("ghi789", "Third"),
+                    createEntry("jkl012", "Fourth")
+                )
+            )
+
+            model.rowCount shouldBe 4
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "def456"
+            model.getEntry(2)?.id?.short shouldBe "ghi789"
+            model.getEntry(3)?.id?.short shouldBe "jkl012"
         }
     }
 }
