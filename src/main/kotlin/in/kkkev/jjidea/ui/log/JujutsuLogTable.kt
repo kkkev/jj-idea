@@ -462,7 +462,9 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /**
      * Get all unique authors in the current entries (for filter UI).
      */
-    fun getAllAuthors(): List<String> = entries.mapNotNull { it.author?.email?.takeIf(String::isNotBlank) }.distinct().sorted()
+    fun getAllAuthors(): List<String> = entries.mapNotNull {
+        it.author?.email?.takeIf(String::isNotBlank)
+    }.distinct().sorted()
 
     /**
      * Get all unique bookmarks in the current entries (for filter UI).
