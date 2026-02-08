@@ -5,8 +5,8 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleColoredComponent.getTextBaseLine
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
-import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.GraphicsTextCanvas
 import `in`.kkkev.jjidea.ui.JujutsuColors
 import `in`.kkkev.jjidea.ui.append

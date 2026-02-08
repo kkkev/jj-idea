@@ -4,8 +4,8 @@ import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.Shortenable
 import kotlinx.datetime.Instant
 

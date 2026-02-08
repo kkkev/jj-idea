@@ -8,8 +8,8 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
-import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.JujutsuColors
 import `in`.kkkev.jjidea.ui.TextCanvas

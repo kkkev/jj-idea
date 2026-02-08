@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 class JujutsuLogEntryTest {
     companion object {
         val CHANGE_ID = ChangeId("qpvuntsm", "qp", 2)
-        val COMMIT_ID = CommitId("abc123", 2)
+        val COMMIT_ID = CommitId("abc123", "ab")
 
         val JUJUTSU_ROOT = mockk<JujutsuRepository>()
 

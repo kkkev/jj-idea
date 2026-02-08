@@ -6,9 +6,9 @@ import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import kotlinx.datetime.Instant
 import java.awt.Component

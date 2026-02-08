@@ -26,7 +26,7 @@ class ChangeIdTest {
         changeId.full shouldBe "qpvuntsm"
         changeId.short shouldBe "qp"
         changeId.remainder shouldBe "vuntsm"
-        changeId.toString() shouldBe "qp"
+        changeId.toString() shouldBe "qpvuntsm"
     }
 
     @Test
