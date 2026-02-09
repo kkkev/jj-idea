@@ -23,19 +23,15 @@ import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.ui.HyperlinkLabel
-import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.JujutsuChangesTree
-import `in`.kkkev.jjidea.vcs.actions.fileChangeActionGroup
-import `in`.kkkev.jjidea.vcs.actions.showChangesDiff
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.CardLayout
-import java.awt.Component
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.Box
@@ -281,7 +277,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun setupTreeInteractions() {
-        // Single-click: open file in preview tab
+        // Single-click: open file in preview tab (unique to working copy panel)
         changesTree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
                 if (e.clickCount == 1 && !e.isPopupTrigger) {
@@ -290,28 +286,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             }
         })
 
-        // Double-click: show diff (working copy context, no logEntry)
-        changesTree.setDoubleClickHandler { _ ->
-            getSelectedChange()?.let {
-                showChangesDiff(project, it, null)
-                true
-            } ?: false
-        }
-
-        // Enter key: show diff (working copy context, no logEntry)
-        changesTree.setEnterKeyHandler {
-            getSelectedChange()?.let {
-                showChangesDiff(project, it, null)
-                true
-            } ?: false
-        }
-
-        // Right-click context menu
-        changesTree.addMouseListener(object : PopupHandler() {
-            override fun invokePopup(comp: Component, x: Int, y: Int) {
-                showContextMenu(comp, x, y)
-            }
-        })
+        changesTree.installHandlers()
     }
 
     private fun getSelectedChange() = changesTree.selectedChanges.firstOrNull()
@@ -401,17 +376,6 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         ApplicationManager.getApplication().invokeLater {
             OpenFileDescriptor(project, virtualFile).navigate(true)
         }
-    }
-
-    private fun showContextMenu(component: Component, x: Int, y: Int) {
-        if (getSelectedChange() == null) return
-
-        val actionManager = ActionManager.getInstance()
-        val group = fileChangeActionGroup()
-
-        val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.CHANGES_VIEW_POPUP, group)
-        popupMenu.setTargetComponent(changesTree)
-        popupMenu.component.show(component, x, y)
     }
 
     private fun loadCollapsedPaths(): MutableSet<String> {

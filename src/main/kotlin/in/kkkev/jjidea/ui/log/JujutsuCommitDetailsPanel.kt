@@ -3,14 +3,12 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.ide.CommonActionsManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.OnePixelSplitter
-import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
@@ -20,10 +18,7 @@ import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.*
 import `in`.kkkev.jjidea.vcs.actions.JujutsuDataKeys
-import `in`.kkkev.jjidea.vcs.actions.fileChangeActionGroup
-import `in`.kkkev.jjidea.vcs.actions.showChangesDiff
 import java.awt.BorderLayout
-import java.awt.Component
 import javax.swing.JEditorPane
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -121,45 +116,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
     }
 
     private fun setupTreeInteractions() {
-        // Double-click to show diff
-        changesTree.setDoubleClickHandler {
-            changesTree.selectedChanges.firstOrNull()?.let { change ->
-                showChangesDiff(project, change, currentEntry)
-                true
-            } ?: false
-        }
-
-        // Enter key to show diff
-        changesTree.setEnterKeyHandler {
-            changesTree.selectedChanges.firstOrNull()?.let { change ->
-                showChangesDiff(project, change, currentEntry)
-                true
-            } ?: false
-        }
-
-        // Context menu
-        changesTree.addMouseListener(
-            object : PopupHandler() {
-                override fun invokePopup(
-                    comp: Component,
-                    x: Int,
-                    y: Int
-                ) {
-                    showContextMenu(comp, x, y)
-                }
-            }
-        )
-    }
-
-    private fun showContextMenu(comp: Component, x: Int, y: Int) {
-        if (changesTree.selectedChanges.isEmpty()) return
-
-        val actionManager = ActionManager.getInstance()
-        val group = fileChangeActionGroup()
-
-        val popupMenu = actionManager.createActionPopupMenu(ActionPlaces.CHANGES_VIEW_POPUP, group)
-        popupMenu.setTargetComponent(changesTree)
-        popupMenu.component.show(comp, x, y)
+        changesTree.installHandlers()
     }
 
     /**

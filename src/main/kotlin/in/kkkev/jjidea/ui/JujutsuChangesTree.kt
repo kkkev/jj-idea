@@ -1,7 +1,10 @@
 package `in`.kkkev.jjidea.ui
 
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
@@ -11,6 +14,7 @@ import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.DIRECTORY_GROUPING
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.REPOSITORY_GROUPING
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
+import `in`.kkkev.jjidea.vcs.actions.fileChangeActionGroup
 import javax.swing.tree.DefaultTreeModel
 
 /**
@@ -50,5 +54,24 @@ class JujutsuChangesTree(project: Project) : AsyncChangesTreeImpl.Changes(projec
         sink[VcsDataKeys.CHANGES] = selectedChanges.toTypedArray()
         sink[CommonDataKeys.VIRTUAL_FILE_ARRAY] = selectedChanges.mapNotNull { it.virtualFile }.toTypedArray()
         additionalDataProvider?.invoke(sink)
+    }
+
+    /**
+     * Install standard handlers for double-click, Enter key, and context menu.
+     * Uses the Diff.ShowDiff action which reads VcsDataKeys.CHANGES from our uiDataSnapshot.
+     */
+    fun installHandlers() {
+        val diffAction = ActionManager.getInstance().getAction("Diff.ShowDiff")!!
+        val invokeDiff: () -> Boolean = {
+            if (selectedChanges.isNotEmpty()) {
+                ActionUtil.invokeAction(diffAction, this, ActionPlaces.CHANGES_VIEW_POPUP, null, null)
+                true
+            } else {
+                false
+            }
+        }
+        setDoubleClickHandler { invokeDiff() }
+        setEnterKeyHandler { invokeDiff() }
+        installPopupHandler(fileChangeActionGroup())
     }
 }
