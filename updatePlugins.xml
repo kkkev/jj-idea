@@ -1,22 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.1.45/jj-idea-0.1.45.zip" version="0.1.45">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.1.46/jj-idea-0.1.46.zip" version="0.1.46">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
-      Native integration with Jujutsu (jj) version control system.
+      <p>Native IntelliJ integration for <a href="https://jj-vcs.github.io/jj/">Jujutsu (jj)</a>, a Git-compatible version control system with a fundamentally different approach to working with code.</p>
 
-      Features:
-      - JJ-native workflow tool window (left side)
-      - Describe-first workflow support
-      - Continuous commit workflow
-      - Working copy status and diffs
-      - Commands: jj describe, jj new
+      <h3>Why Jujutsu?</h3>
+      <p>Jujutsu treats your working copy as a commit—always. No staging area, no "dirty" state. Just describe what you're working on and keep coding.</p>
+
+      <h3>Key Features</h3>
+      <ul>
+          <li><b>Describe-First Workflow</b> — Working Copy tool window for describing current work and creating new changes.</li>
+          <li><b>Custom Log View</b> — Visual commit graph with inline change IDs, descriptions, and bookmarks.</li>
+          <li><b>Change Operations</b> — Edit, abandon, and describe changes directly from the log.</li>
+          <li><b>File History &amp; Annotations</b> — Full file history with diff viewer and line-by-line blame.</li>
+          <li><b>Multi-Repository Support</b> — Work with multiple JJ repositories in a single project.</li>
+          <li><b>Real-Time Status</b> — Auto-refresh keeps the UI in sync as you edit files.</li>
+      </ul>
+
+      <p><a href="https://github.com/kkkev/jj-idea">GitHub</a> · <a href="https://github.com/kkkev/jj-idea/issues">Issues</a></p>
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.1.45</h3>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.1.45">release notes</a> for details.</p>
+      <h3>0.1.46</h3>
+      
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.1.46">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
