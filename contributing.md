@@ -1,3 +1,30 @@
+## Contributing Changes
+
+When making changes that affect users (features, fixes, behavior changes):
+
+1. Add an entry to the `[Unreleased]` section of `CHANGELOG.md`
+2. Use the appropriate section: **Added**, **Fixed**, **Changed**, or **Removed**
+
+CI will fail if you change source code without updating the changelog. For internal changes (refactoring, tests, docs), add `[skip changelog]` to your commit message.
+
+## Release Process (Maintainers)
+
+Run the release script:
+
+```bash
+./scripts/release.sh 0.2.0
+```
+
+The script will:
+- Move `[Unreleased]` content to the new version section
+- Update `build.gradle.kts` version
+- Verify the build passes
+- Create and push the tag
+
+GitHub Actions then creates the GitHub release with changelog notes.
+
+After the release, update `build.gradle.kts` to the next snapshot version (e.g., `0.3.0-SNAPSHOT`).
+
 ## Terminology
 - A **root** is an IDEA VCS root - a folder in the project that has its own VCS configuration, defined
 in IDEA's VCS/Directory Mappings configuration. A Jujutsu root points to the same directory as a Jujutsu repository.

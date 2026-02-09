@@ -3,6 +3,7 @@ name: Build and Release
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
 
@@ -10,6 +11,60 @@ permissions:
   contents: write
 
 jobs:
+  changelog-check:
+    # Check that changelog is updated when source code changes
+    # Skip for: tags, [skip changelog] in commit message, or no source changes
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for skip changelog flag
+        id: skip-check
+        run: |
+          # Check commit message for [skip changelog]
+          if git log --format=%B -n 1 ${{ github.sha }} | grep -qi '\[skip changelog\]'; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Skipping changelog check: [skip changelog] found in commit message"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check changelog updated
+        if: steps.skip-check.outputs.skip != 'true'
+        run: |
+          # Get the base ref for comparison
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            BASE_SHA=${{ github.event.pull_request.base.sha }}
+          else
+            BASE_SHA=${{ github.event.before }}
+          fi
+
+          # Check if source code changed
+          SOURCE_CHANGED=$(git diff --name-only $BASE_SHA ${{ github.sha }} -- 'src/main/**' | head -1)
+
+          if [ -n "$SOURCE_CHANGED" ]; then
+            echo "Source code changed, checking changelog..."
+
+            # Check if CHANGELOG.md was updated
+            CHANGELOG_CHANGED=$(git diff --name-only $BASE_SHA ${{ github.sha }} -- 'CHANGELOG.md' | head -1)
+
+            if [ -z "$CHANGELOG_CHANGED" ]; then
+              echo "::error::Source code changed but CHANGELOG.md was not updated."
+              echo "::error::Please add an entry to the [Unreleased] section of CHANGELOG.md."
+              echo "::error::If this change doesn't need a changelog entry (refactoring, tests, etc.),"
+              echo "::error::add [skip changelog] to your commit message."
+              exit 1
+            else
+              echo "Changelog was updated. Check passed."
+            fi
+          else
+            echo "No source code changes detected. Skipping changelog check."
+          fi
+
   build:
     runs-on: ubuntu-latest
 
@@ -31,11 +86,19 @@ jobs:
       - name: Calculate version
         id: version
         run: |
-          # Use run number for patch version: 0.1.{run_number}
-          VERSION="0.1.${{ github.run_number }}"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            # Tagged release: use tag version (e.g., v0.2.0 -> 0.2.0)
+            VERSION=${GITHUB_REF#refs/tags/v}
+            IS_RELEASE=true
+          else
+            # Development build: use snapshot version
+            VERSION="0.2.${{ github.run_number }}-SNAPSHOT"
+            IS_RELEASE=false
+          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "tag=v${VERSION}" >> $GITHUB_OUTPUT
-          echo "Calculated version: ${VERSION}"
+          echo "is_release=${IS_RELEASE}" >> $GITHUB_OUTPUT
+          echo "Calculated version: ${VERSION} (release: ${IS_RELEASE})"
 
       - name: Update version in build.gradle.kts
         run: |
@@ -55,17 +118,31 @@ jobs:
           path: build/distributions/*.zip
           retention-days: 30
 
-      # Only create release on push to main/master (not on PRs)
+      - name: Extract changelog for release
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          # Extract section between ## [X.Y.Z] and next ## [ or link reference section
+          # Uses awk to find the version section, skip header, stop before next section or links
+          NOTES=$(awk "
+            /^## \[${VERSION}\]/ { found=1; next }
+            found && /^## \[/ { exit }
+            found && /^\[.+\]:/ { exit }
+            found { print }
+          " CHANGELOG.md)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # Only create release on tag push
       - name: Create GitHub Release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
+          tag_name: ${{ github.ref_name }}
           name: Release ${{ steps.version.outputs.version }}
-          body: |
-            Automated release of version ${{ steps.version.outputs.version }}
-
-            Commit: ${{ github.sha }}
+          body: ${{ steps.changelog.outputs.notes }}
           files: build/distributions/*.zip
           draft: false
           prerelease: false
@@ -73,11 +150,16 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update plugin repository XML
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          TAG_NAME="${{ steps.version.outputs.tag }}"
+          TAG_NAME="${{ github.ref_name }}"
           PLUGIN_FILE="jj-idea-${VERSION}.zip"
+
+          # Extract changelog notes for change-notes element
+          CHANGE_NOTES="${{ steps.changelog.outputs.notes }}"
+          # Convert markdown to basic HTML
+          CHANGE_NOTES_HTML=$(echo "$CHANGE_NOTES" | sed 's/^### \(.*\)$/<h4>\1<\/h4>/g' | sed 's/^- \(.*\)$/<li>\1<\/li>/g' | sed 's/^$//g')
 
           cat > updatePlugins.xml << EOF
           <?xml version="1.0" encoding="UTF-8"?>
@@ -98,17 +180,18 @@ jobs:
               <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
               <change-notes><![CDATA[
                 <h3>${VERSION}</h3>
-                <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/${TAG_NAME}">release notes</a> for details.</p>
+                ${CHANGE_NOTES_HTML}
+                <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/${TAG_NAME}">full release notes</a> for details.</p>
               ]]></change-notes>
             </plugin>
           </plugins>
           EOF
 
       - name: Commit updated plugin repository XML
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add updatePlugins.xml
-          git commit -m "Update plugin repository for release ${TAG_NAME}" || echo "No changes to commit"
-          git push origin ${{ github.ref_name }}
+          git commit -m "Update plugin repository for release ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin HEAD:${{ github.event.repository.default_branch }}
