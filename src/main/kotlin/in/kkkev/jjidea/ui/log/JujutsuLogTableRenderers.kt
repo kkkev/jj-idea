@@ -53,7 +53,6 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
 
 /**
  * Renderer for separate Status column (conflict/empty indicators).
- * Matches the logic from JujutsuStatusColumn in VcsLogCustomColumns.
  */
 class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
     companion object {
@@ -153,7 +152,6 @@ class AuthorCellRenderer : TextCellRenderer<VcsUser>() {
 
 /**
  * Renderer for the Committer column.
- * Matches the logic from JujutsuCommitterColumn in VcsLogCustomColumns.
  */
 class CommitterCellRenderer : TextCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {

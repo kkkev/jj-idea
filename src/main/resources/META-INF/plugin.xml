@@ -32,12 +32,6 @@
         <!-- Use older VcsHistoryProvider instead for cleaner JJ-only UI -->
         <!-- <vcsLogFileHistoryHandler implementation="in.kkkev.jjidea.vcs.history.JujutsuLogFileHistoryHandler" order="first" /> -->
 
-        <!-- Custom VCS Log columns (order affects default layout) -->
-        <vcsLogCustomColumn implementation="in.kkkev.jjidea.vcs.log.JujutsuStatusColumn" />
-        <vcsLogCustomColumn implementation="in.kkkev.jjidea.vcs.log.JujutsuChangeIdColumn" />
-        <vcsLogCustomColumn implementation="in.kkkev.jjidea.vcs.log.JujutsuDescriptionColumn" />
-        <vcsLogCustomColumn implementation="in.kkkev.jjidea.vcs.log.JujutsuCommitterColumn" />
-
         <!-- Services -->
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
         <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel" />
