@@ -6,6 +6,17 @@ on:
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: false
+        type: choice
+        options:
+          - '' # snapshot build (default)
+          - patch
+          - minor
+          - major
 
 permissions:
   contents: write
@@ -13,8 +24,8 @@ permissions:
 jobs:
   changelog-check:
     # Check that changelog is updated when source code changes
-    # Skip for: tags, [skip changelog] in commit message, or no source changes
-    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    # Skip for: tags, workflow_dispatch releases, [skip changelog] in commit message, or no source changes
+    if: ${{ !startsWith(github.ref, 'refs/tags/') && inputs.bump == '' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -86,13 +97,46 @@ jobs:
       - name: Calculate version
         id: version
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          if [[ -n "${{ inputs.bump }}" ]]; then
+            # Manual release via workflow_dispatch - calculate next version
+            # Get latest version tag
+            LATEST_TAG=$(git tag -l 'v*' | sort -V | tail -1)
+            if [[ -z "$LATEST_TAG" ]]; then
+              LATEST_TAG="v0.0.0"
+            fi
+            # Parse version components
+            LATEST_VERSION=${LATEST_TAG#v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
+
+            # Bump based on input
+            case "${{ inputs.bump }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            IS_RELEASE=true
+            echo "Bumping from ${LATEST_VERSION} to ${VERSION} (${{ inputs.bump }})"
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             # Tagged release: use tag version (e.g., v0.2.0 -> 0.2.0)
             VERSION=${GITHUB_REF#refs/tags/v}
             IS_RELEASE=true
           else
-            # Development build: use snapshot version
-            VERSION="0.2.${{ github.run_number }}-SNAPSHOT"
+            # Development build: use snapshot version based on latest tag
+            LATEST_TAG=$(git tag -l 'v*' | sort -V | tail -1)
+            LATEST_VERSION=${LATEST_TAG#v}
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$LATEST_VERSION"
+            VERSION="${MAJOR}.${MINOR}.${{ github.run_number }}-SNAPSHOT"
             IS_RELEASE=false
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
@@ -119,7 +163,7 @@ jobs:
           retention-days: 30
 
       - name: Extract changelog for release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.version.outputs.is_release == 'true'
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -135,12 +179,13 @@ jobs:
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # Only create release on tag push
+      # Create release (from tag push or workflow_dispatch)
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.version.outputs.is_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           name: Release ${{ steps.version.outputs.version }}
           body: ${{ steps.changelog.outputs.notes }}
           files: build/distributions/*.zip
@@ -150,10 +195,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Update plugin repository XML
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.version.outputs.is_release == 'true'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          TAG_NAME="${{ github.ref_name }}"
+          TAG_NAME="${{ steps.version.outputs.tag }}"
           PLUGIN_FILE="jj-idea-${VERSION}.zip"
 
           # Extract changelog notes for change-notes element
@@ -196,7 +241,7 @@ jobs:
           EOF
 
       - name: Commit updated plugin repository XML
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: steps.version.outputs.is_release == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -204,11 +249,11 @@ jobs:
           git commit -m "Update plugin repository for release ${{ github.ref_name }}" || echo "No changes to commit"
           git push origin HEAD:${{ github.event.repository.default_branch }}
 
-      # Publish to JetBrains Marketplace on tagged releases
+      # Publish to JetBrains Marketplace on releases
       # Requires PUBLISH_TOKEN secret from JetBrains Hub (hub.jetbrains.com → Profile → Tokens)
       # Optional: CERTIFICATE_CHAIN, PRIVATE_KEY, PRIVATE_KEY_PASSWORD for plugin signing
       - name: Publish to JetBrains Marketplace
-        if: startsWith(github.ref, 'refs/tags/v') && env.PUBLISH_TOKEN != ''
+        if: steps.version.outputs.is_release == 'true' && env.PUBLISH_TOKEN != ''
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
