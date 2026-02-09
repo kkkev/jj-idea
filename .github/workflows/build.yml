@@ -196,14 +196,14 @@ jobs:
 
       - name: Update plugin repository XML
         if: steps.version.outputs.is_release == 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG_NAME: ${{ steps.version.outputs.tag }}
+          CHANGE_NOTES: ${{ steps.changelog.outputs.notes }}
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          TAG_NAME="${{ steps.version.outputs.tag }}"
           PLUGIN_FILE="jj-idea-${VERSION}.zip"
 
-          # Extract changelog notes for change-notes element
-          CHANGE_NOTES="${{ steps.changelog.outputs.notes }}"
-          # Convert markdown to basic HTML
+          # Convert markdown to basic HTML (safely via env var)
           CHANGE_NOTES_HTML=$(echo "$CHANGE_NOTES" | sed 's/^### \(.*\)$/<h4>\1<\/h4>/g' | sed 's/^- \(.*\)$/<li>\1<\/li>/g' | sed 's/^$//g')
 
           cat > updatePlugins.xml << EOF
