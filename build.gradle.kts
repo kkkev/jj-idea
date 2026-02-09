@@ -1,5 +1,52 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
+/**
+ * Extracts changelog notes from CHANGELOG.md for the given version.
+ * For SNAPSHOT versions, returns the [Unreleased] section.
+ * For release versions, returns the section for that specific version.
+ */
+fun extractChangelogNotes(version: String): String {
+    val changelogFile = file("CHANGELOG.md")
+    if (!changelogFile.exists()) {
+        return "<p>See <a href=\"https://github.com/kkkev/jj-idea/releases\">releases</a> for details.</p>"
+    }
+
+    val lines = changelogFile.readLines()
+    val isSnapshot = version.contains("-SNAPSHOT")
+    val targetVersion = if (isSnapshot) "Unreleased" else version.removeSuffix("-SNAPSHOT")
+
+    // Find the target section and extract content until the next section or link references
+    var inSection = false
+    val contentLines = mutableListOf<String>()
+
+    for (line in lines) {
+        when {
+            line.startsWith("## [$targetVersion]") -> inSection = true
+            inSection && (line.startsWith("## [") || line.matches(Regex("""\[.+\]:.*"""))) -> break
+            inSection -> contentLines.add(line)
+        }
+    }
+
+    val markdownContent = contentLines.joinToString("\n").trim()
+
+    if (markdownContent.isEmpty()) {
+        return if (isSnapshot) {
+            "<p>Development build. See <a href=\"https://github.com/kkkev/jj-idea/blob/master/CHANGELOG.md\">CHANGELOG.md</a> for upcoming changes.</p>"
+        } else {
+            "<p>See <a href=\"https://github.com/kkkev/jj-idea/releases/tag/v$version\">release notes</a> for details.</p>"
+        }
+    }
+
+    // Convert markdown to HTML
+    return markdownContent
+        .replace(Regex("""^### (.+)$""", RegexOption.MULTILINE), "<h4>$1</h4>")
+        .replace(Regex("""^- (.+)$""", RegexOption.MULTILINE), "<li>$1</li>")
+        .replace(Regex("""(<li>.*</li>\n?)+""")) { "<ul>${it.value}</ul>" }
+        .replace(Regex("""`([^`]+)`"""), "<code>$1</code>")
+        .replace("\n\n", "<br/><br/>")
+        .trim()
+}
+
 plugins {
     id("java")
     id("org.jetbrains.kotlin.jvm") version "2.1.0"
@@ -58,6 +105,7 @@ intellijPlatform {
             sinceBuild = "251"
             untilBuild = provider { null }
         }
+        changeNotes = provider { extractChangelogNotes(project.version.toString()) }
     }
 
     signing {
