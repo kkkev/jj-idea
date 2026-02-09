@@ -7,6 +7,7 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.*
+import java.util.PriorityQueue
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -18,7 +19,7 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * Unified loader that:
  * - Loads commits from all provided repositories concurrently
- * - Merges results into a single list sorted by timestamp (newest first)
+ * - Merges results using topological sort (children before parents) with timestamp as tiebreaker
  * - Updates the table model and graph on EDT
  * - Subscribes to changeSelection for handling selection requests
  */
@@ -123,8 +124,7 @@ class UnifiedJujutsuLogDataLoader(
                     return
                 }
 
-                allEntries = entriesByRepo.values.flatten()
-                    .sortedByDescending { it.authorTimestamp ?: it.committerTimestamp }
+                allEntries = topologicalSort(entriesByRepo.values.flatten())
 
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
                 graphNodes = graphBuilder.buildGraph(allEntries)
@@ -226,4 +226,65 @@ class UnifiedJujutsuLogDataLoader(
             requestSelection(savedSelection)
         }
     }
+}
+
+/**
+ * Topologically sort log entries so children appear before parents.
+ *
+ * Uses Kahn's algorithm with timestamp as tiebreaker for unrelated entries.
+ * This ensures the graph layout algorithm receives entries in the expected order
+ * (children before parents) while maintaining a sensible visual ordering.
+ *
+ * @param entries List of log entries from one or more repositories
+ * @return Entries sorted topologically (children before parents), with newer entries first among siblings
+ */
+internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
+    if (entries.isEmpty()) return emptyList()
+
+    // Build lookup maps
+    val entryById = entries.associateBy { it.id }
+    val entryIds = entryById.keys
+
+    // Count children for each entry (only counting children that are in our set)
+    val childCount = mutableMapOf<ChangeId, Int>()
+    for (entry in entries) {
+        childCount[entry.id] = 0
+    }
+    for (entry in entries) {
+        for (parentId in entry.parentIds) {
+            if (parentId in entryIds) {
+                childCount[parentId] = childCount.getValue(parentId) + 1
+            }
+        }
+    }
+
+    // Priority queue ordered by timestamp (newest first) for tiebreaking
+    val ready = PriorityQueue<LogEntry>(compareByDescending { it.authorTimestamp ?: it.committerTimestamp })
+
+    // Start with entries that have no children in the set
+    for (entry in entries) {
+        if (childCount[entry.id] == 0) {
+            ready.add(entry)
+        }
+    }
+
+    // Process entries in topological order
+    val result = mutableListOf<LogEntry>()
+    while (ready.isNotEmpty()) {
+        val entry = ready.poll()
+        result.add(entry)
+
+        // Decrement child count for each parent
+        for (parentId in entry.parentIds) {
+            if (parentId in entryIds) {
+                val newCount = childCount.getValue(parentId) - 1
+                childCount[parentId] = newCount
+                if (newCount == 0) {
+                    ready.add(entryById.getValue(parentId))
+                }
+            }
+        }
+    }
+
+    return result
 }
