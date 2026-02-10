@@ -349,4 +349,150 @@ class LayoutCalculatorTest {
         // oq should get lane 1, not lane 2
         layout.rows[6].lane shouldBe 1 // oq at lane 1 (reservation was cleared)
     }
+
+    // 12. Double merge scenario from jj-idea repo
+    // Structure: lur→(yyu,rnz), then later uxy→(vuw,uyy)
+    // Both rnz and uyy should use reserved lanes (pure merge)
+    @Test
+    fun `double merge scenario - nested pure merges`() {
+        val lur = "lur"
+        val yyu = "yyu"
+        val rnz = "rnz"
+        val ysy = "ysy"
+        val lts = "lts"
+        val rsu = "rsu"
+        val uxoy = "uxoy"
+        val uxy = "uxy"
+        val vuw = "vuw"
+        val uyy = "uyy"
+        val kpv = "kpv"
+        val kry = "kry"
+
+        val entries = listOf(
+            GraphEntry(lur, listOf(yyu, rnz)), // Row 0: merge
+            GraphEntry(yyu, listOf(ysy)), // Row 1
+            GraphEntry(rnz, listOf(ysy)), // Row 2
+            GraphEntry(ysy, listOf(lts)), // Row 3
+            GraphEntry(lts, listOf(rsu)), // Row 4
+            GraphEntry(rsu, listOf(uxoy)), // Row 5
+            GraphEntry(uxoy, listOf(uxy)), // Row 6
+            GraphEntry(uxy, listOf(vuw, uyy)), // Row 7: second merge
+            GraphEntry(vuw, listOf(kpv)), // Row 8
+            GraphEntry(uyy, listOf(kpv)), // Row 9
+            GraphEntry(kpv, listOf(kry)), // Row 10
+            GraphEntry(kry, emptyList()) // Row 11
+        )
+        val layout = calculator.calculate(entries)
+
+        // First merge: lur@0, rnz gets reserved lane 1
+        layout.rows[0].lane shouldBe 0 // lur
+        layout.rows[1].lane shouldBe 0 // yyu (not blocked, passthrough to rnz at lane 1)
+        layout.rows[2].lane shouldBe 1 // rnz (uses reserved lane)
+
+        // Linear section
+        layout.rows[3].lane shouldBe 0 // ysy
+        layout.rows[6].lane shouldBe 0 // uxoy
+
+        // Second merge: uxy@0, uyy gets reserved lane 1
+        layout.rows[7].lane shouldBe 0 // uxy
+        layout.rows[8].lane shouldBe 0 // vuw (should NOT be blocked)
+        layout.rows[9].lane shouldBe 1 // uyy (uses reserved lane, NOT lane 2)
+        layout.rows[10].lane shouldBe 0 // kpv
+    }
+
+    // 13. Same scenario with working copy at top
+    @Test
+    fun `double merge scenario with working copy - lanes should be same as without`() {
+        val txq = "txq" // Working copy
+        val lur = "lur"
+        val yyu = "yyu"
+        val rnz = "rnz"
+        val ysy = "ysy"
+        val lts = "lts"
+        val rsu = "rsu"
+        val uxoy = "uxoy"
+        val uxy = "uxy"
+        val vuw = "vuw"
+        val uyy = "uyy"
+        val kpv = "kpv"
+        val kry = "kry"
+
+        val entries = listOf(
+            GraphEntry(txq, listOf(lur)), // Row 0: working copy
+            GraphEntry(lur, listOf(yyu, rnz)), // Row 1: merge
+            GraphEntry(yyu, listOf(ysy)), // Row 2
+            GraphEntry(rnz, listOf(ysy)), // Row 3
+            GraphEntry(ysy, listOf(lts)), // Row 4
+            GraphEntry(lts, listOf(rsu)), // Row 5
+            GraphEntry(rsu, listOf(uxoy)), // Row 6
+            GraphEntry(uxoy, listOf(uxy)), // Row 7
+            GraphEntry(uxy, listOf(vuw, uyy)), // Row 8: second merge
+            GraphEntry(vuw, listOf(kpv)), // Row 9
+            GraphEntry(uyy, listOf(kpv)), // Row 10
+            GraphEntry(kpv, listOf(kry)), // Row 11
+            GraphEntry(kry, emptyList()) // Row 12
+        )
+        val layout = calculator.calculate(entries)
+
+        // All linear commits stay in lane 0
+        layout.rows[0].lane shouldBe 0 // txq
+        layout.rows[1].lane shouldBe 0 // lur
+
+        // First merge: rnz gets reserved lane 1
+        layout.rows[2].lane shouldBe 0 // yyu
+        layout.rows[3].lane shouldBe 1 // rnz
+
+        // Linear section
+        layout.rows[4].lane shouldBe 0 // ysy
+        layout.rows[7].lane shouldBe 0 // uxoy
+
+        // Second merge: uxy@0, uyy gets reserved lane 1
+        layout.rows[8].lane shouldBe 0 // uxy
+        layout.rows[9].lane shouldBe 0 // vuw (should NOT be blocked!)
+        layout.rows[10].lane shouldBe 1 // uyy (reserved lane)
+        layout.rows[11].lane shouldBe 0 // kpv
+
+        // Print actual values for debugging
+        println("=== Actual lane assignments ===")
+        entries.forEachIndexed { idx, entry ->
+            println(
+                "Row $idx (${entry.current}): lane ${layout.rows[idx].lane}, " +
+                    "parentLanes=${layout.rows[idx].parentLanes}, " +
+                    "passthroughs=${layout.rows[idx].passthroughLanes}"
+            )
+        }
+    }
+
+    // 14. Merge with intervening side branch makes both parents non-adjacent
+    //
+    // When a side branch (S) appears between a merge commit (M) and its parents,
+    // both parents become non-adjacent. Without the fix, both would get NEW lanes.
+    // With the fix, the first parent uses the child's lane.
+    //
+    // Structure:
+    //   M → P1, P2  (merge)
+    //   S → P2      (side branch - makes P1 non-adjacent!)
+    //   P1
+    //   P2
+    @Test
+    fun `merge with intervening side branch - first parent keeps child lane`() {
+        val m = "M"
+        val s = "S"
+        val p1 = "P1"
+        val p2 = "P2"
+
+        val entries = listOf(
+            GraphEntry(m, listOf(p1, p2)), // Row 0: merge
+            GraphEntry(s, listOf(p2)), // Row 1: side branch makes P1 non-adjacent!
+            GraphEntry(p1, emptyList()), // Row 2
+            GraphEntry(p2, emptyList()) // Row 3
+        )
+        val layout = calculator.calculate(entries)
+
+        // M at lane 0, first parent P1 uses child's lane (0), second parent P2 gets lane 1
+        layout.rows[0].lane shouldBe 0 // M
+        layout.rows[1].lane shouldBe 2 // S blocked by passthroughs at 0 and 1
+        layout.rows[2].lane shouldBe 0 // P1 - first parent keeps child's lane
+        layout.rows[3].lane shouldBe 1 // P2 - second parent gets new lane
+    }
 }

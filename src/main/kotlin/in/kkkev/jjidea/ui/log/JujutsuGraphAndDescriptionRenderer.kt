@@ -238,49 +238,17 @@ class JujutsuGraphAndDescriptionRenderer(
         }
 
         private fun drawPassThroughLines(g2d: Graphics2D, graphStartX: Int, laneWidth: Int): Set<Int> {
-            val model = table.model as? JujutsuLogTableModel ?: return emptySet()
-            val passThroughLanes = mutableSetOf<Int>()
+            val node = this.graphNode ?: return emptySet()
 
-            for (prevRow in 0 until row) {
-                val prevEntry = model.getEntry(prevRow) ?: continue
-                val prevNode = graphNodes[prevEntry.id] ?: continue
-
-                for ((parentIndex, parentId) in prevEntry.parentIds.withIndex()) {
-                    var parentRow = -1
-                    for (r in row + 1 until model.rowCount) {
-                        if (model.getEntry(r)?.id == parentId) {
-                            parentRow = r
-                            break
-                        }
-                    }
-
-                    if (parentRow > row) {
-                        val childLane = prevNode.lane
-                        val parentLane = prevNode.parentLanes.getOrNull(parentIndex) ?: childLane
-                        val isCrossLane = parentLane != childLane
-
-                        // Get parent node to check if it has multiple children
-                        val parentNode = graphNodes[parentId]
-                        val childHasMultipleParents = prevNode.parentLanes.size > 1
-                        val parentHasMultipleChildren = (parentNode?.childLanes?.size ?: 0) > 1
-
-                        // Classification:
-                        // - Fork or Fork+Merge (parent has multiple children): passthrough in child's lane
-                        // - Pure Merge (parent has one child, child has multiple parents): passthrough in parent's lane
-                        val isForkOrForkMerge = parentHasMultipleChildren && isCrossLane
-                        val isPureMerge = childHasMultipleParents && !parentHasMultipleChildren && isCrossLane
-
-                        val passLane = if (isPureMerge) parentLane else childLane
-                        val passX = graphStartX + laneWidth / 2 + passLane * laneWidth
-
-                        g2d.color = colorForLane(passLane)
-                        g2d.drawLine(passX, 0, passX, height)
-                        passThroughLanes.add(passLane)
-                    }
-                }
+            // Use pre-computed passthrough lanes from the algorithm
+            // The algorithm already determined which lanes have passthroughs at this row
+            for ((lane, color) in node.passThroughLanes) {
+                val passX = graphStartX + laneWidth / 2 + lane * laneWidth
+                g2d.color = color
+                g2d.drawLine(passX, 0, passX, height)
             }
 
-            return passThroughLanes
+            return node.passThroughLanes.keys
         }
 
         private fun drawCommitCircle(g2d: Graphics2D, node: GraphNode, x: Int, y: Int) {
@@ -310,9 +278,8 @@ class JujutsuGraphAndDescriptionRenderer(
             val currentEntry = model.getEntry(currentRow) ?: return
 
             // Draw incoming lines from children
-            // Classification based on whether this is a fork+merge or pure merge:
-            // - Fork or Fork+Merge (parent has multiple children): diagonal at parent's row from child's lane
-            // - Pure Merge (child has multiple parents, parent has one child): vertical from parent's lane
+            // Pure merge (child has multiple parents): passthrough was at parent's lane, draw vertical
+            // Fork/simple (child has one parent): passthrough was at child's lane, draw diagonal
             for (prevRow in 0 until currentRow) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
                 val prevNode = graphNodes[prevEntry.id] ?: continue
@@ -320,50 +287,37 @@ class JujutsuGraphAndDescriptionRenderer(
                 val parentIndex = prevEntry.parentIds.indexOf(currentEntry.id)
                 if (parentIndex >= 0) {
                     val childLane = prevNode.lane
-                    val isCrossLane = childLane != node.lane
                     val childHasMultipleParents = prevNode.parentLanes.size > 1
-                    val parentHasMultipleChildren = node.childLanes.size > 1
 
-                    // Fork+Merge: parent has multiple children, treat as fork (diagonal at parent's row)
-                    // Pure Merge: parent has one child, child has multiple parents (vertical in parent's lane)
-                    val isForkOrForkMerge = parentHasMultipleChildren && isCrossLane
-                    val isPureMerge = childHasMultipleParents && !parentHasMultipleChildren && isCrossLane
-
-                    if (isPureMerge) {
-                        // Pure Merge: line comes from parent's lane (vertical), diagonal was at child's row
-                        val connectionX = graphStartX + laneWidth / 2 + node.lane * laneWidth
-                        g2d.color = colorForLane(node.lane)
-                        g2d.drawLine(connectionX, 0, commitX, commitY)
+                    // Determine connection lane based on child's merge status
+                    val connectionLane = if (childHasMultipleParents) {
+                        // Pure merge: passthrough was at parent's lane
+                        node.lane
                     } else {
-                        // Fork, Fork+Merge, or same-lane: line comes from child's lane (diagonal at parent's row)
-                        val connectionX = graphStartX + laneWidth / 2 + childLane * laneWidth
-                        g2d.color = colorForLane(childLane)
-                        g2d.drawLine(connectionX, 0, commitX, commitY)
+                        // Fork/simple: passthrough was at child's lane
+                        childLane
                     }
+                    val connectionX = graphStartX + laneWidth / 2 + connectionLane * laneWidth
+                    g2d.color = colorForLane(connectionLane)
+                    g2d.drawLine(connectionX, 0, commitX, commitY)
                 }
             }
 
             // Draw outgoing lines to parents
-            // Need to check each parent to determine if it's a fork+merge or pure merge
-            for ((parentIndex, parentId) in currentEntry.parentIds.withIndex()) {
+            // Pure merge (child has multiple parents): diagonal at child's row
+            // Fork/simple (child has one parent): vertical at child's row, diagonal at parent's row
+            val childHasMultipleParents = node.parentLanes.size > 1
+
+            for ((parentIndex, _) in currentEntry.parentIds.withIndex()) {
                 val parentLane = node.parentLanes.getOrNull(parentIndex) ?: continue
-                val parentNode = graphNodes[parentId]
                 val parentX = graphStartX + laneWidth / 2 + parentLane * laneWidth
-                val isCrossLane = parentLane != node.lane
-                val childHasMultipleParents = node.parentLanes.size > 1
-                val parentHasMultipleChildren = (parentNode?.childLanes?.size ?: 0) > 1
 
-                // Fork+Merge: parent has multiple children, treat as fork (vertical in child's lane)
-                // Pure Merge: parent has one child, child has multiple parents (diagonal at child's row)
-                val isForkOrForkMerge = parentHasMultipleChildren && isCrossLane
-                val isPureMerge = childHasMultipleParents && !parentHasMultipleChildren && isCrossLane
-
-                if (isPureMerge) {
-                    // Pure Merge: diagonal at child's row to parent's lane, then vertical in parent's lane
+                if (parentLane != node.lane && childHasMultipleParents) {
+                    // Pure merge: diagonal at child's row to parent's lane
                     g2d.color = colorForLane(parentLane)
                     g2d.drawLine(commitX, commitY, parentX, height)
                 } else {
-                    // Fork, Fork+Merge, or same-lane: vertical down from commit (diagonal at parent's row)
+                    // Same lane or fork/simple: vertical down from commit
                     g2d.color = node.color
                     g2d.drawLine(commitX, commitY, commitX, height)
                 }

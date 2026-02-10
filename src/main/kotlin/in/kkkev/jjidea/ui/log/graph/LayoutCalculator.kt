@@ -98,12 +98,20 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 parentRow != null && parentRow > rowIndex + 1
             }
 
+            // Check if there are any adjacent parents (need to avoid blocking them)
+            val hasAdjacentParent = entry.parents.any { parentId ->
+                val parentRow = rowByChangeId[parentId]
+                parentRow == rowIndex + 1
+            }
+
             // Track which lanes are already used (passthroughs + this entry's lane + remaining reservations)
             var usedLanes = currentPassthroughLanes + lane + clearedReservedLanes.values.toSet()
             val newPassthroughs = mutableSetOf<Passthrough<I>>()
             var newReservedLanes = clearedReservedLanes
 
             val childHasMultipleParents = entry.parents.size > 1
+            // Track if ANY passthrough has used child's lane (prevents pure merge from also using it)
+            var childLaneUsed = false
 
             for (parentId in nonAdjacentParents) {
                 val parentHasOtherChildren = updatedChildrenByParent[parentId]
@@ -112,9 +120,18 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 // Classification:
                 // - Not a merge (child has 1 parent): use child's lane (simple/fork)
                 // - Fork+Merge (merge + parent has other children): use child's lane
-                // - Pure Merge (merge + parent has no other children): use NEW lane
+                // - Pure Merge (merge + parent has no other children):
+                //     - If there are adjacent parents: use NEW lane (avoid blocking adjacent parent)
+                //     - If NO adjacent parents AND child's lane not yet used: first uses child's lane
+                //     - Otherwise: use NEW lane
                 val passLane = if (!childHasMultipleParents || parentHasOtherChildren) {
                     // Simple, Fork, or Fork+Merge: use child's lane
+                    childLaneUsed = true
+                    lane
+                } else if (!hasAdjacentParent && !childLaneUsed) {
+                    // Pure Merge with no adjacent parents and child's lane free: use child's lane
+                    // (parent will find this lane via children, no reservation needed)
+                    childLaneUsed = true
                     lane
                 } else {
                     // Pure Merge: allocate new lane, reserve it for parent
