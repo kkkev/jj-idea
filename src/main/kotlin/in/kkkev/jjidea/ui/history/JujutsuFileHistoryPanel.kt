@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui.log
+package `in`.kkkev.jjidea.ui.history
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
@@ -9,13 +9,14 @@ import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
 import com.intellij.openapi.actionSystem.impl.FieldInplaceActionButtonLook
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.SearchFieldWithExtension
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.stateModel
-import `in`.kkkev.jjidea.vcs.jujutsuRepositories
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.ui.log.*
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.Box
@@ -26,28 +27,32 @@ import javax.swing.event.DocumentListener
 import javax.swing.table.TableColumn
 
 /**
- * Unified panel for Jujutsu commit log UI that shows commits from all repositories.
+ * Panel for displaying file history with the same styling as the custom log view.
  *
- * Layout:
- * - NORTH: Toolbar (refresh, filters including root filter)
- * - CENTER: Splitter with log table (top) and details panel (bottom)
+ * Reuses components from the log panel:
+ * - JujutsuLogTable (with showGraphColumn = false)
+ * - JujutsuLogTableModel
+ * - JujutsuCommitDetailsPanel
+ * - All standard renderers
  *
- * Unlike the single-root JujutsuLogPanel, this panel:
- * - Loads commits from all configured JJ repositories
- * - Provides a root filter to show/hide commits by repository
- * - Displays root indicators in the log entries
+ * Simplified toolbar: refresh, search (no paths/root filters since this is single-file).
  */
-class UnifiedJujutsuLogPanel(private val project: Project) :
+class JujutsuFileHistoryPanel(project: Project, filePath: FilePath, repo: JujutsuRepository) :
     JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
-    // Column manager for controlling column visibility
-    private val columnManager = JujutsuColumnManager()
+    // Column manager configured for file history (no graph column)
+    private val columnManager = JujutsuColumnManager().apply {
+        showGraphColumn = false
+        // Show change ID and description as separate columns since there's no graph
+        showChangeIdColumn = true
+        showDescriptionColumn = true
+    }
 
-    // Table showing commits
+    // Table showing commits (reuses JujutsuLogTable)
     private val logTable = JujutsuLogTable(project, columnManager)
 
-    // Details panel showing selected commit info
+    // Details panel showing selected commit info (reuses JujutsuCommitDetailsPanel)
     private val detailsPanel = JujutsuCommitDetailsPanel(project)
 
     // Splitter for table and details panel
@@ -56,18 +61,8 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     // Details panel position (true = right, false = bottom)
     private var detailsOnRight = true
 
-    // Root filter component (created lazily, only shown if multiple roots)
-    private var rootFilterComponent: JujutsuRootFilterComponent? = null
-
-    // Data loader for background loading from all repositories (subscribes to changeSelection)
-    private val dataLoader = UnifiedJujutsuLogDataLoader(
-        project,
-        { project.jujutsuRepositories },
-        logTable.logModel,
-        logTable,
-        parentDisposable = this,
-        onDataLoaded = { updateRootFilterVisibility() }
-    )
+    // Data loader for file history
+    private val dataLoader = JujutsuFileHistoryDataLoader(repo, filePath, logTable.logModel)
 
     // Filter options state
     private var useRegex = false
@@ -83,9 +78,7 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         textEditor.document.addDocumentListener(
             object : DocumentListener {
                 override fun insertUpdate(e: DocumentEvent?) = applyFilter()
-
                 override fun removeUpdate(e: DocumentEvent?) = applyFilter()
-
                 override fun changedUpdate(e: DocumentEvent?) = applyFilter()
             }
         )
@@ -112,9 +105,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         // Set up initial column visibility
         updateColumnVisibility()
 
-        // Load saved column widths from settings
-        logTable.loadColumnWidths()
-
         // Create table panel with toolbar
         val tablePanel = createTablePanel()
 
@@ -130,45 +120,10 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
             }
         }
 
-        // Subscribe to state changes from all repositories
-        setupStateListener()
-
         // Load initial data
-        dataLoader.loadCommits()
+        dataLoader.loadHistory()
 
-        log.info("UnifiedJujutsuLogPanel initialized for project: ${project.name}")
-    }
-
-    private fun setupStateListener() {
-        // Listen for repository state changes to refresh
-        // (Selection handling is done by the data loader)
-        project.stateModel.repositoryStates.connect(this) { old, new ->
-            if (old != new) {
-                refresh()
-                updateRootFilterVisibility()
-            }
-        }
-    }
-
-    /**
-     * Update root filter and gutter visibility based on whether there are multiple roots.
-     */
-    private fun updateRootFilterVisibility() {
-        val hasMultipleRoots = logTable.logModel.getAllRoots().size > 1
-
-        // Update root filter visibility
-        rootFilterComponent?.let { component ->
-            component.isVisible = hasMultipleRoots
-        }
-
-        // Update gutter column visibility
-        val wasGutterVisible = columnManager.showRootGutterColumn
-        columnManager.showRootGutterColumn = hasMultipleRoots
-
-        // Rebuild column visibility if gutter state changed
-        if (wasGutterVisible != hasMultipleRoots) {
-            updateColumnVisibility()
-        }
+        log.info("JujutsuFileHistoryPanel initialized for file: ${filePath.name}")
     }
 
     /**
@@ -184,8 +139,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
 
     /**
      * Create a splitter with the given orientation.
-     * @param tablePanel The panel containing the table and toolbar
-     * @param horizontal True to position details on right, false for bottom
      */
     private fun createSplitter(tablePanel: JPanel, horizontal: Boolean) =
         OnePixelSplitter(!horizontal, if (horizontal) 0.7f else 0.7f).apply {
@@ -195,7 +148,7 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
 
     private fun createToolbar() =
         JPanel(BorderLayout()).apply {
-            // Create left-side panel with text filter and dropdown filters
+            // Create left-side panel with text filter
             val leftPanel = JPanel().apply {
                 layout = BoxLayout(this, BoxLayout.X_AXIS)
                 add(filterField)
@@ -205,64 +158,52 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
 
             // Create main toolbar with actions on the right
             val toolbar = ActionManager.getInstance().createActionToolbar(
-                "JujutsuLogToolbar",
+                "JujutsuFileHistoryToolbar",
                 createActionGroup(),
                 true
             )
-            toolbar.targetComponent = this@UnifiedJujutsuLogPanel
+            toolbar.targetComponent = this@JujutsuFileHistoryPanel
 
             add(leftPanel, BorderLayout.WEST)
             add(toolbar.component, BorderLayout.EAST)
         }
 
     /**
-     * Create the filter components panel (Root, Reference, Author, Date, Paths).
+     * Create the filter components panel (Reference, Author, Date).
+     * Simplified compared to log panel - no root/paths filters.
      */
-    private fun createFilterComponents() =
-        JPanel().apply {
-            layout = BoxLayout(this, BoxLayout.X_AXIS)
+    private fun createFilterComponents() = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.X_AXIS)
 
-            // Root filter (only shown when multiple roots)
-            rootFilterComponent = JujutsuRootFilterComponent(logTable.logModel).apply {
+        // Reference filter (bookmarks, tags, @)
+        add(
+            JujutsuReferenceFilterComponent(logTable.logModel).apply {
                 initUi()
                 initialize()
-                // Initially hidden, will show when data loads if multiple roots
-                isVisible = false
             }
-            add(rootFilterComponent)
-            add(Box.createHorizontalStrut(5))
+        )
+        add(Box.createHorizontalStrut(5))
 
-            // Reference filter (bookmarks, tags, @)
-            add(
-                JujutsuReferenceFilterComponent(logTable.logModel).apply {
-                    initUi()
-                    initialize()
-                }
-            )
-            add(Box.createHorizontalStrut(5))
+        // Author filter
+        add(
+            JujutsuAuthorFilterComponent(logTable.logModel).apply {
+                initUi()
+                initialize()
+            }
+        )
+        add(Box.createHorizontalStrut(5))
 
-            // Author filter
-            add(
-                JujutsuAuthorFilterComponent(logTable.logModel).apply {
-                    initUi()
-                    initialize()
-                }
-            )
-            add(Box.createHorizontalStrut(5))
-
-            // Date filter
-            add(
-                JujutsuDateFilterComponent(logTable.logModel).apply {
-                    initUi()
-                    initialize()
-                }
-            )
-            // Note: Paths filter is omitted in unified mode as it requires a single root
-        }
+        // Date filter
+        add(
+            JujutsuDateFilterComponent(logTable.logModel).apply {
+                initUi()
+                initialize()
+            }
+        )
+    }
 
     /**
      * Create the filter field using SearchFieldWithExtension pattern.
-     * Following IntelliJ's VCS log approach with ActionToolbar inside the search field.
      */
     private fun createFilterField(): SearchFieldWithExtension {
         // Create action group with toggle buttons
@@ -273,13 +214,7 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         }
 
         // Create custom toolbar that uses toggle-aware action buttons
-        val toolbar = object : ActionToolbarImpl(
-            "JujutsuLogFilter",
-            filterActionsGroup,
-            true, // horizontal
-            false, // decorateButtons
-            true // customizable
-        ) {
+        val toolbar = object : ActionToolbarImpl("JujutsuFileHistoryFilter", filterActionsGroup, true, false, true) {
             override fun createToolbarButton(
                 action: AnAction,
                 look: ActionButtonLook?,
@@ -310,7 +245,7 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     }
 
     /**
-     * Refresh action - reload commits from all repositories.
+     * Refresh action - reload file history.
      */
     private inner class RefreshAction : AnAction(
         JujutsuBundle.message("log.action.refresh"),
@@ -345,25 +280,16 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         }
     }
 
-    /**
-     * Action to position details on the right.
-     */
     private inner class DetailsOnRightAction : ToggleAction(JujutsuBundle.message("log.action.details.right")) {
         override fun isSelected(e: AnActionEvent) = detailsOnRight
 
-        override fun setSelected(
-            e: AnActionEvent,
-            state: Boolean
-        ) {
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
             if (state && !detailsOnRight) {
                 toggleDetailsPosition()
             }
         }
     }
 
-    /**
-     * Action to position details on the bottom.
-     */
     private inner class DetailsOnBottomAction : ToggleAction(JujutsuBundle.message("log.action.details.bottom")) {
         override fun isSelected(e: AnActionEvent) = !detailsOnRight
 
@@ -374,9 +300,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         }
     }
 
-    /**
-     * Toggle regex filter mode.
-     */
     private inner class RegexFilterAction : ToggleAction(
         JujutsuBundle.message("log.filter.regex"),
         JujutsuBundle.message("log.filter.regex.tooltip"),
@@ -390,15 +313,11 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         }
     }
 
-    /**
-     * Toggle match case in filter.
-     */
-    private inner class MatchCaseAction :
-        ToggleAction(
-            JujutsuBundle.message("log.filter.matchcase"),
-            JujutsuBundle.message("log.filter.matchcase.tooltip"),
-            AllIcons.Actions.MatchCase
-        ) {
+    private inner class MatchCaseAction : ToggleAction(
+        JujutsuBundle.message("log.filter.matchcase"),
+        JujutsuBundle.message("log.filter.matchcase.tooltip"),
+        AllIcons.Actions.MatchCase
+    ) {
         override fun isSelected(e: AnActionEvent) = matchCase
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {
@@ -407,9 +326,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         }
     }
 
-    /**
-     * Toggle match whole words in filter.
-     */
     private inner class MatchWholeWordsAction : ToggleAction(
         JujutsuBundle.message("log.filter.words"),
         JujutsuBundle.message("log.filter.words.tooltip"),
@@ -417,10 +333,7 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     ) {
         override fun isSelected(e: AnActionEvent) = matchWholeWords
 
-        override fun setSelected(
-            e: AnActionEvent,
-            state: Boolean
-        ) {
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
             matchWholeWords = state
             applyFilter()
         }
@@ -479,9 +392,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         )
     }
 
-    /**
-     * Toggle action for a single column.
-     */
     private inner class ToggleColumnAction(
         columnName: String,
         private val getter: () -> Boolean,
@@ -492,7 +402,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         override fun setSelected(e: AnActionEvent, state: Boolean) {
             setter(state)
             updateColumnVisibility()
-            logTable.updateGraph(logTable.graphNodes) // Refresh rendering
         }
     }
 
@@ -528,14 +437,8 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
 
         // Re-install renderers
         logTable.installRenderers()
-
-        // Restore saved column widths
-        logTable.loadColumnWidths()
     }
 
-    /**
-     * Toggle the details panel position between right and bottom.
-     */
     private fun toggleDetailsPosition() {
         detailsOnRight = !detailsOnRight
 
@@ -556,9 +459,6 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         log.info("Details panel position toggled to ${if (detailsOnRight) "right" else "bottom"}")
     }
 
-    /**
-     * Apply the current filter text to the table.
-     */
     private fun applyFilter() {
         val filterText = searchTextField.text
         log.info("Applying filter: '$filterText' (regex=$useRegex, matchCase=$matchCase, wholeWords=$matchWholeWords)")
@@ -566,17 +466,15 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     }
 
     /**
-     * Refresh the log data from all VCS roots.
-     * Reloads all commits and updates the display.
+     * Refresh the file history.
      */
     fun refresh() {
-        log.info("Refreshing unified log panel")
+        log.info("Refreshing file history panel")
         dataLoader.refresh()
     }
 
     override fun dispose() {
-        log.info("UnifiedJujutsuLogPanel disposed")
+        log.info("JujutsuFileHistoryPanel disposed")
         detailsPanel.dispose()
-        // Other cleanup will happen automatically
     }
 }

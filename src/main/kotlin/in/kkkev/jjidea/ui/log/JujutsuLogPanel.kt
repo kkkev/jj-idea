@@ -19,7 +19,6 @@ import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.Box
 import javax.swing.BoxLayout
-import javax.swing.Icon
 import javax.swing.JPanel
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
@@ -541,28 +540,5 @@ class JujutsuLogPanel(private val root: JujutsuRepository) :
         log.info("JujutsuLogPanel disposed")
         detailsPanel.dispose()
         // Other cleanup will happen automatically
-    }
-
-    /**
-     * Custom ActionButton that shows visual feedback (different background) when selected.
-     * Based on IntelliJ's VCS log implementation.
-     */
-    private class ToggleAwareActionButton(
-        action: AnAction,
-        presentation: Presentation
-    ) : ActionButton(action, presentation, "JujutsuLogFilter", ActionToolbar.DEFAULT_MINIMUM_BUTTON_SIZE) {
-        init {
-            updateIcon()
-        }
-
-        override fun getPopState(): Int = if (isSelected) SELECTED else super.getPopState()
-
-        override fun getIcon(): Icon {
-            if (isEnabled && isSelected) {
-                val selectedIcon = myPresentation.selectedIcon
-                if (selectedIcon != null) return selectedIcon
-            }
-            return super.getIcon()
-        }
     }
 }

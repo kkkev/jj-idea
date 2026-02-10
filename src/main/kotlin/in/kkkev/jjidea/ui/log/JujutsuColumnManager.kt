@@ -11,6 +11,9 @@ class JujutsuColumnManager {
     // Root gutter column (visible when multiple roots)
     var showRootGutterColumn: Boolean = false
 
+    // Graph column (visible in log view, hidden in file history)
+    var showGraphColumn: Boolean = true
+
     // Separate columns (mutually exclusive with showing in graph column)
     var showStatusColumn: Boolean = false
     var showChangeIdColumn: Boolean = false
@@ -34,7 +37,8 @@ class JujutsuColumnManager {
 
     /**
      * Get list of visible columns (indices).
-     * Graph column is always visible. Root gutter is visible when showRootGutterColumn is true.
+     * Graph column is visible when showGraphColumn is true (hidden in file history).
+     * Root gutter is visible when showRootGutterColumn is true.
      */
     fun getVisibleColumns(): List<Int> {
         val columns = mutableListOf<Int>()
@@ -43,7 +47,9 @@ class JujutsuColumnManager {
             columns.add(JujutsuLogTableModel.COLUMN_ROOT_GUTTER)
         }
 
-        columns.add(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
+        if (showGraphColumn) {
+            columns.add(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
+        }
 
         if (showStatusColumn) {
             columns.add(JujutsuLogTableModel.COLUMN_STATUS)
@@ -81,7 +87,7 @@ class JujutsuColumnManager {
      */
     fun isColumnVisible(columnIndex: Int): Boolean = when (columnIndex) {
         JujutsuLogTableModel.COLUMN_ROOT_GUTTER -> showRootGutterColumn
-        JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> true // Always visible
+        JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> showGraphColumn
         JujutsuLogTableModel.COLUMN_STATUS -> showStatusColumn
         JujutsuLogTableModel.COLUMN_ID -> showChangeIdColumn
         JujutsuLogTableModel.COLUMN_DESCRIPTION -> showDescriptionColumn

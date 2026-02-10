@@ -51,6 +51,7 @@
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
         <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel" />
         <projectService serviceImplementation="in.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager" />
+        <projectService serviceImplementation="in.kkkev.jjidea.ui.history.JujutsuFileHistoryTabManager" />
         <projectService serviceImplementation="in.kkkev.jjidea.ui.ToolWindowEnabler" preload="true" />
         <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings" />
 
@@ -100,7 +101,7 @@
             <reference ref="Annotate"/>
             <reference ref="Jujutsu.ShowChangesDiff"/>
             <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.vcs.actions.JujutsuCompareWithBranchAction"/>
-            <reference ref="Vcs.ShowTabbedFileHistory"/>
+            <action id="Jujutsu.ShowFileHistory" class="in.kkkev.jjidea.vcs.actions.ShowJujutsuFileHistoryAction"/>
             <action id="Jujutsu.ShowHistoryForSelection" class="in.kkkev.jjidea.vcs.actions.JujutsuShowHistoryForSelectionAction"/>
             <action id="Jujutsu.RestoreFile" class="in.kkkev.jjidea.vcs.actions.RestoreSelectionAction"/>
             <!--<add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu.GoToMenu"/>-->
