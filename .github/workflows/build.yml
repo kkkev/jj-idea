@@ -167,14 +167,23 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          # Extract section between ## [X.Y.Z] and next ## [ or link reference section
-          # Uses awk to find the version section, skip header, stop before next section or links
-          NOTES=$(awk "
-            /^## \[${VERSION}\]/ { found=1; next }
+
+          # For workflow_dispatch, use [Unreleased] section since CHANGELOG.md
+          # hasn't been updated yet with a versioned section
+          if [[ -n "${{ inputs.bump }}" ]]; then
+            TARGET_SECTION="Unreleased"
+          else
+            TARGET_SECTION="$VERSION"
+          fi
+
+          # Extract section between ## [TARGET] and next ## [ or link reference
+          NOTES=$(awk -v target="$TARGET_SECTION" '
+            $0 ~ "^## \\[" target "\\]" { found=1; next }
             found && /^## \[/ { exit }
             found && /^\[.+\]:/ { exit }
             found { print }
-          " CHANGELOG.md)
+          ' CHANGELOG.md)
+
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -193,6 +202,51 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update CHANGELOG.md for workflow_dispatch release
+        if: steps.version.outputs.is_release == 'true' && inputs.bump != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          DATE=$(date +%Y-%m-%d)
+
+          # Move [Unreleased] content to new version section (mirrors release.sh logic)
+          awk -v version="$VERSION" -v date="$DATE" '
+            BEGIN { in_unreleased = 0 }
+
+            /^## \[Unreleased\]/ {
+              print $0
+              print ""
+              print "## [" version "] - " date
+              in_unreleased = 1
+              next
+            }
+
+            in_unreleased && /^## \[/ {
+              in_unreleased = 0
+              print $0
+              next
+            }
+
+            /^\[Unreleased\]:/ {
+              print "[Unreleased]: https://github.com/kkkev/jj-idea/compare/v" version "...HEAD"
+              next
+            }
+
+            { print }
+          ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+
+          # Add link for new version after [Unreleased]: line
+          if ! grep -q "^\[$VERSION\]:" CHANGELOG.md; then
+            awk -v version="$VERSION" '
+              /^\[Unreleased\]:/ {
+                print
+                print "[" version "]: https://github.com/kkkev/jj-idea/releases/tag/v" version
+                next
+              }
+              { print }
+            ' CHANGELOG.md > CHANGELOG.md.tmp && mv CHANGELOG.md.tmp CHANGELOG.md
+          fi
 
       - name: Update plugin repository XML
         if: steps.version.outputs.is_release == 'true'
@@ -245,8 +299,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add updatePlugins.xml
-          git commit -m "Update plugin repository for release ${{ github.ref_name }}" || echo "No changes to commit"
+          git add updatePlugins.xml CHANGELOG.md
+          git commit -m "Update plugin repository for release ${{ steps.version.outputs.tag }}" || echo "No changes to commit"
           git push origin HEAD:${{ github.event.repository.default_branch }}
 
       # Publish to JetBrains Marketplace on releases
