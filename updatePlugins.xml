@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.2.2/jj-idea-0.2.2.zip" version="0.2.2">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.2.3/jj-idea-0.2.3.zip" version="0.2.3">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,9 +23,16 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.2.2</h3>
+      <h3>0.2.3</h3>
       
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.2.2">full release notes</a> for details.</p>
+<h4>Added</h4>
+<li>Custom file history panel with same styling as the log view (replaces standard Show History action)</li>
+
+<h4>Fixed</h4>
+<li>Graph rendering: fix phantom passthrough lanes where fork+merge connections drew disconnected vertical lines</li>
+<li>Graph rendering: correct lane assignments and passthrough lines for merge commits with intervening side branches</li>
+<li>Keyboard shortcut error: use `meta` instead of `command` for macOS keyboard shortcuts</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.2.3">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
