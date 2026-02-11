@@ -36,7 +36,7 @@ class CommitGraphBuilderTest {
             val node = graph["aaa"]!!
             node.lane shouldBe 0
             node.parentLanes.size shouldBe 0
-            node.passThroughLanes.size shouldBe 0
+            node.rowPassthroughLanes.size shouldBe 0
         }
 
         @Test
@@ -57,8 +57,8 @@ class CommitGraphBuilderTest {
             graph["bbb"]!!.parentLanes shouldBe listOf(0)
 
             // No pass-through lanes (consecutive commits)
-            graph["bbb"]!!.passThroughLanes.size shouldBe 0
-            graph["aaa"]!!.passThroughLanes.size shouldBe 0
+            graph["bbb"]!!.rowPassthroughLanes.size shouldBe 0
+            graph["aaa"]!!.rowPassthroughLanes.size shouldBe 0
         }
 
         @Test
@@ -82,9 +82,9 @@ class CommitGraphBuilderTest {
             graph["bbb"]!!.parentLanes shouldBe listOf(0)
 
             // No pass-through lanes
-            graph["ccc"]!!.passThroughLanes.size shouldBe 0
-            graph["bbb"]!!.passThroughLanes.size shouldBe 0
-            graph["aaa"]!!.passThroughLanes.size shouldBe 0
+            graph["ccc"]!!.rowPassthroughLanes.size shouldBe 0
+            graph["bbb"]!!.rowPassthroughLanes.size shouldBe 0
+            graph["aaa"]!!.rowPassthroughLanes.size shouldBe 0
         }
     }
 
@@ -107,7 +107,7 @@ class CommitGraphBuilderTest {
             graph["aaa"]!!.lane shouldBe 0
 
             // bbb should have pass-through lane 0 (ccc -> aaa passes through)
-            val bbbPassThrough = graph["bbb"]!!.passThroughLanes
+            val bbbPassThrough = graph["bbb"]!!.rowPassthroughLanes
             bbbPassThrough shouldContainKey 0
             bbbPassThrough[0] shouldBe graph["ccc"]!!.color
         }
@@ -129,10 +129,10 @@ class CommitGraphBuilderTest {
             graph["aaa"]!!.lane shouldBe 0
 
             // ccc should have pass-through lane 0
-            graph["ccc"]!!.passThroughLanes shouldContainKey 0
+            graph["ccc"]!!.rowPassthroughLanes shouldContainKey 0
 
             // bbb should have pass-through lane 0
-            graph["bbb"]!!.passThroughLanes shouldContainKey 0
+            graph["bbb"]!!.rowPassthroughLanes shouldContainKey 0
         }
     }
 
@@ -159,7 +159,7 @@ class CommitGraphBuilderTest {
             graph["ccc"]!!.lane shouldBe 1
 
             // ccc should have pass-through lane 0 (bbb-aaa line passes through)
-            graph["ccc"]!!.passThroughLanes shouldContainKey 0
+            graph["ccc"]!!.rowPassthroughLanes shouldContainKey 0
         }
 
         @Test
@@ -187,7 +187,7 @@ class CommitGraphBuilderTest {
             graph["aaa"]!!.lane shouldBe 0
 
             // bbb should see pass-through lane 0 (ccc->aaa line)
-            graph["bbb"]!!.passThroughLanes shouldContainKey 0
+            graph["bbb"]!!.rowPassthroughLanes shouldContainKey 0
         }
     }
 
@@ -221,10 +221,10 @@ class CommitGraphBuilderTest {
             lane2 shouldBe 1
 
             // Each row should have pass-through lane for the other branch
-            graph["e2"]!!.passThroughLanes shouldContainKey lane1
-            graph["d1"]!!.passThroughLanes shouldContainKey lane2
-            graph["d2"]!!.passThroughLanes shouldContainKey lane1
-            graph["c1"]!!.passThroughLanes shouldContainKey lane2
+            graph["e2"]!!.rowPassthroughLanes shouldContainKey lane1
+            graph["d1"]!!.rowPassthroughLanes shouldContainKey lane2
+            graph["d2"]!!.rowPassthroughLanes shouldContainKey lane1
+            graph["c1"]!!.rowPassthroughLanes shouldContainKey lane2
         }
     }
 
@@ -262,7 +262,7 @@ class CommitGraphBuilderTest {
 
             // Pass-through lanes: at row with c2, should see lane for c1->b1
             // (c3 hasn't been processed yet, so b3 hasn't been assigned)
-            val c2PassThrough = graph["c2"]!!.passThroughLanes
+            val c2PassThrough = graph["c2"]!!.rowPassthroughLanes
             c2PassThrough.keys shouldHaveSize 1 // One active lane from c1
         }
     }
@@ -345,7 +345,7 @@ class CommitGraphBuilderTest {
 
             // d should have pass-through for e->c (lane 0)
             // but NOT for short (it has no parent, lane is free)
-            graph["d"]!!.passThroughLanes.size shouldBe 0 // short branch doesn't reserve a lane
+            graph["d"]!!.rowPassthroughLanes.size shouldBe 0 // short branch doesn't reserve a lane
         }
 
         @Test

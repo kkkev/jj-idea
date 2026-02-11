@@ -34,7 +34,7 @@ class GraphBuilderEdgeCasesTest {
             graph shouldHaveSize 1
             graph["root"]!!.lane shouldBe 0
             graph["root"]!!.parentLanes shouldHaveSize 0
-            graph["root"]!!.passThroughLanes shouldHaveSize 0
+            graph["root"]!!.rowPassthroughLanes shouldHaveSize 0
         }
 
         @Test
@@ -81,9 +81,9 @@ class GraphBuilderEdgeCasesTest {
             val graph = builder.buildGraph(entries)
 
             // No pass-through lanes - adjacent parent-child relationships
-            graph["c"]!!.passThroughLanes shouldHaveSize 0
-            graph["b"]!!.passThroughLanes shouldHaveSize 0
-            graph["a"]!!.passThroughLanes shouldHaveSize 0
+            graph["c"]!!.rowPassthroughLanes shouldHaveSize 0
+            graph["b"]!!.rowPassthroughLanes shouldHaveSize 0
+            graph["a"]!!.rowPassthroughLanes shouldHaveSize 0
         }
     }
 
@@ -131,14 +131,14 @@ class GraphBuilderEdgeCasesTest {
             val graph = builder.buildGraph(entries)
 
             // child1 is first - no pass-through lanes yet (parent not assigned)
-            graph["child1"]!!.passThroughLanes shouldHaveSize 0
+            graph["child1"]!!.rowPassthroughLanes shouldHaveSize 0
 
             // child2 sees parent's lane (0) as pass-through
             // (but not child1's lane since child1 has no pending children)
-            graph["child2"]!!.passThroughLanes shouldContainKey 0
+            graph["child2"]!!.rowPassthroughLanes shouldContainKey 0
 
             // child3 also sees only parent's lane (0) as pass-through
-            graph["child3"]!!.passThroughLanes shouldContainKey 0
+            graph["child3"]!!.rowPassthroughLanes shouldContainKey 0
         }
     }
 

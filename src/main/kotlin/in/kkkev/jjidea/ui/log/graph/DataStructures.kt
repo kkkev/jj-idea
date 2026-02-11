@@ -21,6 +21,6 @@ data class RowLayout<I : Any>(
     val childLanes: List<Int>,
     /** lanes of parents (rows below) */
     val parentLanes: List<Int>,
-    /** lanes with vertical passthroughs */
-    val passthroughLanes: Set<Int>
+    /** For each non-adjacent parent, the passthrough lane used (parent ID → lane) */
+    val passthroughLanes: Map<I, Int> = emptyMap()
 )

@@ -33,21 +33,39 @@ class GraphBuilder {
         val lane: Int,
         val color: Color,
         val parentLanes: List<Int>,
-        val passThroughLanes: Map<Int, Color>
+        /** Per-entry: parent ID → passthrough lane for non-adjacent parents */
+        val passthroughLanes: Map<String, Int>,
+        /** Per-row: lanes with vertical lines passing through (derived from all entries) */
+        val rowPassthroughLanes: Map<Int, Color>
     )
 
     fun buildGraph(entries: List<GraphEntry<String>>): Map<String, Node> {
         // Calculate layout using the algorithm
         val layout = layoutCalculator.calculate(entries)
 
+        // Build row index for per-row passthrough computation
+        val rowByEntryId = layout.rows.withIndex().associate { (idx, row) -> row.id to idx }
+
+        // Compute per-row passthrough lanes (derived from entries' passthroughLanes)
+        val rowPassthroughs = mutableMapOf<Int, MutableSet<Int>>()
+        for ((idx, row) in layout.rows.withIndex()) {
+            for ((parentId, lane) in row.passthroughLanes) {
+                val parentRow = rowByEntryId[parentId] ?: continue
+                for (r in (idx + 1) until parentRow) {
+                    rowPassthroughs.getOrPut(r) { mutableSetOf() }.add(lane)
+                }
+            }
+        }
+
         // Convert RowLayout to Node
-        return layout.rows.associate { row ->
+        return layout.rows.withIndex().associate { (idx, row) ->
             row.id to Node(
                 id = row.id,
                 lane = row.lane,
                 color = colorForLane(row.lane),
                 parentLanes = row.parentLanes,
-                passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
+                passthroughLanes = row.passthroughLanes,
+                rowPassthroughLanes = (rowPassthroughs[idx] ?: emptySet()).associateWith { colorForLane(it) }
             )
         }
     }

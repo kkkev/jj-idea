@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Custom file history panel with same styling as the log view (replaces standard Show History action)
 
 ### Fixed
+- Graph rendering: fix phantom passthrough lanes where fork+merge connections drew disconnected vertical lines
 - Graph rendering: correct lane assignments and passthrough lines for merge commits with intervening side branches
 - Keyboard shortcut error: use `meta` instead of `command` for macOS keyboard shortcuts
 

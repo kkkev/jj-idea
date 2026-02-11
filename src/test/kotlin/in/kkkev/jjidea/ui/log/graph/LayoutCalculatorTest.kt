@@ -89,7 +89,7 @@ class LayoutCalculatorTest {
         layout.rows[0].lane shouldBe 0
         layout.rows[0].childLanes shouldBe emptyList()
         layout.rows[0].parentLanes shouldBe emptyList()
-        layout.rows[0].passthroughLanes shouldBe emptySet()
+        layout.rows[0].passthroughLanes shouldBe emptyMap()
     }
 
     // 2. Linear parent-child
@@ -135,8 +135,9 @@ class LayoutCalculatorTest {
         val layout = calculator.calculate(entries)
 
         layout.rows[0].lane shouldBe 0
+        layout.rows[0].passthroughLanes shouldBe mapOf(C to 0) // A→C passthrough at lane 0
         layout.rows[1].lane shouldBe 1 // B pushed to lane 1
-        layout.rows[1].passthroughLanes shouldBe listOf(0) // passthrough at lane 0
+        layout.rows[1].passthroughLanes shouldBe emptyMap() // B has no non-adjacent parents
         layout.rows[2].lane shouldBe 0 // C at lane 0
     }
 
@@ -188,8 +189,9 @@ class LayoutCalculatorTest {
             )
         val layout = calculator.calculate(entries)
 
-        // Same as test 5, validates passthrough handling
-        layout.rows[1].passthroughLanes shouldBe listOf(0)
+        // A→C passthrough at lane 0 (A's lane, fork connection)
+        layout.rows[0].passthroughLanes shouldBe mapOf(C to 0)
+        layout.rows[1].passthroughLanes shouldBe emptyMap() // B→C is adjacent
     }
 
     // 8. Diamond pattern (fork + merge)
@@ -221,12 +223,13 @@ class LayoutCalculatorTest {
         layout.rows[5].lane shouldBe 1 // F (follows E)
         layout.rows[6].lane shouldBe 0 // G (lowest child lane)
 
-        // Verify passthroughs
-        layout.rows[1].passthroughLanes shouldBe setOf(1) // A→E at lane 1 (pure merge)
-        layout.rows[2].passthroughLanes shouldBe setOf(1) // A→E at lane 1
-        layout.rows[3].passthroughLanes shouldBe setOf(1) // A→E at lane 1
-        layout.rows[4].passthroughLanes shouldBe setOf(0) // D→G at lane 0 (D's lane)
-        layout.rows[5].passthroughLanes shouldBe setOf(0) // D→G at lane 0
+        // Verify per-entry passthroughs
+        layout.rows[0].passthroughLanes shouldBe mapOf(E to 1) // A→E pure merge at lane 1
+        layout.rows[1].passthroughLanes shouldBe emptyMap() // B→C adjacent
+        layout.rows[2].passthroughLanes shouldBe emptyMap() // C→D adjacent
+        layout.rows[3].passthroughLanes shouldBe mapOf(G to 0) // D→G at lane 0
+        layout.rows[4].passthroughLanes shouldBe emptyMap() // E→F adjacent
+        layout.rows[5].passthroughLanes shouldBe emptyMap() // F→G adjacent
     }
 
     // 9. Multiple independent branches
@@ -248,9 +251,10 @@ class LayoutCalculatorTest {
         layout.rows[1].lane shouldBe 1 // B
         layout.rows[2].lane shouldBe 2 // C
 
-        // Passthroughs accumulate
-        layout.rows[1].passthroughLanes shouldBe listOf(0)
-        layout.rows[2].passthroughLanes shouldBe listOf(0, 1)
+        // Per-entry passthroughs
+        layout.rows[0].passthroughLanes shouldBe mapOf(D to 0) // A→D at lane 0
+        layout.rows[1].passthroughLanes shouldBe mapOf(E to 1) // B→E at lane 1
+        layout.rows[2].passthroughLanes shouldBe mapOf(F to 2) // C→F at lane 2
     }
 
     // 10. Fork+Merge classification
@@ -288,21 +292,25 @@ class LayoutCalculatorTest {
 
         // Lane assignments
         layout.rows[0].lane shouldBe 0 // A at lane 0
+        layout.rows[0].passthroughLanes shouldBe mapOf(D to 0) // A→D at lane 0
         layout.rows[1].lane shouldBe 1 // B blocked by A→D passthrough, takes lane 1
         layout.rows[3].lane shouldBe 0 // D at lane 0 (lowest child lane: A)
         layout.rows[4].lane shouldBe 2 // E at lane 2 (reserved by pure merge passthrough)
 
-        // Passthroughs at row 2 (intermediate)
-        // A→D passthrough at lane 0
-        // B→D passthrough at lane 1 (fork+merge: child's lane)
-        // B→E passthrough at lane 2 (pure merge: new lane)
-        layout.rows[2].passthroughLanes shouldBe setOf(0, 1, 2)
+        // C has no parents, no passthroughs
+        layout.rows[2].passthroughLanes shouldBe emptyMap()
 
-        // C is pushed to lane 3 (lanes 0, 1, 2 all blocked)
+        // C is pushed to lane 3 (lanes 0, 1, 2 all blocked by passthroughs)
         layout.rows[2].lane shouldBe 3
 
         // Verify parent lanes for B
         layout.rows[1].parentLanes shouldContainExactlyInAnyOrder listOf(0, 2) // D at 0, E at 2
+
+        // Verify passthrough lane assignments per parent (fixes phantom passthrough bug)
+        // B→D is fork+merge: passthrough at child's lane (1)
+        // B→E is pure merge: passthrough at new lane (2)
+        layout.rows[1].passthroughLanes[D] shouldBe 1
+        layout.rows[1].passthroughLanes[E] shouldBe 2
     }
 
     // 11. Reserved lane release

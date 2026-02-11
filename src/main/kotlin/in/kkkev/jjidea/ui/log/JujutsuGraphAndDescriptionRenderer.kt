@@ -62,6 +62,34 @@ class JujutsuGraphAndDescriptionRenderer(
         fun colorForLane(lane: Int) = LANE_COLORS[lane % LANE_COLORS.size]
     }
 
+    /** Lazily computed per-row passthrough lanes derived from entries' passthroughLanes */
+    private var rowPassthroughCache: Map<Int, Set<Int>>? = null
+
+    private fun getRowPassthroughs(model: JujutsuLogTableModel): Map<Int, Set<Int>> {
+        rowPassthroughCache?.let { return it }
+
+        val rowByChangeId = mutableMapOf<ChangeId, Int>()
+        for (row in 0 until model.rowCount) {
+            val entry = model.getEntry(row) ?: continue
+            rowByChangeId[entry.id] = row
+        }
+
+        val result = mutableMapOf<Int, MutableSet<Int>>()
+        for (row in 0 until model.rowCount) {
+            val entry = model.getEntry(row) ?: continue
+            val node = graphNodes[entry.id] ?: continue
+            for ((parentId, lane) in node.passthroughLanes) {
+                val parentRow = rowByChangeId[parentId] ?: continue
+                for (r in (row + 1) until parentRow) {
+                    result.getOrPut(r) { mutableSetOf() }.add(lane)
+                }
+            }
+        }
+
+        rowPassthroughCache = result
+        return result
+    }
+
     override fun getTableCellRendererComponent(
         table: JTable,
         value: Any?,
@@ -238,17 +266,16 @@ class JujutsuGraphAndDescriptionRenderer(
         }
 
         private fun drawPassThroughLines(g2d: Graphics2D, graphStartX: Int, laneWidth: Int): Set<Int> {
-            val node = this.graphNode ?: return emptySet()
+            val model = table.model as? JujutsuLogTableModel ?: return emptySet()
+            val rowPT = getRowPassthroughs(model)[row] ?: return emptySet()
 
-            // Use pre-computed passthrough lanes from the algorithm
-            // The algorithm already determined which lanes have passthroughs at this row
-            for ((lane, color) in node.passThroughLanes) {
+            for (lane in rowPT) {
                 val passX = graphStartX + laneWidth / 2 + lane * laneWidth
-                g2d.color = color
+                g2d.color = colorForLane(lane)
                 g2d.drawLine(passX, 0, passX, height)
             }
 
-            return node.passThroughLanes.keys
+            return rowPT
         }
 
         private fun drawCommitCircle(g2d: Graphics2D, node: GraphNode, x: Int, y: Int) {
@@ -278,8 +305,8 @@ class JujutsuGraphAndDescriptionRenderer(
             val currentEntry = model.getEntry(currentRow) ?: return
 
             // Draw incoming lines from children
-            // Pure merge (child has multiple parents): passthrough was at parent's lane, draw vertical
-            // Fork/simple (child has one parent): passthrough was at child's lane, draw diagonal
+            // Uses the actual passthrough lane from the algorithm to determine connection path.
+            // For adjacent children, falls back to heuristic (merge → parent's lane, else → child's lane).
             for (prevRow in 0 until currentRow) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
                 val prevNode = graphNodes[prevEntry.id] ?: continue
@@ -289,14 +316,10 @@ class JujutsuGraphAndDescriptionRenderer(
                     val childLane = prevNode.lane
                     val childHasMultipleParents = prevNode.parentLanes.size > 1
 
-                    // Determine connection lane based on child's merge status
-                    val connectionLane = if (childHasMultipleParents) {
-                        // Pure merge: passthrough was at parent's lane
-                        node.lane
-                    } else {
-                        // Fork/simple: passthrough was at child's lane
-                        childLane
-                    }
+                    // Use actual passthrough lane if available (non-adjacent), else heuristic (adjacent)
+                    val passThroughLane = prevNode.passthroughLanes[currentEntry.id]
+                    val connectionLane = passThroughLane
+                        ?: if (childHasMultipleParents) node.lane else childLane
                     val connectionX = graphStartX + laneWidth / 2 + connectionLane * laneWidth
                     g2d.color = colorForLane(connectionLane)
                     g2d.drawLine(connectionX, 0, commitX, commitY)
@@ -304,23 +327,20 @@ class JujutsuGraphAndDescriptionRenderer(
             }
 
             // Draw outgoing lines to parents
-            // Pure merge (child has multiple parents): diagonal at child's row
-            // Fork/simple (child has one parent): vertical at child's row, diagonal at parent's row
+            // Uses the actual passthrough lane to determine where the connection exits this row.
+            // For adjacent parents, falls back to heuristic (merge → parent's lane, else → vertical).
             val childHasMultipleParents = node.parentLanes.size > 1
 
-            for ((parentIndex, _) in currentEntry.parentIds.withIndex()) {
+            for ((parentIndex, parentId) in currentEntry.parentIds.withIndex()) {
                 val parentLane = node.parentLanes.getOrNull(parentIndex) ?: continue
-                val parentX = graphStartX + laneWidth / 2 + parentLane * laneWidth
 
-                if (parentLane != node.lane && childHasMultipleParents) {
-                    // Pure merge: diagonal at child's row to parent's lane
-                    g2d.color = colorForLane(parentLane)
-                    g2d.drawLine(commitX, commitY, parentX, height)
-                } else {
-                    // Same lane or fork/simple: vertical down from commit
-                    g2d.color = node.color
-                    g2d.drawLine(commitX, commitY, commitX, height)
-                }
+                // Use actual passthrough lane if available (non-adjacent), else heuristic (adjacent)
+                val passThroughLane = node.passthroughLanes[parentId]
+                val targetLane = passThroughLane
+                    ?: if (childHasMultipleParents && parentLane != node.lane) parentLane else node.lane
+                val targetX = graphStartX + laneWidth / 2 + targetLane * laneWidth
+                g2d.color = if (targetLane == node.lane) node.color else colorForLane(targetLane)
+                g2d.drawLine(commitX, commitY, targetX, height)
             }
         }
 

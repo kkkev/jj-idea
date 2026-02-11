@@ -20,14 +20,14 @@ import java.awt.Color
  * @property color Color for this commit's line
  * @property parentLanes Lanes where parent commits are located
  * @property childLanes Lanes where child commits are located (for fork detection)
- * @property passThroughLanes Map of lane -> color for lanes with lines passing through
+ * @property passthroughLanes For each non-adjacent parent, the passthrough lane used (parent ChangeId → lane)
  */
 data class GraphNode(
     val lane: Int,
     val color: Color,
     val parentLanes: List<Int> = emptyList(),
     val childLanes: List<Int> = emptyList(),
-    val passThroughLanes: Map<Int, Color> = emptyMap()
+    val passthroughLanes: Map<ChangeId, Int> = emptyMap()
 )
 
 /**
@@ -82,7 +82,7 @@ class CommitGraphBuilder {
                 color = colorForLane(row.lane),
                 parentLanes = row.parentLanes,
                 childLanes = row.childLanes,
-                passThroughLanes = row.passthroughLanes.associateWith { colorForLane(it) }
+                passthroughLanes = row.passthroughLanes
             )
         }
     }

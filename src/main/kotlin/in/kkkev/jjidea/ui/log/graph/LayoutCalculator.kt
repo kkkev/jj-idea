@@ -38,8 +38,8 @@ private data class State<I : Any>(
     val childrenByParent: Map<I, Set<ChildInfo<I>>> = emptyMap(),
     val lanes: Map<I, Int> = emptyMap(),
     val passthroughs: Passthroughs<I> = Passthroughs<I>(),
-    /** row index -> set of passthrough lanes */
-    val passthroughsByRow: Map<Int, Set<Int>> = emptyMap(),
+    /** entry ID -> (parent ID -> passthrough lane) for non-adjacent parents */
+    val passthroughLanesByEntry: Map<I, Map<I, Int>> = emptyMap(),
     /** Reserved lanes for pure merge parents (parent ID -> reserved lane) */
     val reservedLanes: Map<I, Int> = emptyMap()
 ) {
@@ -143,33 +143,24 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 newPassthroughs.add(Passthrough(lane = passLane, targetParentId = parentId))
             }
 
-            // Update passthroughsByRow for rows between this entry and each non-adjacent parent
-            val updatedPassthroughsByRow = newPassthroughs.fold(state.passthroughsByRow) { acc, pt ->
-                val parentRow = rowByChangeId[pt.targetParentId] ?: return@fold acc
-                // Add passthrough lane to all rows between current row and parent row
-                ((rowIndex + 1) until parentRow).fold(acc) { innerAcc, row ->
-                    val existing = innerAcc[row] ?: emptySet()
-                    innerAcc + (row to (existing + pt.lane))
-                }
-            }
-
             State(
                 childrenByParent = updatedChildrenByParent,
                 lanes = state.lanes + (entry.current to lane),
                 passthroughs = remainingPassthroughs + newPassthroughs,
-                passthroughsByRow = updatedPassthroughsByRow,
-                reservedLanes = newReservedLanes
+                reservedLanes = newReservedLanes,
+                passthroughLanesByEntry = state.passthroughLanesByEntry +
+                    (entry.current to newPassthroughs.associate { it.targetParentId to it.lane })
             )
         }
 
         // Second pass: build RowLayout for each entry
-        val rows = entries.mapIndexed { rowIndex, entry ->
+        val rows = entries.map { entry ->
             val lane = finalState.lanes[entry.current] ?: 0
             val childLanes = finalState.childrenByParent[entry.current]
                 ?.map { it.lane }
                 ?: emptyList()
             val parentLanes = entry.parents.mapNotNull { finalState.lanes[it] }
-            val passthroughLanes = finalState.passthroughsByRow[rowIndex] ?: emptySet()
+            val passthroughLanes = finalState.passthroughLanesByEntry[entry.current] ?: emptyMap()
 
             RowLayout(entry.current, lane, childLanes, parentLanes, passthroughLanes)
         }
