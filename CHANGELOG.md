@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Custom file history panel with same styling as the log view (replaces standard Show History action)
+
 ### Fixed
 - Graph rendering: correct lane assignments and passthrough lines for merge commits with intervening side branches
 - Keyboard shortcut error: use `meta` instead of `command` for macOS keyboard shortcuts
