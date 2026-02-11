@@ -633,6 +633,51 @@ When adding features or fixing bugs:
 5. Follow coding standards above
 6. Build and test before committing: `./gradlew build test`
 
+## End of Task Checklist
+
+Before completing a task, run through this checklist:
+
+### 1. Verify Quality
+```bash
+./gradlew check   # Run tests and linting
+```
+Fix any failures before proceeding.
+
+### 2. Update Beads
+- **Close completed issues**: `bd close <id1> <id2> ...` with comments if non-trivial
+- **Create issues for snags**: If something couldn't be fixed in this session, create a bead:
+  - `bug` for bugs discovered
+  - `task` for refactoring or cleanup needed
+  - `feature` for missed functionality
+
+### 3. Update Changelog
+Add entries to the `[Unreleased]` section of `CHANGELOG.md`:
+- `### Added` - New features
+- `### Fixed` - Bug fixes
+- `### Changed` - Changes to existing functionality
+- `### Removed` - Removed features
+
+### 4. Sync Remotes
+```bash
+jj git fetch --remote github                    # Get any automated updates
+jj new master@github master@origin -m "Merge github and origin master branches"  # If diverged
+jj bookmark set master
+```
+
+### 5. Commit and Push
+```bash
+jj git push --remote origin
+```
+
+### 6. Release Decision
+Ask if user wants to release:
+- **No release**: Done (code stays on origin only)
+- **Release**:
+  1. Push to github: `jj git push --remote github`
+  2. Go to [GitHub Actions](https://github.com/kkkev/jj-idea/actions) → "Build and Release" → "Run workflow"
+  3. Select bump type (major/minor/patch)
+  4. Workflow handles: version bump, release creation, changelog update, marketplace publish
+
 ## References
 
 ### Jujutsu Documentation
