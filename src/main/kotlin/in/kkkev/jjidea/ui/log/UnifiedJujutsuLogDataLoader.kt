@@ -201,11 +201,16 @@ class UnifiedJujutsuLogDataLoader(
     }
 
     /**
-     * Request selection of an entry. If data is loading, defers until load completes.
+     * Request selection of an entry and trigger a refresh.
+     * VCS operations (abandon, edit, new) fire changeSelection to request a specific entry
+     * be selected after the operation. We must always refresh when this happens because the
+     * log data has changed, even if repositoryStates reports no WC change (e.g., abandoning
+     * a non-working-copy commit doesn't change the WC entry's stateKey).
      */
     private fun requestSelection(key: ChangeKey) {
         pendingSelection = key
         hasPendingSelection = true
+        loadCommits()
     }
 
     /**

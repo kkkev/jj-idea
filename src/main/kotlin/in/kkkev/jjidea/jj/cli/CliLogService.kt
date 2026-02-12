@@ -94,7 +94,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 Result.failure(e)
             }
         } else {
-            log.error("Diff summary command failed: ${result.stderr}")
+            log.warn("Diff summary command failed: ${result.stderr}")
             Result.failure(Exception("Diff summary command failed: ${result.stderr}"))
         }
     }

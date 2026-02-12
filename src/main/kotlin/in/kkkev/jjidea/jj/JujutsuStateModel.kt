@@ -136,12 +136,15 @@ class JujutsuStateModel(private val project: Project) {
         }
 
         // When repository states change (VCS operations completed), mark directories dirty
-        // to trigger ChangeProvider refresh for file changes
-        repositoryStates.connect(project) { _, new ->
-            if (new.isNotEmpty()) {
-                log.info("Repository states changed, marking ${new.size} roots dirty")
+        // to trigger ChangeProvider refresh for file changes.
+        // Only dirty repos whose state actually changed to avoid flooding FileStatusManager.
+        repositoryStates.connect(project) { old, new ->
+            val oldKeys = old.associate { it.repo to it.stateKey }
+            val changedEntries = new.filter { entry -> oldKeys[entry.repo] != entry.stateKey }
+            if (changedEntries.isNotEmpty()) {
+                log.info("Repository states changed for ${changedEntries.size}/${new.size} repos, marking dirty")
                 val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
-                new.forEach { entry ->
+                changedEntries.forEach { entry ->
                     dirtyScopeManager.dirDirtyRecursively(entry.repo.directory)
                 }
             }
