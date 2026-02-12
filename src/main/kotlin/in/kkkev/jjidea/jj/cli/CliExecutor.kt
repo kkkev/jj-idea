@@ -121,10 +121,15 @@ class CliExecutor(
         // Add color=never to avoid ANSI codes in output
         commandLine.environment["NO_COLOR"] = "1"
 
-        log.debug("Executing: ${commandLine.commandLineString}")
+        val cmdName = args.firstOrNull()?.toString() ?: "unknown"
+        log.info("Executing: jj $cmdName (${Thread.currentThread().name})")
 
+        val startTime = System.currentTimeMillis()
         val processHandler = CapturingProcessHandler(commandLine)
         val output: ProcessOutput = processHandler.runProcess(timeout.toInt())
+        val duration = System.currentTimeMillis() - startTime
+
+        log.info("Completed: jj $cmdName in ${duration}ms (exit=${output.exitCode})")
 
         return CommandExecutor.CommandResult(exitCode = output.exitCode, stdout = output.stdout, stderr = output.stderr)
     }

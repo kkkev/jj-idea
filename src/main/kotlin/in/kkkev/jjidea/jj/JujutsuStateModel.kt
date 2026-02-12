@@ -2,9 +2,11 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
@@ -26,6 +28,8 @@ import `in`.kkkev.jjidea.vcs.jujutsuRepositories
  */
 @Service(Service.Level.PROJECT)
 class JujutsuStateModel(private val project: Project) {
+    private val log = Logger.getInstance(javaClass)
+
     /**
      * Set of VCS-configured JJ roots that are actually initialized (have .jj directory).
      * Cached to avoid EDT slow operations. Updated via file listener when .jj directories change.
@@ -41,7 +45,14 @@ class JujutsuStateModel(private val project: Project) {
      */
     val isJujutsu: Boolean get() = initializedRoots.value.isNotEmpty()
 
-    val repositoryStates = notifiableState(project, "Jujutsu Repository States", emptySet()) {
+    val repositoryStates = notifiableState(
+        project,
+        "Jujutsu Repository States",
+        emptySet(),
+        equalityCheck = { a, b ->
+            a.map { it.stateKey }.toSet() == b.map { it.stateKey }.toSet()
+        }
+    ) {
         // Use initializedRoots.value to only load state for initialized repositories
         // This avoids errors from uninitialized JJ VCS mappings
         initializedRoots.value.mapNotNull {
@@ -79,7 +90,9 @@ class JujutsuStateModel(private val project: Project) {
                         when (event) {
                             is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
                                 event.file?.let { file ->
-                                    if (repos.any { VfsUtil.isAncestor(it.directory, file, false) }) {
+                                    if (repos.any { VfsUtil.isAncestor(it.directory, file, false) } &&
+                                        !isUnderJjDirectory(file, repos)
+                                    ) {
                                         dirtyScopeManager.fileDirty(file)
                                         hasRepoChanges = true
                                     }
@@ -89,10 +102,19 @@ class JujutsuStateModel(private val project: Project) {
                     }
 
                     if (hasRepoChanges) {
+                        log.info(
+                            "File changes detected (${events.size} events on " +
+                                "${Thread.currentThread().name}), scheduling repositoryStates invalidation"
+                        )
                         repositoryStateAlarm.cancelAllRequests()
                         repositoryStateAlarm.addRequest({ repositoryStates.invalidate() }, 300)
                     }
                 }
+
+                private fun isUnderJjDirectory(file: VirtualFile, repos: Set<JujutsuRepository>): Boolean =
+                    repos.any { repo ->
+                        repo.directory.findChild(".jj")?.let { VfsUtil.isAncestor(it, file, false) } ?: false
+                    }
 
                 private fun isJjDirectoryEvent(event: VFileEvent): Boolean {
                     val name = event.file?.name ?: event.path.substringAfterLast('/')
@@ -103,7 +125,8 @@ class JujutsuStateModel(private val project: Project) {
 
         // Update tool window availability when initializedRoots changes
         // Also invalidate repositoryStates since it depends on initializedRoots
-        initializedRoots.connect(project) { _, new ->
+        initializedRoots.connect(project) { old, new ->
+            log.info("Initialized roots changed: ${old.size} -> ${new.size} roots")
             ToolWindowManager.getInstance(project)
                 .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
                 ?.isAvailable = new.isNotEmpty()
@@ -116,6 +139,7 @@ class JujutsuStateModel(private val project: Project) {
         // to trigger ChangeProvider refresh for file changes
         repositoryStates.connect(project) { _, new ->
             if (new.isNotEmpty()) {
+                log.info("Repository states changed, marking ${new.size} roots dirty")
                 val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
                 new.forEach { entry ->
                     dirtyScopeManager.dirDirtyRecursively(entry.repo.directory)

@@ -1,10 +1,8 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.*
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlin.time.Duration.Companion.days
@@ -27,7 +25,7 @@ class JujutsuDateFilterComponent(private val tableModel: JujutsuLogTableModel) :
     }
 
     override fun createActionGroup(): ActionGroup {
-        val group = DefaultActionGroup()
+        val group = BackgroundActionGroup()
 
         // Add predefined date ranges
         DatePeriod.values().forEach { period ->

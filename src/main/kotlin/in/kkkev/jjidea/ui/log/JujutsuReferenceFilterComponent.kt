@@ -4,6 +4,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.*
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 import javax.swing.Icon
 
 /**
@@ -25,7 +26,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
     }
 
     override fun createActionGroup(): ActionGroup {
-        val group = DefaultActionGroup()
+        val group = BackgroundActionGroup()
 
         // Get all references from the table model
         val references = getAllReferences()

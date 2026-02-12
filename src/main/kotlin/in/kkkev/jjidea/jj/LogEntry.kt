@@ -30,5 +30,34 @@ data class LogEntry(
 
     override val parentIds: List<ChangeId> get() = parentIdentifiers.map { it.changeId }
 
+    /**
+     * Projection of LogEntry that excludes volatile fields (timestamps) from equality.
+     * Used by repositoryStates to avoid spurious invalidations when only timestamps change.
+     */
+    data class StateKey(
+        val repo: JujutsuRepository,
+        val id: ChangeId,
+        val commitId: CommitId,
+        val description: String,
+        val bookmarks: List<Bookmark>,
+        val isWorkingCopy: Boolean,
+        val hasConflict: Boolean,
+        val isEmpty: Boolean,
+        val immutable: Boolean
+    )
+
+    val stateKey
+        get() = StateKey(
+            repo = repo,
+            id = id,
+            commitId = commitId,
+            description = underlyingDescription,
+            bookmarks = bookmarks,
+            isWorkingCopy = isWorkingCopy,
+            hasConflict = hasConflict,
+            isEmpty = isEmpty,
+            immutable = immutable
+        )
+
     data class Identifiers(val changeId: ChangeId, val commitId: CommitId)
 }

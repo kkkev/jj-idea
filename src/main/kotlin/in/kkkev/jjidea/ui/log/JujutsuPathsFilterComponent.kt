@@ -1,13 +1,11 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.actionSystem.ActionGroup
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.fileChooser.FileChooserFactory
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 
 /**
@@ -32,10 +30,7 @@ class JujutsuPathsFilterComponent(private val repo: JujutsuRepository, private v
     }
 
     override fun createActionGroup(): ActionGroup {
-        val group = DefaultActionGroup()
-
-        // Add option to select path
-        group.add(SelectPathAction())
+        val group = BackgroundActionGroup(SelectPathAction())
 
         // Show selected paths
         if (selectedPaths.isNotEmpty()) {

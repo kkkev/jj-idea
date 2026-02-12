@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.actionSystem.*
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 
 /**
  * Filter component for authors.
@@ -25,7 +26,7 @@ class JujutsuAuthorFilterComponent(private val tableModel: JujutsuLogTableModel)
     }
 
     override fun createActionGroup(): ActionGroup {
-        val group = DefaultActionGroup()
+        val group = BackgroundActionGroup()
 
         // Add author options
         val authors = tableModel.getAllAuthors()

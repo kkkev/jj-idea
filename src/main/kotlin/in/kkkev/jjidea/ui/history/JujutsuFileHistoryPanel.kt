@@ -17,6 +17,8 @@ import com.intellij.ui.components.SearchFieldWithExtension
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.ui.log.*
+import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.vcs.actions.PopupActionGroup
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.Box
@@ -207,11 +209,7 @@ class JujutsuFileHistoryPanel(project: Project, filePath: FilePath, repo: Jujuts
      */
     private fun createFilterField(): SearchFieldWithExtension {
         // Create action group with toggle buttons
-        val filterActionsGroup = DefaultActionGroup().apply {
-            add(RegexFilterAction())
-            add(MatchCaseAction())
-            add(MatchWholeWordsAction())
-        }
+        val filterActionsGroup = BackgroundActionGroup(RegexFilterAction(), MatchCaseAction(), MatchWholeWordsAction())
 
         // Create custom toolbar that uses toggle-aware action buttons
         val toolbar = object : ActionToolbarImpl("JujutsuFileHistoryFilter", filterActionsGroup, true, false, true) {
@@ -238,11 +236,7 @@ class JujutsuFileHistoryPanel(project: Project, filePath: FilePath, repo: Jujuts
         return SearchFieldWithExtension(toolbar.component, searchTextField)
     }
 
-    private fun createActionGroup() = DefaultActionGroup().apply {
-        add(RefreshAction())
-        add(ColumnsAction())
-        add(DetailsPositionAction())
-    }
+    private fun createActionGroup() = BackgroundActionGroup(RefreshAction(), ColumnsAction(), DetailsPositionAction())
 
     /**
      * Refresh action - reload file history.
@@ -261,10 +255,9 @@ class JujutsuFileHistoryPanel(project: Project, filePath: FilePath, repo: Jujuts
     /**
      * Columns sub-menu - show column visibility options.
      */
-    private inner class ColumnsAction : DefaultActionGroup(JujutsuBundle.message("log.action.columns"), true) {
+    private inner class ColumnsAction : PopupActionGroup("log.action.columns", createColumnsActionGroup()) {
         init {
             templatePresentation.icon = AllIcons.Actions.Show
-            add(createColumnsActionGroup())
         }
     }
 
@@ -272,11 +265,9 @@ class JujutsuFileHistoryPanel(project: Project, filePath: FilePath, repo: Jujuts
      * Details position sub-menu - toggle between right and bottom.
      */
     private inner class DetailsPositionAction :
-        DefaultActionGroup(JujutsuBundle.message("log.action.details.position"), true) {
+        PopupActionGroup("log.action.details.position", DetailsOnRightAction(), DetailsOnBottomAction()) {
         init {
             templatePresentation.icon = AllIcons.Actions.SplitHorizontally
-            add(DetailsOnRightAction())
-            add(DetailsOnBottomAction())
         }
     }
 

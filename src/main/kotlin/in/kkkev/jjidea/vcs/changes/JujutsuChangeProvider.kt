@@ -23,7 +23,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         progress: ProgressIndicator,
         addGate: ChangeListManagerGate
     ) {
-        log.debug("Getting changes for dirty scope")
+        log.info("getChanges called on ${Thread.currentThread().name}, ${dirtyScope.affectedContentRoots.size} roots")
 
         dirtyScope.affectedContentRoots.map { it.jujutsuRepository }.forEach { jujutsuRoot ->
             // Handle uninitialized roots (e.g., .jj directory was deleted)
@@ -34,7 +34,9 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             }
 
             try {
+                val startTime = System.currentTimeMillis()
                 val result = jujutsuRoot.commandExecutor.status()
+                log.info("jj status for ${jujutsuRoot.relativePath} took ${System.currentTimeMillis() - startTime}ms")
 
                 if (!result.isSuccess) {
                     log.warn("Failed to get jj status for ${jujutsuRoot.relativePath}: ${result.stderr}")

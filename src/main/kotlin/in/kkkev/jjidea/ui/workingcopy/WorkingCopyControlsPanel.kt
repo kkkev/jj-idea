@@ -1,7 +1,9 @@
 package `in`.kkkev.jjidea.ui.workingcopy
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
@@ -14,6 +16,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.StringBuilderHtmlTextCanvas
 import `in`.kkkev.jjidea.ui.append
+import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.vcs.actions.requestDescription
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
@@ -200,7 +203,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     fun createToolbar(owner: JComponent): ActionToolbar {
-        val group = DefaultActionGroup()
+        val group = BackgroundActionGroup()
 
         // New Change action - primary workflow operation
         group.add(object : DumbAwareAction(
@@ -215,8 +218,6 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             override fun update(e: AnActionEvent) {
                 e.presentation.isEnabled = boundRepository != null
             }
-
-            override fun getActionUpdateThread() = ActionUpdateThread.EDT
         })
 
         return ActionManager.getInstance()

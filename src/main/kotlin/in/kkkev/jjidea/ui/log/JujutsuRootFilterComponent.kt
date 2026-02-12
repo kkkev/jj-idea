@@ -6,6 +6,7 @@ import com.intellij.util.ui.EmptyIcon
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 
 /**
  * Filter component for repository roots.
@@ -40,7 +41,7 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
     fun shouldBeVisible(): Boolean = tableModel.getAllRoots().size > 1
 
     override fun createActionGroup(): ActionGroup {
-        val group = DefaultActionGroup()
+        val group = BackgroundActionGroup()
 
         // Add root options
         val roots = tableModel.getAllRoots()
@@ -75,8 +76,6 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
             // Reserve space for icon - see PopupFactoryImpl.calcMaxIconSize
             templatePresentation.icon = EmptyIcon.create(JBUI.scale(15))
         }
-
-        override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
         override fun isSelected(e: AnActionEvent): Boolean = selectedRoots.contains(root)
 

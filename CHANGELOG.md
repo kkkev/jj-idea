@@ -7,10 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.2.3] - 2026-02-11
-
 ### Added
 - Custom file history panel with same styling as the log view (replaces standard Show History action)
+- Diagnostic logging for state model, change provider, and CLI executor to aid freeze investigation
+
+### Changed
+- Declared `.jj` as administrative area in plugin.xml (hides from project view, consistent with Git plugin)
+
+### Fixed
+- Performance: most UI action classes now use ActionUpdateThread.BGT to avoid EDT contention during toolbar updates
+- Performance: BulkFileListener now filters out `.jj` internal directory changes to prevent unnecessary refresh cycles
+- Performace: repository state equality excludes volatile timestamps to prevent spurious invalidations
+
+## [0.2.3] - 2026-02-11
 
 ### Fixed
 - Graph rendering: fix phantom passthrough lanes where fork+merge connections drew disconnected vertical lines

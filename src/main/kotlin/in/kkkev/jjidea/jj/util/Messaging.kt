@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj.util
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.util.messages.Topic
 import java.util.concurrent.atomic.AtomicBoolean
@@ -24,17 +25,20 @@ fun <T : Any> notifiableState(
     project: Project,
     topicDisplayName: String,
     startValue: T,
+    equalityCheck: (T, T) -> Boolean = { a, b -> a == b },
     loader: () -> T
 ): NotifiableState<T> =
-    SimpleNotifiableState(project, topicDisplayName, startValue, loader)
+    SimpleNotifiableState(project, topicDisplayName, startValue, equalityCheck, loader)
 
 class SimpleNotifiableState<T : Any>(
     val project: Project,
-    topicDisplayName: String,
+    val topicDisplayName: String,
     val startValue: T,
+    val equalityCheck: (T, T) -> Boolean,
     val loader: () -> T
 ) :
     NotifiableState<T> {
+    private val log = Logger.getInstance(javaClass)
     val topic = topic<NotifiableState.Listener<T>>(topicDisplayName)
 
     private val publisher = project.messageBus.syncPublisher(topic)
@@ -51,13 +55,17 @@ class SimpleNotifiableState<T : Any>(
     override fun invalidate() {
         if (!loading.compareAndSet(false, true)) {
             // A load is already in progress; mark that we need to reload when it finishes
+            log.info("[$topicDisplayName] invalidate skipped (already loading)")
             invalidatedWhileLoading.set(true)
             return
         }
+        log.info("[$topicDisplayName] invalidate started on ${Thread.currentThread().name}")
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
                 val newValue = loader()
-                if (value != newValue) {
+                val changed = !equalityCheck(value, newValue)
+                log.info("[$topicDisplayName] load complete, changed=$changed")
+                if (changed) {
                     val oldValue = value
                     value = newValue
                     notify(publisher, oldValue, newValue)
@@ -66,6 +74,7 @@ class SimpleNotifiableState<T : Any>(
                 loading.set(false)
                 // If invalidated while loading, re-run to pick up latest state
                 if (invalidatedWhileLoading.compareAndSet(true, false)) {
+                    log.info("[$topicDisplayName] re-invalidating (invalidated while loading)")
                     invalidate()
                 }
             }
@@ -76,7 +85,7 @@ class SimpleNotifiableState<T : Any>(
         project.messageBus.connect(parent).subscribe(topic, handler)
         // Only notify immediately if value differs from startValue (meaning load completed)
         // Otherwise, the load completion will trigger notification via invalidate()
-        if (value != startValue) {
+        if (!equalityCheck(value, startValue)) {
             notify(handler, startValue, value)
         }
     }
