@@ -114,27 +114,6 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
 }
 
 /**
- * Renderer for the Description column.
- * Phase 1: Just show description text
- * Phase 3: Add right-aligned refs with fancy icons
- */
-class DescriptionCellRenderer : TextCellRenderer<LogEntry>() {
-    override fun render(value: LogEntry) {
-        // Use shared style logic
-        val descAttributes = DescriptionRenderingStyle.getTextAttributes(value)
-
-        // Append description summary
-        append(value.description.summary, descAttributes)
-
-        // Phase 1: Show bookmarks as simple text
-        append(value.bookmarks)
-
-        // Set tooltip to full description
-        toolTipText = value.description.display
-    }
-}
-
-/**
  * Renderer for the Author column.
  */
 class AuthorCellRenderer : TextCellRenderer<VcsUser>() {
