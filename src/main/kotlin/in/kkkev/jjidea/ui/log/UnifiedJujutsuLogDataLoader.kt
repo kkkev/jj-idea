@@ -1,13 +1,17 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
-import `in`.kkkev.jjidea.jj.*
-import java.util.PriorityQueue
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Expression
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.CommitTablePanel
+import `in`.kkkev.jjidea.ui.DataLoader
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -26,30 +30,25 @@ import java.util.concurrent.atomic.AtomicReference
 class UnifiedJujutsuLogDataLoader(
     private val project: Project,
     private val repositories: () -> List<JujutsuRepository>,
-    private val tableModel: JujutsuLogTableModel,
-    private val table: JujutsuLogTable,
-    parentDisposable: Disposable,
-    private val onDataLoaded: (() -> Unit)? = null
-) {
+    private val panel: CommitTablePanel<Data>
+) : DataLoader {
     private val log = Logger.getInstance(javaClass)
+
     private val graphBuilder = CommitGraphBuilder()
 
     private val loading = AtomicBoolean(false)
     private val pendingRefresh = AtomicBoolean(false)
     private val currentIndicator = AtomicReference<ProgressIndicator?>(null)
 
-    /**
-     * Pending selection to apply after data loads.
-     */
-    @Volatile
-    private var pendingSelection: ChangeKey? = null
+    data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeId, GraphNode>)
 
-    @Volatile
-    private var hasPendingSelection = false
+    override fun load() = loadCommits()
 
-    init {
-        // Listen for change selection requests
-        project.stateModel.changeSelection.connect(parentDisposable) { key -> requestSelection(key) }
+    private fun notify(data: Data) {
+        ApplicationManager.getApplication().invokeLater {
+            panel.onDataLoaded(data)
+            log.info("Table updated with ${data.entries.size} commits and graph layout")
+        }
     }
 
     /**
@@ -61,10 +60,7 @@ class UnifiedJujutsuLogDataLoader(
         val repos = repositories()
         if (repos.isEmpty()) {
             log.info("No repositories to load commits from")
-            ApplicationManager.getApplication().invokeLater {
-                tableModel.setEntries(emptyList())
-                table.updateGraph(emptyMap())
-            }
+            notify(Data(emptyList(), emptyMap()))
             return
         }
 
@@ -79,7 +75,8 @@ class UnifiedJujutsuLogDataLoader(
             private val entriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
             private val errors = ConcurrentHashMap<JujutsuRepository, Throwable>()
             private var allEntries: List<LogEntry> = emptyList()
-            private var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
+            var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
+                private set
 
             override fun run(indicator: ProgressIndicator) {
                 currentIndicator.set(indicator)
@@ -139,19 +136,7 @@ class UnifiedJujutsuLogDataLoader(
                     return
                 }
 
-                ApplicationManager.getApplication().invokeLater {
-                    tableModel.setEntries(allEntries)
-                    table.updateGraph(graphNodes)
-                    log.info("Table updated with ${allEntries.size} commits and graph layout")
-
-                    onDataLoaded?.invoke()
-
-                    if (hasPendingSelection) {
-                        hasPendingSelection = false
-                        pendingSelection?.let { selectEntry(it.repo, it.revision) }
-                        pendingSelection = null
-                    }
-                }
+                notify(Data(allEntries, graphNodes))
 
                 if (pendingRefresh.compareAndSet(true, false)) loadCommits(revset)
             }
@@ -166,70 +151,9 @@ class UnifiedJujutsuLogDataLoader(
         }.queue()
     }
 
-    /**
-     * Select an entry in the table by repo and revision, scrolling it into view.
-     * Matches by repo to ensure correct selection in multi-root.
-     *
-     * @param repo The repository containing the entry
-     * @param revision The revision to select ([ChangeId] or [WorkingCopy])
-     */
-    private fun selectEntry(repo: JujutsuRepository, revision: Revision) {
-        val rowIndex = when (revision) {
-            is ChangeId -> (0 until tableModel.rowCount).firstOrNull { row ->
-                val entry = tableModel.getEntry(row)
-                entry?.repo == repo && entry.id == revision
-            }
-
-            WorkingCopy -> (0 until tableModel.rowCount).firstOrNull { row ->
-                val entry = tableModel.getEntry(row)
-                entry?.repo == repo && entry.isWorkingCopy
-            }
-
-            else -> {
-                log.warn("Unsupported revision type for selection: $revision")
-                null
-            }
-        }
-
-        if (rowIndex != null) {
-            table.setRowSelectionInterval(rowIndex, rowIndex)
-            table.scrollRectToVisible(table.getCellRect(rowIndex, 0, true))
-            log.info("Selected entry at row $rowIndex (${repo.relativePath}:$revision)")
-        } else {
-            log.warn("Entry not found: ${repo.relativePath}:$revision")
-        }
-    }
-
-    /**
-     * Request selection of an entry and trigger a refresh.
-     * VCS operations (abandon, edit, new) fire changeSelection to request a specific entry
-     * be selected after the operation. We must always refresh when this happens because the
-     * log data has changed, even if repositoryStates reports no WC change (e.g., abandoning
-     * a non-working-copy commit doesn't change the WC entry's stateKey).
-     */
-    private fun requestSelection(key: ChangeKey) {
-        pendingSelection = key
-        hasPendingSelection = true
-        loadCommits()
-    }
-
-    /**
-     * Refresh the log - reload all commits from all repositories, preserving current selection.
-     * Does not override explicit selection requests from changeSelection.
-     */
-    fun refresh() {
+    override fun refresh() {
         log.info("Refreshing unified log")
-        // Save current selection to restore after refresh (unless an explicit selection is pending)
-        val savedSelection = table.takeIf { !hasPendingSelection }
-            ?.selectedEntry
-            ?.let { ChangeKey(it.repo, it.id) }
-
         loadCommits()
-
-        // Restore selection only if no explicit selection is pending
-        if (savedSelection != null && !hasPendingSelection) {
-            requestSelection(savedSelection)
-        }
     }
 }
 

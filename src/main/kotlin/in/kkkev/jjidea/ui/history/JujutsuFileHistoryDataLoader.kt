@@ -8,7 +8,8 @@ import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
+import `in`.kkkev.jjidea.ui.CommitTablePanel
+import `in`.kkkev.jjidea.ui.DataLoader
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
@@ -21,9 +22,8 @@ import java.util.concurrent.atomic.AtomicReference
 class JujutsuFileHistoryDataLoader(
     private val repo: JujutsuRepository,
     private val filePath: FilePath,
-    private val tableModel: JujutsuLogTableModel,
-    private val onDataLoaded: (() -> Unit)? = null
-) {
+    private val panel: CommitTablePanel<List<LogEntry>>
+) : DataLoader {
     private val log = Logger.getInstance(javaClass)
 
     private val loading = AtomicBoolean(false)
@@ -33,7 +33,7 @@ class JujutsuFileHistoryDataLoader(
     /**
      * Load file history in the background.
      */
-    fun loadHistory() {
+    override fun load() {
         if (!loading.compareAndSet(false, true)) {
             pendingRefresh.set(true)
             return
@@ -60,14 +60,12 @@ class JujutsuFileHistoryDataLoader(
                 currentIndicator.set(null)
 
                 ApplicationManager.getApplication().invokeLater {
-                    tableModel.setEntries(entries)
-                    log.info("Table updated with ${entries.size} history entries")
-
-                    onDataLoaded?.invoke()
+                    panel.onDataLoaded(entries)
+                    log.info("Updated with ${entries.size} history entries")
                 }
 
                 if (pendingRefresh.compareAndSet(true, false)) {
-                    loadHistory()
+                    load()
                 }
             }
 
@@ -77,7 +75,7 @@ class JujutsuFileHistoryDataLoader(
                 log.error("Failed to load file history for ${filePath.name}", throwable)
 
                 if (pendingRefresh.compareAndSet(true, false)) {
-                    loadHistory()
+                    load()
                 }
             }
         }.queue()
@@ -86,8 +84,8 @@ class JujutsuFileHistoryDataLoader(
     /**
      * Refresh the file history.
      */
-    fun refresh() {
+    override fun refresh() {
         log.info("Refreshing file history for ${filePath.name}")
-        loadHistory()
+        load()
     }
 }

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Performance: simplified UI updates from file changes
+
 ## [0.2.4] - 2026-02-12
 
 ### Added
@@ -19,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Performance: most UI action classes now use ActionUpdateThread.BGT to avoid EDT contention during toolbar updates
 - Performance: BulkFileListener now filters out `.jj` internal directory changes to prevent unnecessary refresh cycles
-- Performace: repository state equality excludes volatile timestamps to prevent spurious invalidations
+- Performance: repository state equality excludes volatile timestamps to prevent spurious invalidations
 - Fix: log panel now refreshes after VCS operations (abandon, edit, new) even when working copy unchanged
 - Fix: only mark repos dirty when their state actually changes, reducing FileStatusManager event flooding
 - Fix: register IgnoredFileProvider for `.jj/` directories to prevent change list processing of internal files

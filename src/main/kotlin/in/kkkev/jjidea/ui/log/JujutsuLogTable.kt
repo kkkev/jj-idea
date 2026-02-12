@@ -1,14 +1,14 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import kotlinx.datetime.Instant
 import java.awt.Component
@@ -29,7 +29,9 @@ import javax.swing.table.AbstractTableModel
 class JujutsuLogTable(
     private val project: Project,
     val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
-) : JBTable(JujutsuLogTableModel()) {
+) : JBTable(JujutsuLogTableModel()), Disposable {
+    private val log = Logger.getInstance(javaClass)
+
     // Graph nodes for rendering (populated when data is loaded)
     var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
         private set
@@ -60,6 +62,14 @@ class JujutsuLogTable(
             val maxWidth = logModel.getAllRoots().maxOfOrNull { fm.stringWidth(it.displayName) } ?: 0
             return maxWidth + 16 // padding
         }
+
+    @Volatile
+    private var pendingSelection: ChangeKey? = null
+
+    fun requestSelection(changeKey: ChangeKey) {
+        if (pendingSelection == null)
+            pendingSelection = changeKey
+    }
 
     /**
      * Toggle the root gutter expansion state.
@@ -210,6 +220,51 @@ class JujutsuLogTable(
      */
     val selectedEntries get() = selectedRows.map(::convertRowIndexToModel).mapNotNull(logModel::getEntry)
 
+    fun setEntries(entries: List<LogEntry>) {
+        selectedEntry?.let {
+            requestSelection(ChangeKey(it.repo, it.id))
+        }
+        logModel.setEntries(entries)
+        pendingSelection?.let {
+            selectEntry(it.repo, it.revision)
+            pendingSelection = null
+        }
+    }
+
+    /**
+     * Select an entry in the table by repo and revision, scrolling it into view.
+     * Matches by repo to ensure correct selection in multi-root.
+     *
+     * @param repo The repository containing the entry
+     * @param revision The revision to select ([ChangeId] or [WorkingCopy])
+     */
+    private fun selectEntry(repo: JujutsuRepository, revision: Revision) {
+        val rowIndex = when (revision) {
+            is ChangeId -> (0 until logModel.rowCount).firstOrNull { row ->
+                val entry = logModel.getEntry(row)
+                entry?.repo == repo && entry.id == revision
+            }
+
+            WorkingCopy -> (0 until logModel.rowCount).firstOrNull { row ->
+                val entry = logModel.getEntry(row)
+                entry?.repo == repo && entry.isWorkingCopy
+            }
+
+            else -> {
+                log.warn("Unsupported revision type for selection: $revision")
+                null
+            }
+        }
+
+        if (rowIndex != null) {
+            setRowSelectionInterval(rowIndex, rowIndex)
+            scrollRectToVisible(getCellRect(rowIndex, 0, true))
+            log.info("Selected entry at row $rowIndex (${repo.relativePath}:$revision)")
+        } else {
+            log.warn("Entry not found: ${repo.relativePath}:$revision")
+        }
+    }
+
     /**
      * Update graph nodes and refresh graph+description column.
      * Called after data is loaded.
@@ -311,6 +366,9 @@ class JujutsuLogTable(
             descColumn.preferredWidth = availableWidth
             descColumn.width = availableWidth
         }
+    }
+
+    override fun dispose() {
     }
 }
 
