@@ -43,7 +43,7 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
         )
 
         // React to initializedRoots changes
-        project.stateModel.initializedRoots.connect(this) { _, jjRoots ->
+        project.stateModel.initializedRoots.connect(this) { jjRoots ->
             handleRootsChange(jjRoots)
         }
 

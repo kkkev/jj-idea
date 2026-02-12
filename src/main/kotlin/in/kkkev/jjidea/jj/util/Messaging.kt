@@ -5,13 +5,13 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.util.messages.Topic
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 inline fun <reified L> topic(displayName: String) = Topic.create(displayName, L::class.java)
 
 interface NotifiableState<T> {
     fun interface Listener<T> {
-        fun changed(oldValue: T, newValue: T)
+        fun changed(newValue: T)
     }
 
     val value: T
@@ -42,8 +42,13 @@ class SimpleNotifiableState<T : Any>(
     val topic = topic<NotifiableState.Listener<T>>(topicDisplayName)
 
     private val publisher = project.messageBus.syncPublisher(topic)
-    private val loading = AtomicBoolean(false)
-    private val invalidatedWhileLoading = AtomicBoolean(false)
+
+    /**
+     * Monotonically increasing version counter. Each [invalidate] call bumps this.
+     * After a load completes, if the version has moved on, we reload — no separate
+     * "invalidated while loading" flag needed.
+     */
+    private val version = AtomicInteger(0)
 
     @Volatile
     override var value: T = startValue
@@ -53,29 +58,22 @@ class SimpleNotifiableState<T : Any>(
     }
 
     override fun invalidate() {
-        if (!loading.compareAndSet(false, true)) {
-            // A load is already in progress; mark that we need to reload when it finishes
-            log.info("[$topicDisplayName] invalidate skipped (already loading)")
-            invalidatedWhileLoading.set(true)
-            return
-        }
-        log.info("[$topicDisplayName] invalidate started on ${Thread.currentThread().name}")
+        val myVersion = version.incrementAndGet()
+        log.info("[$topicDisplayName] invalidate v$myVersion on ${Thread.currentThread().name}")
         ApplicationManager.getApplication().executeOnPooledThread {
-            try {
-                val newValue = loader()
-                val changed = !equalityCheck(value, newValue)
-                log.info("[$topicDisplayName] load complete, changed=$changed")
-                if (changed) {
-                    val oldValue = value
-                    value = newValue
-                    notify(publisher, oldValue, newValue)
-                }
-            } finally {
-                loading.set(false)
-                // If invalidated while loading, re-run to pick up latest state
-                if (invalidatedWhileLoading.compareAndSet(true, false)) {
-                    log.info("[$topicDisplayName] re-invalidating (invalidated while loading)")
-                    invalidate()
+            val newValue = loader()
+            // If version has moved on since we started, another load is queued or will be —
+            // just discard this result. The latest invalidate() will produce a fresher load.
+            if (version.get() != myVersion) {
+                log.info("[$topicDisplayName] v$myVersion stale (now v${version.get()}), discarding")
+                return@executeOnPooledThread
+            }
+            val changed = !equalityCheck(value, newValue)
+            log.info("[$topicDisplayName] v$myVersion loaded, changed=$changed")
+            if (changed) {
+                value = newValue
+                ApplicationManager.getApplication().invokeLater {
+                    publisher.changed(newValue)
                 }
             }
         }
@@ -83,16 +81,11 @@ class SimpleNotifiableState<T : Any>(
 
     override fun connect(parent: Disposable, handler: NotifiableState.Listener<T>) {
         project.messageBus.connect(parent).subscribe(topic, handler)
-        // Only notify immediately if value differs from startValue (meaning load completed)
-        // Otherwise, the load completion will trigger notification via invalidate()
-        if (!equalityCheck(value, startValue)) {
-            notify(handler, startValue, value)
-        }
-    }
-
-    fun notify(listener: NotifiableState.Listener<T>, oldValue: T, newValue: T) {
-        ApplicationManager.getApplication().invokeLater {
-            listener.changed(oldValue, newValue)
+        val current = value
+        if (!equalityCheck(current, startValue)) {
+            ApplicationManager.getApplication().invokeLater {
+                handler.changed(current)
+            }
         }
     }
 }

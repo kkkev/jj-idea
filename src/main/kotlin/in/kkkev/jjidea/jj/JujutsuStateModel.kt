@@ -125,8 +125,8 @@ class JujutsuStateModel(private val project: Project) {
 
         // Update tool window availability when initializedRoots changes
         // Also invalidate repositoryStates since it depends on initializedRoots
-        initializedRoots.connect(project) { old, new ->
-            log.info("Initialized roots changed: ${old.size} -> ${new.size} roots")
+        initializedRoots.connect(project) { new ->
+            log.info("Initialized roots changed to ${new.size} roots")
             ToolWindowManager.getInstance(project)
                 .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
                 ?.isAvailable = new.isNotEmpty()
@@ -138,9 +138,11 @@ class JujutsuStateModel(private val project: Project) {
         // When repository states change (VCS operations completed), mark directories dirty
         // to trigger ChangeProvider refresh for file changes.
         // Only dirty repos whose state actually changed to avoid flooding FileStatusManager.
-        repositoryStates.connect(project) { old, new ->
-            val oldKeys = old.associate { it.repo to it.stateKey }
-            val changedEntries = new.filter { entry -> oldKeys[entry.repo] != entry.stateKey }
+        var previousStateKeys = emptyMap<JujutsuRepository, LogEntry.StateKey>()
+        repositoryStates.connect(project) { new ->
+            val newKeys = new.associate { it.repo to it.stateKey }
+            val changedEntries = new.filter { entry -> previousStateKeys[entry.repo] != entry.stateKey }
+            previousStateKeys = newKeys
             if (changedEntries.isNotEmpty()) {
                 log.info("Repository states changed for ${changedEntries.size}/${new.size} repos, marking dirty")
                 val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)

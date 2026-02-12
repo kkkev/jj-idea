@@ -190,7 +190,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun subscribeToStateModel() {
-        project.stateModel.repositoryStates.connect(this) { _, new ->
+        project.stateModel.repositoryStates.connect(this) { new ->
             ApplicationManager.getApplication().invokeLater {
                 // Update UI based on whether we have any repos
                 val hasRepos = new.isNotEmpty()
