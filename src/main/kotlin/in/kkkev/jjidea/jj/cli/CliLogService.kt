@@ -67,16 +67,20 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         val result = executor.bookmarkList(logTemplates.bookmarkListTemplate.spec)
         return if (result.isSuccess) {
-            try {
-                Result.success(parse(logTemplates.bookmarkListTemplate, result.stdout))
-            } catch (e: Exception) {
-                log.error("Failed to parse bookmarks", e)
-                Result.failure(e)
+            toResult("Failed to parse bookmarks") {
+                parse(logTemplates.bookmarkListTemplate, result.stdout)
             }
         } else {
             log.error("Bookmark list command failed: ${result.stderr}")
             Result.failure(VcsException("Error from jj bookmark list: " + result.stderr))
         }
+    }
+
+    private fun <T> toResult(failureMessage: String, block: () -> T): Result<T> = try {
+        Result.success(block())
+    } catch (e: Exception) {
+        log.error(failureMessage, e)
+        Result.failure(e)
     }
 
     override fun getFileChanges(revision: Revision): Result<List<FileChange>> {
@@ -85,13 +89,10 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val result = executor.diffSummary(revision)
 
         return if (result.isSuccess) {
-            try {
-                val changes = parseFileChanges(result.stdout)
-                log.debug("Parsed ${changes.size} file changes")
-                Result.success(changes)
-            } catch (e: Exception) {
-                log.error("Failed to parse file changes", e)
-                Result.failure(e)
+            toResult("Failed to parse file changes") {
+                parseFileChanges(result.stdout).also {
+                    log.debug("Parsed ${it.size} file changes")
+                }
             }
         } else {
             log.warn("Diff summary command failed: ${result.stderr}")
@@ -120,16 +121,15 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 return@mapNotNull null
             }
 
-            val status =
-                when (statusChar) {
-                    'M' -> FileChangeStatus.MODIFIED
-                    'A' -> FileChangeStatus.ADDED
-                    'D' -> FileChangeStatus.DELETED
-                    else -> {
-                        log.debug("Unknown file status '$statusChar' in line: $cleanLine")
-                        FileChangeStatus.UNKNOWN
-                    }
+            val status = when (statusChar) {
+                'M' -> FileChangeStatus.MODIFIED
+                'A' -> FileChangeStatus.ADDED
+                'D' -> FileChangeStatus.DELETED
+                else -> {
+                    log.debug("Unknown file status '$statusChar' in line: $cleanLine")
+                    FileChangeStatus.UNKNOWN
                 }
+            }
 
             FileChange(filePath, status)
         }
@@ -144,23 +144,14 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         val result = executor.log(revset, template.spec, filePaths)
         return if (result.isSuccess) {
-            try {
-                Result.success(parse(template, result.stdout))
-            } catch (e: Exception) {
-                // TODO Improve logging
-                log.error("Failed to parse", e)
-                Result.failure(e)
-            }
+            toResult("Failed to parse") { parse(template, result.stdout) }
         } else {
             // TODO Improve logging
             Result.failure(VcsException("Error from jj log: " + result.stderr))
         }
     }
 
-    private fun <T> parse(
-        template: LogTemplate<T>,
-        logOutput: String
-    ): List<T> {
+    private fun <T> parse(template: LogTemplate<T>, logOutput: String): List<T> {
         val fields = logOutput.trim().split(FIELD_SEPARATOR)
         val recordSize = template.count
         return fields
@@ -231,31 +222,30 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     }
 
     inner class LogTemplates : LogFields() {
-        val basicLogTemplate =
-            logTemplate(
-                changeId,
-                commitId,
-                description,
-                bookmarks,
-                parents,
-                currentWorkingCopy,
-                conflict,
-                empty,
-                immutable
-            ) {
-                LogEntry(
-                    repo,
-                    changeId.take(it),
-                    commitId.take(it),
-                    description.take(it),
-                    bookmarks.take(it),
-                    parents.take(it),
-                    currentWorkingCopy.take(it),
-                    conflict.take(it),
-                    empty.take(it),
-                    immutable = immutable.take(it)
-                )
-            }
+        val basicLogTemplate = logTemplate(
+            changeId,
+            commitId,
+            description,
+            bookmarks,
+            parents,
+            currentWorkingCopy,
+            conflict,
+            empty,
+            immutable
+        ) {
+            LogEntry(
+                repo,
+                changeId.take(it),
+                commitId.take(it),
+                description.take(it),
+                bookmarks.take(it),
+                parents.take(it),
+                currentWorkingCopy.take(it),
+                conflict.take(it),
+                empty.take(it),
+                immutable = immutable.take(it)
+            )
+        }
 
         val fullLogTemplate = logTemplate(basicLogTemplate, author, committer) {
             val basic = basicLogTemplate.take(it)
