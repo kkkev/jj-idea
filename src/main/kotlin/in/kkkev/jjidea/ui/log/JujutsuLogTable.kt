@@ -67,8 +67,9 @@ class JujutsuLogTable(
     private var pendingSelection: ChangeKey? = null
 
     fun requestSelection(changeKey: ChangeKey) {
-        if (pendingSelection == null)
+        if (pendingSelection == null) {
             pendingSelection = changeKey
+        }
     }
 
     /**

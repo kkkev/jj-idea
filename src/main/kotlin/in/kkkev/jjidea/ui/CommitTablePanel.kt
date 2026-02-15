@@ -296,10 +296,10 @@ abstract class CommitTablePanel<D>(
     private inner class BinaryAction(
         messageKeySuffix: String, icon: Icon, private val property: KMutableProperty1<CommitTablePanel<D>, Boolean>
     ) : ToggleAction(
-        JujutsuBundle.message("log.filter.$messageKeySuffix"),
-        JujutsuBundle.message("log.filter.$messageKeySuffix.tooltip"),
-        icon
-    ) {
+            JujutsuBundle.message("log.filter.$messageKeySuffix"),
+            JujutsuBundle.message("log.filter.$messageKeySuffix.tooltip"),
+            icon
+        ) {
         override fun isSelected(e: AnActionEvent) = property.getter.invoke(this@CommitTablePanel)
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {
@@ -348,7 +348,7 @@ abstract class CommitTablePanel<D>(
 
     inner class ToggleColumnAction(
         resourceKeySuffix: String,
-        private val property: KMutableProperty1<JujutsuColumnManager, Boolean>,
+        private val property: KMutableProperty1<JujutsuColumnManager, Boolean>
     ) : ToggleAction(JujutsuBundle.message("log.column.toggle.$resourceKeySuffix")) {
         override fun isSelected(e: AnActionEvent) = property.getter.invoke(columnManager)
 
