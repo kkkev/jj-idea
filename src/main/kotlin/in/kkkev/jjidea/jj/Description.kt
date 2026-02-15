@@ -9,7 +9,7 @@ class Description(val actual: String) {
 
     override fun toString() = actual
 
-    override fun equals(other: Any?) = (other is Description) && actual.equals(other.actual)
+    override fun equals(other: Any?) = (other is Description) && actual == other.actual
 
     override fun hashCode() = actual.hashCode()
 

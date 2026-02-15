@@ -63,9 +63,9 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         layout = BoxLayout(this, BoxLayout.X_AXIS)
 
         // Set vertical alignment for all components to center
-        nameLabel.alignmentY = Component.CENTER_ALIGNMENT
-        valueLabel.alignmentY = Component.CENTER_ALIGNMENT
-        filterButton.alignmentY = Component.CENTER_ALIGNMENT
+        nameLabel.alignmentY = CENTER_ALIGNMENT
+        valueLabel.alignmentY = CENTER_ALIGNMENT
+        filterButton.alignmentY = CENTER_ALIGNMENT
 
         // Add components
         add(nameLabel)
@@ -167,9 +167,9 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         val isEnabled = isEnabled
         if (isEnabled && isHovered) {
             nameLabel.foreground =
-                if (StartupUiUtil.isUnderDarcula) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
+                if (StartupUiUtil.isDarkTheme) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
             valueLabel.foreground =
-                if (StartupUiUtil.isUnderDarcula) UIUtil.getLabelForeground() else UIUtil.getTextFieldForeground()
+                if (StartupUiUtil.isDarkTheme) UIUtil.getLabelForeground() else UIUtil.getTextFieldForeground()
         } else {
             nameLabel.foreground =
                 if (isEnabled) UIUtil.getLabelInfoForeground() else UIUtil.getLabelDisabledForeground()
@@ -274,13 +274,11 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
      *
      * Note: getText() can be called during superclass initialization before textSupplier is assigned.
      */
-    private inner class DynamicLabel(
-        private val textSupplier: () -> String
-    ) : JBLabel("") {
+    private class DynamicLabel(private val textSupplier: () -> String) : JBLabel("") {
         override fun getText(): String {
             // Check for null - can be called during superclass initialization
             @Suppress("SENSELESS_COMPARISON")
-            return if (textSupplier == null) "" else textSupplier()
+            return textSupplier?.invoke() ?: ""
         }
 
         override fun getMinimumSize(): Dimension {
@@ -304,7 +302,6 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             g2d.color = color
 
-            val t = JBUI.scale(if (thinBorder) 1 else thickness)
             val arc = JBUI.scale(arcSize)
 
             // Draw outer rounded rectangle

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fix: log window text filter
+
 ## [0.2.5] - 2026-02-15
 
 ### Fixed

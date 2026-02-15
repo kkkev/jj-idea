@@ -118,8 +118,7 @@ object JujutsuCompareWithPopup {
                 val index = locationToIndex(event.point)
                 if (index < 0) return null
 
-                val item = model.getElementAt(index)
-                return when (item) {
+                return when (val item = model.getElementAt(index)) {
                     is CompareItem.Change -> {
                         buildString {
                             val canvas = StringBuilderHtmlTextCanvas(this)

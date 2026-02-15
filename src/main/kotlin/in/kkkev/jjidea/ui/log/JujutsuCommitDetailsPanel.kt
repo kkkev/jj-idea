@@ -34,7 +34,7 @@ import javax.swing.text.html.HTMLEditorKit
  * Note: This panel works with entries from any repository. The repository context
  * is obtained from the `LogEntry.repo` field when needed.
  */
-class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
+class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
     private val metadataPanel = JPanel(BorderLayout())

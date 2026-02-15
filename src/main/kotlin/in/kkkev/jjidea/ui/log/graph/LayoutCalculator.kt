@@ -136,8 +136,8 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 } else {
                     // Pure Merge: allocate new lane, reserve it for parent
                     val newLane = usedLanes.firstFree()
-                    usedLanes = usedLanes + newLane
-                    newReservedLanes = newReservedLanes + (parentId to newLane)
+                    usedLanes += newLane
+                    newReservedLanes += (parentId to newLane)
                     newLane
                 }
                 newPassthroughs.add(Passthrough(lane = passLane, targetParentId = parentId))

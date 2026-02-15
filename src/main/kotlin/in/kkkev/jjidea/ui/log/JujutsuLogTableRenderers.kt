@@ -209,19 +209,18 @@ class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), Tab
         this.isHovered = mousePos != null && table.rowAtPoint(mousePos) == row
 
         // Set background based on selection/hover state
-        background =
-            when {
-                isSelected -> table.selectionBackground
-                isHovered -> UIUtil.getListBackground(true, false)
-                else -> table.background
-            }
+        background = when {
+            isSelected -> table.selectionBackground
+            isHovered -> UIUtil.getListBackground(true, false)
+            else -> table.background
+        }
 
         // Set tooltip to full description with HTML formatting
         entry?.let { e ->
-            if (!e.description.empty) {
-                toolTipText = formatDescriptionTooltip(e.description.actual)
+            toolTipText = if (!e.description.empty) {
+                formatDescriptionTooltip(e.description.actual)
             } else {
-                toolTipText = null
+                null
             }
         }
 
@@ -256,8 +255,7 @@ class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), Tab
 
         // Calculate width needed for "(empty)" indicator if applicable
         val emptyText = " (empty)"
-        val emptyIndicatorWidth =
-            if (entry.isEmpty) {
+        val emptyIndicatorWidth = if (entry.isEmpty) {
                 val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
                 g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
             } else {
@@ -306,10 +304,10 @@ class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), Tab
 
         // Binary search for the right length
         var truncated = text
-        while (truncated.isNotEmpty() && fontMetrics.stringWidth(truncated + "...") > availableWidth) {
+        while (truncated.isNotEmpty() && fontMetrics.stringWidth("$truncated...") > availableWidth) {
             truncated = truncated.dropLast(1)
         }
-        return if (truncated.isEmpty()) "" else truncated + "..."
+        return if (truncated.isEmpty()) "" else "$truncated..."
     }
 
     private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry, horizontalPadding: Int): Int {

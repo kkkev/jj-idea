@@ -9,7 +9,6 @@ import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.testFramework.LightVirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.vcs.filePath
 
 /**
  * Open file(s) at a historical revision in a read-only editor tab.

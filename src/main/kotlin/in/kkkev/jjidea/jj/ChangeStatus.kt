@@ -5,11 +5,4 @@ interface ChangeStatus {
     val hasConflict: Boolean
     val isEmpty: Boolean
     val immutable: Boolean
-
-    object Default : ChangeStatus {
-        override val isWorkingCopy = false
-        override val hasConflict = false
-        override val isEmpty = false
-        override val immutable = false
-    }
 }

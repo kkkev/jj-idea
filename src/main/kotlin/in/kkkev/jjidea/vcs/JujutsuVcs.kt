@@ -1,9 +1,7 @@
 package `in`.kkkev.jjidea.vcs
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.Messages.showErrorDialog
 import com.intellij.openapi.vcs.AbstractVcs
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
@@ -89,31 +87,5 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
 
         fun getKey(): VcsKey = KEY
 
-        /**
-         * Get VCS with user-friendly error handling.
-         * Use in user-facing actions where VCS might not be configured (e.g., context menus, toolbar actions).
-         *
-         * If VCS is not found:
-         * - Logs at INFO level (user error, not plugin error)
-         * - Shows user-friendly error dialog
-         * - Returns null
-         *
-         * Call from background thread to avoid EDT slow operations.
-         *
-         * @param project The project to find VCS for
-         * @param actionName Name of the action for logging (e.g., "New Change", "Compare with Branch")
-         * @return JujutsuVcs instance or null if not found
-         */
-        fun getVcsWithUserErrorHandling(project: Project, actionName: String) = project.possibleJujutsuVcs ?: run {
-            log.info("User attempted '$actionName' in non-Jujutsu project: ${project.name}")
-            ApplicationManager.getApplication().invokeLater {
-                showErrorDialog(
-                    project,
-                    "This project is not configured for Jujutsu version control.\n\nTo use Jujutsu, ensure the project has a .jj directory.",
-                    "Jujutsu Not Available"
-                )
-            }
-            null
-        }
     }
 }

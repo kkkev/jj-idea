@@ -17,7 +17,7 @@ open class PopupActionGroup(shortNameResourceKey: String, vararg actions: AnActi
     DefaultActionGroup(JujutsuBundle.message(shortNameResourceKey), actions.toList()),
     ActionUpdateThreadAware.Recursive {
     init {
-        getTemplatePresentation().setPopupGroup(true)
+        getTemplatePresentation().isPopupGroup = true
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT

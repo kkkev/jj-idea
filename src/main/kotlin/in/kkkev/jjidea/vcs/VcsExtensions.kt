@@ -28,16 +28,6 @@ val Project.possibleJujutsuVcs
             }
         ) as? JujutsuVcs
 
-/**
- * Find JujutsuVcs for a project, throwing if not found.
- * Use when VCS MUST be available (e.g., within Jujutsu-specific tool windows or providers).
- * @throws VcsException if Jujutsu VCS is not configured for this project
- *
- * TODO: Localise error message
- */
-val Project.jujutsuVcs
-    get() = this.possibleJujutsuVcs ?: throw VcsException("Jujutsu VCS not available for project ${this.name}")
-
 val Project.isJujutsu get() = this.stateModel.isJujutsu
 
 /** All VCS roots in the project that are managed by Jujutsu. Returns VcsRoot objects (not just paths) since callers often need the full root info. */

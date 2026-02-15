@@ -6,6 +6,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.awt.Color
+import kotlin.math.abs
 
 /**
  * TDD tests for commit graph rendering with a simple canvas test harness.
@@ -19,7 +20,6 @@ class GraphRenderingTest {
     companion object {
         private const val LANE_WIDTH = 16
         private const val ROW_HEIGHT = 22
-        private const val COMMIT_RADIUS = 4
     }
 
     /**
@@ -44,20 +44,18 @@ class GraphRenderingTest {
 
         fun isHorizontal() = from.y == to.y
 
-        fun isDiagonal() = !isVertical() && !isHorizontal()
-
         override fun toString() = "$from -> $to [${colorName(color)}]"
 
         private fun colorName(c: Color): String =
-            when {
-                c == Color(0x4285F4) -> "Blue"
-                c == Color(0xEA4335) -> "Red"
-                c == Color(0xFBBC04) -> "Yellow"
-                c == Color(0x34A853) -> "Green"
-                c == Color(0xFF6D00) -> "Orange"
-                c == Color(0x9C27B0) -> "Purple"
-                c == Color(0x00ACC1) -> "Cyan"
-                c == Color(0x7CB342) -> "LightGreen"
+            when (c) {
+                Color(0x4285F4) -> "Blue"
+                Color(0xEA4335) -> "Red"
+                Color(0xFBBC04) -> "Yellow"
+                Color(0x34A853) -> "Green"
+                Color(0xFF6D00) -> "Orange"
+                Color(0x9C27B0) -> "Purple"
+                Color(0x00ACC1) -> "Cyan"
+                Color(0x7CB342) -> "LightGreen"
                 else -> "Color(${c.rgb})"
             }
     }
@@ -80,15 +78,6 @@ class GraphRenderingTest {
 
         fun getLines() = lines.toList()
 
-        fun getLinesInRow(row: Int): List<LineSegment> {
-            val rowTop = row * ROW_HEIGHT
-            val rowBottom = rowTop + ROW_HEIGHT
-            return lines.filter { line ->
-                // Line is in this row if either endpoint is in row bounds
-                (line.from.y in rowTop..rowBottom) || (line.to.y in rowTop..rowBottom)
-            }
-        }
-
         fun printLines() {
             lines.forEachIndexed { index, line ->
                 println("  $index: $line")
@@ -104,8 +93,6 @@ class GraphRenderingTest {
             endRow: Int
         ) {
             val colorLines = lines.filter { it.color == color }
-            val rowTop = startRow * ROW_HEIGHT
-            val rowBottom = endRow * ROW_HEIGHT + ROW_HEIGHT
 
             // For each row boundary, verify lines connect
             for (row in startRow until endRow) {
@@ -149,11 +136,8 @@ class GraphRenderingTest {
             exists shouldBe true
         }
 
-        private fun pointsClose(
-            p1: Point,
-            p2: Point,
-            tolerance: Int = 2
-        ): Boolean = Math.abs(p1.x - p2.x) <= tolerance && Math.abs(p1.y - p2.y) <= tolerance
+        private fun pointsClose(p1: Point, p2: Point, tolerance: Int = 2) =
+            abs(p1.x - p2.x) <= tolerance && abs(p1.y - p2.y) <= tolerance
     }
 
     /**
@@ -268,9 +252,6 @@ class GraphRenderingTest {
 
             val ddX = LANE_WIDTH / 2 + 0 * LANE_WIDTH // Lane 0 = 8
             val ddY = 0 * ROW_HEIGHT + ROW_HEIGHT / 2 // Row 0 middle = 11
-
-            val aaX = LANE_WIDTH / 2 + 0 * LANE_WIDTH // Lane 0 = 8
-            val aaY = 3 * ROW_HEIGHT + ROW_HEIGHT / 2 // Row 3 middle = 77
 
             // From dd to bottom of row 0
             canvas.assertLineExists(

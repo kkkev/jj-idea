@@ -1,7 +1,10 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ToggleAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
@@ -135,10 +138,8 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
         return result
     }
 
-    private inner class SelectReferenceAction(
-        private val reference: String,
-        private val type: ReferenceType
-    ) : ToggleAction(reference, null, type.icon) {
+    private inner class SelectReferenceAction(private val reference: String, type: ReferenceType) :
+        ToggleAction(reference, null, type.icon) {
         override fun isSelected(e: AnActionEvent): Boolean = selectedReference == reference
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {

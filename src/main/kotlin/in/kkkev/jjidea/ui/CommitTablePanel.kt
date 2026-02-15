@@ -79,9 +79,9 @@ abstract class CommitTablePanel<D>(
     }
 
     // Filter options state
-    private var useRegex = false
-    private var matchCase = false
-    private var matchWholeWords = false
+    var useRegex = false
+    var matchCase = false
+    var matchWholeWords = false
 
     init {
         // Create filter field with extension toolbar
@@ -129,9 +129,9 @@ abstract class CommitTablePanel<D>(
     private fun createFilterField(): SearchFieldWithExtension {
         // Create action group with toggle buttons
         val filterActionsGroup = BackgroundActionGroup(
-            BinaryAction("regex", AllIcons.Actions.RegexHovered, CommitTablePanel<D>::useRegex),
-            BinaryAction("matchcase", AllIcons.Actions.MatchCase, CommitTablePanel<D>::matchCase),
-            BinaryAction("words", AllIcons.Actions.Words, CommitTablePanel<D>::matchWholeWords)
+            FilterToggleAction("regex", AllIcons.Actions.RegexHovered, CommitTablePanel<D>::useRegex),
+            FilterToggleAction("matchcase", AllIcons.Actions.MatchCase, CommitTablePanel<D>::matchCase),
+            FilterToggleAction("words", AllIcons.Actions.Words, CommitTablePanel<D>::matchWholeWords)
         )
 
         // Create custom toolbar that uses toggle-aware action buttons
@@ -293,17 +293,17 @@ abstract class CommitTablePanel<D>(
         }
     }
 
-    private inner class BinaryAction(
+    private inner class FilterToggleAction(
         messageKeySuffix: String, icon: Icon, private val property: KMutableProperty1<CommitTablePanel<D>, Boolean>
     ) : ToggleAction(
             JujutsuBundle.message("log.filter.$messageKeySuffix"),
             JujutsuBundle.message("log.filter.$messageKeySuffix.tooltip"),
             icon
         ) {
-        override fun isSelected(e: AnActionEvent) = property.getter.invoke(this@CommitTablePanel)
+        override fun isSelected(e: AnActionEvent) = property.get(this@CommitTablePanel)
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {
-            property.setter.invoke(this@CommitTablePanel, state)
+            property.set(this@CommitTablePanel, state)
             applyFilter()
         }
     }

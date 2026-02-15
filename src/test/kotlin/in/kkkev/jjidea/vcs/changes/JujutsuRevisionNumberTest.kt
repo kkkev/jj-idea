@@ -2,6 +2,8 @@ package `in`.kkkev.jjidea.vcs.changes
 
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import io.kotest.matchers.comparables.shouldBeGreaterThan
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -43,8 +45,8 @@ class JujutsuRevisionNumberTest {
         val rev1 = JujutsuRevisionNumber(ChangeId("vvv", "v"))
         val rev2 = JujutsuRevisionNumber(ChangeId("www", "w"))
 
-        (rev1.compareTo(rev2) < 0) shouldBe true
-        (rev2.compareTo(rev1) > 0) shouldBe true
+        rev1 shouldBeLessThan rev2
+        rev2 shouldBeGreaterThan rev1
     }
 
     @Test

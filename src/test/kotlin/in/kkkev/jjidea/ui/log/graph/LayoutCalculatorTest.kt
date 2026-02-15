@@ -69,13 +69,13 @@ import org.junit.jupiter.api.Test
   9. Test 9 → Edge case with many parallel passthroughs
  */
 
-private val A = "A"
-private val B = "B"
-private val C = "C"
-private val D = "D"
-private val E = "E"
-private val F = "F"
-private val G = "G"
+private const val A = "A"
+private const val B = "B"
+private const val C = "C"
+private const val D = "D"
+private const val E = "E"
+private const val F = "F"
+private const val G = "G"
 
 class LayoutCalculatorTest {
     private val calculator = LayoutCalculatorImpl<String>()

@@ -7,7 +7,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ApplicationManager.getApplication
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
@@ -66,13 +65,13 @@ class ShowChangesDiffAction : DumbAwareAction(
  */
 fun showFileDiff(project: Project, file: VirtualFile) {
     val parentRevision = RevisionExpression("@-")
-    getApplication().executeOnPooledThread {
+    ApplicationManager.getApplication().executeOnPooledThread {
         val repo = file.jujutsuRepository
         val relPath = repo.getRelativePath(file)
         val revisionResult = repo.commandExecutor.show(relPath, parentRevision)
         val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
-        getApplication().invokeLater {
+        ApplicationManager.getApplication().invokeLater {
             val contentFactory = DiffContentFactory.getInstance()
             val localContent = if (file.exists()) {
                 contentFactory.create(project, file)

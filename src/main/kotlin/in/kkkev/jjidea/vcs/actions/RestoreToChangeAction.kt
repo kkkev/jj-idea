@@ -9,7 +9,6 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.invalidate
-import `in`.kkkev.jjidea.vcs.filePath
 
 /**
  * Restores selected file(s) to their state in a historical revision.
