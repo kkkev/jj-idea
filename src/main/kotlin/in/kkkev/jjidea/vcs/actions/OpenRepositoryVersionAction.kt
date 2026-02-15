@@ -39,8 +39,7 @@ class OpenRepositoryVersionAction : DumbAwareAction(
         ApplicationManager.getApplication().executeOnPooledThread {
             changes.forEach { change ->
                 val filePath = change.afterRevision?.file ?: return@forEach
-                val relPath = repo.getRelativePath(filePath)
-                val result = repo.commandExecutor.show(relPath, revision)
+                val result = repo.commandExecutor.show(filePath, revision)
                 val content = if (result.isSuccess) result.stdout else ""
 
                 ApplicationManager.getApplication().invokeLater {

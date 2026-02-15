@@ -76,7 +76,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
         // Setup controls panel state provider (keyed by repo path for stability)
         controlsPanel.stateProvider = { repo ->
-            descriptionStates.getOrPut(DescriptionState.Key(repo.relativePath)) { DescriptionState() }
+            descriptionStates.getOrPut(DescriptionState.Key(repo.displayName)) { DescriptionState() }
         }
 
         // Handle dropdown selection
@@ -199,7 +199,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
                 if (hasRepos) {
                     // Update the dropdown with available repos
-                    val sortedRepos = new.map { it.repo }.sortedBy { it.relativePath }
+                    val sortedRepos = new.map { it.repo }.sortedBy { it.displayName }
                     controlsPanel.updateAvailableRepositories(sortedRepos)
 
                     // Update controls if the current repo was updated

@@ -89,7 +89,7 @@ class UnifiedJujutsuLogDataLoader(
                 repos.forEachIndexed { index, repo ->
                     ApplicationManager.getApplication().executeOnPooledThread {
                         try {
-                            indicator.text2 = "Loading from ${repo.relativePath.ifEmpty { "root" }}..."
+                            indicator.text2 = "Loading from ${repo.displayName}..."
                             indicator.fraction = index.toDouble() / totalRepos
 
                             val result = repo.logService.getLog(revset)
@@ -97,17 +97,15 @@ class UnifiedJujutsuLogDataLoader(
                             result.onSuccess { loadedEntries ->
                                 entriesByRepo[repo] = loadedEntries
                                 log.info(
-                                    "Loaded ${loadedEntries.size} commits from ${
-                                        repo.relativePath.ifEmpty { "root" }
-                                    }"
+                                    "Loaded ${loadedEntries.size} commits from ${repo.displayName}"
                                 )
                             }.onFailure { e ->
                                 errors[repo] = e
-                                log.error("Failed to load commits from ${repo.relativePath}", e)
+                                log.error("Failed to load commits from $repo", e)
                             }
                         } catch (e: Exception) {
                             errors[repo] = e
-                            log.error("Exception loading commits from ${repo.relativePath}", e)
+                            log.error("Exception loading commits from $repo", e)
                         } finally {
                             latch.countDown()
                         }

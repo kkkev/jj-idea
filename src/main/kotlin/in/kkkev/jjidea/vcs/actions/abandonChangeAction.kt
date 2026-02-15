@@ -43,11 +43,11 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
     }
 
     // Execute abandon in background thread
-    val jujutsuRoot = target.repo
-    jujutsuRoot.commandExecutor.createCommand { abandon(target.id) }
+    val repo = target.repo
+    repo.commandExecutor.createCommand { abandon(target.id) }
         .onSuccess {
             // Select the working copy (may have changed if we abandoned the old working copy)
-            jujutsuRoot.invalidate(select = WorkingCopy)
+            repo.invalidate(select = WorkingCopy)
             log.info("Abandoned change ${target.id}")
         }.onFailureTellUser("log.action.abandon.error", project, log)
         .executeAsync()

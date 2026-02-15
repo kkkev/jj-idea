@@ -57,13 +57,10 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      */
     private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
         try {
-            val jujutsuRoot = file.jujutsuRepository
-
-            // Get the relative path from the root
-            val relativePath = jujutsuRoot.getRelativePath(file)
+            val repo = file.jujutsuRepository
 
             // Execute annotation command with template
-            val result = jujutsuRoot.commandExecutor.annotate(relativePath, revision, AnnotationParser.TEMPLATE)
+            val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
 
             if (!result.isSuccess) {
                 log.warn("Failed to annotate file: ${result.stderr}")
@@ -74,8 +71,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
             val annotationLines = AnnotationParser.parse(result.stdout)
 
             if (annotationLines.isEmpty()) {
-                log.warn("No annotation data received for file: $relativePath")
-                throw VcsException("No annotation data received for file: $relativePath")
+                throw VcsException("No annotation data received for file: $file")
             }
 
             // Create and return the file annotation

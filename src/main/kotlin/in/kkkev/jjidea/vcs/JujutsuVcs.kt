@@ -86,6 +86,5 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
         private val KEY = createKey(VCS_NAME)
 
         fun getKey(): VcsKey = KEY
-
     }
 }

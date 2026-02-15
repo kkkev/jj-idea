@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.vcs.JujutsuTimedCommit
@@ -52,10 +53,10 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     private val executor = repo.commandExecutor
     val logTemplates = LogTemplates()
 
-    override fun getLog(revset: Revset, filePaths: List<String>) =
+    override fun getLog(revset: Revset, filePaths: List<FilePath>) =
         getLog(logTemplates.fullLogTemplate, revset, filePaths)
 
-    override fun getLogBasic(revset: Revset, filePaths: List<String>) =
+    override fun getLogBasic(revset: Revset, filePaths: List<FilePath>) =
         getLog(logTemplates.basicLogTemplate, revset, filePaths)
 
     override fun getRefs(): Result<List<RefAtCommit>> = getLog(logTemplates.refsLogTemplate).map { it.flatten() }
@@ -138,7 +139,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     private fun <T> getLog(
         template: LogTemplate<T>,
         revset: Revset = Expression.ALL,
-        filePaths: List<String> = emptyList()
+        filePaths: List<FilePath> = emptyList()
     ): Result<List<T>> {
         log.debug("Getting log for revset: $revset, files: $filePaths")
 

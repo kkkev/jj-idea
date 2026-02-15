@@ -11,8 +11,10 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.JujutsuRepositoryImpl
 import `in`.kkkev.jjidea.jj.stateModel
 
 /**
@@ -33,7 +35,7 @@ val Project.isJujutsu get() = this.stateModel.isJujutsu
 /** All VCS roots in the project that are managed by Jujutsu. Returns VcsRoot objects (not just paths) since callers often need the full root info. */
 val Project.jujutsuRoots get() = ProjectLevelVcsManager.getInstance(this).allVcsRoots.filter { it.vcs is JujutsuVcs }
 
-fun Project.jujutsuRepositoryFor(directory: VirtualFile) = JujutsuRepository(this, directory)
+fun Project.jujutsuRepositoryFor(directory: VirtualFile) = JujutsuRepositoryImpl(this, directory)
 
 /** JujutsuRepository instances for all Jujutsu roots in the project. Use this when you need to work with JJ commands. */
 val Project.jujutsuRepositories get() = this.jujutsuRoots.map { this.jujutsuRepositoryFor(it.path) }
@@ -75,7 +77,10 @@ val VirtualFile.jujutsuProject
         }
     } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${this.path}")
 
+val VirtualFile.filePath get() = VcsUtil.getFilePath(this)
 fun VirtualFile.pathRelativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
+fun VirtualFile.getChildPath(relativePath: String, isDirectory: Boolean = false) =
+    VcsUtil.getFilePath(this.path + "/" + relativePath, isDirectory)
 
 val FilePath.possibleJujutsuProject: Project?
     get() {

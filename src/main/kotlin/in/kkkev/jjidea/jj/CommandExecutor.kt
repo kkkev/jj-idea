@@ -4,6 +4,8 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 
 /**
@@ -44,7 +46,7 @@ interface CommandExecutor {
      * @param revision Revision (e.g., "@", "@-", commit hash)
      * @return File content
      */
-    fun show(filePath: String, revision: Revision): CommandResult
+    fun show(filePath: FilePath, revision: Revision): CommandResult
 
     /**
      * Check if jujutsu is available and working
@@ -106,17 +108,17 @@ interface CommandExecutor {
     fun log(
         revset: Revset = Expression.ALL,
         template: String? = null,
-        filePaths: List<String> = emptyList()
+        filePaths: List<FilePath> = emptyList()
     ): CommandResult
 
     /**
      * Get line-by-line annotation (blame) for a file
-     * @param filePath Path relative to root
+     * @param file File to annotate
      * @param revision Revision from which to start annotating (default: "@")
      * @param template Template for annotation output
      * @return Annotation output with change info per line
      */
-    fun annotate(filePath: String, revision: Revision = WorkingCopy, template: String? = null): CommandResult
+    fun annotate(file: VirtualFile, revision: Revision = WorkingCopy, template: String? = null): CommandResult
 
     /**
      * List all bookmarks in the repository
@@ -135,7 +137,7 @@ interface CommandExecutor {
     /**
      * Restore the specified files to the specified revision.
      */
-    fun restore(filePaths: List<String>, revision: Revision): CommandResult
+    fun restore(filePaths: List<FilePath>, revision: Revision): CommandResult
 
     data class Command(
         val commandExecutor: CommandExecutor,

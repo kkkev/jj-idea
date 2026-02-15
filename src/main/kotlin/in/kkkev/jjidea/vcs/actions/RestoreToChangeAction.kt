@@ -48,7 +48,7 @@ class RestoreToChangeAction : DumbAwareAction(
         }
 
         repo.commandExecutor.createCommand {
-            restore(listOf(repo.getRelativePath(filePath)), changeId)
+            restore(listOf(filePath), changeId)
         }
             .onSuccess {
                 filePath.virtualFile?.let { vf ->

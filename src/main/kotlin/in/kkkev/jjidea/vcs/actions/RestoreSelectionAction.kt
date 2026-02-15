@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.singleJujutsuRepository
 
 /**
@@ -51,7 +52,7 @@ class RestoreSelectionAction : DumbAwareAction(
         }
 
         repo.commandExecutor.createCommand {
-            restore(files.map(repo::getRelativePath), WorkingCopy.parent)
+            restore(files.map { it.filePath }, WorkingCopy.parent)
         }
             .onSuccess {
                 VfsUtil.markDirtyAndRefresh(false, false, true, *files.toTypedArray())

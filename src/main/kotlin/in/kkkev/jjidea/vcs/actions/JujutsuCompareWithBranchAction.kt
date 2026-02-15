@@ -13,6 +13,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.isJujutsu
 import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
@@ -29,11 +30,11 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.file ?: return
-        val jujutsuRoot = file.jujutsuRepository
+        val repo = file.jujutsuRepository
 
         // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
-        JujutsuCompareWithPopup.show(project, jujutsuRoot) { chosen ->
-            showDiffWithRevision(project, file, chosen, jujutsuRoot)
+        JujutsuCompareWithPopup.show(project, repo) { chosen ->
+            showDiffWithRevision(project, file, chosen, repo)
         }
     }
 
@@ -52,7 +53,7 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
         // Load content in background to avoid EDT blocking
         ApplicationManager.getApplication().executeOnPooledThread {
             // Get file content at target revision
-            val revisionResult = repo.commandExecutor.show(filePath, revision)
+            val revisionResult = repo.commandExecutor.show(file.filePath, revision)
             val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
             // Show diff on EDT

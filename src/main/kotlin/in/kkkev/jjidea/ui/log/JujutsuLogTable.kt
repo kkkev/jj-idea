@@ -260,9 +260,9 @@ class JujutsuLogTable(
         if (rowIndex != null) {
             setRowSelectionInterval(rowIndex, rowIndex)
             scrollRectToVisible(getCellRect(rowIndex, 0, true))
-            log.info("Selected entry at row $rowIndex (${repo.relativePath}:$revision)")
+            log.info("Selected entry at row $rowIndex ($repo:$revision)")
         } else {
-            log.warn("Entry not found: ${repo.relativePath}:$revision")
+            log.warn("Entry not found: $repo:$revision")
         }
     }
 

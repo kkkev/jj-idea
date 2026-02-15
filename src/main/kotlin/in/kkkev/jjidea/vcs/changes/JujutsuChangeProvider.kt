@@ -9,6 +9,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.ui.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.getChildPath
 import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
@@ -25,25 +26,25 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     ) {
         log.info("getChanges called on ${Thread.currentThread().name}, ${dirtyScope.affectedContentRoots.size} roots")
 
-        dirtyScope.affectedContentRoots.map { it.jujutsuRepository }.forEach { jujutsuRoot ->
+        dirtyScope.affectedContentRoots.map { it.jujutsuRepository }.forEach { repo ->
             // Handle uninitialized roots (e.g., .jj directory was deleted)
-            if (!jujutsuRoot.isInitialised) {
-                log.info("Root configured for Jujutsu but not initialized: ${jujutsuRoot.relativePath}")
-                JujutsuNotifications.notifyUninitializedRoot(vcs.project, jujutsuRoot)
+            if (!repo.isInitialised) {
+                log.info("Root configured for Jujutsu but not initialized: $repo")
+                JujutsuNotifications.notifyUninitializedRoot(vcs.project, repo)
                 return@forEach
             }
 
             try {
                 val startTime = System.currentTimeMillis()
-                val result = jujutsuRoot.commandExecutor.status()
-                log.info("jj status for ${jujutsuRoot.relativePath} took ${System.currentTimeMillis() - startTime}ms")
+                val result = repo.commandExecutor.status()
+                log.info("jj status for $repo took ${System.currentTimeMillis() - startTime}ms")
 
                 if (!result.isSuccess) {
-                    log.warn("Failed to get jj status for ${jujutsuRoot.relativePath}: ${result.stderr}")
+                    log.warn("Failed to get jj status for $repo: ${result.stderr}")
                     return@forEach // Continue to next root instead of returning from entire method
                 }
 
-                parseStatus(result.stdout, jujutsuRoot, builder)
+                parseStatus(result.stdout, repo, builder)
             } catch (e: Exception) {
                 log.error("Error getting changes", e)
             }
@@ -60,8 +61,9 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
      * M file1.txt
      * A file2.txt
      * D file3.txt
+     * R foo/bar/{baz/file4.txt => newbaz/newfile4.txt}
      */
-    private fun parseStatus(output: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
+    fun parseStatus(output: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
         val lines = output.lines()
         var inWorkingCopy = false
 
@@ -81,7 +83,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
             // If we're in the working copy section, parse file statuses
             if (inWorkingCopy) {
-                parseStatusLine(trimmed, repo, builder)
+                if (trimmed.startsWith("Working copy")) {
+                    inWorkingCopy = false
+                } else {
+                    parseStatusLine(trimmed, repo, builder)
+                }
             }
         }
     }
@@ -99,7 +105,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         if (filePath.isEmpty()) return
 
         val file = repo.directory.findFileByRelativePath(filePath)
-        val path = repo.getPath(filePath)
+        // Need to get the path even if the file is not found
+        val path = repo.directory.getChildPath(filePath)
 
         when (status) {
             'M' -> {
@@ -162,26 +169,20 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
     /**
      * Parse rename status and add change
-     * Format: "{oldname => newname}"
+     * Format: "{oldname => newname}" or "prefix{oldname => newname}"
      */
     private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
+        val (prefix, before, after, suffix) = requireNotNull(Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(renameSpec)) { "Invalid rename format: $renameSpec" }.destructured
         // Remove braces and parse
-        val spec = renameSpec.trim().removeSurrounding("{", "}")
-        val parts = spec.split(" => ")
 
-        if (parts.size != 2) {
-            log.warn("Invalid rename format: $renameSpec")
-            return
-        }
-
-        val oldPath = parts[0].trim()
-        val newPath = parts[1].trim()
+        val oldPath = prefix + before + suffix
+        val newPath = prefix + after + suffix
 
         log.info("Detected rename: $oldPath => $newPath")
 
         // Create file paths
-        val beforePath = repo.getPath(oldPath)
-        val afterPath = repo.getPath(newPath)
+        val beforePath = repo.directory.getChildPath(oldPath)
+        val afterPath = repo.directory.getChildPath(newPath)
 
         // Create revisions
         val beforeRevision = repo.createRevision(beforePath, WorkingCopy.parent)

@@ -4,11 +4,14 @@ import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.Revset
+import `in`.kkkev.jjidea.vcs.pathRelativeTo
+import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
@@ -28,8 +31,8 @@ class CliExecutor(
 
     override fun diffSummary(revision: Revision) = execute(root, listOf("diff", "--summary", "-r", revision))
 
-    override fun show(filePath: String, revision: Revision) =
-        execute(root, listOf("file", "show", "-r", revision, filePath))
+    override fun show(filePath: FilePath, revision: Revision) =
+        execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root)))
 
     override fun isAvailable() = try {
         val result = execute(null, listOf("--version"))
@@ -72,23 +75,23 @@ class CliExecutor(
 
     override fun edit(revision: Revision): CommandExecutor.CommandResult = execute(root, listOf("edit", revision))
 
-    override fun log(revset: Revset, template: String?, filePaths: List<String>): CommandExecutor.CommandResult {
+    override fun log(revset: Revset, template: String?, filePaths: List<FilePath>): CommandExecutor.CommandResult {
         val args = mutableListOf("log", "-r", revset, "--no-graph")
         if (template != null) {
             args.add("-T")
             args.add(template)
         }
-        args.addAll(filePaths)
+        args.addAll(filePaths.map { it.relativeTo(root) })
         return execute(root, args)
     }
 
-    override fun annotate(filePath: String, revision: Revision, template: String?): CommandExecutor.CommandResult {
+    override fun annotate(file: VirtualFile, revision: Revision, template: String?): CommandExecutor.CommandResult {
         val args = mutableListOf("file", "annotate", "-r", revision)
         if (template != null) {
             args.add("-T")
             args.add(template)
         }
-        args.add(filePath)
+        args.add(file.pathRelativeTo(root))
         return execute(root, args)
     }
 
@@ -104,8 +107,8 @@ class CliExecutor(
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("diff", "--git", "-r", revision))
 
-    override fun restore(filePaths: List<String>, revision: Revision): CommandExecutor.CommandResult =
-        execute(root, listOf("restore", "-f", revision) + filePaths)
+    override fun restore(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
+        execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root) })
 
     private fun execute(
         workingDir: VirtualFile?,

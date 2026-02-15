@@ -6,6 +6,7 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.log.VcsFullCommitDetails
 import com.intellij.vcsUtil.VcsUtil
+import `in`.kkkev.jjidea.vcs.getChildPath
 import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
@@ -119,8 +120,8 @@ class JujutsuFullCommitDetails(entry: LogEntry, root: VirtualFile, private val c
             entry: LogEntry,
             repo: JujutsuRepository
         ): Change {
-            val beforePath = repo.getPath(oldPath)
-            val afterPath = repo.getPath(newPath)
+            val beforePath = repo.directory.getChildPath(oldPath)
+            val afterPath = repo.directory.getChildPath(newPath)
 
             val beforeRevision = entry.parentIds.firstOrNull()?.let { repo.createRevision(beforePath, it) }
             val afterRevision = repo.createRevision(afterPath, entry.id)

@@ -409,7 +409,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
 
     /** Wrapper for displaying repository in dropdown */
     private data class RepoItem(val repo: JujutsuRepository) {
-        val displayName: String get() = repo.relativePath
+        val displayName: String get() = repo.displayName
     }
 }
 

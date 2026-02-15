@@ -73,8 +73,7 @@ class JujutsuFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val relativePath = repo.getRelativePath(filePath)
-        val result = repo.commandExecutor.show(relativePath, entry.id)
+        val result = repo.commandExecutor.show(filePath, entry.id)
         if (!result.isSuccess) {
             throw VcsException("Failed to load file content at revision ${entry.id}: ${result.stderr}")
         }

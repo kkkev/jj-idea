@@ -41,8 +41,6 @@ class JujutsuFileHistoryDataLoader(
 
         currentIndicator.get()?.cancel()
 
-        val relativePath = repo.getRelativePath(filePath)
-
         object : Task.Backgroundable(repo.project, "Loading file history", true) {
             private var entries: List<LogEntry> = emptyList()
 
@@ -51,7 +49,7 @@ class JujutsuFileHistoryDataLoader(
                 indicator.text = "Loading history for ${filePath.name}..."
                 indicator.isIndeterminate = false
 
-                entries = repo.logService.getLog(Expression.ALL, listOf(relativePath)).getOrThrow()
+                entries = repo.logService.getLog(Expression.ALL, listOf(filePath)).getOrThrow()
                 log.info("Loaded ${entries.size} history entries for ${filePath.name}")
             }
 

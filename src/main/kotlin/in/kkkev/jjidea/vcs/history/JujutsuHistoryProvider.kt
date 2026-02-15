@@ -27,13 +27,11 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
         try {
             val jujutsuRepository = filePath.jujutsuRepository
 
-            // Get relative path from repository root
-            val relativePath = jujutsuRepository.getRelativePath(filePath)
-            log.debug("Fetching history for file: $relativePath (absolute: ${filePath.path})")
+            log.debug("Fetching history for file: $filePath")
 
             // Use logService to get log entries for this file
             val logService = jujutsuRepository.logService
-            val result = logService.getLogBasic(Expression.ALL, listOf(relativePath))
+            val result = logService.getLogBasic(Expression.ALL, listOf(filePath))
 
             val entries = result.getOrElse { error ->
                 log.error("Failed to get file history: ${error.message}")
@@ -69,13 +67,11 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
         try {
             val jujutsuRepository = filePath.jujutsuRepository
 
-            // Get relative path from repository root
-            val relativePath = jujutsuRepository.getRelativePath(filePath)
-            log.debug("Fetching history for file: $relativePath (absolute: ${filePath.path})")
+            log.debug("Fetching history for file: $filePath")
 
             // Step 2: Load history
             val logService = jujutsuRepository.logService
-            val result = logService.getLog(Expression.ALL, listOf(relativePath))
+            val result = logService.getLog(Expression.ALL, listOf(filePath))
 
             val entries = result.getOrElse { error ->
                 log.error("Failed to get file history: ${error.message}")

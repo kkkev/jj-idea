@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
+import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.vcs.JujutsuTimedCommit
 
 /**
@@ -14,7 +15,7 @@ interface LogService {
      * @param filePaths Optional file paths to filter by
      * @return List of log entries with complete metadata
      */
-    fun getLog(revset: Revset = Expression.ALL, filePaths: List<String> = emptyList()): Result<List<LogEntry>>
+    fun getLog(revset: Revset = Expression.ALL, filePaths: List<FilePath> = emptyList()): Result<List<LogEntry>>
 
     /**
      * Get log entries with minimal metadata (no author/committer info)
@@ -23,7 +24,7 @@ interface LogService {
      * @param filePaths Optional file paths to filter by
      * @return List of log entries with basic metadata
      */
-    fun getLogBasic(revset: Revset = Expression.ALL, filePaths: List<String> = emptyList()): Result<List<LogEntry>>
+    fun getLogBasic(revset: Revset = Expression.ALL, filePaths: List<FilePath> = emptyList()): Result<List<LogEntry>>
 
     /**
      * Get refs (bookmarks and working copy marker) for all commits

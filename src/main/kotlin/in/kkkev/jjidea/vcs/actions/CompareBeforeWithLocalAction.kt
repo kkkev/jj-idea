@@ -60,9 +60,8 @@ class CompareBeforeWithLocalAction : DumbAwareAction(
         ApplicationManager.getApplication().executeOnPooledThread {
             val requests = validChanges.mapNotNull { change ->
                 val filePath = change.beforeRevision?.file ?: return@mapNotNull null
-                val relPath = repo.getRelativePath(filePath)
 
-                val revisionResult = repo.commandExecutor.show(relPath, revision)
+                val revisionResult = repo.commandExecutor.show(filePath, revision)
                 val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
                 val contentFactory = DiffContentFactory.getInstance()

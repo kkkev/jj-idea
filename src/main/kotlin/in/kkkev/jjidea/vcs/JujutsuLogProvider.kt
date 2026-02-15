@@ -252,12 +252,9 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
                 val leftCommitId = CommitId(leftHash.asString())
                 val rightCommitId = CommitId(rightHash.asString())
 
-                // Get relative path for jj commands
-                val relPath = path.relativeTo(root)
-
                 // Load content for both revisions
-                val leftResult = commandExecutor.show(relPath, leftCommitId)
-                val rightResult = commandExecutor.show(relPath, rightCommitId)
+                val leftResult = commandExecutor.show(path, leftCommitId)
+                val rightResult = commandExecutor.show(path, rightCommitId)
 
                 val leftContent = if (leftResult.isSuccess) leftResult.stdout else ""
                 val rightContent = if (rightResult.isSuccess) rightResult.stdout else ""
@@ -304,11 +301,8 @@ private object JujutsuLogDiffHandler : VcsLogDiffHandler {
                 val jujutsuRoot = root.jujutsuRepository
                 val commitId = CommitId(hash.asString())
 
-                // Get relative path for jj commands
-                val relPath = path.virtualFile!!.pathRelativeTo(root)
-
                 // Load revision content
-                val revisionResult = jujutsuRoot.commandExecutor.show(relPath, commitId)
+                val revisionResult = jujutsuRoot.commandExecutor.show(path, commitId)
                 val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
                 // Show diff on EDT
@@ -384,8 +378,7 @@ private class LazyJujutsuContentRevision(private val filePath: FilePath, private
     ContentRevision {
     override fun getContent(): String? {
         // This is called off EDT, so repository lookup is safe here
-        val repo = filePath.jujutsuRepository
-        val result = repo.commandExecutor.show(repo.getRelativePath(filePath), commitId)
+        val result = filePath.jujutsuRepository.commandExecutor.show(filePath, commitId)
         return result.stdout.takeIf { result.isSuccess }
     }
 

@@ -15,6 +15,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RevisionExpression
+import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.isJujutsu
 import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
@@ -67,8 +68,7 @@ fun showFileDiff(project: Project, file: VirtualFile) {
     val parentRevision = RevisionExpression("@-")
     ApplicationManager.getApplication().executeOnPooledThread {
         val repo = file.jujutsuRepository
-        val relPath = repo.getRelativePath(file)
-        val revisionResult = repo.commandExecutor.show(relPath, parentRevision)
+        val revisionResult = repo.commandExecutor.show(file.filePath, parentRevision)
         val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
         ApplicationManager.getApplication().invokeLater {

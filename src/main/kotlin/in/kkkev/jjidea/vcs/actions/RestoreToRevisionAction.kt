@@ -59,9 +59,7 @@ class RestoreToRevisionAction : DumbAwareAction(
             return
         }
 
-        repo.commandExecutor.createCommand {
-            restore(listOf(repo.getRelativePath(filePath)), commitId)
-        }
+        repo.commandExecutor.createCommand { restore(listOf(filePath), commitId) }
             .onSuccess {
                 filePath.virtualFile?.let { vf ->
                     VfsUtil.markDirtyAndRefresh(false, false, true, vf)

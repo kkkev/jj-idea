@@ -17,7 +17,20 @@ import `in`.kkkev.jjidea.vcs.pathRelativeTo
  * A (possible) JJ repository. "Possible" because the directory could be uninitialised, as this class allows
  * repository initialisation as well as access to all JJ actions.
  */
-data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
+interface JujutsuRepository {
+    val project: Project
+    val directory: VirtualFile
+    val displayName: String
+    val commandExecutor: CommandExecutor
+    val logService: LogService
+    val isInitialised: Boolean
+    fun createRevision(filePath: FilePath, revision: Revision): ContentRevision
+    fun getRelativePath(filePath: FilePath): String
+    fun getRelativePath(file: VirtualFile): String
+}
+
+data class JujutsuRepositoryImpl(override val project: Project, override val directory: VirtualFile) :
+    JujutsuRepository {
     private val executor: CommandExecutor by lazy {
         val settings = JujutsuSettings.getInstance(project)
         CliExecutor(directory, settings.state.jjExecutablePath)
@@ -27,7 +40,7 @@ data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
      * Command executor for initialized repositories. Throws if repository is not initialized.
      * Use [initExecutor] for initialization commands.
      */
-    val commandExecutor: CommandExecutor
+    override val commandExecutor: CommandExecutor
         get() {
             requireInitialised()
             return executor
@@ -38,7 +51,7 @@ data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
      */
     val initExecutor: CommandExecutor get() = executor
 
-    val logService: LogService by lazy { CliLogService(this) }
+    override val logService: LogService by lazy { CliLogService(this) }
 
     private fun requireInitialised() {
         check(isInitialised) { "Repository at ${directory.path} is not initialized. Use initExecutor for gitInit." }
@@ -52,16 +65,16 @@ data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
     /**
      * Display name for UI. Shows the directory name, or "root" if it's the project root.
      */
-    val displayName: String get() = relativePath.ifEmpty { directory.name }
+    override val displayName get() = relativePath.ifEmpty { directory.name }
 
-    val isInitialised get() = JujutsuRootChecker.isJujutsuRoot(directory)
+    override val isInitialised get() = JujutsuRootChecker.isJujutsuRoot(directory)
 
     override fun toString() = "Repository:$relativePath"
 
     /**
      * Gets the path for the specified file path, relative to this root.
      */
-    fun getRelativePath(filePath: FilePath): String {
+    override fun getRelativePath(filePath: FilePath): String {
         val absolutePath = filePath.path
         val rootPath = directory.path
         return if (absolutePath.startsWith(rootPath)) {
@@ -72,15 +85,9 @@ data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
         }
     }
 
-    fun getRelativePath(file: VirtualFile) = getRelativePath(VcsUtil.getFilePath(file))
+    override fun getRelativePath(file: VirtualFile) = getRelativePath(VcsUtil.getFilePath(file))
 
-    /**
-     * Turns a path relative to this root into a FilePath.
-     */
-    fun getPath(relativePath: String, isDirectory: Boolean = false) =
-        VcsUtil.getFilePath(directory.path + "/" + relativePath, isDirectory)
-
-    fun createRevision(filePath: FilePath, revision: Revision): ContentRevision =
+    override fun createRevision(filePath: FilePath, revision: Revision): ContentRevision =
         JujutsuContentRevision(filePath, revision)
 
     /**
@@ -89,7 +96,7 @@ data class JujutsuRepository(val project: Project, val directory: VirtualFile) {
     private inner class JujutsuContentRevision(private val filePath: FilePath, private val revision: Revision) :
         ContentRevision {
         override fun getContent(): String? {
-            val result = commandExecutor.show(getRelativePath(filePath), revision)
+            val result = commandExecutor.show(filePath, revision)
             return result.stdout.takeIf { result.isSuccess }
         }
 

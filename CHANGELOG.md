@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fix: log window text filter
+- Fix: renames and moves are now tracked properly
 
 ## [0.2.5] - 2026-02-15
 

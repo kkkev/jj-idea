@@ -46,11 +46,9 @@ class JujutsuLogFileHistoryHandler(project: Project) : VcsLogFileHistoryHandler 
     ) {
         val jujutsuRoot = root.jujutsuRepository
 
-        val relativePath = jujutsuRoot.getRelativePath(filePath)
-
         // Use Expression.ALL for now (could support hash-based starting point later)
         val logService = jujutsuRoot.logService
-        val result: Result<List<LogEntry>> = logService.getLog(Expression.ALL, listOf(relativePath))
+        val result: Result<List<LogEntry>> = logService.getLog(Expression.ALL, listOf(filePath))
 
         result.fold(
             onSuccess = { entries: List<LogEntry> ->
@@ -79,11 +77,9 @@ class JujutsuLogFileHistoryHandler(project: Project) : VcsLogFileHistoryHandler 
     ) {
         val jujutsuRoot = root.jujutsuRepository
 
-        val relativePath = jujutsuRoot.getRelativePath(filePath)
-
         // Use Expression.ALL for full history
         val logService = jujutsuRoot.logService
-        val result: Result<List<LogEntry>> = logService.getLog(Expression.ALL, listOf(relativePath))
+        val result: Result<List<LogEntry>> = logService.getLog(Expression.ALL, listOf(filePath))
 
         result.fold(
             onSuccess = { entries: List<LogEntry> ->

@@ -256,11 +256,11 @@ class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), Tab
         // Calculate width needed for "(empty)" indicator if applicable
         val emptyText = " (empty)"
         val emptyIndicatorWidth = if (entry.isEmpty) {
-                val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
-                g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
-            } else {
-                0
-            }
+            val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
+            g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
+        } else {
+            0
+        }
 
         // Reduce available width for description to reserve space for "(empty)"
         val availableWidthForDescription = maxDescriptionWidth - emptyIndicatorWidth
