@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.2.4/jj-idea-0.2.4.zip" version="0.2.4">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.2.5/jj-idea-0.2.5.zip" version="0.2.5">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,24 +23,11 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.2.4</h3>
+      <h3>0.2.5</h3>
       
-<h4>Added</h4>
-<li>Custom file history panel with same styling as the log view (replaces standard Show History action)</li>
-<li>Diagnostic logging for state model, change provider, and CLI executor to aid freeze investigation</li>
-
-<h4>Changed</h4>
-<li>Declared `.jj` as administrative area in plugin.xml (hides from project view, consistent with Git plugin)</li>
-
 <h4>Fixed</h4>
-<li>Performance: most UI action classes now use ActionUpdateThread.BGT to avoid EDT contention during toolbar updates</li>
-<li>Performance: BulkFileListener now filters out `.jj` internal directory changes to prevent unnecessary refresh cycles</li>
-<li>Performace: repository state equality excludes volatile timestamps to prevent spurious invalidations</li>
-<li>Fix: log panel now refreshes after VCS operations (abandon, edit, new) even when working copy unchanged</li>
-<li>Fix: only mark repos dirty when their state actually changes, reducing FileStatusManager event flooding</li>
-<li>Fix: register IgnoredFileProvider for `.jj/` directories to prevent change list processing of internal files</li>
-<li>Fix: downgrade diff summary failure from SEVERE to WARN (expected when viewing abandoned commits)</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.2.4">full release notes</a> for details.</p>
+<li>Performance: simplified UI updates from file changes</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.2.5">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
