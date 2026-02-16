@@ -6,14 +6,29 @@ import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.jj.CommandExecutor
-import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.jj.Revset
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
+
+/** Build the argument list for `jj rebase`. */
+internal fun rebaseArgs(
+    revisions: List<Revision>,
+    destinations: List<Revision>,
+    sourceMode: RebaseSourceMode = RebaseSourceMode.REVISION,
+    destinationMode: RebaseDestinationMode = RebaseDestinationMode.ONTO
+): List<String> = buildList {
+    add("rebase")
+    revisions.forEach {
+        add(sourceMode.flag)
+        add(it.toString())
+    }
+    destinations.forEach {
+        add(destinationMode.flag)
+        add(it.toString())
+    }
+}
 
 /**
  * CLI-based implementation of JujutsuCommandExecutor
@@ -109,6 +124,13 @@ class CliExecutor(
 
     override fun restore(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root) })
+
+    override fun rebase(
+        revisions: List<Revision>,
+        destinations: List<Revision>,
+        sourceMode: RebaseSourceMode,
+        destinationMode: RebaseDestinationMode
+    ) = execute(root, rebaseArgs(revisions, destinations, sourceMode, destinationMode))
 
     private fun execute(
         workingDir: VirtualFile?,

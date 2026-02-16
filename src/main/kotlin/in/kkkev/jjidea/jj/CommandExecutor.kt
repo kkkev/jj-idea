@@ -139,6 +139,21 @@ interface CommandExecutor {
      */
     fun restore(filePaths: List<FilePath>, revision: Revision): CommandResult
 
+    /**
+     * Rebase revisions onto a new destination.
+     * @param revisions Revisions to rebase
+     * @param destinations Destination revisions (multiple creates a merge)
+     * @param sourceMode How to select source revisions (-r, -s, -b)
+     * @param destinationMode Where to place them (-d, -A, -B)
+     * @return Command result
+     */
+    fun rebase(
+        revisions: List<Revision>,
+        destinations: List<Revision>,
+        sourceMode: RebaseSourceMode = RebaseSourceMode.REVISION,
+        destinationMode: RebaseDestinationMode = RebaseDestinationMode.ONTO
+    ): CommandResult
+
     data class Command(
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,

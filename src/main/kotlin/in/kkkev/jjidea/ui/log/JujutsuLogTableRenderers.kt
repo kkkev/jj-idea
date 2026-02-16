@@ -8,10 +8,8 @@ import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.ui.common.JujutsuIcons.Conflict
 import `in`.kkkev.jjidea.ui.components.*
 import kotlinx.datetime.Instant
 import java.awt.Color
@@ -169,19 +167,6 @@ fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
     }
 }
 
-/** Append the description summary and "(empty)" indicator for a log entry. */
-fun TextCanvas.appendDescriptionContent(entry: LogEntry) {
-    appendSummary(entry.description)
-    if (entry.isEmpty) {
-        grey {
-            italic {
-                append(" ")
-                append(message("description.empty.suffix"))
-            }
-        }
-    }
-}
-
 /** Append right-side decorations: bookmarks and working copy indicator. */
 fun TextCanvas.appendDecorations(entry: LogEntry) {
     appendBookmarks(entry)
@@ -215,7 +200,7 @@ class SeparateDescriptionCellRenderer() : TableCellRenderer {
         val fg = if (isSelected) table.selectionForeground else table.foreground
 
         panel.configure(
-            leftCanvas = entryCanvas(entry, fg) { appendDescriptionContent(entry) },
+            leftCanvas = entryCanvas(entry, fg) { appendDescriptionAndEmptyIndicator(entry) },
             rightCanvas = entryCanvas(entry, fg) { appendDecorations(entry) },
             cellWidth = table.columnModel.getColumn(column).width,
             background = bg

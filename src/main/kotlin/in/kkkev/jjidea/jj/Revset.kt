@@ -48,3 +48,27 @@ object WorkingCopy : Ref {
 }
 
 data class RefAtCommit(val commitId: CommitId, val ref: Ref)
+
+/** How to select source revisions for `jj rebase`. */
+enum class RebaseSourceMode(val flag: String) {
+    /** Rebase only the specified revisions; descendants stay in place. */
+    REVISION("-r"),
+
+    /** Rebase the revision and all its descendants. */
+    SOURCE("-s"),
+
+    /** Rebase the entire branch containing the revision. */
+    BRANCH("-b")
+}
+
+/** Where to place rebased revisions. */
+enum class RebaseDestinationMode(val flag: String) {
+    /** Standard rebase: become children of the destination. */
+    ONTO("-d"),
+
+    /** Insert after the destination, before its current children. */
+    INSERT_AFTER("-A"),
+
+    /** Insert before the destination, after its parents. */
+    INSERT_BEFORE("-B")
+}

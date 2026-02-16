@@ -319,7 +319,7 @@ object JujutsuCompareWithPopup {
      *
      * @param query Search query to filter changes by change ID or description
      */
-    private fun buildItemList(project: Project, repo: JujutsuRepository, query: String): List<CompareItem> {
+    internal fun buildItemList(project: Project, repo: JujutsuRepository, query: String): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
         val cache = LogCache.getInstance(project)
 

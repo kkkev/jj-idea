@@ -137,6 +137,17 @@ fun TextCanvas.append(repo: JujutsuRepository) {
     }
 }
 
+fun <T> TextCanvas.append(
+    source: List<T>,
+    separator: String = ", ",
+    prefix: String = "",
+    suffix: String = "",
+    partBuilder: TextCanvas.(part: T) -> Unit
+) {
+    val map = source.map { { tc: TextCanvas -> tc.partBuilder(it) } }
+    append(map, separator, prefix, suffix)
+}
+
 fun TextCanvas.append(
     parts: List<TextCanvas.() -> Unit>,
     separator: String = ", ",
@@ -161,13 +172,26 @@ fun TextCanvas.appendSummary(entry: LogEntry) {
     appendBookmarks(entry, "\n")
 }
 
+/** Append the description summary and "(empty)" indicator for a log entry. */
+fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
+    appendSummary(entry.description)
+    if (entry.isEmpty) {
+        grey {
+            italic {
+                append(" ")
+                append(message("description.empty.suffix"))
+            }
+        }
+    }
+}
+
 fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") =
-    append(entry.bookmarks.map { { append(it) } }, separator = " ", prefix = " ", suffix = suffix)
+    append(entry.bookmarks, suffix = suffix) { append(it) }
 
 fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     if (entry.parentIds.isNotEmpty()) {
         append(message("details.parents.label"))
-        append(entry.parentIds.map { { append(it) } })
+        append(entry.parentIds, partBuilder = TextCanvas::append)
     } else {
         append(message("details.parents.none"))
     }

@@ -27,6 +27,16 @@ object JujutsuColors {
     val DIVERGENT = JBColor.PINK
 
     /**
+     * Highlight for source changes for a rebase operation.
+     */
+    val SOURCE_HIGHLIGHT = JBColor(0x34A853, 0x5DCD73)
+
+    /**
+     * Highlight for destination changes for a rebase operation.
+     */
+    val DESTINATION_HIGHLIGHT = JBColor(0x4285F4, 0x6AA1FF)
+
+    /**
      * Get gray color as hex string (for HTML).
      */
     fun getGrayHex(): String = Integer.toHexString(UIUtil.getLabelDisabledForeground().rgb and 0xFFFFFF)

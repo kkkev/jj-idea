@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Rebase dialog with full `jj rebase` support: source modes (-r/-s/-b), destination modes (-d/-A/-B), multi-select source and destination
+- Rebase dialog: log-style destination picker with commit graph, bookmarks as decorations, and search by change ID, description, or bookmark name
+- Rebase dialog: simulated post-rebase graph preview showing reparented commits with source/destination highlighting
+- Rebase dialog: split layout with destination picker on the left and live preview on the right
+- Rebase dialog: invalid destinations (self-rebase, cycle-creating targets) are automatically filtered based on source mode
+
 ### Fixed
 - Fix: log window text filter
 - Fix: renames and moves are now tracked properly

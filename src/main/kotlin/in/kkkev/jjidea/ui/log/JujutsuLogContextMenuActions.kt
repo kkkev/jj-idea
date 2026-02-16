@@ -15,7 +15,11 @@ object JujutsuLogContextMenuActions {
      * Create the action group for the context menu.
      * Different actions are shown depending on whether the selected entry is the working copy.
      */
-    fun createActionGroup(project: Project, entries: List<LogEntry>): DefaultActionGroup =
+    fun createActionGroup(
+        project: Project,
+        entries: List<LogEntry>,
+        allEntries: List<LogEntry> = emptyList()
+    ): DefaultActionGroup =
         DefaultActionGroup().apply {
             val entry = entries.singleOrNull()
             entry?.run { add(copyIdAction(id)) }
@@ -36,5 +40,12 @@ object JujutsuLogContextMenuActions {
             // Can abandon any mutable change including working copy
             // TODO Allow abandon on multiple if all entries are immutable
             add(abandonChangeAction(project, entry?.takeIf { !it.immutable }))
+
+            addSeparator()
+
+            // Offer "Rebase" for mutable changes (single or multi-select, same root)
+            val mutableEntries = entries.filter { !it.immutable }
+            val rebaseRepo = uniqueRoot?.takeIf { mutableEntries.isNotEmpty() }
+            add(rebaseAction(project, rebaseRepo, mutableEntries, allEntries))
         }
 }

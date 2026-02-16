@@ -5,17 +5,8 @@ import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
-import `in`.kkkev.jjidea.ui.components.TruncatingLeftRightLayout
-import `in`.kkkev.jjidea.ui.components.append
-import `in`.kkkev.jjidea.ui.components.appendSummary
-import `in`.kkkev.jjidea.ui.components.appendSummaryAndStatuses
-import `in`.kkkev.jjidea.ui.components.htmlString
-import java.awt.Component
-import java.awt.Dimension
-import java.awt.Graphics
-import java.awt.Graphics2D
-import java.awt.RenderingHints
+import `in`.kkkev.jjidea.ui.components.*
+import java.awt.*
 import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
@@ -144,7 +135,7 @@ class JujutsuGraphAndDescriptionRenderer(
                     append(entry.id)
                     append(" ")
                 }
-                appendDescriptionContent(entry)
+                appendDescriptionAndEmptyIndicator(entry)
             }
 
             val rightCanvas = if (columnManager.showDecorations) {
@@ -198,6 +189,15 @@ class JujutsuGraphAndDescriptionRenderer(
             g2d.fillRect(0, 0, width, height)
 
             val graphNode = this.graphNode ?: return
+
+            // Paint highlight stripe if set (e.g., rebase preview source/destination)
+            graphNode.highlightColor?.let { highlight ->
+                val composite = g2d.composite
+                g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.15f)
+                g2d.color = highlight
+                g2d.fillRect(0, 0, width, height)
+                g2d.composite = composite
+            }
 
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)

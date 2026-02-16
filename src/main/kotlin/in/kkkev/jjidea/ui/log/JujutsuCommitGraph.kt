@@ -27,7 +27,9 @@ data class GraphNode(
     val color: Color,
     val parentLanes: List<Int> = emptyList(),
     val childLanes: List<Int> = emptyList(),
-    val passthroughLanes: Map<ChangeId, Int> = emptyMap()
+    val passthroughLanes: Map<ChangeId, Int> = emptyMap(),
+    /** Optional row highlight for preview (e.g., source/destination highlighting in rebase dialog). */
+    val highlightColor: Color? = null
 )
 
 /**

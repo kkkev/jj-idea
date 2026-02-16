@@ -259,6 +259,121 @@ class JujutsuLogContextMenuActionsTest {
     }
 
     @Nested
+    inner class `Rebase action availability` {
+        @Test
+        fun `immutable entries filtered out`() {
+            val entries = listOf(
+                createEntry("abc123", immutable = true),
+                createEntry("def456", immutable = false)
+            )
+
+            val rebaseEntries = entries.filter { !it.immutable }
+
+            rebaseEntries.size shouldBe 1
+            rebaseEntries.first().id.full shouldBe "def456"
+        }
+
+        @Test
+        fun `all immutable entries results in empty list`() {
+            val entries = listOf(
+                createEntry("abc123", immutable = true),
+                createEntry("def456", immutable = true)
+            )
+
+            val rebaseEntries = entries.filter { !it.immutable }
+
+            rebaseEntries shouldBe emptyList()
+        }
+
+        @Test
+        fun `mutable entries pass through`() {
+            val entries = listOf(
+                createEntry("abc123", immutable = false),
+                createEntry("def456", immutable = false)
+            )
+
+            val rebaseEntries = entries.filter { !it.immutable }
+
+            rebaseEntries.size shouldBe 2
+        }
+
+        @Test
+        fun `working copy mutable entry passes through`() {
+            val entries = listOf(createEntry("abc123", isWorkingCopy = true, immutable = false))
+
+            val rebaseEntries = entries.filter { !it.immutable }
+
+            rebaseEntries.size shouldBe 1
+            rebaseEntries.first().isWorkingCopy shouldBe true
+        }
+
+        @Test
+        fun `requires single root for repo`() {
+            val entries = listOf(
+                createEntry("abc123", repo = repo1),
+                createEntry("def456", repo = repo2)
+            )
+
+            val uniqueRoot = entries.map { it.repo }.toSet().singleOrNull()
+
+            uniqueRoot.shouldBeNull()
+        }
+
+        @Test
+        fun `single root with multiple entries returns repo`() {
+            val entries = listOf(
+                createEntry("abc123", repo = repo1),
+                createEntry("def456", repo = repo1)
+            )
+
+            val uniqueRoot = entries.map { it.repo }.toSet().singleOrNull()
+
+            uniqueRoot.shouldNotBeNull()
+            uniqueRoot shouldBe repo1
+        }
+
+        @Test
+        fun `empty selection results in empty rebase entries`() {
+            val entries = emptyList<LogEntry>()
+
+            val rebaseEntries = entries.filter { !it.immutable }
+
+            rebaseEntries shouldBe emptyList()
+        }
+
+        @Test
+        fun `all immutable same root disables rebase`() {
+            val entries = listOf(
+                createEntry("abc123", immutable = true, repo = repo1),
+                createEntry("def456", immutable = true, repo = repo1)
+            )
+
+            val uniqueRoot = entries.map { it.repo }.toSet().singleOrNull()
+            val mutableEntries = entries.filter { !it.immutable }
+            val rebaseRepo = uniqueRoot?.takeIf { mutableEntries.isNotEmpty() }
+
+            uniqueRoot shouldBe repo1
+            mutableEntries shouldBe emptyList()
+            rebaseRepo.shouldBeNull()
+        }
+
+        @Test
+        fun `mixed immutable and mutable same root enables rebase`() {
+            val entries = listOf(
+                createEntry("abc123", immutable = true, repo = repo1),
+                createEntry("def456", immutable = false, repo = repo1)
+            )
+
+            val uniqueRoot = entries.map { it.repo }.toSet().singleOrNull()
+            val mutableEntries = entries.filter { !it.immutable }
+            val rebaseRepo = uniqueRoot?.takeIf { mutableEntries.isNotEmpty() }
+
+            rebaseRepo shouldBe repo1
+            mutableEntries.size shouldBe 1
+        }
+    }
+
+    @Nested
     inner class `Entry property combinations` {
         @Test
         fun `entry with conflict is still mutable`() {
