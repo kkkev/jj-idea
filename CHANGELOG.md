@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-02-16
+
 ### Fixed
 - Fix: log window text filter
 - Fix: renames and moves are now tracked properly
@@ -77,7 +79,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.2.6
 [0.2.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.2.5
 [0.2.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.2.4
 [0.2.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.2.3
