@@ -172,7 +172,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
      * Format: "{oldname => newname}" or "prefix{oldname => newname}"
      */
     private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val (prefix, before, after, suffix) = requireNotNull(Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(renameSpec)) { "Invalid rename format: $renameSpec" }.destructured
+        val (prefix, before, after, suffix) = requireNotNull(
+            Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(renameSpec)
+        ) {
+            "Invalid rename format: $renameSpec"
+        }.destructured
         // Remove braces and parse
 
         val oldPath = prefix + before + suffix

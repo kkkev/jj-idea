@@ -271,10 +271,10 @@ class JujutsuChangeProviderTest {
     }
 }
 
-private fun statusOutput(vararg lines: String) = """
+private fun statusOutput(vararg lines: String) =
+    """
     Working copy changes:
     ${lines.joinToString("\n")}
     Working copy  (@) : zstylrqo 308df46b original
     Parent commit (@-): vszmmkts 4463701e (empty) b1.1
-""".trimIndent()
-
+    """.trimIndent()
