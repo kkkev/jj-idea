@@ -30,6 +30,8 @@ data class LogEntry(
 
     override val parentIds: List<ChangeId> get() = parentIdentifiers.map { it.changeId }
 
+    val isDivergent get() = id.divergent
+
     /**
      * Projection of LogEntry that excludes volatile fields (timestamps) from equality.
      * Used by repositoryStates to avoid spurious invalidations when only timestamps change.

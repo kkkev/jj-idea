@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
+import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.ui.components.buildText
 import kotlinx.datetime.Instant
@@ -22,18 +23,19 @@ data class AnnotationLine(
      * Get a tooltip-friendly display of this annotation
      */
     fun getTooltip(): String = buildText {
-        append("Change: ")
-        append(id.full)
+        append(message("annotation.aspect.change"))
+        append(": ")
+        append(id)
         append("\n")
 
-        append("Commit: ")
-        append(commitId.full)
+        append(message("annotation.aspect.commit"))
+        append(": ")
+        append(commitId)
         append("\n")
 
-        append("Author: ${author.name}")
-        if (author.email.isNotEmpty()) {
-            append(" <${author.email}>")
-        }
+        append(message("annotation.aspect.author"))
+        append(": ")
+        append(author)
         append("\n")
         append(description)
     }

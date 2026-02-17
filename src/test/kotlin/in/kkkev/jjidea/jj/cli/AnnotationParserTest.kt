@@ -148,7 +148,7 @@ class AnnotationParserTest {
         val tooltip = result[0].getTooltip()
 
         tooltip shouldContain "mnop"
-        tooltip shouldContain "abc123def456"
+        tooltip shouldContain "abc123de"
         tooltip shouldContain "John Doe"
         tooltip shouldContain "john@example.com"
         tooltip shouldContain "Initial commit"

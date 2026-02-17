@@ -16,18 +16,15 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
-import `in`.kkkev.jjidea.ui.components.Formatters
-import `in`.kkkev.jjidea.ui.components.StringBuilderHtmlTextCanvas
-import `in`.kkkev.jjidea.ui.components.append
-import `in`.kkkev.jjidea.ui.components.htmlText
+import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.vcs.actions.JujutsuDataKeys
 import java.awt.BorderLayout
 import javax.swing.JEditorPane
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
-import javax.swing.text.html.HTMLEditorKit
 
 /**
  * Panel that displays detailed information about a selected commit.
@@ -47,7 +44,7 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     private val splitter: OnePixelSplitter
 
     // Metadata components
-    private val metadataPane = JEditorPane()
+    private val metadataPane = IconAwareHtmlPane()
 
     // Changes tree
     private val changesTree = JujutsuChangesTree(project)
@@ -58,11 +55,8 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     init {
         // Configure metadata pane
         metadataPane.apply {
-            contentType = "text/html"
-            isEditable = false
             background = UIUtil.getTextFieldBackground()
             border = JBUI.Borders.empty(8)
-            editorKit = HTMLEditorKit()
         }
 
         metadataPanel.add(JBScrollPane(metadataPane), BorderLayout.CENTER)
@@ -115,7 +109,8 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
         group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
 
         return ActionManager.getInstance()
-            .createActionToolbar("JujutsuCommitDetailsChangesToolbar", group, true).apply {
+            .createActionToolbar("JujutsuCommitDetailsChangesToolbar", group, true)
+            .apply {
                 targetComponent = changesTree
             }
     }
@@ -142,7 +137,7 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
 
         // Scroll to top
         SwingUtilities.invokeLater {
-            metadataPane.caretPosition = 0
+            (metadataPane as JEditorPane).caretPosition = 0
         }
 
         // Load changes in background
@@ -183,107 +178,39 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     /**
      * Build HTML for commit details, matching Git plugin style.
      */
-    private fun buildCommitHtml(entry: LogEntry): String {
-        val sb = StringBuilder()
-        val canvas = StringBuilderHtmlTextCanvas(sb)
-        sb.append("<html><body style='${Formatters.getBodyStyle()}'>")
+    private fun buildCommitHtml(entry: LogEntry) = htmlString {
+        control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
+            appendSummaryAndStatuses(entry)
+            appendParents(entry)
+            control("<pre style='white-space: pre-wrap;'>", "</pre>") {
+                append(entry.description)
+            }
+            control("<p style='margin: 4px 0;'>", "</p>") {
+                entry.author?.let { append(it) } ?: append("Unknown")
+                entry.authorTimestamp?.also {
+                    append(" on ")
+                    append(it)
+                }
 
-        // Commit line: Change ID + decorations
-        sb.append("<p style='margin: 0; padding-bottom: 4px;'>")
-
-        canvas.append(entry.id)
-
-        // Bookmarks with branch icon (⎇ symbol - JEditorPane doesn't support icon data URIs reliably)
-        if (entry.bookmarks.isNotEmpty()) {
-            sb.append(" ")
-            entry.bookmarks.forEach { bookmark ->
-                sb.append(
-                    "<span style='color: #${JujutsuColors.getBookmarkHex()};'>\u2387 ${
-                        Formatters.escapeHtml(bookmark.name)
-                    }</span> "
-                )
+                // Committer line (if different from author)
+                val committer = entry.committer
+                if (committer != null && committer != entry.author) {
+                    append("\ncommitted by ")
+                    append(committer)
+                }
             }
         }
-
-        // Status flags
-        val statusParts = mutableListOf<String>()
-        if (entry.isWorkingCopy) {
-            statusParts.add(
-                "<span style='color: #${JujutsuColors.getWorkingCopyHex()};'>@ ${
-                    JujutsuBundle.message(
-                        "status.workingcopy"
-                    )
-                }</span>"
-            )
-        }
-        if (entry.hasConflict) {
-            statusParts.add(
-                "<span style='color: #${JujutsuColors.getConflictHex()};'>${
-                    JujutsuBundle.message(
-                        "status.conflict"
-                    )
-                }</span>"
-            )
-        }
-        if (entry.isEmpty) {
-            statusParts.add(JujutsuBundle.message("status.empty"))
-        }
-
-        if (statusParts.isNotEmpty()) {
-            sb.append(" [${statusParts.joinToString(", ")}]")
-        }
-
-        sb.append("</p>")
-
-        sb.append("<p style='margin: 4px 0;'>")
-        sb.append(JujutsuBundle.message("details.commitid.label"))
-        canvas.append(entry.commitId)
-        sb.append("</p>")
-
-        // Description or (no description) in italics
-        sb.append("<p style='margin: 8px 0;'>${htmlText { append(entry.description) }}</p>")
-
-        // Author and committer info (Git style with formatted dates)
-        sb.append("<p style='margin: 4px 0;'>")
-
-        // Author line
-        // TODO Localise
-        sb.append(entry.author?.let { htmlText { append(it) } } ?: "Unknown")
-        entry.authorTimestamp?.also {
-            sb.append("on ${htmlText { append(it) }}")
-        }
-
-        // Committer line (if different from author)
-        val committer = entry.committer
-        if (committer != null && committer != entry.author) {
-            sb.append("<br/>committed by ${htmlText { append(committer) }} ")
-        }
-
-        sb.append("</p>")
-
-        // Parents (normal color, using standard formatter)
-        if (entry.parentIds.isNotEmpty()) {
-            sb.append("<p style='margin: 4px 0;'>")
-            sb.append("Parents: ")
-            sb.append(entry.parentIds.joinToString(", ") { htmlText { append(it) } })
-            sb.append("</p>")
-        }
-
-        sb.append("</body></html>")
-        return sb.toString()
     }
 
     /**
      * Show empty state when no commit is selected.
      */
     private fun showEmptyState() {
-        metadataPane.text = "<html><body style='${Formatters.getBodyStyle()} padding: 8px;'>" +
-            "<i style='color: #${JujutsuColors.getGrayHex()};'>${
-                JujutsuBundle.message(
-                    "details.empty.message"
-                )
-            }</i>" +
-            "</body></html>"
+        metadataPane.text = htmlString {
+            control("<body style='${Formatters.getBodyStyle()}; padding: 8px'>", "</body>") {
+                grey { italic { append(message("details.empty.message")) } }
+            }
+        }
     }
 
     override fun dispose() {

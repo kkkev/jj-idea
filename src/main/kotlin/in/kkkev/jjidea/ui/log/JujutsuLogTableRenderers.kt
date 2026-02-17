@@ -2,25 +2,31 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
 import com.intellij.ui.ColoredTableCellRenderer
-import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
-import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
-import `in`.kkkev.jjidea.ui.components.TextCanvas
-import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons.Conflict
+import `in`.kkkev.jjidea.ui.components.*
 import kotlinx.datetime.Instant
-import java.awt.*
-import javax.swing.JPanel
+import java.awt.Color
+import java.awt.Component
+import java.awt.Font
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
-abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
+abstract class TextCellRenderer<T> : ColoredTableCellRenderer() {
+    val canvas = object : StyledTextCanvas() {
+        override fun append(text: String) {
+            this@TextCellRenderer.append(text, style)
+        }
+    }
+
     protected var isWorkingCopyRow = false
 
     override fun customizeCellRenderer(
@@ -35,6 +41,7 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer(), TextCanvas {
         val model = table.model as? JujutsuLogTableModel
         isWorkingCopyRow = model?.getEntry(row)?.isWorkingCopy ?: false
 
+        @Suppress("UNCHECKED_CAST")
         (value as? T)?.let { render(it) }
     }
 
@@ -114,34 +121,12 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
 }
 
 /**
- * Renderer for the Author column.
+ * Renderer for the Author and Committer columns.
  */
-class AuthorCellRenderer : TextCellRenderer<VcsUser>() {
+class UserCellRenderer : TextCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
-        // Use bold for working copy row
-        val attributes =
-            if (isWorkingCopyRow) {
-                SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES
-            } else {
-                SimpleTextAttributes.REGULAR_ATTRIBUTES
-            }
-        append(value.name, attributes)
-    }
-}
-
-/**
- * Renderer for the Committer column.
- */
-class CommitterCellRenderer : TextCellRenderer<VcsUser>() {
-    override fun render(value: VcsUser) {
-        // Use bold for working copy row
-        val attributes =
-            if (isWorkingCopyRow) {
-                SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES
-            } else {
-                SimpleTextAttributes.REGULAR_ATTRIBUTES
-            }
-        append(value.name, attributes)
+        canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) { append(value) }
+        toolTipText = value.email
     }
 }
 
@@ -151,13 +136,7 @@ class CommitterCellRenderer : TextCellRenderer<VcsUser>() {
  */
 class DateCellRenderer : TextCellRenderer<Instant>() {
     override fun render(value: Instant) {
-        // Use bold for working copy row
-        if (isWorkingCopyRow) {
-            val dateStr = DateTimeFormatter.formatRelative(value)
-            append(dateStr, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-        } else {
-            append(value)
-        }
+        canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) { append(value) }
 
         // Tooltip shows full absolute time
         toolTipText = DateTimeFormatter.formatAbsolute(value)
@@ -168,29 +147,52 @@ class DateCellRenderer : TextCellRenderer<Instant>() {
  * Renderer for separate ID column.
  */
 class SeparateIdCellRenderer : TextCellRenderer<ChangeId>() {
-    override fun render(value: ChangeId) {
-        // TODO Should we embolden the working copy row? How would we do that and still use the append method?
-        append(value)
-    }
+    override fun render(value: ChangeId) = canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) { append(value) }
 }
 
 /**
- * Renderer for separate Description column with right-aligned decorations.
- * Uses custom painting to position description left-aligned and bookmarks/@ right-aligned.
+ * Build a [FragmentRecordingCanvas] with the standard row styling (bold for working copy,
+ * foreground color for selection state) applied around [builder].
  */
-class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), TableCellRenderer {
-    companion object {
-        // HiDPI-aware padding using JBValue for proper scaling
-        private val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Description.horizontalPadding", 4)
+fun entryCanvas(entry: LogEntry, fg: Color, builder: TextCanvas.() -> Unit) = FragmentRecordingCanvas().apply {
+    styled(if (entry.isWorkingCopy) Font.BOLD else 0) {
+        colored(fg, builder)
     }
+}
 
-    private var entry: LogEntry? = null
-    private var isSelected = false
-    private var isHovered = false
-
-    init {
-        isOpaque = true
+/** Append status indicators: immutable/public icon and conflict warning. */
+fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
+    append(icon(if (entry.immutable) AllIcons.Nodes::Private else AllIcons.Nodes::Public))
+    if (entry.hasConflict) {
+        append(icon(JujutsuIcons::Conflict, JujutsuColors.CONFLICT))
+        append(" ")
     }
+}
+
+/** Append the description summary and "(empty)" indicator for a log entry. */
+fun TextCanvas.appendDescriptionContent(entry: LogEntry) {
+    appendSummary(entry.description)
+    if (entry.isEmpty) {
+        grey {
+            italic {
+                append(" ")
+                append(message("description.empty.suffix"))
+            }
+        }
+    }
+}
+
+/** Append right-side decorations: bookmarks and working copy indicator. */
+fun TextCanvas.appendDecorations(entry: LogEntry) {
+    appendBookmarks(entry)
+    if (entry.isWorkingCopy) {
+        append(" ")
+        colored(JujutsuColors.WORKING_COPY) { bold { append("@") } }
+    }
+}
+
+class SeparateDescriptionCellRenderer() : TableCellRenderer {
+    private val panel = TruncatingLeftRightLayout()
 
     override fun getTableCellRendererComponent(
         table: JTable,
@@ -200,194 +202,27 @@ class SeparateDescriptionCellRenderer(private val table: JTable) : JPanel(), Tab
         row: Int,
         column: Int
     ): Component {
-        // Get entry from model
         val model = table.model as? JujutsuLogTableModel
-        entry = model?.getEntry(row)
+        val entry = model?.getEntry(row) ?: return panel
 
-        this.isSelected = isSelected
         val mousePos = table.mousePosition
-        this.isHovered = mousePos != null && table.rowAtPoint(mousePos) == row
-
-        // Set background based on selection/hover state
-        background = when {
+        val isHovered = mousePos != null && table.rowAtPoint(mousePos) == row
+        val bg = when {
             isSelected -> table.selectionBackground
             isHovered -> UIUtil.getListBackground(true, false)
             else -> table.background
         }
+        val fg = if (isSelected) table.selectionForeground else table.foreground
 
-        // Set tooltip to full description with HTML formatting
-        entry?.let { e ->
-            toolTipText = if (!e.description.empty) {
-                formatDescriptionTooltip(e.description.actual)
-            } else {
-                null
-            }
-        }
-
-        return this
-    }
-
-    override fun paintComponent(g: Graphics) {
-        val g2d = g as Graphics2D
-        val entry = this.entry ?: return
-
-        // Paint background explicitly
-        g2d.color = background
-        g2d.fillRect(0, 0, width, height)
-
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-        g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
-
-        val centerY = height / 2
-        val baseFontMetrics = g2d.fontMetrics
-        val horizontalPadding = HORIZONTAL_PADDING.get()
-
-        // Calculate decorations width
-        val decorationsWidth = calculateDecorationsWidth(g2d, entry, horizontalPadding)
-
-        // Calculate available width for description
-        val maxDescriptionWidth = width - (horizontalPadding * 2) - decorationsWidth
-
-        // Draw description
-        val fontStyle = DescriptionRenderingStyle.getFontStyle(entry)
-        g2d.font = baseFontMetrics.font.deriveFont(fontStyle)
-        val fontMetrics = g2d.fontMetrics
-
-        // Calculate width needed for "(empty)" indicator if applicable
-        val emptyText = " (empty)"
-        val emptyIndicatorWidth = if (entry.isEmpty) {
-            val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
-            g2d.getFontMetrics(baseFontMetrics.font.deriveFont(emptyStyle)).stringWidth(emptyText)
-        } else {
-            0
-        }
-
-        // Reduce available width for description to reserve space for "(empty)"
-        val availableWidthForDescription = maxDescriptionWidth - emptyIndicatorWidth
-
-        // Set color using shared logic
-        g2d.color = DescriptionRenderingStyle.getTextColor(
-            entry.description,
-            isSelected,
-            table.selectionForeground,
-            table.foreground
+        panel.configure(
+            leftCanvas = entryCanvas(entry, fg) { appendDescriptionContent(entry) },
+            rightCanvas = entryCanvas(entry, fg) { appendDecorations(entry) },
+            cellWidth = table.columnModel.getColumn(column).width,
+            background = bg
         )
 
-        val text = entry.description.display
-
-        // Truncate text if it doesn't fit
-        val displayText = truncateText(text, fontMetrics, availableWidthForDescription)
-
-        var x = horizontalPadding
-        if (displayText.isNotEmpty()) {
-            g2d.drawString(displayText, x, centerY + fontMetrics.ascent / 2)
-            x += fontMetrics.stringWidth(displayText)
-        }
-
-        // Draw "(empty)" indicator if entry is empty
-        if (entry.isEmpty) {
-            val emptyStyle = DescriptionRenderingStyle.getEmptyIndicatorFontStyle(entry.isWorkingCopy)
-            g2d.font = baseFontMetrics.font.deriveFont(emptyStyle)
-            g2d.color = if (isSelected) table.selectionForeground else JBColor.GRAY
-            g2d.drawString(emptyText, x, centerY + g2d.fontMetrics.ascent / 2)
-        }
-
-        // Reset font
-        g2d.font = baseFontMetrics.font
-
-        // Draw decorations on the right
-        drawDecorations(g2d, entry, width - horizontalPadding, horizontalPadding)
-    }
-
-    private fun truncateText(text: String, fontMetrics: FontMetrics, availableWidth: Int): String {
-        if (fontMetrics.stringWidth(text) <= availableWidth) return text
-
-        // Binary search for the right length
-        var truncated = text
-        while (truncated.isNotEmpty() && fontMetrics.stringWidth("$truncated...") > availableWidth) {
-            truncated = truncated.dropLast(1)
-        }
-        return if (truncated.isEmpty()) "" else "$truncated..."
-    }
-
-    private fun calculateDecorationsWidth(g2d: Graphics2D, entry: LogEntry, horizontalPadding: Int): Int {
-        if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return 0
-
-        val fontMetrics = g2d.fontMetrics
-        val boldFont = fontMetrics.font.deriveFont(Font.BOLD)
-        val boldFontMetrics = g2d.getFontMetrics(boldFont)
-        var width = 0
-
-        // Calculate bookmark widths using platform-style painter
-        if (entry.bookmarks.isNotEmpty()) {
-            val painter = JujutsuLabelPainter(this, compact = false)
-            width += painter.calculateWidth(entry.bookmarks)
-        }
-
-        // Calculate @ symbol width
-        if (entry.isWorkingCopy) {
-            width += boldFontMetrics.stringWidth("@")
-            width += horizontalPadding
-        }
-
-        return width
-    }
-
-    @Suppress("UNUSED_PARAMETER")
-    private fun drawDecorations(g2d: Graphics2D, entry: LogEntry, rightX: Int, horizontalPadding: Int) {
-        if (entry.bookmarks.isEmpty() && !entry.isWorkingCopy) return
-
-        val centerY = height / 2
-        val fontMetrics = g2d.fontMetrics
-        val boldFont = fontMetrics.font.deriveFont(Font.BOLD)
-
-        var x = rightX
-
-        // Draw bookmarks using platform-style painter
-        if (entry.bookmarks.isNotEmpty()) {
-            val painter = JujutsuLabelPainter(this, compact = false)
-            val background = when {
-                isSelected -> table.selectionBackground
-                isHovered -> UIUtil.getListBackground(true, false)
-                else -> table.background
-            }
-            // Use grey text color (icon is orange, text is grey)
-            val foreground = if (isSelected) table.selectionForeground else JBColor.GRAY
-
-            x = painter.paintRightAligned(
-                g2d,
-                x,
-                0,
-                height,
-                entry.bookmarks,
-                background,
-                foreground,
-                isSelected
-            )
-        }
-
-        // Draw @ symbol for working copy
-        if (entry.isWorkingCopy) {
-            g2d.font = boldFont
-            g2d.color = if (isSelected) table.selectionForeground else JujutsuColors.WORKING_COPY
-            val atWidth = fontMetrics.stringWidth("@")
-            x -= atWidth
-            g2d.drawString("@", x, centerY + fontMetrics.ascent / 2)
-        }
-
-        // Reset font
-        g2d.font = fontMetrics.font
-    }
-
-    private fun formatDescriptionTooltip(description: String): String {
-        // Convert to HTML and replace newlines with <br>
-        val htmlEscaped = description
-            .replace("&", "&amp;")
-            .replace("<", "&lt;")
-            .replace(">", "&gt;")
-            .replace("\n", "<br>")
-
-        return "<html>$htmlEscaped</html>"
+        panel.toolTipText = htmlString { append(entry.description) }
+        return panel
     }
 }
 
@@ -426,11 +261,8 @@ class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
         if (value.bookmarks.isNotEmpty()) {
             if (hasContent) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
 
-            // Set platform-style bookmark icon (appears once at start of bookmarks)
-            // Use font metrics height for proper scaling
-            val fontMetrics = getFontMetrics(font)
-            val iconHeight = fontMetrics.height
-            icon = JujutsuBookmarkIcon(iconHeight)
+            // icon = JujutsuIcons.Bookmark
+            icon = AllIcons.Nodes.Bookmark
 
             // Render bookmark names with smaller, grayed text (grey text, not orange)
             value.bookmarks.forEachIndexed { index, bookmark ->
@@ -466,10 +298,10 @@ fun JujutsuLogTable.installRenderers() {
     val rootGutterRenderer = JujutsuRootGutterRenderer()
     val statusRenderer = SeparateStatusCellRenderer()
     val changeIdRenderer = SeparateIdCellRenderer()
-    val descriptionRenderer = SeparateDescriptionCellRenderer(this)
+    val descriptionRenderer = SeparateDescriptionCellRenderer()
     val decorationsRenderer = SeparateDecorationsCellRenderer()
-    val authorRenderer = AuthorCellRenderer()
-    val committerRenderer = CommitterCellRenderer()
+    val authorRenderer = UserCellRenderer()
+    val committerRenderer = UserCellRenderer()
     val dateRenderer = DateCellRenderer()
 
     // Iterate through actual columns in the column model

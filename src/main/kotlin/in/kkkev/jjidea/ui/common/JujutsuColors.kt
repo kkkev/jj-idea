@@ -24,6 +24,8 @@ object JujutsuColors {
      */
     val CONFLICT = JBColor.RED
 
+    val DIVERGENT = JBColor.PINK
+
     /**
      * Get gray color as hex string (for HTML).
      */

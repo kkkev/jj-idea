@@ -39,3 +39,10 @@ object JujutsuBundle : DynamicBundle(BUNDLE) {
     fun messagePointer(@PropertyKey(resourceBundle = BUNDLE) key: String, vararg params: Any) =
         getLazyMessage(key, *params)
 }
+
+/**
+ * Reference to a message in the bundle.
+ */
+data class JujutsuMessage(val key: String)
+
+fun message(key: String) = JujutsuMessage(key)

@@ -25,15 +25,10 @@ class JujutsuColumnManager {
     var showCommitterColumn: Boolean = false
     var showDateColumn: Boolean = true
 
-    // Graph column content elements (only shown if corresponding column is hidden)
-    var showChangeIdInGraph: Boolean = true
-    var showDescriptionInGraph: Boolean = true
-    var showDecorationsInGraph: Boolean = true // Bookmarks, tags, working copy indicator
-
     // Computed properties for renderer
-    val showChangeId: Boolean get() = !showChangeIdColumn && showChangeIdInGraph
-    val showDescription: Boolean get() = !showDescriptionColumn && showDescriptionInGraph
-    val showDecorations: Boolean get() = !showDecorationsColumn && showDecorationsInGraph
+    val showChangeId: Boolean get() = !showChangeIdColumn
+    val showDescription: Boolean get() = !showDescriptionColumn
+    val showDecorations: Boolean get() = !showDecorationsColumn
 
     /**
      * Get list of visible columns (indices).

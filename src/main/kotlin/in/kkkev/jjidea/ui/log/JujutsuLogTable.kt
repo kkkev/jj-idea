@@ -1,18 +1,25 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.ide.IdeTooltip
+import com.intellij.ide.IdeTooltipManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
+import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import kotlinx.datetime.Instant
 import java.awt.Component
+import java.awt.Point
 import java.awt.event.*
+import javax.swing.JComponent
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ListSelectionEvent
@@ -39,6 +46,35 @@ class JujutsuLogTable(
     // Currently hovered row for targeted repaint
     var hoveredRow: Int = -1
         private set
+
+    // Tooltip cell tracking — hideCurrentNow() on cell change forces IdeTooltipManager
+    // to call beforeShow() again with fresh content for the new cell
+    private var tooltipRow = -1
+    private var tooltipCol = -1
+
+    private val customTooltip = object : IdeTooltip(this, Point(0, 0), null) {
+        override fun beforeShow(): Boolean {
+            val mousePos = this@JujutsuLogTable.mousePosition ?: return false
+            val row = rowAtPoint(mousePos)
+            val col = columnAtPoint(mousePos)
+            if (row < 0 || col < 0) return false
+
+            val renderer = getCellRenderer(row, col)
+            val component = prepareRenderer(renderer, row, col) as? JComponent ?: return false
+            val text = component.toolTipText
+            if (text.isNullOrBlank()) return false
+
+            val pane = IconAwareHtmlPane()
+            pane.foreground = UIUtil.getToolTipForeground()
+            pane.text = text
+
+            point = mousePos
+            tipComponent = Wrapper(pane)
+            return true
+        }
+
+        override fun canBeDismissedOnTimeout() = false
+    }
 
     // Root gutter state: true = expanded (shows repo name), false = collapsed (just colored strip)
     var isRootGutterExpanded: Boolean = false
@@ -121,7 +157,7 @@ class JujutsuLogTable(
         // Striped rows for better readability
         setStriped(true)
 
-        // Enable hover effect - repaint only affected rows on mouse movement
+        // Enable hover effect and tooltip cell tracking
         addMouseMotionListener(
             object : MouseMotionAdapter() {
                 override fun mouseMoved(e: MouseEvent) {
@@ -132,9 +168,23 @@ class JujutsuLogTable(
                         if (oldRow >= 0) repaintRow(oldRow)
                         if (newRow >= 0) repaintRow(newRow)
                     }
+                    // Force tooltip re-evaluation when the cell changes
+                    val newCol = columnAtPoint(e.point)
+                    if (newRow != tooltipRow || newCol != tooltipCol) {
+                        tooltipRow = newRow
+                        tooltipCol = newCol
+                        IdeTooltipManager.getInstance().hideCurrentNow(false)
+                    }
                 }
             }
         )
+
+        // Register custom tooltip that renders all tooltips via IconAwareHtmlPane.
+        // This ensures <icon> tags render correctly and all tooltips have consistent styling.
+        // The identity check (currentTooltip === tooltip) in IdeTooltipManager keeps the
+        // tooltip stable during mouse movement within the same cell; hideCurrentNow() in
+        // the MouseMotionListener above forces re-evaluation on cell changes.
+        IdeTooltipManager.getInstance().setCustomTooltip(this, customTooltip)
 
         // Handle clicks on the gutter column to toggle expansion
         addMouseListener(

@@ -13,11 +13,10 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.common.DescriptionRenderer
 import `in`.kkkev.jjidea.ui.components.ComponentTextCanvas
-import `in`.kkkev.jjidea.ui.components.StringBuilderHtmlTextCanvas
 import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.ui.components.appendSummary
+import `in`.kkkev.jjidea.ui.components.htmlString
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter
@@ -123,39 +122,28 @@ object JujutsuCompareWithPopup {
                 if (index < 0) return null
 
                 return when (val item = model.getElementAt(index)) {
-                    is CompareItem.Change -> {
-                        buildString {
-                            val canvas = StringBuilderHtmlTextCanvas(this)
-
-                            append("<html>")
-                            canvas.append(item.entry.id)
-                            append(" (")
-                            canvas.append(item.entry.commitId)
-                            append(")")
-                            append("<br>")
-                            item.entry.author?.let {
-                                canvas.append(it)
-                                append("<br>")
-                            }
-                            item.entry.authorTimestamp?.let { timestamp ->
-                                canvas.append(timestamp)
-                                append("<br>")
-                            }
-                            append("<br>")
-                            append(DescriptionRenderer.toHtml(item.entry.description, multiline = true))
-                            append("</html>")
+                    is CompareItem.Change -> htmlString {
+                        append(item.entry.id)
+                        append(" (")
+                        append(item.entry.commitId)
+                        append(")\n")
+                        item.entry.author?.let {
+                            append(it)
+                            append("\n")
                         }
+                        item.entry.authorTimestamp?.let { timestamp ->
+                            append(timestamp)
+                            append("\n")
+                        }
+                        control("<br/>")
+                        appendSummary(item.entry.description)
                     }
 
-                    is CompareItem.Bookmark -> {
-                        buildString {
-                            val canvas = StringBuilderHtmlTextCanvas(this)
-
-                            append("<html>")
-                            append("<b>${item.item.bookmark.name}</b><br>")
-                            canvas.append(item.item.id)
-                            append("</html>")
-                        }
+                    is CompareItem.Bookmark -> htmlString {
+                        append(item.item.bookmark)
+                        append(" (")
+                        append(item.item.id)
+                        append(")")
                     }
 
                     else -> null

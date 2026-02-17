@@ -14,8 +14,10 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.components.StringBuilderHtmlTextCanvas
-import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
+import `in`.kkkev.jjidea.ui.components.appendParents
+import `in`.kkkev.jjidea.ui.components.appendSummary
+import `in`.kkkev.jjidea.ui.components.htmlString
 import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.vcs.actions.requestDescription
 import java.awt.BorderLayout
@@ -105,9 +107,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         })
     }
 
-    private val currentChangeLabel = JBLabel().apply {
-        font = font.deriveFont(13f)
-    }
+    private val currentChangeLabel = IconAwareHtmlPane()
 
     private val descriptionLabel = JBLabel(JujutsuBundle.message("toolwindow.description.label"))
 
@@ -356,32 +356,10 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     private fun updateWorkingCopyLabel(entry: LogEntry) {
-        val labelText = buildString {
-            val canvas = StringBuilderHtmlTextCanvas(this)
-
-            append("<html>")
-            // Show repo:changeId format
-            append("<b>${entry.repo.displayName}</b>:")
-            canvas.append(entry.id)
-            append(" (")
-            canvas.append(entry.commitId)
-            append(")")
-
-            if (entry.parentIds.isNotEmpty()) {
-                append("<br>")
-                append("<font size=-1>")
-                append(JujutsuBundle.message("toolwindow.parents.label"))
-                append(" ")
-                entry.parentIds.forEachIndexed { index, parentId ->
-                    if (index > 0) append(", ")
-                    canvas.append(parentId)
-                }
-                append("</font>")
-            }
-
-            append("</html>")
+        currentChangeLabel.text = htmlString {
+            appendSummary(entry)
+            appendParents(entry)
         }
-        currentChangeLabel.text = labelText
     }
 
     private fun loadCurrentDescription(repo: JujutsuRepository) {
