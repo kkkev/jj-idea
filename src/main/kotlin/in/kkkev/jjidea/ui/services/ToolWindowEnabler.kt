@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.services
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager

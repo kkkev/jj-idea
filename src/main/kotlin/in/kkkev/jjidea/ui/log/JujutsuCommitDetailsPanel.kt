@@ -16,7 +16,12 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.*
+import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.components.Formatters
+import `in`.kkkev.jjidea.ui.components.StringBuilderHtmlTextCanvas
+import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.htmlText
 import `in`.kkkev.jjidea.vcs.actions.JujutsuDataKeys
 import java.awt.BorderLayout
 import javax.swing.JEditorPane

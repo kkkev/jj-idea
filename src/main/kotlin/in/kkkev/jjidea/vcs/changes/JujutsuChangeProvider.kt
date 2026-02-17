@@ -7,7 +7,7 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.ui.JujutsuNotifications
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
 import `in`.kkkev.jjidea.vcs.jujutsuRepository

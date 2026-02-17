@@ -13,7 +13,11 @@ import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.*
+import `in`.kkkev.jjidea.ui.common.DescriptionRenderer
+import `in`.kkkev.jjidea.ui.components.ComponentTextCanvas
+import `in`.kkkev.jjidea.ui.components.StringBuilderHtmlTextCanvas
+import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.appendSummary
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter

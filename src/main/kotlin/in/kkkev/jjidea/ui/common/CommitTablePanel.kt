@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.common
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable

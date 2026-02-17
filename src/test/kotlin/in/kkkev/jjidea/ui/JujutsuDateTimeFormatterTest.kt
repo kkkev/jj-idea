@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui
 
 import com.intellij.util.text.DateTimeFormatManager
+import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldStartWith

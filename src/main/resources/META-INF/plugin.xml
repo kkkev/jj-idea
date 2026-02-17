@@ -52,7 +52,7 @@
         <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel" />
         <projectService serviceImplementation="in.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager" />
         <projectService serviceImplementation="in.kkkev.jjidea.ui.history.JujutsuFileHistoryTabManager" />
-        <projectService serviceImplementation="in.kkkev.jjidea.ui.ToolWindowEnabler" preload="true" />
+        <projectService serviceImplementation="in.kkkev.jjidea.ui.services.ToolWindowEnabler" preload="true" />
         <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings" />
 
         <!-- Ignore .jj/ internal files to prevent VcsDirtyScopeVfsListener feedback loops -->

@@ -8,8 +8,8 @@ import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.CommitTablePanel
-import `in`.kkkev.jjidea.ui.DataLoader
+import `in`.kkkev.jjidea.ui.common.CommitTablePanel
+import `in`.kkkev.jjidea.ui.common.DataLoader
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 

@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.Shortenable
+import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import kotlinx.datetime.Instant
 
 interface TextCanvas {

@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.common
 
 /**
  * A data loader for a panel containing a commit table.

@@ -9,8 +9,8 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.CommitTablePanel
-import `in`.kkkev.jjidea.ui.DataLoader
+import `in`.kkkev.jjidea.ui.common.CommitTablePanel
+import `in`.kkkev.jjidea.ui.common.DataLoader
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch

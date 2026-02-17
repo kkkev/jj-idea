@@ -10,10 +10,10 @@ import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.DateTimeFormatter
-import `in`.kkkev.jjidea.ui.JujutsuColors
-import `in`.kkkev.jjidea.ui.TextCanvas
-import `in`.kkkev.jjidea.ui.append
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
+import `in`.kkkev.jjidea.ui.components.TextCanvas
+import `in`.kkkev.jjidea.ui.components.append
 import kotlinx.datetime.Instant
 import java.awt.*
 import javax.swing.JPanel

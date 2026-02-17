@@ -14,8 +14,8 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.StringBuilderHtmlTextCanvas
-import `in`.kkkev.jjidea.ui.append
+import `in`.kkkev.jjidea.ui.components.StringBuilderHtmlTextCanvas
+import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.vcs.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.vcs.actions.requestDescription
 import java.awt.BorderLayout

@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.common
 
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Description

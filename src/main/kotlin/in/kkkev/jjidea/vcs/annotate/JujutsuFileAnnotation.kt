@@ -12,7 +12,7 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
 import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.ui.DateTimeFormatter
+import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import kotlinx.datetime.Instant
 import java.util.*

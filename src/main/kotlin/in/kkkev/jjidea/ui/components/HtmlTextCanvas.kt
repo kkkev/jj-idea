@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.codeInsight.codeVision.ui.model.richText.RichText
 import com.intellij.ui.SimpleTextAttributes

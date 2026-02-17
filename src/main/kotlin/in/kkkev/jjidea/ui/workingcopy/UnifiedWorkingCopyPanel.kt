@@ -24,7 +24,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.stateModel
-import `in`.kkkev.jjidea.ui.JujutsuChangesTree
+import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.CardLayout

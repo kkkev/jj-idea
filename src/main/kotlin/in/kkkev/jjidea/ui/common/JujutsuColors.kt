@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui
+package `in`.kkkev.jjidea.ui.common
 
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI

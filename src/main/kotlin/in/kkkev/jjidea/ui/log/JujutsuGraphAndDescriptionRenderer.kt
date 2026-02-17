@@ -7,10 +7,10 @@ import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.GraphicsTextCanvas
-import `in`.kkkev.jjidea.ui.JujutsuColors
-import `in`.kkkev.jjidea.ui.append
-import `in`.kkkev.jjidea.ui.drawStringCentredVertically
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.components.GraphicsTextCanvas
+import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.drawStringCentredVertically
 import java.awt.*
 import javax.swing.JPanel
 import javax.swing.JTable

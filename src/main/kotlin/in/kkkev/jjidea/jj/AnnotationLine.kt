@@ -2,8 +2,8 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
 import com.intellij.vcs.log.impl.VcsUserImpl
-import `in`.kkkev.jjidea.ui.append
-import `in`.kkkev.jjidea.ui.buildText
+import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.buildText
 import kotlinx.datetime.Instant
 
 /**

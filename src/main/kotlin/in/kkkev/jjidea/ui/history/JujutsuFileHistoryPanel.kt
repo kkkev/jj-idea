@@ -5,7 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.CommitTablePanel
+import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 
 /**
  * Panel for displaying file history with the same styling as the custom log view.

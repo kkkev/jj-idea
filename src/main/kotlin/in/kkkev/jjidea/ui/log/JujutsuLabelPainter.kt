@@ -6,7 +6,7 @@ import com.intellij.ui.JBColor
 import com.intellij.util.ui.GraphicsUtil
 import com.intellij.util.ui.JBValue
 import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.ui.drawStringCentredVertically
+import `in`.kkkev.jjidea.ui.components.drawStringCentredVertically
 import java.awt.Color
 import java.awt.Font
 import java.awt.FontMetrics
