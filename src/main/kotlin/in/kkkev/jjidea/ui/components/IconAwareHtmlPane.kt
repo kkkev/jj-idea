@@ -33,8 +33,14 @@ object IconResolver {
         val parts = key.split("#", limit = 2)
         val icon = icons[parts[0]] ?: return null
         val hexColor = parts.getOrNull(1) ?: return icon
-        // keepGray preserves white/gray pixels (e.g. exclamation mark in conflict icon)
-        return IconUtil.colorize(icon, ColorUtil.fromHex(hexColor), true)
+        return try {
+            // keepGray preserves white/gray pixels (e.g. exclamation mark in conflict icon)
+            IconUtil.colorize(icon, ColorUtil.fromHex(hexColor), true)
+        } catch (_: NoSuchMethodError) {
+            // IconUtil.colorize signature changed in 2025.2 (added keepBrightness param).
+            // Fall back to uncolored icon on older platform versions.
+            icon
+        }
     }
 
     private val KClass<*>.allIcons
