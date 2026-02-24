@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-24
+
 ### Added
 - Rebase dialog with full `jj rebase` support: source modes (-r/-s/-b), destination modes (-d/-A/-B), multi-select source and destination
 - Rebase dialog: log-style destination picker with commit graph, bookmarks as decorations, and search by change ID, description, or bookmark name
@@ -84,7 +86,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.2.5...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.3.0
 [0.2.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.2.5
 [0.2.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.2.4
 [0.2.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.2.3
