@@ -42,14 +42,11 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
             }
         )
 
-        // React to initializedRoots changes
+        // React to initializedRoots changes (init() already calls invalidate(),
+        // and connect() fires immediately if the value has loaded)
         project.stateModel.initializedRoots.connect(this) { jjRoots ->
             handleRootsChange(jjRoots)
         }
-
-        // Trigger initial load (repositoryStates will be invalidated automatically
-        // when initializedRoots changes, via listener in JujutsuStateModel)
-        project.stateModel.initializedRoots.invalidate()
     }
 
     private fun handleRootsChange(jjRoots: Set<JujutsuRepository>) {

@@ -190,29 +190,28 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun subscribeToStateModel() {
+        // repositoryStates fires on EDT already (via invokeLater in SimpleNotifiableState)
         project.stateModel.repositoryStates.connect(this) { new ->
-            ApplicationManager.getApplication().invokeLater {
-                // Update UI based on whether we have any repos
-                val hasRepos = new.isNotEmpty()
-                val cardLayout = cardPanel.layout as CardLayout
-                cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
+            // Update UI based on whether we have any repos
+            val hasRepos = new.isNotEmpty()
+            val cardLayout = cardPanel.layout as CardLayout
+            cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
 
-                if (hasRepos) {
-                    // Update the dropdown with available repos
-                    val sortedRepos = new.map { it.repo }.sortedBy { it.displayName }
-                    controlsPanel.updateAvailableRepositories(sortedRepos)
+            if (hasRepos) {
+                // Update the dropdown with available repos
+                val sortedRepos = new.map { it.repo }.sortedBy { it.displayName }
+                controlsPanel.updateAvailableRepositories(sortedRepos)
 
-                    // Update controls if the current repo was updated
-                    val currentRepo = controlsPanel.boundRepository
-                    new.find { it.repo == currentRepo }?.let { entry ->
-                        controlsPanel.update(entry)
-                    }
+                // Update controls if the current repo was updated
+                val currentRepo = controlsPanel.boundRepository
+                new.find { it.repo == currentRepo }?.let { entry ->
+                    controlsPanel.update(entry)
+                }
 
-                    // If no repo is bound, select the first one
-                    if (currentRepo == null || new.none { it.repo == currentRepo }) {
-                        controlsPanel.boundRepository = new.firstOrNull()?.repo
-                        new.firstOrNull()?.let { controlsPanel.update(it) }
-                    }
+                // If no repo is bound, select the first one
+                if (currentRepo == null || new.none { it.repo == currentRepo }) {
+                    controlsPanel.boundRepository = new.firstOrNull()?.repo
+                    new.firstOrNull()?.let { controlsPanel.update(it) }
                 }
             }
         }

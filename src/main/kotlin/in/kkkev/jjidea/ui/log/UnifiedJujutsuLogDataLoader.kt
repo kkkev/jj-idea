@@ -1,22 +1,17 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
-import `in`.kkkev.jjidea.ui.common.DataLoader
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Loads commit log data from multiple repositories in parallel and updates the table model on EDT.
@@ -31,14 +26,8 @@ class UnifiedJujutsuLogDataLoader(
     private val project: Project,
     private val repositories: () -> List<JujutsuRepository>,
     private val panel: CommitTablePanel<Data>
-) : DataLoader {
-    private val log = Logger.getInstance(javaClass)
-
+) : BackgroundDataLoader(project, "Loading Jujutsu Commits") {
     private val graphBuilder = CommitGraphBuilder()
-
-    private val loading = AtomicBoolean(false)
-    private val pendingRefresh = AtomicBoolean(false)
-    private val currentIndicator = AtomicReference<ProgressIndicator?>(null)
 
     data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeId, GraphNode>)
 
@@ -64,41 +53,29 @@ class UnifiedJujutsuLogDataLoader(
             return
         }
 
-        if (!loading.compareAndSet(false, true)) {
-            pendingRefresh.set(true)
-            return
-        }
+        val entriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
+        val errors = ConcurrentHashMap<JujutsuRepository, Throwable>()
+        var allEntries: List<LogEntry> = emptyList()
+        var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
 
-        currentIndicator.get()?.cancel()
-
-        object : Task.Backgroundable(project, "Loading Jujutsu Commits", true) {
-            private val entriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
-            private val errors = ConcurrentHashMap<JujutsuRepository, Throwable>()
-            private var allEntries: List<LogEntry> = emptyList()
-            var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
-                private set
-
-            override fun run(indicator: ProgressIndicator) {
-                currentIndicator.set(indicator)
+        executeInBackground(
+            run = { indicator ->
                 indicator.text = "Loading commits from ${repos.size} repositories..."
                 indicator.isIndeterminate = false
 
                 val latch = CountDownLatch(repos.size)
-                val totalRepos = repos.size
 
                 repos.forEachIndexed { index, repo ->
                     ApplicationManager.getApplication().executeOnPooledThread {
                         try {
                             indicator.text2 = "Loading from ${repo.displayName}..."
-                            indicator.fraction = index.toDouble() / totalRepos
+                            indicator.fraction = index.toDouble() / repos.size
 
                             val result = repo.logService.getLog(revset)
 
                             result.onSuccess { loadedEntries ->
                                 entriesByRepo[repo] = loadedEntries
-                                log.info(
-                                    "Loaded ${loadedEntries.size} commits from ${repo.displayName}"
-                                )
+                                log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
                             }.onFailure { e ->
                                 errors[repo] = e
                                 log.error("Failed to load commits from $repo", e)
@@ -116,37 +93,18 @@ class UnifiedJujutsuLogDataLoader(
 
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) {
                     log.error("All repositories failed to load")
-                    return
+                    return@executeInBackground
                 }
 
                 allEntries = topologicalSort(entriesByRepo.values.flatten())
-
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
                 graphNodes = graphBuilder.buildGraph(allEntries)
-            }
-
-            override fun onSuccess() {
-                loading.set(false)
-                currentIndicator.set(null)
-
-                if (entriesByRepo.isEmpty() && errors.isNotEmpty()) {
-                    if (pendingRefresh.compareAndSet(true, false)) loadCommits(revset)
-                    return
-                }
-
+            },
+            onSuccess = {
+                if (entriesByRepo.isEmpty() && errors.isNotEmpty()) return@executeInBackground
                 notify(Data(allEntries, graphNodes))
-
-                if (pendingRefresh.compareAndSet(true, false)) loadCommits(revset)
             }
-
-            override fun onThrowable(throwable: Throwable) {
-                loading.set(false)
-                currentIndicator.set(null)
-                log.error("Background task failed", throwable)
-
-                if (pendingRefresh.compareAndSet(true, false)) loadCommits(revset)
-            }
-        }.queue()
+        )
     }
 
     override fun refresh() {

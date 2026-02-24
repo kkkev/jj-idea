@@ -41,10 +41,9 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         // Subscribe to state changes from all repositories
         setupStateListener()
 
-        // Listen for change selection requests
+        // Listen for change selection requests (data reload is handled by repositoryStates listener)
         project.stateModel.changeSelection.connect(this) { key ->
             logTable.requestSelection(key)
-            dataLoader.refresh()
         }
 
         log.info("UnifiedJujutsuLogPanel initialized for project: ${project.name}")
