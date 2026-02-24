@@ -175,10 +175,10 @@ fun TextCanvas.appendParents(entry: LogEntry) = smaller {
 
 fun TextCanvas.appendConflict(entry: LogEntry, suffix: TextCanvas.() -> Unit = {}) = {
     if (entry.hasConflict) {
-            colored(JujutsuColors.CONFLICT) {
-                append(icon(JujutsuIcons::Conflict, JujutsuColors.CONFLICT))
-                suffix()
-            }
+        colored(JujutsuColors.CONFLICT) {
+            append(icon(JujutsuIcons::Conflict, JujutsuColors.CONFLICT))
+            suffix()
+        }
     }
 }
 

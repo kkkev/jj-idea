@@ -13,12 +13,10 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
-import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.vcs.actions.JujutsuDataKeys
 import java.awt.BorderLayout
