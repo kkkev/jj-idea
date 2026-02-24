@@ -53,3 +53,6 @@ The plugin is designed with a clean separation between the VCS operations and th
 
 This will launch a new IntelliJ IDEA instance with the plugin installed.
 
+## Task tracking
+
+Tasks (features, bugs etc.) are managed in [Beads](https://github.com/steveyegge/beads).

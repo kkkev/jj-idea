@@ -50,10 +50,9 @@ Future updates will be automatically detected and available through the normal p
 
 ## Documentation
 
-- **[Development Roadmap](docs/ROADMAP.md)** - Prioritized feature roadmap with GitLab issue links
 - **[Developer Guide](CLAUDE.md)** - Complete project documentation and architecture
 - **[VCS API Reference](docs/VCS_API_REFERENCE.md)** - IntelliJ VCS integration reference
 
 ## Contributing
 
-See [ROADMAP.md](docs/ROADMAP.md) for planned features and [contributing.md](contributing.md) for development guidelines.
+See [contributing.md](contributing.md) for development guidelines.
