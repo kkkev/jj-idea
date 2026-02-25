@@ -77,6 +77,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
             // Create and return the file annotation
             return JujutsuFileAnnotation(
                 project = project,
+                repo = repo,
                 file = file,
                 annotationLines = annotationLines,
                 vcsKey = vcs.keyInstanceMethod

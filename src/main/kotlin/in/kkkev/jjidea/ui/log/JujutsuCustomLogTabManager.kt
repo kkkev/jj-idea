@@ -85,6 +85,17 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     }
 
     /**
+     * Activate the Jujutsu log tab: select it and bring the tool window to the front.
+     * Used when navigating to a commit from annotations or other entry points.
+     */
+    fun activateLogTab() {
+        val content = unifiedLogContent ?: return
+        val changesViewContentManager = ChangesViewContentManager.getInstance(project)
+        changesViewContentManager.setSelectedContent(content)
+        ChangesViewContentManager.getToolWindowFor(project, content.displayName)?.activate(null)
+    }
+
+    /**
      * Closes the unified Jujutsu log tab.
      *
      * Called when JJ roots are removed from the project, allowing the native VCS log to return.

@@ -20,9 +20,7 @@ import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.vcs.actions.JujutsuDataKeys
 import java.awt.BorderLayout
-import javax.swing.JEditorPane
 import javax.swing.JPanel
-import javax.swing.SwingUtilities
 
 /**
  * Panel that displays detailed information about a selected commit.
@@ -133,9 +131,9 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
         val html = buildCommitHtml(entry)
         metadataPane.text = html
 
-        // Scroll to top
-        SwingUtilities.invokeLater {
-            (metadataPane as JEditorPane).caretPosition = 0
+        // Scroll to top after text is set (invokeLater so layout completes first)
+        ApplicationManager.getApplication().invokeLater {
+            metadataPane.caretPosition = 0
         }
 
         // Load changes in background

@@ -103,9 +103,13 @@ class JujutsuLogTable(
     private var pendingSelection: ChangeKey? = null
 
     fun requestSelection(changeKey: ChangeKey) {
-        if (pendingSelection == null) {
-            pendingSelection = changeKey
+        // Try to select immediately if data is already loaded
+        if (logModel.rowCount > 0 && selectEntry(changeKey.repo, changeKey.revision)) {
+            pendingSelection = null
+            return
         }
+        // Entry not found yet — store for when data loads via setEntries()
+        pendingSelection = changeKey
     }
 
     /**
@@ -293,7 +297,7 @@ class JujutsuLogTable(
      * @param repo The repository containing the entry
      * @param revision The revision to select ([ChangeId] or [WorkingCopy])
      */
-    private fun selectEntry(repo: JujutsuRepository, revision: Revision) {
+    private fun selectEntry(repo: JujutsuRepository, revision: Revision): Boolean {
         val rowIndex = when (revision) {
             is ChangeId -> (0 until logModel.rowCount).firstOrNull { row ->
                 val entry = logModel.getEntry(row)
@@ -309,15 +313,12 @@ class JujutsuLogTable(
                 log.warn("Unsupported revision type for selection: $revision")
                 null
             }
-        }
+        } ?: return false
 
-        if (rowIndex != null) {
-            setRowSelectionInterval(rowIndex, rowIndex)
-            scrollRectToVisible(getCellRect(rowIndex, 0, true))
-            log.info("Selected entry at row $rowIndex ($repo:$revision)")
-        } else {
-            log.warn("Entry not found: $repo:$revision")
-        }
+        setRowSelectionInterval(rowIndex, rowIndex)
+        scrollRectToVisible(getCellRect(rowIndex, 0, true))
+        log.info("Selected entry at row $rowIndex ($repo:$revision)")
+        return true
     }
 
     /**

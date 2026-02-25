@@ -7,12 +7,14 @@ import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspect
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspectAdapter
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.vcs.log.impl.VcsLogNavigationUtil.jumpToRevisionAsync
-import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
+import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
+import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import kotlinx.datetime.Instant
 import java.util.*
@@ -22,6 +24,7 @@ import java.util.*
  */
 class JujutsuFileAnnotation(
     project: Project,
+    private val repo: JujutsuRepository,
     private val file: VirtualFile,
     private val annotationLines: List<AnnotationLine>,
     private val vcsKey: VcsKey
@@ -71,9 +74,9 @@ class JujutsuFileAnnotation(
      */
     fun handleAnnotationClick(lineNumber: Int) {
         getAnnotationLine(lineNumber)?.let { line ->
-            log.info("Annotation clicked for line $lineNumber, commit ID: ${line.commitId}")
-
-            jumpToRevisionAsync(project, file, line.commitId.hash, VcsUtil.getFilePath(file.path, false))
+            log.info("Annotation clicked for line $lineNumber, change ID: ${line.id}")
+            project.stateModel.changeSelection.notify(ChangeKey(repo, line.id))
+            JujutsuCustomLogTabManager.getInstance(project).activateLogTab()
         }
     }
 
