@@ -74,10 +74,10 @@ abstract class StyledTextCanvas : TextCanvas {
     }
 
     override fun styled(style: Int, builder: TextCanvas.() -> Unit) =
-        surround(builder) { derive(style, null, null, null) }
+        surround(builder) { derive(this.style or style, null, null, null) }
 
     override fun colored(color: Color, builder: TextCanvas.() -> Unit) =
-        surround(builder) { derive(0, color, null, null) }
+        surround(builder) { derive(this.style, color, null, null) }
 
     // TODO Actually build the link
     override fun linked(target: URI, builder: TextCanvas.() -> Unit) =
@@ -186,7 +186,7 @@ fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
 }
 
 fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") =
-    append(entry.bookmarks, suffix = suffix) { append(it) }
+    append(entry.bookmarks, separator = " ", suffix = suffix) { append(it) }
 
 fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     if (entry.parentIds.isNotEmpty()) {
@@ -207,41 +207,39 @@ fun TextCanvas.appendConflict(entry: LogEntry, suffix: TextCanvas.() -> Unit = {
 }
 
 fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
-    control("<p style='margin: 0; padding-bottom: 4px; white-space: nowrap;'>", "</p>") {
-        append(entry.repo)
-        append("\n")
+    append(entry.repo)
+    append("\n")
 
-        appendSummary(entry)
+    appendSummary(entry)
 
-        val statusParts = mutableListOf<TextCanvas.() -> Unit>()
-        if (entry.isWorkingCopy) {
-            statusParts.add {
-                colored(JujutsuColors.WORKING_COPY) {
-                    append("@ ")
-                    append(message("status.workingcopy"))
-                }
+    val statusParts = mutableListOf<TextCanvas.() -> Unit>()
+    if (entry.isWorkingCopy) {
+        statusParts.add {
+            colored(JujutsuColors.WORKING_COPY) {
+                append("@ ")
+                append(message("status.workingcopy"))
             }
         }
-        if (entry.hasConflict) {
-            statusParts.add {
-                colored(JujutsuColors.CONFLICT) {
-                    append(icon(JujutsuIcons::Conflict, JujutsuColors.CONFLICT))
-                    append(message("status.conflict"))
-                }
-            }
-        }
-        if (entry.isEmpty) {
-            statusParts.add { append(message("status.empty")) }
-        }
-        if (entry.isDivergent) {
-            statusParts.add { colored(JujutsuColors.DIVERGENT) { append(message("status.divergent")) } }
-        }
-        if (entry.immutable) {
-            statusParts.add {
-                append(icon(AllIcons.Nodes::Private))
-                append(message("status.immutable"))
-            }
-        }
-        append(statusParts, prefix = " [", suffix = "]")
     }
+    if (entry.hasConflict) {
+        statusParts.add {
+            colored(JujutsuColors.CONFLICT) {
+                append(icon(JujutsuIcons::Conflict, JujutsuColors.CONFLICT))
+                append(message("status.conflict"))
+            }
+        }
+    }
+    if (entry.isEmpty) {
+        statusParts.add { append(message("status.empty")) }
+    }
+    if (entry.isDivergent) {
+        statusParts.add { colored(JujutsuColors.DIVERGENT) { append(message("status.divergent")) } }
+    }
+    if (entry.immutable) {
+        statusParts.add {
+            append(icon(AllIcons.Nodes::Private))
+            append(message("status.immutable"))
+        }
+    }
+    append(statusParts, prefix = " [", suffix = "]\n")
 }

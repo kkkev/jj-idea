@@ -72,13 +72,12 @@ class FragmentRecordingCanvasTest {
         }
 
         @Test
-        fun `nested bold then italic replaces style`() {
+        fun `nested bold then italic adds to style`() {
             val canvas = FragmentRecordingCanvas()
-            // derive() replaces style, so inner italic overwrites bold
-            canvas.bold { italic { append("italic only") } }
+            canvas.bold { italic { append("italic and bold") } }
 
             val frag = canvas.fragments[0].shouldBeInstanceOf<Fragment.Text>()
-            frag.style.fontStyle shouldBe Font.ITALIC
+            frag.style.fontStyle shouldBe (Font.ITALIC or Font.BOLD)
         }
 
         @Test
