@@ -52,9 +52,10 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
     private fun setupStateListener() {
         // Listen for repository state changes to refresh
         // (Selection handling is done by the data loader)
+        // Note: don't call updateRootFilterVisibility() here — the table still has stale data.
+        // onDataLoaded() calls it after the table is updated with fresh data.
         project.stateModel.repositoryStates.connect(this) { _ ->
             refresh()
-            updateRootFilterVisibility()
         }
     }
 

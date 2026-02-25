@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.util.messages.Topic
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -84,7 +85,10 @@ class SimpleNotifiableState<T : Any>(
         val current = value
         if (!equalityCheck(current, startValue)) {
             ApplicationManager.getApplication().invokeLater {
-                handler.changed(current)
+                @Suppress("UnstableApiUsage")
+                if (!Disposer.isDisposed(parent)) {
+                    handler.changed(current)
+                }
             }
         }
     }

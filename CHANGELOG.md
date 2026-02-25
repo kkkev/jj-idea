@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fix IDE freeze caused by duplicate background loading tasks and stuck loading state on cancellation
+- Fix annotation click "Searching commit in the log" never completing — now selects in custom log
+- Fix `SwingUtilities.invokeLater` misuse causing Graphics2D paint corruption (must use `ApplicationManager.invokeLater` in plugins)
+- Fix re-entrant data loads by keeping `loading` flag set during EDT callback in `BackgroundDataLoader`
+- Remove redundant `updateRootFilterVisibility()` call with stale data from state listener
+- Reduce startup CLI overhead by passing limit revsets to standard VCS log provider
+- Fix disposal-safety in state model catch-up handler (prevent stale callbacks on project close/reopen)
+- Remove unnecessary `invokeLater` from data loader callbacks to prevent stale table updates
 - Format change ids correctly in the log
 
 ### Changed

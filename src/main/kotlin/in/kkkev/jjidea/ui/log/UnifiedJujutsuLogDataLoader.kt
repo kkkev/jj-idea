@@ -34,10 +34,8 @@ class UnifiedJujutsuLogDataLoader(
     override fun load() = loadCommits()
 
     private fun notify(data: Data) {
-        ApplicationManager.getApplication().invokeLater {
-            panel.onDataLoaded(data)
-            log.info("Table updated with ${data.entries.size} commits and graph layout")
-        }
+        panel.onDataLoaded(data)
+        log.info("Table updated with ${data.entries.size} commits and graph layout")
     }
 
     /**

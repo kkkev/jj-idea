@@ -40,16 +40,16 @@ class JujutsuLogProvider : VcsLogProvider {
     ): VcsLogProvider.DetailedLogData {
         log.debug("Reading first block of commits for root: ${root.path}")
 
-        // Use logService to get log entries
-        val result = root.jujutsuRepository.logService.getLog(Expression.ALL)
+        // Use logService to get log entries, passing limit to JJ to avoid loading all commits
+        val limit = requirements.commitCount
+        val revset = if (limit > 0) Expression("limit(all(), $limit)") else Expression.ALL
+        val result = root.jujutsuRepository.logService.getLog(revset)
 
         val entries = result.getOrElse {
             throw VcsException("Failed to read commits: ${it.message}")
         }
 
-        // Take only the requested number of commits
-        val limit = requirements.commitCount
-        val limitedEntries = if (limit > 0) entries.take(limit) else entries
+        val limitedEntries = entries
 
         // Convert to VcsCommitMetadata, deduplicating by hash
         // (JJ can have multiple change IDs for the same commit)
@@ -91,8 +91,8 @@ class JujutsuLogProvider : VcsLogProvider {
     override fun readAllHashes(root: VirtualFile, consumer: Consumer<in TimedVcsCommit>): VcsLogProvider.LogData {
         log.debug("Reading all commit hashes for root: ${root.path}")
 
-        // Use logService to get commit graph
-        val result = root.jujutsuRepository.logService.getCommitGraph(Expression.ALL)
+        // Use logService to get commit graph, capped to avoid loading unbounded history
+        val result = root.jujutsuRepository.logService.getCommitGraph(Expression("limit(all(), 1000)"))
 
         result.getOrElse {
             log.error("Failed to read commit hashes: ${it.message}")
@@ -188,14 +188,17 @@ class JujutsuLogProvider : VcsLogProvider {
         graphOptions: PermanentGraph.Options,
         maxCount: Int
     ): List<TimedVcsCommit> {
-        // Basic implementation - just return all commits
+        // Basic implementation - pass limit to JJ to avoid loading all commits
         // Full filtering would require translating IntelliJ filters to JJ revsets
         log.debug("Getting commits matching filter (maxCount=$maxCount)")
 
-        val commits = mutableListOf<TimedVcsCommit>()
-        readAllHashes(root) { commits.add(it) }
+        val revset = if (maxCount > 0) Expression("limit(all(), $maxCount)") else Expression("limit(all(), 1000)")
+        val result = root.jujutsuRepository.logService.getCommitGraph(revset)
 
-        return if (maxCount > 0) commits.take(maxCount) else commits
+        return result.getOrElse {
+            log.error("Failed to get commits matching filter: ${it.message}")
+            emptyList()
+        }
     }
 
     override fun subscribeToRootRefreshEvents(roots: Collection<VirtualFile>, refresher: VcsLogRefresher): Disposable {

@@ -55,9 +55,12 @@ abstract class BackgroundDataLoader(
             override fun onCancel() = done { log.info("$taskTitle cancelled") }
 
             private fun done(callback: () -> Unit) {
-                loading.set(false)
                 currentIndicator.set(null)
                 callback()
+                // Release loading AFTER callback so re-entrant refresh() calls
+                // during table updates coalesce into pendingRefresh instead of
+                // starting a concurrent load.
+                loading.set(false)
                 if (pendingRefresh.compareAndSet(true, false)) load()
             }
         }.queue()

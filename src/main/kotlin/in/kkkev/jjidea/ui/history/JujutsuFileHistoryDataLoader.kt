@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.history
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -31,10 +30,8 @@ class JujutsuFileHistoryDataLoader(
                 log.info("Loaded ${entries.size} history entries for ${filePath.name}")
             },
             onSuccess = {
-                ApplicationManager.getApplication().invokeLater {
-                    panel.onDataLoaded(entries)
-                    log.info("Updated with ${entries.size} history entries")
-                }
+                panel.onDataLoaded(entries)
+                log.info("Updated with ${entries.size} history entries")
             }
         )
     }
