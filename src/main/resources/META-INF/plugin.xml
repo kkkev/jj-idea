@@ -42,11 +42,6 @@
         <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" order="first"/>
         <logProvider implementation="in.kkkev.jjidea.vcs.JujutsuLogProvider" />
 
-
-        <!-- Disabled: VCS Log file history handler shows Git actions in popup menu -->
-        <!-- Use older VcsHistoryProvider instead for cleaner JJ-only UI -->
-        <!-- <vcsLogFileHistoryHandler implementation="in.kkkev.jjidea.vcs.history.JujutsuLogFileHistoryHandler" order="first" /> -->
-
         <!-- Services -->
         <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache" />
         <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel" />
