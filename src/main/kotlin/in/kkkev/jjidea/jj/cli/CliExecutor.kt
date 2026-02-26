@@ -90,11 +90,20 @@ class CliExecutor(
 
     override fun edit(revision: Revision): CommandExecutor.CommandResult = execute(root, listOf("edit", revision))
 
-    override fun log(revset: Revset, template: String?, filePaths: List<FilePath>): CommandExecutor.CommandResult {
-        val args = mutableListOf("log", "-r", revset, "--no-graph")
+    override fun log(
+        revset: Revset,
+        template: String?,
+        filePaths: List<FilePath>,
+        limit: Int?
+    ): CommandExecutor.CommandResult {
+        val args = mutableListOf<Any>("log", "-r", revset, "--no-graph")
         if (template != null) {
             args.add("-T")
             args.add(template)
+        }
+        if (limit != null) {
+            args.add("--limit")
+            args.add(limit)
         }
         args.addAll(filePaths.map { it.relativeTo(root) })
         return execute(root, args)

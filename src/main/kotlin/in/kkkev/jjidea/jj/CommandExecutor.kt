@@ -108,7 +108,8 @@ interface CommandExecutor {
     fun log(
         revset: Revset = Expression.ALL,
         template: String? = null,
-        filePaths: List<FilePath> = emptyList()
+        filePaths: List<FilePath> = emptyList(),
+        limit: Int? = null
     ): CommandResult
 
     /**

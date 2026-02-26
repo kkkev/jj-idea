@@ -53,15 +53,16 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     private val executor = repo.commandExecutor
     val logTemplates = LogTemplates()
 
-    override fun getLog(revset: Revset, filePaths: List<FilePath>) =
-        getLog(logTemplates.fullLogTemplate, revset, filePaths)
+    override fun getLog(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
+        getLog(logTemplates.fullLogTemplate, revset, filePaths, limit)
 
-    override fun getLogBasic(revset: Revset, filePaths: List<FilePath>) =
-        getLog(logTemplates.basicLogTemplate, revset, filePaths)
+    override fun getLogBasic(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
+        getLog(logTemplates.basicLogTemplate, revset, filePaths, limit)
 
     override fun getRefs(): Result<List<RefAtCommit>> = getLog(logTemplates.refsLogTemplate).map { it.flatten() }
 
-    override fun getCommitGraph(revset: Revset) = getLog(logTemplates.commitGraphLogTemplate, revset)
+    override fun getCommitGraph(revset: Revset, limit: Int?) =
+        getLog(logTemplates.commitGraphLogTemplate, revset, limit = limit)
 
     override fun getBookmarks(): Result<List<BookmarkItem>> {
         log.debug("Getting bookmarks")
@@ -139,11 +140,12 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     private fun <T> getLog(
         template: LogTemplate<T>,
         revset: Revset = Expression.ALL,
-        filePaths: List<FilePath> = emptyList()
+        filePaths: List<FilePath> = emptyList(),
+        limit: Int? = null
     ): Result<List<T>> {
-        log.debug("Getting log for revset: $revset, files: $filePaths")
+        log.debug("Getting log for revset: $revset, files: $filePaths, limit: $limit")
 
-        val result = executor.log(revset, template.spec, filePaths)
+        val result = executor.log(revset, template.spec, filePaths, limit)
         return if (result.isSuccess) {
             toResult("Failed to parse") { parse(template, result.stdout) }
         } else {

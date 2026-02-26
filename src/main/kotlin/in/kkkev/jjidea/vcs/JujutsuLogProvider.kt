@@ -41,9 +41,8 @@ class JujutsuLogProvider : VcsLogProvider {
         log.debug("Reading first block of commits for root: ${root.path}")
 
         // Use logService to get log entries, passing limit to JJ to avoid loading all commits
-        val limit = requirements.commitCount
-        val revset = if (limit > 0) Expression("limit(all(), $limit)") else Expression.ALL
-        val result = root.jujutsuRepository.logService.getLog(revset)
+        val limit = requirements.commitCount.takeIf { it > 0 }
+        val result = root.jujutsuRepository.logService.getLog(limit = limit)
 
         val entries = result.getOrElse {
             throw VcsException("Failed to read commits: ${it.message}")
@@ -92,7 +91,7 @@ class JujutsuLogProvider : VcsLogProvider {
         log.debug("Reading all commit hashes for root: ${root.path}")
 
         // Use logService to get commit graph, capped to avoid loading unbounded history
-        val result = root.jujutsuRepository.logService.getCommitGraph(Expression("limit(all(), 1000)"))
+        val result = root.jujutsuRepository.logService.getCommitGraph(limit = 1000)
 
         result.getOrElse {
             log.error("Failed to read commit hashes: ${it.message}")
@@ -192,8 +191,8 @@ class JujutsuLogProvider : VcsLogProvider {
         // Full filtering would require translating IntelliJ filters to JJ revsets
         log.debug("Getting commits matching filter (maxCount=$maxCount)")
 
-        val revset = if (maxCount > 0) Expression("limit(all(), $maxCount)") else Expression("limit(all(), 1000)")
-        val result = root.jujutsuRepository.logService.getCommitGraph(revset)
+        val limit = if (maxCount > 0) maxCount else 1000
+        val result = root.jujutsuRepository.logService.getCommitGraph(limit = limit)
 
         return result.getOrElse {
             log.error("Failed to get commits matching filter: ${it.message}")
