@@ -47,5 +47,9 @@ object JujutsuLogContextMenuActions {
             val mutableEntries = entries.filter { !it.immutable }
             val rebaseRepo = uniqueRoot?.takeIf { mutableEntries.isNotEmpty() }
             add(rebaseAction(project, rebaseRepo, mutableEntries, allEntries))
+
+            addSeparator()
+            add(gitFetchAction(project, uniqueRoot))
+            add(gitPushAction(project, uniqueRoot))
         }
 }

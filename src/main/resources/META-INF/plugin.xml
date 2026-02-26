@@ -80,6 +80,9 @@
             <override-text place="Vcs.Toolbar.Widget"/>
         </action>
 
+        <action id="Jujutsu.GitFetch" class="in.kkkev.jjidea.vcs.actions.GitFetchAction"/>
+        <action id="Jujutsu.GitPush" class="in.kkkev.jjidea.vcs.actions.GitPushAction"/>
+
         <!-- Open custom Jujutsu log tab -->
         <action id="Jujutsu.OpenLogTab"
                 class="in.kkkev.jjidea.vcs.actions.OpenJujutsuLogTabAction">

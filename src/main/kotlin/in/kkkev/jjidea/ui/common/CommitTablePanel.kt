@@ -229,7 +229,15 @@ abstract class CommitTablePanel<D>(
         // Note: Paths filter is omitted in unified mode as it requires a single root
     }
 
-    private fun createActionGroup() = BackgroundActionGroup(RefreshAction(), ColumnsAction(), DetailsPositionAction())
+    private fun createActionGroup() = BackgroundActionGroup(
+        RefreshAction(),
+        Separator.create(),
+        ActionManager.getInstance().getAction("Jujutsu.GitFetch"),
+        ActionManager.getInstance().getAction("Jujutsu.GitPush"),
+        Separator.create(),
+        ColumnsAction(),
+        DetailsPositionAction()
+    )
 
     /**
      * Refresh action - reload commits from all repositories.

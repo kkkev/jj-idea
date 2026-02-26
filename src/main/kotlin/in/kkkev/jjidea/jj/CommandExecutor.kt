@@ -2,6 +2,8 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.FilePath
@@ -155,6 +157,29 @@ interface CommandExecutor {
         destinationMode: RebaseDestinationMode = RebaseDestinationMode.ONTO
     ): CommandResult
 
+    /**
+     * Fetch from a Git remote.
+     * @param remote Specific remote to fetch from (null = default)
+     * @param allRemotes Fetch from all remotes
+     * @return Command result
+     */
+    fun gitFetch(remote: String? = null, allRemotes: Boolean = false): CommandResult
+
+    /**
+     * Push to a Git remote.
+     * @param remote Specific remote to push to (null = default)
+     * @param bookmark Specific bookmark to push (null = tracking bookmarks)
+     * @param allBookmarks Push all bookmarks
+     * @return Command result
+     */
+    fun gitPush(remote: String? = null, bookmark: String? = null, allBookmarks: Boolean = false): CommandResult
+
+    /**
+     * List Git remotes.
+     * @return Command result with remote names (one per line)
+     */
+    fun gitRemoteList(): CommandResult
+
     data class Command(
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,
@@ -171,17 +196,25 @@ interface CommandExecutor {
             log.warn(message)
         }
 
+        private fun handleResult(result: CommandResult) {
+            ApplicationManager.getApplication().invokeLater {
+                if (result.isSuccess) onSuccess(result.stdout) else onFailure(result)
+            }
+        }
+
         fun executeAsync() {
             ApplicationManager.getApplication().executeOnPooledThread {
-                val result = commandExecutor.action()
-                ApplicationManager.getApplication().invokeLater {
-                    if (result.isSuccess) {
-                        onSuccess(result.stdout)
-                    } else {
-                        onFailure(result)
-                    }
-                }
+                handleResult(commandExecutor.action())
             }
+        }
+
+        fun executeWithProgress(project: Project, title: String) {
+            object : Task.Backgroundable(project, title, false) {
+                override fun run(indicator: ProgressIndicator) {
+                    indicator.isIndeterminate = true
+                    handleResult(commandExecutor.action())
+                }
+            }.queue()
         }
     }
 

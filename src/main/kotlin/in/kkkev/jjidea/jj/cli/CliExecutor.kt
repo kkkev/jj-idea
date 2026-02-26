@@ -12,6 +12,38 @@ import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
+/** Build the argument list for `jj git fetch`. */
+internal fun gitFetchArgs(remote: String? = null, allRemotes: Boolean = false): List<String> = buildList {
+    add("git")
+    add("fetch")
+    if (allRemotes) {
+        add("--all-remotes")
+    } else if (remote != null) {
+        add("--remote")
+        add(remote)
+    }
+}
+
+/** Build the argument list for `jj git push`. */
+internal fun gitPushArgs(
+    remote: String? = null,
+    bookmark: String? = null,
+    allBookmarks: Boolean = false
+): List<String> = buildList {
+    add("git")
+    add("push")
+    if (remote != null) {
+        add("--remote")
+        add(remote)
+    }
+    if (allBookmarks) {
+        add("--all")
+    } else if (bookmark != null) {
+        add("--bookmark")
+        add(bookmark)
+    }
+}
+
 /** Build the argument list for `jj rebase`. */
 internal fun rebaseArgs(
     revisions: List<Revision>,
@@ -39,6 +71,7 @@ class CliExecutor(
 ) : CommandExecutor {
     private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
+    private val networkTimeout = TimeUnit.SECONDS.toMillis(120)
 
     override fun status() = execute(root, listOf("status"))
 
@@ -140,6 +173,14 @@ class CliExecutor(
         sourceMode: RebaseSourceMode,
         destinationMode: RebaseDestinationMode
     ) = execute(root, rebaseArgs(revisions, destinations, sourceMode, destinationMode))
+
+    override fun gitFetch(remote: String?, allRemotes: Boolean) =
+        execute(root, gitFetchArgs(remote, allRemotes), timeout = networkTimeout)
+
+    override fun gitPush(remote: String?, bookmark: String?, allBookmarks: Boolean) =
+        execute(root, gitPushArgs(remote, bookmark, allBookmarks), timeout = networkTimeout)
+
+    override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
 
     private fun execute(
         workingDir: VirtualFile?,

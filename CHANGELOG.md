@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Git remote operations: Fetch and Push actions accessible from log toolbar, context menu, and VCS menu
+- Push dialog with remote selector, bookmark scope options (tracking/specific/all)
+- Progress bar feedback for network operations (fetch/push)
+
 ## [0.3.3] - 2026-02-26
 
 ### Fixed
