@@ -50,13 +50,8 @@ class JujutsuLogProvider : VcsLogProvider {
 
         val limitedEntries = entries
 
-        // Convert to VcsCommitMetadata, deduplicating by hash
-        // (JJ can have multiple change IDs for the same commit)
-        // TODO It is not as simple as the comment above implies. When we deal with conflicts, we will need to
-        // distinguish by commit id. Here, the id is actually the hash of the change id, so is no better than the change
-        // id.
-        val commits = limitedEntries.map { entry -> JujutsuCommitMetadata(entry, root) }
-            .distinctBy { it.id.asString() }
+        // Convert to VcsCommitMetadata, deduplicating by *commit* hash
+        val commits = limitedEntries.map { entry -> JujutsuCommitMetadata(entry, root) }.distinctBy { it.id }
 
         // Read refs
         val refs = readAllRefsInternal(root)
