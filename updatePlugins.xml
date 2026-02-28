@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.3.3/jj-idea-0.3.3.zip" version="0.3.3">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.3.4/jj-idea-0.3.4.zip" version="0.3.4">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,22 +23,17 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.3.3</h3>
+      <h3>0.3.4</h3>
       
 <h4>Fixed</h4>
-<li>Fix IDE freeze caused by duplicate background loading tasks and stuck loading state on cancellation</li>
-<li>Fix annotation click "Searching commit in the log" never completing — now selects in custom log</li>
-<li>Fix `SwingUtilities.invokeLater` misuse causing Graphics2D paint corruption (must use `ApplicationManager.invokeLater` in plugins)</li>
-<li>Fix re-entrant data loads by keeping `loading` flag set during EDT callback in `BackgroundDataLoader`</li>
-<li>Remove redundant `updateRootFilterVisibility()` call with stale data from state listener</li>
-<li>Reduce startup CLI overhead by passing limit revsets to standard VCS log provider</li>
-<li>Fix disposal-safety in state model catch-up handler (prevent stale callbacks on project close/reopen)</li>
-<li>Remove unnecessary `invokeLater` from data loader callbacks to prevent stale table updates</li>
-<li>Format change ids correctly in the log</li>
+<li>Fix log table rows expanding on hover, causing graph+description to overpaint adjacent columns</li>
+<li>Performance: sped up log loading for large repositories</li>
 
-<h4>Changed</h4>
-<li>Reduce vertical whitespace in details panel </li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.3.3">full release notes</a> for details.</p>
+<h4>Added</h4>
+<li>Git remote operations: Fetch and Push actions accessible from log toolbar, context menu, and VCS menu</li>
+<li>Push dialog with remote selector, bookmark scope options (tracking/specific/all)</li>
+<li>Progress bar feedback for network operations (fetch/push)</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.3.4">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
