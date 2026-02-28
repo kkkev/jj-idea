@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Fix log table rows expanding on hover, causing graph+description to overpaint adjacent columns
 - Performance: sped up log loading for large repositories
 
 ### Added
