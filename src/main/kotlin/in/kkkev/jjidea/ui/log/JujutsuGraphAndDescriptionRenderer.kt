@@ -288,16 +288,7 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
-        override fun getPreferredSize(): Dimension = super.getPreferredSize().apply {
-            val laneWidth = LANE_WIDTH.get()
-            val horizontalPadding = HORIZONTAL_PADDING.get()
-
-            val maxLane = graphNodes.values.maxOfOrNull { it.lane } ?: 0
-            val graphWidth = (maxLane + 1) * laneWidth + laneWidth
-            val contentWidth = 400
-
-            width = horizontalPadding + graphWidth + horizontalPadding * 2 + contentWidth
-            height = ROW_HEIGHT.get()
-        }
+        override fun getPreferredSize() =
+            Dimension(table.columnModel.getColumn(column).width, ROW_HEIGHT.get())
     }
 }

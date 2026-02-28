@@ -161,6 +161,12 @@ class JujutsuLogTable(
         // Striped rows for better readability
         setStriped(true)
 
+        // Disable expandable items — we handle text truncation via TruncatingLeftRightLayout.
+        // Without this, JBTable's ExpandableItemsHandler wraps our renderer in
+        // ExpandedItemRendererComponentWrapper when getPreferredSize() exceeds column width,
+        // causing graph+description to overpaint adjacent columns on hover.
+        setExpandableItemsEnabled(false)
+
         // Enable hover effect and tooltip cell tracking
         addMouseMotionListener(
             object : MouseMotionAdapter() {
