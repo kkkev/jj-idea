@@ -7,8 +7,6 @@ import kotlinx.datetime.Instant
 /**
  * Represents a single entry in the jj log.
  * This is a pure data class / DTO representing parsed JJ log output.
- * Conversion to VCS framework objects (VcsUser, VcsCommitMetadata, etc.)
- * is handled by JujutsuCommitMetadataBase and its subclasses.
  */
 data class LogEntry(
     val repo: JujutsuRepository,

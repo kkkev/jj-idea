@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.vcs.FilePath
-import `in`.kkkev.jjidea.vcs.JujutsuTimedCommit
 
 /**
  * Service for querying Jujutsu log and change information.
@@ -33,20 +32,6 @@ interface LogService {
         filePaths: List<FilePath> = emptyList(),
         limit: Int? = null
     ): Result<List<LogEntry>>
-
-    /**
-     * Get refs (bookmarks and working copy marker) for all commits
-     * @return List of refs
-     */
-    fun getRefs(): Result<List<RefAtCommit>>
-
-    /**
-     * Get minimal commit information (change IDs and parent relationships only)
-     * Used for building commit graphs efficiently.
-     * @param revset Revset to query (default: "all()")
-     * @return List of minimal commit info
-     */
-    fun getCommitGraph(revset: Revset = Expression.ALL, limit: Int? = null): Result<List<JujutsuTimedCommit>>
 
     /**
      * Get file changes for a specific revision

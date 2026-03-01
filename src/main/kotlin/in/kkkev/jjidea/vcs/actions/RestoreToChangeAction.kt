@@ -15,7 +15,6 @@ import `in`.kkkev.jjidea.jj.invalidate
  * Uses [JujutsuDataKeys.LOG_ENTRY] to determine the revision.
  *
  * This action is for our custom log panels where we have a LogEntry context.
- * For standard VCS log/file history, use [RestoreToRevisionAction] which reads from VcsLogDataKeys.
  *
  * Hidden when:
  * - No LOG_ENTRY is present (working copy context)

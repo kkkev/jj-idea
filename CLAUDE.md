@@ -178,7 +178,6 @@ JujutsuVcs (extends AbstractVcs)
 ├── root: VirtualFile - Auto-discovers .jj directory
 ├── JujutsuChangeProvider - Detects file changes via `jj status`
 ├── JujutsuDiffProvider - Provides diff content
-├── JujutsuCheckinEnvironment - Enables commit view
 ├── BulkFileListener - Auto-refresh on file system changes
 └── JujutsuCommandExecutor (interface)
     └── JujutsuCliExecutor(root) - CLI implementation
@@ -240,15 +239,7 @@ Use null byte (`\0`) as field separator in `jj log` template output. Commit desc
 
 **See**: `jj/cli/CliLogService.kt`
 
-#### 2. HashImpl Requirement
-Must use `HashImpl.build(hexString)` for all commit hashes. **Cannot** display JJ change IDs directly in standard VCS log due to platform constraints:
-- `VcsLogStorageImpl` performs hardcoded cast to `HashImpl`
-- `HashImpl.build()` only accepts hex characters (0-9a-f), not JJ format (z-k)
-- Details pane shows hex format, custom columns can show JJ format
-
-**See**: `jj/ChangeId.kt`
-
-#### 3. TextCanvas Pattern for Consistent Rendering
+#### 2. TextCanvas Pattern for Consistent Rendering
 Use `TextCanvas` interface with extension functions for consistent formatting:
 ```kotlin
 interface TextCanvas {
@@ -262,7 +253,7 @@ Extension functions: `append(changeId)`, `append(description)`, `append(instant)
 
 **See**: `ui/TextCanvas.kt`, `ui/DateTimeFormatter.kt`, `ui/Formatters.kt`, `ui/JujutsuColors.kt`
 
-#### 4. Settings Architecture
+#### 3. Settings Architecture
 Project-level `PersistentStateComponent` with `BoundConfigurable` UI:
 - `JujutsuSettingsState` - Data class
 - `JujutsuSettings` - Service managing state
@@ -272,17 +263,17 @@ Settings stored in `.idea/jujutsu.xml`
 
 **See**: `settings/` package
 
-#### 5. Auto-Refresh with BulkFileListener
+#### 4. Auto-Refresh with BulkFileListener
 Modern IntelliJ Platform API for file change detection. Processes changes in batches, automatic disposal through message bus.
 
 **See**: `JujutsuVcs.kt`
 
-#### 6. Auto-Open Custom Log on Startup
+#### 5. Auto-Open Custom Log on Startup
 `PostStartupActivity` automatically opens custom log tab and suppresses default VCS log tabs via `ContentManagerListener`.
 
 **See**: `JujutsuStartupActivity.kt`
 
-#### 7. Reusing Actions in Custom Context Menus via uiDataSnapshot
+#### 6. Reusing Actions in Custom Context Menus via uiDataSnapshot
 When adding context menus to custom tree components (like `JujutsuChangesTree`), **do not** duplicate action logic or create static helpers. Instead:
 
 1. **Override `uiDataSnapshot`** on the tree component to populate the data context with standard keys:
@@ -319,7 +310,7 @@ When adding context menus to custom tree components (like `JujutsuChangesTree`),
 
 **See**: `ui/JujutsuChangesTree.kt`, `vcs/actions/ActionEventExtensions.kt`, `ui/workingcopy/UnifiedWorkingCopyPanel.kt`
 
-#### 8. Action Factory Pattern for VCS Operations
+#### 7. Action Factory Pattern for VCS Operations
 VCS actions (edit, abandon, describe, etc.) use factory functions that return `AnAction` instances:
 
 ```kotlin
@@ -365,8 +356,8 @@ fun editChangeAction(project: Project, changeId: ChangeId?) =
 
 **See**: `vcs/actions/` package
 
-#### 9. Custom Log Architecture
-The custom log replaces IntelliJ's built-in VCS log entirely (avoiding `HashImpl` constraints, see §2) and is built from `JBTable`, `AbstractTableModel`, and custom `TableCellRenderer` implementations.
+#### 8. Custom Log Architecture
+The custom log replaces IntelliJ's built-in VCS log entirely and is built from `JBTable`, `AbstractTableModel`, and custom `TableCellRenderer` implementations.
 
 **Component Hierarchy**:
 ```
@@ -435,8 +426,7 @@ src/main/kotlin/in/kkkev/jjidea/
 │       └── AnnotationParser.kt
 ├── vcs/                         # IntelliJ VCS integration
 │   ├── JujutsuVcs.kt
-│   ├── JujutsuLogProvider.kt
-│   ├── actions/                 # VCS operation actions (see patterns §7, §8)
+│   ├── actions/                 # VCS operation actions (see patterns §6, §7)
 │   ├── changes/
 │   ├── diff/
 │   └── history/
@@ -594,12 +584,6 @@ Distinguish between **user errors** and **system errors**:
 - `?.let { }` that silently does nothing on null when null is unexpected
 - Empty catch blocks
 - Logging errors but continuing as if nothing happened
-
-### VCS Integration Constraints
-- **HashImpl requirement**: You **cannot** use custom implementation of `com.intellij.vcs.log.Hash`
-  - IntelliJ's VCS log cache serialization (`VcsLogStorageImpl`) is hard-coded to use `HashImpl`
-  - Must use `HashImpl.build(hexString)` for all commit hashes
-  - See `jj/ChangeId.kt` for hex conversion implementation
 
 ### Git Workflow
 - **Push workflow**: This project has two remotes (origin and github) with automated workflows

@@ -13,7 +13,7 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
-import `in`.kkkev.jjidea.jj.JujutsuFullCommitDetails
+import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
@@ -143,8 +143,7 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     private fun loadChanges(entry: LogEntry) {
         ApplicationManager.getApplication().executeOnPooledThread {
             try {
-                val fullDetails = JujutsuFullCommitDetails.create(entry, entry.repo.directory)
-                val changes = fullDetails.changes.toList()
+                val changes = ChangeService.loadChanges(entry)
 
                 ApplicationManager.getApplication().invokeLater {
                     if (currentEntry == entry) { // Only update if still the same commit

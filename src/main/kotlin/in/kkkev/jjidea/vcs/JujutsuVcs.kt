@@ -12,7 +12,6 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
-import `in`.kkkev.jjidea.vcs.checkin.JujutsuCheckinEnvironment
 import `in`.kkkev.jjidea.vcs.diff.JujutsuDiffProvider
 import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
 
@@ -22,15 +21,12 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
 class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     private val lazyChangeProvider by lazy { JujutsuChangeProvider(this) }
     private val lazyDiffProvider by lazy { JujutsuDiffProvider() }
-    private val lazyCheckinEnvironment by lazy { JujutsuCheckinEnvironment(this) }
     private val lazyHistoryProvider by lazy { JujutsuHistoryProvider() }
     private val lazyAnnotationProvider by lazy { JujutsuAnnotationProvider(myProject, this) }
 
     override fun getChangeProvider() = lazyChangeProvider
 
     override fun getDiffProvider() = lazyDiffProvider
-
-    override fun getCheckinEnvironment() = lazyCheckinEnvironment
 
     override fun getVcsHistoryProvider() = lazyHistoryProvider
 

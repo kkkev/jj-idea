@@ -1,6 +1,9 @@
 package `in`.kkkev.jjidea.jj.cli
 
-import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.mockRepo
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -14,8 +17,6 @@ class LogTemplateTest {
     private val cliLogService = CliLogService(mockRepo)
     private val basicLogTemplate = cliLogService.logTemplates.basicLogTemplate
     private val fullLogTemplate = cliLogService.logTemplates.fullLogTemplate
-    private val refsLogTemplate = cliLogService.logTemplates.refsLogTemplate
-    private val commitGraphLogTemplate = cliLogService.logTemplates.commitGraphLogTemplate
 
     @Test
     fun `basicLogTemplate parses simple entry`() {
@@ -226,81 +227,5 @@ class LogTemplateTest {
         entry.committer!!.name shouldBe "Cherry Picker"
         entry.committer.email shouldBe "picker@example.com"
         entry.committerTimestamp shouldBe Instant.fromEpochSeconds(2000000000)
-    }
-
-    @Test
-    fun `refsLogTemplate parses entry with only working copy marker`() {
-        val fields = listOf("123abc~12", "", "true")
-
-        val refs = refsLogTemplate.take(fields.iterator())
-
-        refs shouldHaveSize 1
-        refs[0].commitId shouldBe CommitId("123abc", "12")
-        refs[0].ref.toString() shouldBe "@"
-    }
-
-    @Test
-    fun `refsLogTemplate parses entry with bookmarks`() {
-        val fields = listOf("qpvuntsm~q", "main,feature", "false")
-
-        val refs = refsLogTemplate.take(fields.iterator())
-
-        refs shouldHaveSize 2
-        refs[0].ref.toString() shouldBe "main"
-        refs[1].ref.toString() shouldBe "feature"
-    }
-
-    @Test
-    fun `refsLogTemplate parses entry with both working copy and bookmarks`() {
-        val fields = listOf("qpvuntsm~q", "main", "true")
-
-        val refs = refsLogTemplate.take(fields.iterator())
-
-        refs shouldHaveSize 2
-        refs[0].ref.toString() shouldBe "@"
-        refs[1].ref.toString() shouldBe "main"
-    }
-
-    @Test
-    fun `refsLogTemplate parses entry with no refs`() {
-        val fields = listOf("qpvuntsm~q", "", "false")
-
-        val refs = refsLogTemplate.take(fields.iterator())
-
-        refs.shouldBeEmpty()
-    }
-
-    @Test
-    fun `commitGraphLogTemplate parses graph node`() {
-        val fields = listOf("123abc~12", "qvuntsm~qv~|234bcd~23~34", "1234567890")
-
-        val node = commitGraphLogTemplate.take(fields.iterator())
-
-        node.id.toString() shouldBe "123abc"
-        node.parents shouldHaveSize 1
-        node.parents[0].toString() shouldBe "234bcd"
-        node.timestamp shouldBe 1234567890000L
-    }
-
-    @Test
-    fun `commitGraphLogTemplate parses merge node`() {
-        val fields = listOf("123abc~12", "qvuntsm~qv~|234bcd~23,ruvvqw~ru~|135abc~135", "1234567890")
-
-        val node = commitGraphLogTemplate.take(fields.iterator())
-
-        node.parents shouldHaveSize 2
-        node.parents[0].toString() shouldBe "234bcd"
-        node.parents[1].toString() shouldBe "135abc"
-    }
-
-    @Test
-    fun `commitGraphLogTemplate parses root node`() {
-        val fields = listOf("123456~123", "", "1000000000")
-
-        val node = commitGraphLogTemplate.take(fields.iterator())
-
-        node.id.toString() shouldBe "123456"
-        node.parents.shouldBeEmpty()
-        node.timestamp shouldBe 1000000000000L
     }
 }

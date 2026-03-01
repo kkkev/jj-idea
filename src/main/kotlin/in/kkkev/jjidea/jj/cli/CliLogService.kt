@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.vcs.JujutsuTimedCommit
 import kotlinx.datetime.Instant
 
 interface LogSpec<T> {
@@ -58,11 +57,6 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
     override fun getLogBasic(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
         getLog(logTemplates.basicLogTemplate, revset, filePaths, limit)
-
-    override fun getRefs(): Result<List<RefAtCommit>> = getLog(logTemplates.refsLogTemplate).map { it.flatten() }
-
-    override fun getCommitGraph(revset: Revset, limit: Int?) =
-        getLog(logTemplates.commitGraphLogTemplate, revset, limit = limit)
 
     override fun getBookmarks(): Result<List<BookmarkItem>> {
         log.debug("Getting bookmarks")
@@ -259,24 +253,6 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 committerTimestamp = jjCommitter.timestamp,
                 author = jjAuthor.user,
                 committer = jjCommitter.user
-            )
-        }
-
-        val refsLogTemplate = logTemplate(commitId, bookmarks, currentWorkingCopy) {
-            val commitId = commitId.take(it)
-            val bookmarks = bookmarks.take(it)
-            val currentWorkingCopy = currentWorkingCopy.take(it)
-            listOfNotNull(
-                listOf(WorkingCopy).takeIf { currentWorkingCopy },
-                bookmarks
-            ).flatten().map { ref -> RefAtCommit(commitId, ref) }
-        }
-
-        val commitGraphLogTemplate = logTemplate(commitId, parents, committer.timestamp) {
-            JujutsuTimedCommit(
-                commitId.take(it),
-                parents.take(it).map { parentIds -> parentIds.commitId },
-                committer.timestamp.take(it)
             )
         }
 
