@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-03-02
+
 ### Added
 - Squash into Parent action: squash a change into its parent with file selection, description editing, and keep-emptied option
 - Platform test infrastructure: `@Tag("platform")` tests run with full IntelliJ bootstrap via `./gradlew platformTest`
@@ -122,7 +124,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.3.4...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.3.5...HEAD
+[0.3.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.3.5
 [0.3.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.3.4
 [0.3.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.3.3
 [0.3.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.3.1

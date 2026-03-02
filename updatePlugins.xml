@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.3.4/jj-idea-0.3.4.zip" version="0.3.4">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.3.5/jj-idea-0.3.5.zip" version="0.3.5">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,17 +23,12 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.3.4</h3>
+      <h3>0.3.5</h3>
       
-<h4>Fixed</h4>
-<li>Fix log table rows expanding on hover, causing graph+description to overpaint adjacent columns</li>
-<li>Performance: sped up log loading for large repositories</li>
-
 <h4>Added</h4>
-<li>Git remote operations: Fetch and Push actions accessible from log toolbar, context menu, and VCS menu</li>
-<li>Push dialog with remote selector, bookmark scope options (tracking/specific/all)</li>
-<li>Progress bar feedback for network operations (fetch/push)</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.3.4">full release notes</a> for details.</p>
+<li>Squash into Parent action: squash a change into its parent with file selection, description editing, and keep-emptied option</li>
+<li>Platform test infrastructure: `@Tag("platform")` tests run with full IntelliJ bootstrap via `./gradlew platformTest`</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.3.5">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
