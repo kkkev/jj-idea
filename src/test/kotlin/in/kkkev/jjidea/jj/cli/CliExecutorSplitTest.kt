@@ -88,8 +88,11 @@ class CliExecutorSplitTest {
             )
 
             result shouldBe listOf(
-                "split", "-r", "abc123def456",
-                "-m", "First commit",
+                "split",
+                "-r",
+                "abc123def456",
+                "-m",
+                "First commit",
                 "--parallel",
                 "src/main.kt"
             )

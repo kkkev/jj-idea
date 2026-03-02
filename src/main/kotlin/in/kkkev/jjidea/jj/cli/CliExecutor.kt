@@ -52,9 +52,11 @@ internal fun squashArgs(
     keepEmptied: Boolean = false
 ): List<String> = buildList {
     add("squash")
-    add("-r"); add(revision.toString())
+    add("-r")
+    add(revision.toString())
     if (description != null) {
-        add("-m"); add(description.actual)
+        add("-m")
+        add(description.actual)
     }
     if (keepEmptied) add("--keep-emptied")
     addAll(filePaths)
@@ -68,9 +70,11 @@ internal fun splitArgs(
     parallel: Boolean = false
 ): List<String> = buildList {
     add("split")
-    add("-r"); add(revision.toString())
+    add("-r")
+    add(revision.toString())
     if (description != null) {
-        add("-m"); add(description.actual)
+        add("-m")
+        add(description.actual)
     }
     if (parallel) add("--parallel")
     addAll(filePaths)

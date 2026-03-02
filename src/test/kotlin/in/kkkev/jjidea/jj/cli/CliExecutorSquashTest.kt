@@ -88,8 +88,11 @@ class CliExecutorSquashTest {
             )
 
             result shouldBe listOf(
-                "squash", "-r", "abc123def456",
-                "-m", "Combined",
+                "squash",
+                "-r",
+                "abc123def456",
+                "-m",
+                "Combined",
                 "--keep-emptied",
                 "src/main.kt"
             )
