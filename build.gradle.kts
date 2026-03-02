@@ -134,27 +134,34 @@ ktlint {
     enableExperimentalRules = false
 }
 
-// Configure test task to run with IntelliJ Platform classes on classpath
-// but without the IDE bootstrap machinery (custom classloader, coroutines agent, etc.)
-// that the IntelliJ Platform plugin configures by default.
+// Capture IJPGP's test configuration before we override it for unit tests.
+// This must come before the tasks.test block below.
+val ijpgpTestTask = tasks.test.get()
+val ijpgpClasspath = ijpgpTestTask.classpath
+val ijpgpTestClassesDirs = ijpgpTestTask.testClassesDirs
+val ijpgpJavaLauncher = ijpgpTestTask.javaLauncher
+val ijpgpSystemProperties = ijpgpTestTask.systemProperties.toMap()
+val ijpgpJvmArgProviders = ijpgpTestTask.jvmArgumentProviders.toList()
+
+// Unit tests: stripped-down classpath without IJPGP bootstrap.
+// Uses manual classpath and clears jvmArgumentProviders to avoid coroutines agent crash.
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        excludeTags("platform")
+    }
     testClassesDirs = sourceSets["test"].output.classesDirs
 
-    // Use the test compile classpath which resolves IntelliJ Platform modules correctly
     classpath = configurations["testCompileClasspath"] +
         configurations["testRuntimeClasspath"] +
         sourceSets["test"].output +
         sourceSets["main"].output
 
-    // Use standard JDK 21, not JBR
     javaLauncher.set(
         javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(21))
         }
     )
 
-    // JVM arguments required for IntelliJ Platform test framework
     jvmArgs(
         "--add-opens=java.base/java.lang=ALL-UNNAMED",
         "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
@@ -169,15 +176,38 @@ tasks.test {
         "--add-opens=java.desktop/sun.font=ALL-UNNAMED"
     )
 
-    // Remove jvmArgumentProviders injected by the IntelliJ Platform Gradle Plugin
-    // that are incompatible with our test setup (coroutines debug agent, system classloader, etc.)
-    // Must use doFirst because the plugin adds providers after this configuration block.
     doFirst {
         jvmArgumentProviders.clear()
     }
 }
 
+// Platform tests: use IJPGP's original classpath + sandbox config.
+// Filters out coroutines agent and old kotlinx-coroutines JARs to avoid version mismatch.
+tasks.register<Test>("platformTest") {
+    useJUnitPlatform {
+        includeTags("platform")
+    }
+
+    dependsOn("prepareTestSandbox", "prepareTest")
+
+    testClassesDirs = ijpgpTestClassesDirs
+    // Use IJPGP's classpath but exclude old kotlinx-coroutines JARs (1.7.0 from kotest/mockk)
+    // that conflict with the platform's bundled version (1.10.1-intellij).
+    classpath = ijpgpClasspath.filter { !it.name.startsWith("kotlinx-coroutines-") }
+    javaLauncher.set(ijpgpJavaLauncher)
+    ijpgpSystemProperties.forEach { (k, v) -> if (v != null) systemProperty(k, v) }
+    ijpgpJvmArgProviders.forEach { jvmArgumentProviders.add(it) }
+
+    doFirst {
+        // Keep all IJPGP args except the coroutines agent which crashes
+        val allArgs = jvmArgumentProviders.flatMap { it.asArguments() }
+            .filter { !it.contains("coroutines-javaagent") }
+        jvmArgumentProviders.clear()
+        jvmArgs(allArgs)
+    }
+}
+
 // Convenience task that runs both tests and linting
 tasks.named("check") {
-    dependsOn("test", "ktlintCheck")
+    dependsOn("test", "platformTest", "ktlintCheck")
 }
