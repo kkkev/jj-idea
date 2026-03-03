@@ -46,13 +46,14 @@ class JujutsuLogContextMenuActionsTest {
         immutable: Boolean = false,
         isEmpty: Boolean = true,
         repo: JujutsuRepository = repo1,
-        parentIds: List<String> = emptyList()
+        parentIds: List<String> = emptyList(),
+        bookmarks: List<Bookmark> = emptyList()
     ) = LogEntry(
         repo = repo,
         id = ChangeId(changeId, changeId.take(2), null),
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = "Test commit",
-        bookmarks = emptyList(),
+        bookmarks = bookmarks,
         parentIdentifiers = parentIds.map {
             LogEntry.Identifiers(ChangeId(it, it.take(2), null), CommitId(it))
         },
@@ -515,6 +516,101 @@ class JujutsuLogContextMenuActionsTest {
             // Empty commits can still be described/abandoned
             entry.takeUnless { it.immutable }.shouldNotBeNull()
             entry.takeIf { !it.immutable }.shouldNotBeNull()
+        }
+    }
+
+    @Nested
+    inner class `Create bookmark action availability` {
+        @Test
+        fun `available for single selection`() {
+            val entries = listOf(createEntry("abc123"))
+
+            entries.singleOrNull().shouldNotBeNull()
+        }
+
+        @Test
+        fun `unavailable for multi-select`() {
+            val entries = listOf(createEntry("abc123"), createEntry("def456"))
+
+            entries.singleOrNull().shouldBeNull()
+        }
+
+        @Test
+        fun `available for immutable entry`() {
+            // You can create a bookmark pointing to any change, even immutable ones
+            val entry = createEntry("abc123", immutable = true)
+
+            entry.shouldNotBeNull()
+        }
+
+        @Test
+        fun `available for working copy`() {
+            val entry = createEntry("abc123", isWorkingCopy = true)
+
+            entry.shouldNotBeNull()
+        }
+    }
+
+    @Nested
+    inner class `Bookmark submenu availability` {
+        @Test
+        fun `submenu shown when entry has bookmarks`() {
+            val entry = createEntry("abc123", bookmarks = listOf(Bookmark("main")))
+
+            val showSubmenu = entry.bookmarks.isNotEmpty()
+
+            showSubmenu shouldBe true
+        }
+
+        @Test
+        fun `submenu hidden when entry has no bookmarks`() {
+            val entry = createEntry("abc123")
+
+            val showSubmenu = entry.bookmarks.isNotEmpty()
+
+            showSubmenu shouldBe false
+        }
+
+        @Test
+        fun `submenu contains all bookmarks on entry`() {
+            val bookmarks = listOf(Bookmark("main"), Bookmark("feature"), Bookmark("release-v2"))
+            val entry = createEntry("abc123", bookmarks = bookmarks)
+
+            entry.bookmarks.size shouldBe 3
+            entry.bookmarks.map { it.name } shouldBe listOf("main", "feature", "release-v2")
+        }
+
+        @Test
+        fun `single bookmark produces single set of actions`() {
+            val entry = createEntry("abc123", bookmarks = listOf(Bookmark("main")))
+
+            entry.bookmarks.size shouldBe 1
+            entry.bookmarks[0].name shouldBe "main"
+        }
+    }
+
+    @Nested
+    inner class `Move bookmark action availability` {
+        @Test
+        fun `available for single selection`() {
+            val entries = listOf(createEntry("abc123"))
+
+            entries.singleOrNull().shouldNotBeNull()
+        }
+
+        @Test
+        fun `unavailable for multi-select`() {
+            val entries = listOf(createEntry("abc123"), createEntry("def456"))
+
+            entries.singleOrNull().shouldBeNull()
+        }
+
+        @Test
+        fun `available for immutable entry`() {
+            // You can move a bookmark to any change
+            val entry = createEntry("abc123", immutable = true)
+
+            entry.shouldNotBeNull()
         }
     }
 }

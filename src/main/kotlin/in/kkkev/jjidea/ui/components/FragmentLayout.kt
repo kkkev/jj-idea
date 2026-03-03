@@ -5,9 +5,7 @@ import com.intellij.ui.SimpleTextAttributes
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
 import java.awt.Font
 import java.awt.font.FontRenderContext
-import javax.swing.BoxLayout
 import javax.swing.JLabel
-import javax.swing.JPanel
 
 /**
  * Static utility for measuring, truncating, and rendering [Fragment] lists.

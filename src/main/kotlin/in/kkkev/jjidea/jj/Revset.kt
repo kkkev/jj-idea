@@ -18,6 +18,8 @@ sealed interface Ref : Revision
 @JvmInline
 value class Bookmark(val name: String) : Ref {
     override fun toString() = name
+
+    val isRemote get() = name.contains("@")
 }
 
 @JvmInline

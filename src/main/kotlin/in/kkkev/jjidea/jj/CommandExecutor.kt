@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -134,6 +135,14 @@ interface CommandExecutor {
      */
     fun bookmarkList(template: String? = null): CommandResult
 
+    fun bookmarkCreate(name: Bookmark, revision: Revision = WorkingCopy): CommandResult
+
+    fun bookmarkDelete(name: Bookmark): CommandResult
+
+    fun bookmarkRename(oldName: Bookmark, newName: Bookmark): CommandResult
+
+    fun bookmarkSet(name: Bookmark, revision: Revision = WorkingCopy, allowBackwards: Boolean = false): CommandResult
+
     /**
      * Get git-format diff for a revision (to detect renames)
      * @param revision Revision to diff (e.g., "@", change ID)
@@ -225,9 +234,9 @@ interface CommandExecutor {
         fun onFailure(callback: CommandResult.() -> Unit) = copy(onFailure = callback)
 
         private fun handleResult(result: CommandResult) {
-            ApplicationManager.getApplication().invokeLater {
+            ApplicationManager.getApplication().invokeLater({
                 if (result.isSuccess) onSuccess(result.stdout) else onFailure(result)
-            }
+            }, ModalityState.any())
         }
 
         fun executeAsync() {

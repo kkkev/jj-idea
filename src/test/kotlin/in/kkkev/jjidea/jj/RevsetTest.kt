@@ -113,4 +113,17 @@ class RevsetTest {
         val grandparent = revision.parent.parent
         grandparent.toString() shouldBe "@--"
     }
+
+    @Test
+    fun `Bookmark isRemote detects remote bookmarks`() {
+        Bookmark("main@origin").isRemote shouldBe true
+        Bookmark("feature@github").isRemote shouldBe true
+    }
+
+    @Test
+    fun `Bookmark isRemote returns false for local bookmarks`() {
+        Bookmark("main").isRemote shouldBe false
+        Bookmark("feature-branch").isRemote shouldBe false
+        Bookmark("release/v2.0").isRemote shouldBe false
+    }
 }

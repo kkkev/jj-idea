@@ -12,6 +12,20 @@ import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
+internal fun bookmarkCreateArgs(name: Bookmark, revision: Revision = WorkingCopy) =
+    listOf("bookmark", "create", name, "-r", revision).map(Any::toString)
+
+internal fun bookmarkDeleteArgs(name: Bookmark) = listOf("bookmark", "delete", name.toString())
+
+internal fun bookmarkRenameArgs(oldName: Bookmark, newName: Bookmark) =
+    listOf("bookmark", "rename", oldName, newName).map(Any::toString)
+
+internal fun bookmarkSetArgs(name: Bookmark, revision: Revision = WorkingCopy, allowBackwards: Boolean = false) =
+    buildList {
+        addAll(listOf("bookmark", "set", name.toString(), "-r", revision.toString()))
+        if (allowBackwards) add("-B")
+    }
+
 /** Build the argument list for `jj git fetch`. */
 internal fun gitFetchArgs(remote: String? = null, allRemotes: Boolean = false): List<String> = buildList {
     add("git")
@@ -196,6 +210,19 @@ class CliExecutor(
         }
         return execute(root, args)
     }
+
+    // TODO Interpret error:
+    // Error: Bookmark already exists: wadger
+    //Hint: Use `jj bookmark set` to update it.
+
+    override fun bookmarkCreate(name: Bookmark, revision: Revision) = execute(root, bookmarkCreateArgs(name, revision))
+
+    override fun bookmarkDelete(name: Bookmark) = execute(root, bookmarkDeleteArgs(name))
+
+    override fun bookmarkRename(oldName: Bookmark, newName: Bookmark) = execute(root, bookmarkRenameArgs(oldName, newName))
+
+    override fun bookmarkSet(name: Bookmark, revision: Revision, allowBackwards: Boolean) =
+        execute(root, bookmarkSetArgs(name, revision, allowBackwards))
 
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("diff", "--git", "-r", revision))
