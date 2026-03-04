@@ -49,6 +49,6 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
             // Select the working copy (may have changed if we abandoned the old working copy)
             repo.invalidate(select = WorkingCopy)
             log.info("Abandoned change ${target.id}")
-        }.onFailureTellUser("log.action.abandon.error", project, log)
+        }.onFailure { tellUser(project, "log.action.abandon.error") }
         .executeAsync()
 }

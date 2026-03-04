@@ -39,7 +39,7 @@ class GitFetchAction : DumbAwareAction(
                     repo.invalidate()
                     log.info("Fetched for ${repo.displayName}")
                 }
-                .onFailureTellUser("action.git.fetch.error", project, log)
+                .onFailure { tellUser(project, "action.git.fetch.error") }
                 .executeWithProgress(project, JujutsuBundle.message("progress.git.fetch"))
         }
     }

@@ -28,6 +28,6 @@ fun rebaseAction(
                 target.invalidate(select = spec.revisions.first())
                 log.info("Rebased ${spec.revisions} onto ${spec.destinations}")
             }
-            .onFailureTellUser("log.action.rebase.error", project, log)
+            .onFailure { tellUser(project, "log.action.rebase.error") }
             .executeAsync()
     }

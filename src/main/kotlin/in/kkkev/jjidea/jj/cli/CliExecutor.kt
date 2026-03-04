@@ -256,6 +256,8 @@ class CliExecutor(
 
         log.info("Completed: jj $cmdName in ${duration}ms (exit=${output.exitCode})")
 
-        return CommandExecutor.CommandResult(exitCode = output.exitCode, stdout = output.stdout, stderr = output.stderr)
+        output.takeIf { it.exitCode != 0 }?.run { log.warn("jj $cmdName failed with exit code $exitCode:\n$stderr") }
+
+        return with(output) { CommandExecutor.CommandResult(exitCode, stdout, stderr) }
     }
 }

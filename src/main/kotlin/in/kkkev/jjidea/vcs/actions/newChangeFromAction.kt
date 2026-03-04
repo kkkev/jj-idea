@@ -27,6 +27,6 @@ fun newChangeFromAction(project: Project, repo: JujutsuRepository?, parentRevisi
             // The new change becomes the working copy - select it
             target.invalidate(select = WorkingCopy)
             log.info("Created new change from $parentRevisions with description: $description")
-        }.onFailureTellUser("log.action.new.error", project, log)
+        }.onFailure { tellUser(project, "log.action.new.error") }
             .executeAsync()
     }

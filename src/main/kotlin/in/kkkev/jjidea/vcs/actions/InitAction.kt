@@ -58,13 +58,14 @@ class InitAction : DumbAwareAction(
             RefreshVFsSynchronously.refreshVirtualFilesRecursive(listOf(newRoot))
 
             val manager = ProjectLevelVcsManager.getInstance(project)
-            manager.directoryMappings = VcsUtil.addMapping(manager.directoryMappings, newRoot.path, JujutsuVcs.VCS_NAME)
+            manager.directoryMappings =
+                VcsUtil.addMapping(manager.directoryMappings, newRoot.path, JujutsuVcs.VCS_NAME)
 
             result
         }.onSuccess {
             project.stateModel.repositoryStates.invalidate()
             project.stateModel.logRefresh.notify(Unit)
-        }.onFailureTellUser("action.init.error", project, log)
+        }.onFailure { tellUser(project, "action.init.error") }
             .executeAsync()
     }
 }

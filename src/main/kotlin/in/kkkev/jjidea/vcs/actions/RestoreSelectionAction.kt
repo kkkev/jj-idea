@@ -59,7 +59,7 @@ class RestoreSelectionAction : DumbAwareAction(
                 repo.invalidate()
                 logger.info("Restored ${files.size} file(s) to parent revision")
             }
-            .onFailureTellUser("action.restore.selection.error", project, logger)
+            .onFailure { tellUser(project, "action.restore.selection.error") }
             .executeAsync()
     }
 

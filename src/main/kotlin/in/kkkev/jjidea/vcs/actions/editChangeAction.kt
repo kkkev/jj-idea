@@ -20,6 +20,6 @@ fun editChangeAction(project: Project, logEntry: LogEntry?) =
                 // The edited change becomes the working copy - select it
                 jujutsuRoot.invalidate(select = id)
                 log.info("Edited change $id")
-            }.onFailureTellUser("log.action.edit.error", project, log)
+            }.onFailure { tellUser(project, "log.action.edit.error") }
             .executeAsync()
     }

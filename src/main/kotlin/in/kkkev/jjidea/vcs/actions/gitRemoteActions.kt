@@ -19,7 +19,7 @@ fun gitFetchAction(project: Project, repo: JujutsuRepository?) =
                 target.invalidate()
                 log.info("Fetched for ${target.displayName}")
             }
-            .onFailureTellUser("action.git.fetch.error", project, log)
+            .onFailure { tellUser(project, "action.git.fetch.error") }
             .executeWithProgress(project, JujutsuBundle.message("progress.git.fetch"))
     }
 
@@ -45,7 +45,9 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?) =
                         target.invalidate()
                         log.info("Pushed for ${target.displayName}")
                     }
-                    .onFailureTellUser("action.git.push.error", project, log)
+                    .onFailure {
+                        tellUser(project, "action.git.push.error")
+                    }
                     .executeWithProgress(project, JujutsuBundle.message("progress.git.push"))
             }
         }

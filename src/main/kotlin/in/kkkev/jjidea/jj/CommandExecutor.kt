@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -20,6 +19,11 @@ interface CommandExecutor {
      */
     data class CommandResult(val exitCode: Int, val stdout: String, val stderr: String) {
         val isSuccess: Boolean get() = exitCode == 0
+
+        fun tellUser(project: Project, resourceKeyPrefix: String) {
+            val message = JujutsuBundle.message("$resourceKeyPrefix.message", stderr)
+            Messages.showErrorDialog(project, message, JujutsuBundle.message("$resourceKeyPrefix.title"))
+        }
     }
 
     /**
@@ -219,12 +223,6 @@ interface CommandExecutor {
         fun onSuccess(callback: (String) -> Unit) = copy(onSuccess = callback)
 
         fun onFailure(callback: CommandResult.() -> Unit) = copy(onFailure = callback)
-
-        fun onFailureTellUser(resourceKeyPrefix: String, project: Project, log: Logger) = onFailure {
-            val message = JujutsuBundle.message("$resourceKeyPrefix.message", stderr)
-            Messages.showErrorDialog(project, message, JujutsuBundle.message("$resourceKeyPrefix.title"))
-            log.warn(message)
-        }
 
         private fun handleResult(result: CommandResult) {
             ApplicationManager.getApplication().invokeLater {

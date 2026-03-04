@@ -48,7 +48,7 @@ fun squashAction(project: Project, entry: LogEntry?, allEntries: List<LogEntry>)
                         target.repo.invalidate(select = selectId)
                         log.info("Squashed ${target.id} into parent")
                     }
-                    .onFailureTellUser("log.action.squash.into.parent.error", project, log)
+                    .onFailure { tellUser(project, "log.action.squash.into.parent.error") }
                     .executeAsync()
             }
         }

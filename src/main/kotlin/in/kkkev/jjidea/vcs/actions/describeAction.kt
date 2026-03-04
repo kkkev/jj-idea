@@ -27,7 +27,7 @@ fun describeAction(project: Project, logEntry: LogEntry?) =
                     jujutsuRoot.invalidate()
 
                     log.info("Updated working copy description")
-                }.onFailureTellUser("log.action.describe.error", project, log)
+                }.onFailure { tellUser(project, "log.action.describe.error") }
                 .executeAsync()
         }.executeAsync()
     }

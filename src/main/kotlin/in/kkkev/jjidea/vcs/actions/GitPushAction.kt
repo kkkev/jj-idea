@@ -52,7 +52,7 @@ class GitPushAction : DumbAwareAction(
                             targetRepo.invalidate()
                             log.info("Pushed for ${targetRepo.displayName}")
                         }
-                        .onFailureTellUser("action.git.push.error", project, log)
+                        .onFailure { tellUser(project, "action.git.push.error") }
                         .executeWithProgress(project, JujutsuBundle.message("progress.git.push"))
                 }
             }

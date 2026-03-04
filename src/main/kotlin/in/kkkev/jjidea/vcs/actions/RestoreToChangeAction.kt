@@ -56,7 +56,7 @@ class RestoreToChangeAction : DumbAwareAction(
                 repo.invalidate()
                 log.info("Restored $fileName to revision ${changeId.short}")
             }
-            .onFailureTellUser("action.restore.to.revision.error", project, log)
+            .onFailure { tellUser(project, "action.restore.to.revision.error") }
             .executeAsync()
     }
 
