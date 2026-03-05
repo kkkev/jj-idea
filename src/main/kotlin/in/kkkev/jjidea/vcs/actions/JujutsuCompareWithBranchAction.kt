@@ -6,9 +6,7 @@ import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -28,13 +26,12 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
         val file = e.file ?: return
         val repo = file.jujutsuRepository
 
         // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
-        JujutsuCompareWithPopup.show(project, repo) { chosen ->
-            showDiffWithRevision(project, file, chosen, repo)
+        RevisionSelectorPopup.show(repo, true) { chosen ->
+            showDiffWithRevision(repo, file, chosen)
         }
     }
 
@@ -42,43 +39,36 @@ class JujutsuCompareWithBranchAction : DumbAwareAction(
         e.presentation.isEnabledAndVisible = (e.project?.isJujutsu ?: false) && (e.file != null)
     }
 
-    private fun showDiffWithRevision(
-        project: Project,
-        file: VirtualFile,
-        revision: Revision,
-        repo: JujutsuRepository
-    ) {
-        val filePath = repo.getRelativePath(file)
+    private fun showDiffWithRevision(repo: JujutsuRepository, file: VirtualFile, revision: Revision) {
+        repo.commandExecutor.createCommand {
+            show(file.filePath, revision)
+        }.onSuccess {
+            showDiffContent(repo, file, revision, it)
+        }.onFailure {
+            showDiffContent(repo, file, revision, "")
+        }.executeAsync()
+    }
 
-        // Load content in background to avoid EDT blocking
-        ApplicationManager.getApplication().executeOnPooledThread {
-            // Get file content at target revision
-            val revisionResult = repo.commandExecutor.show(file.filePath, revision)
-            val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
+    fun showDiffContent(repo: JujutsuRepository, file: VirtualFile, revision: Revision, revisionContent: String) {
+        val contentFactory = DiffContentFactory.getInstance()
+        val diffManager = DiffManager.getInstance()
 
-            // Show diff on EDT
-            ApplicationManager.getApplication().invokeLater {
-                val contentFactory = DiffContentFactory.getInstance()
-                val diffManager = DiffManager.getInstance()
-
-                // Create diff content
-                val content1 = contentFactory.create(project, revisionContent)
-                val content2 = if (file.exists()) {
-                    contentFactory.create(project, file)
-                } else {
-                    contentFactory.createEmpty()
-                }
-
-                val diffRequest = SimpleDiffRequest(
-                    JujutsuBundle.message("diff.title.compare", file.name, revision.toString()),
-                    content1,
-                    content2,
-                    revision.toString(),
-                    JujutsuBundle.message("diff.label.current")
-                )
-
-                diffManager.showDiff(project, diffRequest)
-            }
+        // Create diff content
+        val content1 = contentFactory.create(repo.project, revisionContent)
+        val content2 = if (file.exists()) {
+            contentFactory.create(repo.project, file)
+        } else {
+            contentFactory.createEmpty()
         }
+
+        val diffRequest = SimpleDiffRequest(
+            JujutsuBundle.message("diff.title.compare", file.name, revision.toString()),
+            content1,
+            content2,
+            revision.toString(),
+            JujutsuBundle.message("diff.label.current")
+        )
+
+        diffManager.showDiff(repo.project, diffRequest)
     }
 }

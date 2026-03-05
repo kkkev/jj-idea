@@ -2,21 +2,15 @@ package `in`.kkkev.jjidea.vcs.actions
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.SearchTextField
-import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.components.ComponentTextCanvas
-import `in`.kkkev.jjidea.ui.components.append
-import `in`.kkkev.jjidea.ui.components.appendSummary
-import `in`.kkkev.jjidea.ui.components.htmlString
+import `in`.kkkev.jjidea.ui.components.*
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter
@@ -24,20 +18,22 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.DefaultListModel
-import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.ListSelectionModel
 import javax.swing.event.DocumentEvent
 
+// TODO Replace this list rendering with shared log rendering
+// TODO For the compare-with popup, we don't need bookmarks separately
+// TODO Although we still need a separate bookmark selector
 /**
- * Popup for selecting a bookmark, change, or revision to compare with
+ * Popup for selecting a bookmark, change, or revision. Used for comparing across revisions or choosing a bookmark.
  * Features:
  * - Shows bookmarks and recent changes (limited to 10 by default)
  * - Real-time search by change ID or description
  * - Search dynamically filters and re-queries to show top 10 matches
  * - Visual icons to distinguish bookmarks from changes
  */
-object JujutsuCompareWithPopup {
+object RevisionSelectorPopup {
     private const val DEFAULT_LIMIT = 10
 
     /**
@@ -67,13 +63,12 @@ object JujutsuCompareWithPopup {
      * Features search field with dynamic filtering
      * Loads data in background to avoid EDT blocking
      */
-    fun show(project: Project, repo: JujutsuRepository, onSelected: (Revision) -> Unit) {
+    fun show(repo: JujutsuRepository, includeLogEntries: Boolean, onSelected: (Revision) -> Unit) {
         // Create UI on EDT
         ApplicationManager.getApplication().invokeLater {
-            val panel = createPopupPanel(project, repo, onSelected)
+            val panel = createPopupPanel(repo, includeLogEntries, onSelected)
 
-            val popup = JBPopupFactory
-                .getInstance()
+            val popup = JBPopupFactory.getInstance()
                 .createComponentPopupBuilder(panel, panel.searchField)
                 .setTitle("Select Branch or Change to Compare")
                 .setResizable(true)
@@ -84,7 +79,7 @@ object JujutsuCompareWithPopup {
             // Set popup reference so panel can close it
             panel.setPopup(popup)
 
-            popup.showCenteredInCurrentWindow(project)
+            popup.showCenteredInCurrentWindow(repo.project)
 
             // Load initial data after popup is shown
             panel.loadData("")
@@ -94,18 +89,15 @@ object JujutsuCompareWithPopup {
     /**
      * Create the popup panel with search field and list
      */
-    private fun createPopupPanel(
-        project: Project,
-        repo: JujutsuRepository,
-        onSelected: (Revision) -> Unit
-    ) = PopupPanel(project, repo, onSelected)
+    private fun createPopupPanel(repo: JujutsuRepository, includeLogEntries: Boolean, onSelected: (Revision) -> Unit) =
+        PopupPanel(repo, includeLogEntries, onSelected)
 
     /**
      * Panel containing search field and results list
      */
     private class PopupPanel(
-        private val project: Project,
         private val repo: JujutsuRepository,
+        private val includeLogEntries: Boolean,
         private val onSelected: (Revision) -> Unit
     ) : JPanel(BorderLayout()) {
         val searchField = SearchTextField(false).apply {
@@ -135,7 +127,7 @@ object JujutsuCompareWithPopup {
                             append(timestamp)
                             append("\n")
                         }
-                        control("<br/>")
+                        append("\n")
                         appendSummary(item.entry.description)
                     }
 
@@ -247,7 +239,7 @@ object JujutsuCompareWithPopup {
          */
         fun loadData(query: String) {
             ApplicationManager.getApplication().executeOnPooledThread {
-                val items = buildItemList(project, repo, query.trim())
+                val items = buildItemList(repo, includeLogEntries, query.trim())
 
                 ApplicationManager.getApplication().invokeLater {
                     listModel.clear()
@@ -281,33 +273,22 @@ object JujutsuCompareWithPopup {
     /**
      * Custom renderer for compare items with icons
      */
-    private class CompareItemRenderer : ColoredListCellRenderer<CompareItem>() {
-        override fun customizeCellRenderer(
-            list: JList<out CompareItem>,
-            value: CompareItem?,
-            index: Int,
-            selected: Boolean,
-            hasFocus: Boolean
-        ) {
-            val canvas = ComponentTextCanvas(this)
+    private class CompareItemRenderer : TextListCellRenderer<CompareItem>() {
+        override fun render(canvas: TextCanvas, value: CompareItem) = with(canvas) {
             when (value) {
                 is CompareItem.Bookmark -> {
-                    icon = AllIcons.Vcs.Branch
-                    append(value.item.bookmark.name, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
-                    append(" (", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-                    canvas.append(value.item.id)
-                    append(")", SimpleTextAttributes.GRAYED_ATTRIBUTES)
+                    append(value.item.bookmark)
+                    append(" (")
+                    append(value.item.id)
+                    append(")")
                 }
 
                 is CompareItem.Change -> {
-                    icon = AllIcons.Vcs.CommitNode
-                    canvas.append(value.id)
-                    append(" ", SimpleTextAttributes.GRAYED_ATTRIBUTES)
-
-                    ComponentTextCanvas(this).appendSummary(value.description)
+                    append(icon(AllIcons.Vcs::CommitNode))
+                    append(value.id)
+                    append(" ")
+                    append(value.description)
                 }
-
-                null -> {}
             }
         }
     }
@@ -319,9 +300,10 @@ object JujutsuCompareWithPopup {
      *
      * @param query Search query to filter changes by change ID or description
      */
-    internal fun buildItemList(project: Project, repo: JujutsuRepository, query: String): List<CompareItem> {
+    // TODO Passing includeLogEntries around a lot
+    internal fun buildItemList(repo: JujutsuRepository, includeLogEntries: Boolean, query: String): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
-        val cache = LogCache.getInstance(project)
+        val cache = LogCache.getInstance(repo.project)
 
         // Add bookmarks - always show all bookmarks filtered by query
         val logService = repo.logService
@@ -343,31 +325,33 @@ object JujutsuCompareWithPopup {
             items.addAll(filteredBookmarks.map { CompareItem.Bookmark(it) })
         }
 
-        // Add recent changes - limit to DEFAULT_LIMIT and filter by query
-        // Try to get from cache first
-        val entries = cache.get(Expression.ALL) ?: run {
-            // Not in cache, fetch from jj and cache it
-            val logResult = logService.getLogBasic(revset = Expression.ALL)
-            logResult.getOrNull()?.also { fetchedEntries ->
-                cache.put(Expression.ALL, emptyList(), fetchedEntries)
-            } ?: emptyList()
-        }
+        if (includeLogEntries) {
+            // Add recent changes - limit to DEFAULT_LIMIT and filter by query
+            // Try to get from cache first
+            val entries = cache.get(Expression.ALL) ?: run {
+                // Not in cache, fetch from jj and cache it
+                val logResult = logService.getLogBasic(revset = Expression.ALL)
+                logResult.getOrNull()?.also { fetchedEntries ->
+                    cache.put(Expression.ALL, emptyList(), fetchedEntries)
+                } ?: emptyList()
+            }
 
-        // Filter changes by query
-        val filteredEntries = if (query.isEmpty()) {
-            entries.take(DEFAULT_LIMIT)
-        } else {
-            entries
-                .filter { entry ->
-                    entry.id.short.contains(query, ignoreCase = true) ||
-                        entry.id.full.contains(query, ignoreCase = true) ||
-                        entry.description.display.contains(query, ignoreCase = true)
-                }.take(DEFAULT_LIMIT)
-        }
+            // Filter changes by query
+            val filteredEntries = if (query.isEmpty()) {
+                entries.take(DEFAULT_LIMIT)
+            } else {
+                entries
+                    .filter { entry ->
+                        entry.id.short.contains(query, ignoreCase = true) ||
+                            entry.id.full.contains(query, ignoreCase = true) ||
+                            entry.description.display.contains(query, ignoreCase = true)
+                    }.take(DEFAULT_LIMIT)
+            }
 
-        // Convert to CompareItems
-        filteredEntries.forEach { entry ->
-            items.add(CompareItem.Change(entry))
+            // Convert to CompareItems
+            filteredEntries.forEach { entry ->
+                items.add(CompareItem.Change(entry))
+            }
         }
 
         return items

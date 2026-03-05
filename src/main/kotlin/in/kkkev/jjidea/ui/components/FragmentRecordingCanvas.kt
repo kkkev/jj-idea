@@ -10,13 +10,15 @@ import com.intellij.ui.SimpleTextAttributes
  * The [truncate] block marks its appended fragments as truncatable. During layout, the
  * truncatable range can be shortened to fit available space (see [FragmentLayout]).
  */
-class FragmentRecordingCanvas : StyledTextCanvas() {
-    sealed class Fragment {
-        data class Text(val text: String, val style: SimpleTextAttributes, val truncatable: Boolean) : Fragment()
-        data class Icon(val icon: IconSpec, val truncatable: Boolean) : Fragment()
+class FragmentRecordingCanvas(initialFragments: List<Fragment> = emptyList()) : StyledTextCanvas() {
+    sealed interface Fragment {
+        val truncatable: Boolean
+
+        data class Text(val text: String, val style: SimpleTextAttributes, override val truncatable: Boolean) : Fragment
+        data class Icon(val icon: IconSpec, override val truncatable: Boolean) : Fragment
     }
 
-    private val _fragments = mutableListOf<Fragment>()
+    private val _fragments = initialFragments.toMutableList()
     val fragments: List<Fragment> get() = _fragments
 
     private var inTruncate = false
@@ -24,9 +26,9 @@ class FragmentRecordingCanvas : StyledTextCanvas() {
     /** Indices of the first and last truncatable fragment, or null if none. */
     val truncateRange: IntRange?
         get() {
-            val first = _fragments.indexOfFirst { isTruncatable(it) }
+            val first = _fragments.indexOfFirst { it.truncatable }
             if (first == -1) return null
-            val last = _fragments.indexOfLast { isTruncatable(it) }
+            val last = _fragments.indexOfLast { it.truncatable }
             return first..last
         }
 
@@ -43,12 +45,5 @@ class FragmentRecordingCanvas : StyledTextCanvas() {
         inTruncate = true
         builder()
         inTruncate = was
-    }
-
-    companion object {
-        fun isTruncatable(fragment: Fragment) = when (fragment) {
-            is Fragment.Text -> fragment.truncatable
-            is Fragment.Icon -> fragment.truncatable
-        }
     }
 }

@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
-import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
@@ -18,34 +17,6 @@ import java.awt.Font
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
-abstract class TextCellRenderer<T> : ColoredTableCellRenderer() {
-    val canvas = object : StyledTextCanvas() {
-        override fun append(text: String) {
-            this@TextCellRenderer.append(text, style)
-        }
-    }
-
-    protected var isWorkingCopyRow = false
-
-    override fun customizeCellRenderer(
-        table: JTable,
-        value: Any?,
-        selected: Boolean,
-        hasFocus: Boolean,
-        row: Int,
-        column: Int
-    ) {
-        // Check if this row is the working copy
-        val model = table.model as? JujutsuLogTableModel
-        isWorkingCopyRow = model?.getEntry(row)?.isWorkingCopy ?: false
-
-        @Suppress("UNCHECKED_CAST")
-        (value as? T)?.let { render(it) }
-    }
-
-    abstract fun render(value: T)
-}
-
 /*
  * Cell renderers for JujutsuLogTable columns.
  * Phase 1: Simple text-based rendering
@@ -59,7 +30,7 @@ abstract class TextCellRenderer<T> : ColoredTableCellRenderer() {
 /**
  * Renderer for separate Status column (conflict/empty indicators).
  */
-class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
+class SeparateStatusCellRenderer : TextTableCellRenderer<LogEntry>() {
     companion object {
         private const val CONFLICT_TOOLTIP = "Conflict - This change has unresolved merge conflicts"
         private const val EMPTY_TOOLTIP = "Empty - This change has no file modifications"
@@ -121,7 +92,7 @@ class SeparateStatusCellRenderer : TextCellRenderer<LogEntry>() {
 /**
  * Renderer for the Author and Committer columns.
  */
-class UserCellRenderer : TextCellRenderer<VcsUser>() {
+class UserCellRenderer : TextTableCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
         canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) { append(value) }
         toolTipText = value.email
@@ -132,7 +103,7 @@ class UserCellRenderer : TextCellRenderer<VcsUser>() {
  * Renderer for the Date column.
  * Shows formatted date/time using consistent formatter (Today/Yesterday/localized date).
  */
-class DateCellRenderer : TextCellRenderer<Instant>() {
+class DateCellRenderer : TextTableCellRenderer<Instant>() {
     override fun render(value: Instant) {
         canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) { append(value) }
 
@@ -144,7 +115,7 @@ class DateCellRenderer : TextCellRenderer<Instant>() {
 /**
  * Renderer for separate ID column.
  */
-class SeparateIdCellRenderer : TextCellRenderer<ChangeId>() {
+class SeparateIdCellRenderer : TextTableCellRenderer<ChangeId>() {
     override fun render(value: ChangeId) = canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) { append(value) }
 }
 
@@ -219,7 +190,7 @@ class SeparateDescriptionCellRenderer() : TableCellRenderer {
  * bookmark icon at the start if there are any bookmarks. Full platform-style rendering
  * with icon-per-bookmark will be implemented in jj-idea-srz (right-aligned refs).
  */
-class SeparateDecorationsCellRenderer : TextCellRenderer<LogEntry>() {
+class SeparateDecorationsCellRenderer : TextTableCellRenderer<LogEntry>() {
     override fun customizeCellRenderer(
         table: JTable,
         value: Any?,

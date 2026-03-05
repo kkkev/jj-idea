@@ -17,10 +17,6 @@ import javax.swing.JPanel
 object FragmentLayout {
     private const val ELLIPSIS = "..."
 
-    /** Measure total pixel width of the fragment list using the given base font. */
-    fun measureWidth(fragments: List<Fragment>, baseFont: Font, frc: FontRenderContext): Double =
-        fragments.sumOf { fragmentWidth(it, baseFont, frc) }
-
     /**
      * Returns a new fragment list with the truncatable region shortened to fit [availableWidth].
      *
@@ -91,39 +87,7 @@ object FragmentLayout {
         return result
     }
 
-    /**
-     * Render fragments into a [JPanel] using [BoxLayout]. Text fragments are appended to
-     * [SimpleColoredComponent]s; icon fragments become [JLabel]s. Adjacent text fragments
-     * share the same SCC to avoid unnecessary component boundaries.
-     */
-    fun renderToPanel(fragments: List<Fragment>, panel: JPanel) {
-        panel.removeAll()
-        panel.layout = BoxLayout(panel, BoxLayout.X_AXIS)
-
-        var currentScc: SimpleColoredComponent? = null
-
-        for (fragment in fragments) {
-            when (fragment) {
-                is Fragment.Text -> {
-                    if (currentScc == null) {
-                        currentScc = SimpleColoredComponent().also {
-                            it.isOpaque = false
-                            panel.add(it)
-                        }
-                    }
-                    currentScc.append(fragment.text, fragment.style)
-                }
-                is Fragment.Icon -> {
-                    currentScc = null
-                    IconResolver.resolveIcon(fragment.icon.qualified)?.let { icon ->
-                        panel.add(JLabel(icon).also { it.isOpaque = false })
-                    }
-                }
-            }
-        }
-    }
-
-    private fun fragmentWidth(fragment: Fragment, baseFont: Font, frc: FontRenderContext) = when (fragment) {
+    fun fragmentWidth(fragment: Fragment, baseFont: Font, frc: FontRenderContext) = when (fragment) {
         is Fragment.Text -> textWidth(fragment.text, baseFont.deriveFont(fragment.style), frc)
         is Fragment.Icon -> IconResolver.resolveIcon(fragment.icon.qualified)?.iconWidth?.toDouble() ?: 0.0
     }

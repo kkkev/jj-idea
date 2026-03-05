@@ -1,9 +1,50 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.ui.SimpleColoredComponent
+import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
 import java.awt.BorderLayout
 import java.awt.Color
 import javax.swing.BoxLayout
+import javax.swing.BoxLayout.X_AXIS
+import javax.swing.JLabel
 import javax.swing.JPanel
+
+class TextCanvasPanel : JPanel() {
+    init {
+        layout = BoxLayout(this, X_AXIS)
+    }
+
+    /**
+     * Render fragments into this panel using [BoxLayout]. Text fragments are appended to
+     * [SimpleColoredComponent]s; icon fragments become [JLabel]s. Adjacent text fragments
+     * share the same SCC to avoid unnecessary component boundaries.
+     */
+    fun renderFrom(canvas: FragmentRecordingCanvas) {
+        removeAll()
+        this.layout = BoxLayout(this, X_AXIS)
+        var currentScc: SimpleColoredComponent? = null
+        for (fragment in canvas.fragments) {
+            when (fragment) {
+                is Fragment.Text -> {
+                    if (currentScc == null) {
+                        currentScc = SimpleColoredComponent().also {
+                            it.isOpaque = false
+                            add(it)
+                        }
+                    }
+                    currentScc.append(fragment.text, fragment.style)
+                }
+
+                is Fragment.Icon -> {
+                    currentScc = null
+                    IconResolver.resolveIcon(fragment.icon.qualified)?.let { icon ->
+                        add(JLabel(icon).also { it.isOpaque = false })
+                    }
+                }
+            }
+        }
+    }
+}
 
 /**
  * A panel that lays out a left side (fills remaining space) and a right side (sizes to content)
@@ -15,8 +56,8 @@ import javax.swing.JPanel
  * `paintComponent`.
  */
 class TruncatingLeftRightLayout : JPanel(BorderLayout(0, 0)) {
-    val left = JPanel().also { it.layout = BoxLayout(it, BoxLayout.X_AXIS) }
-    val right = JPanel().also { it.layout = BoxLayout(it, BoxLayout.X_AXIS) }
+    val left = TextCanvasPanel()
+    val right = TextCanvasPanel()
 
     init {
         isOpaque = true
@@ -42,7 +83,7 @@ class TruncatingLeftRightLayout : JPanel(BorderLayout(0, 0)) {
     ) {
         this.background = background
 
-        FragmentLayout.renderToPanel(rightCanvas.fragments, right)
+        right.renderFrom(rightCanvas)
         val rightWidth = right.preferredSize.width
 
         val frc = getFontMetrics(font).fontRenderContext
@@ -54,6 +95,6 @@ class TruncatingLeftRightLayout : JPanel(BorderLayout(0, 0)) {
             font,
             frc
         )
-        FragmentLayout.renderToPanel(truncated, left)
+        left.renderFrom(FragmentRecordingCanvas(truncated))
     }
 }

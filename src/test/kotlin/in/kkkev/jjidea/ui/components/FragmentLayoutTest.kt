@@ -20,13 +20,13 @@ class FragmentLayoutTest {
     inner class `measureWidth` {
         @Test
         fun `empty list has zero width`() {
-            FragmentLayout.measureWidth(emptyList(), font, frc) shouldBe 0.0
+            measureWidth(emptyList(), font, frc) shouldBe 0.0
         }
 
         @Test
         fun `single text fragment has positive width`() {
             val fragments = listOf(Fragment.Text("hello", SimpleTextAttributes.REGULAR_ATTRIBUTES, false))
-            val width = FragmentLayout.measureWidth(fragments, font, frc)
+            val width = measureWidth(fragments, font, frc)
             assert(width > 0) { "Expected positive width, got $width" }
         }
 
@@ -36,8 +36,8 @@ class FragmentLayoutTest {
             val frag2 = Fragment.Text(" world", SimpleTextAttributes.REGULAR_ATTRIBUTES, false)
             val combined = Fragment.Text("hello world", SimpleTextAttributes.REGULAR_ATTRIBUTES, false)
 
-            val sumWidth = FragmentLayout.measureWidth(listOf(frag1, frag2), font, frc)
-            val combinedWidth = FragmentLayout.measureWidth(listOf(combined), font, frc)
+            val sumWidth = measureWidth(listOf(frag1, frag2), font, frc)
+            val combinedWidth = measureWidth(listOf(combined), font, frc)
 
             // Sum of parts should equal the combined (monospaced font, no kerning difference)
             assert(kotlin.math.abs(sumWidth - combinedWidth) < 1.0) {
@@ -98,7 +98,7 @@ class FragmentLayoutTest {
             val truncatable = Fragment.Text("description", SimpleTextAttributes.REGULAR_ATTRIBUTES, true)
 
             // Use a width that only fits the non-truncatable prefix
-            val prefixWidth = FragmentLayout.measureWidth(listOf(prefix), font, frc)
+            val prefixWidth = measureWidth(listOf(prefix), font, frc)
             val result = FragmentLayout.truncateToFit(listOf(prefix, truncatable), 1..1, prefixWidth, font, frc)
 
             result shouldHaveSize 1
@@ -121,7 +121,7 @@ class FragmentLayoutTest {
             val frag2 = Fragment.Text("Second part", SimpleTextAttributes.REGULAR_ATTRIBUTES, true)
 
             // Enough for first fragment only
-            val frag1Width = FragmentLayout.measureWidth(listOf(frag1), font, frc)
+            val frag1Width = measureWidth(listOf(frag1), font, frc)
             val result = FragmentLayout.truncateToFit(listOf(frag1, frag2), 0..1, frag1Width + 5, font, frc)
 
             // Second fragment should be dropped, first might be slightly truncated or fit
@@ -132,3 +132,7 @@ class FragmentLayoutTest {
         }
     }
 }
+
+/** Measure total pixel width of the fragment list using the given base font. */
+fun measureWidth(fragments: List<Fragment>, baseFont: Font, frc: FontRenderContext): Double =
+    fragments.sumOf { FragmentLayout.fragmentWidth(it, baseFont, frc) }

@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
-import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -82,10 +81,6 @@ abstract class StyledTextCanvas : TextCanvas {
     // TODO Actually build the link
     override fun linked(target: URI, builder: TextCanvas.() -> Unit) =
         surround(builder) { SimpleTextAttributes.merge(this, SimpleTextAttributes.LINK_ATTRIBUTES) }
-}
-
-class ComponentTextCanvas(val component: SimpleColoredComponent) : StyledTextCanvas() {
-    override fun append(text: String) = component.append(text, style)
 }
 
 fun TextCanvas.append(message: JujutsuMessage) = append(JujutsuBundle.message(message.key))
