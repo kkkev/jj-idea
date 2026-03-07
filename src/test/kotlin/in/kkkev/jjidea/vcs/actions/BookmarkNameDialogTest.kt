@@ -14,7 +14,6 @@ import org.junit.jupiter.api.Test
  * by testing the data structures and mapping logic that the dialog depends on.
  */
 class BookmarkNameDialogTest {
-
     @Nested
     inner class `Error code mapping` {
         @Test

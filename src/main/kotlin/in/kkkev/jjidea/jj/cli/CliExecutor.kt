@@ -211,15 +211,12 @@ class CliExecutor(
         return execute(root, args)
     }
 
-    // TODO Interpret error:
-    // Error: Bookmark already exists: wadger
-    //Hint: Use `jj bookmark set` to update it.
-
     override fun bookmarkCreate(name: Bookmark, revision: Revision) = execute(root, bookmarkCreateArgs(name, revision))
 
     override fun bookmarkDelete(name: Bookmark) = execute(root, bookmarkDeleteArgs(name))
 
-    override fun bookmarkRename(oldName: Bookmark, newName: Bookmark) = execute(root, bookmarkRenameArgs(oldName, newName))
+    override fun bookmarkRename(oldName: Bookmark, newName: Bookmark) =
+        execute(root, bookmarkRenameArgs(oldName, newName))
 
     override fun bookmarkSet(name: Bookmark, revision: Revision, allowBackwards: Boolean) =
         execute(root, bookmarkSetArgs(name, revision, allowBackwards))

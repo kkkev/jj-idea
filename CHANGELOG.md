@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Bookmark management: create, delete, rename, and move bookmarks from log context menu
+- Move bookmark confirmation dialog when moving backwards or sideways (non-descendant change)
+
 ## [0.3.6] - 2026-03-02
 
 ## [0.3.5] - 2026-03-02
