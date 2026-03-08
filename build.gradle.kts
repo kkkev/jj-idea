@@ -147,7 +147,7 @@ val ijpgpJvmArgProviders = ijpgpTestTask.jvmArgumentProviders.toList()
 // Uses manual classpath and clears jvmArgumentProviders to avoid coroutines agent crash.
 tasks.test {
     useJUnitPlatform {
-        excludeTags("platform")
+        excludeTags("platform", "contract")
     }
     testClassesDirs = sourceSets["test"].output.classesDirs
 
@@ -205,6 +205,36 @@ tasks.register<Test>("platformTest") {
         jvmArgumentProviders.clear()
         jvmArgs(allArgs)
     }
+}
+
+// Contract tests: run real jj commands to verify CLI output matches plugin's parsers.
+// Same stripped-down classpath as unit tests (no IJPGP). Not included in check — requires jj installed.
+tasks.register<Test>("contractTest") {
+    useJUnitPlatform { includeTags("contract") }
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = configurations["testCompileClasspath"] +
+        configurations["testRuntimeClasspath"] +
+        sourceSets["test"].output +
+        sourceSets["main"].output
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    )
+    jvmArgs(
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.fs=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt.event=ALL-UNNAMED",
+        "--add-opens=java.desktop/javax.swing=ALL-UNNAMED",
+        "--add-opens=java.desktop/javax.swing.plaf.basic=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.font=ALL-UNNAMED"
+    )
+    doFirst { jvmArgumentProviders.clear() }
 }
 
 // Convenience task that runs both tests and linting
