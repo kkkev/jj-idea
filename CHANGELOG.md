@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Replace deprecated `preload="true"` service attribute with `ProjectActivity` to pass JetBrains Marketplace validation
+
 ## [0.5.0] - 2026-03-09
 
 ### Added

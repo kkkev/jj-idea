@@ -48,7 +48,10 @@
         <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel"/>
         <projectService serviceImplementation="in.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager"/>
         <projectService serviceImplementation="in.kkkev.jjidea.ui.history.JujutsuFileHistoryTabManager"/>
-        <projectService serviceImplementation="in.kkkev.jjidea.ui.services.ToolWindowEnabler" preload="true"/>
+        <projectService serviceImplementation="in.kkkev.jjidea.ui.services.ToolWindowEnabler"/>
+
+        <!-- Initialize ToolWindowEnabler on project open (replaces deprecated preload="true") -->
+        <postStartupActivity implementation="in.kkkev.jjidea.ui.services.ToolWindowEnablerInitActivity"/>
         <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings"/>
 
         <!-- Ignore .jj/ internal files to prevent VcsDirtyScopeVfsListener feedback loops -->
