@@ -3,15 +3,14 @@ package `in`.kkkev.jjidea.actions.top
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vcs.update.RefreshVFsSynchronously
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.dsl.builder.*
 import com.intellij.vcsUtil.VcsUtil
@@ -28,8 +27,6 @@ class InitAction : DumbAwareAction(
     JujutsuBundle.message("action.init.description"),
     AllIcons.Actions.NewFolder
 ) {
-    private val log = Logger.getInstance(javaClass)
-
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
@@ -56,7 +53,7 @@ class InitAction : DumbAwareAction(
         commandExecutor.createCommand {
             val result = gitInit(colocate)
 
-            RefreshVFsSynchronously.refreshVirtualFilesRecursive(listOf(newRoot))
+            VfsUtil.markDirtyAndRefresh(false, true, true, newRoot)
 
             val manager = ProjectLevelVcsManager.getInstance(project)
             manager.directoryMappings =

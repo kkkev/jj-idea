@@ -1,12 +1,17 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.actionSystem.*
-import com.intellij.util.ui.CheckboxIcon
 import com.intellij.util.ui.EmptyIcon
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import java.awt.Color
+import java.awt.Component
+import java.awt.Graphics
+import java.awt.Graphics2D
+import java.awt.RenderingHints
+import javax.swing.Icon
 
 /**
  * Filter component for repository roots.
@@ -69,8 +74,8 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
         null
     ) {
         private val color = RepositoryColors.getColor(root)
-        private val selectedIcon = CheckboxIcon.createAndScaleCheckbox(color, true)
-        private val deselectedIcon = CheckboxIcon.createAndScaleCheckbox(color, false)
+        private val selectedIcon = rootIcon(color, true)
+        private val deselectedIcon = rootIcon(color, false)
 
         init {
             // Reserve space for icon - see PopupFactoryImpl.calcMaxIconSize
@@ -99,5 +104,26 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
         override fun actionPerformed(e: AnActionEvent) {
             doResetFilter()
         }
+    }
+}
+
+private fun rootIcon(color: Color, selected: Boolean): Icon {
+    val size = JBUI.scale(10)
+    val arc = JBUI.scale(3)
+    return object : Icon {
+        override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+            val g2 = g.create() as Graphics2D
+            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g2.color = color
+            if (selected) {
+                g2.fillRoundRect(x, y, size, size, arc, arc)
+            } else {
+                g2.drawRoundRect(x, y, size - 1, size - 1, arc, arc)
+            }
+            g2.dispose()
+        }
+
+        override fun getIconWidth() = size
+        override fun getIconHeight() = size
     }
 }

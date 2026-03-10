@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fix icon colorization compatibility break across platform versions
+- Replace deprecated and internal API usages flagged by Plugin Verifier
+
+### Changed
+- Minimum supported version is now IntelliJ IDEA 2025.2
+
 ## [0.5.1] - 2026-03-09
 
 ### Fixed

@@ -3,8 +3,6 @@ package `in`.kkkev.jjidea.actions.filechange
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.CustomShortcutSet
-import com.intellij.openapi.actionSystem.KeyboardShortcut
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
@@ -13,7 +11,6 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.files
 import `in`.kkkev.jjidea.vcs.filePath
-import javax.swing.KeyStroke
 
 /**
  * Action to open selected file(s) in the editor.
@@ -25,13 +22,6 @@ class OpenChangeFileAction : DumbAwareAction(
     null,
     AllIcons.Actions.EditSource
 ) {
-    init {
-        shortcutSet = CustomShortcutSet(
-            KeyboardShortcut(KeyStroke.getKeyStroke("F4"), null),
-            KeyboardShortcut(KeyStroke.getKeyStroke("ENTER"), null)
-        )
-    }
-
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {

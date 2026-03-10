@@ -1,9 +1,7 @@
 package `in`.kkkev.jjidea.ui.common
 
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.ide.DataManager
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsDataKeys
@@ -65,7 +63,16 @@ class JujutsuChangesTree(project: Project, showCheckboxes: Boolean = false) :
         val diffAction = ActionManager.getInstance().getAction("Diff.ShowDiff")!!
         val invokeDiff: () -> Boolean = {
             if (selectedChanges.isNotEmpty()) {
-                ActionUtil.invokeAction(diffAction, this, ActionPlaces.CHANGES_VIEW_POPUP, null, null)
+                val context = DataManager.getInstance().getDataContext(this)
+                val event = AnActionEvent.createEvent(
+                    diffAction,
+                    context,
+                    null,
+                    ActionPlaces.CHANGES_VIEW_POPUP,
+                    ActionUiKind.NONE,
+                    null
+                )
+                ActionUtil.performAction(diffAction, event)
                 true
             } else {
                 false

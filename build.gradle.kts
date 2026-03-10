@@ -102,7 +102,7 @@ intellijPlatform {
 
     pluginConfiguration {
         ideaVersion {
-            sinceBuild = "251"
+            sinceBuild = "252"
             untilBuild = provider { null }
         }
         changeNotes = provider { extractChangelogNotes(project.version.toString()) }
@@ -116,6 +116,12 @@ intellijPlatform {
 
     publishing {
         token = providers.environmentVariable("PUBLISH_TOKEN")
+    }
+
+    pluginVerification {
+        ides {
+            recommended()
+        }
     }
 }
 

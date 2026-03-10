@@ -5,6 +5,7 @@ import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
@@ -55,7 +56,7 @@ object JujutsuNotifications {
                 val initAction = ActionManager.getInstance().getAction("Jujutsu.Init")!!
                 val context = createDataContext(project, repo.directory)
                 val event = AnActionEvent.createEvent(initAction, context, null, "", ActionUiKind.NONE, null)
-                initAction.actionPerformed(event)
+                ActionUtil.performAction(initAction, event)
             }
         })
 

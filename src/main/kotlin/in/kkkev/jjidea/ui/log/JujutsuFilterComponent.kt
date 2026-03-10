@@ -6,10 +6,10 @@ import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListPopup
 import com.intellij.ui.ClickListener
+import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.StartupUiUtil
 import com.intellij.util.ui.UIUtil
 import java.awt.*
 import java.awt.event.*
@@ -167,9 +167,9 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         val isEnabled = isEnabled
         if (isEnabled && isHovered) {
             nameLabel.foreground =
-                if (StartupUiUtil.isDarkTheme) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
+                if (!JBColor.isBright()) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
             valueLabel.foreground =
-                if (StartupUiUtil.isDarkTheme) UIUtil.getLabelForeground() else UIUtil.getTextFieldForeground()
+                if (!JBColor.isBright()) UIUtil.getLabelForeground() else UIUtil.getTextFieldForeground()
         } else {
             nameLabel.foreground =
                 if (isEnabled) UIUtil.getLabelInfoForeground() else UIUtil.getLabelDisabledForeground()

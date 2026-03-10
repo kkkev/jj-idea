@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -28,7 +29,7 @@ import `in`.kkkev.jjidea.vcs.jujutsuRepositories
  * Holds current VCS state and notifies observers via MessageBus when state changes.
  */
 @Service(Service.Level.PROJECT)
-class JujutsuStateModel(private val project: Project) {
+class JujutsuStateModel(private val project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
 
     /**
@@ -78,11 +79,11 @@ class JujutsuStateModel(private val project: Project) {
      */
     val changeSelection = simpleNotifier<ChangeKey>(project, "Jujutsu Change Selection")
 
-    private val repositoryStateAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, project)
+    private val repositoryStateAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
 
     init {
         // Watch for file changes to mark files dirty and detect .jj directory changes
-        project.messageBus.connect(project).subscribe(
+        project.messageBus.connect(this).subscribe(
             VirtualFileManager.VFS_CHANGES,
             object : BulkFileListener {
                 override fun after(events: List<VFileEvent>) {
@@ -137,7 +138,7 @@ class JujutsuStateModel(private val project: Project) {
 
         // Update tool window availability when initializedRoots changes
         // Also invalidate repositoryStates since it depends on initializedRoots
-        initializedRoots.connect(project) { new ->
+        initializedRoots.connect(this) { new ->
             log.info("Initialized roots changed to ${new.size} roots")
             ToolWindowManager.getInstance(project)
                 .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
@@ -151,7 +152,7 @@ class JujutsuStateModel(private val project: Project) {
         // to trigger ChangeProvider refresh for file changes.
         // Only dirty repos whose state actually changed to avoid flooding FileStatusManager.
         var previousStateKeys = emptyMap<JujutsuRepository, LogEntry.StateKey>()
-        repositoryStates.connect(project) { new ->
+        repositoryStates.connect(this) { new ->
             val newKeys = new.associate { it.repo to it.stateKey }
             val changedEntries = new.filter { entry -> previousStateKeys[entry.repo] != entry.stateKey }
             previousStateKeys = newKeys
@@ -165,6 +166,8 @@ class JujutsuStateModel(private val project: Project) {
             logRefresh.notify(Unit)
         }
     }
+
+    override fun dispose() {}
 }
 
 val Project.stateModel: JujutsuStateModel get() = service()

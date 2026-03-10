@@ -119,7 +119,7 @@ fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelativ
 
 fun TextCanvas.append(bookmark: Bookmark) {
     colored(JujutsuColors.BOOKMARK) {
-        append(icon(AllIcons.Nodes::Bookmark, JujutsuColors.BOOKMARK))
+        append(icon(JujutsuIcons::Bookmark))
         smaller { append(bookmark.name) }
     }
 }
@@ -192,10 +192,10 @@ fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     }
 }
 
-fun TextCanvas.appendConflict(entry: LogEntry, suffix: TextCanvas.() -> Unit = {}) = {
+fun TextCanvas.appendConflict(entry: LogEntry, suffix: TextCanvas.() -> Unit = {}) {
     if (entry.hasConflict) {
         colored(JujutsuColors.CONFLICT) {
-            append(icon(JujutsuIcons::Conflict, JujutsuColors.CONFLICT))
+            append(icon(JujutsuIcons::Conflict))
             suffix()
         }
     }
@@ -219,7 +219,7 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
     if (entry.hasConflict) {
         statusParts.add {
             colored(JujutsuColors.CONFLICT) {
-                append(icon(JujutsuIcons::Conflict, JujutsuColors.CONFLICT))
+                append(icon(JujutsuIcons::Conflict))
                 append(message("status.conflict"))
             }
         }

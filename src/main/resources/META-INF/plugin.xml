@@ -43,16 +43,8 @@
         <vcs name="Jujutsu" vcsClass="in.kkkev.jjidea.vcs.JujutsuVcs" administrativeAreaName=".jj"/>
         <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" order="first"/>
 
-        <!-- Services -->
-        <projectService serviceImplementation="in.kkkev.jjidea.jj.LogCache"/>
-        <projectService serviceImplementation="in.kkkev.jjidea.jj.JujutsuStateModel"/>
-        <projectService serviceImplementation="in.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager"/>
-        <projectService serviceImplementation="in.kkkev.jjidea.ui.history.JujutsuFileHistoryTabManager"/>
-        <projectService serviceImplementation="in.kkkev.jjidea.ui.services.ToolWindowEnabler"/>
-
         <!-- Initialize ToolWindowEnabler on project open (replaces deprecated preload="true") -->
         <postStartupActivity implementation="in.kkkev.jjidea.ui.services.ToolWindowEnablerInitActivity"/>
-        <projectService serviceImplementation="in.kkkev.jjidea.settings.JujutsuSettings"/>
 
         <!-- Ignore .jj/ internal files to prevent VcsDirtyScopeVfsListener feedback loops -->
         <ignoredFileProvider implementation="in.kkkev.jjidea.vcs.changes.JujutsuIgnoredFileProvider"/>
@@ -74,6 +66,8 @@
             icon="AllIcons.Vcs.Branch"
             factoryClass="in.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory"
         />
+        <!-- Add .jj to ignored files on first project open -->
+        <postStartupActivity implementation="in.kkkev.jjidea.JujutsuFileTypeSetup"/>
     </extensions>
 
     <actions>
@@ -117,7 +111,10 @@
         </group>
 
         <!-- File change context menu actions for custom panels -->
-        <action id="Jujutsu.OpenChangeFile" class="in.kkkev.jjidea.actions.filechange.OpenChangeFileAction"/>
+        <action id="Jujutsu.OpenChangeFile" class="in.kkkev.jjidea.actions.filechange.OpenChangeFileAction">
+            <keyboard-shortcut first-keystroke="F4" keymap="$default"/>
+            <keyboard-shortcut first-keystroke="ENTER" keymap="$default"/>
+        </action>
         <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.actions.filechange.RestoreToChangeAction"/>
         <action id="Jujutsu.CompareWithLocal" class="in.kkkev.jjidea.actions.filechange.CompareWithLocalAction"/>
         <action id="Jujutsu.CompareBeforeWithLocal"
@@ -125,10 +122,5 @@
         <action id="Jujutsu.OpenRepositoryVersion"
                 class="in.kkkev.jjidea.actions.filechange.OpenRepositoryVersionAction"/>
     </actions>
-
-    <applicationListeners>
-        <listener class="in.kkkev.jjidea.JujutsuFileTypeSetup"
-                  topic="com.intellij.ide.AppLifecycleListener"/>
-    </applicationListeners>
 
 </idea-plugin>

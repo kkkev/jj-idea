@@ -76,7 +76,6 @@ Then install from `build/distributions/` via **Settings → Plugins → Install 
 
 - **[Contributing](contributing.md)** — Development guidelines
 - **[Developer Guide](CLAUDE.md)** — Architecture and implementation details
-- **[VCS API Reference](docs/VCS_API_REFERENCE.md)** — IntelliJ VCS integration reference
 
 ## License
 

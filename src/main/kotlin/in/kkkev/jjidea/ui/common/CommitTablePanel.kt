@@ -133,7 +133,11 @@ abstract class CommitTablePanel<D>(
             FilterToggleAction("words", AllIcons.Actions.Words, CommitTablePanel<D>::matchWholeWords)
         )
 
-        // Create custom toolbar that uses toggle-aware action buttons
+        // Create custom toolbar that uses toggle-aware action buttons.
+        // Uses @Internal ActionToolbarImpl/ActionButton/FieldInplaceActionButtonLook because
+        // the public ActionToolbar interface provides no hook for custom button creation,
+        // and the toggle-aware button styling has no public API equivalent.
+        @Suppress("UnstableApiUsage")
         val toolbar = object : ActionToolbarImpl("JujutsuFileHistoryFilter", filterActionsGroup, true, false, true) {
             override fun createToolbarButton(
                 action: AnAction,
@@ -149,6 +153,7 @@ abstract class CommitTablePanel<D>(
             }
         }
 
+        @Suppress("UnstableApiUsage")
         toolbar.apply {
             targetComponent = searchTextField.textEditor
             setCustomButtonLook(FieldInplaceActionButtonLook())

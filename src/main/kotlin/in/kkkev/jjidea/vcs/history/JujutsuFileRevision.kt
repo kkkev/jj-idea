@@ -81,6 +81,6 @@ class JujutsuFileRevision(
     }
 
     @Throws(VcsException::class)
-    @Deprecated("Use loadContent() instead")
+    @Deprecated("Use loadContent() instead", replaceWith = ReplaceWith("loadContent()"))
     override fun getContent(): ByteArray = loadContent()
 }
