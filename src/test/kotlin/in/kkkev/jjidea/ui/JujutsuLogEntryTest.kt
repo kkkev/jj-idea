@@ -1,7 +1,7 @@
 package `in`.kkkev.jjidea.ui
 
-import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk

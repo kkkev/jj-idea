@@ -11,7 +11,6 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup.CompareItem
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter
@@ -45,7 +44,7 @@ object RevisionSelectorPopup {
                     bookmark.bookmark.name.contains(query, ignoreCase = true) ||
                     bookmark.id.full.contains(query, ignoreCase = true) ||
                     bookmark.id.short.contains(query, ignoreCase = true)
-                )
+            )
 
         fun matches(entry: LogEntry) = includeLogEntries &&
             (
@@ -53,7 +52,7 @@ object RevisionSelectorPopup {
                     entry.id.short.contains(query, ignoreCase = true) ||
                     entry.id.full.contains(query, ignoreCase = true) ||
                     entry.description.display.contains(query, ignoreCase = true)
-                )
+            )
     }
 
     /**

@@ -1,10 +1,10 @@
 package `in`.kkkev.jjidea.jj.cli
 
-import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.AnnotationLine
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import kotlinx.datetime.Instant
 
 /**

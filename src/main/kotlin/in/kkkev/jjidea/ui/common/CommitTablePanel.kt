@@ -3,10 +3,6 @@ package `in`.kkkev.jjidea.ui.common
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.actionSystem.ex.ActionButtonLook
-import com.intellij.openapi.actionSystem.impl.ActionButton
-import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
-import com.intellij.openapi.actionSystem.impl.FieldInplaceActionButtonLook
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.OnePixelSplitter
@@ -17,8 +13,6 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.ui.log.*
 import java.awt.BorderLayout
-import java.awt.Dimension
-import java.util.function.Supplier
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.Icon
@@ -126,39 +120,18 @@ abstract class CommitTablePanel<D>(
      * Create the filter field using SearchFieldWithExtension pattern.
      */
     private fun createFilterField(): SearchFieldWithExtension {
-        // Create action group with toggle buttons
         val filterActionsGroup = BackgroundActionGroup(
             FilterToggleAction("regex", AllIcons.Actions.RegexHovered, CommitTablePanel<D>::useRegex),
             FilterToggleAction("matchcase", AllIcons.Actions.MatchCase, CommitTablePanel<D>::matchCase),
             FilterToggleAction("words", AllIcons.Actions.Words, CommitTablePanel<D>::matchWholeWords)
         )
 
-        // Create custom toolbar that uses toggle-aware action buttons.
-        // Uses @Internal ActionToolbarImpl/ActionButton/FieldInplaceActionButtonLook because
-        // the public ActionToolbar interface provides no hook for custom button creation,
-        // and the toggle-aware button styling has no public API equivalent.
-        @Suppress("UnstableApiUsage")
-        val toolbar = object : ActionToolbarImpl("JujutsuFileHistoryFilter", filterActionsGroup, true, false, true) {
-            override fun createToolbarButton(
-                action: AnAction,
-                look: ActionButtonLook?,
-                place: String,
-                presentation: Presentation,
-                minimumSize: Supplier<out Dimension?>
-            ): ActionButton {
-                val button = ToggleAwareActionButton(action, presentation)
-                button.isFocusable = true
-                applyToolbarLook(look, presentation, button)
-                return button
-            }
-        }
-
-        @Suppress("UnstableApiUsage")
-        toolbar.apply {
-            targetComponent = searchTextField.textEditor
-            setCustomButtonLook(FieldInplaceActionButtonLook())
-            isReservePlaceAutoPopupIcon = false
-        }
+        val toolbar = ActionManager.getInstance().createActionToolbar(
+            "JujutsuFileHistoryFilter",
+            filterActionsGroup,
+            true
+        )
+        toolbar.targetComponent = searchTextField.textEditor
 
         return SearchFieldWithExtension(toolbar.component, searchTextField)
     }

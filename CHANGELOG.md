@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking on change ids in working copy and description panels selects the change in the log
 
 ### Fixed
+- Remove remaining internal API usages flagged by Plugin Verifier (ActionToolbarImpl, VcsUserImpl)
 - Performance: Remove double refreshing of the log per VCS operation
 - Performance: Remove wasted initial load of repository state
 - Bookmark list: Filter deleted bookmarks that were previously throwing errors

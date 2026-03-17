@@ -1,8 +1,8 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.VcsUser
-import com.intellij.vcs.log.impl.VcsUserImpl
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
@@ -748,7 +748,7 @@ class JujutsuLogTableModelFilterTest {
     }
 
     @Nested
-    inner class `Sorting` {
+    inner class Sorting {
         @Test
         fun `entries maintain insertion order when no explicit sort`() {
             model.setEntries(
