@@ -8,12 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- Fix log refreshing twice per VCS operation (logRefresh fired from both repositoryStates cascade and repo.invalidate)
-- Fix wasted initial load where repositoryStates loaded an empty set before initializedRoots had loaded
-
-### Changed
-- Consolidate all IDE event subscriptions (VFS, VCS config, VCS activation) into JujutsuStateModel
-- Rename ToolWindowEnablerInitActivity to JujutsuStartupActivity
+- Performance: Remove double refreshing of the log per VCS operation
+- Performance: Remove wasted initial load of repository state
 
 ## [0.5.2] - 2026-03-10
 
