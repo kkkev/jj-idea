@@ -21,7 +21,11 @@ fun moveBookmarkAction(entry: LogEntry?) = nullAndDumbAwareAction(
     AllIcons.Actions.MoveUp
 ) {
     val repo = target.repo
-    RevisionSelectorPopup.show(repo, false) { revision ->
+    RevisionSelectorPopup.show(
+        "action.bookmark,move.popup.title",
+        repo,
+        RevisionSelectorPopup.Filter(false, false)
+    ) { revision ->
         (revision as? Bookmark)?.let { bookmark ->
             repo.commandExecutor
                 .createCommand { bookmarkSet(bookmark, target.id) }

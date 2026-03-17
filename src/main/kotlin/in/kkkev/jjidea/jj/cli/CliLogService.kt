@@ -64,7 +64,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val result = executor.bookmarkList(logTemplates.bookmarkListTemplate.spec)
         return if (result.isSuccess) {
             toResult("Failed to parse bookmarks") {
-                parse(logTemplates.bookmarkListTemplate, result.stdout)
+                parse(logTemplates.bookmarkListTemplate, result.stdout).filterNotNull()
             }
         } else {
             log.error("Bookmark list command failed: ${result.stderr}")
@@ -185,10 +185,15 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
+        fun <T> optional(field: SingleField<T>) = singleField(field.spec) {
+            if (it.isEmpty()) null else field.parse(it)
+        }
+
         val changeId = singleField(TemplateParts.qualifiedChangeId()) {
             val (full, short, offset) = it.split("~")
             ChangeId(full, short, offset)
         }
+        val optionalChangeId = optional(changeId)
         val commitId = singleField(TemplateParts.commitId()) {
             val (full, short) = it.split("~")
             CommitId(full, short)
@@ -198,7 +203,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val conflict = booleanField("conflict")
         val empty = booleanField("empty")
         val bookmarks = singleField(
-            """bookmarks.map(|b| if(b.remote(), b.name() ++ "@" ++ b.remote(), b.name())).join(",")"""
+            """bookmarks.map(|b| ${TemplateParts.nameWithRemote("b")}).join(",")"""
         ) { it.splitByComma(::Bookmark) }
         val parents = singleField(
             """
@@ -260,16 +265,18 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
          * Template for bookmark list parsing
          * Uses: jj bookmark list -T 'name ++ "\0" ++ normal_target.change_id() ++ "~" ++ normal_target.change_id().shortest() ++ "\0"'
          */
-        val bookmarkListTemplate = object : LogTemplate<BookmarkItem>(
-            stringField("name"),
-            singleField(TemplateParts.qualifiedChangeId("normal_target")) {
-                changeId.parse(it)
+        val bookmarkListTemplate = object : LogTemplate<BookmarkItem?>(
+            booleanField("present"),
+            stringField(TemplateParts.nameWithRemote()),
+            singleField("if(present,${TemplateParts.qualifiedChangeId("normal_target")},\"\")") {
+                optionalChangeId.parse(it)
             }
         ) {
-            override fun take(input: Iterator<String>): BookmarkItem {
-                val name = fields[0].take(input) as String
-                val id = fields[1].take(input) as ChangeId
-                return BookmarkItem(Bookmark(name), id)
+            override fun take(input: Iterator<String>): BookmarkItem? {
+                val present = fields[0].take(input) as Boolean
+                val name = fields[1].take(input) as String
+                val id = fields[2].take(input) as ChangeId?
+                return if (present) BookmarkItem(Bookmark(name), id!!) else null
             }
         }
     }

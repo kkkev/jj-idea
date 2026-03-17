@@ -9,14 +9,9 @@ import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
-import `in`.kkkev.jjidea.jj.BookmarkItem
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogCache
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup.CompareItem
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter
@@ -42,6 +37,24 @@ import javax.swing.event.DocumentEvent
  */
 object RevisionSelectorPopup {
     private const val DEFAULT_LIMIT = 10
+
+    data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, val query: String = "") {
+        fun matches(bookmark: BookmarkItem) = (!bookmark.bookmark.isRemote || includeRemote) &&
+            (
+                query.isEmpty() ||
+                    bookmark.bookmark.name.contains(query, ignoreCase = true) ||
+                    bookmark.id.full.contains(query, ignoreCase = true) ||
+                    bookmark.id.short.contains(query, ignoreCase = true)
+                )
+
+        fun matches(entry: LogEntry) = includeLogEntries &&
+            (
+                query.isEmpty() ||
+                    entry.id.short.contains(query, ignoreCase = true) ||
+                    entry.id.full.contains(query, ignoreCase = true) ||
+                    entry.description.display.contains(query, ignoreCase = true)
+                )
+    }
 
     /**
      * Item in the comparison popup
@@ -70,14 +83,14 @@ object RevisionSelectorPopup {
      * Features search field with dynamic filtering
      * Loads data in background to avoid EDT blocking
      */
-    fun show(repo: JujutsuRepository, includeLogEntries: Boolean, onSelected: (Revision) -> Unit) {
+    fun show(titleKey: String, repo: JujutsuRepository, filter: Filter, onSelected: (Revision) -> Unit) {
         // Create UI on EDT
         ApplicationManager.getApplication().invokeLater {
-            val panel = createPopupPanel(repo, includeLogEntries, onSelected)
+            val panel = createPopupPanel(repo, filter, onSelected)
 
             val popup = JBPopupFactory.getInstance()
                 .createComponentPopupBuilder(panel, panel.searchField)
-                .setTitle("Select Branch or Change to Compare")
+                .setTitle(JujutsuBundle.message(titleKey))
                 .setResizable(true)
                 .setMovable(true)
                 .setRequestFocus(true)
@@ -89,22 +102,22 @@ object RevisionSelectorPopup {
             popup.showCenteredInCurrentWindow(repo.project)
 
             // Load initial data after popup is shown
-            panel.loadData("")
+            panel.loadData()
         }
     }
 
     /**
      * Create the popup panel with search field and list
      */
-    private fun createPopupPanel(repo: JujutsuRepository, includeLogEntries: Boolean, onSelected: (Revision) -> Unit) =
-        PopupPanel(repo, includeLogEntries, onSelected)
+    private fun createPopupPanel(repo: JujutsuRepository, filter: Filter, onSelected: (Revision) -> Unit) =
+        PopupPanel(repo, filter, onSelected)
 
     /**
      * Panel containing search field and results list
      */
     private class PopupPanel(
         private val repo: JujutsuRepository,
-        private val includeLogEntries: Boolean,
+        private var filter: Filter,
         private val onSelected: (Revision) -> Unit
     ) : JPanel(BorderLayout()) {
         val searchField = SearchTextField(false).apply {
@@ -177,7 +190,8 @@ object RevisionSelectorPopup {
             searchField.addDocumentListener(
                 object : DocumentAdapter() {
                     override fun textChanged(e: DocumentEvent) {
-                        loadData(searchField.text)
+                        filter = filter.copy(query = searchField.text.trim())
+                        loadData()
                     }
                 }
             )
@@ -244,9 +258,9 @@ object RevisionSelectorPopup {
         /**
          * Load and filter data based on search query
          */
-        fun loadData(query: String) {
+        fun loadData() {
             ApplicationManager.getApplication().executeOnPooledThread {
-                val items = buildItemList(repo, includeLogEntries, query.trim())
+                val items = buildItemList(repo, filter)
 
                 ApplicationManager.getApplication().invokeLater {
                     listModel.clear()
@@ -304,11 +318,8 @@ object RevisionSelectorPopup {
      * Build list of items to show in popup
      * Should be called from background thread
      * Filters based on query and limits results
-     *
-     * @param query Search query to filter changes by change ID or description
      */
-    // TODO Passing includeLogEntries around a lot
-    internal fun buildItemList(repo: JujutsuRepository, includeLogEntries: Boolean, query: String): List<CompareItem> {
+    internal fun buildItemList(repo: JujutsuRepository, filter: Filter): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
         val cache = LogCache.Companion.getInstance(repo.project)
 
@@ -319,20 +330,12 @@ object RevisionSelectorPopup {
             val bookmarks = bookmarkResult.getOrNull() ?: emptyList()
 
             // Filter bookmarks by query
-            val filteredBookmarks = if (query.isEmpty()) {
-                bookmarks
-            } else {
-                bookmarks.filter { bookmark ->
-                    bookmark.bookmark.name.contains(query, ignoreCase = true) ||
-                        bookmark.id.full.contains(query, ignoreCase = true) ||
-                        bookmark.id.short.contains(query, ignoreCase = true)
-                }
-            }
+            val filteredBookmarks = bookmarks.filter(filter::matches)
 
-            items.addAll(filteredBookmarks.map { CompareItem.Bookmark(it) })
+            items.addAll(filteredBookmarks.map(CompareItem::Bookmark))
         }
 
-        if (includeLogEntries) {
+        if (filter.includeLogEntries) {
             // Add recent changes - limit to DEFAULT_LIMIT and filter by query
             // Try to get from cache first
             val entries = cache.get(Expression.Companion.ALL) ?: run {
@@ -344,21 +347,9 @@ object RevisionSelectorPopup {
             }
 
             // Filter changes by query
-            val filteredEntries = if (query.isEmpty()) {
-                entries.take(DEFAULT_LIMIT)
-            } else {
-                entries
-                    .filter { entry ->
-                        entry.id.short.contains(query, ignoreCase = true) ||
-                            entry.id.full.contains(query, ignoreCase = true) ||
-                            entry.description.display.contains(query, ignoreCase = true)
-                    }.take(DEFAULT_LIMIT)
-            }
+            val filteredEntries = entries.filter(filter::matches).take(DEFAULT_LIMIT)
 
-            // Convert to CompareItems
-            filteredEntries.forEach { entry ->
-                items.add(CompareItem.Change(entry))
-            }
+            items.addAll(filteredEntries.map(CompareItem::Change))
         }
 
         return items

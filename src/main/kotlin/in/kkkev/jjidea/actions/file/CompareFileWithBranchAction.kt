@@ -32,7 +32,11 @@ class CompareFileWithBranchAction : DumbAwareAction(
         val repo = file.jujutsuRepository
 
         // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
-        RevisionSelectorPopup.show(repo, true) { chosen ->
+        RevisionSelectorPopup.show(
+            "action.compare.branch.popup.title",
+            repo,
+            RevisionSelectorPopup.Filter(true, true)
+        ) { chosen ->
             showDiffWithRevision(repo, file, chosen)
         }
     }

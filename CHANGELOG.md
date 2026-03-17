@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Performance: Remove double refreshing of the log per VCS operation
 - Performance: Remove wasted initial load of repository state
+- Bookmark list: Filter deleted bookmarks that were previously throwing errors
+- Move bookmark: Remove remote bookmarks from the list of candidate bookmarks to move
+- Move bookmark: Fix popup title
 
 ## [0.5.2] - 2026-03-10
 
