@@ -247,3 +247,7 @@ tasks.register<Test>("contractTest") {
 tasks.named("check") {
     dependsOn("test", "platformTest", "ktlintCheck")
 }
+
+tasks.runIde {
+    jvmArgs("-Didea.is.internal=true")
+}

@@ -12,6 +12,7 @@ object Formatters {
      */
     fun escapeHtml(text: String): String = text
         .replace("&", "&amp;")
+        .replace(" ", "&nbsp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;")

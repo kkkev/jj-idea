@@ -8,6 +8,7 @@ import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.*
 import kotlinx.datetime.Instant
 import java.awt.Color
@@ -130,8 +131,8 @@ fun entryCanvas(entry: LogEntry, fg: Color, builder: TextCanvas.() -> Unit) = Fr
 
 /** Append status indicators: immutable/public icon and conflict warning. */
 fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
-    append(icon(if (entry.immutable) AllIcons.Nodes::Private else AllIcons.Nodes::Public))
-    appendConflict(entry) { append(" ") }
+    append(icon(if (entry.immutable) JujutsuIcons::Immutable else JujutsuIcons::Mutable))
+    appendConflict(entry)
 }
 
 /** Append right-side decorations: bookmarks and working copy indicator. */

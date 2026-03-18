@@ -5,7 +5,8 @@ import com.intellij.ui.ColorUtil
 import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
-import com.intellij.util.ui.UIUtil
+import com.intellij.ui.scale.JBUIScale
+import com.intellij.util.ui.ImageUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.invalidate
@@ -14,11 +15,11 @@ import `in`.kkkev.jjidea.vcs.jujutsuRepository
 import java.awt.Color
 import java.awt.Component
 import java.awt.Graphics
-import java.awt.Graphics2D
 import java.awt.image.BufferedImage
 import java.util.regex.Pattern
 import javax.swing.Icon
 import javax.swing.event.HyperlinkEvent
+import kotlin.math.roundToInt
 import kotlin.reflect.KClass
 
 private val CHANGE_ID_URL_PARSER = Pattern.compile("^jjc://([^?]+)\\?(.+)$")
@@ -29,7 +30,7 @@ private val CHANGE_ID_URL_PARSER = Pattern.compile("^jjc://([^?]+)\\?(.+)$")
  */
 class IconAwareHtmlPane : JBHtmlPane(
     JBHtmlPaneStyleConfiguration(),
-    JBHtmlPaneConfiguration { iconResolver = IconResolver::resolveIcon }
+    JBHtmlPaneConfiguration { iconResolver = { IconResolver.resolveIcon(it)?.let(::HtmlIcon) } }
 ) {
     init {
         isOpaque = false
@@ -48,16 +49,14 @@ class IconAwareHtmlPane : JBHtmlPane(
 }
 
 object IconResolver {
-    val icons = listOf(
-        AllIcons::class,
-        JujutsuIcons::class
-    ).map { it.allIcons }.fold(emptyMap<String, Icon>()) { a, i -> a + i }
+    val icons = listOf(JujutsuIcons::class, AllIcons::class)
+        .flatMap { it.allIcons.toList() }
+        .toMap()
 
     fun resolveIcon(key: String): Icon? {
         val parts = key.split("#", limit = 2)
-        val icon = icons[parts[0]] ?: return null
-        val hexColor = parts.getOrNull(1) ?: return icon
-        return ColoredIcon(icon, ColorUtil.fromHex(hexColor))
+        val baseIcon = icons[parts[0]] ?: return null
+        return parts.getOrNull(1)?.let { ColoredIcon(baseIcon, ColorUtil.fromHex(it)) } ?: baseIcon
     }
 
     private val KClass<*>.allIcons
@@ -72,30 +71,34 @@ object IconResolver {
 }
 
 /**
- * An icon that recolors a source icon to a target color using HSB recoloring.
- * Preserves transparency and relative brightness of the source icon.
- * Caches the rendered result by scale factor for HiDPI support.
+ * Wraps icons for JBHtmlPane to fix High-DPI "Double Scaling" and baseline alignment.
  */
-private class ColoredIcon(private val source: Icon, private val color: Color) : Icon {
-    @Volatile
-    private var cached: Pair<Double, BufferedImage>? = null
+private class HtmlIcon(private val source: Icon) : Icon {
+    // Report 0 height. This is the only way to stop JBIconView from adding whitespace above text lines with icons.
+    override fun getIconWidth() = (source.iconWidth / JBUIScale.scale(1f)).roundToInt()
+    override fun getIconHeight() = 0
 
     override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-        val g2 = g as Graphics2D
-        val scale = g2.transform.scaleX
-        val entry = cached
-        val img = if (entry != null && entry.first == scale) {
-            entry.second
-        } else {
-            BufferedImage(iconWidth, iconHeight, BufferedImage.TYPE_INT_ARGB).also {
-                val ig = it.createGraphics()
-                source.paintIcon(c, ig, 0, 0)
-                ig.dispose()
-                applyHsbRecolor(it, color)
-                cached = scale to it
-            }
-        }
-        UIUtil.drawImage(g, img, x, y, null)
+        source.paintIcon(c, g, x, y - source.iconHeight + g.fontMetrics.descent)
+    }
+}
+
+/**
+ * An icon that recolors a source icon to a target color using HSB recoloring.
+ * Preserves transparency and relative brightness of the source icon.
+ */
+private class ColoredIcon(private val source: Icon, private val color: Color) : Icon {
+    override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+        // Create a HiDPI-aware BufferedImage using the current Graphics context
+        val bufferedImage = ImageUtil.createImage(g, iconWidth, iconHeight, BufferedImage.TYPE_INT_ARGB)
+        val ig = bufferedImage.createGraphics()
+        source.paintIcon(c, ig, 0, 0)
+        ig.dispose()
+
+        applyHsbRecolor(bufferedImage, color)
+
+        // Draw back at logical coordinates; Graphics2D handles the backing scale
+        g.drawImage(bufferedImage, x, y, iconWidth, iconHeight, null)
     }
 
     override fun getIconWidth() = source.iconWidth

@@ -140,6 +140,7 @@ fun TextCanvas.append(repo: JujutsuRepository) {
     val color = RepositoryColors.getColor(repo)
     colored(color) {
         append(icon(AllIcons.Nodes::Folder, color))
+        append(" ")
         bold { append(repo.displayName) }
     }
 }
@@ -204,11 +205,10 @@ fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     }
 }
 
-fun TextCanvas.appendConflict(entry: LogEntry, suffix: TextCanvas.() -> Unit = {}) {
+fun TextCanvas.appendConflict(entry: LogEntry) {
     if (entry.hasConflict) {
         colored(JujutsuColors.CONFLICT) {
             append(icon(JujutsuIcons::Conflict))
-            suffix()
         }
     }
 }
@@ -232,6 +232,7 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
         statusParts.add {
             colored(JujutsuColors.CONFLICT) {
                 append(icon(JujutsuIcons::Conflict))
+                append(" ")
                 append(message("status.conflict"))
             }
         }
@@ -244,7 +245,8 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
     }
     if (entry.immutable) {
         statusParts.add {
-            append(icon(AllIcons.Nodes::Private))
+            append(icon(JujutsuIcons::Immutable))
+            append(" ")
             append(message("status.immutable"))
         }
     }
