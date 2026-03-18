@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.vcs.changes
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
@@ -45,6 +46,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
                 }
 
                 parseStatus(result.stdout, repo, builder)
+            } catch (e: ProcessCanceledException) {
+                throw e
             } catch (e: Exception) {
                 log.error("Error getting changes", e)
             }
