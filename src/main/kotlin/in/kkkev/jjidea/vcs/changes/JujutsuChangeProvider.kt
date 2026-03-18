@@ -112,7 +112,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             'M' -> {
                 // Modified file
                 if (file != null) {
-                    addModifiedChange(path, builder)
+                    addModifiedChange(path, repo, builder)
                 }
             }
 
@@ -125,7 +125,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
             'D' -> {
                 // Deleted file
-                addDeletedChange(path, builder)
+                addDeletedChange(path, repo, builder)
             }
 
             'R' -> {
@@ -139,8 +139,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         }
     }
 
-    private fun addModifiedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = path.jujutsuRepository.createRevision(path, WorkingCopy.parent) // Parent commit
+    private fun addModifiedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
+        val beforeRevision = repo.createRevision(path, WorkingCopy.parent) // Parent commit
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -158,8 +158,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         )
     }
 
-    private fun addDeletedChange(path: FilePath, builder: ChangelistBuilder) {
-        val beforeRevision = path.jujutsuRepository.createRevision(path, WorkingCopy.parent)
+    private fun addDeletedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
+        val beforeRevision = repo.createRevision(path, WorkingCopy.parent)
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),

@@ -126,6 +126,15 @@ class JujutsuChangeProviderTest {
             builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
         } returns Unit
 
+        val filePathSlot = slot<FilePath>()
+        every {
+            repo.createRevision(capture(filePathSlot), any())
+        } answers {
+            val result = mockk<ContentRevision>()
+            every { result.file } returns filePathSlot.captured
+            result
+        }
+
         jcp.parseStatus(output, repo, builder)
 
         val change = changeSlot.captured
@@ -142,6 +151,15 @@ class JujutsuChangeProviderTest {
         every {
             builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
         } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every {
+            repo.createRevision(capture(filePathSlot), any())
+        } answers {
+            val result = mockk<ContentRevision>()
+            every { result.file } returns filePathSlot.captured
+            result
+        }
 
         jcp.parseStatus(output, repo, builder)
 
