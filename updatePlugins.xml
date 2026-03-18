@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.2/jj-idea-0.5.2.zip" version="0.5.2">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.3/jj-idea-0.5.3.zip" version="0.5.3">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,15 +23,19 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.2</h3>
+      <h3>0.5.3</h3>
       
-<h4>Fixed</h4>
-<li>Fix icon colorization compatibility break across platform versions</li>
-<li>Replace deprecated and internal API usages flagged by Plugin Verifier</li>
+<h4>Added</h4>
+<li>Clicking on change ids in working copy and description panels selects the change in the log</li>
 
-<h4>Changed</h4>
-<li>Minimum supported version is now IntelliJ IDEA 2025.2</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.2">full release notes</a> for details.</p>
+<h4>Fixed</h4>
+<li>Remove remaining internal API usages flagged by Plugin Verifier (ActionToolbarImpl, VcsUserImpl)</li>
+<li>Performance: Remove double refreshing of the log per VCS operation</li>
+<li>Performance: Remove wasted initial load of repository state</li>
+<li>Bookmark list: Filter deleted bookmarks that were previously throwing errors</li>
+<li>Move bookmark: Remove remote bookmarks from the list of candidate bookmarks to move</li>
+<li>Move bookmark: Fix popup title</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.3">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
