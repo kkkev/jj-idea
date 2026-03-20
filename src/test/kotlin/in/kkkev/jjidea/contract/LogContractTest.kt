@@ -7,17 +7,16 @@ import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldMatch
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
-@Tag("contract")
-@RequiresJj
-class LogContractTest {
+abstract class LogContractTest {
     @TempDir
     lateinit var tempDir: Path
-    lateinit var jj: JjCli
+    lateinit var jj: JjBackend
+
+    abstract fun createBackend(tempDir: Path): JjBackend
 
     private val fields = CliLogService.LogFields()
 
@@ -44,7 +43,7 @@ class LogContractTest {
 
     @BeforeEach
     fun setUp() {
-        jj = JjCli(tempDir)
+        jj = createBackend(tempDir)
         jj.init()
     }
 

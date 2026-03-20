@@ -243,6 +243,36 @@ tasks.register<Test>("contractTest") {
     doFirst { jvmArgumentProviders.clear() }
 }
 
+// Stub tests: run stub contract tests in isolation (no jj required).
+// Same stripped-down classpath as unit tests.
+tasks.register<Test>("stubTest") {
+    useJUnitPlatform { includeTags("stub") }
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = configurations["testCompileClasspath"] +
+        configurations["testRuntimeClasspath"] +
+        sourceSets["test"].output +
+        sourceSets["main"].output
+    javaLauncher.set(
+        javaToolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        }
+    )
+    jvmArgs(
+        "--add-opens=java.base/java.lang=ALL-UNNAMED",
+        "--add-opens=java.base/java.lang.reflect=ALL-UNNAMED",
+        "--add-opens=java.base/java.io=ALL-UNNAMED",
+        "--add-opens=java.base/java.util=ALL-UNNAMED",
+        "--add-opens=java.base/sun.nio.fs=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/java.awt.event=ALL-UNNAMED",
+        "--add-opens=java.desktop/javax.swing=ALL-UNNAMED",
+        "--add-opens=java.desktop/javax.swing.plaf.basic=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.awt=ALL-UNNAMED",
+        "--add-opens=java.desktop/sun.font=ALL-UNNAMED"
+    )
+    doFirst { jvmArgumentProviders.clear() }
+}
+
 // Convenience task that runs both tests and linting
 tasks.named("check") {
     dependsOn("test", "platformTest", "ktlintCheck")

@@ -8,12 +8,8 @@ import kotlin.io.path.writeText
  * Helper to run jj commands in temp repos via ProcessBuilder.
  * Used by contract tests to verify real jj output matches the plugin's parsers.
  */
-class JjCli(val workDir: Path) {
-    data class Result(val exitCode: Int, val stdout: String, val stderr: String) {
-        val isSuccess get() = exitCode == 0
-    }
-
-    fun run(vararg args: String): Result {
+class JjCli(override val workDir: Path) : JjBackend {
+    override fun run(vararg args: String): JjBackend.Result {
         val process = ProcessBuilder(listOf("jj") + args)
             .directory(workDir.toFile())
             .apply {
@@ -27,26 +23,26 @@ class JjCli(val workDir: Path) {
         val stderr = process.errorStream.bufferedReader().readText()
         val exitCode = process.waitFor()
 
-        return Result(exitCode, stdout, stderr)
+        return JjBackend.Result(exitCode, stdout, stderr)
     }
 
-    fun init() {
+    override fun init() {
         val result = run("git", "init", "--colocate")
         check(result.isSuccess) { "jj git init failed: ${result.stderr}" }
     }
 
-    fun createFile(path: String, content: String) {
+    override fun createFile(path: String, content: String) {
         val file = workDir.resolve(path)
         file.parent.createDirectories()
         file.writeText(content)
     }
 
-    fun describe(message: String) {
+    override fun describe(message: String) {
         val result = run("describe", "-m", message)
         check(result.isSuccess) { "jj describe failed: ${result.stderr}" }
     }
 
-    fun newChange(message: String = "") {
+    override fun newChange(message: String) {
         val result = if (message.isNotEmpty()) {
             run("new", "-m", message)
         } else {
@@ -55,7 +51,7 @@ class JjCli(val workDir: Path) {
         check(result.isSuccess) { "jj new failed: ${result.stderr}" }
     }
 
-    fun bookmarkCreate(name: String) {
+    override fun bookmarkCreate(name: String) {
         val result = run("bookmark", "create", name)
         check(result.isSuccess) { "jj bookmark create failed: ${result.stderr}" }
     }

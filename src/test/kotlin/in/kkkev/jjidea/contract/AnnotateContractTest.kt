@@ -5,21 +5,20 @@ import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
-@Tag("contract")
-@RequiresJj
-class AnnotateContractTest {
+abstract class AnnotateContractTest {
     @TempDir
     lateinit var tempDir: Path
-    lateinit var jj: JjCli
+    lateinit var jj: JjBackend
+
+    abstract fun createBackend(tempDir: Path): JjBackend
 
     @BeforeEach
     fun setUp() {
-        jj = JjCli(tempDir)
+        jj = createBackend(tempDir)
         jj.init()
     }
 

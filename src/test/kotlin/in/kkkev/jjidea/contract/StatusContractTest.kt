@@ -4,21 +4,20 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
-@Tag("contract")
-@RequiresJj
-class StatusContractTest {
+abstract class StatusContractTest {
     @TempDir
     lateinit var tempDir: Path
-    lateinit var jj: JjCli
+    lateinit var jj: JjBackend
+
+    abstract fun createBackend(tempDir: Path): JjBackend
 
     @BeforeEach
     fun setUp() {
-        jj = JjCli(tempDir)
+        jj = createBackend(tempDir)
         jj.init()
     }
 

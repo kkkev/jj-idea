@@ -5,17 +5,16 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
-@Tag("contract")
-@RequiresJj
-class MutatingCommandsContractTest {
+abstract class MutatingCommandsContractTest {
     @TempDir
     lateinit var tempDir: Path
-    lateinit var jj: JjCli
+    lateinit var jj: JjBackend
+
+    abstract fun createBackend(tempDir: Path): JjBackend
 
     private val fields = CliLogService.LogFields()
     private val basicSpec = listOf(
@@ -32,7 +31,7 @@ class MutatingCommandsContractTest {
 
     @BeforeEach
     fun setUp() {
-        jj = JjCli(tempDir)
+        jj = createBackend(tempDir)
         jj.init()
     }
 
