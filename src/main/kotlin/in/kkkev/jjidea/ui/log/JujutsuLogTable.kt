@@ -291,8 +291,9 @@ class JujutsuLogTable(
         }
         logModel.setEntries(entries)
         pendingSelection?.let {
-            selectEntry(it.repo, it.revision)
-            pendingSelection = null
+            if (selectEntry(it.repo, it.revision)) {
+                pendingSelection = null
+            }
         }
     }
 
