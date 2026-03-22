@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.4/jj-idea-0.5.4.zip" version="0.5.4">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.5/jj-idea-0.5.5.zip" version="0.5.5">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,15 +23,12 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.4</h3>
+      <h3>0.5.5</h3>
       
 <h4>Fixed</h4>
-<li>Show history for selection: fix AssertionError caused by missing block history provider</li>
-<li>Remove deprecated/252-only API usages (ActionUtil.performAction, Disposer.isDisposed)</li>
-
-<h4>Changed</h4>
-<li>Minimum supported version lowered back to IntelliJ IDEA 2025.1</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.4">full release notes</a> for details.</p>
+<li>Fix squash into parent not selecting parent change in log after operation</li>
+<li>Fix HTML icon sizing and alignment at different zoom levels</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.5">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
