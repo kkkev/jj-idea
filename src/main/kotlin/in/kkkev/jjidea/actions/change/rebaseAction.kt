@@ -1,11 +1,11 @@
 package `in`.kkkev.jjidea.actions.change
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.rebase.RebaseDialog
 
 /**
@@ -18,7 +18,7 @@ fun rebaseAction(
     entries: List<LogEntry>,
     allEntries: List<LogEntry> = emptyList()
 ) =
-    nullAndDumbAwareAction(repo, "log.action.rebase", AllIcons.Vcs.Merge) {
+    nullAndDumbAwareAction(repo, "log.action.rebase", JujutsuIcons.Rebase) {
         val dialog = RebaseDialog(project, target, entries, allEntries)
         if (!dialog.showAndGet()) return@nullAndDumbAwareAction
 

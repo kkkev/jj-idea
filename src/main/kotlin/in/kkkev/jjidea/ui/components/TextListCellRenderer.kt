@@ -25,7 +25,7 @@ abstract class TextListCellRenderer<T>() : ListCellRenderer<T> {
 
         val canvas = FragmentRecordingCanvas()
 
-        value?.let { canvas.colored(fg) { render(this, it) } }
+        value?.let { canvas.foreground(fg) { render(this, it) } }
         renderFrom(canvas)
     }
 

@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.actions.change
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.actions.requestDescription
@@ -8,6 +7,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
 /**
  * Create new change from the selected commit.
@@ -17,7 +17,7 @@ fun newChangeFromAction(project: Project, repo: JujutsuRepository?, parentRevisi
     nullAndDumbAwareAction(
         repo,
         (if (parentRevisions.size == 1) "log.action.new.from.singular" else "log.action.new.from.plural"),
-        AllIcons.General.Add
+        JujutsuIcons.NewChange
     ) {
         // Show modal dialog to get description for the new change
         // Null means that the user cancelled when description was requested

@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.ui.SimpleColoredComponent
+import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
 import java.awt.BorderLayout
 import java.awt.Color
@@ -8,6 +9,9 @@ import javax.swing.BoxLayout
 import javax.swing.BoxLayout.X_AXIS
 import javax.swing.JLabel
 import javax.swing.JPanel
+
+/** Scale factor applied to icons inside `smaller { }` blocks, matching the text scale in [FragmentLayout]. */
+internal const val SMALLER_SCALE = 0.85f
 
 class TextCanvasPanel : JPanel() {
     init {
@@ -38,7 +42,8 @@ class TextCanvasPanel : JPanel() {
                 is Fragment.Icon -> {
                     currentScc = null
                     IconResolver.resolveIcon(fragment.icon.qualified)?.let { icon ->
-                        add(JLabel(icon).also { it.isOpaque = false })
+                        val scaled = if (fragment.style.isSmaller) ScaledIcon(icon, SMALLER_SCALE) else icon
+                        add(JLabel(scaled).also { it.isOpaque = false })
                     }
                 }
             }

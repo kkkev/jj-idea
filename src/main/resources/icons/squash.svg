@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="4 0 8 16" fill="none">
+  <style>
+    .primary { stroke: #6c707e }
+    .primary-fill { fill: #6c707e }
+  </style>
+  <circle cx="8" cy="2.5" r="1.75" class="primary"/>
+  <line x1="8" y1="5.5" x2="8" y2="9" class="primary"/>
+  <path d="m 6,7.5 2,2 2,-2" class="primary" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="8" cy="13" r="1.75" class="primary-fill primary"/>
+</svg>

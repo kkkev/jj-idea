@@ -1,4 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-  <rect x="3" y="7" width="10" height="8" rx="1.5" fill="#498C38"/>
-  <path d="M11 7V4.5A3 3 0 0 0 5 4.5V5.5" stroke="#498C38" stroke-width="1.5"/>
+  <style>
+    .primary { stroke: #498C38 }
+    .primary-fill { fill: #498C38 }
+  </style>
+  <rect class="primary-fill" x="3" y="7" width="10" height="8" rx="1.5"/>
+  <path class="primary" d="M11 7V4.5A3 3 0 0 0 5 4.5V5.5" stroke-width="1.5"/>
 </svg>

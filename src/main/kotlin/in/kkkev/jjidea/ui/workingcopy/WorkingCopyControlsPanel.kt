@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.requestDescription
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import `in`.kkkev.jjidea.ui.components.appendParents
 import `in`.kkkev.jjidea.ui.components.appendSummary
@@ -209,7 +210,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         group.add(object : DumbAwareAction(
             JujutsuBundle.message("button.newchange"),
             JujutsuBundle.message("button.newchange.tooltip"),
-            AllIcons.General.Add
+            JujutsuIcons.NewChange
         ) {
             override fun actionPerformed(e: AnActionEvent) {
                 createNewChange()
@@ -229,7 +230,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     private fun createDescribeButton(): JButton {
         describeButton = JButton(JujutsuBundle.message("button.describe")).apply {
             toolTipText = JujutsuBundle.message("button.describe.tooltip")
-            icon = AllIcons.Actions.MenuSaveall
+            icon = JujutsuIcons.Describe
             addActionListener { describeCurrentChange() }
             isEnabled = false
         }

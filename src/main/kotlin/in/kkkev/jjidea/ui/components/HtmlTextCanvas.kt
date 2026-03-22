@@ -26,6 +26,11 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
         sb.append(Formatters.escapeHtml(text))
     }
 
+    override fun append(icon: IconSpec) {
+        val src = applyCurrentColor(icon).qualified
+        control("<icon src='${if (style.isSmaller) "$src@$SMALLER_SCALE" else src}'/>")
+    }
+
     // TODO Optimise nested styles so that they collapse into one if they start and end at the same point
     override fun styled(style: Int, builder: TextCanvas.() -> Unit) {
         val bold = (style and Font.BOLD) != 0
@@ -35,22 +40,29 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
         if (bold) sb.append("<b>")
         if (italic) sb.append("<i>")
         if (smaller) sb.append("<span style='font-size: 85%'>")
-        builder(this)
+        super.styled(style, builder)
         if (smaller) sb.append("</span>")
         if (italic) sb.append("</i>")
         if (bold) sb.append("</b>")
     }
 
     override fun colored(color: Color, builder: TextCanvas.() -> Unit) {
-        val colored = color != style.fgColor
-        if (colored) sb.append("<span style='color: ${color.rgbString}'>")
-        builder(this)
-        if (colored) sb.append("</span>")
+        val needsSpan = color != style.fgColor
+        if (needsSpan) sb.append("<span style='color: ${color.rgbString}'>")
+        super.colored(color, builder)
+        if (needsSpan) sb.append("</span>")
+    }
+
+    override fun foreground(color: Color, builder: TextCanvas.() -> Unit) {
+        val needsSpan = color != style.fgColor
+        if (needsSpan) sb.append("<span style='color: ${color.rgbString}'>")
+        super.foreground(color, builder)
+        if (needsSpan) sb.append("</span>")
     }
 
     override fun linked(target: URI, builder: TextCanvas.() -> Unit) {
         sb.append("<a href='$target'>")
-        builder(this)
+        super.linked(target, builder)
         sb.append("</a>")
     }
 

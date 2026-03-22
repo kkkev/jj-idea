@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.addPopup
@@ -20,6 +19,7 @@ import `in`.kkkev.jjidea.actions.change.squashableEntry
 import `in`.kkkev.jjidea.actions.git.gitFetchAction
 import `in`.kkkev.jjidea.actions.git.gitPushAction
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
 /**
  * Context menu actions for the custom Jujutsu log table.
@@ -67,7 +67,7 @@ object JujutsuLogContextMenuActions {
         addSeparator()
         add(createBookmarkAction(entry))
         entry?.takeIf { it.bookmarks.isNotEmpty() }?.let { entry ->
-            addPopup("action.bookmark.submenu", AllIcons.Nodes.Bookmark) {
+            addPopup("action.bookmark.submenu", JujutsuIcons.Bookmark) {
                 entry.bookmarks.forEachIndexed { i, bookmark ->
                     if (i > 0) {
                         addSeparator()

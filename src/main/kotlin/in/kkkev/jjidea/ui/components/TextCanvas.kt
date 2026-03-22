@@ -65,7 +65,10 @@ abstract class StyledTextCanvas : TextCanvas {
     var style: SimpleTextAttributes = SimpleTextAttributes.REGULAR_ATTRIBUTES
         private set
 
-    private fun surround(builder: TextCanvas.() -> Unit, deriver: SimpleTextAttributes.() -> SimpleTextAttributes) {
+    /** Color that propagates to icons. Set only by [colored], not by [foreground]. */
+    private var iconColor: Color? = null
+
+    protected fun surround(builder: TextCanvas.() -> Unit, deriver: SimpleTextAttributes.() -> SimpleTextAttributes) {
         val oldStyle = style
         style = style.deriver()
         this.builder()
@@ -75,12 +78,32 @@ abstract class StyledTextCanvas : TextCanvas {
     override fun styled(style: Int, builder: TextCanvas.() -> Unit) =
         surround(builder) { derive(this.style or style, null, null, null) }
 
-    override fun colored(color: Color, builder: TextCanvas.() -> Unit) =
+    override fun colored(color: Color, builder: TextCanvas.() -> Unit) {
+        val oldIconColor = iconColor
+        iconColor = color
+        surround(builder) { derive(this.style, color, null, null) }
+        iconColor = oldIconColor
+    }
+
+    /**
+     * Set the text foreground color without propagating to icons.
+     *
+     * Use this for layout-level foreground (e.g., table selection state) where
+     * icons should keep their own semantic colors. Use [colored] when the color
+     * is semantically meaningful and should apply to both text and icons.
+     */
+    open fun foreground(color: Color, builder: TextCanvas.() -> Unit) =
         surround(builder) { derive(this.style, color, null, null) }
 
     // TODO Actually build the link
     override fun linked(target: URI, builder: TextCanvas.() -> Unit) =
         surround(builder) { SimpleTextAttributes.merge(this, SimpleTextAttributes.LINK_ATTRIBUTES) }
+
+    /** Apply the current [iconColor] to an icon that lacks an explicit [IconSpec.fillColor]. */
+    protected fun applyCurrentColor(icon: IconSpec) =
+        if (icon.fillColor == null && iconColor != null) icon.copy(fillColor = iconColor) else icon
+
+    override fun append(icon: IconSpec) = super.append(applyCurrentColor(icon))
 }
 
 fun TextCanvas.append(message: JujutsuMessage) = append(JujutsuBundle.message(message.key))
@@ -131,15 +154,17 @@ fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelativ
 
 fun TextCanvas.append(bookmark: Bookmark) {
     colored(JujutsuColors.BOOKMARK) {
-        append(icon(JujutsuIcons::Bookmark))
-        smaller { append(bookmark.name) }
+        smaller {
+            append(icon(JujutsuIcons::Bookmark))
+            append(bookmark.name)
+        }
     }
 }
 
 fun TextCanvas.append(repo: JujutsuRepository) {
     val color = RepositoryColors.getColor(repo)
     colored(color) {
-        append(icon(AllIcons.Nodes::Folder, color))
+        append(icon(AllIcons.Nodes::Folder))
         append(" ")
         bold { append(repo.displayName) }
     }

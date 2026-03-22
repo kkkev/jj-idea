@@ -15,7 +15,11 @@ class FragmentRecordingCanvas(initialFragments: List<Fragment> = emptyList()) : 
         val truncatable: Boolean
 
         data class Text(val text: String, val style: SimpleTextAttributes, override val truncatable: Boolean) : Fragment
-        data class Icon(val icon: IconSpec, override val truncatable: Boolean) : Fragment
+        data class Icon(
+            val icon: IconSpec,
+            override val truncatable: Boolean,
+            val style: SimpleTextAttributes
+        ) : Fragment
     }
 
     private val _fragments = initialFragments.toMutableList()
@@ -37,7 +41,7 @@ class FragmentRecordingCanvas(initialFragments: List<Fragment> = emptyList()) : 
     }
 
     override fun append(icon: IconSpec) {
-        _fragments.add(Fragment.Icon(icon, inTruncate))
+        _fragments.add(Fragment.Icon(applyCurrentColor(icon), inTruncate, style))
     }
 
     override fun truncate(builder: TextCanvas.() -> Unit) {

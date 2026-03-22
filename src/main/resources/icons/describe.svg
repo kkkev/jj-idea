@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 14" fill="none">
+  <style>
+    .primary { stroke: #6c707e }
+  </style>
+  <path d="M2 1H14V10H6L3 13V10H2Z" class="primary" stroke-linejoin="round"/>
+  <line x1="5" y1="4" x2="11" y2="4" class="primary" stroke-width="0.8" stroke-linecap="round"/>
+  <line x1="5" y1="7" x2="9.5" y2="7" class="primary" stroke-width="0.8" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
+  <style>
+    .primary { stroke: #6c707e }
+    .primary-fill { fill: #6c707e }
+  </style>
+  <circle cx="8" cy="3" r="1.75" class="primary"/>
+  <path class="primary primary-fill" d="m 8,1.25 a 1,1 0 0 0 0,3.5"/>
+  <path class="primary" d="m 8,1.25 a 1,1 0 0 1 0,3.5"/>
+  <path class="primary" d="m 8,11.25 a 1,1 0 0 0 0,3.5"/>
+  <path class="primary primary-fill" d="m 8,11.25 a 1,1 0 0 1 0,3.5"/>
+  <line x1="3.5" y1="8.5" x2="12.5" y2="8.5" class="primary" stroke-dasharray="2 1.5" stroke-width="0.75"/>
+  <path d="m 6.5,7.5 1.5,-1.5 1.5,1.5" class="primary" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="8" y1="6" x2="8" y2="7.75" class="primary"/>
+  <line x1="8" y1="9.25" x2="8" y2="10.5" class="primary"/>
+</svg>

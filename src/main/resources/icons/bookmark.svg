@@ -1,3 +1,6 @@
-<svg width="16" height="16" viewBox="3 0 3 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M4 15L8 11.5L12 15V1H4V15Z" stroke="#F0C674"/>
+<svg width="10" height="16" viewBox="3 0 9 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .primary { stroke: #6c707e }
+  </style>
+  <path d="m3.5,15 l4,-3.5 l4,3.5 v-14 h-8 v14 z" class="primary"/>
 </svg>

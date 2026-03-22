@@ -124,8 +124,8 @@ class SeparateIdCellRenderer : TextTableCellRenderer<ChangeId>() {
  * foreground color for selection state) applied around [builder].
  */
 fun entryCanvas(entry: LogEntry, fg: Color, builder: TextCanvas.() -> Unit) = FragmentRecordingCanvas().apply {
-    styled(if (entry.isWorkingCopy) Font.BOLD else 0) {
-        colored(fg, builder)
+    foreground(fg) {
+        styled(if (entry.isWorkingCopy) Font.BOLD else 0, builder)
     }
 }
 
@@ -214,8 +214,7 @@ class SeparateDecorationsCellRenderer : TextTableCellRenderer<LogEntry>() {
         if (value.bookmarks.isNotEmpty()) {
             if (hasContent) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
 
-            // icon = JujutsuIcons.Bookmark
-            icon = AllIcons.Nodes.Bookmark
+            icon = JujutsuIcons.Bookmark
 
             // Render bookmark names with smaller, grayed text (grey text, not orange)
             value.bookmarks.forEachIndexed { index, bookmark ->

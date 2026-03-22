@@ -87,7 +87,10 @@ object FragmentLayout {
 
     fun fragmentWidth(fragment: Fragment, baseFont: Font, frc: FontRenderContext) = when (fragment) {
         is Fragment.Text -> textWidth(fragment.text, baseFont.deriveFont(fragment.style), frc)
-        is Fragment.Icon -> IconResolver.resolveIcon(fragment.icon.qualified)?.iconWidth?.toDouble() ?: 0.0
+        is Fragment.Icon -> {
+            val w = IconResolver.resolveIcon(fragment.icon.qualified)?.iconWidth?.toDouble() ?: 0.0
+            if (fragment.style.isSmaller) w * SMALLER_SCALE else w
+        }
     }
 
     private fun textWidth(text: String, font: Font, frc: FontRenderContext) =
@@ -121,7 +124,7 @@ object FragmentLayout {
 private fun Font.deriveFont(style: SimpleTextAttributes): Font {
     val fontStyle = style.fontStyle
     return if (style.isSmaller) {
-        deriveFont(this.style or fontStyle, size2D * 0.85f)
+        deriveFont(this.style or fontStyle, size2D * SMALLER_SCALE)
     } else {
         deriveFont(this.style or fontStyle)
     }

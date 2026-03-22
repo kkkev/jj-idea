@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.actions.change
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
@@ -8,6 +7,7 @@ import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashDialog
 
 /**
@@ -21,7 +21,7 @@ import `in`.kkkev.jjidea.ui.squash.SquashDialog
  * which automatically abandons the empty child.
  */
 fun squashAction(project: Project, entry: LogEntry?, allEntries: List<LogEntry>) =
-    nullAndDumbAwareAction(entry, "log.action.squash.into.parent", AllIcons.Vcs.Merge) {
+    nullAndDumbAwareAction(entry, "log.action.squash.into.parent", JujutsuIcons.Squash) {
         val parentEntry = allEntries.firstOrNull { it.id == target.parentIds.firstOrNull() }
 
         ApplicationManager.getApplication().executeOnPooledThread {
