@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-03-24
+
 ### Fixed
 - Fix bookmark icons inconsistent in dark mode (wrong size and fill)
 - Replace internal IntelliJ SVG APIs with public IconLoader API for plugin compatibility
@@ -206,7 +208,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.6
 [0.5.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.5
 [0.5.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.4
 [0.5.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.3
