@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.components
 
-import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.vcs.log.VcsUser
