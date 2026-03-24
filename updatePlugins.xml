@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.6/jj-idea-0.5.6.zip" version="0.5.6">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.7/jj-idea-0.5.7.zip" version="0.5.7">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,16 +23,11 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.6</h3>
+      <h3>0.5.7</h3>
       
-<h4>Fixed</h4>
-<li>Fix bookmark icons inconsistent in dark mode (wrong size and fill)</li>
-<li>Replace internal IntelliJ SVG APIs with public IconLoader API for plugin compatibility</li>
-
-<h4>Added</h4>
-<li>Icons for describe, new change, rebase, split, and squash actions</li>
-<li>Icons in HTML panels now scale correctly inside `smaller` blocks</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.6">full release notes</a> for details.</p>
+<h4>Changed</h4>
+<li>Made accented icon to represent a repository</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.7">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
