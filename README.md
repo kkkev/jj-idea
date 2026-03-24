@@ -80,3 +80,7 @@ Then install from `build/distributions/` via **Settings → Plugins → Install 
 ## License
 
 [Apache License 2.0](LICENSE)
+
+## Links
+
+[![Hypercommit](https://img.shields.io/badge/Hypercommit-DB2475)](https://hypercommit.com/jj-idea)
