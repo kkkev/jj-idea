@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-03-29
+
 ### Added
 - jj installation detection: Plugin now detects jj in PATH and common installation locations (Homebrew, Cargo, Scoop, Chocolatey, Winget, Snap, APT)
 - jj availability notifications: Shows helpful guidance when jj is not found, version is too old (requires 0.37.0+), or configured path is invalid
@@ -223,7 +225,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.8...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.9...HEAD
+[0.5.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.9
 [0.5.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.8
 [0.5.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.7
 [0.5.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.6

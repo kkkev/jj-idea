@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.8/jj-idea-0.5.8.zip" version="0.5.8">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.9/jj-idea-0.5.9.zip" version="0.5.9">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,11 +23,13 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.8</h3>
+      <h3>0.5.9</h3>
       
-<h4>Fixed</h4>
-<li>Settings changes (jj executable path) now take effect immediately without IDE restart ([#4](https://github.com/kkkev/jj-idea/issues/4))</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.8">full release notes</a> for details.</p>
+<h4>Added</h4>
+<li>jj installation detection: Plugin now detects jj in PATH and common installation locations (Homebrew, Cargo, Scoop, Chocolatey, Winget, Snap, APT)</li>
+<li>jj availability notifications: Shows helpful guidance when jj is not found, version is too old (requires 0.37.0+), or configured path is invalid</li>
+<li>Installation guidance: Notifications include one-click actions to copy install/upgrade commands or open documentation</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.9">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
