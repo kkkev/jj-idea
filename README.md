@@ -64,7 +64,7 @@ Then install from `build/distributions/` via **Settings → Plugins → Install 
 ## Requirements
 
 - IntelliJ IDEA 2025.2 or later
-- [Jujutsu](https://jj-vcs.github.io/jj/latest/install/) (`jj`) installed and available in PATH
+- [Jujutsu](https://jj-vcs.github.io/jj/latest/install/) (`jj`) version 0.37 or later installed, available in PATH (or otherwise configured)
 
 ## Getting Started
 
