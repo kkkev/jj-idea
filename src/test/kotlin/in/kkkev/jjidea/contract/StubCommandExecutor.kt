@@ -168,4 +168,10 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
 
     override fun gitRemoteList(): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
+
+    override fun gitClone(
+        source: String,
+        destination: String,
+        colocate: Boolean
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 }

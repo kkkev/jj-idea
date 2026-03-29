@@ -224,6 +224,15 @@ interface CommandExecutor {
      */
     fun gitRemoteList(): CommandResult
 
+    /**
+     * Clone a Git repository and create a Jujutsu repository.
+     * @param source URL or path of the Git repo to clone
+     * @param destination Target directory path
+     * @param colocate Whether to colocate with Git (.git alongside .jj)
+     * @return Command result
+     */
+    fun gitClone(source: String, destination: String, colocate: Boolean = true): CommandResult
+
     data class Command(
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,

@@ -2,8 +2,14 @@ package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.CapturingProcessHandler
+import com.intellij.execution.process.OSProcessHandler
+import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.process.ProcessNotCreatedException
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.*
@@ -92,6 +98,15 @@ internal fun splitArgs(
     addAll(filePaths)
 }
 
+/** Build the argument list for `jj git clone`. */
+internal fun gitCloneArgs(source: String, destination: String, colocate: Boolean): List<String> = buildList {
+    add("git")
+    add("clone")
+    if (colocate) add("--colocate") else add("--no-colocate")
+    add(source)
+    add(destination)
+}
+
 /** Build the argument list for `jj rebase`. */
 internal fun rebaseArgs(
     revisions: List<Revision>,
@@ -114,13 +129,25 @@ internal fun rebaseArgs(
  * CLI-based implementation of JujutsuCommandExecutor
  */
 class CliExecutor(
-    private val root: VirtualFile,
+    private val root: VirtualFile?,
     private val executableProvider: () -> String = { "jj" },
     private val onJjNotFound: (() -> Unit)? = null
 ) : CommandExecutor {
     private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
     private val networkTimeout = TimeUnit.SECONDS.toMillis(120)
+
+    companion object {
+        /** Pattern to extract percentage from git progress output (e.g., "Receiving objects:  45% (123/456)") */
+        private val PROGRESS_PATTERN = Regex("""(\d+)%""")
+
+        /**
+         * Creates a CliExecutor for operations that don't require an existing repository
+         * (e.g., gitClone, isAvailable, version).
+         */
+        fun forRootlessOperations(executableProvider: () -> String = { "jj" }) =
+            CliExecutor(root = null, executableProvider = executableProvider)
+    }
 
     override fun status() = execute(root, listOf("status"))
 
@@ -129,7 +156,7 @@ class CliExecutor(
     override fun diffSummary(revision: Revision) = execute(root, listOf("diff", "--summary", "-r", revision))
 
     override fun show(filePath: FilePath, revision: Revision) =
-        execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root)))
+        execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root!!)))
 
     override fun isAvailable() = try {
         val result = execute(null, listOf("--version"))
@@ -186,7 +213,7 @@ class CliExecutor(
             args.add("--limit")
             args.add(limit)
         }
-        args.addAll(filePaths.map { it.relativeTo(root) })
+        args.addAll(filePaths.map { it.relativeTo(root!!) })
         return execute(root, args)
     }
 
@@ -196,7 +223,7 @@ class CliExecutor(
             args.add("-T")
             args.add(template)
         }
-        args.add(file.pathRelativeTo(root))
+        args.add(file.pathRelativeTo(root!!))
         return execute(root, args)
     }
 
@@ -223,7 +250,7 @@ class CliExecutor(
         execute(root, listOf("diff", "--git", "-r", revision))
 
     override fun restore(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
-        execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root) })
+        execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root!!) })
 
     override fun rebase(
         revisions: List<Revision>,
@@ -237,14 +264,14 @@ class CliExecutor(
         filePaths: List<FilePath>,
         description: Description?,
         keepEmptied: Boolean
-    ) = execute(root, squashArgs(revision, filePaths.map { it.relativeTo(root) }, description, keepEmptied))
+    ) = execute(root, squashArgs(revision, filePaths.map { it.relativeTo(root!!) }, description, keepEmptied))
 
     override fun split(
         revision: Revision,
         filePaths: List<FilePath>,
         description: Description?,
         parallel: Boolean
-    ) = execute(root, splitArgs(revision, filePaths.map { it.relativeTo(root) }, description, parallel))
+    ) = execute(root, splitArgs(revision, filePaths.map { it.relativeTo(root!!) }, description, parallel))
 
     override fun gitFetch(remote: String?, allRemotes: Boolean) =
         execute(root, gitFetchArgs(remote, allRemotes), timeout = networkTimeout)
@@ -253,6 +280,89 @@ class CliExecutor(
         execute(root, gitPushArgs(remote, bookmark, allBookmarks), timeout = networkTimeout)
 
     override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
+
+    override fun gitClone(source: String, destination: String, colocate: Boolean) =
+        execute(null, gitCloneArgs(source, destination, colocate), timeout = networkTimeout)
+
+    /**
+     * Clone a Git repository with streaming progress updates.
+     * Updates the progress indicator with clone status and percentage.
+     */
+    fun gitCloneWithProgress(
+        source: String,
+        destination: String,
+        colocate: Boolean,
+        indicator: ProgressIndicator
+    ): CommandExecutor.CommandResult {
+        val args = gitCloneArgs(source, destination, colocate)
+        val executable = executableProvider()
+        val commandLine = GeneralCommandLine(executable)
+            .withParameters(args)
+            .withCharset(StandardCharsets.UTF_8)
+
+        commandLine.environment["NO_COLOR"] = "1"
+
+        log.info("Executing: jj ${args.joinToString(" ")}")
+
+        return try {
+            val stdout = StringBuilder()
+            val stderr = StringBuilder()
+
+            val handler = OSProcessHandler(commandLine)
+            handler.addProcessListener(object : ProcessAdapter() {
+                override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
+                    val text = event.text
+                    if (text.isNotBlank()) {
+                        if (outputType.toString() == "stderr") {
+                            stderr.append(text)
+                            updateProgress(indicator, text)
+                        } else {
+                            stdout.append(text)
+                        }
+                    }
+                }
+            })
+
+            handler.startNotify()
+            handler.waitFor(networkTimeout)
+
+            val exitCode = handler.exitCode ?: -1
+
+            log.info("Clone completed: exit=$exitCode")
+            if (exitCode != 0) {
+                log.warn("Clone failed: $stderr")
+            }
+
+            CommandExecutor.CommandResult(exitCode, stdout.toString(), stderr.toString())
+        } catch (_: ProcessNotCreatedException) {
+            log.warn("jj executable not found: $executable")
+            onJjNotFound?.invoke()
+            CommandExecutor.CommandResult(
+                exitCode = -1,
+                stdout = "",
+                stderr = "jj executable not found: $executable. Please install jj or configure the path in Settings."
+            )
+        } catch (e: Exception) {
+            log.error("Failed to execute jj git clone", e)
+            CommandExecutor.CommandResult(-1, "", "Failed to execute jj: ${e.message}")
+        }
+    }
+
+    private fun updateProgress(indicator: ProgressIndicator, text: String) {
+        // Update progress text with the latest non-blank line
+        text.lines().lastOrNull { it.isNotBlank() }?.let { line ->
+            indicator.text2 = line.trim()
+        }
+
+        // Parse percentage from git progress output (e.g., "Receiving objects:  45% (123/456)")
+        PROGRESS_PATTERN.find(text)?.let { match ->
+            val percentage = match.groupValues[1].toIntOrNull()
+            if (percentage != null) {
+                indicator.isIndeterminate = false
+                indicator.fraction = percentage / 100.0
+            }
+        }
+    }
 
     private fun execute(
         workingDir: VirtualFile?,
@@ -276,7 +386,7 @@ class CliExecutor(
 
         val processHandler = try {
             CapturingProcessHandler(commandLine)
-        } catch (e: com.intellij.execution.process.ProcessNotCreatedException) {
+        } catch (_: ProcessNotCreatedException) {
             // jj executable not found - return error result instead of throwing
             log.warn("jj executable not found: $executable")
             onJjNotFound?.invoke()

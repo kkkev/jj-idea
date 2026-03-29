@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Git clone with Jujutsu: Clone Git repositories directly from File > New > Project from Version Control using `jj git clone`
+
 ## [0.5.9] - 2026-03-29
 
 ### Added

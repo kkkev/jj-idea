@@ -180,4 +180,14 @@ object JujutsuNotifications {
         currentAvailabilityNotification = null
         lastNotifiedStatus = null
     }
+
+    /**
+     * Show a simple notification with title and message.
+     */
+    fun notify(project: Project, title: String, message: String, type: NotificationType) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(title, message, type)
+            .notify(project)
+    }
 }

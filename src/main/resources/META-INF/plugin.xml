@@ -68,6 +68,12 @@
         />
         <!-- Add .jj to ignored files on first project open -->
         <postStartupActivity implementation="in.kkkev.jjidea.JujutsuFileTypeSetup"/>
+
+        <!-- Clone dialog integration -->
+        <openapi.vcs.ui.cloneDialog.VcsCloneDialogExtension
+            id="in.kkkev.jjidea.clone.JujutsuCloneExtension"
+            implementation="in.kkkev.jjidea.clone.JujutsuCloneExtension"
+            order="after com.intellij.util.ui.cloneDialog.RepositoryUrlCloneDialogExtension"/>
     </extensions>
 
     <actions>
