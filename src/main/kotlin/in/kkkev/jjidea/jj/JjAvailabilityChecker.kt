@@ -5,8 +5,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import `in`.kkkev.jjidea.jj.util.NotifiableState
-import `in`.kkkev.jjidea.jj.util.notifiableState
+import `in`.kkkev.jjidea.util.NotifiableState
+import `in`.kkkev.jjidea.util.notifiableState
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 
 /**

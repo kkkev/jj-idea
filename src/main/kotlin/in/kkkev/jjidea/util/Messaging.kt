@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.jj.util
+package `in`.kkkev.jjidea.util
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -40,7 +40,7 @@ fun <T : Any> notifiableState(
  * - [value] is `@Volatile` and can be read from any thread (returns the last successfully loaded value).
  *
  * ## Versioning
- * Each [invalidate] call bumps an [AtomicInteger] version counter. If a newer invalidation arrives
+ * Each [invalidate] call bumps an [java.util.concurrent.atomic.AtomicInteger] version counter. If a newer invalidation arrives
  * before the loader completes, the stale result is discarded. This means rapid invalidations
  * naturally coalesce to the latest value without explicit debouncing.
  *

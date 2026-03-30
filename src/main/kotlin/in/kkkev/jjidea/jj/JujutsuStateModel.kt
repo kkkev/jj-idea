@@ -19,8 +19,8 @@ import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.Alarm
-import `in`.kkkev.jjidea.jj.util.notifiableState
-import `in`.kkkev.jjidea.jj.util.simpleNotifier
+import `in`.kkkev.jjidea.util.notifiableState
+import `in`.kkkev.jjidea.util.simpleNotifier
 import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
 import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 import java.util.concurrent.atomic.AtomicInteger
