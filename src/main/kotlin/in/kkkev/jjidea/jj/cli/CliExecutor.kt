@@ -1,12 +1,7 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
-import com.intellij.execution.process.OSProcessHandler
-import com.intellij.execution.process.ProcessAdapter
-import com.intellij.execution.process.ProcessEvent
-import com.intellij.execution.process.ProcessNotCreatedException
-import com.intellij.execution.process.ProcessOutput
+import com.intellij.execution.process.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.util.Key
@@ -284,6 +279,11 @@ class CliExecutor(
     override fun gitClone(source: String, destination: String, colocate: Boolean) =
         execute(null, gitCloneArgs(source, destination, colocate), timeout = networkTimeout)
 
+    override fun configGet(key: String) = execute(null, listOf("config", "get", key))
+
+    override fun configSetUser(key: String, value: String) =
+        execute(null, listOf("config", "set", "--user", key, value))
+
     /**
      * Clone a Git repository with streaming progress updates.
      * Updates the progress indicator with clone status and percentage.
@@ -309,7 +309,7 @@ class CliExecutor(
             val stderr = StringBuilder()
 
             val handler = OSProcessHandler(commandLine)
-            handler.addProcessListener(object : ProcessAdapter() {
+            handler.addProcessListener(object : ProcessListener {
                 override fun onTextAvailable(event: ProcessEvent, outputType: Key<*>) {
                     val text = event.text
                     if (text.isNotBlank()) {

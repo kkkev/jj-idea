@@ -233,6 +233,21 @@ interface CommandExecutor {
      */
     fun gitClone(source: String, destination: String, colocate: Boolean = true): CommandResult
 
+    /**
+     * Get a jj config value.
+     * @param key Config key (e.g., "user.name", "user.email")
+     * @return Command result (stdout contains value if exists, exit code 1 if not set)
+     */
+    fun configGet(key: String): CommandResult
+
+    /**
+     * Set a jj config value at user level.
+     * @param key Config key (e.g., "user.name", "user.email")
+     * @param value Config value
+     * @return Command result
+     */
+    fun configSetUser(key: String, value: String): CommandResult
+
     data class Command(
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,

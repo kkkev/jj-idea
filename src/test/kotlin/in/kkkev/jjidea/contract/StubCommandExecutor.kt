@@ -174,4 +174,10 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         destination: String,
         colocate: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
+    override fun configGet(key: String): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
+    override fun configSetUser(key: String, value: String): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
 }

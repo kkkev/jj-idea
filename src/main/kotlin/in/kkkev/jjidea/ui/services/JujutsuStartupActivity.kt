@@ -1,9 +1,15 @@
 package `in`.kkkev.jjidea.ui.services
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
+import `in`.kkkev.jjidea.jj.cli.CliExecutor
+import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.setup.JjUserConfigChecker
+import java.nio.file.Path
 
 /**
  * Bootstraps the Jujutsu state model and tool window management on project open.
@@ -17,17 +23,41 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
  * of issues (not found, wrong version, invalid path).
  */
 class JujutsuStartupActivity : ProjectActivity {
+    private val log = Logger.getInstance(javaClass)
+
     override suspend fun execute(project: Project) {
         ToolWindowEnabler.getInstance(project)
 
         // Initialize availability checking
         val checker = JjAvailabilityChecker.getInstance(project)
         checker.status.connect(project) { status ->
+            log.info("jj availability status changed: $status")
             when (status) {
-                is JjAvailabilityStatus.Available -> JujutsuNotifications.clearAvailabilityNotification()
+                is JjAvailabilityStatus.Available -> {
+                    JujutsuNotifications.clearAvailabilityNotification()
+                    checkUserConfig(project, status.executablePath)
+                }
                 else -> JujutsuNotifications.notifyJjUnavailable(project, status)
             }
         }
         checker.recheck()
+    }
+
+    private fun checkUserConfig(project: Project, executablePath: Path) {
+        val defaultPath = executablePath.toString()
+        val executableProvider = {
+            JujutsuSettings.getInstance(project).state.jjExecutablePath.ifBlank { defaultPath }
+        }
+        val executor = CliExecutor.forRootlessOperations(executableProvider)
+
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val checker = JjUserConfigChecker(executor)
+            val config = checker.checkConfig()
+            log.info("User config check: hasName=${config.hasName}, hasEmail=${config.hasEmail}")
+
+            if (!config.isComplete) {
+                JujutsuNotifications.notifyUserConfigNeeded(project, checker)
+            }
+        }
     }
 }
