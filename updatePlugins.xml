@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.10/jj-idea-0.5.10.zip" version="0.5.10">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.11/jj-idea-0.5.11.zip" version="0.5.11">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,11 +23,15 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.10</h3>
+      <h3>0.5.11</h3>
       
 <h4>Added</h4>
-<li>Git clone with Jujutsu: Clone Git repositories directly from File > New > Project from Version Control using `jj git clone`</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.10">full release notes</a> for details.</p>
+<li>Roadmap of upcoming features</li>
+<li>Squash/split from file context menus: right-click files in working copy panel, commit details, project view, or editor to squash into parent or split into a new change with those files pre-selected</li>
+
+<h4>Changed</h4>
+<li>Resized mutable/immutable icons in the log to be less prominent</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.11">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

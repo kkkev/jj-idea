@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-03-31
+
 ### Added
 - Roadmap of upcoming features
 - Squash/split from file context menus: right-click files in working copy panel, commit details, project view, or editor to squash into parent or split into a new change with those files pre-selected
@@ -238,7 +240,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.10...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.11...HEAD
+[0.5.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.11
 [0.5.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.10
 [0.5.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.9
 [0.5.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.8
