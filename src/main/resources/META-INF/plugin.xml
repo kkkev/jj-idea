@@ -115,6 +115,9 @@
             <action id="Jujutsu.ShowHistoryForSelection"
                     class="in.kkkev.jjidea.actions.file.ShowFileHistoryForSelectionAction"/>
             <action id="Jujutsu.RestoreFile" class="in.kkkev.jjidea.actions.file.RestoreSelectionAction"/>
+            <separator/>
+            <action id="Jujutsu.SquashFilesFromWorkingCopy" class="in.kkkev.jjidea.actions.file.SquashFilesFromWorkingCopyAction"/>
+            <action id="Jujutsu.SplitFilesFromWorkingCopy" class="in.kkkev.jjidea.actions.file.SplitFilesFromWorkingCopyAction"/>
             <!--<add-to-group group-id="EditorPopupMenu" anchor="after" relative-to-action="EditorPopupMenu.GoToMenu"/>-->
             <add-to-group group-id="VcsGroup" anchor="last"/>
         </group>
@@ -125,6 +128,8 @@
             <keyboard-shortcut first-keystroke="ENTER" keymap="$default"/>
         </action>
         <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.actions.filechange.RestoreToChangeAction"/>
+        <action id="Jujutsu.SquashFiles" class="in.kkkev.jjidea.actions.filechange.SquashFilesAction"/>
+        <action id="Jujutsu.SplitFiles" class="in.kkkev.jjidea.actions.filechange.SplitFilesAction"/>
         <action id="Jujutsu.CompareWithLocal" class="in.kkkev.jjidea.actions.filechange.CompareWithLocalAction"/>
         <action id="Jujutsu.CompareBeforeWithLocal"
                 class="in.kkkev.jjidea.actions.filechange.CompareBeforeWithLocalAction"/>

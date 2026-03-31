@@ -66,20 +66,29 @@ class SplitDialog(
     private val project: Project,
     private val sourceEntry: LogEntry,
     changes: List<Change>,
-    allEntries: List<LogEntry> = emptyList()
+    allEntries: List<LogEntry> = emptyList(),
+    preSelectedFiles: Set<FilePath>? = null
 ) : DialogWrapper(project) {
     var result: SplitSpec? = null
         private set
 
     private val allChanges = changes.toList()
 
-    // Child tree (top) — starts empty
+    // Child tree (top) — starts empty (or with pre-selected files)
     internal val childTree = JujutsuChangesTree(project)
-    private var childChanges: MutableList<Change> = mutableListOf()
+    private var childChanges: MutableList<Change> = if (preSelectedFiles != null) {
+        allChanges.filter { it.filePath in preSelectedFiles }.toMutableList()
+    } else {
+        mutableListOf()
+    }
 
-    // Parent tree (bottom) — starts with all files
+    // Parent tree (bottom) — starts with all files (minus pre-selected)
     internal val parentTree = JujutsuChangesTree(project)
-    private var parentChanges: MutableList<Change> = allChanges.toMutableList()
+    private var parentChanges: MutableList<Change> = if (preSelectedFiles != null) {
+        allChanges.filter { it.filePath !in preSelectedFiles }.toMutableList()
+    } else {
+        allChanges.toMutableList()
+    }
 
     // Descriptions
     internal val parentDescriptionField = JBTextArea(sourceEntry.description.actual, 2, 0)

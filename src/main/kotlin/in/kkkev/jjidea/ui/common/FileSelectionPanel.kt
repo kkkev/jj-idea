@@ -37,6 +37,14 @@ class FileSelectionPanel(project: Project) : JPanel(BorderLayout()) {
     }
 
     /**
+     * Set the changes to display and check only the specified subset.
+     */
+    fun setChanges(changes: List<Change>, included: Collection<Change>) {
+        changesTree.setChangesToDisplay(changes)
+        changesTree.setIncludedChanges(included)
+    }
+
+    /**
      * The currently checked (included) changes.
      */
     val includedChanges: Collection<Change> get() = changesTree.includedChanges

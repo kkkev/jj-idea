@@ -55,7 +55,8 @@ class SquashDialog(
     private val project: Project,
     private val sourceEntry: LogEntry,
     private val parentEntry: LogEntry?,
-    changes: List<com.intellij.openapi.vcs.changes.Change>
+    changes: List<com.intellij.openapi.vcs.changes.Change>,
+    preSelectedFiles: Set<FilePath>? = null
 ) : DialogWrapper(project) {
     var result: SquashSpec? = null
         private set
@@ -74,7 +75,12 @@ class SquashDialog(
     init {
         title = JujutsuBundle.message("dialog.squash.title")
         setOKButtonText(JujutsuBundle.message("dialog.squash.button"))
-        fileSelection.setChanges(changes)
+        if (preSelectedFiles != null) {
+            val included = changes.filter { it.filePath in preSelectedFiles }
+            fileSelection.setChanges(changes, included)
+        } else {
+            fileSelection.setChanges(changes)
+        }
         init()
     }
 

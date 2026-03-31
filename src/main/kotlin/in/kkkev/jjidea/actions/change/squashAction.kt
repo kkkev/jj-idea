@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.actions.change
 
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.ChangeService
@@ -9,6 +10,9 @@ import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashDialog
+import `in`.kkkev.jjidea.ui.squash.SquashSpec
+
+private val squashLog = Logger.getInstance("in.kkkev.jjidea.actions.change.squashAction")
 
 /**
  * Squash action. Loads changes on a background thread, opens a dialog to configure
@@ -32,28 +36,42 @@ fun squashAction(project: Project, entry: LogEntry?, allEntries: List<LogEntry>)
                 if (!dialog.showAndGet()) return@invokeLater
 
                 val spec = dialog.result ?: return@invokeLater
-                val editParentAfterSquash = target.isWorkingCopy && !spec.keepEmptied
-                target.repo.commandExecutor
-                    .createCommand {
-                        val result = squash(spec.revision, spec.filePaths, spec.description, spec.keepEmptied)
-                        if (!result.isSuccess) return@createCommand result
-                        // When squashing @, jj creates a new empty @ on the parent.
-                        // Edit into the parent so the user lands on the combined change.
-                        if (editParentAfterSquash) edit(WorkingCopy.parent) else result
-                    }
-                    .onSuccess {
-                        val selectId = when {
-                            spec.keepEmptied -> target.id
-                            else -> parentEntry?.id ?: WorkingCopy
-                        }
-                        target.repo.invalidate(select = selectId)
-                        log.info("Squashed ${target.id} into parent")
-                    }
-                    .onFailure { tellUser(project, "log.action.squash.into.parent.error") }
-                    .executeAsync()
+                executeSquash(project, target, parentEntry, spec, "log.action.squash.into.parent.error")
             }
         }
     }
+
+/**
+ * Execute the squash operation. Shared between the log-level squash action
+ * and the file-level squash actions.
+ */
+internal fun executeSquash(
+    project: Project,
+    entry: LogEntry,
+    parentEntry: LogEntry?,
+    spec: SquashSpec,
+    errorKey: String
+) {
+    val editParentAfterSquash = entry.isWorkingCopy && !spec.keepEmptied
+    entry.repo.commandExecutor
+        .createCommand {
+            val result = squash(spec.revision, spec.filePaths, spec.description, spec.keepEmptied)
+            if (!result.isSuccess) return@createCommand result
+            // When squashing @, jj creates a new empty @ on the parent.
+            // Edit into the parent so the user lands on the combined change.
+            if (editParentAfterSquash) edit(WorkingCopy.parent) else result
+        }
+        .onSuccess {
+            val selectId = when {
+                spec.keepEmptied -> entry.id
+                else -> parentEntry?.id ?: WorkingCopy
+            }
+            entry.repo.invalidate(select = selectId)
+            squashLog.info("Squashed ${entry.id} into parent")
+        }
+        .onFailure { tellUser(project, errorKey) }
+        .executeAsync()
+}
 
 /**
  * Determine whether a squash action should be enabled for the given entry.

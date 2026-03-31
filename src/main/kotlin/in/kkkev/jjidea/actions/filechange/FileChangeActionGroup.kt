@@ -40,5 +40,11 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.RestoreToChange")?.let { group.add(it) }
 
+    group.addSeparator()
+
+    // Squash/split actions — self-filter based on entry mutability
+    actionManager.getAction("Jujutsu.SquashFiles")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.SplitFiles")?.let { group.add(it) }
+
     return group
 }

@@ -60,7 +60,7 @@ fun splitAction(
         }
     }
 
-private fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
+internal fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
     ApplicationManager.getApplication().executeOnPooledThread {
         val result = target.repo.commandExecutor.split(
             spec.revision,
