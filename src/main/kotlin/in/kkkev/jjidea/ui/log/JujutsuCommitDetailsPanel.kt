@@ -5,7 +5,6 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.OnePixelSplitter
@@ -19,6 +18,8 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.components.*
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import javax.swing.JPanel
 
@@ -131,8 +132,8 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
         val html = buildCommitHtml(entry)
         metadataPane.text = html
 
-        // Scroll to top after text is set (invokeLater so layout completes first)
-        ApplicationManager.getApplication().invokeLater {
+        // Scroll to top after text is set (runLater so layout completes first)
+        runLater {
             metadataPane.caretPosition = 0
         }
 
@@ -141,11 +142,11 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     }
 
     private fun loadChanges(entry: LogEntry) {
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             try {
                 val changes = ChangeService.loadChanges(entry)
 
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     if (currentEntry == entry) { // Only update if still the same commit
                         changesTree.setChangesToDisplay(changes)
                         // Expand all nodes by default after loading changes
@@ -158,7 +159,7 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
                 // This can happen when a commit is removed (e.g., by abandon, or empty commit auto-removed).
                 // Treat this as "no commit selected" rather than an error.
                 log.info("Change ${entry.id} no longer exists (likely abandoned or auto-removed): ${e.message}")
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     if (currentEntry == entry) {
                         // Clear the selection state since this commit no longer exists
                         currentEntry = null

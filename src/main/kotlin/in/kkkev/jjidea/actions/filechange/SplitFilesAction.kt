@@ -2,8 +2,6 @@ package `in`.kkkev.jjidea.actions.filechange
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.change.executeSplit
@@ -15,6 +13,8 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.singleJujutsuRepository
 
@@ -32,8 +32,6 @@ class SplitFilesAction : DumbAwareAction(
     JujutsuBundle.message("action.split.files.description"),
     JujutsuIcons.Split
 ) {
-    private val log = Logger.getInstance(javaClass)
-
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
@@ -51,15 +49,14 @@ class SplitFilesAction : DumbAwareAction(
         val entry = resolveEntry(e) ?: return
         val preSelectedFiles = e.changes.mapNotNull { it.filePath }.toSet()
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val changes = ChangeService.loadChanges(entry)
 
-            ApplicationManager.getApplication().invokeLater {
+            runLater {
                 val dialog = SplitDialog(project, entry, changes, preSelectedFiles = preSelectedFiles)
-                if (!dialog.showAndGet()) return@invokeLater
-
-                val spec = dialog.result ?: return@invokeLater
-                executeSplit(project, entry, spec)
+                if (dialog.showAndGet()) {
+                    dialog.result?.let { executeSplit(project, entry, it) }
+                }
             }
         }
     }

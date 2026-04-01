@@ -7,6 +7,7 @@ import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.grouped
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.*
@@ -216,12 +217,22 @@ class SeparateDecorationsCellRenderer : TextTableCellRenderer<LogEntry>() {
         if (value.bookmarks.isNotEmpty()) {
             if (hasContent) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
 
-            icon = JujutsuIcons.Bookmark
+            icon = if (value.bookmarks.any { it.tracked }) JujutsuIcons.BookmarkTracked else JujutsuIcons.Bookmark
 
-            // Render bookmark names with smaller, grayed text (grey text, not orange)
-            value.bookmarks.forEachIndexed { index, bookmark ->
-                if (index > 0) append(", ", SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
-                append(bookmark.name, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+            val groups = value.bookmarks.grouped()
+            var first = true
+            for (group in groups) {
+                group.local?.let {
+                    if (!first) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                    append(group.localName, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                    first = false
+                }
+                for (remote in group.remotes) {
+                    if (!first) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
+                    val label = if (group.local != null) "@${remote.remote}" else remote.name
+                    append(label, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                    first = false
+                }
             }
         }
     }

@@ -154,8 +154,25 @@ fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelativ
 fun TextCanvas.append(bookmark: Bookmark) {
     colored(JujutsuColors.BOOKMARK) {
         smaller {
-            append(icon(JujutsuIcons::Bookmark))
+            val iconRef = if (bookmark.tracked) JujutsuIcons::BookmarkTracked else JujutsuIcons::Bookmark
+            append(icon(iconRef))
             append(bookmark.name)
+        }
+    }
+}
+
+fun TextCanvas.append(group: BookmarkGroup) {
+    colored(JujutsuColors.BOOKMARK) {
+        smaller {
+            group.local?.let {
+                append(icon(JujutsuIcons::BookmarkTracked))
+                append(group.localName)
+            }
+            group.remotes.forEach { remote ->
+                val iconRef = if (remote.tracked) JujutsuIcons::BookmarkTracked else JujutsuIcons::Bookmark
+                append(icon(iconRef))
+                if (group.local != null) append("@${remote.remote}") else append(remote.name)
+            }
         }
     }
 }
@@ -218,7 +235,7 @@ fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
 }
 
 fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") =
-    append(entry.bookmarks, separator = " ", suffix = suffix) { append(it) }
+    append(entry.bookmarks.grouped(), separator = " ", suffix = suffix) { append(it) }
 
 fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     if (entry.parentIds.isNotEmpty()) {

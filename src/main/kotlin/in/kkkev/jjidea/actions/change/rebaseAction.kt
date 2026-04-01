@@ -26,7 +26,7 @@ fun rebaseAction(
         target.commandExecutor
             .createCommand { rebase(spec.revisions, spec.destinations, spec.sourceMode, spec.destinationMode) }
             .onSuccess {
-                target.invalidate(select = spec.revisions.first())
+                target.invalidate(select = spec.revisions.first(), vfsChanged = true)
                 log.info("Rebased ${spec.revisions} onto ${spec.destinations}")
             }
             .onFailure { tellUser(project, "log.action.rebase.error") }

@@ -5,7 +5,6 @@ import com.intellij.ide.CommonActionsManager
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.options.ShowSettingsUtil
@@ -28,6 +27,8 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.CardLayout
@@ -253,6 +254,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
                 val hasRepos = project.stateModel.repositoryStates.value.isNotEmpty()
                 cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
             }
+
             else -> {
                 // Replace the notInstalled panel with fresh content for current status
                 cardPanel.remove(notInstalledPanel)
@@ -357,10 +359,10 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      * Reads from ChangeListManager cache and updates the UI.
      */
     private fun reloadChangesFromCache() {
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val changes = ChangeListManager.getInstance(project).allChanges.toList()
 
-            ApplicationManager.getApplication().invokeLater {
+            runLater {
                 updateChangesView(changes)
             }
         }
@@ -375,7 +377,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
                 changesTree.treeExpander.expandAll()
                 reapplyUserCollapses()
 
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     log.info("Re-enabling expansion event tracking")
                     ignoreExpansionEvents = false
                 }

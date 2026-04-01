@@ -8,7 +8,6 @@ import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
@@ -18,6 +17,8 @@ import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 
 /**
  * Compare file(s) from the parent of a historical revision with local working copy.
@@ -59,7 +60,7 @@ class CompareBeforeWithLocalAction : DumbAwareAction(
         val validChanges = changes.filter { it.beforeRevision != null }
         if (validChanges.isEmpty()) return
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val requests = validChanges.mapNotNull { change ->
                 val filePath = change.beforeRevision?.file ?: return@mapNotNull null
 
@@ -84,7 +85,7 @@ class CompareBeforeWithLocalAction : DumbAwareAction(
             }
 
             if (requests.isNotEmpty()) {
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     val chain = SimpleDiffRequestChain(requests)
                     DiffManager.getInstance().showDiff(project, chain, DiffDialogHints.DEFAULT)
                 }

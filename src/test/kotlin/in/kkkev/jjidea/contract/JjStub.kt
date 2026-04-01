@@ -456,7 +456,7 @@ class JjStub(override val workDir: Path) : JjBackend {
         field(qualifiedChangeId(change))
         field(qualifiedCommitId(change))
         field(desc)
-        field(change.bookmarks.joinToString(","))
+        field(change.bookmarks.joinToString(",") { "$it;true" })
         field(formatParents(change))
         field(if (isWc) "true" else "false")
         field("false") // conflict

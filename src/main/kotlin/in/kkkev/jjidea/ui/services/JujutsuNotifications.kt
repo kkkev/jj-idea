@@ -8,7 +8,6 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.CustomizedDataContext
 import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
@@ -18,6 +17,8 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
 import `in`.kkkev.jjidea.setup.JjUserConfigDialog
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import java.util.concurrent.ConcurrentHashMap
 
 fun Notification.addExpiringAction(messageKey: String, action: () -> Unit) {
@@ -218,16 +219,16 @@ object JujutsuNotifications {
 
     private fun showUserConfigDialog(project: Project, checker: JjUserConfigChecker) {
         // Load git config on background, show dialog on EDT, save on background, notify on EDT
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val (gitName, gitEmail) = checker.getGitConfig()
 
-            ApplicationManager.getApplication().invokeLater {
+            runLater {
                 val dialog = JjUserConfigDialog(project, gitName, gitEmail)
                 if (dialog.showAndGet()) {
-                    val config = dialog.result ?: return@invokeLater
-                    ApplicationManager.getApplication().executeOnPooledThread {
+                    val config = dialog.result ?: return@runLater
+                    runInBackground {
                         val result = checker.setConfig(config.name, config.email)
-                        ApplicationManager.getApplication().invokeLater {
+                        runLater {
                             val (title, message, type) = if (result?.isSuccess == true) {
                                 Triple(
                                     JujutsuBundle.message("dialog.userconfig.success.title"),

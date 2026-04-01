@@ -126,4 +126,68 @@ class RevsetTest {
         Bookmark("feature-branch").isRemote shouldBe false
         Bookmark("release/v2.0").isRemote shouldBe false
     }
+
+    @Test
+    fun `Bookmark localName extracts name before @`() {
+        Bookmark("main@origin").localName shouldBe "main"
+        Bookmark("feature@github").localName shouldBe "feature"
+    }
+
+    @Test
+    fun `Bookmark localName returns full name for local bookmarks`() {
+        Bookmark("main").localName shouldBe "main"
+    }
+
+    @Test
+    fun `Bookmark remote extracts remote after @`() {
+        Bookmark("main@origin").remote shouldBe "origin"
+        Bookmark("feature@github").remote shouldBe "github"
+    }
+
+    @Test
+    fun `Bookmark remote returns empty string for local bookmarks`() {
+        Bookmark("main").remote shouldBe ""
+    }
+
+    @Test
+    fun `Bookmark tracked defaults to true`() {
+        Bookmark("main").tracked shouldBe true
+    }
+
+    @Test
+    fun `Bookmark tracked can be set to false`() {
+        Bookmark("main@origin", tracked = false).tracked shouldBe false
+    }
+
+    @Test
+    fun `grouped collapses local and remote bookmarks by localName`() {
+        val bookmarks = listOf(
+            Bookmark("main"),
+            Bookmark("main@origin"),
+            Bookmark("main@github"),
+            Bookmark("feature@origin", tracked = false)
+        )
+        val groups = bookmarks.grouped()
+        groups.map { it.localName } shouldBe listOf("main", "feature")
+
+        val mainGroup = groups[0]
+        mainGroup.local shouldBe Bookmark("main")
+        mainGroup.remotes.map { it.name } shouldBe listOf("main@origin", "main@github")
+        mainGroup.tracked shouldBe true
+
+        val featureGroup = groups[1]
+        featureGroup.local shouldBe null
+        featureGroup.remotes.map { it.name } shouldBe listOf("feature@origin")
+        featureGroup.tracked shouldBe false
+    }
+
+    @Test
+    fun `grouped treats group as tracked if any remote is tracked`() {
+        val bookmarks = listOf(
+            Bookmark("main@origin", tracked = true),
+            Bookmark("main@github", tracked = false)
+        )
+        val groups = bookmarks.grouped()
+        groups.single().tracked shouldBe true
+    }
 }

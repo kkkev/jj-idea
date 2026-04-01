@@ -202,9 +202,20 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val currentWorkingCopy = booleanField("current_working_copy")
         val conflict = booleanField("conflict")
         val empty = booleanField("empty")
+        private val localBookmarkTemplate =
+            """bookmarks.map(|b| ${TemplateParts.nameWithRemote("b")}""" +
+                """ ++ ";" ++ if(b.remote(), b.tracked(), "true")).join(",")"""
+        private val remoteBookmarkTemplate =
+            """remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote()""" +
+                """ ++ ";" ++ b.tracked()).join(",")"""
         val bookmarks = singleField(
-            """bookmarks.map(|b| ${TemplateParts.nameWithRemote("b")}).join(",")"""
-        ) { it.splitByComma(::Bookmark) }
+            """separate(",", $localBookmarkTemplate, $remoteBookmarkTemplate)"""
+        ) {
+            it.splitByComma { part ->
+                val (nameStr, trackedStr) = part.split(";")
+                Bookmark(nameStr, trackedStr == "true")
+            }.distinctBy { b -> b.name }
+        }
         val parents = singleField(
             """
                 |parents.map(|c|

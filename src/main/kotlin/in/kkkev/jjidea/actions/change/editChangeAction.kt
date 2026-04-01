@@ -19,7 +19,7 @@ fun editChangeAction(project: Project, logEntry: LogEntry?) =
             .createCommand { edit(id) }
             .onSuccess {
                 // The edited change becomes the working copy - select it
-                jujutsuRoot.invalidate(select = id)
+                jujutsuRoot.invalidate(select = id, vfsChanged = true)
                 log.info("Edited change $id")
             }.onFailure { tellUser(project, "log.action.edit.error") }
             .executeAsync()

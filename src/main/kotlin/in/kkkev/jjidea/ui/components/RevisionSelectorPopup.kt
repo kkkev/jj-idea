@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.DocumentAdapter
@@ -11,6 +10,8 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter
@@ -84,7 +85,7 @@ object RevisionSelectorPopup {
      */
     fun show(titleKey: String, repo: JujutsuRepository, filter: Filter, onSelected: (Revision) -> Unit) {
         // Create UI on EDT
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             val panel = createPopupPanel(repo, filter, onSelected)
 
             val popup = JBPopupFactory.getInstance()
@@ -258,10 +259,10 @@ object RevisionSelectorPopup {
          * Load and filter data based on search query
          */
         fun loadData() {
-            ApplicationManager.getApplication().executeOnPooledThread {
+            runInBackground {
                 val items = buildItemList(repo, filter)
 
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     listModel.clear()
                     items.forEach { listModel.addElement(it) }
 
@@ -320,7 +321,7 @@ object RevisionSelectorPopup {
      */
     internal fun buildItemList(repo: JujutsuRepository, filter: Filter): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
-        val cache = LogCache.Companion.getInstance(repo.project)
+        val cache = LogCache.getInstance(repo.project)
 
         // Add bookmarks - always show all bookmarks filtered by query
         val logService = repo.logService
@@ -337,11 +338,11 @@ object RevisionSelectorPopup {
         if (filter.includeLogEntries) {
             // Add recent changes - limit to DEFAULT_LIMIT and filter by query
             // Try to get from cache first
-            val entries = cache.get(Expression.Companion.ALL) ?: run {
+            val entries = cache.get(Expression.ALL) ?: run {
                 // Not in cache, fetch from jj and cache it
-                val logResult = logService.getLogBasic(revset = Expression.Companion.ALL)
+                val logResult = logService.getLogBasic(revset = Expression.ALL)
                 logResult.getOrNull()?.also { fetchedEntries ->
-                    cache.put(Expression.Companion.ALL, emptyList(), fetchedEntries)
+                    cache.put(Expression.ALL, emptyList(), fetchedEntries)
                 } ?: emptyList()
             }
 

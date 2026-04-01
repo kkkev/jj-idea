@@ -3,7 +3,6 @@ package `in`.kkkev.jjidea.actions.filechange
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileTypes.FileTypeRegistry
 import com.intellij.openapi.project.DumbAwareAction
@@ -11,6 +10,8 @@ import com.intellij.testFramework.LightVirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 
 /**
  * Open file(s) at a historical revision in a read-only editor tab.
@@ -38,13 +39,13 @@ class OpenRepositoryVersionAction : DumbAwareAction(
         val repo = entry.repo
         val revision = entry.id
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             changes.forEach { change ->
                 val filePath = change.afterRevision?.file ?: return@forEach
                 val result = repo.commandExecutor.show(filePath, revision)
                 val content = if (result.isSuccess) result.stdout else ""
 
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     val fileType = FileTypeRegistry.getInstance().getFileTypeByFileName(filePath.name)
                     val lightFile = LightVirtualFile(
                         "${filePath.name} (${revision.short})",

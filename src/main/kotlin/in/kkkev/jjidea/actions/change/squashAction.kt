@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.actions.change
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
@@ -11,6 +10,8 @@ import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashDialog
 import `in`.kkkev.jjidea.ui.squash.SquashSpec
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 
 private val squashLog = Logger.getInstance("in.kkkev.jjidea.actions.change.squashAction")
 
@@ -28,14 +29,14 @@ fun squashAction(project: Project, entry: LogEntry?, allEntries: List<LogEntry>)
     nullAndDumbAwareAction(entry, "log.action.squash.into.parent", JujutsuIcons.Squash) {
         val parentEntry = allEntries.firstOrNull { it.id == target.parentIds.firstOrNull() }
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val changes = ChangeService.loadChanges(target)
 
-            ApplicationManager.getApplication().invokeLater {
+            runLater {
                 val dialog = SquashDialog(project, target, parentEntry, changes)
-                if (!dialog.showAndGet()) return@invokeLater
+                if (!dialog.showAndGet()) return@runLater
 
-                val spec = dialog.result ?: return@invokeLater
+                val spec = dialog.result ?: return@runLater
                 executeSquash(project, target, parentEntry, spec, "log.action.squash.into.parent.error")
             }
         }
@@ -66,7 +67,7 @@ internal fun executeSquash(
                 spec.keepEmptied -> entry.id
                 else -> parentEntry?.id ?: WorkingCopy
             }
-            entry.repo.invalidate(select = selectId)
+            entry.repo.invalidate(select = selectId, vfsChanged = true)
             squashLog.info("Squashed ${entry.id} into parent")
         }
         .onFailure { tellUser(project, errorKey) }

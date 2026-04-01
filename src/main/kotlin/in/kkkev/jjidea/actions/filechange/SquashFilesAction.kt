@@ -2,8 +2,6 @@ package `in`.kkkev.jjidea.actions.filechange
 
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -16,6 +14,8 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashDialog
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.singleJujutsuRepository
 
@@ -34,8 +34,6 @@ class SquashFilesAction : DumbAwareAction(
     JujutsuBundle.message("action.squash.files.description"),
     JujutsuIcons.Squash
 ) {
-    private val log = Logger.getInstance(javaClass)
-
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
@@ -53,28 +51,27 @@ class SquashFilesAction : DumbAwareAction(
         val entry = resolveEntry(e) ?: return
         val preSelectedFiles = e.changes.mapNotNull { it.filePath }.toSet()
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val changes = ChangeService.loadChanges(entry)
             val parentId = entry.parentIds.firstOrNull()
             val parentEntry = parentId?.let {
                 entry.repo.logService.getLogBasic(it).getOrNull()?.firstOrNull()
             }
 
-            ApplicationManager.getApplication().invokeLater {
+            runLater {
                 if (parentEntry?.immutable == true) {
                     Messages.showWarningDialog(
                         project,
                         JujutsuBundle.message("action.squash.files.error.message", "Parent change is immutable"),
                         JujutsuBundle.message("action.squash.files.error.title")
                     )
-                    return@invokeLater
+                    return@runLater
                 }
 
                 val dialog = SquashDialog(project, entry, parentEntry, changes, preSelectedFiles)
-                if (!dialog.showAndGet()) return@invokeLater
-
-                val spec = dialog.result ?: return@invokeLater
-                executeSquash(project, entry, parentEntry, spec, "action.squash.files.error")
+                if (dialog.showAndGet()) {
+                    dialog.result?.let { executeSquash(project, entry, parentEntry, it, "action.squash.files.error") }
+                }
             }
         }
     }

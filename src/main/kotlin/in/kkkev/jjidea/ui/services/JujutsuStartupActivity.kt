@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.services
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
@@ -9,6 +8,7 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
+import `in`.kkkev.jjidea.util.runInBackground
 import java.nio.file.Path
 
 /**
@@ -50,7 +50,7 @@ class JujutsuStartupActivity : ProjectActivity {
         }
         val executor = CliExecutor.forRootlessOperations(executableProvider)
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val checker = JjUserConfigChecker(executor)
             val config = checker.checkConfig()
             log.info("User config check: hasName=${config.hasName}, hasEmail=${config.hasEmail}")

@@ -1,10 +1,10 @@
 package `in`.kkkev.jjidea.util
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.util.messages.Topic
+import `in`.kkkev.jjidea.util.NotifiableState.Listener
 import java.util.concurrent.atomic.AtomicInteger
 
 inline fun <reified L> topic(displayName: String) = Topic.create(displayName, L::class.java)
@@ -55,10 +55,9 @@ class SimpleNotifiableState<T : Any>(
     val startValue: T,
     val equalityCheck: (T, T) -> Boolean,
     val loader: () -> T
-) :
-    NotifiableState<T> {
+) : NotifiableState<T> {
     private val log = Logger.getInstance(javaClass)
-    val topic = topic<NotifiableState.Listener<T>>(topicDisplayName)
+    val topic = topic<Listener<T>>(topicDisplayName)
 
     private val publisher = project.messageBus.syncPublisher(topic)
 
@@ -75,32 +74,32 @@ class SimpleNotifiableState<T : Any>(
     override fun invalidate() {
         val myVersion = version.incrementAndGet()
         log.info("[$topicDisplayName] invalidate v$myVersion on ${Thread.currentThread().name}")
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val newValue = loader()
             // If version has moved on since we started, another load is queued or will be —
             // just discard this result. The latest invalidate() will produce a fresher load.
             if (version.get() != myVersion) {
                 log.info("[$topicDisplayName] v$myVersion stale (now v${version.get()}), discarding")
-                return@executeOnPooledThread
+                return@runInBackground
             }
             val changed = !equalityCheck(value, newValue)
             log.info("[$topicDisplayName] v$myVersion loaded, changed=$changed")
             if (changed) {
                 value = newValue
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     publisher.changed(newValue)
                 }
             }
         }
     }
 
-    override fun connect(parent: Disposable, handler: NotifiableState.Listener<T>) {
+    override fun connect(parent: Disposable, handler: Listener<T>) {
         project.messageBus.connect(parent).subscribe(topic, handler)
         val current = value
         if (!equalityCheck(current, startValue)) {
             // Publish through the bus so that if parent is disposed before this runs,
             // the disposed connection simply drops the message.
-            ApplicationManager.getApplication().invokeLater {
+            runLater {
                 publisher.changed(current)
             }
         }
@@ -127,7 +126,7 @@ class SimpleNotifier<E>(val project: Project, topicDisplayName: String) : Notifi
     }
 
     override fun notify(event: E) {
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             publisher.onEvent(event)
         }
     }

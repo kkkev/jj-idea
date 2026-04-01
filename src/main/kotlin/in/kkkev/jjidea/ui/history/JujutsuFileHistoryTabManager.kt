@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.ui.history
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -13,6 +12,7 @@ import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.util.runLater
 
 /**
  * Service that manages file history tabs in the VCS tool window.
@@ -36,7 +36,7 @@ class JujutsuFileHistoryTabManager(private val project: Project) : Disposable {
     fun openFileHistory(filePath: FilePath, repo: JujutsuRepository) {
         log.info("Opening file history for: ${filePath.path}")
 
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             val pathKey = filePath.path
 
             // Check if tab already exists
@@ -46,7 +46,7 @@ class JujutsuFileHistoryTabManager(private val project: Project) : Disposable {
                 val changesViewContentManager = ChangesViewContentManager.getInstance(project)
                 changesViewContentManager.setSelectedContent(existingContent)
                 log.info("Selected existing file history tab for: ${filePath.name}")
-                return@invokeLater
+                return@runLater
             }
 
             // Create new file history panel

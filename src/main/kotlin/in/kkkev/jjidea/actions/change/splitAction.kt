@@ -1,7 +1,5 @@
 package `in`.kkkev.jjidea.actions.change
 
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
@@ -12,6 +10,8 @@ import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog
 import `in`.kkkev.jjidea.ui.split.SplitSpec
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 
 private val splitLog = Logger.getInstance("in.kkkev.jjidea.actions.change.splitAction")
 
@@ -45,23 +45,22 @@ fun splitAction(
     project: Project,
     entry: LogEntry?,
     allEntries: List<LogEntry> = emptyList()
-) =
-    nullAndDumbAwareAction(entry, "log.action.split", JujutsuIcons.Split) {
-        ApplicationManager.getApplication().executeOnPooledThread {
-            val changes = ChangeService.loadChanges(target)
+) = nullAndDumbAwareAction(entry, "log.action.split", JujutsuIcons.Split) {
+    runInBackground {
+        val changes = ChangeService.loadChanges(target)
 
-            ApplicationManager.getApplication().invokeLater {
-                val dialog = SplitDialog(project, target, changes, allEntries)
-                if (!dialog.showAndGet()) return@invokeLater
+        runLater {
+            val dialog = SplitDialog(project, target, changes, allEntries)
+            if (!dialog.showAndGet()) return@runLater
 
-                val spec = dialog.result ?: return@invokeLater
-                executeSplit(project, target, spec)
-            }
+            val spec = dialog.result ?: return@runLater
+            executeSplit(project, target, spec)
         }
     }
+}
 
 internal fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
-    ApplicationManager.getApplication().executeOnPooledThread {
+    runInBackground {
         val result = target.repo.commandExecutor.split(
             spec.revision,
             spec.filePaths,
@@ -69,10 +68,10 @@ internal fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
             spec.parallel
         )
 
-        ApplicationManager.getApplication().invokeLater({
+        runLater {
             if (!result.isSuccess) {
                 result.tellUser(project, "log.action.split.error")
-                return@invokeLater
+                return@runLater
             }
 
             val childDesc = spec.childDescription
@@ -82,7 +81,7 @@ internal fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
                     target.repo.commandExecutor
                         .createCommand { describe(childDesc, childId) }
                         .onSuccess {
-                            target.repo.invalidate(select = target.id)
+                            target.repo.invalidate(select = target.id, vfsChanged = true)
                             splitLog.info("Split ${target.id} and described child $childId")
                         }
                         .onFailure { tellUser(project, "log.action.split.error") }
@@ -91,12 +90,12 @@ internal fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
                     splitLog.warn(
                         "Could not parse child change ID from split output: ${result.stderr}"
                     )
-                    target.repo.invalidate(select = target.id)
+                    target.repo.invalidate(select = target.id, vfsChanged = true)
                 }
             } else {
-                target.repo.invalidate(select = target.id)
+                target.repo.invalidate(select = target.id, vfsChanged = true)
                 splitLog.info("Split ${target.id}")
             }
-        }, ModalityState.any())
+        }
     }
 }

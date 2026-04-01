@@ -15,12 +15,30 @@ sealed interface Revision : Revset {
  */
 sealed interface Ref : Revision
 
-@JvmInline
-value class Bookmark(val name: String) : Ref {
+data class Bookmark(val name: String, val tracked: Boolean = true) : Ref {
     override fun toString() = name
 
-    val isRemote get() = name.contains("@")
+    val isRemote get() = '@' in name
+    val localName get() = name.substringBefore('@')
+    val remote get() = name.substringAfter('@', "")
 }
+
+/**
+ * A group of bookmarks sharing the same [localName], e.g. `master` (local) + `master@origin` + `master@github`.
+ * Used for collapsed display: `master (@origin, @github)`.
+ */
+data class BookmarkGroup(val localName: String, val local: Bookmark?, val remotes: List<Bookmark>) {
+    val tracked get() = local != null || remotes.any { it.tracked }
+}
+
+fun List<Bookmark>.grouped(): List<BookmarkGroup> =
+    groupBy { it.localName }.map { (localName, bookmarks) ->
+        BookmarkGroup(
+            localName,
+            local = bookmarks.find { !it.isRemote },
+            remotes = bookmarks.filter { it.isRemote }
+        )
+    }
 
 @JvmInline
 value class Tag(val name: String) : Ref {

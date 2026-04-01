@@ -21,6 +21,12 @@ internal fun bookmarkDeleteArgs(name: Bookmark) = listOf("bookmark", "delete", n
 internal fun bookmarkRenameArgs(oldName: Bookmark, newName: Bookmark) =
     listOf("bookmark", "rename", oldName, newName).map(Any::toString)
 
+internal fun bookmarkTrackArgs(name: Bookmark) =
+    listOf("bookmark", "track", name.localName, "--remote", name.remote)
+
+internal fun bookmarkUntrackArgs(name: Bookmark) =
+    listOf("bookmark", "untrack", name.localName, "--remote", name.remote)
+
 internal fun bookmarkSetArgs(name: Bookmark, revision: Revision = WorkingCopy, allowBackwards: Boolean = false) =
     buildList {
         addAll(listOf("bookmark", "set", name.toString(), "-r", revision.toString()))
@@ -222,8 +228,13 @@ class CliExecutor(
         return execute(root, args)
     }
 
-    override fun bookmarkList(template: String?): CommandExecutor.CommandResult {
+    override fun bookmarkList(template: String?, remote: String?, tracked: Boolean): CommandExecutor.CommandResult {
         val args = mutableListOf("bookmark", "list")
+        if (tracked) args.add("--tracked")
+        if (remote != null) {
+            args.add("--remote")
+            args.add(remote)
+        }
         if (template != null) {
             args.add("-T")
             args.add(template)
@@ -240,6 +251,10 @@ class CliExecutor(
 
     override fun bookmarkSet(name: Bookmark, revision: Revision, allowBackwards: Boolean) =
         execute(root, bookmarkSetArgs(name, revision, allowBackwards))
+
+    override fun bookmarkTrack(name: Bookmark) = execute(root, bookmarkTrackArgs(name))
+
+    override fun bookmarkUntrack(name: Bookmark) = execute(root, bookmarkUntrackArgs(name))
 
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("diff", "--git", "-r", revision))

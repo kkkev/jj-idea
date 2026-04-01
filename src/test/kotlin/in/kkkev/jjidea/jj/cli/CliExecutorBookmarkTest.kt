@@ -43,6 +43,24 @@ class CliExecutorBookmarkTest {
     }
 
     @Nested
+    inner class `bookmark track` {
+        @Test
+        fun `track remote bookmark`() {
+            bookmarkTrackArgs(Bookmark("main@origin")) shouldBe
+                listOf("bookmark", "track", "main", "--remote", "origin")
+        }
+    }
+
+    @Nested
+    inner class `bookmark untrack` {
+        @Test
+        fun `untrack remote bookmark`() {
+            bookmarkUntrackArgs(Bookmark("main@origin")) shouldBe
+                listOf("bookmark", "untrack", "main", "--remote", "origin")
+        }
+    }
+
+    @Nested
     inner class `bookmark set` {
         @Test
         fun `set at working copy`() {

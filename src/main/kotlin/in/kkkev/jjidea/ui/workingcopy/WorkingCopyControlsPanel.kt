@@ -4,7 +4,6 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
@@ -21,6 +20,8 @@ import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import `in`.kkkev.jjidea.ui.components.appendParents
 import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.htmlString
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
@@ -289,7 +290,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     fun update(logEntry: LogEntry) {
         if (logEntry.repo != boundRepository) return
 
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             persistedDescription = logEntry.description
             if (!isDescriptionModified) {
                 descriptionArea.text = persistedDescription.actual
@@ -364,10 +365,10 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     private fun loadCurrentDescription(repo: JujutsuRepository) {
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             val result = repo.logService.getLog(WorkingCopy)
-            ApplicationManager.getApplication().invokeLater {
-                if (boundRepository != repo) return@invokeLater // Repo changed while loading
+            runLater {
+                if (boundRepository != repo) return@runLater // Repo changed while loading
 
                 result.onSuccess { entries ->
                     entries.firstOrNull()?.let { entry ->

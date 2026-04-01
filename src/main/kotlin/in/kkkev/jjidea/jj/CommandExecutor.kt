@@ -1,7 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
@@ -10,6 +10,8 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 
 /**
  * Abstraction for executing jujutsu commands.
@@ -134,7 +136,11 @@ interface CommandExecutor {
      * @param template Optional template for output formatting
      * @return Command result with bookmark list
      */
-    fun bookmarkList(template: String? = null): CommandResult
+    fun bookmarkList(
+        template: String? = null,
+        remote: String? = null,
+        tracked: Boolean = false
+    ): CommandResult
 
     fun bookmarkCreate(name: Bookmark, revision: Revision = WorkingCopy): CommandResult
 
@@ -143,6 +149,10 @@ interface CommandExecutor {
     fun bookmarkRename(oldName: Bookmark, newName: Bookmark): CommandResult
 
     fun bookmarkSet(name: Bookmark, revision: Revision = WorkingCopy, allowBackwards: Boolean = false): CommandResult
+
+    fun bookmarkTrack(name: Bookmark): CommandResult
+
+    fun bookmarkUntrack(name: Bookmark): CommandResult
 
     /**
      * Get git-format diff for a revision (to detect renames)
@@ -259,20 +269,24 @@ interface CommandExecutor {
         fun onFailure(callback: CommandResult.() -> Unit) = copy(onFailure = callback)
 
         private fun handleResult(result: CommandResult) {
-            ApplicationManager.getApplication().invokeLater({
+            runLater {
                 if (result.isSuccess) onSuccess(result.stdout) else onFailure(result)
-            }, ModalityState.any())
+            }
         }
 
         fun executeAsync() {
-            FileDocumentManager.getInstance().saveAllDocuments()
-            ApplicationManager.getApplication().executeOnPooledThread {
+            if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
+                FileDocumentManager.getInstance().saveAllDocuments()
+            }
+            runInBackground {
                 handleResult(commandExecutor.action())
             }
         }
 
         fun executeWithProgress(project: Project, title: String) {
-            FileDocumentManager.getInstance().saveAllDocuments()
+            if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
+                FileDocumentManager.getInstance().saveAllDocuments()
+            }
             object : Task.Backgroundable(project, title, false) {
                 override fun run(indicator: ProgressIndicator) {
                     indicator.isIndeterminate = true

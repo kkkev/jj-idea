@@ -36,7 +36,7 @@ class JujutsuDiffProvider() : DiffProvider {
     }
 
     override fun createFileContent(revisionNumber: VcsRevisionNumber?, file: VirtualFile) = revisionNumber?.let {
-        file.jujutsuRepository.createRevision(VcsUtil.getFilePath(file), RevisionExpression(it.toString()))
+        file.jujutsuRepository.createRevision(VcsUtil.getFilePath(file), RevisionExpression(it.asString()))
     }
 
     // TODO When addressing jj-idea-3jo, ensure that these return the correct change ids

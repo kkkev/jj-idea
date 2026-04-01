@@ -170,7 +170,7 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        fields[3] shouldBe "test-bookmark"
+        fields[3] shouldBe "test-bookmark;true"
     }
 
     @Test

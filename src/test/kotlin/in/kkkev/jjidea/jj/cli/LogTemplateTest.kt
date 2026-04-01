@@ -51,7 +51,7 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Feature work",
-            "main,feature",
+            "main;true,feature;true",
             "",
             "true",
             "false",

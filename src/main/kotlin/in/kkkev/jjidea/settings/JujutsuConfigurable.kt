@@ -2,8 +2,6 @@ package `in`.kkkev.jjidea.settings
 
 import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
@@ -20,6 +18,8 @@ import com.intellij.ui.dsl.builder.*
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLaterInModal
 import java.awt.Font
 import java.awt.datatransfer.StringSelection
 
@@ -170,61 +170,58 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         showValidationResult(null, JujutsuBundle.message("settings.jj.path.test.testing"))
 
         // Run validation on background thread
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             log.info("Running validation for: '$path'")
             val result = finder.validatePath(path)
             log.info("Validation result: $result")
 
-            ApplicationManager.getApplication().invokeLater(
-                {
-                    when (result) {
-                        is JjExecutableFinder.ValidationResult.Valid -> {
-                            val exe = result.executable
-                            if (exe.version.meetsMinimum()) {
-                                showValidationResult(
-                                    true,
-                                    JujutsuBundle.message(
-                                        "settings.jj.path.test.success",
-                                        exe.version.toString(),
-                                        exe.path.toString()
-                                    )
+            runLaterInModal(pathField.component) {
+                when (result) {
+                    is JjExecutableFinder.ValidationResult.Valid -> {
+                        val exe = result.executable
+                        if (exe.version.meetsMinimum()) {
+                            showValidationResult(
+                                true,
+                                JujutsuBundle.message(
+                                    "settings.jj.path.test.success",
+                                    exe.version.toString(),
+                                    exe.path.toString()
                                 )
-                            } else {
-                                showValidationResult(
-                                    false,
-                                    JujutsuBundle.message(
-                                        "settings.jj.path.test.version",
-                                        exe.version.toString(),
-                                        JjVersion.MINIMUM.toString()
-                                    )
+                            )
+                        } else {
+                            showValidationResult(
+                                false,
+                                JujutsuBundle.message(
+                                    "settings.jj.path.test.version",
+                                    exe.version.toString(),
+                                    JjVersion.MINIMUM.toString()
                                 )
-                            }
-                        }
-
-                        is JjExecutableFinder.ValidationResult.Invalid -> {
-                            // Use details if available, otherwise fall back to generic message
-                            val message = result.details ?: when (result.reason) {
-                                JjExecutableFinder.InvalidReason.NOT_FOUND ->
-                                    JujutsuBundle.message("settings.jj.path.test.notfound")
-
-                                JjExecutableFinder.InvalidReason.IS_DIRECTORY ->
-                                    JujutsuBundle.message("settings.jj.path.test.isdirectory")
-
-                                JjExecutableFinder.InvalidReason.NOT_EXECUTABLE ->
-                                    JujutsuBundle.message("settings.jj.path.test.notexecutable")
-
-                                JjExecutableFinder.InvalidReason.NOT_JJ ->
-                                    JujutsuBundle.message("settings.jj.path.test.notjj")
-
-                                JjExecutableFinder.InvalidReason.EXECUTION_FAILED ->
-                                    JujutsuBundle.message("settings.jj.path.test.failed")
-                            }
-                            showValidationResult(false, message)
+                            )
                         }
                     }
-                },
-                ModalityState.any()
-            )
+
+                    is JjExecutableFinder.ValidationResult.Invalid -> {
+                        // Use details if available, otherwise fall back to generic message
+                        val message = result.details ?: when (result.reason) {
+                            JjExecutableFinder.InvalidReason.NOT_FOUND ->
+                                JujutsuBundle.message("settings.jj.path.test.notfound")
+
+                            JjExecutableFinder.InvalidReason.IS_DIRECTORY ->
+                                JujutsuBundle.message("settings.jj.path.test.isdirectory")
+
+                            JjExecutableFinder.InvalidReason.NOT_EXECUTABLE ->
+                                JujutsuBundle.message("settings.jj.path.test.notexecutable")
+
+                            JjExecutableFinder.InvalidReason.NOT_JJ ->
+                                JujutsuBundle.message("settings.jj.path.test.notjj")
+
+                            JjExecutableFinder.InvalidReason.EXECUTION_FAILED ->
+                                JujutsuBundle.message("settings.jj.path.test.failed")
+                        }
+                        showValidationResult(false, message)
+                    }
+                }
+            }
         }
     }
 

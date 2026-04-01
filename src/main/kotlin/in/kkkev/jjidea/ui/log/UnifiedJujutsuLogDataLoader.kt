@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Expression
@@ -8,6 +7,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
+import `in`.kkkev.jjidea.util.runInBackground
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -64,7 +64,7 @@ class UnifiedJujutsuLogDataLoader(
                 val latch = CountDownLatch(repos.size)
 
                 repos.forEachIndexed { index, repo ->
-                    ApplicationManager.getApplication().executeOnPooledThread {
+                    runInBackground {
                         try {
                             indicator.text2 = "Loading from ${repo.displayName}..."
                             indicator.fraction = index.toDouble() / repos.size

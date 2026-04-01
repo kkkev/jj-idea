@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.deleteBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
+import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
 import `in`.kkkev.jjidea.actions.change.copyIdAction
@@ -76,6 +77,9 @@ object JujutsuLogContextMenuActions {
                     }
                     add(deleteBookmarkAction(entry.repo, bookmark))
                     add(renameBookmarkAction(entry.repo, bookmark))
+                    if (bookmark.isRemote) {
+                        add(toggleTrackBookmarkAction(entry.repo, bookmark))
+                    }
                 }
             }
         }

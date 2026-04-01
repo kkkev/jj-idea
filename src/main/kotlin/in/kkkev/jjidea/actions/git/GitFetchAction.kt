@@ -36,7 +36,7 @@ class GitFetchAction : DumbAwareAction(
             repo.commandExecutor
                 .createCommand { gitFetch() }
                 .onSuccess {
-                    repo.invalidate()
+                    repo.invalidate(vfsChanged = true)
                     log.info("Fetched for ${repo.displayName}")
                 }
                 .onFailure { tellUser(project, "action.git.fetch.error") }

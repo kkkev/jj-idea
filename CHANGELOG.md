@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Roadmap of upcoming features
 - Squash/split from file context menus: right-click files in working copy panel, commit details, project view, or editor to squash into parent or split into a new change with those files pre-selected
+- Track/untrack remote bookmarks: right-click a remote bookmark in the log context menu to track or untrack it
+- Visual distinction between tracked (filled) and untracked (outline) bookmark icons in the log and push dialog
+
+### Fixed
+- UI freeze when VCS operations triggered from modal dialogs (e.g., push dialog) by propagating correct modality state to async callbacks
+- Project view and editors now refresh after VCS operations (edit, new, abandon, rebase, squash, split, fetch) that change working copy files on disk
 
 ### Changed
 - Resized mutable/immutable icons in the log to be less prominent

@@ -6,7 +6,6 @@ import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
@@ -18,6 +17,8 @@ import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RevisionExpression
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.isJujutsu
 import `in`.kkkev.jjidea.vcs.jujutsuRepository
@@ -69,12 +70,12 @@ class ShowChangesDiffAction : DumbAwareAction(
  */
 fun showFileDiff(project: Project, file: VirtualFile) {
     val parentRevision = RevisionExpression("@-")
-    ApplicationManager.getApplication().executeOnPooledThread {
+    runInBackground {
         val repo = file.jujutsuRepository
         val revisionResult = repo.commandExecutor.show(file.filePath, parentRevision)
         val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             val contentFactory = DiffContentFactory.getInstance()
             val localContent = if (file.exists()) {
                 contentFactory.create(project, file)
@@ -111,7 +112,7 @@ fun showFileDiff(project: Project, file: VirtualFile) {
 fun showChangesDiff(project: Project, change: Change, logEntry: LogEntry?) {
     val isWorkingCopyContext = logEntry == null || logEntry.isWorkingCopy
 
-    ApplicationManager.getApplication().executeOnPooledThread {
+    runInBackground {
         val beforePath = change.beforeRevision?.file
         val afterPath = change.afterRevision?.file
         val fileName = afterPath?.name ?: beforePath?.name ?: JujutsuBundle.message("diff.title.unknown")
@@ -146,7 +147,7 @@ fun showChangesDiff(project: Project, change: Change, logEntry: LogEntry?) {
             "$beforeName ($parentId)" to "$afterName ($currentId)"
         }
 
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             val contentFactory = DiffContentFactory.getInstance()
             val diffManager = DiffManager.getInstance()
 

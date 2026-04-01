@@ -257,6 +257,8 @@ val Project.stateModel: JujutsuStateModel get() = service()
  * Invalidate cached repository state and optionally request a change selection.
  *
  * @param select The revision to select after refresh, or null for no selection change.
+ * @param vfsChanged Whether to refresh IntelliJ's VFS from disk. Set to true for operations
+ *   that change working copy files (edit, new, abandon, rebase, squash, split, fetch).
  *
  * Use cases:
  * - `invalidate()` - just refresh, no selection change
@@ -264,7 +266,10 @@ val Project.stateModel: JujutsuStateModel get() = service()
  * - `invalidate(WorkingCopy)` - refresh and select working copy (e.g., after `jj new`)
  * - `invalidate(bookmark)` - refresh and select a bookmark
  */
-fun JujutsuRepository.invalidate(select: Revision? = null) {
+fun JujutsuRepository.invalidate(select: Revision? = null, vfsChanged: Boolean = false) {
+    if (vfsChanged) {
+        VfsUtil.markDirtyAndRefresh(true, true, true, directory)
+    }
     val stateModel = project.stateModel
     stateModel.repositoryStates.invalidate()
     stateModel.logRefresh.notify(Unit)

@@ -1,14 +1,23 @@
 package `in`.kkkev.jjidea.actions.git
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.SimpleColoredComponent
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.dsl.builder.bind
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.toNullableProperty
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.git.GitPushDialog.Companion.loadDialogData
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import java.awt.Component
+import javax.swing.DefaultComboBoxModel
 import javax.swing.JComponent
+import javax.swing.JList
+import javax.swing.ListCellRenderer
 
 /**
  * Dialog for configuring a `jj git push` operation.
@@ -16,26 +25,71 @@ import javax.swing.JComponent
  * Options:
  * - Remote selector (populated from pre-loaded remote list)
  * - Push scope: default tracking bookmarks, specific bookmark, or all bookmarks
- * - Bookmark selector (when "specific bookmark" is selected)
+ * - Bookmark selector (when "specific bookmark" is selected, filtered by tracked bookmarks for the selected remote)
  *
  * **Important**: Remotes and bookmarks must be loaded off EDT before constructing this dialog.
  * Use [loadDialogData] to load data on a background thread.
  */
-class GitPushDialog(project: Project, private val remotes: List<String>, private val bookmarks: List<String>) :
-    DialogWrapper(project) {
+class GitPushDialog(project: Project, private val data: DialogData) : DialogWrapper(project) {
     /**
      * Result of the push dialog — the user's chosen parameters.
      */
     data class GitPushSpec(val remote: String?, val bookmark: String?, val allBookmarks: Boolean)
 
+    /**
+     * Pre-loaded dialog data: remotes and tracked bookmarks per remote.
+     */
+    data class DialogData(
+        val remotes: List<String>,
+        val trackedByRemote: Map<String, List<String>>,
+        val allLocal: List<String>
+    )
+
     var result: GitPushSpec? = null
         private set
 
-    private var selectedRemote: String = remotes.firstOrNull() ?: ""
+    private var selectedRemote: String = data.remotes.firstOrNull() ?: ""
     private var pushScope = PushScope.DEFAULT
-    private var selectedBookmark: String = bookmarks.firstOrNull() ?: ""
+    private var selectedBookmark: String = currentBookmarks().firstOrNull() ?: ""
+    private val bookmarkModel = DefaultComboBoxModel(currentBookmarks().toTypedArray())
+
+    private fun currentBookmarks(): List<String> {
+        val tracked = data.trackedByRemote[selectedRemote] ?: emptyList()
+        val untracked = data.allLocal.filter { it !in tracked }
+        return tracked + untracked
+    }
 
     private enum class PushScope { DEFAULT, BOOKMARK, ALL }
+
+    private inner class BookmarkRenderer : SimpleColoredComponent(), ListCellRenderer<String> {
+        override fun getListCellRendererComponent(
+            list: JList<out String>?,
+            value: String?,
+            index: Int,
+            isSelected: Boolean,
+            cellHasFocus: Boolean
+        ): Component {
+            clear()
+            val name = value ?: return this
+            val tracked = data.trackedByRemote[selectedRemote] ?: emptyList()
+            if (name in tracked) {
+                icon = JujutsuIcons.BookmarkTracked
+                append(name)
+            } else {
+                icon = JujutsuIcons.Bookmark
+                append(name)
+                append(" (new)", SimpleTextAttributes.GRAYED_ITALIC_ATTRIBUTES)
+            }
+            if (isSelected) {
+                background = list?.selectionBackground
+                foreground = list?.selectionForeground
+            } else {
+                background = list?.background
+                foreground = list?.foreground
+            }
+            return this
+        }
+    }
 
     init {
         title = JujutsuBundle.message("dialog.git.push.title")
@@ -43,10 +97,24 @@ class GitPushDialog(project: Project, private val remotes: List<String>, private
         init()
     }
 
+    private fun updateBookmarks() {
+        val bookmarks = currentBookmarks()
+        bookmarkModel.removeAllElements()
+        bookmarkModel.addAll(bookmarks)
+        selectedBookmark = bookmarks.firstOrNull() ?: ""
+    }
+
     override fun createCenterPanel(): JComponent = panel {
-        if (remotes.size > 1) {
+        if (data.remotes.size > 1) {
             row(JujutsuBundle.message("dialog.git.push.remote.label")) {
-                comboBox(remotes).bindItem(::selectedRemote.toNullableProperty())
+                comboBox(data.remotes)
+                    .bindItem(::selectedRemote.toNullableProperty())
+                    .applyToComponent {
+                        addActionListener {
+                            selectedRemote = selectedItem as? String ?: ""
+                            updateBookmarks()
+                        }
+                    }
             }
         }
 
@@ -56,7 +124,8 @@ class GitPushDialog(project: Project, private val remotes: List<String>, private
             }
             row {
                 radioButton(JujutsuBundle.message("dialog.git.push.scope.bookmark"), PushScope.BOOKMARK)
-                comboBox(bookmarks).bindItem(::selectedBookmark.toNullableProperty())
+                cell(ComboBox(bookmarkModel).apply { renderer = BookmarkRenderer() })
+                    .bindItem(::selectedBookmark.toNullableProperty())
             }
             row {
                 radioButton(JujutsuBundle.message("dialog.git.push.scope.all"), PushScope.ALL)
@@ -66,7 +135,7 @@ class GitPushDialog(project: Project, private val remotes: List<String>, private
 
     override fun doOKAction() {
         result = GitPushSpec(
-            remote = selectedRemote.takeIf { remotes.size > 1 },
+            remote = selectedRemote.takeIf { data.remotes.size > 1 },
             bookmark = selectedBookmark.takeIf { pushScope == PushScope.BOOKMARK },
             allBookmarks = pushScope == PushScope.ALL
         )
@@ -74,27 +143,40 @@ class GitPushDialog(project: Project, private val remotes: List<String>, private
     }
 
     companion object {
+        private val LOCAL_BOOKMARK_TEMPLATE =
+            """if(present, if(remote, "", name ++ "\n"))"""
+
         /**
-         * Load dialog data (remotes and bookmarks) from a repository. Call off EDT.
+         * Load dialog data (remotes and tracked bookmarks per remote) from a repository. Call off EDT.
          */
-        fun loadDialogData(repo: JujutsuRepository): Pair<List<String>, List<String>> {
+        fun loadDialogData(repo: JujutsuRepository): DialogData {
             val remotes = repo.commandExecutor.gitRemoteList().let { result ->
+                if (result.isSuccess) {
+                    result.stdout.lines()
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                        .map { it.substringBefore(' ') }
+                } else {
+                    emptyList()
+                }
+            }
+            val trackedByRemote = remotes.associateWith { remote ->
+                repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE, remote, true).let { result ->
+                    if (result.isSuccess) {
+                        result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }
+                    } else {
+                        emptyList()
+                    }
+                }
+            }
+            val allLocal = repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE).let { result ->
                 if (result.isSuccess) {
                     result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }
                 } else {
                     emptyList()
                 }
             }
-            val bookmarks = repo.commandExecutor.bookmarkList().let { result ->
-                if (result.isSuccess) {
-                    result.stdout.lines()
-                        .map { it.trim().substringBefore(':').substringBefore(' ') }
-                        .filter { it.isNotEmpty() }
-                } else {
-                    emptyList()
-                }
-            }
-            return remotes to bookmarks
+            return DialogData(remotes, trackedByRemote, allLocal)
         }
     }
 }

@@ -3,13 +3,13 @@ package `in`.kkkev.jjidea.actions.filechange
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 
 /**
@@ -31,7 +31,7 @@ class OpenChangeFileAction : DumbAwareAction(
 
         if (files.isEmpty()) return
 
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             val fileEditorManager = FileEditorManager.getInstance(project)
             files.forEach { file ->
                 fileEditorManager.openFile(file, true)

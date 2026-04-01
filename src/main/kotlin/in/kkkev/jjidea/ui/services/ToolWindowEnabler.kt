@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.ui.services
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -14,6 +13,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
+import `in`.kkkev.jjidea.util.runLater
 
 /**
  * Service that enables/disables Jujutsu tool windows based on VCS roots.
@@ -40,7 +40,7 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
     }
 
     private fun handleRootsChange(jjRoots: Set<JujutsuRepository>) {
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             val hasJjRoots = jjRoots.isNotEmpty()
             val allVcsRoots = ProjectLevelVcsManager.getInstance(project).allVcsRoots
             val totalVcsRoots = allVcsRoots.size
@@ -130,7 +130,7 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
                         log.info("Suppressing default VCS log tab: ${event.content.displayName}")
                         // Defer removal to allow the platform to complete initialization
                         // Removing synchronously causes disposal errors (IncorrectOperationException)
-                        ApplicationManager.getApplication().invokeLater {
+                        runLater {
                             vcsToolWindow.contentManager.removeContent(event.content, true)
                         }
                     }

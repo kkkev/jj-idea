@@ -21,7 +21,10 @@ object JujutsuIcons {
         load(path).recolored(mapOf("primary-fill" to ("fill" to color)))
 
     @JvmField
-    val Bookmark: Icon = strokeIcon("/icons/bookmark.svg", GRAY)
+    val Bookmark: Icon = load("/icons/bookmark.svg").accented(GRAY)
+
+    @JvmField
+    val BookmarkTracked: Icon = load("/icons/bookmarkTracked.svg").accented(GRAY)
 
     @JvmField
     val Conflict: Icon = fillIcon("/icons/conflict.svg", RED)

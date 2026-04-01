@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -13,6 +12,8 @@ import com.intellij.ui.content.ContentFactory
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 import java.awt.BorderLayout
 import java.awt.CardLayout
@@ -55,19 +56,19 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     fun openCustomLogTab() {
         log.info("Opening unified Jujutsu log tab")
 
-        ApplicationManager.getApplication().executeOnPooledThread {
+        runInBackground {
             try {
                 val roots = project.jujutsuRepositories
 
                 if (roots.isEmpty()) {
                     log.info("No Jujutsu repositories found, skipping log tab creation")
-                    return@executeOnPooledThread
+                    return@runInBackground
                 }
 
                 val contentFactory = ContentFactory.getInstance()
                 val changesViewContentManager = ChangesViewContentManager.getInstance(project)
 
-                ApplicationManager.getApplication().invokeLater {
+                runLater {
                     // Only create one unified tab if not already open
                     if (unifiedLogContent == null) {
                         // Create wrapper panel with CardLayout
@@ -135,6 +136,7 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
             is JjAvailabilityStatus.Available -> {
                 layout.show(wrapper, CARD_LOG)
             }
+
             else -> {
                 // Replace the not-installed panel with fresh content
                 notInstalledPanel?.let { wrapper.remove(it) }
@@ -165,7 +167,7 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     fun closeCustomLogTab() {
         log.info("Closing unified Jujutsu log tab")
 
-        ApplicationManager.getApplication().invokeLater {
+        runLater {
             unifiedLogContent?.let { content ->
                 try {
                     ChangesViewContentManager.getInstance(project).removeContent(content)
