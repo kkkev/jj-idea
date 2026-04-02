@@ -4,11 +4,15 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
+import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.SearchTextField
+import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.SearchFieldWithExtension
+import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.ui.log.*
@@ -23,7 +27,7 @@ import javax.swing.table.TableColumn
 import kotlin.reflect.KMutableProperty1
 
 abstract class CommitTablePanel<D>(
-    project: Project,
+    protected val project: Project,
     private val toolbarPlace: String,
     dataLoaderFactory: (CommitTablePanel<D>) -> DataLoader,
     columnManagerConfig: JujutsuColumnManager.() -> Unit = {}
@@ -75,6 +79,13 @@ abstract class CommitTablePanel<D>(
     var useRegex = false
     var matchCase = false
     var matchWholeWords = false
+
+    // Status bar for truncation indicator
+    private val statusBar = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.X_AXIS)
+        isVisible = false
+        border = JBUI.Borders.empty(2, 6)
+    }
 
     init {
         // Create filter field with extension toolbar
@@ -145,6 +156,9 @@ abstract class CommitTablePanel<D>(
 
         // Add table scroll pane in the center
         add(ScrollPaneFactory.createScrollPane(logTable), BorderLayout.CENTER)
+
+        // Add status bar at the bottom (hidden by default)
+        add(statusBar, BorderLayout.SOUTH)
     }
 
     private fun createToolbar() = JPanel(BorderLayout()).apply {
@@ -361,6 +375,29 @@ abstract class CommitTablePanel<D>(
         val filterText = searchTextField.text
         log.info("Applying filter: '$filterText' (regex=$useRegex, matchCase=$matchCase, wholeWords=$matchWholeWords)")
         logTable.logModel.setFilter(filterText, useRegex, matchCase, matchWholeWords)
+    }
+
+    /**
+     * Update the status bar to indicate when the log is truncated by the limit.
+     */
+    protected fun updateStatusBar(entryCount: Int, limit: Int) {
+        if (entryCount < limit) {
+            statusBar.isVisible = false
+            return
+        }
+        statusBar.removeAll()
+        statusBar.add(
+            JBLabel(JujutsuBundle.message("log.status.truncated", entryCount, limit))
+        )
+        statusBar.add(
+            HyperlinkLabel(JujutsuBundle.message("log.status.truncated.link")).apply {
+                addHyperlinkListener {
+                    ShowSettingsUtil.getInstance()
+                        .showSettingsDialog(project, JujutsuBundle.message("settings.title"))
+                }
+            }
+        )
+        statusBar.isVisible = true
     }
 
     /**

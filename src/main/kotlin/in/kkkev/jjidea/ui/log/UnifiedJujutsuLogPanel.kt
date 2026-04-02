@@ -20,7 +20,7 @@ import javax.swing.JPanel
  * - Provides a root filter to show/hide commits by repository
  * - Displays root indicators in the log entries
  */
-class UnifiedJujutsuLogPanel(private val project: Project) :
+class UnifiedJujutsuLogPanel(project: Project) :
     CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>(project, "JujutsuLogToolbar", {
         UnifiedJujutsuLogDataLoader(
             project,
@@ -63,6 +63,7 @@ class UnifiedJujutsuLogPanel(private val project: Project) :
         logTable.setEntries(data.entries)
         logTable.updateGraph(data.graphNodes)
         updateRootFilterVisibility()
+        updateStatusBar(data.entries.size, data.limit)
         // Refresh detail panel with the (possibly updated) selected entry.
         // fireTableDataChanged() doesn't change the selection, so the ListSelectionListener
         // won't fire — but the entry data may have changed (e.g., empty flag, file changes).

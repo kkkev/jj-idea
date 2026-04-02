@@ -782,28 +782,5 @@ class JujutsuLogTableModelFilterTest {
             model.getEntry(0)?.id?.short shouldBe "abc123"
             model.getEntry(1)?.id?.short shouldBe "ghi789"
         }
-
-        @Test
-        fun `appendEntries preserves existing order and adds at end`() {
-            model.setEntries(
-                listOf(
-                    createEntry("abc123", "First"),
-                    createEntry("def456", "Second")
-                )
-            )
-
-            model.appendEntries(
-                listOf(
-                    createEntry("ghi789", "Third"),
-                    createEntry("jkl012", "Fourth")
-                )
-            )
-
-            model.rowCount shouldBe 4
-            model.getEntry(0)?.id?.short shouldBe "abc123"
-            model.getEntry(1)?.id?.short shouldBe "def456"
-            model.getEntry(2)?.id?.short shouldBe "ghi789"
-            model.getEntry(3)?.id?.short shouldBe "jkl012"
-        }
     }
 }

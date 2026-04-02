@@ -5,6 +5,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.util.runInBackground
@@ -29,7 +30,7 @@ class UnifiedJujutsuLogDataLoader(
 ) : BackgroundDataLoader(project, "Loading Jujutsu Commits") {
     private val graphBuilder = CommitGraphBuilder()
 
-    data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeId, GraphNode>)
+    data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeId, GraphNode>, val limit: Int)
 
     override fun load() = loadCommits()
 
@@ -45,9 +46,11 @@ class UnifiedJujutsuLogDataLoader(
      */
     fun loadCommits(revset: Expression = Expression.ALL) {
         val repos = repositories()
+        val limit = JujutsuSettings.getInstance(project).state.logChangeLimit
+
         if (repos.isEmpty()) {
             log.info("No repositories to load commits from")
-            notify(Data(emptyList(), emptyMap()))
+            notify(Data(emptyList(), emptyMap(), limit))
             return
         }
 
@@ -69,7 +72,7 @@ class UnifiedJujutsuLogDataLoader(
                             indicator.text2 = "Loading from ${repo.displayName}..."
                             indicator.fraction = index.toDouble() / repos.size
 
-                            val result = repo.logService.getLog(revset)
+                            val result = repo.logService.getLog(revset, limit = limit)
 
                             result.onSuccess { loadedEntries ->
                                 entriesByRepo[repo] = loadedEntries
@@ -100,7 +103,7 @@ class UnifiedJujutsuLogDataLoader(
             },
             onSuccess = {
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) return@executeInBackground
-                notify(Data(allEntries, graphNodes))
+                notify(Data(allEntries, graphNodes, limit))
             }
         )
     }

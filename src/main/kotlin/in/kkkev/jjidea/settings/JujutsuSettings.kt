@@ -20,6 +20,11 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     override fun getState(): JujutsuSettingsState = state
 
     override fun loadState(state: JujutsuSettingsState) {
+        // Migrate old default: users who never changed from 50 get bumped to 500
+        if (state.settingsVersion < 1 && state.logChangeLimit == 50) {
+            state.logChangeLimit = 500
+        }
+        state.settingsVersion = 1
         XmlSerializerUtil.copyBean(state, this.state)
     }
 

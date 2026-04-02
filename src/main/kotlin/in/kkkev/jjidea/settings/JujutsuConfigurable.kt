@@ -32,6 +32,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private val log = Logger.getInstance(javaClass)
     private val settings = JujutsuSettings.getInstance(project)
     private var previousPath = settings.state.jjExecutablePath
+    private var previousLogLimit = settings.state.logChangeLimit
     private val finder = JjExecutableFinder()
 
     // UI components for validation feedback
@@ -126,7 +127,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
 
         group(JujutsuBundle.message("settings.group.log")) {
             row(JujutsuBundle.message("settings.log.limit.label")) {
-                intTextField(range = 1..1000)
+                intTextField(range = 1..10000)
                     .bindIntText(settings.state::logChangeLimit)
                     .columns(COLUMNS_TINY)
                     .comment(JujutsuBundle.message("settings.log.limit.comment"))
@@ -154,6 +155,13 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
 
             // Trigger the recheck after subscribing
             checker.recheck()
+        }
+
+        // If log limit changed, reload the log
+        val newLogLimit = settings.state.logChangeLimit
+        if (newLogLimit != previousLogLimit) {
+            previousLogLimit = newLogLimit
+            project.stateModel.logRefresh.notify(Unit)
         }
     }
 

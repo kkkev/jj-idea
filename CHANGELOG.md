@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Truncation indicator in log panel when the entry count hits the limit, with a clickable link to open settings
+- Log automatically reloads when the limit setting is changed
+
 ### Fixed
 - Support custom jj builds with version strings like "jj companyname-0.39.0-..." (GitHub #7)
+
+### Changed
+- Default log limit increased from 50 to 500, with automatic migration for existing users who never changed the default
 
 ## [0.5.14] - 2026-04-02
 

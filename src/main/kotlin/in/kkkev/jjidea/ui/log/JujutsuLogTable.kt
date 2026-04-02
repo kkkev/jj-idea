@@ -698,14 +698,6 @@ class JujutsuLogTableModel : AbstractTableModel() {
     }
 
     /**
-     * Append more entries (for pagination/incremental loading).
-     */
-    fun appendEntries(moreEntries: List<LogEntry>) {
-        entries.addAll(moreEntries)
-        applyFilter()
-    }
-
-    /**
      * Clear all entries.
      */
     fun clear() {

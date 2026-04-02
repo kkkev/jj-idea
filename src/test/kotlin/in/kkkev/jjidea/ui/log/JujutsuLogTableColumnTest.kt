@@ -151,23 +151,6 @@ class JujutsuLogTableColumnTest {
     }
 
     @Test
-    fun `table model appendEntries adds to existing entries`() {
-        val model = JujutsuLogTableModel()
-        model.setEntries(listOf(createTestEntry("abc123")))
-
-        model.rowCount shouldBe 1
-
-        model.appendEntries(
-            listOf(
-                createTestEntry("def456"),
-                createTestEntry("ghi789")
-            )
-        )
-
-        model.rowCount shouldBe 3
-    }
-
-    @Test
     fun `column manager controls column visibility correctly`() {
         val manager = JujutsuColumnManager()
 
