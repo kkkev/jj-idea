@@ -31,7 +31,8 @@ import java.awt.datatransfer.StringSelection
 class JujutsuConfigurable(private val project: Project) : BoundConfigurable(JujutsuBundle.message("settings.title")) {
     private val log = Logger.getInstance(javaClass)
     private val settings = JujutsuSettings.getInstance(project)
-    private var previousPath = settings.state.jjExecutablePath
+    private val appSettings = JujutsuApplicationSettings.getInstance()
+    private var previousPath = appSettings.state.jjExecutablePath
     private var previousLogLimit = settings.state.logChangeLimit
     private val finder = JjExecutableFinder()
 
@@ -47,7 +48,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         .createSingleFileOrExecutableAppDescriptor()
                         .withTitle(JujutsuBundle.message("settings.jj.path.chooser.title")),
                     project
-                ).bindText(settings.state::jjExecutablePath)
+                ).bindText(appSettings.state::jjExecutablePath)
                     .columns(COLUMNS_LARGE)
                     .comment(JujutsuBundle.message("settings.jj.path.comment"))
 
@@ -138,7 +139,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     override fun apply() {
         super.apply()
         // If executable path changed, recheck availability and refresh if now available
-        val newPath = settings.state.jjExecutablePath
+        val newPath = appSettings.state.jjExecutablePath
         if (newPath != previousPath) {
             previousPath = newPath
             val checker = JjAvailabilityChecker.getInstance(project)

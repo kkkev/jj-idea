@@ -14,7 +14,12 @@ class JujutsuSettingsPlatformTest {
     @Test
     fun `settings service is available and has default state`() {
         val settings = JujutsuSettings.getInstance(project.get())
-        settings.state.jjExecutablePath shouldBe "jj"
         settings.state.autoRefreshEnabled shouldBe true
+    }
+
+    @Test
+    fun `application settings service is available and has default state`() {
+        val appSettings = JujutsuApplicationSettings.getInstance()
+        appSettings.state.jjExecutablePath shouldBe "jj"
     }
 }

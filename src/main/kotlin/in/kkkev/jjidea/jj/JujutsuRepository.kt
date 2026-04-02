@@ -8,7 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.jj.cli.CliLogService
-import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
@@ -32,10 +32,9 @@ interface JujutsuRepository {
 data class JujutsuRepositoryImpl(override val project: Project, override val directory: VirtualFile) :
     JujutsuRepository {
     private val executor: CommandExecutor by lazy {
-        val settings = JujutsuSettings.getInstance(project)
         CliExecutor(
             root = directory,
-            executableProvider = { settings.state.jjExecutablePath },
+            executableProvider = { JujutsuApplicationSettings.getInstance().state.jjExecutablePath },
             onJjNotFound = { JjAvailabilityChecker.getInstance(project).recheck() }
         )
     }

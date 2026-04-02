@@ -6,6 +6,7 @@ import com.intellij.openapi.startup.ProjectActivity
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
+import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
 import `in`.kkkev.jjidea.util.runInBackground
@@ -28,11 +29,16 @@ class JujutsuStartupActivity : ProjectActivity {
     override suspend fun execute(project: Project) {
         ToolWindowEnabler.getInstance(project)
 
+        // Load project settings first — triggers migration of jjExecutablePath to app-level
+        // settings. Must happen before the availability check reads from app settings.
+        JujutsuSettings.getInstance(project)
+
         // Initialize availability checking
         val checker = JjAvailabilityChecker.getInstance(project)
         checker.status.connect(project) { status ->
             log.info("jj availability status changed: $status")
             when (status) {
+                is JjAvailabilityStatus.Checking -> {} // Initial state, wait for real result
                 is JjAvailabilityStatus.Available -> {
                     JujutsuNotifications.clearAvailabilityNotification()
                     checkUserConfig(project, status.executablePath)
@@ -46,7 +52,7 @@ class JujutsuStartupActivity : ProjectActivity {
     private fun checkUserConfig(project: Project, executablePath: Path) {
         val defaultPath = executablePath.toString()
         val executableProvider = {
-            JujutsuSettings.getInstance(project).state.jjExecutablePath.ifBlank { defaultPath }
+            JujutsuApplicationSettings.getInstance().state.jjExecutablePath.ifBlank { defaultPath }
         }
         val executor = CliExecutor.forRootlessOperations(executableProvider)
 

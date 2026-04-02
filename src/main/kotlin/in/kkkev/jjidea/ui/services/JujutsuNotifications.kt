@@ -114,7 +114,7 @@ object JujutsuNotifications {
         // Clear any existing availability notification
         clearAvailabilityNotification()
 
-        if (status is JjAvailabilityStatus.Available) return
+        if (status is JjAvailabilityStatus.Available || status is JjAvailabilityStatus.Checking) return
 
         val (title, content) = when (status) {
             is JjAvailabilityStatus.NotFound -> Pair(
@@ -136,7 +136,7 @@ object JujutsuNotifications {
                 JujutsuBundle.message("notification.jj.invalid.content", status.configuredPath)
             )
 
-            is JjAvailabilityStatus.Available -> return
+            is JjAvailabilityStatus.Available, is JjAvailabilityStatus.Checking -> return
         }
 
         val notification = NotificationGroupManager.getInstance()

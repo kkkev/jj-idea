@@ -249,6 +249,14 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     private fun updateForAvailabilityStatus(status: JjAvailabilityStatus) {
         val cardLayout = cardPanel.layout as CardLayout
         when (status) {
+            is JjAvailabilityStatus.Checking -> {
+                // Don't flash an error while checking — show loading panel
+                cardPanel.remove(notInstalledPanel)
+                notInstalledPanel = JjNotInstalledPanel(project, status)
+                cardPanel.add(notInstalledPanel, "notInstalled")
+                cardLayout.show(cardPanel, "notInstalled")
+            }
+
             is JjAvailabilityStatus.Available -> {
                 // Let state model handler decide between "content" and "empty"
                 val hasRepos = project.stateModel.repositoryStates.value.isNotEmpty()

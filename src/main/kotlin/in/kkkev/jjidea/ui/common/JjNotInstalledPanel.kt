@@ -38,16 +38,18 @@ class JjNotInstalledPanel(private val project: Project, private val status: JjAv
             }
             add(description)
 
-            add(Box.createVerticalStrut(16))
-
-            // Configure/settings link
-            add(createSettingsLink())
+            // Configure/settings link (not shown during initial check)
+            if (status !is JjAvailabilityStatus.Checking) {
+                add(Box.createVerticalStrut(16))
+                add(createSettingsLink())
+            }
         }
 
         add(centerPanel, BorderLayout.CENTER)
     }
 
     private fun getTitle(): String = when (status) {
+        is JjAvailabilityStatus.Checking -> JujutsuBundle.message("panel.jj.checking.title")
         is JjAvailabilityStatus.NotFound -> JujutsuBundle.message("panel.jj.notfound.title")
         is JjAvailabilityStatus.VersionTooOld -> JujutsuBundle.message("panel.jj.version.title")
         is JjAvailabilityStatus.InvalidPath -> JujutsuBundle.message("panel.jj.invalid.title")
@@ -55,6 +57,7 @@ class JjNotInstalledPanel(private val project: Project, private val status: JjAv
     }
 
     private fun getDescription(): String = when (status) {
+        is JjAvailabilityStatus.Checking -> JujutsuBundle.message("panel.jj.checking.description")
         is JjAvailabilityStatus.NotFound -> JujutsuBundle.message("panel.jj.notfound.description")
         is JjAvailabilityStatus.VersionTooOld -> JujutsuBundle.message(
             "panel.jj.version.description",

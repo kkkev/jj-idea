@@ -10,6 +10,11 @@ import java.nio.file.Path
  */
 sealed interface JjAvailabilityStatus {
     /**
+     * Availability check is in progress. Shown briefly at startup before the first check completes.
+     */
+    data object Checking : JjAvailabilityStatus
+
+    /**
      * jj found and ready to use.
      */
     data class Available(
