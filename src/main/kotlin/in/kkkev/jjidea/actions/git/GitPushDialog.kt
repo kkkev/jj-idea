@@ -114,8 +114,9 @@ class GitPushDialog(project: Project, private val data: DialogData) : DialogWrap
     }
 
     override fun doOKAction() {
+        applyFields()
         result = GitPushSpec(
-            remote = selectedRemote.takeIf { data.remotes.size > 1 },
+            remote = selectedRemote,
             bookmark = selectedBookmark.takeIf { pushScope == PushScope.BOOKMARK },
             allBookmarks = pushScope == PushScope.ALL
         )

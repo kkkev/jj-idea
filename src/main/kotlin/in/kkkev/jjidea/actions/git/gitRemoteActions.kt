@@ -1,11 +1,14 @@
 package `in`.kkkev.jjidea.actions.git
 
 import com.intellij.icons.AllIcons
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
@@ -42,10 +45,23 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?) =
                 val spec = dialog.result ?: return@runLater
 
                 target.commandExecutor
-                    .createCommand { gitPush(spec.remote, spec.bookmark, spec.allBookmarks) }
-                    .onSuccess {
+                    .createCommand {
+                        val bm = spec.bookmark
+                        if (bm != null && !bm.tracked) {
+                            val trackResult = bookmarkTrack(Bookmark("${bm.localName}@${spec.remote}"))
+                            if (!trackResult.isSuccess) return@createCommand trackResult
+                        }
+                        gitPush(spec.remote, bm, spec.allBookmarks)
+                    }
+                    .onSuccess { stdout ->
                         target.invalidate()
                         log.info("Pushed for ${target.displayName}")
+                        JujutsuNotifications.notify(
+                            project,
+                            JujutsuBundle.message("action.git.push.success.title"),
+                            stdout.ifBlank { JujutsuBundle.message("action.git.push.success.message.default") },
+                            NotificationType.INFORMATION
+                        )
                     }
                     .onFailure {
                         tellUser(project, "action.git.push.error")

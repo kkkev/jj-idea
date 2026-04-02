@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- User feedback after successful push — now shows a notification with the push output
+- Can now push untracked bookmarks
+
+### Fixed
+- Respect remote and bookmark selections when pushing to remote
+
 ## [0.5.11] - 2026-03-31
 
 ### Added
