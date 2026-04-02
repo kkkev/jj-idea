@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.15] - 2026-04-02
+
 ### Added
 - Truncation indicator in log panel when the entry count hits the limit, with a clickable link to open settings
 - Log automatically reloads when the limit setting is changed
@@ -270,7 +272,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.14...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.15...HEAD
+[0.5.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.15
 [0.5.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.14
 [0.5.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.13
 [0.5.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.12
