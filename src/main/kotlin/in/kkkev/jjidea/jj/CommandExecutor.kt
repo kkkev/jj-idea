@@ -1,8 +1,5 @@
 package `in`.kkkev.jjidea.jj
 
-import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.TransactionGuard
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
@@ -12,6 +9,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.util.saveAllDocuments
 
 /**
  * Abstraction for executing jujutsu commands.
@@ -271,18 +269,14 @@ interface CommandExecutor {
         }
 
         fun executeAsync() {
-            if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
-                FileDocumentManager.getInstance().saveAllDocuments()
-            }
+            saveAllDocuments()
             runInBackground {
                 handleResult(commandExecutor.action())
             }
         }
 
         fun executeWithProgress(project: Project, title: String) {
-            if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
-                FileDocumentManager.getInstance().saveAllDocuments()
-            }
+            saveAllDocuments()
             object : Task.Backgroundable(project, title, false) {
                 override fun run(indicator: ProgressIndicator) {
                     indicator.isIndeterminate = true

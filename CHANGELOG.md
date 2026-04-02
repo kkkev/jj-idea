@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Describe working copy no longer throws write-only access error
+
 ## [0.5.15] - 2026-04-02
 
 ### Added
