@@ -25,7 +25,7 @@ value class JjVersion(private val components: Triple<Int, Int, Int>) : Comparabl
         /** Minimum required jj version for this plugin. Required for change_offset feature. */
         val MINIMUM = JjVersion(Triple(0, 37, 0))
 
-        private val VERSION_PATTERN = Regex("""jj\s+(\d+)\.(\d+)\.(\d+)""")
+        private val VERSION_PATTERN = Regex("""jj\s+(?:\w+-)?(\d+)\.(\d+)\.(\d+)""")
 
         /**
          * Parse a version string from `jj --version` output.
