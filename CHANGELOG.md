@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.13] - 2026-04-02
+
 ### Added
 - User feedback after successful push — now shows a notification with the push output
 - Can now push untracked bookmarks
@@ -255,7 +257,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.12...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.13...HEAD
+[0.5.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.13
 [0.5.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.12
 [0.5.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.11
 [0.5.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.10
