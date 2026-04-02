@@ -283,11 +283,13 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 optionalChangeId.parse(it)
             }
         ) {
-            override fun take(input: Iterator<String>): BookmarkItem? {
+            override fun take(input: Iterator<String>): BookmarkItem? = try {
                 val present = fields[0].take(input) as Boolean
                 val name = fields[1].take(input) as String
                 val id = fields[2].take(input) as ChangeId?
-                return if (present) BookmarkItem(Bookmark(name), id!!) else null
+                if (present && id != null) BookmarkItem(Bookmark(name), id) else null
+            } catch (_: Exception) {
+                null
             }
         }
     }

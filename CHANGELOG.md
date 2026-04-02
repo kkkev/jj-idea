@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Support custom jj builds with version strings like "jj companyname-0.39.0-..." (GitHub #7)
+- Conflicted bookmarks no longer break lists of all bookmarks
 
 ### Changed
 - Default log limit increased from 50 to 500, with automatic migration for existing users who never changed the default
