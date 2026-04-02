@@ -200,12 +200,16 @@ class CliExecutor(
     override fun edit(revision: Revision): CommandExecutor.CommandResult = execute(root, listOf("edit", revision))
 
     override fun log(
-        revset: Revset,
+        revset: Revset?,
         template: String?,
         filePaths: List<FilePath>,
         limit: Int?
     ): CommandExecutor.CommandResult {
-        val args = mutableListOf<Any>("log", "-r", revset, "--no-graph")
+        val args = mutableListOf<Any>("log", "--no-graph")
+        if (revset != null) {
+            args.add("-r")
+            args.add(revset)
+        }
         if (template != null) {
             args.add("-T")
             args.add(template)
