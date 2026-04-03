@@ -52,7 +52,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     private val executor = repo.commandExecutor
     val logTemplates = LogTemplates()
 
-    override fun getLog(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
+    override fun getLog(revset: Revset?, filePaths: List<FilePath>, limit: Int?) =
         getLog(logTemplates.fullLogTemplate, revset, filePaths, limit)
 
     override fun getLogBasic(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
@@ -133,7 +133,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
     private fun <T> getLog(
         template: LogTemplate<T>,
-        revset: Revset = Expression.ALL,
+        revset: Revset?,
         filePaths: List<FilePath> = emptyList(),
         limit: Int? = null
     ): Result<List<T>> {

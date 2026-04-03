@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.integration
 
 import `in`.kkkev.jjidea.contract.JjStub
 import `in`.kkkev.jjidea.contract.StubCommandExecutor
+import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.FileChangeStatus
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
@@ -142,7 +143,7 @@ class LogServiceIntegrationTest {
         fun `author fields populated`() {
             stub.describe("Test commit")
 
-            val entries = logService.getLog().getOrThrow()
+            val entries = logService.getLog(Expression.ALL).getOrThrow()
             val wc = entries.first { it.isWorkingCopy }
 
             wc.author.shouldNotBeNull()
@@ -155,7 +156,7 @@ class LogServiceIntegrationTest {
         fun `committer fields populated`() {
             stub.describe("Test commit")
 
-            val entries = logService.getLog().getOrThrow()
+            val entries = logService.getLog(null).getOrThrow()
             val wc = entries.first { it.isWorkingCopy }
 
             wc.committer.shouldNotBeNull()

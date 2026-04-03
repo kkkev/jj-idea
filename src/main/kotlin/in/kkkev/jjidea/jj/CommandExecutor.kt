@@ -114,7 +114,7 @@ interface CommandExecutor {
      * @return Command result with log output
      */
     fun log(
-        revset: Revset = Expression.ALL,
+        revset: Revset?,
         template: String? = null,
         filePaths: List<FilePath> = emptyList(),
         limit: Int? = null

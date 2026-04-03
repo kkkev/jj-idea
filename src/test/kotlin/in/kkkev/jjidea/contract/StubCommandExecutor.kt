@@ -14,7 +14,7 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         CommandExecutor.CommandResult(r.exitCode, r.stdout, r.stderr)
 
     override fun log(
-        revset: Revset,
+        revset: Revset?,
         template: String?,
         filePaths: List<FilePath>,
         limit: Int?
@@ -22,9 +22,11 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         stub.run(
             *buildList {
                 add("log")
-                add("-r")
-                add(revset.toString())
                 add("--no-graph")
+                if (revset != null) {
+                    add("-r")
+                    add(revset.toString())
+                }
                 if (template != null) {
                     add("-T")
                     add(template)

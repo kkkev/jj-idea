@@ -15,7 +15,7 @@ interface LogService {
      * @return List of log entries with complete metadata
      */
     fun getLog(
-        revset: Revset = Expression.ALL,
+        revset: Revset?,
         filePaths: List<FilePath> = emptyList(),
         limit: Int? = null
     ): Result<List<LogEntry>>
