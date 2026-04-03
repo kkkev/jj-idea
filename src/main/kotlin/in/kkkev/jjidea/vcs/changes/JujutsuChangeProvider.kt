@@ -10,7 +10,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
-import `in`.kkkev.jjidea.vcs.possibleInitialisedJujutsuRepositoryForRoot
+import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
 /**
  * Provides change information for jujutsu working copy
@@ -26,7 +26,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     ) {
         log.info("getChanges called on ${Thread.currentThread().name}, ${dirtyScope.affectedContentRoots.size} roots")
 
-        dirtyScope.affectedContentRoots.mapNotNull { vcs.project.possibleInitialisedJujutsuRepositoryForRoot(it) }.toSet()
+        dirtyScope.affectedContentRoots.mapNotNull { vcs.project.possibleJujutsuRepositoryFor(it) }.toSet()
             .forEach { repo ->
                 try {
                     val startTime = System.currentTimeMillis()

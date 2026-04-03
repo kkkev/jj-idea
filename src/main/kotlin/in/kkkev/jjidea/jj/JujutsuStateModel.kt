@@ -19,11 +19,14 @@ import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.Alarm
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.notifiableState
 import `in`.kkkev.jjidea.util.simpleNotifier
+import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
-import `in`.kkkev.jjidea.vcs.jujutsuRepositories
+import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.Path
 
 /**
  * Central state model for Jujutsu VCS data.
@@ -57,7 +60,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * ## Initialization Order
  *
  * 1. Constructor registers all subscriptions (VFS, VCS config, VCS activated)
- * 2. Explicit [initializedRoots.invalidate] fires initial root scan
+ * 2. Explicit [initialisedRepositories.invalidate] fires initial root scan
  * 3. initializedRoots cascade → repositoryStates + logRefresh
  * 4. ToolWindowEnabler connects to initializedRoots separately
  *
@@ -72,19 +75,46 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     private val refreshSuppression = AtomicInteger(0)
 
     /**
-     * Set of VCS-configured JJ roots that are actually initialized (have .jj directory).
+     * Cache of JJ VCS root directories, regardless of whether they have been initialised.
+     */
+    val jujutsuVcsRoots = notifiableState(project, "Jujutsu VCS Root Directories", emptySet()) {
+        ProjectLevelVcsManager.getInstance(project).findVcsByName(JujutsuVcs.VCS_NAME)
+            ?.let { ProjectLevelVcsManager.getInstance(project).getDirectoryMappings(it) }
+            ?.mapNotNull { VfsUtil.findFile(Path(it.directory), true) }
+            ?.toSet()
+            ?: emptySet()
+    }
+
+    /**
+     * Set of VCS-configured JJ repositories that are actually initialised (have .jj directory).
      * Cached to avoid EDT slow operations. Updated via file listener when .jj directories change.
      */
-    val initializedRoots = notifiableState(project, "Jujutsu Initialized Roots", emptySet()) {
-        // This runs on background thread - safe to call VCS manager
-        project.jujutsuRepositories.filter { it.isInitialised }.toSet()
-    }
+    val initialisedRepositories =
+        notifiableState<Map<VirtualFile, JujutsuRepository>>(project, "Jujutsu Initialized Repositories", emptyMap()) {
+            val allRootPaths = jujutsuVcsRoots.value
+            val rootsWithUniqueNames = allRootPaths.distinctBy { it.name }.toSet()
+
+            // This runs on background thread - safe to call VCS manager
+            allRootPaths.associateWith {
+                val displayName = if (it in rootsWithUniqueNames)
+                    it.name
+                else
+                    it.pathRelativeTo(project.basePath!!)
+                JujutsuRepositoryImpl(project, it, displayName)
+            }.filterValues {
+                val initialised = it.isInitialised
+                if (!initialised) {
+                    JujutsuNotifications.notifyUninitializedRoot(project, it)
+                }
+                initialised
+            }
+        }
 
     /**
      * Whether this project has any initialized JJ repositories.
      * Safe to call from EDT - uses cached value.
      */
-    val isJujutsu: Boolean get() = initializedRoots.value.isNotEmpty()
+    val isJujutsu: Boolean get() = initialisedRepositories.value.isNotEmpty()
 
     val repositoryStates = notifiableState(
         project,
@@ -94,9 +124,9 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             a.map { it.stateKey }.toSet() == b.map { it.stateKey }.toSet()
         }
     ) {
-        // Use initializedRoots.value to only load state for initialized repositories
-        // This avoids errors from uninitialized JJ VCS mappings
-        initializedRoots.value.mapNotNull {
+        // Use initialisedRoots.value to only load state for initialized repositories
+        // This avoids errors from uninitialised JJ VCS mappings
+        initialisedRepositories.value.mapNotNull { (_, it) ->
             it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
         }.toSet()
     }
@@ -143,7 +173,8 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     init {
         // Fire off an initial invalidation of repository roots to transition from empty to the actual roots - so that
         // initial state is initialised in all listeners
-        initializedRoots.invalidate()
+        jujutsuVcsRoots.invalidate()
+        initialisedRepositories.invalidate()
 
         val connection = project.messageBus.connect(this)
 
@@ -154,12 +185,12 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                 override fun after(events: List<VFileEvent>) {
                     // Check for .jj directory changes to update initializedRoots
                     if (events.any { isJjDirectoryEvent(it) }) {
-                        initializedRoots.invalidate()
+                        initialisedRepositories.invalidate()
                     }
 
                     // Mark changed files as dirty for VCS refresh
                     // Uses cached initializedRoots to avoid EDT slow operations
-                    val repos = initializedRoots.value
+                    val repos = initialisedRepositories.value.values
                     if (repos.isEmpty()) return
 
                     val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
@@ -192,7 +223,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                     }
                 }
 
-                private fun isUnderJjDirectory(file: VirtualFile, repos: Set<JujutsuRepository>) =
+                private fun isUnderJjDirectory(file: VirtualFile, repos: Collection<JujutsuRepository>) =
                     repos.any { repo ->
                         repo.directory.findChild(DOT_JJ)
                             ?.let { VfsUtil.isAncestor(it, file, false) } ?: false
@@ -216,24 +247,28 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             }
         }
 
+        jujutsuVcsRoots.connect(this) { new ->
+            initialisedRepositories.invalidate()
+        }
+
         // Subscribe to VCS configuration changes
         connection.subscribe(
             ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED,
             VcsListener {
                 log.debug("VCS configuration changed")
-                initializedRoots.invalidate()
+                jujutsuVcsRoots.invalidate()
             }
         )
         connection.subscribe(
             ProjectLevelVcsManagerEx.VCS_ACTIVATED,
             VcsActivationListener {
                 log.debug("VCS activated")
-                initializedRoots.invalidate()
+                jujutsuVcsRoots.invalidate()
             }
         )
 
         // Invalidate repositoryStates since it depends on initializedRoots
-        initializedRoots.connect(this) { new ->
+        initialisedRepositories.connect(this) { new ->
             log.info("Initialized roots changed to ${new.size} roots")
             // Reload repository states now that we have the current roots
             repositoryStates.invalidate()

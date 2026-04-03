@@ -345,7 +345,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      * 4. Reload from cache (the listener chain may also trigger reloadChangesFromCache)
      */
     fun refresh() {
-        val repos = project.stateModel.initializedRoots.value.map { it.directory }
+        val repos = project.stateModel.initialisedRepositories.value.keys
         if (repos.isNotEmpty()) {
             // Sync VFS for external changes (async)
             VfsUtil.markDirtyAndRefresh(true, true, true, *repos.toTypedArray())

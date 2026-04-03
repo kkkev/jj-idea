@@ -10,7 +10,6 @@ import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
 import `in`.kkkev.jjidea.util.runInBackground
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Bootstraps the Jujutsu state model and tool window management on project open.
@@ -46,13 +45,8 @@ class JujutsuStartupActivity : ProjectActivity {
         checker.recheck()
 
         // Check user config per repo as repos become available
-        val checkedRepoPaths: MutableSet<String> = ConcurrentHashMap.newKeySet()
-        project.stateModel.initializedRoots.connect(project) { roots ->
-            roots.forEach { repo ->
-                if (checkedRepoPaths.add(repo.directory.path)) {
-                    checkUserConfigForRepo(project, repo)
-                }
-            }
+        project.stateModel.initialisedRepositories.connect(project) { roots ->
+            roots.values.forEach { repo -> checkUserConfigForRepo(project, repo) }
         }
     }
 

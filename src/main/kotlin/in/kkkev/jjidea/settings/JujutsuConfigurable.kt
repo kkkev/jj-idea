@@ -51,7 +51,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private var globalEmailField: JBTextField? = null
 
     // Per-repo settings
-    private val repos: List<JujutsuRepository> = project.stateModel.initializedRoots.value.toList()
+    private val repos: Collection<JujutsuRepository> = project.stateModel.initialisedRepositories.value.values
     private var repoSettingsDirty = false
 
     private data class RepoSettingsPanel(

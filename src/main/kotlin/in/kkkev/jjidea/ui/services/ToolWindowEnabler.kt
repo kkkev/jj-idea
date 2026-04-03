@@ -34,12 +34,12 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
     init {
         // React to initializedRoots changes (init() already calls invalidate(),
         // and connect() fires immediately if the value has loaded)
-        project.stateModel.initializedRoots.connect(this) { jjRoots ->
-            handleRootsChange(jjRoots)
+        project.stateModel.initialisedRepositories.connect(this) { jjRoots ->
+            handleRootsChange(jjRoots.values)
         }
     }
 
-    private fun handleRootsChange(jjRoots: Set<JujutsuRepository>) {
+    private fun handleRootsChange(jjRoots: Collection<JujutsuRepository>) {
         runLater {
             val hasJjRoots = jjRoots.isNotEmpty()
             val allVcsRoots = ProjectLevelVcsManager.getInstance(project).allVcsRoots

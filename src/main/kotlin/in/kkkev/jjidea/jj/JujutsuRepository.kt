@@ -6,9 +6,7 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
-import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.jj.cli.CliLogService
-import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
@@ -29,30 +27,21 @@ interface JujutsuRepository {
     fun getRelativePath(file: VirtualFile): String
 }
 
-data class JujutsuRepositoryImpl(override val project: Project, override val directory: VirtualFile) :
-    JujutsuRepository {
-    private val executor: CommandExecutor by lazy {
-        CliExecutor(
-            root = directory,
-            executableProvider = { JujutsuApplicationSettings.getInstance().state.jjExecutablePath },
-            onJjNotFound = { JjAvailabilityChecker.getInstance(project).recheck() }
-        )
-    }
+data class JujutsuRepositoryImpl(
+    override val project: Project,
+    override val directory: VirtualFile,
+    override val displayName: String
+) : JujutsuRepository {
+    private val executor: CommandExecutor by lazy { project.commandExecutorFactory.create(directory) }
 
     /**
      * Command executor for initialized repositories. Throws if repository is not initialized.
-     * Use [initExecutor] for initialization commands.
      */
     override val commandExecutor: CommandExecutor
         get() {
             requireInitialised()
             return executor
         }
-
-    /**
-     * Command executor for initialization operations (gitInit). Does not require repository to be initialized.
-     */
-    val initExecutor: CommandExecutor get() = executor
 
     override val logService: LogService by lazy { CliLogService(this) }
 
@@ -64,11 +53,6 @@ data class JujutsuRepositoryImpl(override val project: Project, override val dir
      * Path of this root, relative to the project directory.
      */
     val relativePath get() = project.guessProjectDir()?.let { directory.pathRelativeTo(it) } ?: directory.path
-
-    /**
-     * Display name for UI. Shows the directory name, or "root" if it's the project root.
-     */
-    override val displayName get() = relativePath.ifEmpty { directory.name }
 
     override val isInitialised get() = JujutsuRootChecker.isJujutsuRoot(directory)
 
