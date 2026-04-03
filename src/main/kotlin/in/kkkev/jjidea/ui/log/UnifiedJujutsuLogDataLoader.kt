@@ -46,11 +46,12 @@ class UnifiedJujutsuLogDataLoader(
      */
     fun loadCommits(revset: Expression = Expression.ALL) {
         val repos = repositories()
-        val limit = JujutsuSettings.getInstance(project).state.logChangeLimit
+        val settings = JujutsuSettings.getInstance(project)
+        val defaultLimit = settings.state.logChangeLimit
 
         if (repos.isEmpty()) {
             log.info("No repositories to load commits from")
-            notify(Data(emptyList(), emptyMap(), limit))
+            notify(Data(emptyList(), emptyMap(), defaultLimit))
             return
         }
 
@@ -72,7 +73,8 @@ class UnifiedJujutsuLogDataLoader(
                             indicator.text2 = "Loading from ${repo.displayName}..."
                             indicator.fraction = index.toDouble() / repos.size
 
-                            val result = repo.logService.getLog(revset, limit = limit)
+                            val repoLimit = settings.logChangeLimit(repo)
+                            val result = repo.logService.getLog(revset, limit = repoLimit)
 
                             result.onSuccess { loadedEntries ->
                                 entriesByRepo[repo] = loadedEntries
@@ -103,7 +105,7 @@ class UnifiedJujutsuLogDataLoader(
             },
             onSuccess = {
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) return@executeInBackground
-                notify(Data(allEntries, graphNodes, limit))
+                notify(Data(allEntries, graphNodes, defaultLimit))
             }
         )
     }

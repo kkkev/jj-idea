@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.16] - 2026-04-03
+
+### Changed
+- JJ executable path is now a global (application-level) setting, shared across all projects. Existing custom paths are automatically migrated.
+- Settings architecture uses three tiers: global (app), project, and per-repository overrides
+- Working copy and log panels show "Checking jj..." instead of "jj Not Found" during startup availability check
+
 ### Fixed
-- Describe working copy no longer throws write-only access error
+- Describe working copy no longer throws write-only access error (Github #8)
 
 ## [0.5.15] - 2026-04-02
 
@@ -275,7 +282,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.15...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.16...HEAD
+[0.5.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.16
 [0.5.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.15
 [0.5.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.14
 [0.5.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.13

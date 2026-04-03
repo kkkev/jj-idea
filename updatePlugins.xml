@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.15/jj-idea-0.5.15.zip" version="0.5.15">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.16/jj-idea-0.5.16.zip" version="0.5.16">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,19 +23,16 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.15</h3>
+      <h3>0.5.16</h3>
       
-<h4>Added</h4>
-<li>Truncation indicator in log panel when the entry count hits the limit, with a clickable link to open settings</li>
-<li>Log automatically reloads when the limit setting is changed</li>
+<h4>Changed</h4>
+<li>JJ executable path is now a global (application-level) setting, shared across all projects. Existing custom paths are automatically migrated.</li>
+<li>Settings architecture uses three tiers: global (app), project, and per-repository overrides</li>
+<li>Working copy and log panels show "Checking jj..." instead of "jj Not Found" during startup availability check</li>
 
 <h4>Fixed</h4>
-<li>Support custom jj builds with version strings like "jj companyname-0.39.0-..." (GitHub #7)</li>
-<li>Conflicted bookmarks no longer break lists of all bookmarks</li>
-
-<h4>Changed</h4>
-<li>Default log limit increased from 50 to 500, with automatic migration for existing users who never changed the default</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.15">full release notes</a> for details.</p>
+<li>Describe working copy no longer throws write-only access error (Github #8)</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.16">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

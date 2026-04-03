@@ -253,13 +253,28 @@ Extension functions: `append(changeId)`, `append(description)`, `append(instant)
 
 **See**: `ui/TextCanvas.kt`, `ui/DateTimeFormatter.kt`, `ui/Formatters.kt`, `ui/JujutsuColors.kt`
 
-#### 3. Settings Architecture
-Project-level `PersistentStateComponent` with `BoundConfigurable` UI:
-- `JujutsuSettingsState` - Data class
-- `JujutsuSettings` - Service managing state
-- `JujutsuConfigurable` - UI panel using Kotlin UI DSL
+#### 3. Settings Architecture — Three-Tier Model
 
-Settings stored in `.idea/jujutsu.xml`
+Settings use three tiers with fallback resolution: **repo override → project default → global default**.
+
+| Tier | Service | Storage | Settings |
+|------|---------|---------|----------|
+| **Global** (app-level) | `JujutsuApplicationSettings` | `~/Library/.../jujutsu.xml` | `jjExecutablePath` |
+| **Project** | `JujutsuSettings` | `.idea/jujutsu.xml` | UI prefs, log defaults |
+| **Repository** | `RepositoryConfig` in project state | `.idea/jujutsu.xml` (map keyed by repo path) | `logChangeLimit` overrides |
+
+**Global tier** (`JujutsuApplicationSettings`): `@Service(Service.Level.APP)` with `RoamingType.DISABLED`. Machine-specific settings shared across all projects. Currently only `jjExecutablePath`.
+
+**Project tier** (`JujutsuSettings`): `@Service(Service.Level.PROJECT)`. UI preferences and defaults for repo-level settings.
+
+**Repository tier** (`RepositoryConfig`): Stored in `JujutsuSettingsState.repositoryOverrides` map, keyed by `repo.directory.path`. Nullable fields — `null` means "use project default". Access via `settings.logChangeLimit(repo)`.
+
+**Adding new settings**:
+- Global (machine-specific): Add field to `JujutsuApplicationSettingsState`
+- Project (UI pref): Add field to `JujutsuSettingsState`
+- Per-repo (overridable): Add nullable field to `RepositoryConfig`, add accessor to `JujutsuSettings`
+
+**Migration**: `loadState()` handles version upgrades. v2 migrated `jjExecutablePath` from project to global (first project with custom path wins).
 
 **See**: `settings/` package
 

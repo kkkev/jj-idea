@@ -25,7 +25,7 @@ import com.intellij.util.ui.JBEmptyBorder
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
-import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import java.io.File
@@ -132,8 +132,8 @@ class JujutsuCloneComponent(private val project: Project) : VcsCloneDialogExtens
                 indicator.isIndeterminate = true
                 indicator.text = JujutsuBundle.message("clone.progress.starting")
 
-                val settings = JujutsuSettings.getInstance(project)
-                val executor = CliExecutor.forRootlessOperations { settings.state.jjExecutablePath }
+                val appSettings = JujutsuApplicationSettings.getInstance()
+                val executor = CliExecutor.forRootlessOperations { appSettings.state.jjExecutablePath }
                 val result = executor.gitCloneWithProgress(url, directory, colocate, indicator)
 
                 if (result.isSuccess) {

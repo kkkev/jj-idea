@@ -5,7 +5,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.util.NotifiableState
 import `in`.kkkev.jjidea.util.notifiableState
 
@@ -32,15 +32,14 @@ class JjAvailabilityChecker(private val project: Project) : Disposable {
     val status: NotifiableState<JjAvailabilityStatus> = notifiableState(
         project,
         "JjAvailabilityStatus",
-        JjAvailabilityStatus.NotFound(emptyList())
+        JjAvailabilityStatus.Checking
     ) {
         checkAvailability()
     }
 
     private fun checkAvailability(): JjAvailabilityStatus {
         try {
-            val settings = JujutsuSettings.getInstance(project)
-            val configuredPath = settings.state.jjExecutablePath
+            val configuredPath = JujutsuApplicationSettings.getInstance().state.jjExecutablePath
 
             log.info("Checking jj availability (configured path: $configuredPath)")
 

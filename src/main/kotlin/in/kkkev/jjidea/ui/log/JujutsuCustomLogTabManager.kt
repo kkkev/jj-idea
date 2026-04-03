@@ -138,7 +138,7 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
             }
 
             else -> {
-                // Replace the not-installed panel with fresh content
+                // Replace the not-installed panel with fresh content (including Checking state)
                 notInstalledPanel?.let { wrapper.remove(it) }
                 val newNotInstalledPanel = JjNotInstalledPanel(project, status)
                 notInstalledPanel = newNotInstalledPanel
