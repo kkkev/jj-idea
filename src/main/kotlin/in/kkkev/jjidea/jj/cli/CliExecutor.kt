@@ -295,20 +295,21 @@ class CliExecutor(
     override fun gitClone(source: String, destination: String, colocate: Boolean) =
         execute(null, gitCloneArgs(source, destination, colocate), timeout = networkTimeout)
 
-    override fun configGet(key: String) = execute(root, buildList {
-        addAllIfNotNull("config", "get", key)
-    })
+    override fun configGet(key: String) = execute(
+        root,
+        buildList { addAllIfNotNull("config", "get", key) }
+    )
 
-    override fun configList(key: String?, scope: CommandExecutor.ConfigScope?) = execute(root, buildList {
-        addAllIfNotNull("config", "list", scope?.param, key)
-    })
+    override fun configList(key: String?, scope: CommandExecutor.ConfigScope?) = execute(
+        root,
+        buildList { addAllIfNotNull("config", "list", scope?.param, key) }
+    )
 
     override fun configSetUser(scope: CommandExecutor.ConfigScope, key: String, value: String) =
         execute(root, listOf("config", "set", scope.param, key, value))
 
-    override fun configUnset(scope: CommandExecutor.ConfigScope, key: String): CommandExecutor.CommandResult {
-        return execute(root, listOf("config", "unset", scope.param, key))
-    }
+    override fun configUnset(scope: CommandExecutor.ConfigScope, key: String) =
+        execute(root, listOf("config", "unset", scope.param, key))
 
     /**
      * Clone a Git repository with streaming progress updates.

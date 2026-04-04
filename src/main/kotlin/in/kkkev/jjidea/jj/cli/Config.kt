@@ -11,7 +11,7 @@ class Config(private val commandExecutor: CommandExecutor) {
 
     enum class Key(val string: String) {
         USER_NAME("user.name"),
-        USER_EMAIL("user.email"),
+        USER_EMAIL("user.email")
     }
 
     interface ScopedConfig {
@@ -20,15 +20,18 @@ class Config(private val commandExecutor: CommandExecutor) {
     }
 
     private inner class ScopedConfigImpl(private val scope: CommandExecutor.ConfigScope?) : ScopedConfig {
-        override fun get(key: Key) = if (
-            (scope != null) &&
-            (commandExecutor.configList(key.string, scope).takeIf { it.isSuccess }?.stdout?.isNotBlank() != true)
-        )
-        // If a scope has been specified - see if the config option is set in the specific scope by listing
-            null
-        else
-            commandExecutor.configGet(key.string).takeIf { it.isSuccess }?.stdout?.trim()
-                ?.takeIf { it.isNotEmpty() }
+        // If a scope has been specified, check the config option exists in that scope via listing.
+        // Falls back to effective (cross-scope) lookup when no scope filter is active.
+        override fun get(key: Key): String? =
+            if (
+                scope != null &&
+                commandExecutor.configList(key.string, scope).takeIf { it.isSuccess }?.stdout?.isNotBlank() != true
+            ) {
+                null
+            } else {
+                commandExecutor.configGet(key.string).takeIf { it.isSuccess }?.stdout?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+            }
 
         override fun set(key: Key, value: String?) {
             val actualScope = scope ?: CommandExecutor.ConfigScope.REPO
