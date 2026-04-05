@@ -41,7 +41,7 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     private val splitter: OnePixelSplitter
 
     // Metadata components
-    private val metadataPane = IconAwareHtmlPane()
+    private val metadataPane = IconAwareHtmlPane(project)
 
     // Changes tree
     private val changesTree = JujutsuChangesTree(project)

@@ -392,7 +392,7 @@ class SplitDialog(
         border = JBUI.Borders.empty(4, 0)
     }
 
-    private fun createEntryPane(entry: LogEntry) = IconAwareHtmlPane().apply {
+    private fun createEntryPane(entry: LogEntry) = IconAwareHtmlPane(project).apply {
         alignmentX = JPanel.LEFT_ALIGNMENT
         text = htmlString {
             appendStatusIndicators(entry)

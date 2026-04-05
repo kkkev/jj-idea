@@ -26,6 +26,6 @@ class OpenJujutsuLogTabAction : DumbAwareAction(
     override fun update(e: AnActionEvent) = with(e.presentation) {
         // Always visible in menus, but only enabled when in a Jujutsu project
         isVisible = true
-        isEnabled = e.project?.isJujutsu ?: false
+        isEnabled = e.project.isJujutsu
     }
 }

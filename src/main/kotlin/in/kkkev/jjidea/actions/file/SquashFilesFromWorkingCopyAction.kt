@@ -7,6 +7,7 @@ import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.change.executeSquash
 import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -14,7 +15,6 @@ import `in`.kkkev.jjidea.ui.squash.SquashDialog
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.singleJujutsuRepository
 
 /**
  * Squash selected files into the parent change, from the project view or editor context.
@@ -29,8 +29,7 @@ class SquashFilesFromWorkingCopyAction : DumbAwareAction(
 
     override fun update(e: AnActionEvent) {
         val project = e.project
-        val files = e.files
-        val repo = files.singleJujutsuRepository
+        val repo = e.singleRepoForFiles
         if (project == null || repo == null) {
             e.presentation.isEnabledAndVisible = false
             return
@@ -42,7 +41,7 @@ class SquashFilesFromWorkingCopyAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val files = e.files
-        val repo = files.singleJujutsuRepository ?: return
+        val repo = e.singleRepoForFiles ?: return
         val entry = project.stateModel.repositoryStates.value
             .find { it.isWorkingCopy && it.repo == repo } ?: return
         val preSelectedFiles = files.map { it.filePath }.toSet()

@@ -8,8 +8,8 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.ui.history.JujutsuFileHistoryTabManager
-import `in`.kkkev.jjidea.vcs.possibleJujutsuRepository
 
 /**
  * Action to show custom file history for a Jujutsu-managed file.
@@ -29,9 +29,9 @@ class ShowFileHistoryAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val file = e.file ?: return
+        val repo = e.repoForFile ?: return
 
         val filePath = VcsUtil.getFilePath(file)
-        val repo = filePath.possibleJujutsuRepository ?: return
 
         log.info("Opening custom file history for: ${file.path}")
 
@@ -39,13 +39,9 @@ class ShowFileHistoryAction : DumbAwareAction(
     }
 
     override fun update(e: AnActionEvent) {
-        val project = e.project
         val file = e.file
 
         // Only enable for files in a Jujutsu repository
-        e.presentation.isEnabledAndVisible = project != null &&
-            file != null &&
-            !file.isDirectory &&
-            VcsUtil.getFilePath(file).possibleJujutsuRepository != null
+        e.presentation.isEnabledAndVisible = file != null && !file.isDirectory && e.repoForFile != null
     }
 }

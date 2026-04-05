@@ -8,10 +8,9 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
-import `in`.kkkev.jjidea.vcs.jujutsuRepository
+import `in`.kkkev.jjidea.vcs.possibleInitialisedJujutsuRepositoryForRoot
 
 /**
  * Provides change information for jujutsu working copy
@@ -27,31 +26,25 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     ) {
         log.info("getChanges called on ${Thread.currentThread().name}, ${dirtyScope.affectedContentRoots.size} roots")
 
-        dirtyScope.affectedContentRoots.map { it.jujutsuRepository }.forEach { repo ->
-            // Handle uninitialized roots (e.g., .jj directory was deleted)
-            if (!repo.isInitialised) {
-                log.info("Root configured for Jujutsu but not initialized: $repo")
-                JujutsuNotifications.notifyUninitializedRoot(vcs.project, repo)
-                return@forEach
-            }
+        dirtyScope.affectedContentRoots.mapNotNull { vcs.project.possibleInitialisedJujutsuRepositoryForRoot(it) }.toSet()
+            .forEach { repo ->
+                try {
+                    val startTime = System.currentTimeMillis()
+                    val result = repo.commandExecutor.status()
+                    log.info("jj status for $repo took ${System.currentTimeMillis() - startTime}ms")
 
-            try {
-                val startTime = System.currentTimeMillis()
-                val result = repo.commandExecutor.status()
-                log.info("jj status for $repo took ${System.currentTimeMillis() - startTime}ms")
+                    if (!result.isSuccess) {
+                        log.warn("Failed to get jj status for $repo: ${result.stderr}")
+                        return@forEach // Continue to next root instead of returning from entire method
+                    }
 
-                if (!result.isSuccess) {
-                    log.warn("Failed to get jj status for $repo: ${result.stderr}")
-                    return@forEach // Continue to next root instead of returning from entire method
+                    parseStatus(result.stdout, repo, builder)
+                } catch (e: ProcessCanceledException) {
+                    throw e
+                } catch (e: Exception) {
+                    log.warn("Error getting changes for $repo: ${e.message}")
                 }
-
-                parseStatus(result.stdout, repo, builder)
-            } catch (e: ProcessCanceledException) {
-                throw e
-            } catch (e: Exception) {
-                log.warn("Error getting changes for $repo: ${e.message}")
             }
-        }
     }
 
     override fun isModifiedDocumentTrackingRequired() = true

@@ -10,10 +10,10 @@ import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.files
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.singleJujutsuRepository
 
 /**
  * Restores selected files to their state in the parent revision (@-).
@@ -33,9 +33,7 @@ class RestoreSelectionAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val files = e.files
-        if (files.isEmpty()) return
-
-        val repo = files.singleJujutsuRepository ?: return
+        val repo = e.singleRepoForFiles ?: return
 
         // Show confirmation dialog
         val title = if (files.size == 1) {
@@ -68,13 +66,12 @@ class RestoreSelectionAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        val files = e.files
         val entry = e.logEntry
 
         // Hide when in historical context (entry is present and not working copy)
         // In that case, RestoreToChangeAction should be used instead
         val isHistoricalContext = entry != null && !entry.isWorkingCopy
-        val hasValidFiles = e.project != null && files.isNotEmpty() && files.singleJujutsuRepository != null
+        val hasValidFiles = e.singleRepoForFiles != null
 
         e.presentation.isEnabledAndVisible = !isHistoricalContext && hasValidFiles
     }

@@ -64,7 +64,7 @@ class JujutsuLogTable(
             val text = component.toolTipText
             if (text.isNullOrBlank()) return false
 
-            val pane = IconAwareHtmlPane()
+            val pane = IconAwareHtmlPane(project)
             pane.foreground = UIUtil.getToolTipForeground()
             pane.text = text
 

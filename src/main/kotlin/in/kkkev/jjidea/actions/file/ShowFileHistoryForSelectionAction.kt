@@ -9,7 +9,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.editor
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.performAction
-import `in`.kkkev.jjidea.vcs.isJujutsu
+import `in`.kkkev.jjidea.actions.repoForFile
 
 /**
  * Action to show history filtered to selected lines in the editor
@@ -28,11 +28,11 @@ class ShowFileHistoryForSelectionAction :
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
-        e.editor?.let {
-            e.file?.let { file ->
-                log.info("Showing history for selection in ${file.path}")
-                e.performAction("Vcs.ShowHistoryForBlock")
-            }
+        if (e.editor != null) {
+            val file = e.file ?: return
+
+            log.info("Showing history for selection in ${file.path}")
+            e.performAction("Vcs.ShowHistoryForBlock")
         }
     }
 
@@ -40,10 +40,7 @@ class ShowFileHistoryForSelectionAction :
         val editor = e.editor
         val project = e.project
 
-        e.presentation.isEnabledAndVisible = (project != null) &&
-            (editor != null) &&
-            (e.file != null) &&
-            editor.selectionModel.hasSelection() &&
-            project.isJujutsu
+        e.presentation.isEnabledAndVisible =
+            editor != null && editor.selectionModel.hasSelection() && e.repoForFile != null
     }
 }

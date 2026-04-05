@@ -13,7 +13,7 @@ import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.jujutsuRepository
+import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 
 /**
  * Provides file annotations (blame) for Jujutsu files
@@ -57,7 +57,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      */
     private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
         try {
-            val repo = file.jujutsuRepository
+            val repo = project.jujutsuRepositoryFor(file)
 
             // Execute annotation command with template
             val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)

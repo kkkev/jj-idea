@@ -19,7 +19,7 @@ import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
+import `in`.kkkev.jjidea.vcs.jujutsuRepositoryForRoot
 import javax.swing.JComponent
 
 class InitAction : DumbAwareAction(
@@ -48,7 +48,7 @@ class InitAction : DumbAwareAction(
         val colocate = dialog.isColocate
 
         // Run init in background - use initExecutor since repo isn't initialized yet
-        val commandExecutor = project.jujutsuRepositoryFor(newRoot).initExecutor
+        val commandExecutor = project.jujutsuRepositoryForRoot(newRoot).initExecutor
 
         commandExecutor.createCommand {
             val result = gitInit(colocate)

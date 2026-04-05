@@ -12,8 +12,8 @@ import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 import `in`.kkkev.jjidea.vcs.isJujutsu
-import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 
 /**
  * Push to a Git remote. Loads remotes/bookmarks off EDT, then opens a dialog to configure options.
@@ -29,14 +29,16 @@ class GitPushAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = e.project?.isJujutsu == true
+        e.presentation.isEnabledAndVisible = e.project.isJujutsu
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val repos = project.jujutsuRepositories.filter { it.isInitialised }
+        val repos = project.initialisedJujutsuRepositories
         if (repos.isEmpty()) return
 
+        // TODO jj-idea-wbib: don't just assume first initialise repository
+        // TODO Fix in jj-idea-p929
         val repo = repos.first()
 
         // Load remotes and bookmarks off EDT, then show dialog on EDT

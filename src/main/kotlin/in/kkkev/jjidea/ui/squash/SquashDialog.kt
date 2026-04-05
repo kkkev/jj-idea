@@ -130,7 +130,7 @@ class SquashDialog(
         return label
     }
 
-    private fun createEntryPane(entry: LogEntry) = IconAwareHtmlPane().apply {
+    private fun createEntryPane(entry: LogEntry) = IconAwareHtmlPane(project).apply {
         alignmentX = JPanel.LEFT_ALIGNMENT
         text = htmlString {
             appendStatusIndicators(entry)

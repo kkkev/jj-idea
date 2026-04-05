@@ -187,7 +187,7 @@ class RebaseDialog(
         return label
     }
 
-    private fun createSourcePanel() = IconAwareHtmlPane().apply {
+    private fun createSourcePanel() = IconAwareHtmlPane(project).apply {
         alignmentX = JPanel.LEFT_ALIGNMENT
         text = htmlString {
             append(sourceEntries, separator = "\n") { entry ->

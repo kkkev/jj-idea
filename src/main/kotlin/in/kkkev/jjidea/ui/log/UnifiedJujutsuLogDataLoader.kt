@@ -25,7 +25,7 @@ import java.util.concurrent.TimeUnit
  */
 class UnifiedJujutsuLogDataLoader(
     private val project: Project,
-    private val repositories: () -> List<JujutsuRepository>,
+    private val repositories: () -> Collection<JujutsuRepository>,
     private val panel: CommitTablePanel<Data>
 ) : BackgroundDataLoader(project, "Loading Jujutsu Commits") {
     private val graphBuilder = CommitGraphBuilder()

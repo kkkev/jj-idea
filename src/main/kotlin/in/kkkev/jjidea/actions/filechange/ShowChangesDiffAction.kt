@@ -15,13 +15,13 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.actions.repoForFile
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.isJujutsu
-import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Action to show diff for selected file changes.
@@ -50,17 +50,13 @@ class ShowChangesDiffAction : DumbAwareAction(
             showChangesDiff(project, change, logEntry)
         } else {
             // Project view/editor context - show diff for selected file
-            val file = e.file ?: return
-            showFileDiff(project, file)
+            showFileDiff(e.repoForFile ?: return, e.file ?: return)
         }
     }
 
     override fun update(e: AnActionEvent) {
-        val hasChanges = e.changes.isNotEmpty()
-        val hasJujutsuFile = e.file?.isJujutsu == true
-
         // Show in changes context OR when in a jj project with a file selected
-        e.presentation.isEnabledAndVisible = hasChanges || hasJujutsuFile
+        e.presentation.isEnabledAndVisible = e.changes.isNotEmpty() || e.repoForFile != null
     }
 }
 
@@ -68,30 +64,29 @@ class ShowChangesDiffAction : DumbAwareAction(
  * Show diff for a file in project view/editor context.
  * Compares file at @- with the local working copy (editable).
  */
-fun showFileDiff(project: Project, file: VirtualFile) {
+fun showFileDiff(repo: JujutsuRepository, file: VirtualFile) {
     val parentRevision = RevisionExpression("@-")
     runInBackground {
-        val repo = file.jujutsuRepository
         val revisionResult = repo.commandExecutor.show(file.filePath, parentRevision)
         val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
         runLater {
             val contentFactory = DiffContentFactory.getInstance()
             val localContent = if (file.exists()) {
-                contentFactory.create(project, file)
+                contentFactory.create(repo.project, file)
             } else {
                 contentFactory.createEmpty()
             }
 
             val diffRequest = SimpleDiffRequest(
                 file.name,
-                contentFactory.create(project, revisionContent, file.fileType),
+                contentFactory.create(repo.project, revisionContent, file.fileType),
                 localContent,
                 "${file.name} (@-)",
                 "${file.name} (@)"
             )
 
-            DiffManager.getInstance().showDiff(project, diffRequest)
+            DiffManager.getInstance().showDiff(repo.project, diffRequest)
         }
     }
 }
@@ -160,8 +155,10 @@ fun showChangesDiff(project: Project, change: Change, logEntry: LogEntry?) {
             val content2 = when {
                 afterVirtualFile != null && afterVirtualFile.exists() ->
                     contentFactory.create(project, afterVirtualFile)
+
                 afterPath != null && afterContent != null && afterContent.isNotEmpty() ->
                     contentFactory.create(project, afterContent, afterPath.fileType)
+
                 else -> contentFactory.createEmpty()
             }
 

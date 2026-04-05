@@ -1,20 +1,18 @@
 package `in`.kkkev.jjidea.vcs
 
-import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectLocator
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.JujutsuRepositoryImpl
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 
 /**
  * Find JujutsuVcs for a project. Returns null if not found.
@@ -29,87 +27,47 @@ val Project.possibleJujutsuVcs
             }
         ) as? JujutsuVcs
 
-val Project.isJujutsu get() = this.stateModel.isJujutsu
+val Project?.isJujutsu get() = this?.stateModel?.isJujutsu == true
 
 /** All VCS roots in the project that are managed by Jujutsu. Returns VcsRoot objects (not just paths) since callers often need the full root info. */
 val Project.jujutsuRoots get() = ProjectLevelVcsManager.getInstance(this).allVcsRoots.filter { it.vcs is JujutsuVcs }
 
-fun Project.jujutsuRepositoryFor(directory: VirtualFile) = JujutsuRepositoryImpl(this, directory)
+fun Project.jujutsuRepositoryForRoot(directory: VirtualFile) = JujutsuRepositoryImpl(this, directory)
+
+fun Project.possibleJujutsuRepositoryFor(file: VirtualFile) =
+    VcsUtil.getVcsRootFor(this, file)?.let { jujutsuRepositoryForRoot(it) }
+
+fun Project.jujutsuRepositoryFor(file: VirtualFile) = possibleJujutsuRepositoryFor(file)
+    ?: throw VcsException(JujutsuBundle.getMessage("vcs.error.no.root", file))
+
+fun Project.possibleJujutsuRepositoryFor(filePath: FilePath) =
+    VcsUtil.getVcsRootFor(this, filePath)?.let { jujutsuRepositoryForRoot(it) }
+
+fun Project.jujutsuRepositoryFor(filePath: FilePath) = possibleJujutsuRepositoryFor(filePath)
+    ?: throw VcsException(JujutsuBundle.message("vcs.error.no.root", filePath))
+
+/**
+ * Get the Jujutsu repository for the specified directory, warning with a popup (and returning null) if the repository
+ * is not yet initialised.
+ */
+fun Project.possibleInitialisedJujutsuRepositoryForRoot(directory: VirtualFile): JujutsuRepositoryImpl? {
+    val repo = jujutsuRepositoryForRoot(directory)
+    return if (repo.isInitialised)
+        repo
+    else {
+        JujutsuNotifications.notifyUninitializedRoot(this, repo)
+        null
+    }
+}
 
 /** JujutsuRepository instances for all Jujutsu roots in the project. Use this when you need to work with JJ commands. */
-val Project.jujutsuRepositories get() = this.jujutsuRoots.map { this.jujutsuRepositoryFor(it.path) }
-
-/**
- * Find JujutsuVcs for a virtual file root. Returns null if not found.
- * Use when VCS might not be available.
- */
-val VirtualFile.possibleJujutsuVcs
-    get() = ProjectLocator.getInstance()
-        .guessProjectForFile(this)
-        ?.let(ProjectLevelVcsManager::getInstance)
-        ?.getVcsFor(this) as? JujutsuVcs
-
-/**
- * Find JujutsuVcs for a project, throwing if not found.
- * Use when VCS MUST be available (e.g., within Jujutsu-specific tool windows or providers).
- * @throws VcsException if Jujutsu VCS is not configured for this project
- */
-val VirtualFile.jujutsuVcs
-    get() = this.possibleJujutsuVcs ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
-
-val VirtualFile.jujutsuRepository
-    get() = jujutsuVcs.jujutsuRepositoryFor(this) ?: throw VcsException(
-        JujutsuBundle.message(
-            "vcs.error.no.root",
-            this.path
-        )
-    )
-
-val List<VirtualFile>.singleJujutsuRepository get() = this.map { it.jujutsuRepository }.toSet().singleOrNull()
-
-val VirtualFile.isJujutsu get() = possibleJujutsuVcs?.jujutsuRepositoryFor(this) != null
-
-val VirtualFile.jujutsuProject
-    get() = ReadAction.compute<Project?, RuntimeException> {
-        ProjectManager.getInstance().openProjects.firstOrNull { project ->
-            project.jujutsuRoots.any { it.path == this || VfsUtilCore.isAncestor(it.path, this, false) }
-        }
-    } ?: throw VcsException("Cannot find Jujutsu VCS for file: ${this.path}")
+val Project.jujutsuRepositories get() = jujutsuRoots.map { this.jujutsuRepositoryForRoot(it.path) }
+val Project.initialisedJujutsuRepositories: Set<JujutsuRepository> get() = stateModel.initializedRoots.value
 
 val VirtualFile.filePath get() = VcsUtil.getFilePath(this)
 fun VirtualFile.pathRelativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
 fun VirtualFile.getChildPath(relativePath: String, isDirectory: Boolean = false) =
     VcsUtil.getFilePath(this.path + "/" + relativePath, isDirectory)
-
-val FilePath.possibleJujutsuProject: Project?
-    get() {
-        // Search up the directory structure, as this path may represent a deleted file
-        var path: FilePath? = this
-        var file: VirtualFile? = virtualFile
-        while ((file == null) && (path != null)) {
-            path = path.parentPath
-            file = path?.virtualFile
-        }
-        return file?.jujutsuProject
-    }
-
-val FilePath.possibleJujutsuVcs
-    get() = this.possibleJujutsuProject?.let(ProjectLevelVcsManager::getInstance)?.getVcsFor(this) as? JujutsuVcs
-
-val FilePath.jujutsuVcs
-    get() = this.possibleJujutsuVcs ?: throw VcsException(JujutsuBundle.message("vcs.error.not.available", this.path))
-
-val FilePath.possibleJujutsuRepository get() = this.possibleJujutsuVcs?.jujutsuRepositoryFor(this)
-
-val FilePath.jujutsuRepository
-    get() = this.possibleJujutsuRepository ?: throw VcsException(
-        JujutsuBundle.message(
-            "vcs.error.no.root",
-            this.path
-        )
-    )
-
-val FilePath.isJujutsu get() = this.possibleJujutsuRepository != null
 
 fun FilePath.relativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
 

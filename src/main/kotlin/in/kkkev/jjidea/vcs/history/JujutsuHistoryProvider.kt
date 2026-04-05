@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.vcs.history
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsActions
 import com.intellij.openapi.vcs.VcsException
@@ -11,13 +12,13 @@ import com.intellij.openapi.vcs.history.*
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.vcs.jujutsuRepository
+import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import javax.swing.JComponent
 
 /**
  * Provides file history for the Jujutsu VCS
  */
-class JujutsuHistoryProvider() : VcsHistoryProvider {
+class JujutsuHistoryProvider(private val project: Project) : VcsHistoryProvider {
     private val log = Logger.getInstance(javaClass)
 
     @RequiresBackgroundThread
@@ -25,12 +26,12 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
         log.info("Creating history session for file: ${filePath.path}")
 
         try {
-            val jujutsuRepository = filePath.jujutsuRepository
+            val repo = project.jujutsuRepositoryFor(filePath)
 
             log.debug("Fetching history for file: $filePath")
 
             // Use logService to get log entries for this file
-            val logService = jujutsuRepository.logService
+            val logService = repo.logService
             val result = logService.getLogBasic(Expression.ALL, listOf(filePath))
 
             val entries = result.getOrElse { error ->
@@ -46,7 +47,7 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
             }
 
             // Convert to VcsFileRevision objects
-            val revisions = entries.map { entry -> JujutsuFileRevision(entry, filePath, jujutsuRepository) }
+            val revisions = entries.map { entry -> JujutsuFileRevision(entry, filePath, repo) }
 
             // Return history session
             val currentRevision = revisions.firstOrNull()?.revisionNumber
@@ -65,12 +66,12 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
         partner.reportCreatedEmptySession(emptySession)
 
         try {
-            val jujutsuRepository = filePath.jujutsuRepository
+            val repo = project.jujutsuRepositoryFor(filePath)
 
             log.debug("Fetching history for file: $filePath")
 
             // Step 2: Load history
-            val logService = jujutsuRepository.logService
+            val logService = repo.logService
             val result = logService.getLog(Expression.ALL, listOf(filePath))
 
             val entries = result.getOrElse { error ->
@@ -83,7 +84,7 @@ class JujutsuHistoryProvider() : VcsHistoryProvider {
 
             // Step 3: Stream each revision to the partner
             entries.forEach { entry ->
-                val revision = JujutsuFileRevision(entry, filePath, jujutsuRepository)
+                val revision = JujutsuFileRevision(entry, filePath, repo)
                 partner.acceptRevision(revision)
             }
         } catch (e: Exception) {

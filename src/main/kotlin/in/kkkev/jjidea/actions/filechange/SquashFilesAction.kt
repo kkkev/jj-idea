@@ -7,8 +7,8 @@ import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.change.executeSquash
 import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.files
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
@@ -17,7 +17,6 @@ import `in`.kkkev.jjidea.ui.squash.SquashDialog
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.singleJujutsuRepository
 
 /**
  * Squash selected files into the parent change, from a file changes context.
@@ -79,8 +78,7 @@ class SquashFilesAction : DumbAwareAction(
     private fun resolveEntry(e: AnActionEvent): LogEntry? {
         e.logEntry?.let { return it }
         val project = e.project ?: return null
-        val repo = e.files.singleJujutsuRepository ?: return null
-        return project.stateModel.repositoryStates.value
-            .find { it.isWorkingCopy && it.repo == repo }
+        val repo = e.singleRepoForFiles ?: return null
+        return project.stateModel.repositoryStates.value.find { it.isWorkingCopy && it.repo == repo }
     }
 }

@@ -4,7 +4,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
-import `in`.kkkev.jjidea.vcs.jujutsuRepositories
+import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 import javax.swing.Box
 import javax.swing.JPanel
 
@@ -24,7 +24,7 @@ class UnifiedJujutsuLogPanel(project: Project) :
     CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>(project, "JujutsuLogToolbar", {
         UnifiedJujutsuLogDataLoader(
             project,
-            { project.jujutsuRepositories },
+            { project.initialisedJujutsuRepositories },
             it
         )
     }) {

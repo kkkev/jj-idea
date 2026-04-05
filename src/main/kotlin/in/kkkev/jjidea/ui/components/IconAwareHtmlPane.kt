@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.project.Project
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
@@ -12,7 +13,7 @@ import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.common.accented
-import `in`.kkkev.jjidea.vcs.jujutsuRepository
+import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import java.awt.Component
 import java.awt.Graphics
 import java.util.regex.Pattern
@@ -27,7 +28,7 @@ private val CHANGE_ID_URL_PARSER = Pattern.compile("^jjc://([^?]+)\\?(.+)$")
  * An HTML pane that can resolve icons from a set of icon libraries, including IDEA's icons
  * [com.intellij.icons.AllIcons].
  */
-class IconAwareHtmlPane : JBHtmlPane(
+class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     JBHtmlPaneStyleConfiguration(),
     JBHtmlPaneConfiguration { iconResolver = { IconResolver.resolveIcon(it)?.let(::HtmlIcon) } }
 ) {
@@ -37,8 +38,7 @@ class IconAwareHtmlPane : JBHtmlPane(
             if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
                 with(CHANGE_ID_URL_PARSER.matcher(e.description)) {
                     if (matches()) {
-                        VcsUtil.getFilePath(this.group(1), true)
-                            .jujutsuRepository
+                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(this.group(1), true))
                             .invalidate(ChangeId(this.group(2)))
                     }
                 }

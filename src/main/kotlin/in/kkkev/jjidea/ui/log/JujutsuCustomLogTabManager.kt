@@ -14,7 +14,7 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
-import `in`.kkkev.jjidea.vcs.jujutsuRepositories
+import `in`.kkkev.jjidea.vcs.isJujutsu
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import javax.swing.JPanel
@@ -58,10 +58,8 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
 
         runInBackground {
             try {
-                val roots = project.jujutsuRepositories
-
-                if (roots.isEmpty()) {
-                    log.info("No Jujutsu repositories found, skipping log tab creation")
+                if (!project.isJujutsu) {
+                    log.info("No initialised Jujutsu repositories found, skipping log tab creation")
                     return@runInBackground
                 }
 

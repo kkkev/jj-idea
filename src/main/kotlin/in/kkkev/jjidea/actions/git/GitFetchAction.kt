@@ -7,8 +7,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 import `in`.kkkev.jjidea.vcs.isJujutsu
-import `in`.kkkev.jjidea.vcs.jujutsuRepositories
 
 /**
  * Fetch from Git remotes for all initialized JJ roots.
@@ -24,15 +24,13 @@ class GitFetchAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = e.project?.isJujutsu == true
+        e.presentation.isEnabledAndVisible = e.project.isJujutsu
     }
 
     override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val repos = project.jujutsuRepositories.filter { it.isInitialised }
-        if (repos.isEmpty()) return
+        val project = e.project
 
-        repos.forEach { repo ->
+        project?.initialisedJujutsuRepositories?.forEach { repo ->
             repo.commandExecutor
                 .createCommand { gitFetch() }
                 .onSuccess {

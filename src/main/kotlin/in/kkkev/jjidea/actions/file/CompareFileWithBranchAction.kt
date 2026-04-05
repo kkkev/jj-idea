@@ -10,12 +10,11 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.isJujutsu
-import `in`.kkkev.jjidea.vcs.jujutsuRepository
 
 /**
  * Action to compare current file with a bookmark, change, or revision
@@ -29,7 +28,7 @@ class CompareFileWithBranchAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val file = e.file ?: return
-        val repo = file.jujutsuRepository
+        val repo = e.repoForFile ?: return
 
         // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
         RevisionSelectorPopup.show(
@@ -42,7 +41,7 @@ class CompareFileWithBranchAction : DumbAwareAction(
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = (e.project?.isJujutsu ?: false) && (e.file != null)
+        e.presentation.isEnabledAndVisible = e.repoForFile != null
     }
 
     private fun showDiffWithRevision(repo: JujutsuRepository, file: VirtualFile, revision: Revision) {

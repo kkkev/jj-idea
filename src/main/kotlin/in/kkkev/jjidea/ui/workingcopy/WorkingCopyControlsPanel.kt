@@ -109,7 +109,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         })
     }
 
-    private val currentChangeLabel = IconAwareHtmlPane()
+    private val currentChangeLabel = IconAwareHtmlPane(project)
 
     private val descriptionLabel = JBLabel(JujutsuBundle.message("toolwindow.description.label"))
 
