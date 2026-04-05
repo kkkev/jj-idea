@@ -5,12 +5,12 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
-import `in`.kkkev.jjidea.jj.cli.CliExecutor
-import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
 import `in`.kkkev.jjidea.util.runInBackground
-import java.nio.file.Path
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Bootstraps the Jujutsu state model and tool window management on project open.
@@ -39,31 +39,31 @@ class JujutsuStartupActivity : ProjectActivity {
             log.info("jj availability status changed: $status")
             when (status) {
                 is JjAvailabilityStatus.Checking -> {} // Initial state, wait for real result
-                is JjAvailabilityStatus.Available -> {
-                    JujutsuNotifications.clearAvailabilityNotification()
-                    checkUserConfig(project, status.executablePath)
-                }
+                is JjAvailabilityStatus.Available -> JujutsuNotifications.clearAvailabilityNotification()
                 else -> JujutsuNotifications.notifyJjUnavailable(project, status)
             }
         }
         checker.recheck()
+
+        // Check user config per repo as repos become available
+        val checkedRepoPaths: MutableSet<String> = ConcurrentHashMap.newKeySet()
+        project.stateModel.initializedRoots.connect(project) { roots ->
+            roots.forEach { repo ->
+                if (checkedRepoPaths.add(repo.directory.path)) {
+                    checkUserConfigForRepo(project, repo)
+                }
+            }
+        }
     }
 
-    private fun checkUserConfig(project: Project, executablePath: Path) {
-        val defaultPath = executablePath.toString()
-        val executableProvider = {
-            JujutsuApplicationSettings.getInstance().state.jjExecutablePath.ifBlank { defaultPath }
-        }
-        val executor = CliExecutor.forRootlessOperations(executableProvider)
+    private fun checkUserConfigForRepo(project: Project, repo: JujutsuRepository) = runInBackground {
+        val checker = JjUserConfigChecker(repo)
+        val config = checker.checkConfig()
+        val name = repo.displayName
+        log.info("User config check for $name: $config")
 
-        runInBackground {
-            val checker = JjUserConfigChecker(executor)
-            val config = checker.checkConfig()
-            log.info("User config check: hasName=${config.hasName}, hasEmail=${config.hasEmail}")
-
-            if (!config.isComplete) {
-                JujutsuNotifications.notifyUserConfigNeeded(project, checker)
-            }
+        if (!config.isComplete) {
+            JujutsuNotifications.notifyUserConfigNeeded(project, repo.displayName)
         }
     }
 }

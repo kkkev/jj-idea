@@ -238,19 +238,41 @@ interface CommandExecutor {
     fun gitClone(source: String, destination: String, colocate: Boolean = true): CommandResult
 
     /**
-     * Get a jj config value.
+     * Scope for getting/setting configuration values.
+     */
+    enum class ConfigScope {
+        /**
+         * Global across all jj interactions for the current user.
+         */
+        USER,
+
+        /**
+         * Configuration specific to the repository.
+         */
+        REPO;
+
+        val param = "--${name.lowercase()}"
+    }
+
+    /**
+     * Get a jj config value. Works in the same way as jj; looks in the repository first, falling back to user scope.
      * @param key Config key (e.g., "user.name", "user.email")
      * @return Command result (stdout contains value if exists, exit code 1 if not set)
      */
     fun configGet(key: String): CommandResult
 
+    fun configList(key: String? = null, scope: ConfigScope? = null): CommandResult
+
     /**
      * Set a jj config value at user level.
+     * @param scope Scope at which to set the config value
      * @param key Config key (e.g., "user.name", "user.email")
      * @param value Config value
      * @return Command result
      */
-    fun configSetUser(key: String, value: String): CommandResult
+    fun configSetUser(scope: ConfigScope, key: String, value: String): CommandResult
+
+    fun configUnset(scope: ConfigScope, key: String): CommandResult
 
     data class Command(
         val commandExecutor: CommandExecutor,

@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.17] - 2026-04-04
+### Added
+- User Identity section in Settings → Jujutsu for editing global `user.name` / `user.email`
+- Repository Settings section in Settings → Jujutsu with one collapsible group per repo — all repos visible and configurable simultaneously, no switching required
+- Startup now checks user config per-repo using each repo's own executor, so repo-scoped config is recognised
+- User config notification now links directly to Settings → Jujutsu for configuration
+- Repository Settings identity section auto-detects existing repo-scoped overrides (via `jj config get --repo`)
+
+### Fixed
+- `jj config get` now runs in repo context, picking up repo-scoped config (GitHub #9)
 
 ## [0.5.16] - 2026-04-03
 
