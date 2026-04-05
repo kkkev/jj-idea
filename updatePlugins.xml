@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.17/jj-idea-0.5.17.zip" version="0.5.17">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.18/jj-idea-0.5.18.zip" version="0.5.18">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,9 +23,18 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.17</h3>
+      <h3>0.5.18</h3>
       
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.17">full release notes</a> for details.</p>
+<h4>Added</h4>
+<li>User Identity section in Settings → Jujutsu for editing global `user.name` / `user.email`</li>
+<li>Repository Settings section in Settings → Jujutsu with one collapsible group per repo — all repos visible and configurable simultaneously, no switching required</li>
+<li>Startup now checks user config per-repo using each repo's own executor, so repo-scoped config is recognised</li>
+<li>User config notification now links directly to Settings → Jujutsu for configuration</li>
+<li>Repository Settings identity section auto-detects existing repo-scoped overrides (via `jj config get --repo`)</li>
+
+<h4>Fixed</h4>
+<li>`jj config get` now runs in repo context, picking up repo-scoped config (GitHub #9)</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.18">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

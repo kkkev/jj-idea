@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.18] - 2026-04-05
+
 ### Added
 - User Identity section in Settings → Jujutsu for editing global `user.name` / `user.email`
 - Repository Settings section in Settings → Jujutsu with one collapsible group per repo — all repos visible and configurable simultaneously, no switching required
@@ -292,7 +294,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.17...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.18...HEAD
+[0.5.18]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.18
 [0.5.17]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.17
 [0.5.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.16
 [0.5.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.15
