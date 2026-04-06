@@ -191,6 +191,19 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun configGet(key: String): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
-    override fun configSetUser(key: String, value: String): CommandExecutor.CommandResult =
-        TODO("Not needed for integration tests")
+    override fun configList(
+        key: String?,
+        scope: CommandExecutor.ConfigScope?
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
+    override fun configSetUser(
+        scope: CommandExecutor.ConfigScope,
+        key: String,
+        value: String
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
+    override fun configUnset(
+        scope: CommandExecutor.ConfigScope,
+        key: String
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 }

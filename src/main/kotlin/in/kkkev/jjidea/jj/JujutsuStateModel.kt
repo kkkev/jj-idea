@@ -205,6 +205,17 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             }
         )
 
+        // When jj becomes available (e.g., user upgrades from VersionTooOld, or changes path),
+        // reload repository states and log. Without this, repositoryStates stays empty from the
+        // failed load when jj was unavailable, and the working copy panel shows "No repositories".
+        JjAvailabilityChecker.getInstance(project).status.connect(this) { status ->
+            if (status is JjAvailabilityStatus.Available) {
+                log.info("jj became available (${status.version}), refreshing state")
+                repositoryStates.invalidate()
+                logRefresh.notify(Unit)
+            }
+        }
+
         // Subscribe to VCS configuration changes
         connection.subscribe(
             ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED,

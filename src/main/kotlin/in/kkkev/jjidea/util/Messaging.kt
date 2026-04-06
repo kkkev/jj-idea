@@ -97,10 +97,11 @@ class SimpleNotifiableState<T : Any>(
         project.messageBus.connect(parent).subscribe(topic, handler)
         val current = value
         if (!equalityCheck(current, startValue)) {
-            // Publish through the bus so that if parent is disposed before this runs,
-            // the disposed connection simply drops the message.
+            // Replay current value to the new handler only (not all subscribers).
+            // Using handler directly instead of publisher avoids spurious replays
+            // to long-lived subscribers (log tab, working copy panel).
             runLater {
-                publisher.changed(current)
+                handler.changed(current)
             }
         }
     }

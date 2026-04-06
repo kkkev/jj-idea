@@ -15,10 +15,6 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.performAction
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.setup.JjUserConfigChecker
-import `in`.kkkev.jjidea.setup.JjUserConfigDialog
-import `in`.kkkev.jjidea.util.runInBackground
-import `in`.kkkev.jjidea.util.runLater
 import java.util.concurrent.ConcurrentHashMap
 
 fun Notification.addExpiringAction(messageKey: String, action: () -> Unit) {
@@ -190,66 +186,36 @@ object JujutsuNotifications {
             .notify(project)
     }
 
-    // Track if we've already notified about user config in this session
-    @Volatile
-    private var userConfigNotified = false
+    // Track which repo keys we've already notified about in this session (key = repoName ?: "global")
+    private val notifiedKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     /**
      * Show a notification prompting user to configure jj user settings.
-     * Only shows once per session.
+     * Only shows once per repo per session. Pass [repoName] for per-repo notifications.
+     * The action opens Settings → Version Control → Jujutsu where identity can be configured.
      */
-    fun notifyUserConfigNeeded(project: Project, checker: JjUserConfigChecker) {
-        if (userConfigNotified) return
-        userConfigNotified = true
+    fun notifyUserConfigNeeded(project: Project, repoName: String? = null) {
+        val key = repoName ?: "global"
+        if (!notifiedKeys.add(key)) return
+
+        val content = if (repoName != null) {
+            JujutsuBundle.message("notification.userconfig.content.repo", repoName)
+        } else {
+            JujutsuBundle.message("notification.userconfig.content")
+        }
 
         val notification = NotificationGroupManager.getInstance()
             .getNotificationGroup(GROUP_ID)
             .createNotification(
                 JujutsuBundle.message("notification.userconfig.title"),
-                JujutsuBundle.message("notification.userconfig.content"),
+                content,
                 NotificationType.WARNING
             )
 
         notification.addExpiringAction("notification.userconfig.action.configure") {
-            showUserConfigDialog(project, checker)
+            ShowSettingsUtil.getInstance().showSettingsDialog(project, "Jujutsu")
         }
 
         notification.notify(project)
-    }
-
-    private fun showUserConfigDialog(project: Project, checker: JjUserConfigChecker) {
-        // Load git config on background, show dialog on EDT, save on background, notify on EDT
-        runInBackground {
-            val (gitName, gitEmail) = checker.getGitConfig()
-
-            runLater {
-                val dialog = JjUserConfigDialog(project, gitName, gitEmail)
-                if (dialog.showAndGet()) {
-                    val config = dialog.result ?: return@runLater
-                    runInBackground {
-                        val result = checker.setConfig(config.name, config.email)
-                        runLater {
-                            val (title, message, type) = if (result?.isSuccess == true) {
-                                Triple(
-                                    JujutsuBundle.message("dialog.userconfig.success.title"),
-                                    JujutsuBundle.message("dialog.userconfig.success.message"),
-                                    NotificationType.INFORMATION
-                                )
-                            } else {
-                                Triple(
-                                    JujutsuBundle.message("dialog.userconfig.error.title"),
-                                    JujutsuBundle.message(
-                                        "dialog.userconfig.error.message",
-                                        result?.stderr ?: "Unknown error"
-                                    ),
-                                    NotificationType.ERROR
-                                )
-                            }
-                            notify(project, title, message, type)
-                        }
-                    }
-                }
-            }
-        }
     }
 }

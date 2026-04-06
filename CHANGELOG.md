@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.19] - 2026-04-05
+
+## [0.5.18] - 2026-04-05
+
+### Added
+- User Identity section in Settings → Jujutsu for editing global `user.name` / `user.email`
+- Repository Settings section in Settings → Jujutsu with one collapsible group per repo — all repos visible and configurable simultaneously, no switching required
+- Startup now checks user config per-repo using each repo's own executor, so repo-scoped config is recognised
+- User config notification now links directly to Settings → Jujutsu for configuration
+- Repository Settings identity section auto-detects existing repo-scoped overrides (via `jj config get --repo`)
+
+### Fixed
+- `jj config get` now runs in repo context, picking up repo-scoped config (GitHub #9)
+- Changed jj executable path in settings now takes effect immediately without IDE restart
+- Upgrading jj binary in-place (same path) now detected when clicking Test button, refreshing working copy and log automatically
+
 ## [0.5.16] - 2026-04-03
 
 ### Changed
@@ -282,7 +298,10 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.16...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.19...HEAD
+[0.5.19]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.19
+[0.5.18]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.18
+[0.5.17]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.17
 [0.5.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.16
 [0.5.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.15
 [0.5.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.14
