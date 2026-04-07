@@ -1,6 +1,9 @@
 package `in`.kkkev.jjidea.jj
 
-sealed interface Revset
+sealed interface Revset {
+    /** Omit `-r` flag entirely, letting jj use its `revsets.log` config. */
+    data object Default : Revset
+}
 
 /**
  * Revset pointing to a single revision, which could be a [Ref] or any expression that resolves to a single revision.

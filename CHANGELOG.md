@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Test button for revset expressions in Log Settings — validates against each repo and shows change count
+- Per-repo Test button for revset overrides in Repository Settings
+- Revset validation on apply — prevents saving invalid expressions
+
 ### Fixed
 - Root filter now appears in log toolbar for multi-repo projects (GitHub #10)
 - Repository names in multi-repo projects now use simple directory names if they are unambiguous (Github #10 part 3)

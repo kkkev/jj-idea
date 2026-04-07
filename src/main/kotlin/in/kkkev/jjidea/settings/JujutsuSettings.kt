@@ -47,6 +47,9 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     fun logChangeLimit(repo: JujutsuRepository) =
         state.repositoryOverrides[repo.directory.path]?.logChangeLimit ?: state.logChangeLimit
 
+    fun logRevset(repo: JujutsuRepository): String =
+        state.repositoryOverrides[repo.directory.path]?.logRevset ?: state.logRevset
+
     companion object {
         fun getInstance(project: Project): JujutsuSettings = project.getService(JujutsuSettings::class.java)
     }

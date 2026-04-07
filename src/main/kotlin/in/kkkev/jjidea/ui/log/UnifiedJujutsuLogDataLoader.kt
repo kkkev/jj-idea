@@ -1,10 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.project.Project
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.Expression
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
@@ -44,7 +41,7 @@ class UnifiedJujutsuLogDataLoader(
      *
      * @param revset Revision expression to load (default: all commits)
      */
-    fun loadCommits(revset: Expression = Expression.ALL) {
+    fun loadCommits() {
         val repos = repositories()
         val settings = JujutsuSettings.getInstance(project)
         val defaultLimit = settings.state.logChangeLimit
@@ -74,6 +71,9 @@ class UnifiedJujutsuLogDataLoader(
                             indicator.fraction = index.toDouble() / repos.size
 
                             val repoLimit = settings.logChangeLimit(repo)
+                            val revsetSetting = settings.logRevset(repo)
+                            val revset: Revset =
+                                if (revsetSetting.isBlank()) Revset.Default else Expression(revsetSetting)
                             val result = repo.logService.getLog(revset, limit = repoLimit)
 
                             result.onSuccess { loadedEntries ->

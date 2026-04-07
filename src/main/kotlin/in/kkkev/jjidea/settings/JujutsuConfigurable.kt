@@ -26,6 +26,8 @@ import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.util.runLaterInModal
 import java.awt.Font
 import java.awt.datatransfer.StringSelection
+import javax.swing.BoxLayout
+import javax.swing.JPanel
 
 /**
  * Settings panel for Jujutsu plugin configuration.
@@ -38,11 +40,20 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private val appSettings = JujutsuApplicationSettings.getInstance()
     private var previousPath = appSettings.state.jjExecutablePath
     private var previousLogLimit = settings.state.logChangeLimit
+    private var previousLogRevset = settings.state.logRevset
     private val finder = JjExecutableFinder()
 
     // UI components for validation feedback
     private lateinit var pathField: Cell<TextFieldWithBrowseButton>
     private val validationLabel = JBLabel()
+
+    // Revset validation
+    private lateinit var revsetField: Cell<JBTextField>
+    private val revsetValidationPanel = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        isOpaque = false
+    }
+    private var revsetError: String? = null
 
     // Global identity — backing properties for bindText(); async-loaded from jj config
     private var globalNameBinding = ""
@@ -60,7 +71,11 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         val nameField: JBTextField,
         val emailField: JBTextField,
         val limitCb: JBCheckBox,
-        val limitField: JBTextField
+        val limitField: JBTextField,
+        val revsetCb: JBCheckBox,
+        val revsetField: JBTextField,
+        val revsetValidationLabel: JBLabel = JBLabel(),
+        var revsetError: String? = null
     )
 
     private val repoSettingsPanels = mutableListOf<RepoSettingsPanel>()
@@ -177,6 +192,26 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     .columns(COLUMNS_TINY)
                     .comment(JujutsuBundle.message("settings.log.limit.comment"))
             }
+            row(JujutsuBundle.message("settings.log.revset.label")) {
+                revsetField = textField()
+                    .bindText(settings.state::logRevset)
+                    .columns(COLUMNS_LARGE)
+                    .validationOnApply {
+                        revsetError?.let { error(it) }
+                    }
+                    .also {
+                        it.component.document.addDocumentListener(clearErrorListener { revsetError = null })
+                    }
+                button(JujutsuBundle.message("settings.log.revset.test")) {
+                    testRevset()
+                }
+            }
+            row("") {
+                cell(revsetValidationPanel).align(AlignX.FILL)
+            }
+            row {
+                comment(JujutsuBundle.message("settings.log.revset.comment"))
+            }
         }
 
         if (repos.isNotEmpty()) {
@@ -201,6 +236,8 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     val emailField = JBTextField()
                     val limitCb = JBCheckBox(JujutsuBundle.message("settings.repo.loglimit.override"))
                     val limitField = JBTextField()
+                    val revsetCb = JBCheckBox(JujutsuBundle.message("settings.repo.logrevset.override"))
+                    val revsetField = JBTextField()
 
                     fun updateIdentityEnabled() {
                         nameField.isEnabled = identityCb.isSelected
@@ -211,6 +248,10 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         limitField.isEnabled = limitCb.isSelected
                     }
 
+                    fun updateRevsetEnabled() {
+                        revsetField.isEnabled = revsetCb.isSelected
+                    }
+
                     identityCb.addActionListener {
                         updateIdentityEnabled()
                         repoSettingsDirty = true
@@ -219,15 +260,22 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         updateLimitEnabled()
                         repoSettingsDirty = true
                     }
+                    revsetCb.addActionListener {
+                        updateRevsetEnabled()
+                        repoSettingsDirty = true
+                    }
                     nameField.document.addDocumentListener(dirtyListener)
                     emailField.document.addDocumentListener(dirtyListener)
                     limitField.document.addDocumentListener(dirtyListener)
+                    revsetField.document.addDocumentListener(dirtyListener)
 
-                    // Load limit override from plugin settings (synchronous)
+                    // Load limit and revset overrides from plugin settings (synchronous)
                     val repoPath = repo.directory.path
                     val repoConfig = settings.state.repositoryOverrides[repoPath]
                     limitCb.isSelected = repoConfig?.logChangeLimit != null
                     limitField.text = repoConfig?.logChangeLimit?.toString() ?: ""
+                    revsetCb.isSelected = repoConfig?.logRevset != null
+                    revsetField.text = repoConfig?.logRevset ?: ""
 
                     // Load identity from jj config (background): prefer repo-scoped, fall back to effective
                     runInBackground {
@@ -244,10 +292,20 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
 
                     updateIdentityEnabled()
                     updateLimitEnabled()
+                    updateRevsetEnabled()
 
-                    repoSettingsPanels.add(
-                        RepoSettingsPanel(repo, identityCb, nameField, emailField, limitCb, limitField)
+                    val repoPanel = RepoSettingsPanel(
+                        repo,
+                        identityCb,
+                        nameField,
+                        emailField,
+                        limitCb,
+                        limitField,
+                        revsetCb,
+                        revsetField
                     )
+                    revsetField.document.addDocumentListener(clearErrorListener { repoPanel.revsetError = null })
+                    repoSettingsPanels.add(repoPanel)
 
                     collapsibleGroup(repo.displayName) {
                         row { cell(identityCb) }
@@ -278,6 +336,23 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         row {
                             cell(limitCb)
                             cell(limitField).columns(COLUMNS_TINY)
+                        }
+                        row {
+                            cell(revsetCb)
+                            cell(revsetField).columns(COLUMNS_LARGE)
+                                .validationOnApply {
+                                    if (revsetCb.isSelected) {
+                                        repoPanel.revsetError?.let { error(it) }
+                                    } else {
+                                        null
+                                    }
+                                }
+                            button(JujutsuBundle.message("settings.log.revset.test")) {
+                                testRepoRevset(repoPanel)
+                            }
+                        }
+                        row("") {
+                            cell(repoPanel.revsetValidationLabel)
                         }
                     }.apply { expanded = repos.size == 1 }
                 }
@@ -327,20 +402,18 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         repoSettingsPanels.forEach { panel ->
             val repoPath = panel.repo.directory.path
 
-            // Save log limit override to plugin settings
-            val currentOverride = settings.state.repositoryOverrides[repoPath]
+            // Save log limit and revset overrides to plugin settings
+            var currentOverride = settings.state.repositoryOverrides[repoPath]
             val newLimit = if (panel.limitCb.isSelected) panel.limitField.text.trim().toIntOrNull() else null
-            if (newLimit != currentOverride?.logChangeLimit) {
-                if (newLimit != null) {
-                    settings.state.repositoryOverrides[repoPath] =
-                        (currentOverride ?: RepositoryConfig()).copy(logChangeLimit = newLimit)
+            val newRevset = if (panel.revsetCb.isSelected) panel.revsetField.text.trim() else null
+
+            if (newLimit != currentOverride?.logChangeLimit || newRevset != currentOverride?.logRevset) {
+                val updated = (currentOverride ?: RepositoryConfig())
+                    .copy(logChangeLimit = newLimit, logRevset = newRevset)
+                if (updated.logChangeLimit == null && updated.logRevset == null) {
+                    settings.state.repositoryOverrides.remove(repoPath)
                 } else {
-                    val updated = currentOverride?.copy(logChangeLimit = null)
-                    if (updated != null) {
-                        settings.state.repositoryOverrides[repoPath] = updated
-                    } else {
-                        settings.state.repositoryOverrides.remove(repoPath)
-                    }
+                    settings.state.repositoryOverrides[repoPath] = updated
                 }
             }
 
@@ -369,11 +442,102 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             project.stateModel.logRefresh.notify(Unit)
         }
 
-        // If log limit changed, reload the log
+        // If log limit or revset changed, reload the log
         val newLogLimit = settings.state.logChangeLimit
-        if (newLogLimit != previousLogLimit) {
+        val newLogRevset = settings.state.logRevset
+        if (newLogLimit != previousLogLimit || newLogRevset != previousLogRevset) {
             previousLogLimit = newLogLimit
+            previousLogRevset = newLogRevset
             project.stateModel.logRefresh.notify(Unit)
+        }
+    }
+
+    private fun testRevset() {
+        val expression = revsetField.component.text.trim()
+        revsetValidationPanel.removeAll()
+        revsetValidationPanel.add(iconLabel(null, JujutsuBundle.message("settings.log.revset.test.testing")))
+        revsetValidationPanel.revalidate()
+        revsetValidationPanel.repaint()
+
+        runInBackground {
+            val results = repos.map { repo ->
+                val panel = repoSettingsPanels.find { it.repo == repo }
+                val hasOverride = panel?.revsetCb?.isSelected == true
+                val effectiveRevset = if (hasOverride) panel!!.revsetField.text.trim() else expression
+                val result = runRevsetTest(repo, effectiveRevset)
+                Triple(repo, result, hasOverride)
+            }
+
+            runLater {
+                revsetValidationPanel.removeAll()
+                revsetError = null
+                results.forEach { (repo, result, hasOverride) ->
+                    val (icon, msg) = if (!result.isSuccess) {
+                        revsetError = result.stderr.trim()
+                        AllIcons.General.Error to JujutsuBundle.message(
+                            "settings.log.revset.test.error",
+                            repo.displayName,
+                            result.stderr.trim()
+                        )
+                    } else {
+                        val count = result.stdout.length
+                        val key = if (hasOverride) {
+                            "settings.log.revset.test.valid.override"
+                        } else {
+                            "settings.log.revset.test.valid"
+                        }
+                        AllIcons.General.InspectionsOK to JujutsuBundle.message(key, repo.displayName, count)
+                    }
+                    revsetValidationPanel.add(iconLabel(icon, msg))
+                }
+                revsetValidationPanel.revalidate()
+                revsetValidationPanel.repaint()
+            }
+        }
+    }
+
+    private fun testRepoRevset(panel: RepoSettingsPanel) {
+        val expression = panel.revsetField.text.trim()
+        showRevsetResult(panel.revsetValidationLabel, null, JujutsuBundle.message("settings.log.revset.test.testing"))
+        panel.revsetError = null
+
+        runInBackground {
+            val result = runRevsetTest(panel.repo, expression)
+            runLater {
+                if (result.isSuccess) {
+                    val count = result.stdout.length
+                    showRevsetResult(
+                        panel.revsetValidationLabel,
+                        true,
+                        JujutsuBundle.message("settings.log.revset.test.valid", panel.repo.displayName, count)
+                    )
+                    panel.revsetError = null
+                } else {
+                    val errorMsg = result.stderr.trim()
+                    showRevsetResult(
+                        panel.revsetValidationLabel,
+                        false,
+                        JujutsuBundle.message("settings.log.revset.test.error.single", errorMsg)
+                    )
+                    panel.revsetError = errorMsg
+                }
+            }
+        }
+    }
+
+    private fun runRevsetTest(repo: JujutsuRepository, expression: String): CommandExecutor.CommandResult {
+        val revset = if (expression.isEmpty()) Revset.Default else Expression(expression)
+        return repo.commandExecutor.log(revset = revset, template = "'.'", limit = 10000)
+    }
+
+    private fun iconLabel(icon: javax.swing.Icon?, text: String) = JBLabel(text, icon, JBLabel.LEADING)
+
+    private fun showRevsetResult(label: JBLabel, success: Boolean?, message: String) {
+        label.text = message
+        label.icon = when (success) {
+            true -> AllIcons.General.InspectionsOK
+            false -> AllIcons.General.Error
+            null -> AllIcons.Process.Step_1
         }
     }
 
@@ -469,6 +633,12 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                 CopyPasteManager.getInstance().setContents(StringSelection(command))
             }
         }
+    }
+
+    private fun clearErrorListener(clear: () -> Unit) = object : javax.swing.event.DocumentListener {
+        override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = clear()
+        override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = clear()
+        override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = clear()
     }
 
     /** Creates a read-only text field with monospace font for displaying commands. */

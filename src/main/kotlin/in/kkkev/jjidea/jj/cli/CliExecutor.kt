@@ -206,7 +206,12 @@ class CliExecutor(
         filePaths: List<FilePath>,
         limit: Int?
     ): CommandExecutor.CommandResult {
-        val args = mutableListOf<Any>("log", "-r", revset, "--no-graph")
+        val args = mutableListOf<Any>("log")
+        if (revset !is Revset.Default) {
+            args.add("-r")
+            args.add(revset)
+        }
+        args.add("--no-graph")
         if (template != null) {
             args.add("-T")
             args.add(template)

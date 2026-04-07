@@ -22,8 +22,10 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         stub.run(
             *buildList {
                 add("log")
-                add("-r")
-                add(revset.toString())
+                if (revset !is Revset.Default) {
+                    add("-r")
+                    add(revset.toString())
+                }
                 add("--no-graph")
                 if (template != null) {
                     add("-T")
