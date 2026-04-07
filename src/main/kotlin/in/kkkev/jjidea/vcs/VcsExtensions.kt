@@ -36,7 +36,6 @@ fun Project.possibleJujutsuRepositoryFor(filePath: FilePath) =
 fun Project.jujutsuRepositoryFor(filePath: FilePath) = possibleJujutsuRepositoryFor(filePath)
     ?: throw VcsException(JujutsuBundle.message("vcs.error.no.root", filePath))
 
-
 val VirtualFile.filePath get() = VcsUtil.getFilePath(this)
 fun VirtualFile.pathRelativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
 fun VirtualFile.pathRelativeTo(root: String) = path.removePrefix(root).removePrefix("/")

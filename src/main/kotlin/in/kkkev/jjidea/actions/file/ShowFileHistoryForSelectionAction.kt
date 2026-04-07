@@ -41,6 +41,8 @@ class ShowFileHistoryForSelectionAction :
         val project = e.project
 
         e.presentation.isEnabledAndVisible =
-            editor != null && editor.selectionModel.hasSelection() && e.repoForFile != null
+            editor != null &&
+            editor.selectionModel.hasSelection() &&
+            e.repoForFile != null
     }
 }

@@ -96,10 +96,11 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 
             // This runs on background thread - safe to call VCS manager
             allRootPaths.associateWith {
-                val displayName = if (it in rootsWithUniqueNames)
+                val displayName = if (it in rootsWithUniqueNames) {
                     it.name
-                else
+                } else {
                     it.pathRelativeTo(project.basePath!!)
+                }
                 JujutsuRepositoryImpl(project, it, displayName)
             }.filterValues {
                 val initialised = it.isInitialised
