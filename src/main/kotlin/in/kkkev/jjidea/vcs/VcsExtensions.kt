@@ -20,7 +20,8 @@ val Project.possibleJujutsuVcs
 
 val Project?.isJujutsu get() = this?.stateModel?.isJujutsu == true
 
-val Project.initialisedJujutsuRepositories: Collection<JujutsuRepository> get() = stateModel.initialisedRepositories.value.values
+val Project.initialisedJujutsuRepositories: Collection<JujutsuRepository>
+    get() = stateModel.initialisedRepositories.value.values
 
 fun Project.jujutsuRepositoryForRoot(directory: VirtualFile) = stateModel.initialisedRepositories.value[directory]
 

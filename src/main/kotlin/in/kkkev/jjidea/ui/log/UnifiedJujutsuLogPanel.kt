@@ -99,8 +99,8 @@ class UnifiedJujutsuLogPanel(project: Project) :
             // Initially hidden, will show when data loads if multiple roots
             isVisible = false
         }
-        add(rootFilterComponent)
-        add(Box.createHorizontalStrut(5))
+        filterPanel.add(rootFilterComponent)
+        filterPanel.add(Box.createHorizontalStrut(5))
     }
 
     override fun updateTableStuff() {
