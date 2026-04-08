@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Spurious WARN log entries for `jj config get` (key not found is normal) and `jj file annotate` (caller already logs failures)
 - Annotating an empty file no longer shows an error dialog
+- Fixed repository detection for single-repository projects (regression introduced in 0.5.20)
 
 ## [0.5.20] - 2026-04-08
 

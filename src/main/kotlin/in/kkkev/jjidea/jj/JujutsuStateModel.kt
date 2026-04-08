@@ -80,7 +80,10 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     val jujutsuVcsRoots = notifiableState(project, "Jujutsu VCS Root Directories", emptySet()) {
         ProjectLevelVcsManager.getInstance(project).findVcsByName(JujutsuVcs.VCS_NAME)
             ?.let { ProjectLevelVcsManager.getInstance(project).getDirectoryMappings(it) }
-            ?.mapNotNull { VfsUtil.findFile(Path(it.directory), true) }
+            ?.mapNotNull {
+                (it.directory.takeIf { it.isNotEmpty() } ?: project.basePath)
+                    ?.let { directory -> VfsUtil.findFile(Path(directory), true) }
+            }
             ?.toSet()
             ?: emptySet()
     }
