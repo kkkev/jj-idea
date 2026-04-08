@@ -70,10 +70,6 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
             // Parse the annotation output
             val annotationLines = AnnotationParser.parse(result.stdout)
 
-            if (annotationLines.isEmpty()) {
-                throw VcsException("No annotation data received for file: $file")
-            }
-
             // Create and return the file annotation
             return JujutsuFileAnnotation(
                 project = project,

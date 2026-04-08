@@ -231,7 +231,7 @@ class CliExecutor(
             args.add(template)
         }
         args.add(file.pathRelativeTo(root!!))
-        return execute(root, args)
+        return execute(root, args, warnOnFailure = false)
     }
 
     override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean): CommandExecutor.CommandResult {
@@ -302,7 +302,8 @@ class CliExecutor(
 
     override fun configGet(key: String) = execute(
         root,
-        buildList { addAllIfNotNull("config", "get", key) }
+        buildList { addAllIfNotNull("config", "get", key) },
+        warnOnFailure = false
     )
 
     override fun configList(key: String?, scope: CommandExecutor.ConfigScope?) = execute(
@@ -399,7 +400,8 @@ class CliExecutor(
     private fun execute(
         workingDir: VirtualFile?,
         args: List<Any>,
-        timeout: Long = defaultTimeout
+        timeout: Long = defaultTimeout,
+        warnOnFailure: Boolean = true
     ): CommandExecutor.CommandResult {
         val executable = executableProvider()
         val commandLine = GeneralCommandLine(executable)
@@ -434,7 +436,10 @@ class CliExecutor(
 
         log.info("Completed: jj $cmdName in ${duration}ms (exit=${output.exitCode})")
 
-        output.takeIf { it.exitCode != 0 }?.run { log.warn("jj $cmdName failed with exit code $exitCode:\n$stderr") }
+        if (warnOnFailure) {
+            output.takeIf { it.exitCode != 0 }
+                ?.run { log.warn("jj $cmdName failed with exit code $exitCode:\n$stderr") }
+        }
 
         return with(output) { CommandExecutor.CommandResult(exitCode, stdout, stderr) }
     }
