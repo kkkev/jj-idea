@@ -7,7 +7,6 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
-import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Splitter
@@ -27,6 +26,7 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
+import `in`.kkkev.jjidea.ui.services.showVcsMappingsSettings
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
@@ -184,12 +184,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
             val link = HyperlinkLabel(JujutsuBundle.message("workingcopy.empty.link"))
             link.alignmentX = CENTER_ALIGNMENT
-            link.addHyperlinkListener {
-                ShowSettingsUtil.getInstance().showSettingsDialog(
-                    project,
-                    "project.propVCSSupport.DirectoryMappings"
-                )
-            }
+            link.addHyperlinkListener { project.showVcsMappingsSettings() }
             add(link)
         }
 

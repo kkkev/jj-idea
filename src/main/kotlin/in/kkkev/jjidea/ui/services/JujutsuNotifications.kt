@@ -74,7 +74,7 @@ object JujutsuNotifications {
         // Action to open VCS settings
         notification.addExpiringAction("notification.uninitialized.action.settings") {
             notifiedUninitializedRoots.remove(rootPath)
-            ShowSettingsUtil.getInstance().showSettingsDialog(project, "project.propVCSSupport.Mappings")
+            project.showVcsMappingsSettings()
         }
 
         notification.notify(project)
