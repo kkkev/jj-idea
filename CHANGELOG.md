@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.21] - 2026-04-08
+
 ### Fixed
 - Spurious WARN log entries for `jj config get` (key not found is normal) and `jj file annotate` (caller already logs failures)
 - Annotating an empty file no longer shows an error dialog
@@ -313,7 +315,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.20...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.21...HEAD
+[0.5.21]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.21
 [0.5.20]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.20
 [0.5.19]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.19
 [0.5.18]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.18
