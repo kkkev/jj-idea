@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.19/jj-idea-0.5.19.zip" version="0.5.19">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.20/jj-idea-0.5.20.zip" version="0.5.20">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,9 +23,17 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.19</h3>
+      <h3>0.5.20</h3>
       
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.19">full release notes</a> for details.</p>
+<h4>Added</h4>
+<li>Test button for revset expressions in Log Settings — validates against each repo and shows change count</li>
+<li>Per-repo Test button for revset overrides in Repository Settings</li>
+<li>Revset validation on apply — prevents saving invalid expressions</li>
+
+<h4>Fixed</h4>
+<li>Root filter now appears in log toolbar for multi-repo projects (GitHub #10)</li>
+<li>Repository names in multi-repo projects now use simple directory names if they are unambiguous (Github #10 part 3)</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.20">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

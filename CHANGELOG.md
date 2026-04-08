@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.20] - 2026-04-08
+
 ### Added
 - Test button for revset expressions in Log Settings — validates against each repo and shows change count
 - Per-repo Test button for revset overrides in Repository Settings
@@ -305,7 +307,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.19...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.5.20...HEAD
+[0.5.20]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.20
 [0.5.19]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.19
 [0.5.18]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.18
 [0.5.17]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.17
