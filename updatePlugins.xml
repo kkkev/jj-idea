@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.5.21/jj-idea-0.5.21.zip" version="0.5.21">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.0/jj-idea-0.6.0.zip" version="0.6.0">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,14 +23,17 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.5.21</h3>
+      <h3>0.6.0</h3>
       
+<h4>Added</h4>
+<li>Push from a specific log entry now scopes the operation to that revision: bookmark list is filtered to ancestors of the selected change, and `jj git push -r <revision>` is used for the default push scope</li>
+
 <h4>Fixed</h4>
-<li>Spurious WARN log entries for `jj config get` (key not found is normal) and `jj file annotate` (caller already logs failures)</li>
-<li>Annotating an empty file no longer shows an error dialog</li>
-<li>Fixed repository detection for single-repository projects (regression introduced in 0.5.20)</li>
-<li>"Configure VCS roots..." link now navigates correctly to VCS directory mappings settings (previously opened last-visited settings page due to wrong configurable ID) (GitHub #20)</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.5.21">full release notes</a> for details.</p>
+<li>Push dialog now includes a repository selector when multiple repositories are open, pre-selected from file context</li>
+<li>"Specific bookmark" dropdown in the push dialog is now disabled unless that radio button is selected</li>
+<li>Pushing a new (untracked) local bookmark no longer fails with "Refusing to create new remote bookmark" — `--allow-new` is passed automatically</li>
+<li>Push and fetch now show a clear warning notification instead of failing cryptically when no Git remote is configured</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.0">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
