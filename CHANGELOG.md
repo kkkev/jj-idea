@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Push from a specific log entry now scopes the operation to that revision: bookmark list is filtered to ancestors of the selected change, and `jj git push -r <revision>` is used for the default push scope
+
 ### Fixed
 - Push dialog now includes a repository selector when multiple repositories are open, pre-selected from file context
 - "Specific bookmark" dropdown in the push dialog is now disabled unless that radio button is selected
 - Pushing a new (untracked) local bookmark no longer fails with "Refusing to create new remote bookmark" — `--allow-new` is passed automatically
+- Push and fetch now show a clear warning notification instead of failing cryptically when no Git remote is configured
 
 ## [0.5.21] - 2026-04-08
 

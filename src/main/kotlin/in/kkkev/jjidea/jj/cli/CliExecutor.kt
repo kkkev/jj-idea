@@ -51,7 +51,8 @@ internal fun gitPushArgs(
     remote: Remote? = null,
     bookmark: Bookmark? = null,
     allBookmarks: Boolean = false,
-    allowNew: Boolean = false
+    allowNew: Boolean = false,
+    revision: Revision? = null
 ): List<String> = buildList {
     add("git")
     add("push")
@@ -66,6 +67,10 @@ internal fun gitPushArgs(
         add(bookmark.name)
     }
     if (allowNew) add("--allow-new")
+    if (revision != null && bookmark == null && !allBookmarks) {
+        add("-r")
+        add(revision.toString())
+    }
 }
 
 /** Build the argument list for `jj squash`. */
@@ -236,12 +241,21 @@ class CliExecutor(
         return execute(root, args, warnOnFailure = false)
     }
 
-    override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean): CommandExecutor.CommandResult {
+    override fun bookmarkList(
+        template: String?,
+        remote: Remote?,
+        tracked: Boolean,
+        revision: Revision?
+    ): CommandExecutor.CommandResult {
         val args = mutableListOf("bookmark", "list")
         if (tracked) args.add("--tracked")
         if (remote != null) {
             args.add("--remote")
             args.add(remote.name)
+        }
+        if (revision != null) {
+            args.add("-r")
+            args.add("::$revision")
         }
         if (template != null) {
             args.add("-T")
@@ -294,8 +308,13 @@ class CliExecutor(
     override fun gitFetch(remote: Remote?, allRemotes: Boolean) =
         execute(root, gitFetchArgs(remote, allRemotes), timeout = networkTimeout)
 
-    override fun gitPush(remote: Remote?, bookmark: Bookmark?, allBookmarks: Boolean, allowNew: Boolean) =
-        execute(root, gitPushArgs(remote, bookmark, allBookmarks, allowNew), timeout = networkTimeout)
+    override fun gitPush(
+        remote: Remote?,
+        bookmark: Bookmark?,
+        allBookmarks: Boolean,
+        allowNew: Boolean,
+        revision: Revision?
+    ) = execute(root, gitPushArgs(remote, bookmark, allBookmarks, allowNew, revision), timeout = networkTimeout)
 
     override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
 

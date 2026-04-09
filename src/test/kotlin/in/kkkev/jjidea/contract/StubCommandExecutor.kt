@@ -42,7 +42,7 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun diffSummary(revision: Revision) =
         toResult(stub.run("diff", "--summary", "-r", revision.toString()))
 
-    override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean) = toResult(
+    override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean, revision: Revision?) = toResult(
         stub.run(
             *buildList {
                 add("bookmark")
@@ -51,6 +51,10 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
                 if (remote != null) {
                     add("--remote")
                     add(remote.name)
+                }
+                if (revision != null) {
+                    add("-r")
+                    add("::$revision")
                 }
                 if (template != null) {
                     add("-T")
@@ -163,7 +167,8 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         remote: Remote?,
         bookmark: Bookmark?,
         allBookmarks: Boolean,
-        allowNew: Boolean
+        allowNew: Boolean,
+        revision: Revision?
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun squash(

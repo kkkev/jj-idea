@@ -87,6 +87,6 @@ object JujutsuLogContextMenuActions {
 
         addSeparator()
         add(gitFetchAction(project, uniqueRepo))
-        add(gitPushAction(project, uniqueRepo))
+        add(gitPushAction(project, uniqueRepo, entry?.id))
     }
 }

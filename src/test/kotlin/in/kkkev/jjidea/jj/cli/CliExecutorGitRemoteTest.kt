@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Remote
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
@@ -71,6 +72,32 @@ class CliExecutorGitRemoteTest {
         @Test
         fun `all bookmarks takes precedence over specific bookmark`() {
             gitPushArgs(bookmark = Bookmark("main"), allBookmarks = true) shouldBe listOf("git", "push", "--all")
+        }
+
+        @Test
+        fun `push with revision adds -r flag in default scope`() {
+            val revision = ChangeId("abc123", "abc")
+            gitPushArgs(revision = revision) shouldBe listOf("git", "push", "-r", "abc123")
+        }
+
+        @Test
+        fun `push with revision and remote`() {
+            val revision = ChangeId("abc123", "abc")
+            gitPushArgs(remote = Remote("origin"), revision = revision) shouldBe
+                listOf("git", "push", "--remote", "origin", "-r", "abc123")
+        }
+
+        @Test
+        fun `revision is ignored when specific bookmark is selected`() {
+            val revision = ChangeId("abc123", "abc")
+            gitPushArgs(bookmark = Bookmark("main"), revision = revision) shouldBe
+                listOf("git", "push", "--bookmark", "main")
+        }
+
+        @Test
+        fun `revision is ignored when all bookmarks is selected`() {
+            val revision = ChangeId("abc123", "abc")
+            gitPushArgs(allBookmarks = true, revision = revision) shouldBe listOf("git", "push", "--all")
         }
     }
 }

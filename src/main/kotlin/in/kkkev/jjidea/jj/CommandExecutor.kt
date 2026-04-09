@@ -134,7 +134,12 @@ interface CommandExecutor {
      * @param template Optional template for output formatting
      * @return Command result with bookmark list
      */
-    fun bookmarkList(template: String? = null, remote: Remote? = null, tracked: Boolean = false): CommandResult
+    fun bookmarkList(
+        template: String? = null,
+        remote: Remote? = null,
+        tracked: Boolean = false,
+        revision: Revision? = null
+    ): CommandResult
 
     fun bookmarkCreate(name: Bookmark, revision: Revision = WorkingCopy): CommandResult
 
@@ -194,7 +199,8 @@ interface CommandExecutor {
         remote: Remote? = null,
         bookmark: Bookmark? = null,
         allBookmarks: Boolean = false,
-        allowNew: Boolean = false
+        allowNew: Boolean = false,
+        revision: Revision? = null
     ): CommandResult
 
     /**

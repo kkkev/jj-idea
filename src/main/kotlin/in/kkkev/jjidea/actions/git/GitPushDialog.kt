@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.actions.git.GitPushDialog.Companion.loadDialogData
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Remote
+import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.components.TextCanvas
 import `in`.kkkev.jjidea.ui.components.TextListCellRenderer
 import `in`.kkkev.jjidea.ui.components.append
@@ -171,10 +172,10 @@ class GitPushDialog(
             """if(present, if(remote, "", name ++ "\n"))"""
 
         /**
-         * Load dialog data (remotes and tracked bookmarks per remote) from a repository. Call off EDT.
+         * Load the list of Git remotes for a repository. Call off EDT.
          */
-        fun loadDialogData(repo: JujutsuRepository): DialogData {
-            val remotes = repo.commandExecutor.gitRemoteList().let { result ->
+        fun loadRemotes(repo: JujutsuRepository): List<Remote> =
+            repo.commandExecutor.gitRemoteList().let { result ->
                 if (result.isSuccess) {
                     result.stdout.lines()
                         .map { it.trim() }
@@ -185,8 +186,15 @@ class GitPushDialog(
                     emptyList()
                 }
             }
+
+        /**
+         * Load dialog data (remotes and tracked bookmarks per remote) from a repository. Call off EDT.
+         * @param revision When provided, bookmarks are filtered to those on this revision or its ancestors.
+         */
+        fun loadDialogData(repo: JujutsuRepository, revision: Revision? = null): DialogData {
+            val remotes = loadRemotes(repo)
             val trackedByRemote = remotes.associateWith { remote ->
-                repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE, remote, true).let { result ->
+                repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE, remote, true, revision).let { result ->
                     if (result.isSuccess) {
                         result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.map { Bookmark(it, true) }
                     } else {
@@ -194,7 +202,10 @@ class GitPushDialog(
                     }
                 }
             }
-            val allLocal = repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE).let { result ->
+            val allLocal = repo.commandExecutor.bookmarkList(
+                template = LOCAL_BOOKMARK_TEMPLATE,
+                revision = revision
+            ).let { result ->
                 if (result.isSuccess) {
                     result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.map { Bookmark(it, false) }
                 } else {
