@@ -190,7 +190,12 @@ interface CommandExecutor {
      * @param allBookmarks Push all bookmarks
      * @return Command result
      */
-    fun gitPush(remote: Remote? = null, bookmark: Bookmark? = null, allBookmarks: Boolean = false): CommandResult
+    fun gitPush(
+        remote: Remote? = null,
+        bookmark: Bookmark? = null,
+        allBookmarks: Boolean = false,
+        allowNew: Boolean = false
+    ): CommandResult
 
     /**
      * Squash a change into its parent.

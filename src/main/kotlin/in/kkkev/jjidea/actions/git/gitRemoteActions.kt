@@ -5,7 +5,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
-import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -39,7 +38,7 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?) =
             val data = GitPushDialog.loadDialogData(target)
 
             runLater {
-                val dialog = GitPushDialog(project, data)
+                val dialog = GitPushDialog(project, mapOf(target to data), target)
                 if (!dialog.showAndGet()) return@runLater
 
                 val spec = dialog.result ?: return@runLater
@@ -47,11 +46,7 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?) =
                 target.commandExecutor
                     .createCommand {
                         val bm = spec.bookmark
-                        if (bm != null && !bm.tracked) {
-                            val trackResult = bookmarkTrack(Bookmark("${bm.localName}@${spec.remote}"))
-                            if (!trackResult.isSuccess) return@createCommand trackResult
-                        }
-                        gitPush(spec.remote, bm, spec.allBookmarks)
+                        gitPush(spec.remote, bm, spec.allBookmarks, allowNew = bm != null && !bm.tracked)
                     }
                     .onSuccess { stdout ->
                         target.invalidate()

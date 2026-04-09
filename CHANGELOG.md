@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Push dialog now includes a repository selector when multiple repositories are open, pre-selected from file context
+- "Specific bookmark" dropdown in the push dialog is now disabled unless that radio button is selected
+- Pushing a new (untracked) local bookmark no longer fails with "Refusing to create new remote bookmark" — `--allow-new` is passed automatically
+
 ## [0.5.21] - 2026-04-08
 
 ### Fixed

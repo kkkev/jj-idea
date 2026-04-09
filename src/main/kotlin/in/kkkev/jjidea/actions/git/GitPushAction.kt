@@ -7,7 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
@@ -18,6 +18,9 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
 /**
  * Push to a Git remote. Loads remotes/bookmarks off EDT, then opens a dialog to configure options.
  * Registered in plugin.xml and added to the VCS menu and log toolbar.
+ *
+ * When multiple repositories exist, the dialog includes a repository selector pre-populated from
+ * the file context (if any). The push targets only the repo selected in the dialog.
  */
 class GitPushAction : DumbAwareAction(
     JujutsuBundle.message("action.git.push"),
@@ -36,44 +39,35 @@ class GitPushAction : DumbAwareAction(
         val project = e.project ?: return
         val repos = project.initialisedJujutsuRepositories
         if (repos.isEmpty()) return
+        val initialRepo = e.repoForFile ?: repos.first()
 
-        // TODO jj-idea-wbib: don't just assume first initialise repository
-        // TODO Fix in jj-idea-p929
-        val repo = repos.first()
-
-        // Load remotes and bookmarks off EDT, then show dialog on EDT
+        // Load remotes and bookmarks for all repos off EDT, then show dialog on EDT
         runInBackground {
-            val data = GitPushDialog.loadDialogData(repo)
+            val allData = GitPushDialog.loadAllDialogData(repos)
 
             runLater {
-                val dialog = GitPushDialog(project, data)
+                val dialog = GitPushDialog(project, allData, initialRepo)
                 if (!dialog.showAndGet()) return@runLater
 
                 val spec = dialog.result ?: return@runLater
 
-                repos.forEach { targetRepo ->
-                    targetRepo.commandExecutor
-                        .createCommand {
-                            val bm = spec.bookmark
-                            if (bm != null && !bm.tracked) {
-                                val trackResult = bookmarkTrack(Bookmark("${bm.localName}@${spec.remote}"))
-                                if (!trackResult.isSuccess) return@createCommand trackResult
-                            }
-                            gitPush(spec.remote, bm, spec.allBookmarks)
-                        }
-                        .onSuccess { stdout ->
-                            targetRepo.invalidate()
-                            log.info("Pushed for ${targetRepo.displayName}")
-                            JujutsuNotifications.notify(
-                                project,
-                                JujutsuBundle.message("action.git.push.success.title"),
-                                stdout.ifBlank { JujutsuBundle.message("action.git.push.success.message.default") },
-                                NotificationType.INFORMATION
-                            )
-                        }
-                        .onFailure { tellUser(project, "action.git.push.error") }
-                        .executeWithProgress(project, JujutsuBundle.message("progress.git.push"))
-                }
+                spec.repo.commandExecutor
+                    .createCommand {
+                        val bm = spec.bookmark
+                        gitPush(spec.remote, bm, spec.allBookmarks, allowNew = bm != null && !bm.tracked)
+                    }
+                    .onSuccess { stdout ->
+                        spec.repo.invalidate()
+                        log.info("Pushed for ${spec.repo.displayName}")
+                        JujutsuNotifications.notify(
+                            project,
+                            JujutsuBundle.message("action.git.push.success.title"),
+                            stdout.ifBlank { JujutsuBundle.message("action.git.push.success.message.default") },
+                            NotificationType.INFORMATION
+                        )
+                    }
+                    .onFailure { tellUser(project, "action.git.push.error") }
+                    .executeWithProgress(project, JujutsuBundle.message("progress.git.push"))
             }
         }
     }

@@ -162,7 +162,8 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun gitPush(
         remote: Remote?,
         bookmark: Bookmark?,
-        allBookmarks: Boolean
+        allBookmarks: Boolean,
+        allowNew: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun squash(

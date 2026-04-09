@@ -50,7 +50,8 @@ internal fun gitFetchArgs(remote: Remote? = null, allRemotes: Boolean = false): 
 internal fun gitPushArgs(
     remote: Remote? = null,
     bookmark: Bookmark? = null,
-    allBookmarks: Boolean = false
+    allBookmarks: Boolean = false,
+    allowNew: Boolean = false
 ): List<String> = buildList {
     add("git")
     add("push")
@@ -64,6 +65,7 @@ internal fun gitPushArgs(
         add("--bookmark")
         add(bookmark.name)
     }
+    if (allowNew) add("--allow-new")
 }
 
 /** Build the argument list for `jj squash`. */
@@ -292,8 +294,8 @@ class CliExecutor(
     override fun gitFetch(remote: Remote?, allRemotes: Boolean) =
         execute(root, gitFetchArgs(remote, allRemotes), timeout = networkTimeout)
 
-    override fun gitPush(remote: Remote?, bookmark: Bookmark?, allBookmarks: Boolean) =
-        execute(root, gitPushArgs(remote, bookmark, allBookmarks), timeout = networkTimeout)
+    override fun gitPush(remote: Remote?, bookmark: Bookmark?, allBookmarks: Boolean, allowNew: Boolean) =
+        execute(root, gitPushArgs(remote, bookmark, allBookmarks, allowNew), timeout = networkTimeout)
 
     override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
 
