@@ -100,11 +100,8 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             override fun changedUpdate(e: DocumentEvent?) = checkModified()
 
             private fun checkModified() {
-                val newModified = text != persistedDescription.actual
-                if (newModified != isDescriptionModified) {
-                    isDescriptionModified = newModified
-                    updateDescriptionLabel()
-                }
+                isDescriptionModified = text != persistedDescription.actual
+                updateDescriptionLabel()
             }
         })
     }
@@ -291,6 +288,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         if (logEntry.repo != boundRepository) return
 
         runLater {
+            if (logEntry.repo != boundRepository) return@runLater
             persistedDescription = logEntry.description
             if (!isDescriptionModified) {
                 descriptionArea.text = persistedDescription.actual

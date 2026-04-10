@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.committed.CommittedChangesTreeBrowser
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.vcs.getChildPath
 
@@ -11,6 +12,13 @@ import `in`.kkkev.jjidea.vcs.getChildPath
  */
 object ChangeService {
     private val log = Logger.getInstance(ChangeService::class.java)
+
+    fun loadChanges(entries: List<LogEntry>): List<Change> {
+        if (entries.size == 1) return loadChanges(entries.single())
+        // Collect all changes in chronological order (oldest first = reversed selection order)
+        val allChanges = entries.reversed().flatMap { loadChanges(it) }
+        return CommittedChangesTreeBrowser.zipChanges(allChanges)
+    }
 
     fun loadChanges(entry: LogEntry): List<Change> {
         val repo = entry.repo

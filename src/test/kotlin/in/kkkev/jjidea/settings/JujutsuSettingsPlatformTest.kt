@@ -14,7 +14,7 @@ class JujutsuSettingsPlatformTest {
     @Test
     fun `settings service is available and has default state`() {
         val settings = JujutsuSettings.getInstance(project.get())
-        settings.state.autoRefreshEnabled shouldBe true
+        settings.state.logChangeLimit shouldBe 500
     }
 
     @Test

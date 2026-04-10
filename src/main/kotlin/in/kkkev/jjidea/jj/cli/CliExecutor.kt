@@ -329,7 +329,8 @@ class CliExecutor(
 
     override fun configList(key: String?, scope: CommandExecutor.ConfigScope?) = execute(
         root,
-        buildList { addAllIfNotNull("config", "list", scope?.param, key) }
+        buildList { addAllIfNotNull("config", "list", scope?.param, key) },
+        warnOnFailure = false
     )
 
     override fun configSetUser(scope: CommandExecutor.ConfigScope, key: String, value: String) =

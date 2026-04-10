@@ -52,7 +52,7 @@ class LogServiceIntegrationTest {
             val entries = logService.getLogBasic().getOrThrow()
             val wc = entries.first { it.isWorkingCopy }
 
-            wc.description.actual shouldBe "Hello world\n"
+            wc.description.actual shouldBe "Hello world"
             wc.id.full.shouldNotBeBlank()
             wc.commitId.full.shouldNotBeBlank()
         }
@@ -85,7 +85,7 @@ class LogServiceIntegrationTest {
             val entries = logService.getLogBasic().getOrThrow()
             val wc = entries.first { it.isWorkingCopy }
 
-            wc.description.actual shouldBe "Line one\nLine two\nLine three\n"
+            wc.description.actual shouldBe "Line one\nLine two\nLine three"
         }
 
         @Test

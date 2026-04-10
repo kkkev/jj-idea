@@ -110,9 +110,7 @@ abstract class CommitTablePanel<D>(
 
         // Wire table selection to details panel
         logTable.selectionModel.addListSelectionListener { e ->
-            if (!e.valueIsAdjusting) {
-                detailsPanel.showCommit(logTable.selectedEntry)
-            }
+            if (!e.valueIsAdjusting) detailsPanel.showCommits(logTable.selectedEntries)
         }
 
         dataLoader.load()
