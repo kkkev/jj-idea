@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Multi-select in log: metadata pane shows each selected commit's details stacked with separators (capped at 20, with overflow label)
 - Change ID in commit details panel is now a clickable link that selects that single commit in the log
 
+### Fixed
+- Describe button now correctly enables when typing into an empty (undescribed) working copy
+- Descriptions no longer accumulate a trailing blank line on each describe: jj's storage newline is stripped on read, and intentional trailing blank lines are preserved
+
 ### Removed
 - "UI Preferences" settings group containing three non-functional checkboxes (auto-refresh, short change ID format, auto-open log tab) — these settings were stored but never read
 

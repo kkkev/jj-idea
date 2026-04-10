@@ -198,7 +198,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             val (full, short) = it.split("~")
             CommitId(full, short)
         }
-        val description = stringField("description")
+        val description = singleField("description") { it.removeSuffix("\n") }
         val currentWorkingCopy = booleanField("current_working_copy")
         val conflict = booleanField("conflict")
         val empty = booleanField("empty")
