@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.0/jj-idea-0.6.0.zip" version="0.6.0">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.1/jj-idea-0.6.1.zip" version="0.6.1">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,17 +23,9 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.0</h3>
+      <h3>0.6.1</h3>
       
-<h4>Added</h4>
-<li>Push from a specific log entry now scopes the operation to that revision: bookmark list is filtered to ancestors of the selected change, and `jj git push -r <revision>` is used for the default push scope</li>
-
-<h4>Fixed</h4>
-<li>Push dialog now includes a repository selector when multiple repositories are open, pre-selected from file context</li>
-<li>"Specific bookmark" dropdown in the push dialog is now disabled unless that radio button is selected</li>
-<li>Pushing a new (untracked) local bookmark no longer fails with "Refusing to create new remote bookmark" — `--allow-new` is passed automatically</li>
-<li>Push and fetch now show a clear warning notification instead of failing cryptically when no Git remote is configured</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.0">full release notes</a> for details.</p>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.1">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
