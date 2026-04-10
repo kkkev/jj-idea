@@ -167,24 +167,6 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             }
         }
 
-        group(JujutsuBundle.message("settings.group.ui")) {
-            row {
-                checkBox(JujutsuBundle.message("settings.autorefresh.label"))
-                    .bindSelected(settings.state::autoRefreshEnabled)
-                    .comment(JujutsuBundle.message("settings.autorefresh.comment"))
-            }
-            row {
-                checkBox(JujutsuBundle.message("settings.shortformat.label"))
-                    .bindSelected(settings.state::showChangeIdsInShortFormat)
-                    .comment(JujutsuBundle.message("settings.shortformat.comment"))
-            }
-            row {
-                checkBox(JujutsuBundle.message("settings.autoopenlog.label"))
-                    .bindSelected(settings.state::autoOpenCustomLogTab)
-                    .comment(JujutsuBundle.message("settings.autoopenlog.comment"))
-            }
-        }
-
         group(JujutsuBundle.message("settings.group.log")) {
             row(JujutsuBundle.message("settings.log.limit.label")) {
                 intTextField(range = 1..10000)

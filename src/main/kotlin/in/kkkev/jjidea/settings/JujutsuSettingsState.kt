@@ -8,11 +8,8 @@ package `in`.kkkev.jjidea.settings
  */
 data class JujutsuSettingsState(
     var jjExecutablePath: String = "jj",
-    var autoRefreshEnabled: Boolean = true,
-    var showChangeIdsInShortFormat: Boolean = true,
     var logChangeLimit: Int = 500,
     var logRevset: String = "all()",
-    var autoOpenCustomLogTab: Boolean = true,
     // Column widths for custom log table (column index -> width in pixels)
     var customLogColumnWidths: MutableMap<Int, Int> = mutableMapOf(),
     var repositoryOverrides: MutableMap<String, RepositoryConfig> = mutableMapOf(),

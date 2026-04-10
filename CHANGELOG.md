@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- "UI Preferences" settings group containing three non-functional checkboxes (auto-refresh, short change ID format, auto-open log tab) — these settings were stored but never read
+
 ## [0.6.0] - 2026-04-09
 
 ### Added
