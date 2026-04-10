@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Multi-select in log: changes tree now shows the union of all selected commits' changes (chained by file path, oldest-to-newest)
+- Multi-select in log: metadata pane shows each selected commit's details stacked with separators (capped at 20, with overflow label)
+- Change ID in commit details panel is now a clickable link that selects that single commit in the log
+
 ### Removed
 - "UI Preferences" settings group containing three non-functional checkboxes (auto-refresh, short change ID format, auto-open log tab) — these settings were stored but never read
 

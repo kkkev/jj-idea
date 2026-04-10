@@ -67,7 +67,7 @@ class UnifiedJujutsuLogPanel(project: Project) :
         // Refresh detail panel with the (possibly updated) selected entry.
         // fireTableDataChanged() doesn't change the selection, so the ListSelectionListener
         // won't fire — but the entry data may have changed (e.g., empty flag, file changes).
-        detailsPanel.showCommit(logTable.selectedEntry)
+        detailsPanel.showCommits(logTable.selectedEntries)
     }
 
     /**

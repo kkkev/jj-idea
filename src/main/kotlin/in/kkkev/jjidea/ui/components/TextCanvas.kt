@@ -213,7 +213,7 @@ fun TextCanvas.append(
 }
 
 fun TextCanvas.appendSummary(entry: LogEntry) {
-    append(entry.id)
+    append(ChangeKey(entry.repo, entry.id))
     append(" (")
     append(entry.commitId)
     append(")\n")

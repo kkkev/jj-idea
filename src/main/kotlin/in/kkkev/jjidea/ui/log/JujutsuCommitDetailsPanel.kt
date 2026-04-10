@@ -12,6 +12,7 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -46,8 +47,8 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     // Changes tree
     private val changesTree = JujutsuChangesTree(project)
 
-    // Current selected entry
-    private var currentEntry: LogEntry? = null
+    // Current selected entries
+    private var currentEntries: List<LogEntry> = emptyList()
 
     init {
         // Configure metadata pane
@@ -61,9 +62,11 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
         // Setup changes panel with tree and toolbar
         setupChangesPanel()
 
-        // Inject LOG_ENTRY into data context for actions to determine working copy vs historical
+        // Inject LOG_ENTRY into data context for actions to determine working copy vs historical.
+        // Prefer the working copy entry if one is in the selection, otherwise use the first entry.
         changesTree.additionalDataProvider = { sink ->
-            currentEntry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+            val entry = currentEntries.firstOrNull { it.isWorkingCopy } ?: currentEntries.firstOrNull()
+            entry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
         }
 
         // Create splitter: changes on top, metadata on bottom
@@ -119,50 +122,50 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     /**
      * Update the panel to show details for the given commit.
      */
-    fun showCommit(entry: LogEntry?) {
-        currentEntry = entry
+    fun showCommit(entry: LogEntry?) = showCommits(listOfNotNull(entry))
 
-        if (entry == null) {
+    /**
+     * Update the panel to show details for the given commits.
+     * For multiple commits, metadata is displayed as stacked sections with <hr> separators,
+     * and the changes tree shows the union of all selected commits' changes.
+     */
+    fun showCommits(entries: List<LogEntry>) {
+        currentEntries = entries
+
+        if (entries.isEmpty()) {
             showEmptyState()
             changesTree.setChangesToDisplay(emptyList())
             return
         }
 
         // Update metadata immediately
-        val html = buildCommitHtml(entry)
-        metadataPane.text = html
+        metadataPane.text = buildCommitHtml(entries)
 
         // Scroll to top after text is set (runLater so layout completes first)
-        runLater {
-            metadataPane.caretPosition = 0
-        }
+        runLater { metadataPane.caretPosition = 0 }
 
         // Load changes in background
-        loadChanges(entry)
+        loadChanges(entries)
     }
 
-    private fun loadChanges(entry: LogEntry) {
+    private fun loadChanges(entries: List<LogEntry>) {
         runInBackground {
             try {
-                val changes = ChangeService.loadChanges(entry)
-
+                val changes = ChangeService.loadChanges(entries)
                 runLater {
-                    if (currentEntry == entry) { // Only update if still the same commit
+                    if (currentEntries == entries) {
                         changesTree.setChangesToDisplay(changes)
-                        // Expand all nodes by default after loading changes
-                        changesTree.invokeAfterRefresh {
-                            changesTree.treeExpander.expandAll()
-                        }
+                        changesTree.invokeAfterRefresh { changesTree.treeExpander.expandAll() }
                     }
                 }
             } catch (e: Exception) {
                 // This can happen when a commit is removed (e.g., by abandon, or empty commit auto-removed).
                 // Treat this as "no commit selected" rather than an error.
-                log.info("Change ${entry.id} no longer exists (likely abandoned or auto-removed): ${e.message}")
+                val ids = entries.joinToString { it.id.toString() }
+                log.info("Change(s) $ids no longer exist (likely abandoned or auto-removed): ${e.message}")
                 runLater {
-                    if (currentEntry == entry) {
-                        // Clear the selection state since this commit no longer exists
-                        currentEntry = null
+                    if (currentEntries == entries) {
+                        currentEntries = emptyList()
                         showEmptyState()
                         changesTree.setChangesToDisplay(emptyList())
                     }
@@ -172,30 +175,46 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
     }
 
     /**
-     * Build HTML for commit details, matching Git plugin style.
+     * Build HTML for one or more commit details.
+     * Multiple entries are separated by <hr> dividers, capped at MAX_DISPLAYED_COMMITS.
      */
-    private fun buildCommitHtml(entry: LogEntry) = htmlString {
+    private fun buildCommitHtml(entries: List<LogEntry>) = htmlString {
+        val displayed = entries.take(MAX_DISPLAYED_COMMITS)
         control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
-            appendSummaryAndStatuses(entry)
-            appendParents(entry)
-            control("<pre style='white-space: pre-wrap;'>", "</pre>") {
-                append(entry.description)
-            }
-            control("<p style='margin: 4px 0;'>", "</p>") {
-                entry.author?.let { append(it) } ?: append("Unknown")
-                entry.authorTimestamp?.also {
-                    append(" on ")
-                    append(it)
+            displayed.forEachIndexed { index, entry ->
+                if (index > 0) control("<hr/>")
+                appendSummaryAndStatuses(entry)
+                appendParents(entry)
+                control("<pre style='white-space: pre-wrap;'>", "</pre>") {
+                    append(entry.description)
                 }
-
-                // Committer line (if different from author)
-                val committer = entry.committer
-                if (committer != null && committer != entry.author) {
-                    append("\ncommitted by ")
-                    append(committer)
+                control("<p style='margin: 4px 0;'>", "</p>") {
+                    entry.author?.let { append(it) } ?: append("Unknown")
+                    entry.authorTimestamp?.also {
+                        append(" on ")
+                        append(it)
+                    }
+                    val committer = entry.committer
+                    if (committer != null && committer != entry.author) {
+                        append("\ncommitted by ")
+                        append(committer)
+                    }
+                }
+            }
+            if (entries.size > MAX_DISPLAYED_COMMITS) {
+                control("<p>", "</p>") {
+                    grey {
+                        append(
+                            JujutsuBundle.message("details.multi.overflow", MAX_DISPLAYED_COMMITS, entries.size)
+                        )
+                    }
                 }
             }
         }
+    }
+
+    companion object {
+        private const val MAX_DISPLAYED_COMMITS = 20
     }
 
     /**
