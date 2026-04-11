@@ -318,6 +318,12 @@ class CliExecutor(
 
     override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
 
+    override fun latestPushedAncestorCommitId(remoteName: String): String? {
+        val revset = Expression("latest(ancestors(@) & ancestors(remote_bookmarks(remote=$remoteName)))")
+        val result = log(revset, template = "commit_id", limit = 1)
+        return result.stdout.trim().takeIf { result.isSuccess && it.isNotEmpty() }
+    }
+
     override fun gitClone(source: String, destination: String, colocate: Boolean) =
         execute(null, gitCloneArgs(source, destination, colocate), timeout = networkTimeout)
 

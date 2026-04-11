@@ -5,11 +5,13 @@ import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
+import java.util.concurrent.CompletableFuture
 
 /**
  * A (possible) JJ repository. "Possible" because the directory could be uninitialised, as this class allows
@@ -22,6 +24,9 @@ interface JujutsuRepository {
     val commandExecutor: CommandExecutor
     val logService: LogService
     val isInitialised: Boolean
+
+    /** Git remotes for this repository, lazily fetched once per session. */
+    val gitRemotes: List<GitRemote>
     fun createRevision(filePath: FilePath, revision: Revision): ContentRevision
     fun getRelativePath(filePath: FilePath): String
     fun getRelativePath(file: VirtualFile): String
@@ -44,6 +49,24 @@ data class JujutsuRepositoryImpl(
         }
 
     override val logService: LogService by lazy { CliLogService(this) }
+
+    private val gitRemotesFuture: CompletableFuture<List<GitRemote>> = CompletableFuture.supplyAsync(
+        {
+            val result = executor.gitRemoteList()
+            if (!result.isSuccess) return@supplyAsync emptyList()
+            result.stdout.lines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .mapNotNull { line ->
+                    val name = line.substringBefore(' ')
+                    val url = line.substringAfter(' ', "").trim()
+                    if (url.isEmpty()) null else GitRemote(name, url)
+                }
+        },
+        AppExecutorUtil.getAppExecutorService()
+    ).exceptionally { emptyList() }
+
+    override val gitRemotes: List<GitRemote> get() = gitRemotesFuture.getNow(emptyList())
 
     private fun requireInitialised() {
         check(isInitialised) { "Repository at ${directory.path} is not initialized. Use initExecutor for gitInit." }

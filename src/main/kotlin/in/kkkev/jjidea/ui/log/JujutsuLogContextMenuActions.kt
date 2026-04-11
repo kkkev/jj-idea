@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.actions.change.squashAction
 import `in`.kkkev.jjidea.actions.change.squashableEntry
 import `in`.kkkev.jjidea.actions.git.gitFetchAction
 import `in`.kkkev.jjidea.actions.git.gitPushAction
+import `in`.kkkev.jjidea.actions.git.openInRemoteGroup
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
@@ -88,5 +89,6 @@ object JujutsuLogContextMenuActions {
         addSeparator()
         add(gitFetchAction(project, uniqueRepo))
         add(gitPushAction(project, uniqueRepo, entry?.id))
+        entry?.let { add(openInRemoteGroup(it.repo, it.commitId, it.immutable)) }
     }
 }

@@ -11,6 +11,7 @@ import com.intellij.openapi.vcs.annotate.ShowAllAffectedGenericAction
 import com.intellij.openapi.vcs.history.*
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import `in`.kkkev.jjidea.actions.git.OpenInRemoteFromHistoryGroup
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import javax.swing.JComponent
@@ -103,7 +104,8 @@ class JujutsuHistoryProvider(private val project: Project) : VcsHistoryProvider 
     override fun getAdditionalActions(refresher: Runnable): Array<AnAction> =
         arrayOf(
             ShowAllAffectedGenericAction.getInstance(),
-            ActionManager.getInstance().getAction(VcsActions.ACTION_COPY_REVISION_NUMBER)
+            ActionManager.getInstance().getAction(VcsActions.ACTION_COPY_REVISION_NUMBER),
+            OpenInRemoteFromHistoryGroup()
         )
 
     override fun isDateOmittable() = false

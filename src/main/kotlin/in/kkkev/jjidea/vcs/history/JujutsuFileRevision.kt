@@ -19,7 +19,7 @@ import java.util.*
 class JujutsuFileRevision(
     private val entry: LogEntry,
     private val filePath: FilePath,
-    private val repo: JujutsuRepository
+    val repo: JujutsuRepository
 ) : VcsFileRevisionEx() {
     private val log = Logger.getInstance(javaClass)
 
@@ -35,6 +35,10 @@ class JujutsuFileRevision(
             }.find { it.filePath == filePath.path }
             ?.status
     }
+
+    val commitId get() = entry.commitId
+    val immutable get() = entry.immutable
+    val repoRelativePath get() = repo.getRelativePath(filePath)
 
     override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.id)
 

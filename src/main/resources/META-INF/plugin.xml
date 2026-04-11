@@ -123,6 +123,21 @@
             <add-to-group group-id="VcsGroup" anchor="last"/>
         </group>
 
+        <!-- "Open In" submenu entry: opens file at latest pushed commit on GitHub/GitLab -->
+        <group id="Jujutsu.OpenInRemoteFromEditor"
+               class="in.kkkev.jjidea.actions.file.OpenInRemoteFromEditorGroup">
+            <add-to-group group-id="RevealGroup" anchor="last"/>
+        </group>
+
+        <!-- "Open In" for file history: opens file/commit at the selected revision on GitHub/GitLab.
+             Covers right-click popup in history panel, selection history popup, and diff editor "Open In". -->
+        <group id="Jujutsu.OpenInRemoteFromHistory"
+               class="in.kkkev.jjidea.actions.git.OpenInRemoteFromHistoryGroup">
+            <add-to-group group-id="VcsHistoryActionsGroup" anchor="last"/>
+            <add-to-group group-id="VcsSelectionHistoryDialog.Popup" anchor="last"/>
+            <add-to-group group-id="RevealGroup" anchor="last"/>
+        </group>
+
         <!-- File change context menu actions for custom panels -->
         <action id="Jujutsu.OpenChangeFile" class="in.kkkev.jjidea.actions.filechange.OpenChangeFileAction">
             <keyboard-shortcut first-keystroke="F4" keymap="$default"/>
@@ -136,6 +151,8 @@
                 class="in.kkkev.jjidea.actions.filechange.CompareBeforeWithLocalAction"/>
         <action id="Jujutsu.OpenRepositoryVersion"
                 class="in.kkkev.jjidea.actions.filechange.OpenRepositoryVersionAction"/>
+        <group id="Jujutsu.OpenFileInRemote"
+               class="in.kkkev.jjidea.actions.filechange.OpenFileInRemoteGroup"/>
     </actions>
 
 </idea-plugin>

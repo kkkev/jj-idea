@@ -240,6 +240,13 @@ interface CommandExecutor {
     fun gitRemoteList(): CommandResult
 
     /**
+     * Find the most recent ancestor of the working copy that has been pushed to [remoteName].
+     * Returns the full commit hash, or null if no pushed ancestor is found.
+     * @param remoteName Remote name (e.g. "origin")
+     */
+    fun latestPushedAncestorCommitId(remoteName: String): String?
+
+    /**
      * Clone a Git repository and create a Jujutsu repository.
      * @param source URL or path of the Git repo to clone
      * @param destination Target directory path
