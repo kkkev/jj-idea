@@ -1,17 +1,16 @@
 package `in`.kkkev.jjidea.vcs.history
 
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.RepositoryLocation
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.history.VcsFileRevisionEx
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.jj.FileChangeStatus
-import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.GitRemote
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
-import java.util.*
+import java.util.Date
 
 /**
  * Represents a single revision of a file in Jujutsu history
@@ -19,26 +18,14 @@ import java.util.*
 class JujutsuFileRevision(
     private val entry: LogEntry,
     private val filePath: FilePath,
-    val repo: JujutsuRepository
+    val fileStatus: FileChangeStatus,
+    val possibleRemotes: List<GitRemote>
 ) : VcsFileRevisionEx() {
-    private val log = Logger.getInstance(javaClass)
-
-    /**
-     * Lazy-loaded file status. Determines if this file was deleted in this revision.
-     */
-    private val fileStatus: FileChangeStatus? by lazy {
-        val logService = repo.logService
-        logService.getFileChanges(entry.id)
-            .getOrElse { error ->
-                log.debug("Error loading file changes for ${entry.id}: ${error.message}")
-                emptyList()
-            }.find { it.filePath == filePath.path }
-            ?.status
-    }
-
     val commitId get() = entry.commitId
     val immutable get() = entry.immutable
-    val repoRelativePath get() = repo.getRelativePath(filePath)
+    val repoRelativePath get() = entry.repo.getRelativePath(filePath)
+    val committer get() = entry.committer?.name
+    val committerDate get() = entry.committerTimestamp?.toJavaDate()
 
     override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.id)
 
@@ -58,16 +45,6 @@ class JujutsuFileRevision(
 
     override fun getCommitMessage(): String = entry.description.display
 
-    /**
-     * Get the committer name (may differ from author in JJ)
-     */
-    fun getCommitter() = entry.committer?.name
-
-    /**
-     * Get the committer timestamp
-     */
-    fun getCommitterDate() = entry.committerTimestamp?.toJavaDate()
-
     // TODO Fill this in
     override fun getChangedRepositoryPath(): RepositoryLocation? = null
 
@@ -77,7 +54,7 @@ class JujutsuFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val result = repo.commandExecutor.show(filePath, entry.id)
+        val result = entry.repo.commandExecutor.show(filePath, entry.id)
         if (!result.isSuccess) {
             throw VcsException("Failed to load file content at revision ${entry.id}: ${result.stderr}")
         }

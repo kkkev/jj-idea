@@ -71,6 +71,7 @@ class FileChangeTest {
                 FileChangeStatus.MODIFIED,
                 FileChangeStatus.ADDED,
                 FileChangeStatus.DELETED,
+                FileChangeStatus.RENAMED,
                 FileChangeStatus.UNKNOWN
             )
     }
@@ -80,6 +81,7 @@ class FileChangeTest {
         FileChangeStatus.valueOf("MODIFIED") shouldBe FileChangeStatus.MODIFIED
         FileChangeStatus.valueOf("ADDED") shouldBe FileChangeStatus.ADDED
         FileChangeStatus.valueOf("DELETED") shouldBe FileChangeStatus.DELETED
+        FileChangeStatus.valueOf("RENAMED") shouldBe FileChangeStatus.RENAMED
         FileChangeStatus.valueOf("UNKNOWN") shouldBe FileChangeStatus.UNKNOWN
     }
 

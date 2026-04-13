@@ -9,14 +9,15 @@ import java.util.*
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
+val VcsFileRevision?.committer get() = (this as? JujutsuFileRevision)?.committer ?: ""
+
 /**
  * Custom column for committer (may differ from author in JJ)
  */
 class CommitterColumnInfo : ColumnInfo<VcsFileRevision, String>("Committer") {
-    override fun valueOf(revision: VcsFileRevision): String = (revision as? JujutsuFileRevision)?.getCommitter() ?: ""
+    override fun valueOf(revision: VcsFileRevision) = revision.committer
 
-    override fun getComparator(): Comparator<VcsFileRevision> =
-        compareBy { (it as? JujutsuFileRevision)?.getCommitter() ?: "" }
+    override fun getComparator(): Comparator<VcsFileRevision> = compareBy { it.committer }
 
     override fun getPreferredStringValue() = "user@example.com"
 
@@ -27,10 +28,9 @@ class CommitterColumnInfo : ColumnInfo<VcsFileRevision, String>("Committer") {
  * Custom column for commit timestamp (committer timestamp)
  */
 class CommitTimestampColumnInfo : ColumnInfo<VcsFileRevision, Date?>("Commit Time") {
-    override fun valueOf(revision: VcsFileRevision): Date? = (revision as? JujutsuFileRevision)?.getCommitterDate()
+    override fun valueOf(revision: VcsFileRevision): Date? = (revision as? JujutsuFileRevision)?.committerDate
 
-    override fun getComparator(): Comparator<VcsFileRevision> =
-        compareBy(nullsLast()) { (it as? JujutsuFileRevision)?.getCommitterDate() }
+    override fun getComparator(): Comparator<VcsFileRevision> = compareBy(nullsLast()) { it.committer }
 
     override fun getRenderer(revision: VcsFileRevision): TableCellRenderer = object : ColoredTableCellRenderer() {
         override fun customizeCellRenderer(

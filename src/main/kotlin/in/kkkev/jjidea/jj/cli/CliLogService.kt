@@ -58,6 +58,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     override fun getLogBasic(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
         getLog(logTemplates.basicLogTemplate, revset, filePaths, limit)
 
+    override fun getLogAndFileStatuses(revset: Revset, filePath: FilePath, limit: Int?) =
+        getLog(logTemplates.fileStatusesFor(filePath), revset, listOf(filePath), limit)
+
     override fun getBookmarks(): Result<List<BookmarkItem>> {
         log.debug("Getting bookmarks")
 
@@ -270,6 +273,26 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 author = jjAuthor.user,
                 committer = jjCommitter.user
             )
+        }
+
+        fun fileChangeStatusFor(filePath: FilePath) = singleField<FileChangeStatus>(
+            "diff.files().filter(|e| e.path().display() == '$filePath').map(|e| e.status()).join(',')"
+        ) {
+            when (it) {
+                "added" -> FileChangeStatus.ADDED
+                "modified" -> FileChangeStatus.MODIFIED
+                "renamed" -> FileChangeStatus.RENAMED
+                "removed" -> FileChangeStatus.DELETED
+                else -> FileChangeStatus.UNKNOWN
+            }
+        }
+
+        fun fileStatusesFor(filePath: FilePath): LogTemplate<FileRevision> {
+            val fileStatus = fileChangeStatusFor(filePath)
+            return logTemplate(basicLogTemplate, fileStatus) {
+                val basic = basicLogTemplate.take(it)
+                FileRevision(basic, fileStatus.take(it))
+            }
         }
 
         /**

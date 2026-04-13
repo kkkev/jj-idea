@@ -135,7 +135,6 @@
                class="in.kkkev.jjidea.actions.git.OpenInRemoteFromHistoryGroup">
             <add-to-group group-id="VcsHistoryActionsGroup" anchor="last"/>
             <add-to-group group-id="VcsSelectionHistoryDialog.Popup" anchor="last"/>
-            <add-to-group group-id="RevealGroup" anchor="last"/>
         </group>
 
         <!-- File change context menu actions for custom panels -->

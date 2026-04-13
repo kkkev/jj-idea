@@ -142,7 +142,7 @@ object ChangeService {
                 Change(beforeRevision, null, FileStatus.DELETED)
             }
 
-            FileChangeStatus.UNKNOWN -> {
+            FileChangeStatus.RENAMED, FileChangeStatus.UNKNOWN -> {
                 log.debug("Skipping file with unknown status: ${fileChange.filePath}")
                 null
             }

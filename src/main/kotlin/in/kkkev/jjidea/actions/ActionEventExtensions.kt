@@ -8,6 +8,7 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
 val AnActionEvent.file: VirtualFile? get() = this.getData(CommonDataKeys.VIRTUAL_FILE)
@@ -23,6 +24,8 @@ val AnActionEvent.changes: List<Change>
     get() = (this.getData(VcsDataKeys.SELECTED_CHANGES) ?: this.getData(VcsDataKeys.CHANGES))
         ?.toList()
         ?: emptyList()
+
+val AnActionEvent.fileRevision get() = this.getData(VcsDataKeys.VCS_FILE_REVISION) as? JujutsuFileRevision
 
 /**
  * Gets the Jujutsu repository for the single file selected in the action.

@@ -33,6 +33,12 @@ interface LogService {
         limit: Int? = null
     ): Result<List<LogEntry>>
 
+    fun getLogAndFileStatuses(
+        revset: Revset = Expression.ALL,
+        filePath: FilePath,
+        limit: Int? = null
+    ): Result<List<FileRevision>>
+
     /**
      * Get file changes for a specific revision
      * @param revision Single revision (e.g., "@", change ID, bookmark)

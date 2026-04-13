@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.vcs.VcsDataKeys
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.fileRevision
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
@@ -57,10 +58,10 @@ class OpenInRemoteFromHistoryGroup : DefaultActionGroup() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun remotes(revision: JujutsuFileRevision) =
-        RemoteUrlBuilder.recognizedRemotes(revision.repo.gitRemotes, revision.commitId.full, revision.immutable)
+        RemoteUrlBuilder.recognizedRemotes(revision.possibleRemotes, revision.commitId.full, revision.immutable)
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
-        val revision = e?.getData(VcsDataKeys.VCS_FILE_REVISION) as? JujutsuFileRevision
+        val revision = e?.fileRevision
             ?: return emptyArray()
         val remotes = remotes(revision)
         return when (remotes.size) {
@@ -69,6 +70,7 @@ class OpenInRemoteFromHistoryGroup : DefaultActionGroup() {
                 val remote = remotes.single()
                 arrayOf(fileAction(remote, revision), commitAction(remote))
             }
+
             else -> remotes.map { remote ->
                 DefaultActionGroup(JujutsuBundle.message("log.action.open.in.remote", remote.kind.label), true).also {
                     it.add(fileAction(remote, revision))
@@ -79,7 +81,7 @@ class OpenInRemoteFromHistoryGroup : DefaultActionGroup() {
     }
 
     override fun update(e: AnActionEvent) {
-        val revision = e.getData(VcsDataKeys.VCS_FILE_REVISION) as? JujutsuFileRevision ?: run {
+        val revision = e.fileRevision ?: run {
             e.presentation.isVisible = false
             return
         }
