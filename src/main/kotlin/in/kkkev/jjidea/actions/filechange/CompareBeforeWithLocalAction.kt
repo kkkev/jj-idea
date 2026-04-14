@@ -7,15 +7,12 @@ import com.intellij.diff.chains.SimpleDiffRequestChain
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.logEntry
-import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -36,26 +33,27 @@ import `in`.kkkev.jjidea.util.runLater
  *
  * For project view/editor "show diff" functionality, use [ShowChangesDiffAction] instead.
  */
-class CompareBeforeWithLocalAction : DumbAwareAction(
-    JujutsuBundle.message("action.compare.before.with.local"),
-    JujutsuBundle.message("action.compare.before.with.local.description"),
-    AllIcons.Actions.Diff
-) {
+class CompareBeforeWithLocalAction :
+    HistoricalVersionAction("action.compare.before.with.local", AllIcons.Actions.Diff) {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val logEntry = e.logEntry ?: return
-        val parentId = logEntry.parentIds.firstOrNull() ?: return
-
-        compareChangesWithLocal(project, e.changes, logEntry.repo, parentId)
+    override fun actionPerformed(
+        project: Project,
+        commandExecutor: CommandExecutor,
+        logEntry: LogEntry,
+        changes: List<Change>
+    ) {
+        // TODO This only compares against the first parent, which may be incorrect for a merge
+        logEntry.parentIds.firstOrNull()?.let { parentId ->
+            compareChangesWithLocal(project, changes, commandExecutor, parentId)
+        }
     }
 
     private fun compareChangesWithLocal(
         project: Project,
         changes: List<Change>,
-        repo: JujutsuRepository,
-        revision: Revision
+        commandExecutor: CommandExecutor,
+        parentRevision: Revision
     ) {
         val validChanges = changes.filter { it.beforeRevision != null }
         if (validChanges.isEmpty()) return
@@ -64,7 +62,7 @@ class CompareBeforeWithLocalAction : DumbAwareAction(
             val requests = validChanges.mapNotNull { change ->
                 val filePath = change.beforeRevision?.file ?: return@mapNotNull null
 
-                val revisionResult = repo.commandExecutor.show(filePath, revision)
+                val revisionResult = commandExecutor.show(filePath, parentRevision)
                 val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
 
                 val contentFactory = DiffContentFactory.getInstance()
@@ -79,7 +77,7 @@ class CompareBeforeWithLocalAction : DumbAwareAction(
                     filePath.name,
                     contentFactory.create(project, revisionContent, filePath.fileType),
                     localContent,
-                    "${filePath.name} (${revision.short})",
+                    "${filePath.name} (${parentRevision.short})",
                     "${filePath.name} (${JujutsuBundle.message("diff.label.local")})"
                 )
             }
@@ -93,14 +91,6 @@ class CompareBeforeWithLocalAction : DumbAwareAction(
         }
     }
 
-    override fun update(e: AnActionEvent) {
-        val logEntry = e.logEntry
-
-        // Only visible in historical log context with parents
-        val visible = logEntry != null && !logEntry.isWorkingCopy && logEntry.parentIds.isNotEmpty()
-        val enabled = visible && e.changes.any { it.beforeRevision != null }
-
-        e.presentation.isVisible = visible
-        e.presentation.isEnabled = enabled
-    }
+    // Only visible in historical log context with parents
+    override fun isVisible(entry: LogEntry) = super.isVisible(entry) && entry.parentIds.isNotEmpty()
 }

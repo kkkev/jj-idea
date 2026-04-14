@@ -7,13 +7,12 @@ import com.intellij.diff.chains.SimpleDiffRequestChain
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.logEntry
-import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.util.runLater
 
 /**
@@ -26,65 +25,42 @@ import `in`.kkkev.jjidea.util.runLater
  * Enabled:
  * - When at least one selected file has afterRevision (not deleted)
  */
-class CompareWithLocalAction : DumbAwareAction(
-    JujutsuBundle.message("action.compare.with.local"),
-    JujutsuBundle.message("action.compare.with.local.description"),
-    AllIcons.Actions.Diff
-) {
+class CompareWithLocalAction : HistoricalVersionAction("action.compare.with.local", AllIcons.Actions.Diff) {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
+    override fun actionPerformed(
+        project: Project,
+        commandExecutor: CommandExecutor,
+        logEntry: LogEntry,
+        changes: List<Change>
+    ) {
+        val changeId = logEntry.id
+        val requests = changes.mapNotNull { change ->
+            val filePath = change.afterRevision?.file ?: return@mapNotNull null
+            val result = commandExecutor.show(filePath, changeId)
+            val content = if (result.isSuccess) result.stdout else ""
 
-    override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
-        val entry = e.logEntry ?: return
-        val changes = e.changes.filter { it.afterRevision != null }
-        if (changes.isEmpty()) return
-
-        val repo = entry.repo
-        val revision = entry.id
-
-        runInBackground {
-            val requests = changes.mapNotNull { change ->
-                val filePath = change.afterRevision?.file ?: return@mapNotNull null
-
-                val revisionResult = repo.commandExecutor.show(filePath, revision)
-                val revisionContent = if (revisionResult.isSuccess) revisionResult.stdout else ""
-
-                val contentFactory = DiffContentFactory.getInstance()
-                val localFile = LocalFileSystem.getInstance().findFileByPath(filePath.path)
-                val localContent = if (localFile?.exists() == true) {
-                    contentFactory.create(project, localFile)
-                } else {
-                    contentFactory.createEmpty()
-                }
-
-                SimpleDiffRequest(
-                    filePath.name,
-                    contentFactory.create(project, revisionContent, filePath.fileType),
-                    localContent,
-                    "${filePath.name} (${revision.short})",
-                    "${filePath.name} (${JujutsuBundle.message("diff.label.local")})"
-                )
+            val contentFactory = DiffContentFactory.getInstance()
+            val localFile = LocalFileSystem.getInstance().findFileByPath(filePath.path)
+            val localContent = if (localFile?.exists() == true) {
+                contentFactory.create(project, localFile)
+            } else {
+                contentFactory.createEmpty()
             }
 
-            if (requests.isNotEmpty()) {
-                runLater {
-                    val chain = SimpleDiffRequestChain(requests)
-                    DiffManager.getInstance().showDiff(project, chain, DiffDialogHints.DEFAULT)
-                }
+            SimpleDiffRequest(
+                filePath.name,
+                contentFactory.create(project, content, filePath.fileType),
+                localContent,
+                "${filePath.name} (${changeId.short})",
+                "${filePath.name} (${JujutsuBundle.message("diff.label.local")})"
+            )
+        }
+
+        if (requests.isNotEmpty()) {
+            runLater {
+                val chain = SimpleDiffRequestChain(requests)
+                DiffManager.getInstance().showDiff(project, chain, DiffDialogHints.DEFAULT)
             }
         }
-    }
-
-    override fun update(e: AnActionEvent) {
-        val entry = e.logEntry
-        val changes = e.changes
-
-        // Hidden in working copy context or when no entry
-        val visible = entry != null && !entry.isWorkingCopy
-        // Enabled when at least one file has afterRevision (not deleted)
-        val enabled = visible && changes.any { it.afterRevision != null }
-
-        e.presentation.isVisible = visible
-        e.presentation.isEnabled = enabled
     }
 }
