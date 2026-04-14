@@ -3,9 +3,14 @@ package `in`.kkkev.jjidea.util
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.util.messages.Topic
 import `in`.kkkev.jjidea.util.NotifiableState.Listener
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.milliseconds
 
 inline fun <reified L> topic(displayName: String) = Topic.create(displayName, L::class.java)
 
@@ -16,9 +21,60 @@ interface NotifiableState<T> {
 
     val value: T
 
+    /**
+     * Returns the current cached value if already loaded, or runs the loader synchronously
+     * on the calling thread if the cache is still at its start value.
+     *
+     * ## When to use
+     * Only call this from a **background thread** — e.g. inside another [NotifiableState] loader,
+     * or a pooled-thread VCS provider. It exists to break ordering dependencies between states
+     * whose loaders cascade: without it, a loader that reads another state's [value] may see an
+     * empty start value if the upstream load hasn't finished yet.
+     *
+     * ## Why it is safe
+     * Loaders are pure functions (read-only, idempotent). If the background load races with this
+     * synchronous call, both runs produce the same result; the background loader's result is
+     * discarded by the version check in [invalidate]. [value] is only ever written by the
+     * background loader, so there is no write-write conflict.
+     *
+     * ## What it does NOT do
+     * - Does **not** update [value] or notify listeners — the background loader owns that.
+     * - Does **not** coalesce with an in-flight background load.
+     *
+     * ## What would break it
+     * - **Calling from EDT** — would block the UI thread for the duration of the loader.
+     * - **A loader with side effects** — double-execution would fire those effects twice.
+     *   Keep loaders pure.
+     */
+    val immediateValue: T
+
     fun connect(parent: Disposable, handler: Listener<T>)
 
     fun invalidate()
+
+    /**
+     * Suspends until this state has loaded a non-start value, then returns it.
+     *
+     * If the value is already loaded ([value] != start value), returns immediately.
+     *
+     * ## Why this exists
+     * [in.kkkev.jjidea.ui.services.JujutsuStartupActivity] awaits this on
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.initialisedRepositories] before returning, ensuring the
+     * repository cache is warm before IntelliJ activates VCS and calls annotation/diff providers.
+     *
+     * ## Ordering guarantee relied upon
+     * IntelliJ guarantees that VCS activation — which triggers
+     * `com.intellij.vcs.CacheableAnnotationProvider.populateCache` and
+     * [com.intellij.openapi.vcs.diff.DiffProvider.getLastRevision] — happens **after** all
+     * [com.intellij.openapi.startup.ProjectActivity] instances complete. If that guarantee is
+     * removed in a future platform version, this await will no longer prevent the race and the
+     * annotation/diff providers will need their own fallback.
+     *
+     * ## Timeout
+     * Gives up after [timeoutMs] ms to avoid hanging startup when jj is unavailable or
+     * misconfigured. On timeout, returns the current [value] as-is (may still be the start value).
+     */
+    suspend fun awaitLoad(timeoutMs: Long = 10_000): T
 }
 
 fun <T : Any> notifiableState(
@@ -70,6 +126,23 @@ class SimpleNotifiableState<T : Any>(
 
     @Volatile
     override var value: T = startValue
+
+    override val immediateValue: T
+        get() = if (!equalityCheck(value, startValue)) value else loader()
+
+    override suspend fun awaitLoad(timeoutMs: Long): T {
+        if (!equalityCheck(value, startValue)) return value
+        return withTimeoutOrNull(timeoutMs.milliseconds) {
+            suspendCancellableCoroutine { cont ->
+                val disposable = Disposer.newDisposable("awaitLoad-$topicDisplayName")
+                cont.invokeOnCancellation { Disposer.dispose(disposable) }
+                connect(disposable) { newValue ->
+                    Disposer.dispose(disposable)
+                    if (cont.isActive) cont.resume(newValue)
+                }
+            }
+        } ?: value
+    }
 
     override fun invalidate() {
         val myVersion = version.incrementAndGet()

@@ -94,7 +94,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
      */
     val initialisedRepositories =
         notifiableState<Map<VirtualFile, JujutsuRepository>>(project, "Jujutsu Initialized Repositories", emptyMap()) {
-            val allRootPaths = jujutsuVcsRoots.value
+            val allRootPaths = jujutsuVcsRoots.immediateValue
             val rootsWithUniqueNames = allRootPaths.distinctBy { it.name }.toSet()
 
             // This runs on background thread - safe to call VCS manager

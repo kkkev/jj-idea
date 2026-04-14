@@ -28,6 +28,13 @@ class JujutsuStartupActivity : ProjectActivity {
     override suspend fun execute(project: Project) {
         ToolWindowEnabler.getInstance(project)
 
+        // Wait for the repository cache to be populated before returning. IntelliJ activates VCS
+        // (triggering annotation/diff providers) only after all ProjectActivity instances complete,
+        // so this ensures jujutsuRepositoryFor() finds warm state rather than an empty map.
+        // See NotifiableState.awaitLoad() for the ordering guarantee this relies on and what
+        // would break it.
+        project.stateModel.initialisedRepositories.awaitLoad()
+
         // Load project settings first — triggers migration of jjExecutablePath to app-level
         // settings. Must happen before the availability check reads from app settings.
         JujutsuSettings.getInstance(project)

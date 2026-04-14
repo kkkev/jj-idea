@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Open in GitHub" / "Open in GitLab" action in the commit log context menu and file history toolbar. Supports github.com and gitlab.com remotes (SSH and HTTPS). Shows a submenu when multiple recognized remotes are configured. File history additionally offers "Open File" to navigate to the specific file at that revision. Tooltip warns when the commit has not been detected on the remote.
 
 ### Fixed
+- Annotation and diff providers no longer race with startup: the repository cache is guaranteed warm before IntelliJ activates VCS
 - Describe button now correctly enables when typing into an empty (undescribed) working copy
 - Descriptions no longer accumulate a trailing blank line on each describe: jj's storage newline is stripped on read, and intentional trailing blank lines are preserved
 - Uninitialised Jujutsu repository notification now navigates to the Directory Mappings settings page
