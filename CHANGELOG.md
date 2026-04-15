@@ -9,7 +9,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - "Open in Remote" now works in editors opened via "Open Repository Version": the editor correctly resolves its repository and opens the file at the pinned historical commit rather than the latest pushed ancestor
-- `Project.possibleLogEntryFor(file)` — new extension providing uniform access to the Jujutsu log entry for any virtual file; returns the pinned historical entry for repository-version editors, the working-copy entry for regular files, and null for ignored/unknown files
 
 ## [0.6.2] - 2026-04-15
 
