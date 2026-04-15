@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - "Open in Remote" now works in editors opened via "Open Repository Version": the editor correctly resolves its repository and opens the file at the pinned historical commit rather than the latest pushed ancestor
+- "Open in Remote" now appears in diff viewer right-click menus (Show Diff, Compare with Local, Compare Before with Local). Both the local and historical sides are supported: the historical side opens the file at the exact commit shown, while the local side opens at the latest pushed ancestor
 
 ## [0.6.2] - 2026-04-15
 

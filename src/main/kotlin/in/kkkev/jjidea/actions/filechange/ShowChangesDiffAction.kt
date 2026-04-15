@@ -12,6 +12,8 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys.DiffContentInfo
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntry
@@ -160,6 +162,24 @@ fun showChangesDiff(project: Project, change: Change, logEntry: LogEntry?) {
                     contentFactory.create(project, afterContent, afterPath.fileType)
 
                 else -> contentFactory.createEmpty()
+            }
+
+            // Annotate historical content sides so Open In > Remote works in the diff editor popup
+            if (!isWorkingCopyContext) {
+                val repo = logEntry!!.repo
+                val parentCommitId = logEntry.parentIdentifiers.firstOrNull()?.commitId
+                beforePath?.let {
+                    content1.putUserData(
+                        JujutsuDataKeys.DIFF_CONTENT_INFO,
+                        DiffContentInfo(repo, it, parentCommitId)
+                    )
+                }
+                afterPath?.let {
+                    content2.putUserData(
+                        JujutsuDataKeys.DIFF_CONTENT_INFO,
+                        DiffContentInfo(repo, it, logEntry.commitId)
+                    )
+                }
             }
 
             val diffRequest = SimpleDiffRequest(fileName, content1, content2, beforeLabel, afterLabel)

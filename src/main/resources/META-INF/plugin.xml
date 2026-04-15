@@ -123,10 +123,19 @@
             <add-to-group group-id="VcsGroup" anchor="last"/>
         </group>
 
-        <!-- "Open In" submenu entry: opens file at latest pushed commit on GitHub/GitLab -->
+        <!-- "Open In" submenu entry: opens file at latest pushed commit on GitHub/GitLab. -->
         <group id="Jujutsu.OpenInRemoteFromEditor"
                class="in.kkkev.jjidea.actions.file.OpenInRemoteFromEditorGroup">
             <add-to-group group-id="RevealGroup" anchor="last"/>
+        </group>
+
+        <!-- Wraps Jujutsu.OpenInRemoteFromEditor in an "Open In" submenu for the diff editor popup.
+             The inner group can be transparent (1 remote) — its child still appears inside this popup,
+             giving the correct "Open In > Github 'origin'" nesting in diff viewer right-click menus.
+             Historical content sides are annotated with DiffContentInfo so the action works on both sides. -->
+        <group id="Jujutsu.DiffEditorOpenInGroup" text="Open In" popup="true">
+            <reference ref="Jujutsu.OpenInRemoteFromEditor"/>
+            <add-to-group group-id="Diff.EditorPopupMenu" anchor="last"/>
         </group>
 
         <!-- "Open In" for file history: opens file/commit at the selected revision on GitHub/GitLab.

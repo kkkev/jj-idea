@@ -11,7 +11,11 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys.DiffContentInfo
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.util.runInBackground
@@ -44,16 +48,24 @@ class CompareBeforeWithLocalAction :
         changes: List<Change>
     ) {
         // TODO This only compares against the first parent, which may be incorrect for a merge
-        logEntry.parentIds.firstOrNull()?.let { parentId ->
-            compareChangesWithLocal(project, changes, commandExecutor, parentId)
-        }
+        val parentIdentifiers = logEntry.parentIdentifiers.firstOrNull() ?: return
+        compareChangesWithLocal(
+            project,
+            changes,
+            commandExecutor,
+            logEntry.repo,
+            parentIdentifiers.changeId,
+            parentIdentifiers.commitId
+        )
     }
 
     private fun compareChangesWithLocal(
         project: Project,
         changes: List<Change>,
         commandExecutor: CommandExecutor,
-        parentRevision: Revision
+        repo: JujutsuRepository,
+        parentRevision: Revision,
+        parentCommitId: CommitId?
     ) {
         val validChanges = changes.filter { it.beforeRevision != null }
         if (validChanges.isEmpty()) return
@@ -73,9 +85,15 @@ class CompareBeforeWithLocalAction :
                     contentFactory.createEmpty()
                 }
 
+                val historicalContent = contentFactory.create(project, revisionContent, filePath.fileType)
+                historicalContent.putUserData(
+                    JujutsuDataKeys.DIFF_CONTENT_INFO,
+                    DiffContentInfo(repo, filePath, parentCommitId)
+                )
+
                 SimpleDiffRequest(
                     filePath.name,
-                    contentFactory.create(project, revisionContent, filePath.fileType),
+                    historicalContent,
                     localContent,
                     "${filePath.name} (${parentRevision.short})",
                     "${filePath.name} (${JujutsuBundle.message("diff.label.local")})"

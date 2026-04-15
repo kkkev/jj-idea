@@ -11,6 +11,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys.DiffContentInfo
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.util.runLater
@@ -47,9 +49,15 @@ class CompareWithLocalAction : HistoricalVersionAction("action.compare.with.loca
                 contentFactory.createEmpty()
             }
 
+            val historicalContent = contentFactory.create(project, content, filePath.fileType)
+            historicalContent.putUserData(
+                JujutsuDataKeys.DIFF_CONTENT_INFO,
+                DiffContentInfo(logEntry.repo, filePath, logEntry.commitId)
+            )
+
             SimpleDiffRequest(
                 filePath.name,
-                contentFactory.create(project, content, filePath.fileType),
+                historicalContent,
                 localContent,
                 "${filePath.name} (${changeId.short})",
                 "${filePath.name} (${JujutsuBundle.message("diff.label.local")})"
