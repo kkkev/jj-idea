@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-04-15
+
 ### Added
 - "Open in GitHub" / "Open in GitLab" action in the commit log context menu and file history toolbar. Supports github.com and gitlab.com remotes (SSH and HTTPS). Shows a submenu when multiple recognized remotes are configured. File history additionally offers "Open File" to navigate to the specific file at that revision. Tooltip warns when the commit has not been detected on the remote.
 
@@ -345,7 +347,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.2...HEAD
+[0.6.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.2
 [0.6.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.1
 [0.6.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.0
 [0.5.21]: https://github.com/kkkev/jj-idea/releases/tag/v0.5.21

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.1/jj-idea-0.6.1.zip" version="0.6.1">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.2/jj-idea-0.6.2.zip" version="0.6.2">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,9 +23,17 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.1</h3>
+      <h3>0.6.2</h3>
       
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.1">full release notes</a> for details.</p>
+<h4>Added</h4>
+<li>"Open in GitHub" / "Open in GitLab" action in the commit log context menu and file history toolbar. Supports github.com and gitlab.com remotes (SSH and HTTPS). Shows a submenu when multiple recognized remotes are configured. File history additionally offers "Open File" to navigate to the specific file at that revision. Tooltip warns when the commit has not been detected on the remote.</li>
+
+<h4>Fixed</h4>
+<li>Annotation and diff providers no longer race with startup: the repository cache is guaranteed warm before IntelliJ activates VCS</li>
+<li>Describe button now correctly enables when typing into an empty (undescribed) working copy</li>
+<li>Descriptions no longer accumulate a trailing blank line on each describe: jj's storage newline is stripped on read, and intentional trailing blank lines are preserved</li>
+<li>Uninitialised Jujutsu repository notification now navigates to the Directory Mappings settings page</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.2">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
