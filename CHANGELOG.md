@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-04-15
+
 ### Added
 - "Open in Remote" now works in editors opened via "Open Repository Version": the editor correctly resolves its repository and opens the file at the pinned historical commit rather than the latest pushed ancestor
 - "Open in Remote" now appears in diff viewer right-click menus (Show Diff, Compare with Local, Compare Before with Local). Both the local and historical sides are supported: the historical side opens the file at the exact commit shown, while the local side opens at the latest pushed ancestor
@@ -354,7 +356,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.2...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.3...HEAD
+[0.6.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.3
 [0.6.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.2
 [0.6.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.1
 [0.6.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.0
