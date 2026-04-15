@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.vcs.possibleLogEntryFor
 
 /**
  * Action group that opens the current editor file at its latest pushed ancestor commit
@@ -59,8 +60,11 @@ private fun editorRemoteAction(
         val project = e.project ?: return
         val file = e.file ?: return
         val relativePath = repo.getRelativePath(file)
+        val logEntry = project.possibleLogEntryFor(file)
+        val pinnedCommitId = logEntry?.takeUnless { it.isWorkingCopy }?.commitId
         runInBackground {
-            val commitHash = repo.commandExecutor.latestPushedAncestorCommitId(remote.name)
+            val commitHash = pinnedCommitId?.full
+                ?: repo.commandExecutor.latestPushedAncestorCommitId(remote.name)
             if (commitHash == null) {
                 JujutsuNotifications.notify(
                     project,

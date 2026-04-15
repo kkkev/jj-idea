@@ -5,10 +5,13 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.vfs.ContentRevisionVirtualFile
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 
 /**
@@ -26,7 +29,17 @@ val Project.initialisedJujutsuRepositories: Collection<JujutsuRepository>
 fun Project.jujutsuRepositoryForRoot(directory: VirtualFile) = stateModel.initialisedRepositories.value[directory]
 
 fun Project.possibleJujutsuRepositoryFor(file: VirtualFile) =
-    VcsUtil.getVcsRootFor(this, file)?.let { jujutsuRepositoryForRoot(it) }
+    file.getUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY)?.repo
+        ?: when (file) {
+            is ContentRevisionVirtualFile -> possibleJujutsuRepositoryFor(file.contentRevision.file)
+            else -> VcsUtil.getVcsRootFor(this, file)?.let { jujutsuRepositoryForRoot(it) }
+        }
+
+fun Project.possibleLogEntryFor(file: VirtualFile): LogEntry? =
+    file.getUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY)
+        ?: possibleJujutsuRepositoryFor(file)?.let { repo ->
+            stateModel.repositoryStates.value.find { it.repo == repo }
+        }
 
 fun Project.jujutsuRepositoryFor(file: VirtualFile) = possibleJujutsuRepositoryFor(file)
     ?: throw VcsException(JujutsuBundle.getMessage("vcs.error.no.root", file))

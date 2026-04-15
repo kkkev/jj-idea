@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.actions
 
 import com.intellij.openapi.actionSystem.DataKey
+import com.intellij.openapi.util.Key
 import `in`.kkkev.jjidea.jj.LogEntry
 
 /**
@@ -14,4 +15,11 @@ object JujutsuDataKeys {
      */
     @JvmField
     val LOG_ENTRY: DataKey<LogEntry> = DataKey.create("Jujutsu.LogEntry")
+
+    /**
+     * VirtualFile user-data: log entry pinned to a historical version opened by OpenRepositoryVersionAction.
+     * Use [Project.possibleLogEntryFor] as the single access point rather than reading this key directly.
+     */
+    @JvmField
+    val VIRTUAL_FILE_LOG_ENTRY: Key<LogEntry> = Key.create("Jujutsu.VirtualFileLogEntry")
 }

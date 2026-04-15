@@ -10,6 +10,7 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.vfs.ContentRevisionVirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.jj.CommandExecutor
@@ -89,6 +90,7 @@ class OpenRepositoryVersionAction :
                 override fun getRevisionNumber() = afterRevision.revisionNumber
             }
             val vFile = ContentRevisionVirtualFile.create(cachedRevision)
+            vFile.putUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY, logEntry)
             runLater { FileEditorManager.getInstance(project).openFile(vFile, true) }
         }
     }
