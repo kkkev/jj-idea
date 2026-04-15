@@ -107,15 +107,6 @@ class JujutsuChangeProviderTest {
     }
 
     @Test
-    fun `add non-existent file silently ignores`() {
-        val output = statusOutput("A foo.txt")
-
-        jcp.parseStatus(output, repo, builder)
-
-        verify { builder wasNot Called }
-    }
-
-    @Test
     fun `single modify`() {
         directory.addChild(getOrCreateVirtualFile(false, "foo.txt"))
 

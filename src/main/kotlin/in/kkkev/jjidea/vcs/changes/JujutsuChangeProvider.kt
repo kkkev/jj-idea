@@ -100,23 +100,17 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
         if (filePath.isEmpty()) return
 
-        val file = repo.directory.findFileByRelativePath(filePath)
-        // Need to get the path even if the file is not found
         val path = repo.directory.getChildPath(filePath)
 
         when (status) {
             'M' -> {
                 // Modified file
-                if (file != null) {
-                    addModifiedChange(path, repo, builder)
-                }
+                addModifiedChange(path, repo, builder)
             }
 
             'A' -> {
                 // Added file
-                if (file != null) {
-                    addAddedChange(path, builder)
-                }
+                addAddedChange(path, builder)
             }
 
             'D' -> {
