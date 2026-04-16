@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-04-16
+
 ### Added
 - Push now warns before performing sideways (non-fast-forward) bookmark moves. A confirmation dialog lists the affected bookmarks and requires explicit approval before force-pushing
 
@@ -363,7 +365,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.3...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.4...HEAD
+[0.6.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.4
 [0.6.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.3
 [0.6.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.2
 [0.6.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.1

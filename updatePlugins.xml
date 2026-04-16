@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.3/jj-idea-0.6.3.zip" version="0.6.3">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.4/jj-idea-0.6.4.zip" version="0.6.4">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,15 +23,14 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.3</h3>
+      <h3>0.6.4</h3>
       
 <h4>Added</h4>
-<li>"Open in Remote" now works in editors opened via "Open Repository Version": the editor correctly resolves its repository and opens the file at the pinned historical commit rather than the latest pushed ancestor</li>
-<li>"Open in Remote" now appears in diff viewer right-click menus (Show Diff, Compare with Local, Compare Before with Local). Both the local and historical sides are supported: the historical side opens the file at the exact commit shown, while the local side opens at the latest pushed ancestor</li>
+<li>Push now warns before performing sideways (non-fast-forward) bookmark moves. A confirmation dialog lists the affected bookmarks and requires explicit approval before force-pushing</li>
 
 <h4>Fixed</h4>
-<li>Modified and added files now appear correctly in Local Changes and Working Copy. Previously, a spurious VFS cache check caused them to be silently dropped in large projects (or any project where IntelliJ's VFS scan was still in progress when changes were first detected), leaving only deleted files visible (fixes #19)</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.3">full release notes</a> for details.</p>
+<li>Plugin no longer crashes on startup when the system PATH contains entries with invalid characters (e.g. `Dev:\sdks\flutter\`); invalid entries are now skipped with a warning logged</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.4">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
