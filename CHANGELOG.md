@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Push now warns before performing sideways (non-fast-forward) bookmark moves. A confirmation dialog lists the affected bookmarks and requires explicit approval before force-pushing
 
+### Fixed
+- Plugin no longer crashes on startup when the system PATH contains entries with invalid characters (e.g. `Dev:\sdks\flutter\`); invalid entries are now skipped with a warning logged
+
 ## [0.6.3] - 2026-04-15
 
 ### Added

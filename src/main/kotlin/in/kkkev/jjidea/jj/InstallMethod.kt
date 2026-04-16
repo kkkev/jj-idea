@@ -9,7 +9,17 @@ import java.nio.file.Paths
 import java.nio.file.Paths.get
 import kotlin.io.path.pathString
 
-internal val List<String>.paths get() = this.filterNot(String::isBlank).map(Paths::get)
+private val pathsLog = Logger.getInstance("in.kkkev.jjidea.jj.paths")
+
+internal val List<String>.paths
+    get() = this.filterNot(String::isBlank).mapNotNull { entry ->
+        try {
+            Paths.get(entry)
+        } catch (e: Exception) {
+            pathsLog.warn("Skipping invalid PATH entry: $entry (${e.message})")
+            null
+        }
+    }
 
 /**
  * List of directories in the system path. Grab this once as it won't change during IntelliJ execution.

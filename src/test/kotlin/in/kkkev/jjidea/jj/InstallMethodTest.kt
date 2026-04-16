@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
+import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.Test
@@ -62,5 +63,13 @@ class InstallMethodTest {
         InstallMethod.Cargo.canRunDirectly shouldBe false
         InstallMethod.Scoop.canRunDirectly shouldBe false
         InstallMethod.Manual.canRunDirectly shouldBe false
+    }
+
+    @Test
+    fun `paths skips invalid PATH entries`() {
+        val entries = listOf("/path/with\u0000null", "/valid/path", "", "  ")
+        val paths = entries.paths
+        paths shouldHaveSize 1
+        paths[0].toString() shouldBe "/valid/path"
     }
 }
