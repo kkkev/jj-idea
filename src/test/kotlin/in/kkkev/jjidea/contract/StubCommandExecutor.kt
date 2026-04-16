@@ -168,7 +168,8 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         bookmark: Bookmark?,
         allBookmarks: Boolean,
         allowNew: Boolean,
-        revision: Revision?
+        revision: Revision?,
+        dryRun: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun squash(

@@ -52,7 +52,8 @@ internal fun gitPushArgs(
     bookmark: Bookmark? = null,
     allBookmarks: Boolean = false,
     allowNew: Boolean = false,
-    revision: Revision? = null
+    revision: Revision? = null,
+    dryRun: Boolean = false
 ): List<String> = buildList {
     add("git")
     add("push")
@@ -71,6 +72,7 @@ internal fun gitPushArgs(
         add("-r")
         add(revision.toString())
     }
+    if (dryRun) add("--dry-run")
 }
 
 /** Build the argument list for `jj squash`. */
@@ -313,8 +315,9 @@ class CliExecutor(
         bookmark: Bookmark?,
         allBookmarks: Boolean,
         allowNew: Boolean,
-        revision: Revision?
-    ) = execute(root, gitPushArgs(remote, bookmark, allBookmarks, allowNew, revision), timeout = networkTimeout)
+        revision: Revision?,
+        dryRun: Boolean
+    ) = execute(root, gitPushArgs(remote, bookmark, allBookmarks, allowNew, revision, dryRun), timeout = networkTimeout)
 
     override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
 

@@ -200,7 +200,8 @@ interface CommandExecutor {
         bookmark: Bookmark? = null,
         allBookmarks: Boolean = false,
         allowNew: Boolean = false,
-        revision: Revision? = null
+        revision: Revision? = null,
+        dryRun: Boolean = false
     ): CommandResult
 
     /**
