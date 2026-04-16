@@ -19,6 +19,10 @@
         <li><b>Rebase</b> — Full rebase dialog with source mode selection (-r/-s/-b), visual destination picker with commit graph, and live preview of the post-rebase state.</li>
         <li><b>Git Remotes</b> — Fetch and push to Git remotes without leaving the IDE. Push dialog with remote selector and bookmark scope options.</li>
         <li><b>File History &amp; Annotations</b> — Full file history with diff viewer. Line-by-line blame annotations showing who changed what and when.</li>
+        <li><b>Open in GitHub / GitLab</b> — Right-click any commit, file-history entry, or diff to jump to it on the remote, with line-number fragments for editor selections.</li>
+        <li><b>Squash &amp; Split from File Menus</b> — Right-click files in the working copy, project view, or editor to squash into parent or split into a new change with those files pre-selected.</li>
+        <li><b>Bookmark Management</b> — Create, delete, rename, and move bookmarks from the log. Track and untrack remote bookmarks; tracked vs. untracked are visually distinct.</li>
+        <li><b>Clone &amp; First-Run Setup</b> — Clone Git repos with jj from File &gt; New &gt; Project from Version Control. Plugin detects your jj install and walks you through user.name / user.email setup.</li>
         <li><b>Multi-Repository Support</b> — Work with multiple JJ repositories in a single project. Unified log view with per-repo filtering.</li>
         <li><b>Real-Time Status</b> — Auto-refresh keeps the UI in sync as you edit files. See modified, added, and deleted files instantly.</li>
     </ul>
@@ -34,7 +38,7 @@
     </ol>
 
     <h3>Roadmap</h3>
-    <p>Coming soon: remote bookmark management, squash/split from file selection, conflict resolution UI, operation log with undo/redo, and more. See the full <a href="https://github.com/kkkev/jj-idea/blob/master/ROADMAP.md">roadmap</a>.</p>
+    <p>Coming soon: hunk-level squash/split with destination picker, branches panel and bookmark toolbar widget, conflict resolution UI, operation log with undo/redo, remote management, and forge (PR/MR) integration. See the full <a href="https://github.com/kkkev/jj-idea/blob/master/ROADMAP.md">roadmap</a>.</p>
 
     <p><a href="https://github.com/kkkev/jj-idea">GitHub</a> · <a href="https://github.com/kkkev/jj-idea/issues">Issues</a></p>
     ]]></description>

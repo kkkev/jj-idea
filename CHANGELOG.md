@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Marketplace description now lists Open in GitHub/GitLab, file-menu squash/split, bookmark management, and clone & first-run setup as shipped features
+- Roadmap trimmed: "Open in Remote" removed (shipped in 0.6.2/0.6.3); "Squash & Split from File Selection" narrowed to remaining destination-picker + hunk work; "Remote Bookmark Management" narrowed to branches panel and bookmark toolbar widget
+
 ## [0.6.4] - 2026-04-16
 
 ### Added
