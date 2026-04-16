@@ -7,25 +7,19 @@ import `in`.kkkev.jjidea.jj.Revision
 /**
  * Revision number implementation for Jujutsu that supports both full and short display formats
  */
-class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumber {
+data class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumber {
     /**
-     * Returns hex format when used with VCS Log (Hash compatibility),
-     * otherwise returns JJ change ID format
+     * Returns string form of the revision, typically for displaying in an editor tab when viewing a historical version
+     * of a fle.
      */
-    // TODO Where is this used? What happens if a QCI is passed?
     override fun asString() = revision.toString()
 
     override fun toShortString() = revision.short
 
-    override fun equals(other: Any?) = when {
-        other !is JujutsuRevisionNumber -> false
-        this.revision == other.revision -> true
-        else -> false
-    }
-
-    override fun hashCode() = revision.hashCode()
-
-    // TODO What is the ordering assumption here?
+    /**
+     * Compares revision numbers by comparing the underlying revisions. Used when building changelists. Ordering doesn't
+     * matter - just equality.
+     */
     override fun compareTo(other: VcsRevisionNumber?) = if (other !is JujutsuRevisionNumber) {
         0
     } else {
