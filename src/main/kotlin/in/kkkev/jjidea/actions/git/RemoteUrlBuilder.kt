@@ -70,9 +70,24 @@ internal object RemoteUrlBuilder {
             ClassifiedRemote(remote.name, base, kind)
         }
 
-    fun fileUrl(base: String, kind: RemoteKind, commitHash: String, repoRelativePath: String): String {
+    fun fileUrl(
+        base: String,
+        kind: RemoteKind,
+        commitHash: String,
+        repoRelativePath: String,
+        lineRange: IntRange? = null
+    ): String {
         val blobPath = if (kind == RemoteKind.GITLAB) "/-/blob" else "/blob"
-        return "$base$blobPath/$commitHash/$repoRelativePath"
+        val fragment = lineRange?.let { r ->
+            if (r.first == r.last) {
+                "#L${r.first}"
+            } else if (kind == RemoteKind.GITLAB) {
+                "#L${r.first}-${r.last}"
+            } else {
+                "#L${r.first}-L${r.last}"
+            }
+        } ?: ""
+        return "$base$blobPath/$commitHash/$repoRelativePath$fragment"
     }
 
     internal fun parseBaseUrl(remoteUrl: String): Pair<String, RemoteKind>? {

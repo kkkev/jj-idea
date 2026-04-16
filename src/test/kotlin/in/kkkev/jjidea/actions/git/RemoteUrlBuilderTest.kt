@@ -163,7 +163,41 @@ class RemoteUrlBuilderTest {
             val url = RemoteUrlBuilder.fileUrl("https://gitlab.com/user/repo", RemoteKind.GITLAB, hash, "src/Foo.kt")
             url shouldBe "https://gitlab.com/user/repo/-/blob/$hash/src/Foo.kt"
         }
+
+        @Test
+        fun `no line range produces no fragment`() {
+            fileUrl(RemoteKind.GITHUB, null) shouldBe "https://github.com/user/repo/blob/$hash/src/Foo.kt"
+        }
+
+        @Test
+        fun `GitHub single line appends L fragment`() {
+            fileUrl(RemoteKind.GITHUB, 42..42) shouldBe "https://github.com/user/repo/blob/$hash/src/Foo.kt#L42"
+        }
+
+        @Test
+        fun `GitHub line range appends L-L fragment`() {
+            fileUrl(RemoteKind.GITHUB, 42..50) shouldBe "https://github.com/user/repo/blob/$hash/src/Foo.kt#L42-L50"
+        }
+
+        @Test
+        fun `GitLab single line appends L fragment`() {
+            fileUrl(RemoteKind.GITLAB, 42..42) shouldBe "https://gitlab.com/user/repo/-/blob/$hash/src/Foo.kt#L42"
+        }
+
+        @Test
+        fun `GitLab line range appends L-N fragment without second L`() {
+            fileUrl(RemoteKind.GITLAB, 42..50) shouldBe "https://gitlab.com/user/repo/-/blob/$hash/src/Foo.kt#L42-50"
+        }
     }
+
+    private fun fileUrl(kind: RemoteKind, lineRange: IntRange?) =
+        RemoteUrlBuilder.fileUrl(
+            if (kind == RemoteKind.GITLAB) "https://gitlab.com/user/repo" else "https://github.com/user/repo",
+            kind,
+            hash,
+            "src/Foo.kt",
+            lineRange
+        )
 
     /** Parse a list of simulated `jj git remote list` output lines into [RecognizedRemote]s. */
     private fun recognizedRemotes(lines: List<String>, commitHash: String, isPushed: Boolean = false) =
