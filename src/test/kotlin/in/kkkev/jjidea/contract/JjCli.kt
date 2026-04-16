@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.contract
 
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.writeText
@@ -54,6 +55,18 @@ class JjCli(override val workDir: Path) : JjBackend {
     override fun bookmarkCreate(name: String) {
         val result = run("bookmark", "create", name)
         check(result.isSuccess) { "jj bookmark create failed: ${result.stderr}" }
+    }
+
+    override fun renameFile(from: String, to: String) {
+        val src = workDir.resolve(from)
+        val dst = workDir.resolve(to)
+        dst.parent.createDirectories()
+        Files.move(src, dst)
+    }
+
+    override fun addGitRemote(name: String, url: String) {
+        val result = run("git", "remote", "add", name, url)
+        check(result.isSuccess) { "jj git remote add failed: ${result.stderr}" }
     }
 
     override fun split(message: String, filePaths: List<String>, revision: String) {

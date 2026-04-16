@@ -11,6 +11,8 @@ class JjStub(override val workDir: Path) : JjBackend {
     private var idCounter = 0
     private val changes = mutableListOf<StubChange>()
     private var workingCopyIndex = -1
+    private val configValues = mutableMapOf<String, String>()
+    private val remotes = mutableMapOf<String, String>()
 
     private val workingCopy get() = changes[workingCopyIndex]
 
@@ -63,7 +65,8 @@ class JjStub(override val workDir: Path) : JjBackend {
     // -- Command dispatch --
 
     private fun dispatch(args: List<String>): JjBackend.Result = when {
-        args.startsWith("git", "init") -> cmdGitInit()
+        args.startsWith("git") -> dispatchGit(args)
+        args.startsWith("config") -> dispatchConfig(args)
         args.startsWith("log") -> cmdLog(args)
         args.startsWith("status") -> cmdStatus()
         args.startsWith("diff") -> cmdDiff(args)
@@ -76,6 +79,20 @@ class JjStub(override val workDir: Path) : JjBackend {
         args.startsWith("file", "annotate") -> cmdFileAnnotate(args)
         args.startsWith("bookmark") -> dispatchBookmark(args)
         else -> throw StubError("Unknown command: ${args.joinToString(" ")}")
+    }
+
+    private fun dispatchGit(args: List<String>): JjBackend.Result = when {
+        args.startsWith("git", "init") -> cmdGitInit()
+        args.startsWith("git", "remote", "add") -> cmdGitRemoteAdd(args)
+        args.startsWith("git", "remote", "list") -> cmdGitRemoteList()
+        else -> throw StubError("Unknown git subcommand: ${args.joinToString(" ")}")
+    }
+
+    private fun dispatchConfig(args: List<String>): JjBackend.Result = when {
+        args.startsWith("config", "get") -> cmdConfigGet(args)
+        args.startsWith("config", "list") -> cmdConfigList(args)
+        args.startsWith("config", "set") -> cmdConfigSet(args)
+        else -> throw StubError("Unknown config subcommand: ${args.joinToString(" ")}")
     }
 
     private fun dispatchBookmark(args: List<String>): JjBackend.Result = when {
@@ -134,11 +151,30 @@ class JjStub(override val workDir: Path) : JjBackend {
 
     private fun cmdDiff(args: List<String>): JjBackend.Result {
         val revset = args.flagValue("-r") ?: "@"
+        val isGit = "--git" in args
         val isSummary = "--summary" in args
-        if (!isSummary) throw StubError("Only --summary diffs supported in stub")
+        if (isGit) return cmdDiffGit(revset)
+        if (!isSummary) throw StubError("Only --summary and --git diffs supported in stub")
         val change = resolveOne(revset)
         val diffs = computeDiffs(change)
         val output = diffs.sortedBy { it.first }.joinToString("") { (path, status) -> "$status $path\n" }
+        return ok(output)
+    }
+
+    private fun cmdDiffGit(revset: String): JjBackend.Result {
+        val change = resolveOne(revset)
+        val output = buildString {
+            val renamedPaths = change.renames.keys + change.renames.values
+            for ((from, to) in change.renames.entries.sortedBy { it.key }) {
+                appendLine("diff --git a/$from b/$to")
+                appendLine("rename from $from")
+                appendLine("rename to $to")
+            }
+            val diffs = computeDiffs(change).filter { it.first !in renamedPaths }
+            for ((path, _) in diffs.sortedBy { it.first }) {
+                appendLine("diff --git a/$path b/$path")
+            }
+        }
         return ok(output)
     }
 
@@ -312,6 +348,7 @@ class JjStub(override val workDir: Path) : JjBackend {
                     parentIds = newParentIds,
                     files = change.files,
                     bookmarks = change.bookmarks,
+                    renames = change.renames,
                     authorName = change.authorName,
                     authorEmail = change.authorEmail,
                     timestamp = change.timestamp,
@@ -436,6 +473,66 @@ class JjStub(override val workDir: Path) : JjBackend {
             }
         }
         return ok(output)
+    }
+
+    // -- Git remote commands --
+
+    private fun cmdGitRemoteAdd(args: List<String>): JjBackend.Result {
+        val positional = args.drop(3) // drop "git", "remote", "add"
+        val name = positional.getOrNull(0) ?: throw StubError("git remote add requires a name")
+        val url = positional.getOrNull(1) ?: throw StubError("git remote add requires a url")
+        remotes[name] = url
+        return ok()
+    }
+
+    private fun cmdGitRemoteList(): JjBackend.Result {
+        val output = remotes.entries.sortedBy { it.key }.joinToString("") { (name, url) -> "$name $url\n" }
+        return ok(output)
+    }
+
+    // -- Config commands --
+
+    private fun cmdConfigGet(args: List<String>): JjBackend.Result {
+        val key = args.drop(2).firstOrNull { !it.startsWith("-") }
+            ?: throw StubError("config get requires a key")
+        val value = configValues[key] ?: return JjBackend.Result(1, "", "No value for key `$key`")
+        return ok("$value\n")
+    }
+
+    private fun cmdConfigList(args: List<String>): JjBackend.Result {
+        val isUserScope = "--user" in args
+        if (isUserScope) return ok() // stub has no user-level config
+        val keyFilter = args.drop(2).firstOrNull { !it.startsWith("-") }
+        val entries = configValues.entries
+            .filter { (k, _) -> keyFilter == null || k == keyFilter || k.startsWith("$keyFilter.") }
+            .sortedBy { it.key }
+        val output = entries.joinToString("") { (k, v) -> "$k = \"$v\"\n" }
+        return ok(output)
+    }
+
+    private fun cmdConfigSet(args: List<String>): JjBackend.Result {
+        // args: config set [--repo|--user] key value
+        val positional = args.drop(2).filter { !it.startsWith("-") }
+        val key = positional.getOrNull(0) ?: throw StubError("config set requires a key")
+        val value = positional.getOrNull(1) ?: throw StubError("config set requires a value")
+        configValues[key] = value
+        return ok()
+    }
+
+    // -- JjBackend helper methods --
+
+    override fun renameFile(from: String, to: String) {
+        val src = workDir.resolve(from)
+        val dst = workDir.resolve(to)
+        dst.parent.createDirectories()
+        val content = src.readText()
+        dst.writeText(content)
+        src.toFile().delete()
+        workingCopy.renames[from] = to
+    }
+
+    override fun addGitRemote(name: String, url: String) {
+        remotes[name] = url
     }
 
     // -- Template formatting --
@@ -753,6 +850,7 @@ private data class StubChange(
     val parentIds: List<String>,
     val files: MutableMap<String, String?> = mutableMapOf(),
     val bookmarks: MutableList<String> = mutableListOf(),
+    val renames: MutableMap<String, String> = mutableMapOf(),
     val authorName: String = "Test User",
     val authorEmail: String = "test@example.com",
     val timestamp: Long = System.currentTimeMillis() / 1000,

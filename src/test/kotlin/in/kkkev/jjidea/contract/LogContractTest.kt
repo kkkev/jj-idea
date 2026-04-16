@@ -2,8 +2,10 @@ package `in`.kkkev.jjidea.contract
 
 import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.longs.shouldBeGreaterThan
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldMatch
 import org.junit.jupiter.api.BeforeEach
@@ -170,7 +172,8 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        fields[3] shouldBe "test-bookmark;true"
+        // In a colocated git repo, jj also tracks the bookmark as test-bookmark@git;true
+        fields[3].split(",") shouldContain "test-bookmark;true"
     }
 
     @Test
