@@ -21,7 +21,11 @@ fun describeAction(project: Project, logEntry: LogEntry?) =
             log(target.id, "description")
         }.onSuccess { currentDescription ->
             val newDescription =
-                project.requestDescription("dialog.describe.input", Description(currentDescription.removeSuffix("\n")))
+                project.requestDescription(
+                    "dialog.describe.input",
+                    Description(currentDescription.removeSuffix("\n")),
+                    target.id
+                )
                     ?: return@onSuccess
             // If that was null, the user cancelled
             commandExecutor.createCommand { describe(newDescription, target.id) }

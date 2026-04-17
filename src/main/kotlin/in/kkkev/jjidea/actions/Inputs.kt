@@ -5,12 +5,15 @@ import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Description
 
-fun Project.requestDescription(resourceKeyPrefix: String, initial: Description = Description.EMPTY) =
-    Messages.showMultilineInputDialog(
-        this,
-        JujutsuBundle.message("$resourceKeyPrefix.message"),
-        JujutsuBundle.message("$resourceKeyPrefix.title"),
-        initial.actual,
-        null,
-        null
-    )?.let(::Description)
+fun Project.requestDescription(
+    resourceKeyPrefix: String,
+    initial: Description = Description.EMPTY,
+    vararg messageParams: Any
+) = Messages.showMultilineInputDialog(
+    this,
+    JujutsuBundle.message("$resourceKeyPrefix.message", *messageParams),
+    JujutsuBundle.message("$resourceKeyPrefix.title"),
+    initial.actual,
+    null,
+    null
+)?.let(::Description)
