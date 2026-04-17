@@ -76,8 +76,10 @@ object JujutsuLogContextMenuActions {
                     if (i > 0) {
                         addSeparator()
                     }
-                    add(deleteBookmarkAction(entry.repo, bookmark))
-                    add(renameBookmarkAction(entry.repo, bookmark))
+                    if (!bookmark.isRemote) {
+                        add(deleteBookmarkAction(entry.repo, bookmark))
+                        add(renameBookmarkAction(entry.repo, bookmark))
+                    }
                     if (bookmark.isRemote) {
                         add(toggleTrackBookmarkAction(entry.repo, bookmark))
                     }

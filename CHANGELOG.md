@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Deleting a remote bookmark no longer shows an error dialog with a missing resource string. Remote bookmarks (e.g. `main@origin`) no longer offer Delete or Rename actions; only Track/Untrack is offered for remote bookmarks
 - Diffs from merge working copies no longer fail. Previously, comparing against `@-` was ambiguous when the working copy had multiple parents, causing "cannot load diff" errors or showing files as entirely new. Now resolves to the first parent's change id from cached state
 
 ### Changed
