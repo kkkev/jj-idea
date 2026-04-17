@@ -24,7 +24,8 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
         log.debug("Getting last revision for VirtualFile: ${file.path}")
 
         val filePath = VcsUtil.getFilePath(file)
-        val revision = createContentRevision(filePath, WorkingCopy.parent)
+        val repo = project.jujutsuRepositoryFor(filePath)
+        val revision = repo.createRevision(filePath, repo.workingCopyParent())
 
         return ItemLatestState(revision.revisionNumber, true, true)
     }
@@ -32,7 +33,8 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
     override fun getLastRevision(filePath: FilePath): ItemLatestState {
         log.debug("Getting last revision for FilePath: ${filePath.path}")
 
-        val revision = createContentRevision(filePath, WorkingCopy.parent)
+        val repo = project.jujutsuRepositoryFor(filePath)
+        val revision = repo.createRevision(filePath, repo.workingCopyParent())
 
         return ItemLatestState(revision.revisionNumber, true, true)
     }
@@ -47,5 +49,6 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
     // TODO When addressing jj-idea-3jo, ensure that these return the correct change ids
     override fun getCurrentRevision(file: VirtualFile) = JujutsuRevisionNumber(WorkingCopy)
 
-    override fun getLatestCommittedRevision(file: VirtualFile) = JujutsuRevisionNumber(WorkingCopy.parent)
+    override fun getLatestCommittedRevision(file: VirtualFile) =
+        JujutsuRevisionNumber(project.jujutsuRepositoryFor(VcsUtil.getFilePath(file)).workingCopyParent())
 }

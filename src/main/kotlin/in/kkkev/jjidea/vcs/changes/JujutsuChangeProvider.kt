@@ -7,7 +7,6 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
 import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
@@ -130,7 +129,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addModifiedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val beforeRevision = repo.createRevision(path, WorkingCopy.parent) // Parent commit
+        val beforeRevision = repo.createRevision(path, repo.workingCopyParent())
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -149,7 +148,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addDeletedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val beforeRevision = repo.createRevision(path, WorkingCopy.parent)
+        val beforeRevision = repo.createRevision(path, repo.workingCopyParent())
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),
@@ -179,7 +178,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         val afterPath = repo.directory.getChildPath(newPath)
 
         // Create revisions
-        val beforeRevision = repo.createRevision(beforePath, WorkingCopy.parent)
+        val beforeRevision = repo.createRevision(beforePath, repo.workingCopyParent())
         val afterRevision = CurrentContentRevision(afterPath)
 
         // Create change with MODIFIED status (IntelliJ shows renames as modifications)

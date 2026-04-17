@@ -45,6 +45,7 @@ class JujutsuChangeProviderTest {
         application.registerService(VcsContextFactory::class.java, vcsContextFactory)
 
         every { repo.directory } returns directory
+        every { repo.workingCopyParent() } returns mockk<Revision>()
 
         val pathStringSlot = slot<String>()
         val isDirectorySlot = slot<Boolean>()

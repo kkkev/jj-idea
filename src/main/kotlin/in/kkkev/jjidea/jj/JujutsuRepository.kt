@@ -30,6 +30,16 @@ interface JujutsuRepository {
     fun createRevision(filePath: FilePath, revision: Revision): ContentRevision
     fun getRelativePath(filePath: FilePath): String
     fun getRelativePath(file: VirtualFile): String
+
+    /**
+     * The revision to use as the working copy's parent for change/diff providers.
+     *
+     * Using the raw revset `@-` breaks when the working copy is a merge, because `@-` resolves
+     * to multiple commits and `jj file show -r @-` then fails. This resolves to the first parent's
+     * change id via the cached working copy entry in the state model. Falls back to `@-` only when
+     * the cache is not populated yet (harmless for non-merge working copies).
+     */
+    fun workingCopyParent(): Revision
 }
 
 data class JujutsuRepositoryImpl(
@@ -99,6 +109,13 @@ data class JujutsuRepositoryImpl(
 
     override fun createRevision(filePath: FilePath, revision: Revision): ContentRevision =
         JujutsuContentRevision(filePath, revision)
+
+    override fun workingCopyParent(): Revision =
+        project.stateModel.repositoryStates.value
+            .firstOrNull { it.repo == this }
+            ?.parentIds
+            ?.firstOrNull()
+            ?: WorkingCopy.parent
 
     /**
      * Represents the content of a file at a specific jujutsu revision
