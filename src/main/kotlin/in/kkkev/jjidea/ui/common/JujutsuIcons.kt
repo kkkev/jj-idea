@@ -17,12 +17,14 @@ object JujutsuIcons {
 
     private fun strokeFillIcon(path: String, primaryColor: Color, contrastColor: Color? = null) =
         load(path).recolored(mapOf("primary" to ("stroke" to primaryColor), "primary-fill" to ("fill" to primaryColor)))
-            .recolored(listOfNotNull(
-                "primary" to ("stroke" to primaryColor),
-                "primary-fill" to ("fill" to primaryColor),
-                contrastColor?.let { "contrast" to ("stroke" to it) },
-                contrastColor?.let { "contrast-fill" to ("fill" to it) },
-            ).toMap())
+            .recolored(
+                listOfNotNull(
+                    "primary" to ("stroke" to primaryColor),
+                    "primary-fill" to ("fill" to primaryColor),
+                    contrastColor?.let { "contrast" to ("stroke" to it) },
+                    contrastColor?.let { "contrast-fill" to ("fill" to it) }
+                ).toMap()
+            )
 
     private fun fillIcon(path: String, color: Color) =
         load(path).recolored(mapOf("primary-fill" to ("fill" to color)))

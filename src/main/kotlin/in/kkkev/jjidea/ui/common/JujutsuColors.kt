@@ -33,5 +33,4 @@ object JujutsuColors {
      * Highlight for destination changes for a rebase operation.
      */
     val DESTINATION_HIGHLIGHT = JBColor(0x4285F4, 0x6AA1FF)
-
 }
