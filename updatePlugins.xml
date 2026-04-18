@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.4/jj-idea-0.6.4.zip" version="0.6.4">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.5/jj-idea-0.6.5.zip" version="0.6.5">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,14 +23,17 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.4</h3>
+      <h3>0.6.5</h3>
       
-<h4>Added</h4>
-<li>Push now warns before performing sideways (non-fast-forward) bookmark moves. A confirmation dialog lists the affected bookmarks and requires explicit approval before force-pushing</li>
-
 <h4>Fixed</h4>
-<li>Plugin no longer crashes on startup when the system PATH contains entries with invalid characters (e.g. `Dev:\sdks\flutter\`); invalid entries are now skipped with a warning logged</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.4">full release notes</a> for details.</p>
+<li>Describe dialog no longer shows a literal `{0}` placeholder in the prompt; it now correctly shows the change ID being described</li>
+<li>Deleting a remote bookmark no longer shows an error dialog with a missing resource string. Remote bookmarks (e.g. `main@origin`) no longer offer Delete or Rename actions; only Track/Untrack is offered for remote bookmarks</li>
+<li>Diffs from merge working copies no longer fail. Previously, comparing against `@-` was ambiguous when the working copy had multiple parents, causing "cannot load diff" errors or showing files as entirely new. Now resolves to the first parent's change id from cached state</li>
+
+<h4>Changed</h4>
+<li>Marketplace description expanded to surface additional shipped features: compare with branch/revision, restore files, configurable revsets with Test button, per-repository setting overrides, push safety (non-fast-forward and sideways move warnings), multi-select in log, rebase post-rebase preview, split's dual-tree UI, Show History for Selection, and colocate option in clone/init</li>
+<li>Roadmap trimmed: "Open in Remote" removed (shipped in 0.6.2/0.6.3); "Squash & Split from File Selection" narrowed to remaining destination-picker + hunk work; "Remote Bookmark Management" narrowed to branches panel and bookmark toolbar widget</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.5">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

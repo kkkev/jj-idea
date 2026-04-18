@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-04-18
+
 ### Fixed
 - Describe dialog no longer shows a literal `{0}` placeholder in the prompt; it now correctly shows the change ID being described
 - Deleting a remote bookmark no longer shows an error dialog with a missing resource string. Remote bookmarks (e.g. `main@origin`) no longer offer Delete or Rename actions; only Track/Untrack is offered for remote bookmarks
@@ -374,7 +376,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.4...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.5...HEAD
+[0.6.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.5
 [0.6.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.4
 [0.6.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.3
 [0.6.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.2
