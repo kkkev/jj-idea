@@ -14,16 +14,19 @@
     <h3>Key Features</h3>
     <ul>
         <li><b>Describe-First Workflow</b> — The Working Copy tool window (left side) lets you describe your current work and create new changes with one click. No more "WIP" commits.</li>
-        <li><b>Custom Log View</b> — Visual commit graph with inline change IDs, descriptions, bookmarks, and author info. Filter by text, branch, author, or date range.</li>
-        <li><b>Change Operations</b> — Edit, abandon, describe, and rebase changes directly from the log. Right-click context menus for common operations.</li>
-        <li><b>Rebase</b> — Full rebase dialog with source mode selection (-r/-s/-b), visual destination picker with commit graph, and live preview of the post-rebase state.</li>
-        <li><b>Git Remotes</b> — Fetch and push to Git remotes without leaving the IDE. Push dialog with remote selector and bookmark scope options.</li>
-        <li><b>File History &amp; Annotations</b> — Full file history with diff viewer. Line-by-line blame annotations showing who changed what and when.</li>
+        <li><b>Custom Log View</b> — Visual commit graph with inline change IDs, descriptions, bookmarks, and author info. Filter by text, branch, author, or date range. Multi-select changes to see a combined diff or stacked metadata. Copy change IDs and descriptions from the context menu.</li>
+        <li><b>Change Operations</b> — Edit, abandon, describe, rebase, squash, and split changes directly from the log. Right-click context menus for all common operations.</li>
+        <li><b>Rebase</b> — Full rebase dialog with source mode selection (-r/-s/-b), visual destination picker with commit graph, and a live post-rebase graph preview showing exactly where commits will land.</li>
+        <li><b>Squash &amp; Split</b> — Squash changes into parent or any destination. Split into two with a dual file-tree UI that lets you write descriptions for both halves. Right-click files in the working copy, project view, or editor to squash or split with those files pre-selected.</li>
+        <li><b>Restore Files</b> — Restore any file to its parent revision from the editor, project view, working copy panel, or commit details.</li>
+        <li><b>Compare &amp; Diff</b> — Compare any file against any revision or bookmark using a visual revision picker. Show diffs of working copy changes or historical commits. Compare historical versions against local working copy.</li>
+        <li><b>Git Remotes</b> — Fetch and push to Git remotes without leaving the IDE. Push dialog with remote selector and bookmark scope options. Dry-run detection warns before non-fast-forward bookmark moves; sideways pushes require explicit confirmation.</li>
+        <li><b>File History &amp; Annotations</b> — Full file history with diff viewer and Show History for Selection (line-range history). Line-by-line blame annotations showing who changed what and when.</li>
         <li><b>Open in GitHub / GitLab</b> — Right-click any commit, file-history entry, or diff to jump to it on the remote, with line-number fragments for editor selections.</li>
-        <li><b>Squash &amp; Split from File Menus</b> — Right-click files in the working copy, project view, or editor to squash into parent or split into a new change with those files pre-selected.</li>
         <li><b>Bookmark Management</b> — Create, delete, rename, and move bookmarks from the log. Track and untrack remote bookmarks; tracked vs. untracked are visually distinct.</li>
-        <li><b>Clone &amp; First-Run Setup</b> — Clone Git repos with jj from File &gt; New &gt; Project from Version Control. Plugin detects your jj install and walks you through user.name / user.email setup.</li>
-        <li><b>Multi-Repository Support</b> — Work with multiple JJ repositories in a single project. Unified log view with per-repo filtering.</li>
+        <li><b>Clone &amp; First-Run Setup</b> — Clone Git repos with jj from File &gt; New &gt; Project from Version Control, with colocate option. Plugin detects your jj install and walks you through user.name / user.email setup.</li>
+        <li><b>Configurable Log Revsets</b> — Filter the log with any custom revset expression. A Test button validates the expression against each repo and shows how many changes match before you save.</li>
+        <li><b>Multi-Repository Support</b> — Work with multiple JJ repositories in a single project. Unified log view with per-repo filtering, and per-repository overrides for identity, log limit, and revset.</li>
         <li><b>Real-Time Status</b> — Auto-refresh keeps the UI in sync as you edit files. See modified, added, and deleted files instantly.</li>
     </ul>
 
