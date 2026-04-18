@@ -121,6 +121,14 @@ class JujutsuGraphAndDescriptionRenderer(
 
         private fun buildTooltip(entry: LogEntry) = htmlString {
             appendSummaryAndStatuses(entry)
+            entry.author?.let { author ->
+                append(author)
+                entry.authorTimestamp?.let { ts ->
+                    append(" \u00b7 ")
+                    append(DateTimeFormatter.formatAbsolute(ts))
+                }
+                append("\n")
+            }
             control("<pre style='white-space: pre-wrap;'>", "</pre>") {
                 appendSummary(entry.description)
             }

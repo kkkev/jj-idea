@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.vcs.annotate
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.colors.ColorKey
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.annotate.FileAnnotation
@@ -13,6 +14,7 @@ import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
@@ -37,7 +39,9 @@ class JujutsuFileAnnotation(
         ?.id
         ?.let(::JujutsuRevisionNumber)
 
-    override fun getToolTip(lineNumber: Int) = getAnnotationLine(lineNumber)?.getTooltip()
+    override fun getToolTip(lineNumber: Int): String? = null
+
+    override fun getHtmlToolTip(lineNumber: Int) = getAnnotationLine(lineNumber)?.getHtmlTooltip()
 
     override fun getLineDate(lineNumber: Int) = getAnnotationLine(lineNumber)?.authorTimestamp?.toJavaDate()
 
@@ -100,18 +104,24 @@ class JujutsuFileAnnotation(
     ) : LineAnnotationAspectAdapter(id, displayName, showByDefault) {
         override fun getValue(line: Int) = getAnnotationDetail(line, defaultValue, extractor)
 
-        override fun showAffectedPaths(lineNum: Int) {
-            // Handle click on the change ID
-            handleAnnotationClick(lineNum)
-        }
+        override fun showAffectedPaths(lineNum: Int) = handleAnnotationClick(lineNum)
     }
 
     private inner class ChangeIdAspect : Aspect(
         "change-id",
         JujutsuBundle.message("annotation.aspect.change"),
-        false,
+        true,
         { it.id.short }
-    )
+    ) {
+        override fun getColor(line: Int) = CHANGE_ID_COLOR_KEY
+    }
+
+    companion object {
+        val CHANGE_ID_COLOR_KEY: ColorKey = ColorKey.createColorKey(
+            "JUJUTSU_ANNOTATION_CHANGE_ID",
+            JujutsuColors.WORKING_COPY
+        )
+    }
 
     private inner class AuthorAspect : Aspect(
         "author",

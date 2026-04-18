@@ -1,9 +1,10 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
-import `in`.kkkev.jjidea.message
+import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.components.append
-import `in`.kkkev.jjidea.ui.components.buildText
+import `in`.kkkev.jjidea.ui.components.appendSummary
+import `in`.kkkev.jjidea.ui.components.htmlString
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import kotlinx.datetime.Instant
 
@@ -19,25 +20,17 @@ data class AnnotationLine(
     val lineContent: String,
     val lineNumber: Int
 ) {
-    /**
-     * Get a tooltip-friendly display of this annotation
-     */
-    fun getTooltip(): String = buildText {
-        append(message("annotation.aspect.change"))
-        append(": ")
+    fun getHtmlTooltip(): String = htmlString {
         append(id)
-        append("\n")
-
-        append(message("annotation.aspect.commit"))
-        append(": ")
+        append(" (")
         append(commitId)
-        append("\n")
-
-        append(message("annotation.aspect.author"))
-        append(": ")
+        append(")\n")
         append(author)
-        append("\n")
-        append(description)
+        authorTimestamp?.let { ts ->
+            append(" \u00b7 ")
+            append(DateTimeFormatter.formatAbsolute(ts))
+        }
+        control("<pre style='white-space: pre-wrap;'>") { appendSummary(description) }
     }
 
     companion object {

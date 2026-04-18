@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Annotation gutter now shows the change ID column by default, coloured in the plugin's change ID blue
+- Annotation tooltips are now formatted HTML: change ID, commit ID, author · date, and description — matching the log row tooltip style
+- Log row tooltip now includes author · date above the description
+- Commit details panel now shows author · date using absolute timestamps; committer date also shown when different from author
+
+### Fixed
+- Clicking an annotation gutter column now correctly navigates the log to that change
+
 ### Changed
 - Repository icon colours are now consistent with IDE folders
 

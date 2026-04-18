@@ -103,9 +103,12 @@ class JujutsuLogTable(
     private var pendingSelection: ChangeKey? = null
 
     fun requestSelection(changeKey: ChangeKey) {
-        // Store for setEntries() to apply after model update.
-        // Don't select eagerly — the current data may be stale (a refresh is likely in flight).
+        // Try immediate selection from current model data (e.g., annotation click with no pending refresh).
+        // Store as pending regardless so setEntries() can apply it if a refresh is in flight.
         pendingSelection = changeKey
+        if (!selectEntry(changeKey.repo, changeKey.revision)) {
+            log.info("requestSelection: entry not in current model, will apply on next setEntries()")
+        }
     }
 
     /**

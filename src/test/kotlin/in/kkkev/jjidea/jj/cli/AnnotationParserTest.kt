@@ -5,6 +5,7 @@ import `in`.kkkev.jjidea.jj.CommitId
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
 class AnnotationParserTest {
@@ -145,13 +146,13 @@ class AnnotationParserTest {
             "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
-        val tooltip = result[0].getTooltip()
+        val tooltip = result[0].getHtmlTooltip()
 
-        tooltip shouldContain "mnop"
-        tooltip shouldContain "abc123de"
-        tooltip shouldContain "John Doe"
+        tooltip shouldContain "mnop" // change ID short
+        tooltip shouldContain "c123de" // commit ID remainder (HTML splits bold short from grey tail)
         tooltip shouldContain "john@example.com"
-        tooltip shouldContain "Initial commit"
+        tooltip shouldContain "John"
+        tooltip shouldContain "Initial"
     }
 
     @Test
@@ -160,9 +161,9 @@ class AnnotationParserTest {
             "1768575623\u0000\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
-        val tooltip = result[0].getTooltip()
+        val tooltip = result[0].getHtmlTooltip()
 
-        tooltip shouldContain "(no description)"
+        tooltip shouldContain "(no&nbsp;description)"
     }
 
     @Test
@@ -171,11 +172,10 @@ class AnnotationParserTest {
             "1768575623\u0000Initial commit\u0000println(\"Hello\")"
 
         val result = AnnotationParser.parse(output)
-        val tooltip = result[0].getTooltip()
+        val tooltip = result[0].getHtmlTooltip()
 
-        tooltip shouldContain "John Doe"
-        // Email should not be shown when empty
-        tooltip.count { it == '<' } shouldBe 0
+        tooltip shouldContain "John"
+        tooltip shouldNotContain "mailto:"
     }
 
     @Test

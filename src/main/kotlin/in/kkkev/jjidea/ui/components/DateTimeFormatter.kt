@@ -38,7 +38,9 @@ object DateTimeFormatter {
         }
     }
 
-    fun formatAbsolute(instant: Instant): String = DateFormatUtil.formatPrettyDateTime(instant.toEpochMilliseconds())
+    fun formatAbsolute(instant: Instant): String =
+        runCatching { DateFormatUtil.formatPrettyDateTime(instant.toEpochMilliseconds()) }
+            .getOrElse { instant.toString() }
 
     /**
      * Check if two timestamps are on the same day.
