@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Repository icon colours are now consistent with IDE folders
+
 ## [0.6.5] - 2026-04-18
 
 ### Fixed

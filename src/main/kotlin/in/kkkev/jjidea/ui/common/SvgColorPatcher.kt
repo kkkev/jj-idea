@@ -69,7 +69,7 @@ class SvgIcon private constructor(
     override fun getIconHeight() = delegate().iconHeight
     override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) = delegate().paintIcon(c, g, x, y)
 
-    fun recolored(newColors: ColorMap) = SvgIcon(path, originalBytes, newColors)
+    fun recolored(newColors: ColorMap) = SvgIcon(path, originalBytes, colors + newColors)
 
     companion object {
         fun load(path: String, context: Class<*>): SvgIcon {

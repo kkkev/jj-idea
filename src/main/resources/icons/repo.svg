@@ -2,7 +2,10 @@
   <style>
     .primary { stroke: #6c707e }
     .primary-fill { fill: #6c707e }
+    .accent { stroke: #20a070 }
     .accent-fill { fill: #20a070 }
+    .contrast { stroke: #ced0d6 }
+    .contrast-fill { fill: #ced0d6 }
   </style>
   <path d="
     M8.10584,4.34613
@@ -18,10 +21,10 @@
     H6.1217
     C6.25792,2.5 6.38824,2.55557 6.48253,2.65387
     L8.10584,4.34613Z
-  " class="primary accent-fill"/>
-  <line x1="5" y1="7" x2="5" y2="11" class="primary" />
-  <circle cx="5" cy="7" r="1.5" class="primary-fill" />
-  <circle cx="5" cy="11" r="1.5" class="primary-fill" />
-  <line x1="8" y1="7" x2="13" y2="7" class="primary" />
-  <line x1="8" y1="11" x2="13" y2="11" class="primary" />
+  " class="primary contrast-fill"/>
+  <line x1="5" y1="7" x2="5" y2="11" class="accent" />
+  <circle cx="5" cy="7" r="1.5" class="accent-fill" />
+  <circle cx="5" cy="11" r="1.5" class="accent-fill" />
+  <line x1="8" y1="7" x2="13" y2="7" class="accent" />
+  <line x1="8" y1="11" x2="13" y2="11" class="accent" />
 </svg>
