@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Commit details panel now shows author · date using absolute timestamps; committer date also shown when different from author
 
 ### Fixed
+- ENTER key no longer hijacks global IDE navigation (e.g. Find Usages); the Jujutsu changes tree handles ENTER locally
 - Clicking an annotation gutter column now correctly navigates the log to that change
 - Annotation "View Colors" now works — lines from the same change share a background colour, and "Color by Author" groups by author
 - Annotation "View Names" / "Email" modes now work correctly — name shortening (initials, first/last name, email) is applied when toggled

@@ -156,7 +156,6 @@
         <!-- File change context menu actions for custom panels -->
         <action id="Jujutsu.OpenChangeFile" class="in.kkkev.jjidea.actions.filechange.OpenChangeFileAction">
             <keyboard-shortcut first-keystroke="F4" keymap="$default"/>
-            <keyboard-shortcut first-keystroke="ENTER" keymap="$default"/>
         </action>
         <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.actions.filechange.RestoreToChangeAction"/>
         <action id="Jujutsu.SquashFiles" class="in.kkkev.jjidea.actions.filechange.SquashFilesAction"/>
