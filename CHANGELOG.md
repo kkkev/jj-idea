@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-04-19
+
 ### Added
 - Annotation gutter now shows the change ID column by default, coloured in the plugin's change ID blue
 - Annotation tooltips are now formatted HTML: change ID, commit ID, author · date, and description — matching the log row tooltip style
@@ -391,7 +393,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.5...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.6...HEAD
+[0.6.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.6
 [0.6.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.5
 [0.6.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.4
 [0.6.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.3
