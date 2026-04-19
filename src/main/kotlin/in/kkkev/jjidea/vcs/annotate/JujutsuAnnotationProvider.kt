@@ -12,6 +12,7 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 
@@ -70,13 +71,18 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
             // Parse the annotation output
             val annotationLines = AnnotationParser.parse(result.stdout)
 
+            // Look up the working copy change ID so getCurrentRevision() can match annotated lines
+            val wcChangeId = project.stateModel.repositoryStates.value
+                .find { it.repo == repo && it.isWorkingCopy }?.id
+
             // Create and return the file annotation
             return JujutsuFileAnnotation(
                 project = project,
                 repo = repo,
                 file = file,
                 annotationLines = annotationLines,
-                vcsKey = vcs.keyInstanceMethod
+                vcsKey = vcs.keyInstanceMethod,
+                workingCopyChangeId = wcChangeId
             )
         } catch (e: VcsException) {
             throw e

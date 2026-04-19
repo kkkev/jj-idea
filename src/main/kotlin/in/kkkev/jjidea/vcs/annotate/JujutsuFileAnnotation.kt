@@ -7,12 +7,14 @@ import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspect
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspectAdapter
+import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.vcs.log.util.VcsUserUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
@@ -29,7 +31,8 @@ class JujutsuFileAnnotation(
     private val repo: JujutsuRepository,
     private val file: VirtualFile,
     private val annotationLines: List<AnnotationLine>,
-    private val vcsKey: VcsKey
+    private val vcsKey: VcsKey,
+    private val workingCopyChangeId: ChangeId? = null
 ) : FileAnnotation(project) {
     private val log = Logger.getInstance(javaClass)
 
@@ -58,12 +61,22 @@ class JujutsuFileAnnotation(
 
     override fun getAnnotatedContent() = annotationLines.joinToString("\n") { it.lineContent }
 
-    // For Jujutsu, the current revision is typically the working copy commit (@)
-    // TODO Where is this used? Is this correct? Can we annotate old revisions?
-    override fun getCurrentRevision() = JujutsuRevisionNumber(WorkingCopy)
+    override fun getCurrentRevision() = workingCopyChangeId?.let(::JujutsuRevisionNumber)
 
-    // TODO Should this integrate with JujutsuHistoryProvider?
     override fun getRevisions() = null
+
+    override fun getAuthorsMappingProvider() = AuthorsMappingProvider {
+        annotationLines
+            .distinctBy { it.id }
+            .associate { JujutsuRevisionNumber(it.id) as VcsRevisionNumber to it.author.name }
+    }
+
+    override fun getRevisionsOrderProvider() = RevisionsOrderProvider {
+        annotationLines
+            .distinctBy { it.id }
+            .sortedByDescending { it.authorTimestamp }
+            .map { listOf(JujutsuRevisionNumber(it.id) as VcsRevisionNumber) }
+    }
 
     /**
      * Override to prevent EDT slow operations.
@@ -124,10 +137,10 @@ class JujutsuFileAnnotation(
     }
 
     private inner class AuthorAspect : Aspect(
-        "author",
+        AUTHOR,
         JujutsuBundle.message("annotation.aspect.author"),
         true,
-        { it.author.name }
+        { VcsUserUtil.toExactString(it.author) }
     )
 
     private inner class AuthorInstantAspect : Aspect(
