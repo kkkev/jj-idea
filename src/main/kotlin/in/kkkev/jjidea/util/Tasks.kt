@@ -5,6 +5,7 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.TransactionGuard
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import java.awt.Component
+import java.util.concurrent.Future
 
 fun saveAllDocuments() {
     if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
@@ -16,9 +17,9 @@ fun saveAllDocuments() {
 
 private val capturedModality = ThreadLocal<ModalityState>()
 
-fun runInBackground(action: () -> Unit) {
+fun <T> runInBackground(action: () -> T): Future<T> {
     val modality = ModalityState.defaultModalityState()
-    ApplicationManager.getApplication().executeOnPooledThread {
+    return ApplicationManager.getApplication().executeOnPooledThread<T> {
         capturedModality.set(modality)
         try {
             action()

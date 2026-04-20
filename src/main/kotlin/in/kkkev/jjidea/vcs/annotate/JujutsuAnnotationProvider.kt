@@ -8,6 +8,7 @@ import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.WorkingCopy
@@ -26,10 +27,9 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
     private val cache = mutableMapOf<VirtualFile, FileAnnotation>()
 
     override fun populateCache(file: VirtualFile) {
-        // Pre-load annotations in the background for caching
         try {
-            val annotation = annotateInternal(file, WorkingCopy)
-            cache[file] = annotation
+            val repo = project.jujutsuRepositoryFor(file)
+            cache[file] = annotateInternal(file, repo.workingCopyParent(), repo)
         } catch (e: Exception) {
             log.warn("Failed to populate annotation cache for ${file.path}", e)
         }
@@ -38,47 +38,44 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
     override fun getFromCache(file: VirtualFile) = cache[file]
 
     /**
-     * Annotate a file at the current working copy revision
+     * Annotate a file at the working copy parent (@-), matching the LineStatusTracker base.
+     * Lines changed in @ appear unannotated; IntelliJ's UpToDateLineNumberProvider handles the mapping.
      */
-    override fun annotate(file: VirtualFile) = annotateInternal(file, WorkingCopy)
+    override fun annotate(file: VirtualFile): FileAnnotation {
+        val repo = project.jujutsuRepositoryFor(file)
+        return annotateInternal(file, repo.workingCopyParent(), repo)
+    }
 
     /**
-     * Annotate a file at a specific revision
+     * Annotate a file at a specific revision (used for "Annotate This/Previous Revision").
      */
     override fun annotate(file: VirtualFile, revision: VcsFileRevision?) =
         annotateInternal(file, revision?.revisionNumber?.asString()?.let(::RevisionExpression) ?: WorkingCopy)
 
-    /**
-     * Check if we can annotate this revision
-     */
     override fun isAnnotationValid(rev: VcsFileRevision) = true
 
-    /**
-     * Internal method to perform annotation
-     */
-    private fun annotateInternal(file: VirtualFile, revision: Revision): FileAnnotation {
+    private fun annotateInternal(
+        file: VirtualFile,
+        revision: Revision,
+        repo: JujutsuRepository? = null
+    ): FileAnnotation {
         try {
-            val repo = project.jujutsuRepositoryFor(file)
-
-            // Execute annotation command with template
-            val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
+            val resolvedRepo = repo ?: project.jujutsuRepositoryFor(file)
+            val result = resolvedRepo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
 
             if (!result.isSuccess) {
                 log.warn("Failed to annotate file: ${result.stderr}")
                 throw VcsException("Failed to annotate file: ${result.stderr}")
             }
 
-            // Parse the annotation output
             val annotationLines = AnnotationParser.parse(result.stdout)
 
-            // Look up the working copy change ID so getCurrentRevision() can match annotated lines
             val wcChangeId = project.stateModel.repositoryStates.value
-                .find { it.repo == repo && it.isWorkingCopy }?.id
+                .find { it.repo == resolvedRepo && it.isWorkingCopy }?.id
 
-            // Create and return the file annotation
             return JujutsuFileAnnotation(
                 project = project,
-                repo = repo,
+                repo = resolvedRepo,
                 file = file,
                 annotationLines = annotationLines,
                 vcsKey = vcs.keyInstanceMethod,

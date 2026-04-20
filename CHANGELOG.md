@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clicking an annotation gutter column now correctly navigates the log to that change
 - Annotation "View Colors" now works — lines from the same change share a background colour, and "Color by Author" groups by author
 - Annotation "View Names" / "Email" modes now work correctly — name shortening (initials, first/last name, email) is applied when toggled
+- Annotation no longer shows a "line count mismatch" warning when the working copy has local changes; the annotation now targets `@-` (the parent), matching IntelliJ's line status tracker base
+- "Annotate Previous Revision" now loads file content correctly, including for files opened in historical annotation tabs
 
 ### Changed
 - Repository icon colours are now consistent with IDE folders

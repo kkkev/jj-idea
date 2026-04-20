@@ -11,20 +11,20 @@ import kotlinx.datetime.Instant
 data class LogEntry(
     val repo: JujutsuRepository,
     override val id: ChangeId,
-    val commitId: CommitId,
+    override val commitId: CommitId,
     private val underlyingDescription: String,
     val bookmarks: List<Bookmark> = emptyList(),
     val parentIdentifiers: List<Identifiers> = emptyList(),
     override val isWorkingCopy: Boolean = false,
     override val hasConflict: Boolean = false,
     override val isEmpty: Boolean = false,
-    val authorTimestamp: Instant? = null,
+    override val authorTimestamp: Instant? = null,
     val committerTimestamp: Instant? = null,
-    val author: VcsUser? = null,
+    override val author: VcsUser? = null,
     val committer: VcsUser? = null,
     override val immutable: Boolean = false
-) : GraphableEntry, ChangeStatus {
-    val description = Description(underlyingDescription)
+) : GraphableEntry, ChangeStatus, ChangeDetail {
+    override val description = Description(underlyingDescription)
 
     override val parentIds: List<ChangeId> get() = parentIdentifiers.map { it.changeId }
 

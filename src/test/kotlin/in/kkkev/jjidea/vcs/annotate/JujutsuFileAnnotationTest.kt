@@ -45,4 +45,10 @@ class JujutsuFileAnnotationTest {
         val method = JujutsuFileAnnotation::class.java.getDeclaredMethod("getRevisionsChangesProvider")
         method shouldNotBe null
     }
+
+    @Test
+    fun `getRevisions method is overridden`() {
+        val method = JujutsuFileAnnotation::class.java.getDeclaredMethod("getRevisions")
+        method shouldNotBe null
+    }
 }

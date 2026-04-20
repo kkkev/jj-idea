@@ -6,6 +6,7 @@ import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.vfs.ContentRevisionVirtualFile
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -28,11 +29,14 @@ val Project.initialisedJujutsuRepositories: Collection<JujutsuRepository>
 
 fun Project.jujutsuRepositoryForRoot(directory: VirtualFile) = stateModel.initialisedRepositories.value[directory]
 
-fun Project.possibleJujutsuRepositoryFor(file: VirtualFile) =
+fun Project.possibleJujutsuRepositoryFor(file: VirtualFile): JujutsuRepository? =
     file.getUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY)?.repo
         ?: when (file) {
             is ContentRevisionVirtualFile -> possibleJujutsuRepositoryFor(file.contentRevision.file)
             else -> VcsUtil.getVcsRootFor(this, file)?.let { jujutsuRepositoryForRoot(it) }
+                ?: LocalFileSystem.getInstance().findFileByPath(file.path)
+                    ?.takeUnless { file.isInLocalFileSystem }
+                    ?.let { possibleJujutsuRepositoryFor(it) }
         }
 
 fun Project.possibleLogEntryFor(file: VirtualFile): LogEntry? =

@@ -1,7 +1,5 @@
 package `in`.kkkev.jjidea.jj.cli
 
-import `in`.kkkev.jjidea.jj.AnnotationLine
-import `in`.kkkev.jjidea.jj.CommitId
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -241,18 +239,5 @@ class AnnotationParserTest {
         result shouldHaveSize 1
         result[0].id.full shouldBe longChangeId
         result[0].id.short shouldBe "mnop"
-    }
-
-    @Test
-    fun `empty annotation line helper creates valid empty line`() {
-        val emptyLine = AnnotationLine.empty(42, "some content")
-
-        emptyLine.lineNumber shouldBe 42
-        emptyLine.lineContent shouldBe "some content"
-        emptyLine.id.full shouldBe ""
-        emptyLine.commitId shouldBe CommitId("")
-        emptyLine.author.name shouldBe ""
-        emptyLine.author.email shouldBe ""
-        emptyLine.description.summary shouldBe "(no description)"
     }
 }

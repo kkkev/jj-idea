@@ -21,14 +21,15 @@ object AnnotationParser {
 
     /**
      * Template to use with `jj file annotate -T`
-     * Outputs 7 fields per line separated by null bytes:
+     * Outputs 8 fields per line separated by null bytes:
      * 1. full commit hash
      * 2. short commit hash
      * 3. commit hash (duplicate for compatibility)
      * 4. author name
      * 5. author email
      * 6. description first line
-     * 7. line content
+     * 7. is commit the working copy?
+     * 8. line content
      *
      * Note: In annotate context, use `commit` instead of `commit_id`
      */

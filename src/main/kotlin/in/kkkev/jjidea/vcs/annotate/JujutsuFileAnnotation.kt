@@ -2,23 +2,25 @@ package `in`.kkkev.jjidea.vcs.annotate
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.colors.ColorKey
+import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspect
 import com.intellij.openapi.vcs.annotate.LineAnnotationAspectAdapter
+import com.intellij.openapi.vcs.history.VcsFileRevision
+import com.intellij.openapi.vcs.history.VcsFileRevisionEx
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.log.util.VcsUserUtil
+import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.AnnotationLine
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.ChangeKey
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
+import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import kotlinx.datetime.Instant
 import java.util.*
@@ -63,7 +65,9 @@ class JujutsuFileAnnotation(
 
     override fun getCurrentRevision() = workingCopyChangeId?.let(::JujutsuRevisionNumber)
 
-    override fun getRevisions() = null
+    override fun getRevisions(): List<VcsFileRevision> = annotationLines
+        .distinctBy { it.id }
+        .map { AnnotationFileRevision(it, file, repo) }
 
     override fun getAuthorsMappingProvider() = AuthorsMappingProvider {
         annotationLines
@@ -159,5 +163,37 @@ class JujutsuFileAnnotation(
     )
 }
 
-// TODO Use standard formatter
+private class AnnotationFileRevision(
+    private val line: AnnotationLine,
+    private val virtualFile: VirtualFile,
+    private val repo: JujutsuRepository
+) : VcsFileRevisionEx() {
+    override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(line.id)
+    override fun getRevisionDate() = line.authorTimestamp?.toJavaDate()
+    override fun getAuthorDate() = line.authorTimestamp?.toJavaDate()
+    override fun getAuthor() = line.author.name
+    override fun getAuthorEmail() = line.author.email
+    override fun getCommitMessage() = line.description.display
+    override fun getBranchName(): String? = null
+    override fun getCommitterName(): String? = null
+    override fun getCommitterEmail(): String? = null
+    override fun getChangedRepositoryPath() = null
+    override fun getPath() = VcsUtil.getFilePath(virtualFile)
+    override fun isDeleted() = false
+
+    @Throws(VcsException::class)
+    override fun loadContent(): ByteArray {
+        val filePath = VcsUtil.getFilePath(virtualFile)
+        val revision = RevisionExpression(line.id.full)
+        val future = runInBackground { repo.commandExecutor.show(filePath, revision) }
+        val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
+        if (!result.isSuccess) throw VcsException("Failed to load content at ${line.id}: ${result.stderr}")
+        return result.stdout.toByteArray()
+    }
+
+    @Throws(VcsException::class)
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun getContent(): ByteArray = loadContent()
+}
+
 fun Instant.toJavaDate() = Date(this.toEpochMilliseconds())

@@ -212,6 +212,19 @@ fun TextCanvas.append(
     }
 }
 
+fun TextCanvas.appendChangeTooltip(detail: ChangeDetail) {
+    append(detail.id)
+    append(" (")
+    append(detail.commitId)
+    append(")\n")
+    detail.author?.let { append(it) }
+    detail.authorTimestamp?.let { ts ->
+        if (detail.author != null) append(" \u00b7 ")
+        append(DateTimeFormatter.formatAbsolute(ts))
+    }
+    control("<pre style='white-space: pre-wrap;'>") { appendSummary(detail.description) }
+}
+
 fun TextCanvas.appendSummary(entry: LogEntry) {
     append(ChangeKey(entry.repo, entry.id))
     append(" (")
