@@ -5,6 +5,16 @@ import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.jj.Revision
 
 /**
+ * Revision number for the auto-merged parent tree of a merge commit.
+ * Carries the child revision so [JujutsuDiffProvider] can reconstruct parent content
+ * via reverse-apply when IntelliJ calls back with this revision number.
+ */
+data class JujutsuMergeParentRevisionNumber(val childRevision: Revision) : VcsRevisionNumber {
+    override fun asString() = "merge-parent:$childRevision"
+    override fun compareTo(other: VcsRevisionNumber?) = 0
+}
+
+/**
  * Revision number implementation for Jujutsu that supports both full and short display formats
  */
 data class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumber {

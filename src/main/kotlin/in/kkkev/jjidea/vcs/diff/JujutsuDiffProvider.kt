@@ -8,9 +8,10 @@ import com.intellij.openapi.vcs.diff.ItemLatestState
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
-import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.vcs.changes.JujutsuMergeParentRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 
@@ -22,33 +23,36 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
 
     override fun getLastRevision(file: VirtualFile): ItemLatestState {
         log.debug("Getting last revision for VirtualFile: ${file.path}")
-
-        val filePath = VcsUtil.getFilePath(file)
-        val repo = project.jujutsuRepositoryFor(filePath)
-        val revision = repo.createRevision(filePath, repo.workingCopyParent())
-
-        return ItemLatestState(revision.revisionNumber, true, true)
+        return ItemLatestState(revisionNumberFor(VcsUtil.getFilePath(file)), true, true)
     }
 
     override fun getLastRevision(filePath: FilePath): ItemLatestState {
         log.debug("Getting last revision for FilePath: ${filePath.path}")
-
-        val repo = project.jujutsuRepositoryFor(filePath)
-        val revision = repo.createRevision(filePath, repo.workingCopyParent())
-
-        return ItemLatestState(revision.revisionNumber, true, true)
+        return ItemLatestState(revisionNumberFor(filePath), true, true)
     }
 
-    private fun createContentRevision(filePath: FilePath, revision: Revision) =
-        project.jujutsuRepositoryFor(filePath).createRevision(filePath, revision)
+    private fun revisionNumberFor(filePath: FilePath): VcsRevisionNumber {
+        val parent = project.jujutsuRepositoryFor(filePath).workingCopyParent()
+        return if (parent is MergeParentOf) {
+            JujutsuMergeParentRevisionNumber(parent.childRevision)
+        } else {
+            JujutsuRevisionNumber(parent)
+        }
+    }
 
     override fun createFileContent(revisionNumber: VcsRevisionNumber?, file: VirtualFile) = revisionNumber?.let {
-        createContentRevision(VcsUtil.getFilePath(file), RevisionExpression(it.asString()))
+        val filePath = VcsUtil.getFilePath(file)
+        val repo = project.jujutsuRepositoryFor(filePath)
+        if (it is JujutsuMergeParentRevisionNumber) {
+            repo.createRevision(filePath, MergeParentOf(it.childRevision))
+        } else {
+            repo.createRevision(filePath, RevisionExpression(it.asString()))
+        }
     }
 
     // TODO When addressing jj-idea-3jo, ensure that these return the correct change ids
     override fun getCurrentRevision(file: VirtualFile) = JujutsuRevisionNumber(WorkingCopy)
 
     override fun getLatestCommittedRevision(file: VirtualFile) =
-        JujutsuRevisionNumber(project.jujutsuRepositoryFor(VcsUtil.getFilePath(file)).workingCopyParent())
+        revisionNumberFor(VcsUtil.getFilePath(file))
 }

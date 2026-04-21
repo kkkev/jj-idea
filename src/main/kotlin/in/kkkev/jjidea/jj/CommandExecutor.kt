@@ -161,6 +161,15 @@ interface CommandExecutor {
     fun diffGit(revision: Revision): CommandResult
 
     /**
+     * Get git-format diff for a single file at a specific revision.
+     * Used for reverse-applying to reconstruct merge parent content.
+     * @param revision Revision to diff (e.g., "@", change ID)
+     * @param filePath File to diff
+     * @return Git-format diff output for the specific file
+     */
+    fun diffGitFile(revision: Revision, filePath: FilePath): CommandResult
+
+    /**
      * Restore the specified files to the specified revision.
      */
     fun restore(filePaths: List<FilePath>, revision: Revision): CommandResult

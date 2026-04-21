@@ -107,7 +107,7 @@ object ChangeService {
         val beforePath = repo.directory.getChildPath(oldPath)
         val afterPath = repo.directory.getChildPath(newPath)
 
-        val beforeRevision = entry.parentIds.firstOrNull()?.let { repo.createRevision(beforePath, it) }
+        val beforeRevision = parentRevisionFor(entry)?.let { repo.createRevision(beforePath, it) }
         val afterRevision = repo.createRevision(afterPath, entry.id)
 
         return Change(beforeRevision, afterRevision, FileStatus.MODIFIED).apply {
@@ -121,9 +121,7 @@ object ChangeService {
      */
     private fun convertToChange(fileChange: FileChange, entry: LogEntry, repo: JujutsuRepository): Change? {
         val path = VcsUtil.getFilePath(repo.directory.path + "/" + fileChange.filePath, false)
-
-        // For historical commits, we use the parent revision as "before"
-        val parentRevision = entry.parentIds.firstOrNull()
+        val parentRevision = parentRevisionFor(entry)
 
         return when (fileChange.status) {
             FileChangeStatus.MODIFIED -> {
@@ -147,5 +145,15 @@ object ChangeService {
                 null
             }
         }
+    }
+
+    /**
+     * Returns the revision to use as "before" content for a log entry's parent.
+     * For merge commits (multiple parents), returns [MergeParentOf] so that content is
+     * reconstructed via reverse-apply of the entry's diff rather than using first-parent content.
+     */
+    private fun parentRevisionFor(entry: LogEntry): Revision? = when {
+        entry.parentIds.size > 1 -> MergeParentOf(entry.id)
+        else -> entry.parentIds.firstOrNull()
     }
 }

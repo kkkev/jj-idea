@@ -75,6 +75,19 @@ object WorkingCopy : Ref {
     override fun toString() = "@"
 }
 
+/**
+ * Signals that content should be obtained by reverse-applying `jj diff --git -r [childRevision]`
+ * to the file content at [childRevision], reconstructing the auto-merged parent tree content.
+ *
+ * Used when [childRevision] is a merge commit (working copy or historical), where
+ * `jj file show -r <firstParent>` would give only the first parent's content rather than
+ * the auto-merged tree that jj actually diffs against.
+ */
+data class MergeParentOf(val childRevision: Revision) : Revision {
+    override fun toString() = childRevision.toString()
+    override val short get() = childRevision.short
+}
+
 data class RefAtCommit(val commitId: CommitId, val ref: Ref)
 
 /** How to select source revisions for `jj rebase`. */

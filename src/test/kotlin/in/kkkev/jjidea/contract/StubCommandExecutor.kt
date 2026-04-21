@@ -146,6 +146,9 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
+    override fun diffGitFile(revision: Revision, filePath: FilePath): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
     override fun restore(
         filePaths: List<FilePath>,
         revision: Revision

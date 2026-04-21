@@ -8,6 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.cli.CliLogService
+import `in`.kkkev.jjidea.util.GitDiffReverseApplier
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
@@ -110,21 +111,40 @@ data class JujutsuRepositoryImpl(
     override fun createRevision(filePath: FilePath, revision: Revision): ContentRevision =
         JujutsuContentRevision(filePath, revision)
 
-    override fun workingCopyParent(): Revision =
-        project.stateModel.repositoryStates.value
+    override fun workingCopyParent(): Revision {
+        val parentIds = project.stateModel.repositoryStates.value
             .firstOrNull { it.repo == this }
             ?.parentIds
-            ?.firstOrNull()
-            ?: WorkingCopy.parent
+            ?: return WorkingCopy.parent
+        return if (parentIds.size > 1) {
+            MergeParentOf(WorkingCopy)
+        } else {
+            parentIds.firstOrNull() ?: WorkingCopy.parent
+        }
+    }
 
     /**
-     * Represents the content of a file at a specific jujutsu revision
+     * Represents the content of a file at a specific jujutsu revision.
+     *
+     * When [revision] is [MergeParentOf], reconstructs the auto-merged parent tree content by
+     * reverse-applying `jj diff --git -r <childRevision> -- <file>` to the file's content at
+     * [MergeParentOf.childRevision]. This is necessary because `jj file show -r <firstParent>`
+     * only returns the first parent's content, not the merge parent tree jj diffs against.
      */
     private inner class JujutsuContentRevision(private val filePath: FilePath, private val revision: Revision) :
         ContentRevision {
         override fun getContent(): String? {
-            val result = commandExecutor.show(filePath, revision)
-            return result.stdout.takeIf { result.isSuccess }
+            if (revision !is MergeParentOf) {
+                val result = commandExecutor.show(filePath, revision)
+                return result.stdout.takeIf { result.isSuccess }
+            }
+            val childRevision = revision.childRevision
+            val afterContent = commandExecutor.show(filePath, childRevision).let {
+                if (it.isSuccess) it.stdout else ""
+            }
+            val diffResult = commandExecutor.diffGitFile(childRevision, filePath)
+            if (!diffResult.isSuccess || diffResult.stdout.isBlank()) return afterContent
+            return GitDiffReverseApplier.reverseApply(afterContent, diffResult.stdout) ?: afterContent
         }
 
         override fun getFile() = filePath

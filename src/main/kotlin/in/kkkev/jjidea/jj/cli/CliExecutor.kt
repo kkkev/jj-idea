@@ -283,6 +283,9 @@ class CliExecutor(
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("diff", "--git", "-r", revision))
 
+    override fun diffGitFile(revision: Revision, filePath: FilePath): CommandExecutor.CommandResult =
+        execute(root, listOf("diff", "--git", "-r", revision, "--", filePath.relativeTo(root!!)))
+
     override fun restore(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root!!) })
 
