@@ -32,7 +32,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     // Compare actions (self-filter: historical only)
     actionManager.getAction("Jujutsu.CompareWithLocal")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareBeforeWithLocal")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.OpenRepositoryVersion")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.CompareWithBranch")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.OpenFileInRemote")?.let { group.add(it) }
 
     group.addSeparator()

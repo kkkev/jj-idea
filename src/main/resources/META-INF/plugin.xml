@@ -107,7 +107,7 @@
     </action>
 
     <!-- Show Diff action - defined before EditorGroup so it can be referenced -->
-    <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.actions.filechange.ShowChangesDiffAction">
+    <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.actions.filechange.ShowDiffAction">
       <keyboard-shortcut first-keystroke="control D" keymap="$default"/>
       <keyboard-shortcut first-keystroke="meta D" keymap="Mac OS X"/>
       <keyboard-shortcut first-keystroke="meta D" keymap="Mac OS X 10.5+"/>
@@ -119,8 +119,7 @@
     <action id="Jujutsu.CompareWithLocal" class="in.kkkev.jjidea.actions.filechange.CompareWithLocalAction"/>
     <action id="Jujutsu.CompareBeforeWithLocal"
             class="in.kkkev.jjidea.actions.filechange.CompareBeforeWithLocalAction"/>
-    <action id="Jujutsu.OpenRepositoryVersion"
-            class="in.kkkev.jjidea.actions.filechange.OpenRepositoryVersionAction"/>
+    <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.actions.file.CompareFileWithBranchAction"/>
     <group id="Jujutsu.OpenFileInRemote"
            class="in.kkkev.jjidea.actions.filechange.OpenFileInRemoteGroup"/>
 
@@ -129,7 +128,9 @@
            popup="true">
       <reference ref="Annotate"/>
       <reference ref="Jujutsu.ShowChangesDiff"/>
-      <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.actions.file.CompareFileWithBranchAction"/>
+      <reference ref="Jujutsu.CompareWithLocal"/>
+      <reference ref="Jujutsu.CompareBeforeWithLocal"/>
+      <reference ref="Jujutsu.CompareWithBranch"/>
       <action id="Jujutsu.ShowFileHistory" class="in.kkkev.jjidea.actions.file.ShowFileHistoryAction"/>
       <action id="Jujutsu.ShowHistoryForSelection"
               class="in.kkkev.jjidea.actions.file.ShowFileHistoryForSelectionAction"/>
@@ -137,7 +138,9 @@
       <separator/>
       <reference ref="Jujutsu.SquashFiles"/>
       <reference ref="Jujutsu.SplitFiles"/>
-      <add-to-group group-id="VcsGroup" anchor="last"/>
+      <add-to-group group-id="EditorLangPopupMenu" anchor="after" relative-to-action="VersionControlsGroup"/>
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="VersionControlsGroup"/>
+      <add-to-group group-id="Diff.EditorPopupMenu" anchor="last"/>
     </group>
 
     <!-- "Open In" submenu entry: opens file at latest pushed commit on GitHub/GitLab. -->

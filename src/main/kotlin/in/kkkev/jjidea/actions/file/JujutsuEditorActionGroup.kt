@@ -1,15 +1,18 @@
 package `in`.kkkev.jjidea.actions.file
 
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.actions.StandardVcsGroup
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
 /**
  * Action group for Jujutsu VCS in editor context menu
  */
-class JujutsuEditorActionGroup : StandardVcsGroup() {
-    override fun getVcs(project: Project?) = project?.possibleJujutsuVcs
+class JujutsuEditorActionGroup : DefaultActionGroup() {
+    override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-    override fun getVcsName(project: Project?) = JujutsuVcs.Companion.VCS_NAME
+    override fun update(e: AnActionEvent) {
+        e.presentation.isEnabledAndVisible = e.file?.let { e.project?.possibleJujutsuRepositoryFor(it) } != null
+    }
 }

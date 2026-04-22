@@ -8,9 +8,11 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
+import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
-import `in`.kkkev.jjidea.vcs.filePath
+import `in`.kkkev.jjidea.vcs.cacheContents
 
 /**
  * Action to open selected file(s) in the editor.
@@ -26,23 +28,24 @@ class OpenChangeFileAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val files = e.files.takeIf { it.isNotEmpty() }
-            ?: e.changes.mapNotNull { it.filePath?.virtualFile }
 
-        if (files.isEmpty()) return
-
-        runLater {
-            val fileEditorManager = FileEditorManager.getInstance(project)
-            files.forEach { file ->
-                fileEditorManager.openFile(file, true)
-                OpenFileDescriptor(project, file).navigate(true)
+        runInBackground {
+            e.files.takeUnless { it.isEmpty() }?.let { files ->
+                files.forEach { it.cacheContents() }
+                runLater {
+                    val fileEditorManager = FileEditorManager.getInstance(project)
+                    files.forEach { file ->
+                        fileEditorManager.openFile(file, true)
+                        OpenFileDescriptor(project, file).navigate(true)
+                    }
+                }
             }
         }
     }
 
     override fun update(e: AnActionEvent) {
-        val hasFiles = e.files.isNotEmpty() ||
-            e.changes.any { it.filePath?.virtualFile != null }
+        val hasFiles = e.filePaths.isNotEmpty() ||
+            e.changes.any { it.after != null }
         e.presentation.isEnabled = e.project != null && hasFiles
     }
 }

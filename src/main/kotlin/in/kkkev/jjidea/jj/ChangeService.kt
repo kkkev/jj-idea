@@ -28,12 +28,11 @@ object ChangeService {
             emptyList()
         }.map { fileChange ->
             val beforeContentRevision = fileChange.before?.let { before ->
-                (fileChange.after?.contentLocator as? ChangeId)?.let { afterChangeId ->
-                    repo.createContentRevision(before.filePath, repo.getLogEntry(afterChangeId).parentContentLocator)
-                } ?: repo.createContentRevision(before)
+                fileChange.after?.contentLocator?.let(repo::getLogEntry)?.parentContentLocator
+                    ?.let { parentContentLocator -> repo.createContentRevision(before.filePath, parentContentLocator) }
+                    ?: repo.createContentRevision(before)
             }
-            val afterContentRevision =
-                fileChange.after?.let { after -> repo.createContentRevision(after) }
+            val afterContentRevision = fileChange.after?.let { after -> repo.createContentRevision(after) }
             Change(beforeContentRevision, afterContentRevision)
         }
     }

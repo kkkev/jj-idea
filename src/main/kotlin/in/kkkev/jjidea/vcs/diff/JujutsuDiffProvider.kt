@@ -34,6 +34,7 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
 
     private fun revisionNumberFor(filePath: FilePath): VcsRevisionNumber {
         val parent = project.jujutsuRepositoryFor(filePath).workingCopy.parentContentLocator
+        // TODO Looks like something to pull up to be reused elsewhere?
         return when (parent) {
             is MergeParentOf -> JujutsuMergeParentRevisionNumber(parent.childRevision)
             is ChangeId -> JujutsuRevisionNumber(parent)

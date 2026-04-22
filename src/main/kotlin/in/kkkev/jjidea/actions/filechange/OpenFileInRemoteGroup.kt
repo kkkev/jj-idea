@@ -32,11 +32,7 @@ class OpenFileInRemoteGroup : DefaultActionGroup() {
 
     override fun update(e: AnActionEvent) {
         val entry = e.logEntry
-        if (entry == null ||
-            entry.isWorkingCopy ||
-            e.changes.size != 1 ||
-            e.changes.first().afterRevision == null
-        ) {
+        if (entry == null || entry.isWorkingCopy || e.changes.none { it.after != null }) {
             e.presentation.isVisible = false
             return
         }
@@ -45,29 +41,27 @@ class OpenFileInRemoteGroup : DefaultActionGroup() {
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         val entry = e?.logEntry ?: return emptyArray()
-        val change = e.changes.firstOrNull() ?: return emptyArray()
-        val filePath = change.afterRevision?.file ?: return emptyArray()
-        val relativePath = entry.repo.getRelativePath(filePath)
+        val changes = e.changes.takeUnless { it.isEmpty() } ?: return emptyArray()
+        val filePaths = changes.mapNotNull { it.after?.filePath }.takeUnless { it.isEmpty() } ?: return emptyArray()
+        val relativePaths = filePaths.map { filePath -> entry.repo.getRelativePath(filePath) }
         val commitHash = entry.commitId.full
         return remotes(entry).map { remote ->
-            fileChangeRemoteAction(remote, commitHash, relativePath)
+            fileChangeRemoteAction(remote, commitHash, relativePaths)
         }.toTypedArray()
     }
 }
 
-private fun fileChangeRemoteAction(
-    remote: RecognizedRemote,
-    commitHash: String,
-    relativePath: String
-) = object : DumbAwareAction(
-    JujutsuBundle.message("log.action.open.file.in.remote.named", remote.kind.label, remote.name),
-    if (remote.isPushed) {
-        JujutsuBundle.message("log.action.open.file.in.remote.tooltip", remote.kind.label)
-    } else {
-        JujutsuBundle.message("log.action.open.file.in.remote.not.pushed.tooltip", remote.kind.label)
-    },
-    remote.kind.icon
-) {
-    override fun actionPerformed(e: AnActionEvent) =
-        BrowserUtil.browse(RemoteUrlBuilder.fileUrl(remote.base, remote.kind, commitHash, relativePath))
-}
+private fun fileChangeRemoteAction(remote: RecognizedRemote, commitHash: String, relativePaths: List<String>) =
+    object : DumbAwareAction(
+        JujutsuBundle.message("log.action.open.file.in.remote.named", remote.kind.label, remote.name),
+        if (remote.isPushed) {
+            JujutsuBundle.message("log.action.open.file.in.remote.tooltip", remote.kind.label)
+        } else {
+            JujutsuBundle.message("log.action.open.file.in.remote.not.pushed.tooltip", remote.kind.label)
+        },
+        remote.kind.icon
+    ) {
+        override fun actionPerformed(e: AnActionEvent) = relativePaths.forEach { relativePath ->
+            BrowserUtil.browse(RemoteUrlBuilder.fileUrl(remote.base, remote.kind, commitHash, relativePath))
+        }
+    }

@@ -1,20 +1,15 @@
 package `in`.kkkev.jjidea.actions.filechange
 
-import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffDialogHints
 import com.intellij.diff.DiffManager
 import com.intellij.diff.chains.SimpleDiffRequestChain
-import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.changes.Change
-import com.intellij.openapi.vfs.LocalFileSystem
-import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.JujutsuDataKeys
-import `in`.kkkev.jjidea.actions.JujutsuDataKeys.DiffContentInfo
-import `in`.kkkev.jjidea.jj.CommandExecutor
-import `in`.kkkev.jjidea.jj.LogEntry
+import com.intellij.openapi.actionSystem.AnActionEvent
+import `in`.kkkev.jjidea.actions.changes
+import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.jj.diffRequest
+import `in`.kkkev.jjidea.jj.fileAtWorkingCopy
+import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
 /**
@@ -28,46 +23,25 @@ import `in`.kkkev.jjidea.util.runLater
  * - When at least one selected file has afterRevision (not deleted)
  */
 class CompareWithLocalAction : HistoricalVersionAction("action.compare.with.local", AllIcons.Actions.Diff) {
-    override fun getActionUpdateThread() = ActionUpdateThread.BGT
-    override fun actionPerformed(
-        project: Project,
-        commandExecutor: CommandExecutor,
-        logEntry: LogEntry,
-        changes: List<Change>
-    ) {
-        val changeId = logEntry.id
-        val requests = changes.mapNotNull { change ->
-            val filePath = change.afterRevision?.file ?: return@mapNotNull null
-            val result = commandExecutor.show(filePath, changeId)
-            val content = if (result.isSuccess) result.stdout else ""
+    override fun actionPerformed(e: AnActionEvent) {
+        val logEntry = e.logEntry ?: return
+        val repo = logEntry.repo
 
-            val contentFactory = DiffContentFactory.getInstance()
-            val localFile = LocalFileSystem.getInstance().findFileByPath(filePath.path)
-            val localContent = if (localFile?.exists() == true) {
-                contentFactory.create(project, localFile)
-            } else {
-                contentFactory.createEmpty()
+        runInBackground {
+            val requests = e.changes.mapNotNull { change ->
+                change.after?.let { after ->
+                    val filePath = after.filePath
+                    val localSide = repo.createDiffSideFor(filePath.fileAtWorkingCopy)
+                    val historicalSide = repo.createDiffSideFor(after)
+                    diffRequest(filePath.name, historicalSide, localSide)
+                }
             }
 
-            val historicalContent = contentFactory.create(project, content, filePath.fileType)
-            historicalContent.putUserData(
-                JujutsuDataKeys.DIFF_CONTENT_INFO,
-                DiffContentInfo(logEntry.repo, filePath, logEntry.commitId)
-            )
-
-            SimpleDiffRequest(
-                filePath.name,
-                historicalContent,
-                localContent,
-                "${filePath.name} (${changeId.short})",
-                "${filePath.name} (${JujutsuBundle.message("diff.label.local")})"
-            )
-        }
-
-        if (requests.isNotEmpty()) {
-            runLater {
-                val chain = SimpleDiffRequestChain(requests)
-                DiffManager.getInstance().showDiff(project, chain, DiffDialogHints.DEFAULT)
+            if (requests.isNotEmpty()) {
+                runLater {
+                    val chain = SimpleDiffRequestChain(requests)
+                    DiffManager.getInstance().showDiff(repo.project, chain, DiffDialogHints.DEFAULT)
+                }
             }
         }
     }

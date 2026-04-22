@@ -1,19 +1,23 @@
 package `in`.kkkev.jjidea.actions.file
 
-import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
-import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.files
 import `in`.kkkev.jjidea.actions.repoForFile
+import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.diffRequest
+import `in`.kkkev.jjidea.jj.fileAt
 import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.fileAtVersion
 import `in`.kkkev.jjidea.vcs.filePath
 
 /**
@@ -27,16 +31,17 @@ class CompareFileWithBranchAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
-        val file = e.file ?: return
-        val repo = e.repoForFile ?: return
+        val files = e.files
+        val repo = e.singleRepoForFiles ?: return
 
-        // JujutsuCompareWithPopup.show() already handles EDT scheduling internally
-        RevisionSelectorPopup.show(
-            "action.compare.branch.popup.title",
-            repo,
-            RevisionSelectorPopup.Filter(true, true)
-        ) { chosen ->
-            showDiffWithRevision(repo, file, chosen)
+        if (!files.isEmpty()) {
+            RevisionSelectorPopup.show(
+                "action.compare.branch.popup.title",
+                repo,
+                RevisionSelectorPopup.Filter(true, true)
+            ) { chosen ->
+                showDiff(repo, files, chosen)
+            }
         }
     }
 
@@ -44,36 +49,28 @@ class CompareFileWithBranchAction : DumbAwareAction(
         e.presentation.isEnabledAndVisible = e.repoForFile != null
     }
 
-    private fun showDiffWithRevision(repo: JujutsuRepository, file: VirtualFile, revision: Revision) {
-        repo.commandExecutor.createCommand {
-            show(file.filePath, revision)
-        }.onSuccess {
-            showDiffContent(repo, file, revision, it)
-        }.onFailure {
-            showDiffContent(repo, file, revision, "")
-        }.executeAsync()
-    }
+    fun showDiff(repo: JujutsuRepository, files: List<VirtualFile>, leftRevision: Revision) {
+        runInBackground {
+            val diffManager = DiffManager.getInstance()
 
-    fun showDiffContent(repo: JujutsuRepository, file: VirtualFile, revision: Revision, revisionContent: String) {
-        val contentFactory = DiffContentFactory.getInstance()
-        val diffManager = DiffManager.getInstance()
+            // Locate change id in case revision is a bookmark or other expression
+            val leftChangeId = repo.getLogEntry(leftRevision).id
 
-        // Create diff content
-        val content1 = contentFactory.create(repo.project, revisionContent)
-        val content2 = if (file.exists()) {
-            contentFactory.create(repo.project, file)
-        } else {
-            contentFactory.createEmpty()
+            val diffRequests = files.map { file ->
+                val leftSide = repo.createDiffSideFor(file.filePath.fileAt(leftChangeId))
+                val rightSide = repo.createDiffSideFor(file.fileAtVersion)
+                diffRequest(
+                    JujutsuBundle.message("diff.title.compare", file.filePath.name, leftRevision.toString()),
+                    leftSide,
+                    rightSide
+                )
+            }
+
+            runLater {
+                diffRequests.forEach {
+                    diffManager.showDiff(repo.project, it)
+                }
+            }
         }
-
-        val diffRequest = SimpleDiffRequest(
-            JujutsuBundle.message("diff.title.compare", file.name, revision.toString()),
-            content1,
-            content2,
-            revision.toString(),
-            JujutsuBundle.message("diff.label.current")
-        )
-
-        diffManager.showDiff(repo.project, diffRequest)
     }
 }

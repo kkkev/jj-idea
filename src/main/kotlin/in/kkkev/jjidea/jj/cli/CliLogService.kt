@@ -144,7 +144,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                     val afterPath = repo.directory.getChildPath(newPath)
                     FileChange.Renamed(
                         beforePath.fileAt(beforeContentLocator),
-                        afterPath.fileAt(beforeContentLocator)
+                        afterPath.fileAt(afterChangeId)
                     )
                 }
 

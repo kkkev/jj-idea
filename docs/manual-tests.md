@@ -49,10 +49,23 @@ Use this checklist:
 - [ ] Details panel shows on row selection
 - [ ] Metadata displays correctly (author, date, change ID)
 - [ ] Description renders HTML formatting
-- [ ] File change tree shows correct files
-- [ ] Double-click file opens it in editor
 - [ ] Splitter position persists
 - [ ] Toggle details panel position (right/bottom) works
+
+### Details Changes Panel
+
+- [ ] File change tree shows correct files
+- [ ] Double-click file opens it in editor
+- [ ] Menu has "Show Diff" ✅
+- [ ] Menu has "Open File" ✅
+- [ ] Menu has "Compare with local (if not working copy) ✅
+- [ ] Menu has "Compare Before with Local (if not working copy) ✅
+- [ ] Menu has "Compare with Another Commit ❌
+- [ ] Menu has "Compare Before with Another Commit ❌
+- [ ] Menu has open in -> remote ✅
+- [ ] open file for historical opens correct version ✅
+- [ ] open file for working copy opens editable editor ✅
+
 
 ### Context Menu Actions
 
@@ -110,7 +123,7 @@ Use this checklist:
 - [ ] Large repository (100+ commits) loads without hanging
 - [ ] Rapid filtering doesn't cause errors
 
-## Keyboard Shortcuts
+### Keyboard Shortcuts
 
 Verify these keyboard shortcuts work in the log view:
 
@@ -122,7 +135,7 @@ Verify these keyboard shortcuts work in the log view:
 | Delete | Abandon selected change (with confirmation) |
 | F2 | Rename/describe selected change |
 
-## Working Copy Panel
+### Working Copy Panel
 
 - [ ] Description text area shows current description
 - [ ] "Describe" button updates description via `jj describe`
@@ -131,8 +144,18 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] File type icons display correctly
 - [ ] Double-click opens file in editor
 - [ ] Right-click shows context menu with file actions
+- [ ] Menu has open ✅
+- [ ] Open shows working copy as editable ✅
+- [ ] Single click does nothing ❌
+- [ ] Menu has "Show Diff" ✅
+- [ ] Menu has "Compare with Another Commit" ❌
+- [ ] Menu has "Compare Before with Another Commit" ❌
+- [ ] Show diff for multiple files opens multiple editors ✅
+- [ ] Open for multiple files opens multiple editors ✅
+- [ ] Menu has Open in -> remote ❌
+- [ ] Open in -> remote for single parent opens that parent
 
-## Settings (Version Control > Jujutsu)
+### Settings (Version Control > Jujutsu)
 
 - [ ] JJ executable path can be configured
 - [ ] File picker works for selecting executable
@@ -141,9 +164,55 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Log change limit affects number of entries loaded
 - [ ] Settings persist across IDE restarts
 
-## Error Handling
+### Error Handling
 
 - [ ] Invalid JJ path shows helpful error message
 - [ ] Non-JJ repository shows appropriate message
 - [ ] Network errors during operations show user-friendly errors
 - [ ] Concurrent operations don't cause corruption
+
+### Project Tool Window
+- [ ] File in tool window has Jujutsu menu ✅
+- [ ] Jujutsu menu has "Show Diff" ✅
+- [ ] Jujutsu menu has "Compare with Another Commit..." ✅
+- [ ] If file has changed, Jujutsu menu has "Compare Before with Another Commit..." ❌
+- [ ] Show diff for multiple files opens multiple editors ✅
+- [ ] Menu has Open in -> remote ✅
+- [ ] Open in -> remote for single parent opens that parent ✅
+
+### Diffs
+- [ ] Diff for unchanged file shows no changes (before view has same content, shows content as identical) ✅
+- [ ] Diff for modified file and single parent shows before from parent, current from selected ✅
+- [ ] Diff for deleted file and single parent shows before from parent, empty current ✅
+- [ ] Diff for added file and single parent shows empty before, current from @ ✅
+- [ ] Diff for renamed file and single parent shows before from @- with previous filepath, current from @ ✅
+- [ ] Diff from working copy shows before = parent, current from working copy
+- [ ] When right-hand diff pane contains working copy, it is editable
+- [ ] When right-hand diff pane contains historical version, it is not editable
+
+### Editors for Current Files
+- [ ] Menu has Jujutsu sub-menu ✅
+- [ ] Jujutsu menu has "Show Diff" ✅
+- [ ] Jujutsu menu has "Compare with Another Commit" ✅
+- [ ] Jujutsu menu has "Annotate" ✅
+- [ ] Annotate fetches annotations for the correct revision ✅
+- [ ] if file has changed, Jujutsu menu has compare before with another commit ❌
+- [ ] diff for unchanged file shows no changes (before view has same content, shows content as identical) ✅
+- [ ] diff for modified file and single parent shows before from @-, current from @ ✅
+- [ ] has open in -> remote ✅
+- [ ] open in -> remote for single parent opens that parent ✅
+
+### Editors for Historical Versions
+- [ ] has title including change id ✅
+- [ ] has Jujutsu menu ✅
+- [ ] Jujutsu menu has diff ✅
+- [ ] Jujutsu menu has compare with another commit ✅
+- [ ] compare with another commit opens that commit on LHS, editor's version on RHS ✅
+- [ ] Jujutsu menu has compare with local ❌
+- [ ] if file has changed, Jujutsu menu has compare before with another commit ❌
+- [ ] diff for modified file and single parent shows before from parent, current from selected version ✅
+- [ ] Jujutsu menu has annotate ❌ jj-idea-3jo
+- [ ] Annotate fetches annotations for the correct revision
+- [ ] has open in -> remote ✅
+- [ ] open in -> remote for single parent opens that parent ✅
+- [ ] open in -> remote for unambiguous remote ancestor parent opens that ancestor ❌

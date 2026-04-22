@@ -45,6 +45,7 @@ class SquashFilesAction : DumbAwareAction(
 
         runInBackground {
             val changes = ChangeService.loadChanges(entry)
+            // TODO What if this is a merge? See jj-idea-25t7
             val parentEntry = entry.parentIds.firstOrNull()?.let {
                 entry.repo.getLogEntry(it)
             }

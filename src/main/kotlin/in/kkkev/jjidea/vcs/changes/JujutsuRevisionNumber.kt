@@ -12,10 +12,10 @@ import `in`.kkkev.jjidea.jj.Revision
  * via reverse-apply when IntelliJ calls back with this revision number.
  */
 data class JujutsuMergeParentRevisionNumber(val childRevision: Revision) : VcsRevisionNumber {
-    override fun asString() = "merge-parent:$childRevision"
-    override fun compareTo(other: VcsRevisionNumber?) = 0
+    val contentLocator = MergeParentOf(childRevision)
 
-    val contentLocator get() = MergeParentOf(childRevision)
+    override fun asString() = contentLocator.title
+    override fun compareTo(other: VcsRevisionNumber?) = 0
 }
 
 /**

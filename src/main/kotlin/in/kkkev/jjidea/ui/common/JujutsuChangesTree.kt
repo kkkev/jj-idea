@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.common
 
-import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsDataKeys
@@ -12,7 +11,6 @@ import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.DIRE
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.REPOSITORY_GROUPING
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
 import `in`.kkkev.jjidea.actions.filechange.fileChangeActionGroup
-import `in`.kkkev.jjidea.actions.performAction
 import javax.swing.tree.DefaultTreeModel
 
 /**
@@ -23,7 +21,8 @@ class JujutsuChangesTree(project: Project, showCheckboxes: Boolean = false) :
     AsyncChangesTreeImpl.Changes(project, showCheckboxes, true) {
     /**
      * Optional additional data provider to inject context-specific data keys.
-     * Called from [uiDataSnapshot] to allow parent panels to provide context like [JujutsuDataKeys.LOG_ENTRY].
+     * Called from [uiDataSnapshot] to allow parent panels to provide context like
+     * [in.kkkev.jjidea.actions.JujutsuDataKeys.LOG_ENTRY].
      */
     var additionalDataProvider: ((DataSink) -> Unit)? = null
 

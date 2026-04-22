@@ -8,10 +8,14 @@ import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
-import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.contentLocator
+import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 
@@ -26,10 +30,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
 
     override fun populateCache(file: VirtualFile) {
         try {
-            val repo = project.jujutsuRepositoryFor(file)
-            // For the purpose of annotating, pick an arbitrary parent (the first one)
-            // TODO What happens if the file has merged from multiple parents?
-            cache[file] = annotateInternal(file, repo.workingCopy.parentIds.first(), repo)
+            cache[file] = annotate(file)
         } catch (e: Exception) {
             log.warn("Failed to populate annotation cache for ${file.path}", e)
         }
@@ -43,29 +44,53 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      */
     override fun annotate(file: VirtualFile): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
+
+        // 1. Find the content locator
+        val contentLocator = file.contentLocator
+
+        // 2. Find the change object
+        val change = repo.logService.getFileChanges(repo.getLogEntry(contentLocator) ?: repo.workingCopy, file.filePath)
+            .getOrNull()?.firstOrNull()
+
+        // 3. Locate the revision and file path of the before
+        // TODO: If we can't find the log entry, it's probably a merge parent - so default to parent for now
+        // If there is no change, then can just use the parent
+        val before = change?.before ?: FileAtVersion(file.filePath, repo.workingCopy.parentContentLocator)
+        val beforeFile = repo.getVirtualFile(before)
+        val beforeRevision = (before.contentLocator as? Revision)
+            ?: ((contentLocator as? Revision) ?: WorkingCopy).parent
+
         // For the purpose of annotating, pick an arbitrary parent (the first one)
         // TODO What happens if the file has merged from multiple parents?
-        return annotateInternal(file, repo.workingCopy.parentIds.first(), repo)
+        // TODO Or for a rename, the filename would have changed
+        // If we get this information from a change... that's great... but we can annotate files too
+        // In that case, we need to find the change object from a working copy virtual file
+        // MergeParentOf will need its own special handling - which will be complex. We would probably need to
+        // annotate all of the parents, then compare these to the merge parent (reverse diff), copying annotations
+        // across for all lines that match.
+        return annotateInternal(beforeFile, beforeRevision, repo)
     }
 
     /**
      * Annotate a file at a specific revision (used for "Annotate This/Previous Revision").
      */
-    override fun annotate(file: VirtualFile, revision: VcsFileRevision?) = annotateInternal(
-        file,
-        (revision as? JujutsuFileRevision)?.entry?.id
-            ?: project.jujutsuRepositoryFor(file).workingCopy.id
-    )
+    override fun annotate(file: VirtualFile, revision: VcsFileRevision?): FileAnnotation {
+        val repo = project.jujutsuRepositoryFor(file)
+        return annotateInternal(
+            file,
+            (revision as? JujutsuFileRevision)?.entry?.id ?: repo.workingCopy.id,
+            repo
+        )
+    }
 
     override fun isAnnotationValid(rev: VcsFileRevision) = true
 
     private fun annotateInternal(
         file: VirtualFile,
-        changeId: ChangeId,
-        repo: JujutsuRepository? = null
+        revision: Revision,
+        repo: JujutsuRepository
     ): FileAnnotation = try {
-        val resolvedRepo = repo ?: project.jujutsuRepositoryFor(file)
-        val result = resolvedRepo.commandExecutor.annotate(file, changeId, AnnotationParser.TEMPLATE)
+        val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
 
         if (!result.isSuccess) {
             log.warn("Failed to annotate file: ${result.stderr}")
@@ -76,11 +101,11 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
 
         JujutsuFileAnnotation(
             project = project,
-            repo = resolvedRepo,
+            repo = repo,
             file = file,
             annotationLines = annotationLines,
             vcsKey = vcs.keyInstanceMethod,
-            workingCopyChangeId = resolvedRepo.workingCopy.id
+            workingCopyChangeId = repo.workingCopy.id
         )
     } catch (e: VcsException) {
         throw e

@@ -6,14 +6,12 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
-import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
-import `in`.kkkev.jjidea.vcs.filePath
 
 /**
  * Restores selected files to their state in the parent revision (@-).
@@ -32,19 +30,19 @@ class RestoreSelectionAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val files = e.files
+        val filePaths = e.filePaths
         val repo = e.singleRepoForFiles ?: return
 
         // Show confirmation dialog
-        val title = if (files.size == 1) {
-            JujutsuBundle.message("action.restore.selection.confirm.title", files.first().name)
+        val title = if (filePaths.size == 1) {
+            JujutsuBundle.message("action.restore.selection.confirm.title", filePaths.first().name)
         } else {
-            JujutsuBundle.message("action.restore.selection.confirm.title", "${files.size} files")
+            JujutsuBundle.message("action.restore.selection.confirm.title", "${filePaths.size} files")
         }
-        val message = if (files.size == 1) {
+        val message = if (filePaths.size == 1) {
             JujutsuBundle.message("action.restore.selection.confirm.single")
         } else {
-            JujutsuBundle.message("action.restore.selection.confirm.multiple", files.size)
+            JujutsuBundle.message("action.restore.selection.confirm.multiple", filePaths.size)
         }
 
         if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
@@ -52,12 +50,11 @@ class RestoreSelectionAction : DumbAwareAction(
         }
 
         repo.commandExecutor.createCommand {
-            restore(files.map { it.filePath }, WorkingCopy.parent)
+            restore(filePaths, WorkingCopy.parent)
         }
             .onSuccess {
-                VfsUtil.markDirtyAndRefresh(false, false, true, *files.toTypedArray())
-                repo.invalidate()
-                logger.info("Restored ${files.size} file(s) to parent revision")
+                repo.invalidate(vfsChanged = true)
+                logger.info("Restored ${filePaths.size} file(s) to parent revision")
             }
             .onFailure { tellUser(project, "action.restore.selection.error") }
             .executeAsync()

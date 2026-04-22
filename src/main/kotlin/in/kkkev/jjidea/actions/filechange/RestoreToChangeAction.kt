@@ -6,9 +6,11 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
+import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.jj.invalidate
 
@@ -34,29 +36,27 @@ class RestoreToChangeAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val entry = e.logEntry ?: return
-        val change = e.changes.firstOrNull() ?: return
+        val filePaths = e.filePaths.takeUnless { it.isEmpty() } ?: return
 
-        val filePath = change.afterRevision?.file ?: change.beforeRevision?.file ?: return
-        val fileName = filePath.name
+        val fileNames = filePaths.joinToString { it.name }
         val changeId = entry.id
         val repo = entry.repo
 
         // Show confirmation dialog
-        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileName, changeId.short)
+        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileNames, changeId.short)
         val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", changeId.short)
         if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
             return
         }
 
         repo.commandExecutor.createCommand {
-            restore(listOf(filePath), changeId)
+            restore(filePaths, changeId)
         }
             .onSuccess {
-                filePath.virtualFile?.let { vf ->
-                    VfsUtil.markDirtyAndRefresh(false, false, true, vf)
-                }
+                val files = filePaths.map(FilePath::getVirtualFile)
+                VfsUtil.markDirtyAndRefresh(false, false, true, *files.toTypedArray())
                 repo.invalidate()
-                log.info("Restored $fileName to revision ${changeId.short}")
+                log.info("Restored $fileNames to revision ${changeId.short}")
             }
             .onFailure { tellUser(project, "action.restore.to.revision.error") }
             .executeAsync()

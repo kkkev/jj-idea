@@ -30,8 +30,9 @@ object JujutsuDataKeys {
      * DiffContent user-data: Jujutsu context for one side of a diff viewer.
      *
      * Set on [com.intellij.diff.contents.DiffContent] objects created by diff actions (e.g.
-     * [in.kkkev.jjidea.actions.filechange.ShowChangesDiffAction], [in.kkkev.jjidea.actions.filechange.CompareWithLocalAction]).
-     * [OpenInRemoteFromEditorGroup] reads this from [com.intellij.diff.tools.util.DiffDataKeys.CURRENT_CONTENT]
+     * [in.kkkev.jjidea.actions.filechange.CompareWithLocalAction]).
+     * [in.kkkev.jjidea.actions.file.OpenInRemoteFromEditorGroup] reads this from
+     * [com.intellij.diff.tools.util.DiffDataKeys.CURRENT_CONTENT]
      * when [com.intellij.openapi.actionSystem.CommonDataKeys.VIRTUAL_FILE] is not a real project file
      * (i.e. for the historical/text-based side of a diff).
      *

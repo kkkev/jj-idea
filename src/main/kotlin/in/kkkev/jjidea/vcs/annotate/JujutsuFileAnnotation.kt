@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.vcs.filePath
 import kotlinx.datetime.Instant
 import java.util.*
 
@@ -183,9 +184,8 @@ private class AnnotationFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val filePath = VcsUtil.getFilePath(virtualFile)
         val revision = RevisionExpression(line.id.full)
-        val future = runInBackground { repo.commandExecutor.show(filePath, revision) }
+        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, revision) }
         val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
         if (!result.isSuccess) throw VcsException("Failed to load content at ${line.id}: ${result.stderr}")
         return result.stdout.toByteArray()
