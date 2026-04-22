@@ -40,13 +40,14 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
         }
     }
 
+    // TODO Could be simplified further: we now have JujutsuMergeParentRevisionNumber and MergeParentOf as intermediates
     override fun createFileContent(revisionNumber: VcsRevisionNumber?, file: VirtualFile) = revisionNumber?.let {
         val filePath = VcsUtil.getFilePath(file)
         val repo = project.jujutsuRepositoryFor(filePath)
         if (it is JujutsuMergeParentRevisionNumber) {
-            repo.createRevision(filePath, MergeParentOf(it.childRevision))
+            repo.createContentRevision(filePath, MergeParentOf(it.childRevision))
         } else {
-            repo.createRevision(filePath, RevisionExpression(it.asString()))
+            repo.createContentRevision(filePath, RevisionExpression(it.asString()))
         }
     }
 

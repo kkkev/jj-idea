@@ -72,7 +72,7 @@ fun showFileDiff(repo: JujutsuRepository, file: VirtualFile) {
     runInBackground {
         val filePath = file.filePath
         val parentRevision = repo.workingCopyParent()
-        val revisionContent = repo.createRevision(filePath, parentRevision).content ?: ""
+        val revisionContent = repo.createContentRevision(filePath, parentRevision).content ?: ""
         val parentLabel = if (parentRevision is MergeParentOf) {
             JujutsuBundle.message("diff.label.merged.parents")
         } else {

@@ -120,7 +120,7 @@ class JujutsuChangeProviderTest {
 
         val filePathSlot = slot<FilePath>()
         every {
-            repo.createRevision(capture(filePathSlot), any())
+            repo.createContentRevision(capture(filePathSlot), any<Revision>())
         } answers {
             val result = mockk<ContentRevision>()
             every { result.file } returns filePathSlot.captured
@@ -146,7 +146,7 @@ class JujutsuChangeProviderTest {
 
         val filePathSlot = slot<FilePath>()
         every {
-            repo.createRevision(capture(filePathSlot), any())
+            repo.createContentRevision(capture(filePathSlot), any<Revision>())
         } answers {
             val result = mockk<ContentRevision>()
             every { result.file } returns filePathSlot.captured
@@ -175,7 +175,7 @@ class JujutsuChangeProviderTest {
         val filePathSlot = slot<FilePath>()
         val revisionSlot = slot<Revision>()
         every {
-            repo.createRevision(capture(filePathSlot), capture(revisionSlot))
+            repo.createContentRevision(capture(filePathSlot), capture(revisionSlot))
         } answers {
             val result = mockk<ContentRevision>()
             every { result.file } returns filePathSlot.captured
@@ -205,7 +205,7 @@ class JujutsuChangeProviderTest {
         val filePathSlot = slot<FilePath>()
         val revisionSlot = slot<Revision>()
         every {
-            repo.createRevision(capture(filePathSlot), capture(revisionSlot))
+            repo.createContentRevision(capture(filePathSlot), capture(revisionSlot))
         } answers {
             val result = mockk<ContentRevision>()
             every { result.file } returns filePathSlot.captured
@@ -235,7 +235,7 @@ class JujutsuChangeProviderTest {
         val filePathSlot = slot<FilePath>()
         val revisionSlot = slot<Revision>()
         every {
-            repo.createRevision(capture(filePathSlot), capture(revisionSlot))
+            repo.createContentRevision(capture(filePathSlot), capture(revisionSlot))
         } answers {
             val result = mockk<ContentRevision>()
             every { result.file } returns filePathSlot.captured
@@ -265,7 +265,7 @@ class JujutsuChangeProviderTest {
         val filePathSlot = slot<FilePath>()
         val revisionSlot = slot<Revision>()
         every {
-            repo.createRevision(capture(filePathSlot), capture(revisionSlot))
+            repo.createContentRevision(capture(filePathSlot), capture(revisionSlot))
         } answers {
             val result = mockk<ContentRevision>()
             every { result.file } returns filePathSlot.captured

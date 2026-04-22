@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -28,7 +29,12 @@ interface JujutsuRepository {
 
     /** Git remotes for this repository, lazily fetched once per session. */
     val gitRemotes: List<GitRemote>
-    fun createRevision(filePath: FilePath, revision: Revision): ContentRevision
+    fun getLogEntry(revision: Revision): LogEntry
+
+    fun createContentRevision(filePath: FilePath, revision: Revision): ContentRevision
+    fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentRevision
+    fun createParentContentRevision(filePath: FilePath, entry: LogEntry): ContentRevision
+
     fun getRelativePath(filePath: FilePath): String
     fun getRelativePath(file: VirtualFile): String
 
@@ -108,20 +114,35 @@ data class JujutsuRepositoryImpl(
 
     override fun getRelativePath(file: VirtualFile) = getRelativePath(VcsUtil.getFilePath(file))
 
-    override fun createRevision(filePath: FilePath, revision: Revision): ContentRevision =
-        JujutsuContentRevision(filePath, revision)
-
-    override fun workingCopyParent(): Revision {
-        val parentIds = project.stateModel.repositoryStates.value
-            .firstOrNull { it.repo == this }
-            ?.parentIds
-            ?: return WorkingCopy.parent
-        return if (parentIds.size > 1) {
-            MergeParentOf(WorkingCopy)
-        } else {
-            parentIds.firstOrNull() ?: WorkingCopy.parent
-        }
+    override fun createContentRevision(filePath: FilePath, revision: Revision): ContentRevision = when (revision) {
+        is MergeParentOf -> JujutsuContentRevision(filePath, revision)
+        else -> ContentLogEntryImpl(filePath, getLogEntry(revision))
     }
+
+    override fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentLogEntry =
+        ContentLogEntryImpl(filePath, logEntry)
+
+    override fun getLogEntry(revision: Revision) = logService.getLog(revision).getOrThrow().singleOrNull()
+        ?: throw VcsException("Multiple log entries found for revision $revision")
+
+    override fun workingCopyParent() = project.stateModel.repositoryStates.value
+        .firstOrNull { it.repo == this }
+        ?.let(this::getParentRevisionFor)
+        ?: WorkingCopy.parent
+
+    /**
+     * Returns the revision to use as "before" content for a log entry's parent.
+     * For merge commits (multiple parents), returns [MergeParentOf] so that content is
+     * reconstructed via reverse-apply of the entry's diff rather than using first-parent content.
+     */
+    private fun getParentRevisionFor(entry: LogEntry) = when (entry.parentIds.size) {
+        1 -> entry.parentIds.first()
+        0 -> entry.id.parent
+        else -> MergeParentOf(entry.id)
+    }
+
+    override fun createParentContentRevision(filePath: FilePath, entry: LogEntry) =
+        createContentRevision(filePath, getParentRevisionFor(entry))
 
     /**
      * Represents the content of a file at a specific jujutsu revision.
@@ -150,5 +171,13 @@ data class JujutsuRepositoryImpl(
         override fun getFile() = filePath
 
         override fun getRevisionNumber() = JujutsuRevisionNumber(revision)
+    }
+
+    private inner class ContentLogEntryImpl(override val filePath: FilePath, override val logEntry: LogEntry) :
+        ContentLogEntry {
+        override fun getContent(): String? {
+            val result = commandExecutor.show(filePath, logEntry.commitId)
+            return result.stdout.takeIf { result.isSuccess }
+        }
     }
 }

@@ -4,7 +4,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.committed.CommittedChangesTreeBrowser
-import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.vcs.getChildPath
 
 /**
@@ -41,7 +40,7 @@ object ChangeService {
         }
         // Create Change objects for renames
         val renameChanges = renames.map { (oldPath, newPath) ->
-            createRenameChange(oldPath, newPath, entry, repo)
+            createRenameChange(oldPath, newPath, entry)
         }
         return regularChanges + renameChanges
     }
@@ -98,21 +97,18 @@ object ChangeService {
     /**
      * Create a Change object for a renamed file.
      */
-    private fun createRenameChange(
-        oldPath: String,
-        newPath: String,
-        entry: LogEntry,
-        repo: JujutsuRepository
-    ): Change {
-        val beforePath = repo.directory.getChildPath(oldPath)
-        val afterPath = repo.directory.getChildPath(newPath)
+    private fun createRenameChange(oldPath: String, newPath: String, entry: LogEntry): Change {
+        val repo = entry.repo
+        val directory = repo.directory
 
-        val beforeRevision = parentRevisionFor(entry)?.let { repo.createRevision(beforePath, it) }
-        val afterRevision = repo.createRevision(afterPath, entry.id)
+        val beforePath = directory.getChildPath(oldPath)
+        val afterPath = directory.getChildPath(newPath)
 
-        return Change(beforeRevision, afterRevision, FileStatus.MODIFIED).apply {
-            this.isIsReplaced = true
-        }
+        val beforeContentRevision = repo.createParentContentRevision(beforePath, entry)
+        val afterContentRevision = repo.createContentRevision(afterPath, entry)
+
+        return Change(beforeContentRevision, afterContentRevision, FileStatus.MODIFIED)
+            .apply { isIsReplaced = true }
     }
 
     /**
@@ -120,24 +116,21 @@ object ChangeService {
      * This is where we integrate with the IntelliJ VCS framework.
      */
     private fun convertToChange(fileChange: FileChange, entry: LogEntry, repo: JujutsuRepository): Change? {
-        val path = VcsUtil.getFilePath(repo.directory.path + "/" + fileChange.filePath, false)
-        val parentRevision = parentRevisionFor(entry)
+        val path = repo.directory.getChildPath(fileChange.filePath)
+        val beforeContentRevision = repo.createParentContentRevision(path, entry)
+        val afterContentRevision = repo.createContentRevision(path, entry)
 
         return when (fileChange.status) {
             FileChangeStatus.MODIFIED -> {
-                val beforeRevision = parentRevision?.let { repo.createRevision(path, it) }
-                val afterRevision = repo.createRevision(path, entry.id)
-                Change(beforeRevision, afterRevision, FileStatus.MODIFIED)
+                Change(beforeContentRevision, afterContentRevision, FileStatus.MODIFIED)
             }
 
             FileChangeStatus.ADDED -> {
-                val afterRevision = repo.createRevision(path, entry.id)
-                Change(null, afterRevision, FileStatus.ADDED)
+                Change(null, afterContentRevision, FileStatus.ADDED)
             }
 
             FileChangeStatus.DELETED -> {
-                val beforeRevision = parentRevision?.let { repo.createRevision(path, it) }
-                Change(beforeRevision, null, FileStatus.DELETED)
+                Change(beforeContentRevision, null, FileStatus.DELETED)
             }
 
             FileChangeStatus.RENAMED, FileChangeStatus.UNKNOWN -> {
@@ -145,15 +138,5 @@ object ChangeService {
                 null
             }
         }
-    }
-
-    /**
-     * Returns the revision to use as "before" content for a log entry's parent.
-     * For merge commits (multiple parents), returns [MergeParentOf] so that content is
-     * reconstructed via reverse-apply of the entry's diff rather than using first-parent content.
-     */
-    private fun parentRevisionFor(entry: LogEntry): Revision? = when {
-        entry.parentIds.size > 1 -> MergeParentOf(entry.id)
-        else -> entry.parentIds.firstOrNull()
     }
 }
