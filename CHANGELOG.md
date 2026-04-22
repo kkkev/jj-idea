@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Diffs, change lists, and annotation gutters now show the correct base content for merge commits, using the auto-merged parent tree instead of the first parent's content
 - Diffs work for files that have been renamed
 
+### Changed
+- Removed spurious opening of files from working copy window when selecting a file
+
 ## [0.6.6] - 2026-04-19
 
 ### Added

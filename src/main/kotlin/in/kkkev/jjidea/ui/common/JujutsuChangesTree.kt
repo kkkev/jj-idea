@@ -51,26 +51,14 @@ class JujutsuChangesTree(project: Project, showCheckboxes: Boolean = false) :
     override fun uiDataSnapshot(sink: DataSink) {
         super.uiDataSnapshot(sink)
         sink[VcsDataKeys.CHANGES] = selectedChanges.toTypedArray()
-        sink[CommonDataKeys.VIRTUAL_FILE_ARRAY] = selectedChanges.mapNotNull { it.virtualFile }.toTypedArray()
         additionalDataProvider?.invoke(sink)
     }
 
     /**
-     * Install standard handlers for double-click, Enter key, and context menu.
-     * Uses the Diff.ShowDiff action which reads VcsDataKeys.CHANGES from our uiDataSnapshot.
+     * Install standard handler for popup.
+     * TODO How should default action/enter/double-click register?
      */
     fun installHandlers() {
-        val invokeDiff: () -> Boolean = {
-            if (selectedChanges.isNotEmpty()) {
-                val context = DataManager.getInstance().getDataContext(this)
-                performAction("Diff.ShowDiff", context, ActionPlaces.CHANGES_VIEW_POPUP)
-                true
-            } else {
-                false
-            }
-        }
-        setDoubleClickHandler { invokeDiff() }
-        setEnterKeyHandler { invokeDiff() }
         installPopupHandler(fileChangeActionGroup())
     }
 }
