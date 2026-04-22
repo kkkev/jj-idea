@@ -115,11 +115,30 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         }
 
     /**
-     * Whether this project has any initialized JJ repositories.
+     * Whether this project has any initialised JJ repositories.
      * Safe to call from EDT - uses cached value.
      */
     val isJujutsu: Boolean get() = initialisedRepositories.value.isNotEmpty()
 
+    /**
+     * Working copy log entries - one for each repo.
+     */
+    val workingCopies = notifiableState(
+        project,
+        "Working Copies",
+        emptyMap(),
+        equalityCheck = { a, b ->
+            a.mapValues { it.value.stateKey } == b.mapValues { it.value.stateKey }
+        }
+    ) {
+        // Use initialisedRoots.value to only load state for initialised repositories
+        // This avoids errors from uninitialised JJ VCS mappings
+        initialisedRepositories.value.mapNotNull { (_, it) ->
+            it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
+        }.associateBy { it.repo.directory.path }
+    }
+
+    @Deprecated("Use working copies by repo instead")
     val repositoryStates = notifiableState(
         project,
         "Jujutsu Repository States",
@@ -128,7 +147,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             a.map { it.stateKey }.toSet() == b.map { it.stateKey }.toSet()
         }
     ) {
-        // Use initialisedRoots.value to only load state for initialized repositories
+        // Use initialisedRoots.value to only load state for initialised repositories
         // This avoids errors from uninitialised JJ VCS mappings
         initialisedRepositories.value.mapNotNull { (_, it) ->
             it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
@@ -138,10 +157,10 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     /**
      * Log refresh notifier. Fires when the log should reload, either because:
      * - A VCS operation completed (via [JujutsuRepository.invalidate])
-     * - Working copy state changed (cascaded from [repositoryStates])
+     * - Working copy state changed (cascaded from [workingCopies])
      *
-     * The log subscribes to this instead of [repositoryStates] directly, because
-     * [repositoryStates] only tracks the working copy entry and won't fire for
+     * The log subscribes to this instead of [workingCopies] directly, because
+     * [workingCopies] only tracks the working copy entry and won't fire for
      * operations on non-working-copy commits (abandon, describe, rebase, etc.).
      */
     val logRefresh = simpleNotifier<Unit>(project, "Jujutsu Log Refresh")
@@ -169,7 +188,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     private fun scheduleRepositoryRefresh() {
         repositoryStateAlarm.cancelAllRequests()
         repositoryStateAlarm.addRequest({
-            repositoryStates.invalidate()
+            workingCopies.invalidate()
             logRefresh.notify(Unit)
         }, 300)
     }
@@ -246,7 +265,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         JjAvailabilityChecker.getInstance(project).status.connect(this) { status ->
             if (status is JjAvailabilityStatus.Available) {
                 log.info("jj became available (${status.version}), refreshing state")
-                repositoryStates.invalidate()
+                workingCopies.invalidate()
                 logRefresh.notify(Unit)
             }
         }
@@ -275,7 +294,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         initialisedRepositories.connect(this) { new ->
             log.info("Initialized roots changed to ${new.size} roots")
             // Reload repository states now that we have the current roots
-            repositoryStates.invalidate()
+            workingCopies.invalidate()
             // Also reload the log
             logRefresh.notify(Unit)
         }
@@ -283,16 +302,16 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         // When repository states change (VCS operations completed), mark directories dirty
         // to trigger ChangeProvider refresh for file changes.
         // Only dirty repos whose state actually changed to avoid flooding FileStatusManager.
-        var previousStateKeys = emptyMap<JujutsuRepository, LogEntry.StateKey>()
-        repositoryStates.connect(this) { new ->
-            val newKeys = new.associate { it.repo to it.stateKey }
-            val changedEntries = new.filter { entry -> previousStateKeys[entry.repo] != entry.stateKey }
+        var previousStateKeys = emptyMap<String, LogEntry.StateKey>()
+        workingCopies.connect(this) { new ->
+            val newKeys = new.mapValues { it.value.stateKey }
+            val changedEntries = new.filter { entry -> previousStateKeys[entry.key] != entry.value.stateKey }
             previousStateKeys = newKeys
             if (changedEntries.isNotEmpty()) {
                 log.info("Repository states changed for ${changedEntries.size}/${new.size} repos, marking dirty")
                 val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
                 changedEntries.forEach { entry ->
-                    dirtyScopeManager.dirDirtyRecursively(entry.repo.directory)
+                    dirtyScopeManager.dirDirtyRecursively(entry.value.repo.directory)
                 }
             }
         }
@@ -321,7 +340,7 @@ fun JujutsuRepository.invalidate(select: Revision? = null, vfsChanged: Boolean =
         VfsUtil.markDirtyAndRefresh(true, true, true, directory)
     }
     val stateModel = project.stateModel
-    stateModel.repositoryStates.invalidate()
+    stateModel.workingCopies.invalidate()
     stateModel.logRefresh.notify(Unit)
     if (select != null) {
         stateModel.changeSelection.notify(ChangeKey(this, select))

@@ -420,7 +420,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             // may produce data-class-equal repos (same project+directory), suppressing the
             // change notification. Explicitly refreshing repositoryStates and logRefresh
             // ensures the UI picks up the new executable immediately.
-            project.stateModel.repositoryStates.invalidate()
+            project.stateModel.workingCopies.invalidate()
             project.stateModel.logRefresh.notify(Unit)
         }
 

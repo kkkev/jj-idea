@@ -13,7 +13,6 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
-import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 
@@ -29,7 +28,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
     override fun populateCache(file: VirtualFile) {
         try {
             val repo = project.jujutsuRepositoryFor(file)
-            cache[file] = annotateInternal(file, repo.workingCopyParent(), repo)
+            cache[file] = annotateInternal(file, repo.workingCopyParent, repo)
         } catch (e: Exception) {
             log.warn("Failed to populate annotation cache for ${file.path}", e)
         }
@@ -43,7 +42,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      */
     override fun annotate(file: VirtualFile): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
-        return annotateInternal(file, repo.workingCopyParent(), repo)
+        return annotateInternal(file, repo.workingCopyParent, repo)
     }
 
     /**
@@ -58,34 +57,29 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
         file: VirtualFile,
         revision: Revision,
         repo: JujutsuRepository? = null
-    ): FileAnnotation {
-        try {
-            val resolvedRepo = repo ?: project.jujutsuRepositoryFor(file)
-            val result = resolvedRepo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
+    ): FileAnnotation = try {
+        val resolvedRepo = repo ?: project.jujutsuRepositoryFor(file)
+        val result = resolvedRepo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
 
-            if (!result.isSuccess) {
-                log.warn("Failed to annotate file: ${result.stderr}")
-                throw VcsException("Failed to annotate file: ${result.stderr}")
-            }
-
-            val annotationLines = AnnotationParser.parse(result.stdout)
-
-            val wcChangeId = project.stateModel.repositoryStates.value
-                .find { it.repo == resolvedRepo && it.isWorkingCopy }?.id
-
-            return JujutsuFileAnnotation(
-                project = project,
-                repo = resolvedRepo,
-                file = file,
-                annotationLines = annotationLines,
-                vcsKey = vcs.keyInstanceMethod,
-                workingCopyChangeId = wcChangeId
-            )
-        } catch (e: VcsException) {
-            throw e
-        } catch (e: Exception) {
-            log.error("Error during annotation", e)
-            throw VcsException("Failed to annotate file: ${e.message}", e)
+        if (!result.isSuccess) {
+            log.warn("Failed to annotate file: ${result.stderr}")
+            throw VcsException("Failed to annotate file: ${result.stderr}")
         }
+
+        val annotationLines = AnnotationParser.parse(result.stdout)
+
+        JujutsuFileAnnotation(
+            project = project,
+            repo = resolvedRepo,
+            file = file,
+            annotationLines = annotationLines,
+            vcsKey = vcs.keyInstanceMethod,
+            workingCopyChangeId = resolvedRepo.workingCopy.id
+        )
+    } catch (e: VcsException) {
+        throw e
+    } catch (e: Exception) {
+        log.error("Error during annotation", e)
+        throw VcsException("Failed to annotate file: ${e.message}", e)
     }
 }

@@ -9,8 +9,6 @@ import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog
 import `in`.kkkev.jjidea.util.runInBackground
@@ -60,10 +58,5 @@ class SplitFilesAction : DumbAwareAction(
         }
     }
 
-    private fun resolveEntry(e: AnActionEvent): LogEntry? {
-        e.logEntry?.let { return it }
-        val project = e.project ?: return null
-        val repo = e.singleRepoForFiles ?: return null
-        return project.stateModel.repositoryStates.value.find { it.isWorkingCopy && it.repo == repo }
-    }
+    private fun resolveEntry(e: AnActionEvent) = e.logEntry ?: e.singleRepoForFiles?.workingCopy
 }

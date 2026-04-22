@@ -20,7 +20,9 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.relativeTo
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
-import io.mockk.*
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -45,7 +47,7 @@ class JujutsuChangeProviderTest {
         application.registerService(VcsContextFactory::class.java, vcsContextFactory)
 
         every { repo.directory } returns directory
-        every { repo.workingCopyParent() } returns mockk<Revision>()
+        every { repo.workingCopyParent } returns mockk<Revision>()
 
         val pathStringSlot = slot<String>()
         val isDirectorySlot = slot<Boolean>()

@@ -129,7 +129,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addModifiedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val beforeRevision = repo.createContentRevision(path, repo.workingCopyParent())
+        val beforeRevision = repo.createContentRevision(path, repo.workingCopyParent)
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
@@ -148,7 +148,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addDeletedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val beforeRevision = repo.createContentRevision(path, repo.workingCopyParent())
+        val beforeRevision = repo.createContentRevision(path, repo.workingCopyParent)
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),
@@ -178,7 +178,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         val afterPath = repo.directory.getChildPath(newPath)
 
         // Create revisions
-        val beforeRevision = repo.createContentRevision(beforePath, repo.workingCopyParent())
+        val beforeRevision = repo.createContentRevision(beforePath, repo.workingCopyParent)
         val afterRevision = CurrentContentRevision(afterPath)
 
         // Create change with MODIFIED status (IntelliJ shows renames as modifications)

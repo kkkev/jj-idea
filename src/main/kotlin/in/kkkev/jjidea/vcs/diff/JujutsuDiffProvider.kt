@@ -32,7 +32,7 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
     }
 
     private fun revisionNumberFor(filePath: FilePath): VcsRevisionNumber {
-        val parent = project.jujutsuRepositoryFor(filePath).workingCopyParent()
+        val parent = project.jujutsuRepositoryFor(filePath).workingCopyParent
         return if (parent is MergeParentOf) {
             JujutsuMergeParentRevisionNumber(parent.childRevision)
         } else {

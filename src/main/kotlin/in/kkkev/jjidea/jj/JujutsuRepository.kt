@@ -29,7 +29,10 @@ interface JujutsuRepository {
 
     /** Git remotes for this repository, lazily fetched once per session. */
     val gitRemotes: List<GitRemote>
+
     fun getLogEntry(revision: Revision): LogEntry
+
+    val workingCopy: LogEntry
 
     fun createContentRevision(filePath: FilePath, revision: Revision): ContentRevision
     fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentRevision
@@ -46,7 +49,7 @@ interface JujutsuRepository {
      * change id via the cached working copy entry in the state model. Falls back to `@-` only when
      * the cache is not populated yet (harmless for non-merge working copies).
      */
-    fun workingCopyParent(): Revision
+    val workingCopyParent: Revision
 }
 
 data class JujutsuRepositoryImpl(
@@ -125,10 +128,11 @@ data class JujutsuRepositoryImpl(
     override fun getLogEntry(revision: Revision) = logService.getLog(revision).getOrThrow().singleOrNull()
         ?: throw VcsException("Multiple log entries found for revision $revision")
 
-    override fun workingCopyParent() = project.stateModel.repositoryStates.value
-        .firstOrNull { it.repo == this }
-        ?.let(this::getParentRevisionFor)
-        ?: WorkingCopy.parent
+    override val workingCopy: LogEntry
+        get() = project.stateModel.workingCopies.value[directory.path]
+            ?: throw VcsException("Working copy not found for $this")
+
+    override val workingCopyParent get() = getParentRevisionFor(workingCopy)
 
     /**
      * Returns the revision to use as "before" content for a log entry's parent.

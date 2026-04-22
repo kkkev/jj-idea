@@ -54,6 +54,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
                 // Update dropdown selection without triggering callback
                 updateDropdownSelection(value)
             }
+            value?.let { update(it.workingCopy) }
         }
 
     // Track whether description has been modified since last load

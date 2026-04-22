@@ -39,11 +39,13 @@ fun Project.possibleJujutsuRepositoryFor(file: VirtualFile): JujutsuRepository? 
                     ?.let { possibleJujutsuRepositoryFor(it) }
         }
 
+/**
+ * Gets the log entry for the specified virtual file. If the virtual file originated from a file change in a historical
+ * commit, this is the log entry of that historical commit. Otherwise it is the working copy of the file's repository.
+ */
 fun Project.possibleLogEntryFor(file: VirtualFile): LogEntry? =
     file.getUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY)
-        ?: possibleJujutsuRepositoryFor(file)?.let { repo ->
-            stateModel.repositoryStates.value.find { it.repo == repo }
-        }
+        ?: possibleJujutsuRepositoryFor(file)?.workingCopy
 
 fun Project.jujutsuRepositoryFor(file: VirtualFile) = possibleJujutsuRepositoryFor(file)
     ?: throw VcsException(JujutsuBundle.getMessage("vcs.error.no.root", file))

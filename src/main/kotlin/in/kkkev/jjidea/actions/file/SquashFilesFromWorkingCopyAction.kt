@@ -9,7 +9,6 @@ import `in`.kkkev.jjidea.actions.change.executeSquash
 import `in`.kkkev.jjidea.actions.files
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
-import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashDialog
 import `in`.kkkev.jjidea.util.runInBackground
@@ -34,16 +33,15 @@ class SquashFilesFromWorkingCopyAction : DumbAwareAction(
             e.presentation.isEnabledAndVisible = false
             return
         }
-        val entry = project.stateModel.repositoryStates.value.find { it.isWorkingCopy && it.repo == repo }
-        e.presentation.isEnabledAndVisible = entry != null && !entry.immutable && entry.parentIds.size == 1
+        val entry = repo.workingCopy
+        e.presentation.isEnabledAndVisible = !entry.immutable && entry.parentIds.size == 1
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val files = e.files
         val repo = e.singleRepoForFiles ?: return
-        val entry = project.stateModel.repositoryStates.value
-            .find { it.isWorkingCopy && it.repo == repo } ?: return
+        val entry = repo.workingCopy
         val preSelectedFiles = files.map { it.filePath }.toSet()
 
         runInBackground {
