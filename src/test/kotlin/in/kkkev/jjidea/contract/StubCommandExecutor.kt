@@ -39,8 +39,17 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         )
     )
 
-    override fun diffSummary(revision: Revision) =
-        toResult(stub.run("diff", "--summary", "-r", revision.toString()))
+    override fun diffSummary(revision: Revision, filePath: FilePath?) = toResult(
+        stub.run(
+            *listOfNotNull(
+                "diff",
+                "--summary",
+                "-r",
+                revision.toString(),
+                filePath?.path
+            ).toTypedArray()
+        )
+    )
 
     override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean, revision: Revision?) = toResult(
         stub.run(

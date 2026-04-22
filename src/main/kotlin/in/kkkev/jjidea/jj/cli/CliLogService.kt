@@ -4,6 +4,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.vcs.getChildPath
 import kotlinx.datetime.Instant
 
 interface LogSpec<T> {
@@ -82,28 +83,32 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         Result.failure(e)
     }
 
-    override fun getFileChanges(revision: Revision): Result<List<FileChange>> {
-        log.debug("Getting file changes for revision: $revision")
+    override fun getFileChanges(logEntry: LogEntry, filePath: FilePath?): Result<List<FileChange>> {
+        val changeId = logEntry.id
+        log.debug("Getting file changes for change: $changeId")
 
-        val result = executor.diffSummary(revision)
+        val result = executor.diffSummary(changeId, filePath)
 
         return if (result.isSuccess) {
             toResult("Failed to parse file changes") {
-                parseFileChanges(result.stdout).also {
+                parseFileChanges(result.stdout, changeId, logEntry.parentContentLocator).also {
                     log.debug("Parsed ${it.size} file changes")
                 }
             }
         } else {
-            log.warn("Diff summary command failed: ${result.stderr}")
             Result.failure(Exception("Diff summary command failed: ${result.stderr}"))
         }
     }
 
     /**
      * Parse diff summary output.
-     * Format: "M path/to/file" or "A path/to/file" or "D path/to/file"
+     * Format: "M path/to/file" or "A path/to/file" or "D path/to/file" or "R prefix{old => new}suffix"
      */
-    private fun parseFileChanges(output: String): List<FileChange> {
+    private fun parseFileChanges(
+        output: String,
+        afterChangeId: ChangeId,
+        beforeContentLocator: ContentLocator
+    ): List<FileChange> {
         val trimmed = output.trim()
         if (trimmed.isBlank()) return emptyList()
 
@@ -114,23 +119,40 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             }
 
             val statusChar = cleanLine[0]
-            val filePath = cleanLine.substring(2).trim()
+            val changeFileSpec = cleanLine.substring(2).trim()
+            val filePath = repo.directory.getChildPath(changeFileSpec)
 
-            if (filePath.isEmpty()) {
-                return@mapNotNull null
-            }
+            when (statusChar) {
+                'M' -> FileChange.Modified(filePath.fileAt(beforeContentLocator), filePath.fileAt(afterChangeId))
+                'A' -> FileChange.Added(filePath.fileAt(afterChangeId))
+                'D' -> FileChange.Deleted(filePath.fileAt(beforeContentLocator))
+                'R' -> {
+                    val (prefix, before, after, suffix) = requireNotNull(
+                        Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(changeFileSpec)
+                    ) {
+                        "Invalid rename format: $changeFileSpec"
+                    }.destructured
+                    // Remove braces and parse
 
-            val status = when (statusChar) {
-                'M' -> FileChangeStatus.MODIFIED
-                'A' -> FileChangeStatus.ADDED
-                'D' -> FileChangeStatus.DELETED
+                    val oldPath = prefix + before + suffix
+                    val newPath = prefix + after + suffix
+
+                    log.info("Detected rename: $oldPath => $newPath")
+
+                    // Create file paths
+                    val beforePath = repo.directory.getChildPath(oldPath)
+                    val afterPath = repo.directory.getChildPath(newPath)
+                    FileChange.Renamed(
+                        beforePath.fileAt(beforeContentLocator),
+                        afterPath.fileAt(beforeContentLocator)
+                    )
+                }
+
                 else -> {
                     log.debug("Unknown file status '$statusChar' in line: $cleanLine")
-                    FileChangeStatus.UNKNOWN
+                    null
                 }
             }
-
-            FileChange(filePath, status)
         }
     }
 
@@ -275,15 +297,15 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
-        fun fileChangeStatusFor(filePath: FilePath) = singleField<FileChangeStatus>(
+        fun fileChangeStatusFor(filePath: FilePath) = singleField<FileChange.Status>(
             "diff.files().filter(|e| e.path().display() == '$filePath').map(|e| e.status()).join(',')"
         ) {
             when (it) {
-                "added" -> FileChangeStatus.ADDED
-                "modified" -> FileChangeStatus.MODIFIED
-                "renamed" -> FileChangeStatus.RENAMED
-                "removed" -> FileChangeStatus.DELETED
-                else -> FileChangeStatus.UNKNOWN
+                "added" -> FileChange.Status.ADDED
+                "modified" -> FileChange.Status.MODIFIED
+                "renamed" -> FileChange.Status.RENAMED
+                "removed" -> FileChange.Status.DELETED
+                else -> FileChange.Status.UNKNOWN
             }
         }
 

@@ -46,7 +46,7 @@ interface CommandExecutor {
      * @param revision Revision (e.g., "@", "@-", commit hash)
      * @return Summary of file changes
      */
-    fun diffSummary(revision: Revision): CommandResult
+    fun diffSummary(revision: Revision, filePath: FilePath? = null): CommandResult
 
     /**
      * Get the content of a file at a specific revision

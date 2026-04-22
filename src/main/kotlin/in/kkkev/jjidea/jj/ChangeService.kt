@@ -1,10 +1,8 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.committed.CommittedChangesTreeBrowser
-import `in`.kkkev.jjidea.vcs.getChildPath
 
 /**
  * Service for accessing changes associated with a log entry.
@@ -12,131 +10,31 @@ import `in`.kkkev.jjidea.vcs.getChildPath
 object ChangeService {
     private val log = Logger.getInstance(ChangeService::class.java)
 
-    fun loadChanges(entries: List<LogEntry>): List<Change> {
-        if (entries.size == 1) return loadChanges(entries.single())
+    fun loadChanges(entries: List<LogEntry>): List<Change> = if (entries.size == 1) {
+        loadChanges(entries.single())
+    } else {
         // Collect all changes in chronological order (oldest first = reversed selection order)
         val allChanges = entries.reversed().flatMap { loadChanges(it) }
-        return CommittedChangesTreeBrowser.zipChanges(allChanges)
+        CommittedChangesTreeBrowser.zipChanges(allChanges)
     }
 
     fun loadChanges(entry: LogEntry): List<Change> {
         val repo = entry.repo
 
-        // First, detect renames using git-format diff
-        val renames = detectRenames(entry, repo.commandExecutor)
-        val renamedPaths = renames.flatMap { (oldPath, newPath) -> listOf(oldPath, newPath) }.toSet()
-        // Get regular file changes
-        val result = repo.logService.getFileChanges(entry.id)
-        val regularChanges = result.getOrElse { error ->
+        return repo.logService.getFileChanges(entry).getOrElse { error ->
             // This can happen when a commit is removed during loading (e.g., abandon, empty commit auto-removed).
             // Log at info level since this is an expected scenario, not a programming error.
             log.info("Error loading changes for ${entry.id}: ${error.message}")
             emptyList()
-        }.filter { fileChange ->
-            // Filter out files that are part of renames to avoid duplicates
-            fileChange.filePath !in renamedPaths
-        }.mapNotNull { fileChange ->
-            convertToChange(fileChange, entry, repo)
-        }
-        // Create Change objects for renames
-        val renameChanges = renames.map { (oldPath, newPath) ->
-            createRenameChange(oldPath, newPath, entry)
-        }
-        return regularChanges + renameChanges
-    }
-
-    /**
-     * Detect file renames using git-format diff.
-     * Returns a list of (oldPath, newPath) pairs.
-     */
-    private fun detectRenames(entry: LogEntry, commandExecutor: CommandExecutor): List<Pair<String, String>> {
-        val result = commandExecutor.diffGit(entry.id)
-
-        if (!result.isSuccess) {
-            log.debug("Failed to get git diff for ${entry.id}: ${result.stderr}")
-            return emptyList()
-        }
-
-        return parseGitDiffRenames(result.stdout)
-    }
-
-    /**
-     * Parse git-format diff to extract rename pairs.
-     * Format:
-     * ```
-     * diff --git a/old.txt b/new.txt
-     * rename from old.txt
-     * rename to new.txt
-     * ```
-     */
-    private fun parseGitDiffRenames(diffOutput: String): List<Pair<String, String>> {
-        val lines = diffOutput.lines()
-        val renames = mutableListOf<Pair<String, String>>()
-        var renameFrom: String? = null
-
-        for (line in lines) {
-            when {
-                line.startsWith("rename from ") -> {
-                    renameFrom = line.substringAfter("rename from ").trim()
-                }
-
-                line.startsWith("rename to ") -> {
-                    val renameTo = line.substringAfter("rename to ").trim()
-                    if (renameFrom != null) {
-                        renames.add(renameFrom to renameTo)
-                        log.info("Detected rename in ${diffOutput.lines().firstOrNull()}: $renameFrom -> $renameTo")
-                        renameFrom = null
-                    }
-                }
+        }.map { fileChange ->
+            val beforeContentRevision = fileChange.before?.let { before ->
+                (fileChange.after?.contentLocator as? ChangeId)?.let { afterChangeId ->
+                    repo.createContentRevision(before.filePath, repo.getLogEntry(afterChangeId).parentContentLocator)
+                } ?: repo.createContentRevision(before)
             }
-        }
-
-        return renames
-    }
-
-    /**
-     * Create a Change object for a renamed file.
-     */
-    private fun createRenameChange(oldPath: String, newPath: String, entry: LogEntry): Change {
-        val repo = entry.repo
-        val directory = repo.directory
-
-        val beforePath = directory.getChildPath(oldPath)
-        val afterPath = directory.getChildPath(newPath)
-
-        val beforeContentRevision = repo.createParentContentRevision(beforePath, entry)
-        val afterContentRevision = repo.createContentRevision(afterPath, entry)
-
-        return Change(beforeContentRevision, afterContentRevision, FileStatus.MODIFIED)
-            .apply { isIsReplaced = true }
-    }
-
-    /**
-     * Convert a FileChange DTO to an IntelliJ Change object.
-     * This is where we integrate with the IntelliJ VCS framework.
-     */
-    private fun convertToChange(fileChange: FileChange, entry: LogEntry, repo: JujutsuRepository): Change? {
-        val path = repo.directory.getChildPath(fileChange.filePath)
-        val beforeContentRevision = repo.createParentContentRevision(path, entry)
-        val afterContentRevision = repo.createContentRevision(path, entry)
-
-        return when (fileChange.status) {
-            FileChangeStatus.MODIFIED -> {
-                Change(beforeContentRevision, afterContentRevision, FileStatus.MODIFIED)
-            }
-
-            FileChangeStatus.ADDED -> {
-                Change(null, afterContentRevision, FileStatus.ADDED)
-            }
-
-            FileChangeStatus.DELETED -> {
-                Change(beforeContentRevision, null, FileStatus.DELETED)
-            }
-
-            FileChangeStatus.RENAMED, FileChangeStatus.UNKNOWN -> {
-                log.debug("Skipping file with unknown status: ${fileChange.filePath}")
-                null
-            }
+            val afterContentRevision =
+                fileChange.after?.let { after -> repo.createContentRevision(after) }
+            Change(beforeContentRevision, afterContentRevision)
         }
     }
 }

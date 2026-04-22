@@ -5,6 +5,7 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.vfs.ContentRevisionVirtualFile
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -14,6 +15,7 @@ import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 
 /**
  * Find JujutsuVcs for a project. Returns null if not found.
@@ -68,4 +70,9 @@ fun FilePath.relativeTo(root: VirtualFile) = path.removePrefix(root.path).remove
  * File path associated with the change. For an update, the only file path, for a rename, the target, for a delete, the
  * old file path. This is useful for finding the path of a file on which to act, given a change.
  */
-val Change.filePath get() = this.afterRevision?.file ?: this.beforeRevision?.file
+val Change.filePath
+    get() = this.afterRevision?.file ?: this.beforeRevision?.file ?: throw VcsException("Change $this has no file")
+
+val ContentRevision.changeId
+    get() = (this.revisionNumber as? JujutsuRevisionNumber ?: throw VcsException("Not a Jujutsu revision: $this"))
+        .changeId

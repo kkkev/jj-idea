@@ -40,11 +40,12 @@ interface LogService {
     ): Result<List<FileRevision>>
 
     /**
-     * Get file changes for a specific revision
-     * @param revision Single revision (e.g., "@", change ID, bookmark)
+     * Get file changes for a specific log entry.
+     * @param logEntry log entry pointing to the revision whose file changes should be retrieved
+     * @param filePath if specified, path of the single file change to get
      * @return List of file changes
      */
-    fun getFileChanges(revision: Revision): Result<List<FileChange>>
+    fun getFileChanges(logEntry: LogEntry, filePath: FilePath? = null): Result<List<FileChange>>
 
     /**
      * Get all bookmarks in the repository

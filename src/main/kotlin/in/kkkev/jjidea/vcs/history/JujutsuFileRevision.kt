@@ -5,7 +5,7 @@ import com.intellij.openapi.vcs.RepositoryLocation
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.history.VcsFileRevisionEx
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
-import `in`.kkkev.jjidea.jj.FileChangeStatus
+import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.GitRemote
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
@@ -18,7 +18,7 @@ import java.util.Date
 class JujutsuFileRevision(
     val entry: LogEntry,
     private val filePath: FilePath,
-    val fileStatus: FileChangeStatus,
+    val fileStatus: FileChange.Status,
     val possibleRemotes: List<GitRemote>
 ) : VcsFileRevisionEx() {
     val commitId get() = entry.commitId
@@ -50,7 +50,7 @@ class JujutsuFileRevision(
 
     override fun getPath(): FilePath = filePath
 
-    override fun isDeleted(): Boolean = fileStatus == FileChangeStatus.DELETED
+    override fun isDeleted(): Boolean = fileStatus == FileChange.Status.DELETED
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {

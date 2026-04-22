@@ -108,7 +108,7 @@ sealed interface ContentLocator : Shortenable {
  */
 data class MergeParentOf(val childRevision: Revision) : ContentLocator {
     override fun toString() = "MergeParent($childRevision)"
-    override val title get() = "${childRevision.short}-"
+    override val title get() = JujutsuBundle.message("diff.label.merged.parents")
     override val full get() = title
     override val short = title
 }

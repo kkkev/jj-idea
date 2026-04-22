@@ -164,7 +164,10 @@ class CliExecutor(
 
     override fun diff(filePath: String) = execute(root, listOf("diff", filePath))
 
-    override fun diffSummary(revision: Revision) = execute(root, listOf("diff", "--summary", "-r", revision))
+    override fun diffSummary(revision: Revision, filePath: FilePath?) = execute(
+        root,
+        listOfNotNull("diff", "--summary", "-r", revision, filePath?.relativeTo(root!!))
+    )
 
     override fun show(filePath: FilePath, revision: Revision) =
         execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root!!)))

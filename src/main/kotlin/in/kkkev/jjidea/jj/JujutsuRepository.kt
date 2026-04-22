@@ -36,8 +36,7 @@ interface JujutsuRepository {
     val workingCopy: LogEntry
 
     fun createContentRevision(filePath: FilePath, contentLocator: ContentLocator): ContentRevision
-    fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentRevision
-    fun createParentContentRevision(filePath: FilePath, entry: LogEntry): ContentRevision
+    fun createContentRevision(fileAtVersion: FileAtVersion): ContentRevision
 
     fun getRelativePath(filePath: FilePath): String
     fun getRelativePath(file: VirtualFile): String
@@ -116,8 +115,8 @@ data class JujutsuRepositoryImpl(
             is ContentLocator.Empty -> EmptyContentRevisionImpl(filePath)
         }
 
-    override fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentLogEntry =
-        ContentLogEntryImpl(filePath, logEntry)
+    override fun createContentRevision(fileAtVersion: FileAtVersion) =
+        createContentRevision(fileAtVersion.filePath, fileAtVersion.contentLocator)
 
     override fun getLogEntry(revision: Revision) = logService.getLog(revision).getOrThrow().singleOrNull()
         ?: throw VcsException("Multiple log entries found for revision $revision")
@@ -125,9 +124,6 @@ data class JujutsuRepositoryImpl(
     override val workingCopy: LogEntry
         get() = project.stateModel.workingCopies.value[directory.path]
             ?: throw VcsException("Working copy not found for $this")
-
-    override fun createParentContentRevision(filePath: FilePath, entry: LogEntry) =
-        createContentRevision(filePath, entry.parentContentLocator)
 
     /**
      * Represents the content of a file prior to a merge.
