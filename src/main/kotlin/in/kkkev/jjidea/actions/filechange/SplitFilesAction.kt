@@ -5,7 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.change.executeSplit
-import `in`.kkkev.jjidea.actions.changes
+import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
@@ -13,14 +13,14 @@ import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
-import `in`.kkkev.jjidea.vcs.filePath
 
 /**
  * Split selected files into a new change, from a file changes context.
  *
- * Works in two contexts:
+ * Works in three contexts:
  * - Working copy panel: resolves WC entry from state model (no LOG_ENTRY)
- * - Commit details panel: uses LOG_ENTRY from data context
+ * - Commit details panel / historical editor: uses LOG_ENTRY from data context
+ * - Project view / current editor: resolves WC entry from state model (no LOG_ENTRY)
  *
  * Hidden when the entry is immutable.
  */
@@ -32,19 +32,14 @@ class SplitFilesAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        val project = e.project
-        if (project == null || e.changes.isEmpty()) {
-            e.presentation.isEnabledAndVisible = false
-            return
-        }
         val entry = resolveEntry(e)
-        e.presentation.isEnabledAndVisible = entry != null && !entry.immutable
+        e.presentation.isEnabledAndVisible = entry?.immutable == false
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val entry = resolveEntry(e) ?: return
-        val preSelectedFiles = e.changes.mapNotNull { it.filePath }.toSet()
+        val preSelectedFiles = e.filePaths.toSet()
 
         runInBackground {
             val changes = ChangeService.loadChanges(entry)
