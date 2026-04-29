@@ -1,6 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
-import `in`.kkkev.jjidea.jj.Shortenable.Companion.calculateShortLength
+import `in`.kkkev.jjidea.jj.ShortenableImpl.Companion.calculateShortLength
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test

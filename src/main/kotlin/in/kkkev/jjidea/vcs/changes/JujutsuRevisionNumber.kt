@@ -2,6 +2,8 @@ package `in`.kkkev.jjidea.vcs.changes
 
 import com.intellij.openapi.vcs.history.ShortVcsRevisionNumber
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
 
 /**
@@ -12,19 +14,21 @@ import `in`.kkkev.jjidea.jj.Revision
 data class JujutsuMergeParentRevisionNumber(val childRevision: Revision) : VcsRevisionNumber {
     override fun asString() = "merge-parent:$childRevision"
     override fun compareTo(other: VcsRevisionNumber?) = 0
+
+    val contentLocator get() = MergeParentOf(childRevision)
 }
 
 /**
  * Revision number implementation for Jujutsu that supports both full and short display formats
  */
-data class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumber {
+data class JujutsuRevisionNumber(val changeId: ChangeId) : ShortVcsRevisionNumber {
     /**
      * Returns string form of the revision, typically for displaying in an editor tab when viewing a historical version
      * of a fle.
      */
-    override fun asString() = revision.toString()
+    override fun asString() = changeId.toString()
 
-    override fun toShortString() = revision.short
+    override fun toShortString() = changeId.short
 
     /**
      * Compares revision numbers by comparing the underlying revisions. Used when building changelists. Ordering doesn't
@@ -33,6 +37,6 @@ data class JujutsuRevisionNumber(val revision: Revision) : ShortVcsRevisionNumbe
     override fun compareTo(other: VcsRevisionNumber?) = if (other !is JujutsuRevisionNumber) {
         0
     } else {
-        revision.toString().compareTo(other.revision.toString())
+        changeId.toString().compareTo(other.changeId.toString())
     }
 }

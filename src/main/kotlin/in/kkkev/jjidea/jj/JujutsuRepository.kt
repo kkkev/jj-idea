@@ -5,13 +5,14 @@ import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.changes.CurrentContentRevision
+import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.util.GitDiffReverseApplier
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
-import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import java.util.concurrent.CompletableFuture
 
@@ -34,22 +35,12 @@ interface JujutsuRepository {
 
     val workingCopy: LogEntry
 
-    fun createContentRevision(filePath: FilePath, revision: Revision): ContentRevision
+    fun createContentRevision(filePath: FilePath, contentLocator: ContentLocator): ContentRevision
     fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentRevision
     fun createParentContentRevision(filePath: FilePath, entry: LogEntry): ContentRevision
 
     fun getRelativePath(filePath: FilePath): String
     fun getRelativePath(file: VirtualFile): String
-
-    /**
-     * The revision to use as the working copy's parent for change/diff providers.
-     *
-     * Using the raw revset `@-` breaks when the working copy is a merge, because `@-` resolves
-     * to multiple commits and `jj file show -r @-` then fails. This resolves to the first parent's
-     * change id via the cached working copy entry in the state model. Falls back to `@-` only when
-     * the cache is not populated yet (harmless for non-merge working copies).
-     */
-    val workingCopyParent: Revision
 }
 
 data class JujutsuRepositoryImpl(
@@ -117,10 +108,13 @@ data class JujutsuRepositoryImpl(
 
     override fun getRelativePath(file: VirtualFile) = getRelativePath(VcsUtil.getFilePath(file))
 
-    override fun createContentRevision(filePath: FilePath, revision: Revision): ContentRevision = when (revision) {
-        is MergeParentOf -> JujutsuContentRevision(filePath, revision)
-        else -> ContentLogEntryImpl(filePath, getLogEntry(revision))
-    }
+    override fun createContentRevision(filePath: FilePath, contentLocator: ContentLocator): ContentRevision =
+        when (contentLocator) {
+            is WorkingCopy -> CurrentContentRevision(filePath)
+            is MergeParentOf -> MergeParentContentRevision(filePath, contentLocator)
+            is ChangeId -> ContentLogEntryImpl(filePath, getLogEntry(contentLocator))
+            is ContentLocator.Empty -> EmptyContentRevisionImpl(filePath)
+        }
 
     override fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentLogEntry =
         ContentLogEntryImpl(filePath, logEntry)
@@ -132,37 +126,23 @@ data class JujutsuRepositoryImpl(
         get() = project.stateModel.workingCopies.value[directory.path]
             ?: throw VcsException("Working copy not found for $this")
 
-    override val workingCopyParent get() = getParentRevisionFor(workingCopy)
-
-    /**
-     * Returns the revision to use as "before" content for a log entry's parent.
-     * For merge commits (multiple parents), returns [MergeParentOf] so that content is
-     * reconstructed via reverse-apply of the entry's diff rather than using first-parent content.
-     */
-    private fun getParentRevisionFor(entry: LogEntry) = when (entry.parentIds.size) {
-        1 -> entry.parentIds.first()
-        0 -> entry.id.parent
-        else -> MergeParentOf(entry.id)
-    }
-
     override fun createParentContentRevision(filePath: FilePath, entry: LogEntry) =
-        createContentRevision(filePath, getParentRevisionFor(entry))
+        createContentRevision(filePath, entry.parentContentLocator)
 
     /**
-     * Represents the content of a file at a specific jujutsu revision.
-     *
-     * When [revision] is [MergeParentOf], reconstructs the auto-merged parent tree content by
-     * reverse-applying `jj diff --git -r <childRevision> -- <file>` to the file's content at
-     * [MergeParentOf.childRevision]. This is necessary because `jj file show -r <firstParent>`
-     * only returns the first parent's content, not the merge parent tree jj diffs against.
+     * Represents the content of a file prior to a merge.
      */
-    private inner class JujutsuContentRevision(private val filePath: FilePath, private val revision: Revision) :
-        ContentRevision {
-        override fun getContent(): String? {
-            if (revision !is MergeParentOf) {
-                val result = commandExecutor.show(filePath, revision)
-                return result.stdout.takeIf { result.isSuccess }
-            }
+    private inner class MergeParentContentRevision(
+        private val filePath: FilePath,
+        private val revision: MergeParentOf
+    ) : ContentRevision {
+        /**
+         * Reconstructs the auto-merged parent tree content by
+         * reverse-applying `jj diff --git -r <childRevision> -- <file>` to the file's content at
+         * [MergeParentOf.childRevision]. This is necessary because `jj file show -r <firstParent>`
+         * only returns the first parent's content, not the merge parent tree jj diffs against.
+         */
+        override fun getContent(): String {
             val childRevision = revision.childRevision
             val afterContent = commandExecutor.show(filePath, childRevision).let {
                 if (it.isSuccess) it.stdout else ""
@@ -174,7 +154,7 @@ data class JujutsuRepositoryImpl(
 
         override fun getFile() = filePath
 
-        override fun getRevisionNumber() = JujutsuRevisionNumber(revision)
+        override fun getRevisionNumber() = dummyRevisionNumber(revision.title)
     }
 
     private inner class ContentLogEntryImpl(override val filePath: FilePath, override val logEntry: LogEntry) :
@@ -183,5 +163,21 @@ data class JujutsuRepositoryImpl(
             val result = commandExecutor.show(filePath, logEntry.commitId)
             return result.stdout.takeIf { result.isSuccess }
         }
+    }
+
+    private class EmptyContentRevisionImpl(private val filePath: FilePath) : ContentRevision {
+        override fun getFile() = filePath
+        override fun getContent() = null
+        override fun getRevisionNumber() = dummyRevisionNumber(ContentLocator.Empty.title)
+    }
+}
+
+private fun dummyRevisionNumber(title: String) = object : VcsRevisionNumber {
+    override fun asString() = title
+    override fun toString() = title
+
+    override fun compareTo(other: VcsRevisionNumber?) = when {
+        other === this -> 0
+        else -> this.toString().compareTo(other.toString())
     }
 }

@@ -107,7 +107,7 @@ abstract class StyledTextCanvas : TextCanvas {
 
 fun TextCanvas.append(message: JujutsuMessage) = append(JujutsuBundle.message(message.key))
 
-fun TextCanvas.append(shortenable: Shortenable) {
+fun TextCanvas.append(shortenable: ShortenableImpl) {
     bold { append(shortenable.short) }
     shortenable.displayRemainder.takeIf { it.isNotEmpty() }?.let { remainder -> smaller { grey { append(remainder) } } }
 }

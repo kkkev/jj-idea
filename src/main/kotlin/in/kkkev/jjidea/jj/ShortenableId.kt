@@ -1,6 +1,11 @@
 package `in`.kkkev.jjidea.jj
 
-open class Shortenable(open val full: String, private val shortLength: Int? = null) {
+interface Shortenable {
+    val full: String
+    val short: String
+}
+
+open class ShortenableImpl(open val full: String, private val shortLength: Int? = null) {
     constructor(full: String, short: String? = null) : this(full, short?.let { calculateShortLength(full, it) })
 
     /**
@@ -10,7 +15,7 @@ open class Shortenable(open val full: String, private val shortLength: Int? = nu
 
     override fun equals(other: Any?) = when {
         this === other -> true
-        other !is Shortenable -> false
+        other !is ShortenableImpl -> false
         this::class != other::class -> false
         // Ignore the short length; two ids are equal if their full representations are the same
         else -> full == other.full
@@ -34,6 +39,7 @@ open class Shortenable(open val full: String, private val shortLength: Int? = nu
                 remainder
             }
         }
+
     companion object {
         fun calculateShortLength(full: String, short: String): Int {
             require(full.indexOf(short) == 0) { "Invalid short change id $short (not prefix of $full)" }

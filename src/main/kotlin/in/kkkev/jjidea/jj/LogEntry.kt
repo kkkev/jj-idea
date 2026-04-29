@@ -31,6 +31,18 @@ data class LogEntry(
     val isDivergent get() = id.divergent
 
     /**
+     * Returns the content locator to use as "before" content for a log entry's parent.
+     * For merge commits (multiple parents), returns [MergeParentOf] so that content is
+     * reconstructed via reverse-apply of the entry's diff rather than using first-parent content.
+     */
+    val parentContentLocator
+        get() = when (parentIds.size) {
+            1 -> parentIds.first()
+            0 -> ContentLocator.Empty
+            else -> MergeParentOf(id)
+        }
+
+    /**
      * Projection of LogEntry that excludes volatile fields (timestamps) from equality.
      * Used by repositoryStates to avoid spurious invalidations when only timestamps change.
      */

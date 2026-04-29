@@ -12,15 +12,10 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.*
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys.DiffContentInfo
-import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.file
-import `in`.kkkev.jjidea.actions.logEntry
-import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
@@ -65,19 +60,14 @@ class ShowChangesDiffAction : DumbAwareAction(
 /**
  * Show diff for a file in project view/editor context.
  * Compares the merge-aware working copy parent with the local working copy (editable).
- * Uses [JujutsuRepository.workingCopyParent] so that merge working copies diff against
+ * Uses [LogEntry.parentContentLocator] so that merge working copies diff against
  * the auto-merged parent tree rather than a single parent via the ambiguous `@-` revset.
  */
 fun showFileDiff(repo: JujutsuRepository, file: VirtualFile) {
     runInBackground {
         val filePath = file.filePath
-        val parentRevision = repo.workingCopyParent
+        val parentRevision = repo.workingCopy.parentContentLocator
         val revisionContent = repo.createContentRevision(filePath, parentRevision).content ?: ""
-        val parentLabel = if (parentRevision is MergeParentOf) {
-            JujutsuBundle.message("diff.label.merged.parents")
-        } else {
-            "@-"
-        }
 
         runLater {
             val contentFactory = DiffContentFactory.getInstance()
@@ -91,7 +81,7 @@ fun showFileDiff(repo: JujutsuRepository, file: VirtualFile) {
                 file.name,
                 contentFactory.create(repo.project, revisionContent, file.fileType),
                 localContent,
-                "${file.name} ($parentLabel)",
+                "${file.name} (${parentRevision.title})",
                 "${file.name} (@)"
             )
 
@@ -165,7 +155,7 @@ fun showChangesDiff(project: Project, change: Change, logEntry: LogEntry?) {
                 afterVirtualFile != null && afterVirtualFile.exists() ->
                     contentFactory.create(project, afterVirtualFile)
 
-                afterPath != null && afterContent != null && afterContent.isNotEmpty() ->
+                afterPath != null && !afterContent.isNullOrEmpty() ->
                     contentFactory.create(project, afterContent, afterPath.fileType)
 
                 else -> contentFactory.createEmpty()
@@ -173,7 +163,7 @@ fun showChangesDiff(project: Project, change: Change, logEntry: LogEntry?) {
 
             // Annotate historical content sides so Open In > Remote works in the diff editor popup
             if (!isWorkingCopyContext) {
-                val repo = logEntry!!.repo
+                val repo = logEntry.repo
                 val parentCommitId = logEntry.parentIdentifiers.firstOrNull()?.commitId
                 beforePath?.let {
                     content1.putUserData(

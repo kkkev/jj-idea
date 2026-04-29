@@ -8,12 +8,11 @@ import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.jj.RevisionExpression
-import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 
 /**
@@ -28,7 +27,9 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
     override fun populateCache(file: VirtualFile) {
         try {
             val repo = project.jujutsuRepositoryFor(file)
-            cache[file] = annotateInternal(file, repo.workingCopyParent, repo)
+            // For the purpose of annotating, pick an arbitrary parent (the first one)
+            // TODO What happens if the file has merged from multiple parents?
+            cache[file] = annotateInternal(file, repo.workingCopy.parentIds.first(), repo)
         } catch (e: Exception) {
             log.warn("Failed to populate annotation cache for ${file.path}", e)
         }
@@ -42,24 +43,29 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
      */
     override fun annotate(file: VirtualFile): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
-        return annotateInternal(file, repo.workingCopyParent, repo)
+        // For the purpose of annotating, pick an arbitrary parent (the first one)
+        // TODO What happens if the file has merged from multiple parents?
+        return annotateInternal(file, repo.workingCopy.parentIds.first(), repo)
     }
 
     /**
      * Annotate a file at a specific revision (used for "Annotate This/Previous Revision").
      */
-    override fun annotate(file: VirtualFile, revision: VcsFileRevision?) =
-        annotateInternal(file, revision?.revisionNumber?.asString()?.let(::RevisionExpression) ?: WorkingCopy)
+    override fun annotate(file: VirtualFile, revision: VcsFileRevision?) = annotateInternal(
+        file,
+        (revision as? JujutsuFileRevision)?.entry?.id
+            ?: project.jujutsuRepositoryFor(file).workingCopy.id
+    )
 
     override fun isAnnotationValid(rev: VcsFileRevision) = true
 
     private fun annotateInternal(
         file: VirtualFile,
-        revision: Revision,
+        changeId: ChangeId,
         repo: JujutsuRepository? = null
     ): FileAnnotation = try {
         val resolvedRepo = repo ?: project.jujutsuRepositoryFor(file)
-        val result = resolvedRepo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
+        val result = resolvedRepo.commandExecutor.annotate(file, changeId, AnnotationParser.TEMPLATE)
 
         if (!result.isSuccess) {
             log.warn("Failed to annotate file: ${result.stderr}")

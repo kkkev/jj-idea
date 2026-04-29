@@ -16,7 +16,7 @@ import java.util.Date
  * Represents a single revision of a file in Jujutsu history
  */
 class JujutsuFileRevision(
-    private val entry: LogEntry,
+    val entry: LogEntry,
     private val filePath: FilePath,
     val fileStatus: FileChangeStatus,
     val possibleRemotes: List<GitRemote>
