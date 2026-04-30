@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.ToggleAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import javax.swing.Icon
 
 /**
@@ -36,7 +37,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
 
         // Add @ (working copy) if it exists
         if (references.workingCopy != null) {
-            group.add(SelectReferenceAction("@", ReferenceType.WORKING_COPY))
+            group.add(SelectReferenceAction(WorkingCopy.REF, ReferenceType.WORKING_COPY))
         }
 
         // Add bookmarks
@@ -85,7 +86,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
         allEntries.forEach { entry ->
             // Check for working copy
             if (entry.isWorkingCopy) {
-                workingCopy = "@"
+                workingCopy = WorkingCopy.REF
             }
 
             // Collect bookmarks (tags not yet supported in log template)
@@ -113,7 +114,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
         // Find the commit with the reference
         val referencedEntry = allEntries.find { entry ->
             // Check if it's the working copy
-            if (referenceName == "@" && entry.isWorkingCopy) {
+            if (referenceName == WorkingCopy.REF && entry.isWorkingCopy) {
                 return@find true
             }
             // Check if it has the bookmark/tag

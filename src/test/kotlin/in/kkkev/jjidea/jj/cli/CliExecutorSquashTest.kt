@@ -24,7 +24,7 @@ class CliExecutorSquashTest {
         fun `squash working copy`() {
             val result = squashArgs(WorkingCopy)
 
-            result shouldBe listOf("squash", "-r", "@")
+            result shouldBe listOf("squash", "-r", WorkingCopy.REF)
         }
     }
 

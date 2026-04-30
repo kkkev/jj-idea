@@ -48,7 +48,7 @@ class RevsetTest {
 
     @Test
     fun `RevisionExpression toString returns value`() {
-        val revision = RevisionExpression("@")
+        val revision = WorkingCopy
         revision.toString() shouldBe "@"
     }
 
@@ -65,7 +65,7 @@ class RevsetTest {
 
     @Test
     fun `Revision parent returns expression with minus suffix`() {
-        val revision = RevisionExpression("@")
+        val revision = WorkingCopy
         val parent = revision.parent
         parent.toString() shouldBe "@-"
     }
@@ -109,7 +109,7 @@ class RevsetTest {
 
     @Test
     fun `multiple parent calls chain correctly`() {
-        val revision = RevisionExpression("@")
+        val revision = WorkingCopy
         val grandparent = revision.parent.parent
         grandparent.toString() shouldBe "@--"
     }

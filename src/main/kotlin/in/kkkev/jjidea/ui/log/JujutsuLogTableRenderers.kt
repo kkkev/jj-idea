@@ -7,6 +7,7 @@ import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.grouped
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -143,7 +144,7 @@ fun TextCanvas.appendDecorations(entry: LogEntry) {
     appendBookmarks(entry)
     if (entry.isWorkingCopy) {
         append(" ")
-        colored(JujutsuColors.WORKING_COPY) { bold { append("@") } }
+        colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
     }
 }
 
@@ -209,7 +210,7 @@ class SeparateDecorationsCellRenderer : TextTableCellRenderer<LogEntry>() {
 
         // Show @ for working copy
         if (value.isWorkingCopy) {
-            append("@", SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JujutsuColors.WORKING_COPY))
+            append(WorkingCopy.REF, SimpleTextAttributes(SimpleTextAttributes.STYLE_BOLD, JujutsuColors.WORKING_COPY))
             hasContent = true
         }
 

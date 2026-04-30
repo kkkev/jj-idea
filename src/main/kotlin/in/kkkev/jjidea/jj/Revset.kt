@@ -72,12 +72,13 @@ value class RevisionExpression(val value: String) : Revision {
     override fun toString() = value
 }
 
-// TODO Find other references to @
 object WorkingCopy : Ref, ContentLocator {
-    override fun toString() = "@"
+    override fun toString() = REF
     override val title = JujutsuBundle.message("diff.label.current")
-    override val full = ""
-    override val short = ""
+    override val full = REF
+    override val short = REF
+
+    const val REF = "@"
 }
 
 /**
