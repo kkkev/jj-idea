@@ -163,6 +163,9 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         revision: Revision
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun resolveList(revision: Revision): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
     override fun rebase(
         revisions: List<Revision>,
         destinations: List<Revision>,
