@@ -9,9 +9,11 @@ import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
 import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
 
 // TODO: Upgrade to MergeProvider2 to support bulk Accept Yours / Accept Theirs
-class JujutsuMergeProvider(private val project: Project) : MergeProvider {
+class JujutsuMergeProvider(
+    private val project: Project,
     private val extractor: ConflictExtractor = JjMarkerConflictExtractor()
-
+) : MergeProvider {
+    // Called on a background thread by the merge framework; contentsToByteArray() I/O is safe here
     override fun loadRevisions(file: VirtualFile): MergeData =
         extractor.extract(file.contentsToByteArray())
             ?: throw VcsException("Could not extract conflict data from ${file.name}")

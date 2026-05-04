@@ -2,7 +2,9 @@ package `in`.kkkev.jjidea.vcs.merge
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
+import com.intellij.openapi.vcs.merge.MergeData
 import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -11,23 +13,21 @@ import org.junit.jupiter.api.Test
 
 class JujutsuMergeProviderTest {
     private val project = mockk<Project>()
-    private val provider = JujutsuMergeProvider(project)
+    private val extractor = mockk<ConflictExtractor>()
+    private val provider = JujutsuMergeProvider(project, extractor)
 
     @Test
     fun `loadRevisions - conflict content - returns correct MergeData`() {
-        val content = """
-            |<<<<<<< Conflict 1 of 1
-            |+++++++ Contents of side #1
-            |ours
-            |------- Base
-            |base
-            |+++++++ Contents of side #2
-            |theirs
-            |>>>>>>> Conflict 1 of 1 ends
-        """.trimMargin()
+        val bytes = "content".toByteArray()
+        val mergeData = MergeData().also {
+            it.CURRENT = "ours".toByteArray(Charsets.UTF_8)
+            it.ORIGINAL = "base".toByteArray(Charsets.UTF_8)
+            it.LAST = "theirs".toByteArray(Charsets.UTF_8)
+        }
 
         val file = mockk<VirtualFile>()
-        every { file.contentsToByteArray() } returns content.toByteArray(Charsets.UTF_8)
+        every { file.contentsToByteArray() } returns bytes
+        every { extractor.extract(bytes) } returns mergeData
 
         val result = provider.loadRevisions(file)
 
@@ -38,9 +38,11 @@ class JujutsuMergeProviderTest {
 
     @Test
     fun `loadRevisions - no conflict markers - throws VcsException`() {
+        val bytes = "no conflicts here".toByteArray()
         val file = mockk<VirtualFile>()
-        every { file.contentsToByteArray() } returns "no conflicts here".toByteArray()
+        every { file.contentsToByteArray() } returns bytes
         every { file.name } returns "test.txt"
+        every { extractor.extract(bytes) } returns null
 
         shouldThrow<VcsException> { provider.loadRevisions(file) }
     }

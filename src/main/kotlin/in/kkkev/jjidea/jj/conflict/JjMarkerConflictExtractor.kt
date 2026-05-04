@@ -3,7 +3,6 @@ package `in`.kkkev.jjidea.jj.conflict
 import com.intellij.openapi.vcs.merge.MergeData
 
 class JjMarkerConflictExtractor : ConflictExtractor {
-
     override fun extract(fileContent: ByteArray): MergeData? {
         val lines = fileContent.toString(Charsets.UTF_8).split('\n')
         val current = mutableListOf<String>()
@@ -26,7 +25,12 @@ class JjMarkerConflictExtractor : ConflictExtractor {
                 while (i < lines.size) {
                     val inner = lines[i]
                     when {
-                        inner.startsWith(">>>>>>> Conflict ") -> { closed = true; i++; break }
+                        inner.startsWith(">>>>>>> Conflict ") -> {
+                            closed = true
+                            i++
+                            break
+                        }
+                        // Header lines set section and are intentionally not added to content
                         inner.startsWith("+++++++ Contents of side #1") -> section = Section.SIDE1
                         inner.startsWith("------- Base") -> section = Section.BASE
                         inner.startsWith("+++++++ Contents of side #2") -> section = Section.SIDE2

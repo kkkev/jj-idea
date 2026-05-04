@@ -162,7 +162,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addConflictedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val beforeRevision = repo.createRevision(path, repo.workingCopyParent())
+        val beforeRevision = repo.createContentRevision(path, repo.workingCopy.parentContentLocator)
         val afterRevision = CurrentContentRevision(path)
 
         builder.processChange(
