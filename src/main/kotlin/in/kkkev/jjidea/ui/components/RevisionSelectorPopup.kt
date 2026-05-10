@@ -1,6 +1,8 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.DocumentAdapter
@@ -36,6 +38,7 @@ import javax.swing.event.DocumentEvent
  * - Visual icons to distinguish bookmarks from changes
  */
 object RevisionSelectorPopup {
+    private val log = com.intellij.openapi.diagnostic.Logger.getInstance(RevisionSelectorPopup::class.java)
     private const val DEFAULT_LIMIT = 10
 
     data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, val query: String = "") {
@@ -52,6 +55,8 @@ object RevisionSelectorPopup {
                 query.isEmpty() ||
                     entry.id.short.contains(query, ignoreCase = true) ||
                     entry.id.full.contains(query, ignoreCase = true) ||
+                    entry.commitId.short.contains(query, ignoreCase = true) ||
+                    entry.commitId.full.contains(query, ignoreCase = true) ||
                     entry.description.display.contains(query, ignoreCase = true)
             )
     }
@@ -76,6 +81,9 @@ object RevisionSelectorPopup {
             override val displayName: String = "${item.bookmark.name} (${item.id.short})",
             override val revision: Revision = item.bookmark
         ) : CompareItem(displayName, revision)
+
+        /** Free-form revision expression typed by the user */
+        data class FreeForm(val text: String) : CompareItem(text, RevisionExpression(text))
     }
 
     /**
@@ -121,7 +129,7 @@ object RevisionSelectorPopup {
         private val onSelected: (Revision) -> Unit
     ) : JPanel(BorderLayout()) {
         val searchField = SearchTextField(false).apply {
-            textEditor.emptyText.text = "Search by change ID or description..."
+            textEditor.emptyText.text = "Search or type any revision (change ID, bookmark, git SHA)..."
         }
 
         private val listModel = DefaultListModel<CompareItem>()
@@ -168,8 +176,12 @@ object RevisionSelectorPopup {
         }
 
         private var currentPopup: JBPopup? = null
+        @Volatile private var allItems: List<CompareItem> = emptyList()
+        @Volatile private var dataLoaded = false
 
         init {
+            list.emptyText.text = "Loading..."
+
             // Search field
             add(searchField, BorderLayout.NORTH)
 
@@ -186,12 +198,12 @@ object RevisionSelectorPopup {
                 scrollPane.preferredSize.height + searchField.preferredSize.height + JBUI.scale(12)
             )
 
-            // Listen to search field changes
+            // Listen to search field changes — filter already-loaded data in-memory
             searchField.addDocumentListener(
                 object : DocumentAdapter() {
                     override fun textChanged(e: DocumentEvent) {
                         filter = filter.copy(query = searchField.text.trim())
-                        loadData()
+                        applyFilter()
                     }
                 }
             )
@@ -222,9 +234,11 @@ object RevisionSelectorPopup {
                             }
 
                             KeyEvent.VK_ENTER -> {
-                                if (list.selectedValue != null) {
-                                    selectItem(list.selectedValue)
-                                    e.consume()
+                                val selected = list.selectedValue
+                                val text = searchField.text.trim()
+                                when {
+                                    selected != null -> { selectItem(selected); e.consume() }
+                                    text.isNotEmpty() -> { selectRevisionExpression(text); e.consume() }
                                 }
                             }
                         }
@@ -255,31 +269,81 @@ object RevisionSelectorPopup {
             )
         }
 
-        /**
-         * Load and filter data based on search query
-         */
+        /** Fetch data in two phases: bookmarks first (fast), then log entries (slower). */
         fun loadData() {
             runInBackground {
-                val items = buildItemList(repo, filter)
+                try {
+                    // Phase 1: bookmarks (fast — shows results immediately)
+                    val bookmarks = fetchBookmarks()
+                    allItems = bookmarks
+                    ApplicationManager.getApplication().invokeLater({ applyFilter() }, ModalityState.any())
 
-                runLater {
-                    listModel.clear()
-                    items.forEach { listModel.addElement(it) }
-
-                    // Select first item by default
-                    if (listModel.size() > 0) {
-                        list.selectedIndex = 0
+                    // Phase 2: log entries (slower — limited to avoid hanging on large repos)
+                    if (filter.includeLogEntries) {
+                        allItems = bookmarks + fetchChanges()
                     }
+                } catch (e: Exception) {
+                    log.warn("Failed to load revision selector data", e)
+                } finally {
+                    dataLoaded = true
+                    ApplicationManager.getApplication().invokeLater(::applyFilter, ModalityState.any())
                 }
             }
         }
 
-        /**
-         * Select an item and close popup
-         */
+        private fun fetchBookmarks(): List<CompareItem.Bookmark> {
+            val result = repo.logService.getBookmarks()
+            if (!result.isSuccess) {
+                log.warn("getBookmarks() failed: ${result.exceptionOrNull()?.message}")
+                return emptyList()
+            }
+            return (result.getOrNull() ?: emptyList()).map(CompareItem::Bookmark)
+        }
+
+        private fun fetchChanges(): List<CompareItem.Change> {
+            // Read from cache if available (populated by the main log panel with full results).
+            // Don't write back — we'd poison the cache with a limit-200 result.
+            val cached = LogCache.getInstance(repo.project).get(Expression.ALL)
+            val entries = cached ?: run {
+                val logResult = repo.logService.getLogBasic(revset = Expression.ALL, limit = 200)
+                if (!logResult.isSuccess) {
+                    log.warn("getLogBasic() failed: ${logResult.exceptionOrNull()?.message}")
+                    return@run emptyList()
+                }
+                logResult.getOrNull() ?: emptyList()
+            }
+            return entries.map(CompareItem::Change)
+        }
+
+        /** Filter already-loaded data in-memory and update the list model. Called on EDT. */
+        private fun applyFilter() {
+            val query = filter.query
+            val filtered = if (query.isEmpty()) {
+                allItems.take(DEFAULT_LIMIT)
+            } else {
+                val matches = allItems.filter { item ->
+                    when (item) {
+                        is CompareItem.Bookmark -> filter.matches(item.item)
+                        is CompareItem.Change -> filter.matches(item.entry)
+                        is CompareItem.FreeForm -> false
+                    }
+                }.take(DEFAULT_LIMIT)
+                if (matches.isEmpty()) listOf(CompareItem.FreeForm(query)) else matches
+            }
+
+            list.emptyText.text = if (dataLoaded) "No results found" else "Loading..."
+            listModel.clear()
+            filtered.forEach { listModel.addElement(it) }
+            if (listModel.size() > 0) list.selectedIndex = 0
+        }
+
         private fun selectItem(item: CompareItem) {
             onSelected(item.revision)
-            // Close the popup
+            currentPopup?.cancel()
+        }
+
+        private fun selectRevisionExpression(text: String) {
+            onSelected(RevisionExpression(text))
             currentPopup?.cancel()
         }
 
@@ -310,6 +374,11 @@ object RevisionSelectorPopup {
                     append(" ")
                     append(value.description)
                 }
+
+                is CompareItem.FreeForm -> {
+                    append(icon(AllIcons.Actions::Search))
+                    grey { append(" Use \"${value.text}\" as revision") }
+                }
             }
         }
     }
@@ -322,34 +391,19 @@ object RevisionSelectorPopup {
     internal fun buildItemList(repo: JujutsuRepository, filter: Filter): List<CompareItem> {
         val items = mutableListOf<CompareItem>()
         val cache = LogCache.getInstance(repo.project)
-
-        // Add bookmarks - always show all bookmarks filtered by query
         val logService = repo.logService
+
         val bookmarkResult = logService.getBookmarks()
         if (bookmarkResult.isSuccess) {
             val bookmarks = bookmarkResult.getOrNull() ?: emptyList()
-
-            // Filter bookmarks by query
-            val filteredBookmarks = bookmarks.filter(filter::matches)
-
-            items.addAll(filteredBookmarks.map(CompareItem::Bookmark))
+            items.addAll(bookmarks.filter(filter::matches).map(CompareItem::Bookmark))
         }
 
         if (filter.includeLogEntries) {
-            // Add recent changes - limit to DEFAULT_LIMIT and filter by query
-            // Try to get from cache first
-            val entries = cache.get(Expression.ALL) ?: run {
-                // Not in cache, fetch from jj and cache it
-                val logResult = logService.getLogBasic(revset = Expression.ALL)
-                logResult.getOrNull()?.also { fetchedEntries ->
-                    cache.put(Expression.ALL, emptyList(), fetchedEntries)
-                } ?: emptyList()
-            }
-
-            // Filter changes by query
-            val filteredEntries = entries.filter(filter::matches).take(DEFAULT_LIMIT)
-
-            items.addAll(filteredEntries.map(CompareItem::Change))
+            val entries = cache.get(Expression.ALL)
+                ?: logService.getLogBasic(revset = Expression.ALL, limit = 200).getOrNull()
+                ?: emptyList()
+            items.addAll(entries.filter(filter::matches).map(CompareItem::Change))
         }
 
         return items

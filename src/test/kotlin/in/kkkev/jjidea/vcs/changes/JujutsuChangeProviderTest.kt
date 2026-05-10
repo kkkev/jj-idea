@@ -253,6 +253,58 @@ class JujutsuChangeProviderTest {
     }
 
     @Test
+    fun `single conflict`() {
+        directory.addChild(getOrCreateVirtualFile(false, "foo.txt"))
+
+        val output = statusOutput("C foo.txt")
+
+        val changeSlot = slot<Change>()
+        every {
+            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+        } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every {
+            repo.createRevision(capture(filePathSlot), any())
+        } answers {
+            val result = mockk<ContentRevision>()
+            every { result.file } returns filePathSlot.captured
+            result
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        val change = changeSlot.captured
+        change.fileStatus shouldBe FileStatus.MERGED_WITH_CONFLICTS
+        change.beforeRevision?.file?.relativeTo(directory) shouldBe "foo.txt"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "foo.txt"
+    }
+
+    @Test
+    fun `conflict alongside modify`() {
+        directory.addChild(getOrCreateVirtualFile(false, "conflict.txt"))
+        directory.addChild(getOrCreateVirtualFile(false, "modified.txt"))
+
+        val output = statusOutput("C conflict.txt", "M modified.txt")
+
+        val changes = mutableListOf<Change>()
+        every {
+            builder.processChange(capture(changes), JujutsuVcs.getKey())
+        } returns Unit
+
+        every {
+            repo.createRevision(any(), any())
+        } answers {
+            val fp = firstArg<FilePath>()
+            mockk<ContentRevision> { every { file } returns fp }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        changes.map { it.fileStatus } shouldBe listOf(FileStatus.MERGED_WITH_CONFLICTS, FileStatus.MODIFIED)
+    }
+
+    @Test
     fun `move to new subdirectory`() {
         val subdir = getOrCreateVirtualFile(true, "bar")
         subdir.addChild(getOrCreateVirtualFile(false, "bar.txt"))
@@ -281,6 +333,169 @@ class JujutsuChangeProviderTest {
         change.beforeRevision?.file?.relativeTo(directory) shouldBe "foo/bar.txt"
         change.afterRevision?.file?.relativeTo(directory) shouldBe "bar/bar.txt"
     }
+
+    @Test
+    fun `modified file that also appears in conflict warning is reported as conflicted not modified`() {
+        directory.addChild(getOrCreateVirtualFile(false, "conflict.txt"))
+        directory.addChild(getOrCreateVirtualFile(false, "clean.txt"))
+
+        val output = mixedConflictStatus(
+            listOf("M conflict.txt", "M clean.txt"),
+            listOf("conflict.txt    2-sided conflict"),
+        )
+
+        val changes = mutableListOf<Change>()
+        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+
+        every { repo.createRevision(any(), any()) } answers {
+            val fp = firstArg<FilePath>()
+            mockk<ContentRevision> { every { file } returns fp }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        changes.map { it.fileStatus } shouldBe listOf(FileStatus.MERGED_WITH_CONFLICTS, FileStatus.MODIFIED)
+        changes.find { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
+            ?.afterRevision?.file?.relativeTo(directory) shouldBe "conflict.txt"
+    }
+
+    @Test
+    fun `secondary warning section lines are not parsed as conflict paths`() {
+        directory.addChild(getOrCreateVirtualFile(false, "conflict.txt"))
+
+        val output = mixedConflictStatus(
+            listOf("M conflict.txt"),
+            listOf("conflict.txt    2-sided conflict"),
+            trailingWarning = "Warning: These bookmarks have conflicts:",
+        )
+
+        val changes = mutableListOf<Change>()
+        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+
+        every { repo.createRevision(any(), any()) } answers {
+            val fp = firstArg<FilePath>()
+            mockk<ContentRevision> { every { file } returns fp }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        changes.size shouldBe 1
+        changes[0].fileStatus shouldBe FileStatus.MERGED_WITH_CONFLICTS
+    }
+
+    @Test
+    fun `empty merge with conflict warning section - detects conflicted file`() {
+        directory.addChild(getOrCreateVirtualFile(false, "conflict-test.txt"))
+
+        val output = emptyMergeWithConflicts("conflict-test.txt    2-sided conflict")
+
+        val changeSlot = slot<Change>()
+        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every { repo.createRevision(capture(filePathSlot), any()) } answers {
+            mockk<ContentRevision> { every { file } returns filePathSlot.captured }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        val change = changeSlot.captured
+        change.fileStatus shouldBe FileStatus.MERGED_WITH_CONFLICTS
+        change.beforeRevision?.file?.relativeTo(directory) shouldBe "conflict-test.txt"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "conflict-test.txt"
+    }
+
+    @Test
+    fun `empty merge with multiple conflicts in warning section`() {
+        directory.addChild(getOrCreateVirtualFile(false, "a.txt"))
+        directory.addChild(getOrCreateVirtualFile(false, "b.txt"))
+
+        val output = emptyMergeWithConflicts(
+            "a.txt    2-sided conflict",
+            "b.txt    2-sided conflict",
+        )
+
+        val changes = mutableListOf<Change>()
+        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+
+        every { repo.createRevision(any(), any()) } answers {
+            val fp = firstArg<FilePath>()
+            mockk<ContentRevision> { every { file } returns fp }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        changes.map { it.fileStatus } shouldBe listOf(
+            FileStatus.MERGED_WITH_CONFLICTS,
+            FileStatus.MERGED_WITH_CONFLICTS,
+        )
+    }
+
+    @Test
+    fun `long path with single-space separator in warning section is detected as conflict`() {
+        val longPath = "gateway/lib/gatewaysnapshotvolatileservice.go"
+        directory.addChild(getOrCreateVirtualFile(false, longPath))
+        directory.addChild(getOrCreateVirtualFile(false, "model/outgoingdatasender.go"))
+
+        val output = mixedConflictStatus(
+            listOf("M $longPath", "M model/outgoingdatasender.go"),
+            listOf("$longPath 2-sided conflict"),
+        )
+
+        val changes = mutableListOf<Change>()
+        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { repo.createRevision(any(), any()) } answers {
+            val fp = firstArg<FilePath>()
+            mockk<ContentRevision> { every { file } returns fp }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        changes.map { it.fileStatus } shouldBe listOf(FileStatus.MERGED_WITH_CONFLICTS, FileStatus.MODIFIED)
+        changes.find { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
+            ?.afterRevision?.file?.relativeTo(directory) shouldBe longPath
+    }
+
+    @Test
+    fun `parseConflictPaths parses jj resolve -l output`() {
+        val output = """
+            gateway/lib/gatewaysnapshotvolatileservice.go 2-sided conflict
+            gateway/lib/gatewaywrapper.go       2-sided conflict
+            gateway/lib/snapshotworker.go       2-sided conflict including 1 deletion
+        """.trimIndent()
+
+        val paths = jcp.parseConflictPaths(output)
+
+        paths shouldBe setOf(
+            "gateway/lib/gatewaysnapshotvolatileservice.go",
+            "gateway/lib/gatewaywrapper.go",
+            "gateway/lib/snapshotworker.go",
+        )
+    }
+
+    @Test
+    fun `explicit conflict paths from resolveList override warning section`() {
+        val longPath = "gateway/lib/gatewaysnapshotvolatileservice.go"
+        directory.addChild(getOrCreateVirtualFile(false, longPath))
+        directory.addChild(getOrCreateVirtualFile(false, "model/clean.go"))
+
+        val statusOutput = mixedConflictStatus(
+            listOf("M $longPath", "M model/clean.go"),
+            emptyList(),
+        )
+        val explicitConflictPaths = setOf(longPath)
+
+        val changes = mutableListOf<Change>()
+        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { repo.createRevision(any(), any()) } answers {
+            val fp = firstArg<FilePath>()
+            mockk<ContentRevision> { every { file } returns fp }
+        }
+
+        jcp.parseStatus(statusOutput, repo, builder, explicitConflictPaths)
+
+        changes.map { it.fileStatus } shouldBe listOf(FileStatus.MERGED_WITH_CONFLICTS, FileStatus.MODIFIED)
+    }
 }
 
 private fun statusOutput(vararg lines: String) =
@@ -289,4 +504,28 @@ private fun statusOutput(vararg lines: String) =
     ${lines.joinToString("\n")}
     Working copy  (@) : zstylrqo 308df46b original
     Parent commit (@-): vszmmkts 4463701e (empty) b1.1
+    """.trimIndent()
+
+private fun emptyMergeWithConflicts(vararg conflictLines: String) =
+    """
+    The working copy has no changes.
+    Working copy  (@) : tvqlyorq 90595c38 (conflict) (empty) merge
+    Parent commit (@-): nmzxrwpn 70f4d821 test-side-a* | side A
+    Parent commit (@-): vnwpmmrk 6e92b484 test-side-b* | side B
+    Warning: There are unresolved conflicts at these paths:
+    ${conflictLines.joinToString("\n")}
+    """.trimIndent()
+
+private fun mixedConflictStatus(
+    statusLines: List<String>,
+    conflictLines: List<String>,
+    trailingWarning: String = "",
+) = """
+    Working copy changes:
+    ${statusLines.joinToString("\n")}
+    Working copy  (@) : opwrwloq 562fb59e (conflict) Some commit
+    Parent commit (@-): abc123 Previous commit
+    Warning: There are unresolved conflicts at these paths:
+    ${conflictLines.joinToString("\n")}
+    $trailingWarning
     """.trimIndent()
