@@ -250,6 +250,14 @@ interface CommandExecutor {
     fun gitRemoteList(): CommandResult
 
     /**
+     * Find the most recent ancestor of [revision] that has been pushed to [remoteName].
+     * Returns the full commit hash, or null if no pushed ancestor is found.
+     * @param revision Revision to search ancestors of
+     * @param remoteName Remote name (e.g. "origin")
+     */
+    fun latestPushedAncestorCommitId(revision: Revision, remoteName: String): String?
+
+    /**
      * Find the most recent ancestor of the working copy that has been pushed to [remoteName].
      * Returns the full commit hash, or null if no pushed ancestor is found.
      * @param remoteName Remote name (e.g. "origin")

@@ -201,6 +201,9 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun gitRemoteList(): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
+    override fun latestPushedAncestorCommitId(revision: Revision, remoteName: String): String? =
+        TODO("Not needed for integration tests")
+
     override fun latestPushedAncestorCommitId(remoteName: String): String? =
         TODO("Not needed for integration tests")
 
