@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Open in Remote finds last pushed revision
 
 ### Changed
+- "Restore to This" now supports multiple file selections
 - Removed spurious opening of files from working copy window when selecting a file
 - Consolidated "Open File" and "Open Repository Version"
 - "Restore to This" works for multiple files

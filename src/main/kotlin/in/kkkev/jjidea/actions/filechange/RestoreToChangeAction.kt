@@ -43,8 +43,26 @@ class RestoreToChangeAction : DumbAwareAction(
         val repo = entry.repo
 
         // Show confirmation dialog
-        val title = JujutsuBundle.message("action.restore.to.revision.confirm.title", fileNames, changeId.short)
-        val message = JujutsuBundle.message("action.restore.to.revision.confirm.message", changeId.short)
+        val (title, message) = if (filePaths.size == 1) {
+            JujutsuBundle.message(
+                "action.restore.to.revision.confirm.title",
+                fileNames.first(),
+                changeId.short
+            ) to JujutsuBundle.message(
+                "action.restore.to.revision.confirm.message",
+                changeId.short
+            )
+        } else {
+            JujutsuBundle.message(
+                "action.restore.to.revision.confirm.title.multiple",
+                filePaths.size,
+                changeId.short
+            ) to JujutsuBundle.message(
+                "action.restore.to.revision.confirm.message.multiple",
+                filePaths.size,
+                changeId.short
+            )
+        }
         if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
             return
         }
