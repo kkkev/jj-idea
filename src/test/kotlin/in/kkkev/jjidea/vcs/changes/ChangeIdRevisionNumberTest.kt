@@ -9,26 +9,26 @@ import org.junit.jupiter.api.Test
 /**
  * Tests for JujutsuRevisionNumber
  */
-class JujutsuRevisionNumberTest {
+class ChangeIdRevisionNumberTest {
     @Test
     fun `revision number returns revision as string`() {
-        val revNum = JujutsuRevisionNumber(QUALIFIED_CHANGE_ID)
+        val revNum = ChangeIdRevisionNumber(QUALIFIED_CHANGE_ID)
 
         revNum.asString() shouldBe "sprottynpurq/7"
     }
 
     @Test
     fun `equal revisions compare as 0`() {
-        val rev1 = JujutsuRevisionNumber(QUALIFIED_CHANGE_ID)
-        val rev2 = JujutsuRevisionNumber(QUALIFIED_CHANGE_ID)
+        val rev1 = ChangeIdRevisionNumber(QUALIFIED_CHANGE_ID)
+        val rev2 = ChangeIdRevisionNumber(QUALIFIED_CHANGE_ID)
 
         rev1.compareTo(rev2) shouldBe 0
     }
 
     @Test
     fun `different revisions compare by string`() {
-        val rev1 = JujutsuRevisionNumber(ChangeId("vvv", "v"))
-        val rev2 = JujutsuRevisionNumber(ChangeId("www", "w"))
+        val rev1 = ChangeIdRevisionNumber(ChangeId("vvv", "v"))
+        val rev2 = ChangeIdRevisionNumber(ChangeId("www", "w"))
 
         rev1 shouldBeLessThan rev2
         rev2 shouldBeGreaterThan rev1

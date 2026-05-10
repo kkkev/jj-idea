@@ -11,7 +11,6 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.vcs.changes.JujutsuMergeParentRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 
 val Project?.isJujutsu get() = this?.stateModel?.isJujutsu == true
@@ -73,12 +72,10 @@ val Change.filePath
     get() = this.afterRevision?.file ?: this.beforeRevision?.file ?: throw VcsException("Change $this has no file")
 
 val ContentRevision.locator: ContentLocator
-    // TODO Have interface for this
     get() {
         val revisionNumber = this.revisionNumber
         return when {
-            revisionNumber is JujutsuRevisionNumber -> revisionNumber.changeId
-            revisionNumber is JujutsuMergeParentRevisionNumber -> revisionNumber.contentLocator
+            revisionNumber is JujutsuRevisionNumber -> revisionNumber.contentLocator
             this is CurrentContentRevision -> WorkingCopy
             else -> throw VcsException("Not a Jujutsu revision: $this")
         }

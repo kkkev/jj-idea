@@ -19,8 +19,8 @@ import `in`.kkkev.jjidea.actions.JujutsuDataKeys.DiffContentInfo
 import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.util.GitDiffReverseApplier
 import `in`.kkkev.jjidea.vcs.*
-import `in`.kkkev.jjidea.vcs.changes.JujutsuMergeParentRevisionNumber
-import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
 import java.util.concurrent.CompletableFuture
 
 /**
@@ -43,6 +43,8 @@ interface JujutsuRepository {
     fun getLogEntry(changeId: ChangeId) = getLogEntry(changeId as Revision)
 
     val workingCopy: LogEntry
+
+    fun revisionNumberFor(filePath: FilePath): VcsRevisionNumber
 
     fun createContentRevision(filePath: FilePath, contentLocator: ContentLocator): ContentRevision
     fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentRevision
@@ -121,6 +123,12 @@ data class JujutsuRepositoryImpl(
 
     override fun getRelativePath(file: VirtualFile) = getRelativePath(VcsUtil.getFilePath(file))
 
+    override fun revisionNumberFor(filePath: FilePath) = when (val parent = workingCopy.parentContentLocator) {
+        is MergeParentOf -> MergeParentRevisionNumber(parent.childRevision)
+        is ChangeId -> ChangeIdRevisionNumber(parent)
+        else -> throw VcsException("Cannot find revision number for $parent")
+    }
+
     override fun createContentRevision(filePath: FilePath, contentLocator: ContentLocator): ContentRevision =
         when (contentLocator) {
             is WorkingCopy -> CurrentContentRevision(filePath)
@@ -186,14 +194,14 @@ data class JujutsuRepositoryImpl(
 
         override fun getFile() = filePath
 
-        override fun getRevisionNumber() = JujutsuMergeParentRevisionNumber(mergeParentOf.childRevision)
+        override fun getRevisionNumber() = MergeParentRevisionNumber(mergeParentOf.childRevision)
     }
 
     private inner class ContentLogEntryImpl(private val filePath: FilePath, private val changeId: ChangeId) :
         ContentRevision {
         override fun getFile() = filePath
 
-        override fun getRevisionNumber() = JujutsuRevisionNumber(changeId)
+        override fun getRevisionNumber() = ChangeIdRevisionNumber(changeId)
 
         override fun getContent(): String? {
             val result = commandExecutor.show(filePath, changeId)

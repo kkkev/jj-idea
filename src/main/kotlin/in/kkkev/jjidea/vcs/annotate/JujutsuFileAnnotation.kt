@@ -21,7 +21,7 @@ import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.util.runInBackground
-import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.filePath
 import kotlinx.datetime.Instant
 import java.util.*
@@ -43,7 +43,7 @@ class JujutsuFileAnnotation(
 
     override fun getLineRevisionNumber(lineNumber: Int) = getAnnotationLine(lineNumber)
         ?.id
-        ?.let(::JujutsuRevisionNumber)
+        ?.let(::ChangeIdRevisionNumber)
 
     override fun getToolTip(lineNumber: Int): String? = null
 
@@ -64,7 +64,7 @@ class JujutsuFileAnnotation(
 
     override fun getAnnotatedContent() = annotationLines.joinToString("\n") { it.lineContent }
 
-    override fun getCurrentRevision() = workingCopyChangeId?.let(::JujutsuRevisionNumber)
+    override fun getCurrentRevision() = workingCopyChangeId?.let(::ChangeIdRevisionNumber)
 
     override fun getRevisions(): List<VcsFileRevision> = annotationLines
         .distinctBy { it.id }
@@ -73,14 +73,14 @@ class JujutsuFileAnnotation(
     override fun getAuthorsMappingProvider() = AuthorsMappingProvider {
         annotationLines
             .distinctBy { it.id }
-            .associate { JujutsuRevisionNumber(it.id) as VcsRevisionNumber to it.author.name }
+            .associate { ChangeIdRevisionNumber(it.id) as VcsRevisionNumber to it.author.name }
     }
 
     override fun getRevisionsOrderProvider() = RevisionsOrderProvider {
         annotationLines
             .distinctBy { it.id }
             .sortedByDescending { it.authorTimestamp }
-            .map { listOf(JujutsuRevisionNumber(it.id) as VcsRevisionNumber) }
+            .map { listOf(ChangeIdRevisionNumber(it.id) as VcsRevisionNumber) }
     }
 
     /**
@@ -169,7 +169,7 @@ private class AnnotationFileRevision(
     private val virtualFile: VirtualFile,
     private val repo: JujutsuRepository
 ) : VcsFileRevisionEx() {
-    override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(line.id)
+    override fun getRevisionNumber(): VcsRevisionNumber = ChangeIdRevisionNumber(line.id)
     override fun getRevisionDate() = line.authorTimestamp?.toJavaDate()
     override fun getAuthorDate() = line.authorTimestamp?.toJavaDate()
     override fun getAuthor() = line.author.name

@@ -5,10 +5,10 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsDataKeys
-import com.intellij.openapi.vcs.vfs.ContentRevisionVirtualFile
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.jj.FileChange
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
@@ -33,10 +33,6 @@ val AnActionEvent.changes: List<FileChange>
             ?.toList()
             ?: emptyList()
     ).map { FileChange.from(it) }
-
-val AnActionEvent.revision: Revision?
-    get() = logEntry?.id
-        ?: ((file as? ContentRevisionVirtualFile)?.contentRevision?.revisionNumber as? JujutsuRevisionNumber)?.changeId
 
 val AnActionEvent.fileRevision get() = this.getData(VcsDataKeys.VCS_FILE_REVISION) as? JujutsuFileRevision
 

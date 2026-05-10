@@ -9,7 +9,7 @@ import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.GitRemote
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.annotate.toJavaDate
-import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import java.util.Date
 
 /**
@@ -27,7 +27,7 @@ class JujutsuFileRevision(
     val committer get() = entry.committer?.name
     val committerDate get() = entry.committerTimestamp?.toJavaDate()
 
-    override fun getRevisionNumber(): VcsRevisionNumber = JujutsuRevisionNumber(entry.id)
+    override fun getRevisionNumber(): VcsRevisionNumber = ChangeIdRevisionNumber(entry.id)
 
     override fun getBranchName(): String = entry.bookmarks.firstOrNull()?.name ?: ""
 
