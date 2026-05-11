@@ -80,6 +80,11 @@
     <!-- Add .jj to ignored files on first project open -->
     <postStartupActivity implementation="in.kkkev.jjidea.JujutsuFileTypeSetup"/>
 
+    <statusBarWidgetFactory
+        id="Jujutsu.StatusBarWidget"
+        implementation="in.kkkev.jjidea.ui.statusbar.JujutsuStatusBarWidgetFactory"
+        order="after git4idea"/>
+
     <!-- Clone dialog integration -->
     <openapi.vcs.ui.cloneDialog.VcsCloneDialogExtension
         id="in.kkkev.jjidea.clone.JujutsuCloneExtension"
