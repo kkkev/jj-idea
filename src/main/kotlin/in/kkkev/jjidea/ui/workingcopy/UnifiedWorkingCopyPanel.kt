@@ -10,6 +10,7 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Splitter
+import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -48,7 +49,7 @@ import javax.swing.tree.TreePath
  * The dropdown selector is the authoritative way to choose which repo's
  * working copy to edit. The tree is purely for viewing and navigating changes.
  */
-class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
+class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     companion object {
         private const val COLLAPSED_PATHS_KEY_PREFIX = "JujutsuToolWindow.CollapsedPaths"
     }
@@ -312,6 +313,10 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         })
 
         changesTree.installHandlers()
+    }
+
+    override fun uiDataSnapshot(sink: DataSink) {
+        sink[VcsDataKeys.CHANGES] = changesTree.selectedChanges.toTypedArray()
     }
 
     private fun getSelectedChange() = changesTree.selectedChanges.firstOrNull()
