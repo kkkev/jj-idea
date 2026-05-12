@@ -68,8 +68,6 @@ class RestoreSelectionAction : DumbAwareAction(
         // Hide when in historical context (entry is present and not working copy)
         // In that case, RestoreToChangeAction should be used instead
         val isHistoricalContext = entry != null && !entry.isWorkingCopy
-        val hasValidFiles = e.singleRepoForFiles != null
-
-        e.presentation.isEnabledAndVisible = !isHistoricalContext && hasValidFiles
+        e.presentation.isEnabledAndVisible = !isHistoricalContext && e.singleRepoForFiles != null
     }
 }

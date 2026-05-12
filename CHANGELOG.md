@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Diffs, change lists, and annotation gutters now show the correct base content for merge commits, using the auto-merged parent tree instead of the first parent's content
 - Diffs work for files that have been renamed
 - Open in Remote finds last pushed revision
+- Restore Selection action no longer evaluates repository resolution unnecessarily when hidden in historical context
 
 ### Changed
 - "Restore to This" now supports multiple file selections

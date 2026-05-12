@@ -56,13 +56,8 @@ Use this checklist:
 
 - [ ] File change tree shows correct files
 - [ ] Double-click file opens it in editor
-- [ ] Menu has "Show Diff" ✅
-- [ ] Menu has "Open File" ✅
-- [ ] Menu has "Compare with local (if not working copy) ✅
-- [ ] Menu has "Compare Before with Local (if not working copy) ✅
-- [ ] Menu has "Compare with Another Commit ❌
-- [ ] Menu has "Compare Before with Another Commit ❌
-- [ ] Menu has open in -> remote ✅
+- [ ] Menu has "Compare with Another Commit" ❌ jj-idea-7d9p
+- [ ] Menu has "Compare Before with Another Commit" ❌ jj-idea-lo7u
 - [ ] open file for historical opens correct version ✅
 - [ ] open file for working copy opens editable editor ✅
 
@@ -144,15 +139,13 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] File type icons display correctly
 - [ ] Double-click opens file in editor
 - [ ] Right-click shows context menu with file actions
-- [ ] Menu has open ✅
 - [ ] Open shows working copy as editable ✅
-- [ ] Single click does nothing ❌
-- [ ] Menu has "Show Diff" ✅
-- [ ] Menu has "Compare with Another Commit" ❌
-- [ ] Menu has "Compare Before with Another Commit" ❌
+- [ ] Single click does nothing ❌ jj-idea-c82g
+- [ ] Menu has "Compare with Another Commit" ❌ jj-idea-7d9p
+- [ ] Menu has "Compare Before with Another Commit" ❌ jj-idea-lo7u
 - [ ] Show diff for multiple files opens multiple editors ✅
 - [ ] Open for multiple files opens multiple editors ✅
-- [ ] Menu has Open in -> remote ❌
+- [ ] Menu has Open in -> remote ❌ jj-idea-x43h
 - [ ] Open in -> remote for single parent opens that parent
 
 ### Settings (Version Control > Jujutsu)
@@ -175,7 +168,7 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] File in tool window has Jujutsu menu ✅
 - [ ] Jujutsu menu has "Show Diff" ✅
 - [ ] Jujutsu menu has "Compare with Another Commit..." ✅
-- [ ] If file has changed, Jujutsu menu has "Compare Before with Another Commit..." ❌
+- [ ] If file has changed, Jujutsu menu has "Compare Before with Another Commit..." ❌ jj-idea-lo7u
 - [ ] Show diff for multiple files opens multiple editors ✅
 - [ ] Menu has Open in -> remote ✅
 - [ ] Open in -> remote for single parent opens that parent ✅
@@ -196,7 +189,7 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Jujutsu menu has "Compare with Another Commit" ✅
 - [ ] Jujutsu menu has "Annotate" ✅
 - [ ] Annotate fetches annotations for the correct revision ✅
-- [ ] if file has changed, Jujutsu menu has compare before with another commit ❌
+- [ ] if file has changed, Jujutsu menu has compare before with another commit ❌ jj-idea-lo7u
 - [ ] diff for unchanged file shows no changes (before view has same content, shows content as identical) ✅
 - [ ] diff for modified file and single parent shows before from @-, current from @ ✅
 - [ ] has open in -> remote ✅
@@ -208,11 +201,11 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Jujutsu menu has diff ✅
 - [ ] Jujutsu menu has compare with another commit ✅
 - [ ] compare with another commit opens that commit on LHS, editor's version on RHS ✅
-- [ ] Jujutsu menu has compare with local ❌
-- [ ] if file has changed, Jujutsu menu has compare before with another commit ❌
+- [ ] Jujutsu menu has compare with local ❌ jj-idea-zvzk
+- [ ] if file has changed, Jujutsu menu has compare before with another commit ❌ jj-idea-lo7u
 - [ ] diff for modified file and single parent shows before from parent, current from selected version ✅
 - [ ] Jujutsu menu has annotate ❌ jj-idea-3jo
 - [ ] Annotate fetches annotations for the correct revision
 - [ ] has open in -> remote ✅
 - [ ] open in -> remote for single parent opens that parent ✅
-- [ ] open in -> remote for unambiguous remote ancestor parent opens that ancestor ❌
+- [ ] open in -> remote for unambiguous remote ancestor parent opens that ancestor ❌ jj-idea-i2mj
