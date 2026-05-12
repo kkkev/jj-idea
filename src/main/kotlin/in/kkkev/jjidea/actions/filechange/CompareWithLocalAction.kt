@@ -6,11 +6,14 @@ import com.intellij.diff.chains.SimpleDiffRequestChain
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.AnActionEvent
 import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.jj.diffRequest
 import `in`.kkkev.jjidea.jj.fileAtWorkingCopy
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.fileAtVersion
+import `in`.kkkev.jjidea.vcs.filePath
 
 /**
  * Compare file(s) at a historical revision with the local working copy.
@@ -24,7 +27,7 @@ import `in`.kkkev.jjidea.util.runLater
  */
 class CompareWithLocalAction : HistoricalVersionAction("action.compare.with.local", AllIcons.Actions.Diff) {
     override fun actionPerformed(e: AnActionEvent) {
-        val logEntry = e.logEntry ?: return
+        val logEntry = e.logEntryForFile ?: return
         val repo = logEntry.repo
 
         runInBackground {
@@ -35,6 +38,17 @@ class CompareWithLocalAction : HistoricalVersionAction("action.compare.with.loca
                     val historicalSide = repo.createDiffSideFor(after)
                     diffRequest(filePath.name, historicalSide, localSide)
                 }
+            }.ifEmpty {
+                // Editor context: no changes in DataSink, use the file directly
+                e.file?.let { f ->
+                    listOf(
+                        diffRequest(
+                            f.name,
+                            repo.createDiffSideFor(f.fileAtVersion),
+                            repo.createDiffSideFor(f.filePath.fileAtWorkingCopy)
+                        )
+                    )
+                } ?: emptyList()
             }
 
             if (requests.isNotEmpty()) {

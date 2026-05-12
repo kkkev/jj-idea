@@ -359,15 +359,8 @@ class FileChangeActionVisibilityTest {
 
     @Nested
     inner class `CompareWithBranch` {
-        /**
-         * CompareWithBranchAction checks [AnActionEvent.repoForFile] which requires VIRTUAL_FILE.
-         * In changes tree context only CHANGES are available — so the action is invisible.
-         * See: bug tracked in beads for this limitation.
-         */
         @Test
-        fun `hidden in changes tree context because VIRTUAL_FILE is absent`() {
-            withLogEntry(historicalEntry())
-            withChanges(historicalChange("Main.kt"))
+        fun `hidden when no file and no changes`() {
             CompareFileWithBranchAction().update(event)
             presentation.isEnabledAndVisible shouldBe false
         }

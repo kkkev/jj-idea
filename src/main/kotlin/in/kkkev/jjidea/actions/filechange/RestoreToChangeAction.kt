@@ -10,19 +10,21 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
+import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.filePaths
-import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.vcs.filePath
 
 /**
  * Restores selected file(s) to their state in a historical revision.
  * Uses [in.kkkev.jjidea.actions.JujutsuDataKeys.LOG_ENTRY] to determine the revision.
  *
- * This action is for our custom log panels where we have a LogEntry context.
+ * Works in both changes tree context (LOG_ENTRY DataSink) and editor context (file user data).
  *
  * Hidden when:
- * - No LOG_ENTRY is present (working copy context)
- * - LOG_ENTRY.isWorkingCopy is true (use RestoreSelectionAction instead)
+ * - No log entry resolvable (working copy editor context)
+ * - Log entry isWorkingCopy is true (use RestoreSelectionAction instead)
  */
 class RestoreToChangeAction : DumbAwareAction(
     JujutsuBundle.message("action.restore.to.revision"),
@@ -35,8 +37,8 @@ class RestoreToChangeAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val entry = e.logEntry ?: return
-        val filePaths = e.filePaths.takeUnless { it.isEmpty() } ?: return
+        val entry = e.logEntryForFile ?: return
+        val filePaths = (e.filePaths.takeUnless { it.isEmpty() } ?: e.file?.let { listOf(it.filePath) }) ?: return
 
         val fileNames = filePaths.joinToString { it.name }
         val changeId = entry.id
@@ -81,11 +83,12 @@ class RestoreToChangeAction : DumbAwareAction(
     }
 
     override fun update(e: AnActionEvent) {
-        val entry = e.logEntry
-        val hasChange = e.changes.isNotEmpty()
+        val entry = e.logEntryForFile
+        // Changes tree: has changes; editor context: has a file
+        val hasContent = e.changes.isNotEmpty() || e.file != null
 
-        // Hide when no entry, entry is working copy, or no change selected
-        val visible = entry != null && !entry.isWorkingCopy && hasChange
+        // Hide when no entry, entry is working copy, or no file content to act on
+        val visible = entry != null && !entry.isWorkingCopy && hasContent
         e.presentation.isEnabledAndVisible = e.project != null && visible
     }
 }

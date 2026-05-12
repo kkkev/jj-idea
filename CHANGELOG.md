@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Diff on a directory opens diff views on all changed files under that directory
 - Cmd+D (Show Diff) now works in working copy tool window regardless of which component has focus
+- Compare with Local, Compare Before with Local, and Restore to This now appear and work in historical file editors
+- Compare with Another Commit now appears in the changes tree context menu (details panel and working copy panel)
+- Restore to This registered in editor Jujutsu menu
 
 ## [0.6.7] - 2026-05-12
 

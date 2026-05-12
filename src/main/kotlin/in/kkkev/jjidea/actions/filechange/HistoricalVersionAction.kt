@@ -5,7 +5,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.jj.LogEntry
 import javax.swing.Icon
 
@@ -22,12 +23,14 @@ abstract class HistoricalVersionAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        val entry = e.logEntry
+        val entry = e.logEntryForFile
         val changes = e.changes
 
         val visible = entry?.let(::isVisible) ?: false
-        // Enabled when at least one file has afterRevision (not deleted) and is not working copy
-        val enabled = visible && changes.any { it.after?.isWorkingCopy == false }
+        // Changes tree: enabled when at least one file has afterRevision (not deleted) and is not working copy.
+        // Editor context: changes is empty but we have a file — enabled if visible (isWorkingCopy already checked).
+        val enabled = visible &&
+            (changes.any { it.after?.isWorkingCopy == false } || (changes.isEmpty() && e.file != null))
 
         e.presentation.isVisible = visible
         e.presentation.isEnabled = enabled

@@ -12,11 +12,16 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
+import `in`.kkkev.jjidea.vcs.possibleLogEntryFor
 import `in`.kkkev.jjidea.vcs.possibleVirtualFileFor
 
 val AnActionEvent.file: VirtualFile? get() = this.getData(CommonDataKeys.VIRTUAL_FILE)
 
 val AnActionEvent.logEntry: LogEntry? get() = this.getData(JujutsuDataKeys.LOG_ENTRY)
+
+/** Gets the log entry from the DataSink, falling back to the file's user data. Use in actions that need to work in both changes tree and editor contexts. */
+val AnActionEvent.logEntryForFile: LogEntry?
+    get() = logEntry ?: project?.let { p -> file?.let(p::possibleLogEntryFor) }
 val AnActionEvent.files: List<VirtualFile>
     get() = this.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()
         ?: changes.mapNotNull {
