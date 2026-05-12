@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-05-12
+
 ### Added
 - Jujutsu context menu available when viewing historical file versions
 - Show diff for historical change
@@ -414,7 +416,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.6...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.7...HEAD
+[0.6.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.7
 [0.6.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.6
 [0.6.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.5
 [0.6.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.4

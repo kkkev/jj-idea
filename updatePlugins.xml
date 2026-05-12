@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.6/jj-idea-0.6.6.zip" version="0.6.6">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.7/jj-idea-0.6.7.zip" version="0.6.7">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,23 +23,27 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.6</h3>
+      <h3>0.6.7</h3>
       
 <h4>Added</h4>
-<li>Annotation gutter now shows the change ID column by default, coloured in the plugin's change ID blue</li>
-<li>Annotation tooltips are now formatted HTML: change ID, commit ID, author · date, and description — matching the log row tooltip style</li>
-<li>Log row tooltip now includes author · date above the description</li>
-<li>Commit details panel now shows author · date using absolute timestamps; committer date also shown when different from author</li>
+<li>Jujutsu context menu available when viewing historical file versions</li>
+<li>Show diff for historical change</li>
+<li>Compare historical change with another commit</li>
+<li>Custom history provider replaces built-in VCS history tabs</li>
 
 <h4>Fixed</h4>
-<li>ENTER key no longer hijacks global IDE navigation (e.g. Find Usages); the Jujutsu changes tree handles ENTER locally</li>
-<li>Clicking an annotation gutter column now correctly navigates the log to that change</li>
-<li>Annotation "View Colors" now works — lines from the same change share a background colour, and "Color by Author" groups by author</li>
-<li>Annotation "View Names" / "Email" modes now work correctly — name shortening (initials, first/last name, email) is applied when toggled</li>
+<li>Diffs, change lists, and annotation gutters now show the correct base content for merge commits, using the auto-merged parent tree instead of the first parent's content</li>
+<li>Diffs work for files that have been renamed</li>
+<li>Open in Remote finds last pushed revision</li>
+<li>Restore Selection action no longer evaluates repository resolution unnecessarily when hidden in historical context</li>
 
 <h4>Changed</h4>
-<li>Repository icon colours are now consistent with IDE folders</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.6">full release notes</a> for details.</p>
+<li>"Restore to This" now supports multiple file selections</li>
+<li>Removed spurious opening of files from working copy window when selecting a file</li>
+<li>Consolidated "Open File" and "Open Repository Version"</li>
+<li>Split and squash actions consolidated for working copy and historical revisions</li>
+<li>Open in Remote works for multiple files</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.7">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
