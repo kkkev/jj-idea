@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Diff on a directory opens diff views on all changed files under that directory 
+
 ## [0.6.7] - 2026-05-12
 
 ### Added

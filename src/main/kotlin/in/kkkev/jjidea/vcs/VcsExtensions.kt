@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.vcs
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
@@ -12,6 +13,8 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
+
+private val log = Logger.getInstance("in.kkkev.jjidea.vcs.VcsExtensions")
 
 val Project?.isJujutsu get() = this?.stateModel?.isJujutsu == true
 
@@ -59,7 +62,11 @@ val VirtualFile.fileAtVersion get() = FileAtVersion(filePath, contentLocator)
  * file is subsequently going to have its contents inspected by a foreground thread.
  */
 fun VirtualFile.cacheContents() {
-    this.contentsToByteArray(true)
+    if (isDirectory) {
+        log.warn("cacheContents called on directory: $path")
+        return
+    }
+    contentsToByteArray(true)
 }
 
 fun FilePath.relativeTo(root: VirtualFile) = path.removePrefix(root.path).removePrefix("/")
