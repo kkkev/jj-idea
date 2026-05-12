@@ -174,6 +174,8 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Open in -> remote for single parent opens that parent ✅
 
 ### Diffs
+- [ ] Show diff for a directory with changed files shows diffs for each file in the directory
+- [ ] Show diff for a directory with no changed files does nothing (no crash)
 - [ ] Diff for unchanged file shows no changes (before view has same content, shows content as identical) ✅
 - [ ] Diff for modified file and single parent shows before from parent, current from selected ✅
 - [ ] Diff for deleted file and single parent shows before from parent, empty current ✅

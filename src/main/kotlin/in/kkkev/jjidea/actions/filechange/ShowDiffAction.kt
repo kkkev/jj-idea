@@ -65,12 +65,30 @@ class ShowDiffAction :
                     }
                     filesByLogEntry.flatMap { (logEntry, groupFiles) ->
                         val changesByPath = changesByLogEntry[logEntry] ?: emptyMap()
-                        groupFiles.map { file ->
-                            val change = changesByPath[file.filePath]
-                            val before = change?.before ?: file.filePath.fileAt(logEntry.parentContentLocator)
-                            val after = change?.after ?: file.fileAtVersion
+                        groupFiles.flatMap { file ->
                             val repo = logEntry.repo
-                            diffRequest(file.name, repo.createDiffSideFor(before), repo.createDiffSideFor(after))
+                            if (file.isDirectory) {
+                                changesByPath.filter { (path, _) -> path.isUnder(file.filePath, false) }
+                                    .values
+                                    .map { change ->
+                                        diffRequest(
+                                            change.filePath.name,
+                                            repo.createDiffSideFor(change.before),
+                                            repo.createDiffSideFor(change.after)
+                                        )
+                                    }
+                            } else {
+                                val change = changesByPath[file.filePath]
+                                val before = change?.before ?: file.filePath.fileAt(logEntry.parentContentLocator)
+                                val after = change?.after ?: file.fileAtVersion
+                                listOf(
+                                    diffRequest(
+                                        file.name,
+                                        repo.createDiffSideFor(before),
+                                        repo.createDiffSideFor(after)
+                                    )
+                                )
+                            }
                         }
                     }
                 } else {
