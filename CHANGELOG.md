@@ -8,8 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Jujutsu context menu available when viewing historical file versions
 - Show diff for historical change
 - Compare historical change with another commit
+- Custom history provider replaces built-in VCS history tabs
 
 ### Fixed
 - Diffs, change lists, and annotation gutters now show the correct base content for merge commits, using the auto-merged parent tree instead of the first parent's content
@@ -20,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Restore to This" now supports multiple file selections
 - Removed spurious opening of files from working copy window when selecting a file
 - Consolidated "Open File" and "Open Repository Version"
-- "Restore to This" works for multiple files
+- Split and squash actions consolidated for working copy and historical revisions
 - Open in Remote works for multiple files
 
 ## [0.6.6] - 2026-04-19
