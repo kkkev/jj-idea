@@ -22,7 +22,8 @@ data class LogEntry(
     val committerTimestamp: Instant? = null,
     override val author: VcsUser? = null,
     val committer: VcsUser? = null,
-    override val immutable: Boolean = false
+    override val immutable: Boolean = false,
+    val hasPushedAncestor: Boolean = false
 ) : GraphableEntry, ChangeStatus, ChangeDetail {
     override val description = Description(underlyingDescription)
 

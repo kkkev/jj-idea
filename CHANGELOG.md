@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- "Open File in Remote" no longer causes IDE errors when hovering the context menu in large repos (eliminated synchronous jj subprocess call from action update)
 - Diff on a directory opens diff views on all changed files under that directory
 - Cmd+D (Show Diff) now works in working copy tool window regardless of which component has focus
 - Compare with Local, Compare Before with Local, and Restore to This now appear and work in historical file editors

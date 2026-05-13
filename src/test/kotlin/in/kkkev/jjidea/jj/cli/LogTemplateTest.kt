@@ -29,6 +29,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -43,6 +44,7 @@ class LogTemplateTest {
         entry.hasConflict shouldBe false
         entry.isEmpty shouldBe false
         entry.immutable shouldBe false
+        entry.hasPushedAncestor shouldBe false
     }
 
     @Test
@@ -54,6 +56,7 @@ class LogTemplateTest {
             "main;true,feature;true",
             "",
             "true",
+            "false",
             "false",
             "false",
             "false"
@@ -74,6 +77,7 @@ class LogTemplateTest {
             "Merge commit",
             "",
             "plkvukqt~p~|bcd123~bc,rlvkpnrz~rl~34|cde234~cde",
+            "false",
             "false",
             "false",
             "false",
@@ -98,6 +102,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -117,6 +122,7 @@ class LogTemplateTest {
             "false",
             "false",
             "true",
+            "false",
             "false"
         )
 
@@ -137,6 +143,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false", // Not empty
+            "false",
             "false"
         )
 
@@ -158,6 +165,7 @@ class LogTemplateTest {
             "false",
             "true",
             "false",
+            "false",
             "false"
         )
 
@@ -174,6 +182,7 @@ class LogTemplateTest {
             "Add new feature",
             "",
             "",
+            "false",
             "false",
             "false",
             "false",
@@ -207,6 +216,7 @@ class LogTemplateTest {
             "Cherry-picked commit",
             "",
             "",
+            "false",
             "false",
             "false",
             "false",

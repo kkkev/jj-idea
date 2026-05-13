@@ -12,7 +12,6 @@ import `in`.kkkev.jjidea.actions.git.ClassifiedRemote
 import `in`.kkkev.jjidea.actions.git.RemoteUrlBuilder
 import `in`.kkkev.jjidea.actions.git.applyRemoteVisibility
 import `in`.kkkev.jjidea.actions.logEntry
-import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogEntry
 
 /**
@@ -31,16 +30,9 @@ class OpenFileInRemoteGroup : DefaultActionGroup() {
     private fun classifiedRemotes(entry: LogEntry) =
         RemoteUrlBuilder.classifiedRemotes(entry.repo.gitRemotes)
 
-    private fun hasPushedAncestor(entry: LogEntry): Boolean {
-        if (entry.immutable) return true
-        val revset = Expression("latest(ancestors(${entry.id}) & ancestors(remote_bookmarks()))")
-        val result = entry.repo.commandExecutor.log(revset, template = "commit_id", limit = 1)
-        return result.isSuccess && result.stdout.trim().isNotEmpty()
-    }
-
     override fun update(e: AnActionEvent) {
         val entry = e.logEntry
-        if (entry == null || entry.isWorkingCopy || !hasPushedAncestor(entry) || e.changes.none { it.after != null }) {
+        if (entry == null || entry.isWorkingCopy || !entry.hasPushedAncestor || e.changes.none { it.after != null }) {
             e.presentation.isVisible = false
             return
         }

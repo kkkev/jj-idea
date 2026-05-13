@@ -257,6 +257,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val author = SignatureFields("author")
         val committer = SignatureFields("committer")
         val immutable = booleanField("immutable")
+        val hasPushedAncestor = booleanField("""self.contained_in("descendants(::remote_bookmarks())")""")
     }
 
     inner class LogTemplates : LogFields() {
@@ -269,7 +270,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             currentWorkingCopy,
             conflict,
             empty,
-            immutable
+            immutable,
+            hasPushedAncestor
         ) {
             LogEntry(
                 repo,
@@ -281,7 +283,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 currentWorkingCopy.take(it),
                 conflict.take(it),
                 empty.take(it),
-                immutable = immutable.take(it)
+                immutable = immutable.take(it),
+                hasPushedAncestor = hasPushedAncestor.take(it)
             )
         }
 

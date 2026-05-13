@@ -62,13 +62,18 @@ class FileChangeActionVisibilityTest {
         every { event.getData(VcsDataKeys.CHANGES) } returns changes.toList().toTypedArray()
     }
 
-    private fun historicalEntry(immutable: Boolean = false, parentCount: Int = 1) = LogEntry(
+    private fun historicalEntry(
+        immutable: Boolean = false,
+        parentCount: Int = 1,
+        hasPushedAncestor: Boolean = false
+    ) = LogEntry(
         repo = repo,
         id = ChangeId("abc123abc123", "abc1"),
         commitId = CommitId("abc0000000000000000000000000000000000000000"),
         underlyingDescription = "Test",
         isWorkingCopy = false,
         immutable = immutable,
+        hasPushedAncestor = hasPushedAncestor,
         parentIdentifiers = (1..parentCount).map {
             LogEntry.Identifiers(
                 ChangeId("par${it}23456789ab", "par$it"),
@@ -346,10 +351,17 @@ class FileChangeActionVisibilityTest {
         }
 
         @Test
-        fun `hidden when no changes with afterRevision (immutable entry, no files selected)`() {
-            // Use immutable=true so hasPushedAncestor() returns true immediately,
-            // isolating the "no changes" condition as the reason for hiding
-            withLogEntry(historicalEntry(immutable = true))
+        fun `hidden when no changes with afterRevision (no files selected)`() {
+            // hasPushedAncestor=true so the only hiding condition is the absent changes
+            withLogEntry(historicalEntry(hasPushedAncestor = true))
+            OpenFileInRemoteGroup().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `hidden when entry has no pushed ancestor`() {
+            withLogEntry(historicalEntry(hasPushedAncestor = false))
+            withChanges(historicalChange("Main.kt"))
             OpenFileInRemoteGroup().update(event)
             presentation.isVisible shouldBe false
         }

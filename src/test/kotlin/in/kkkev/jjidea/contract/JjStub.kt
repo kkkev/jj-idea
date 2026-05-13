@@ -109,7 +109,12 @@ class JjStub(override val workDir: Path) : JjBackend {
     private fun cmdGitInit(): JjBackend.Result {
         workDir.resolve(".jj").createDirectories()
         // Root commit (immutable, empty)
-        val rootChange = newStubChange(description = "", parentIds = emptyList(), immutable = true)
+        val rootChange = newStubChange(
+            description = "",
+            parentIds = emptyList(),
+            immutable = true,
+            hasPushedAncestor = true
+        )
         changes.add(rootChange)
         // Working copy on top of root
         val wc = newStubChange(description = "", parentIds = listOf(rootChange.commitId))
@@ -353,7 +358,8 @@ class JjStub(override val workDir: Path) : JjBackend {
                     authorEmail = change.authorEmail,
                     timestamp = change.timestamp,
                     abandoned = change.abandoned,
-                    immutable = change.immutable
+                    immutable = change.immutable,
+                    hasPushedAncestor = change.hasPushedAncestor
                 )
                 changes[i] = replacement
                 if (workingCopyIndex == i) workingCopyIndex = i // stays the same index
@@ -559,6 +565,7 @@ class JjStub(override val workDir: Path) : JjBackend {
         field("false") // conflict
         field(if (isEmpty) "true" else "false")
         field(if (change.immutable) "true" else "false")
+        field(if (change.hasPushedAncestor) "true" else "false")
 
         if (isFullTemplate) {
             field(change.authorName)
@@ -828,13 +835,15 @@ class JjStub(override val workDir: Path) : JjBackend {
     private fun newStubChange(
         description: String,
         parentIds: List<String>,
-        immutable: Boolean = false
+        immutable: Boolean = false,
+        hasPushedAncestor: Boolean = immutable
     ) = StubChange(
         changeId = nextChangeId(),
         commitId = nextCommitId(),
         description = description,
         parentIds = parentIds,
-        immutable = immutable
+        immutable = immutable,
+        hasPushedAncestor = hasPushedAncestor
     )
 
     private fun nextChangeId(): String {
@@ -892,5 +901,6 @@ private data class StubChange(
     val authorEmail: String = "test@example.com",
     val timestamp: Long = System.currentTimeMillis() / 1000,
     var abandoned: Boolean = false,
-    val immutable: Boolean = false
+    val immutable: Boolean = false,
+    val hasPushedAncestor: Boolean = false
 )

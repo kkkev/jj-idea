@@ -31,7 +31,8 @@ abstract class LogContractTest {
         fields.currentWorkingCopy,
         fields.conflict,
         fields.empty,
-        fields.immutable
+        fields.immutable,
+        fields.hasPushedAncestor
     ).joinToString(" ++ ") { it.spec }
 
     private val fullSpec = basicSpec + " ++ " +
@@ -112,7 +113,8 @@ abstract class LogContractTest {
             5 to "currentWorkingCopy",
             6 to "conflict",
             7 to "empty",
-            8 to "immutable"
+            8 to "immutable",
+            9 to "hasPushedAncestor"
         )
         booleanFields.forEach { (idx, name) ->
             fields[idx] shouldMatch Regex("true|false")
@@ -155,9 +157,9 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", fullSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        // Author timestamp at index 11, committer timestamp at index 14
-        val authorTs = fields[11]
-        val committerTs = fields[14]
+        // Author timestamp at index 12, committer timestamp at index 15
+        val authorTs = fields[12]
+        val committerTs = fields[15]
 
         authorTs.toLong() shouldBeGreaterThan 0L
         committerTs.toLong() shouldBeGreaterThan 0L
@@ -210,8 +212,19 @@ abstract class LogContractTest {
         records.size shouldBeGreaterThan 2
     }
 
+    @Test
+    fun `hasPushedAncestor is false when no remote bookmarks`() {
+        jj.describe("Test")
+
+        val result = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        result.isSuccess shouldBe true
+
+        val fields = result.stdout.trim().split("\u0000")
+        fields[9] shouldBe "false"
+    }
+
     companion object {
-        private const val BASIC_FIELD_COUNT = 9
-        private const val FULL_FIELD_COUNT = 15
+        private const val BASIC_FIELD_COUNT = 10
+        private const val FULL_FIELD_COUNT = 16
     }
 }
