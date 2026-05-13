@@ -126,14 +126,17 @@
     <!-- Jujutsu action group in editor context menu -->
     <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.actions.file.JujutsuEditorActionGroup"
            popup="true">
-      <reference ref="Annotate"/>
       <reference ref="Jujutsu.ShowChangesDiff"/>
+      <separator/>
       <reference ref="Jujutsu.CompareWithLocal"/>
       <reference ref="Jujutsu.CompareBeforeWithLocal"/>
       <reference ref="Jujutsu.CompareWithBranch"/>
+      <separator/>
+      <reference ref="Annotate"/>
       <action id="Jujutsu.ShowFileHistory" class="in.kkkev.jjidea.actions.file.ShowFileHistoryAction"/>
       <action id="Jujutsu.ShowHistoryForSelection"
               class="in.kkkev.jjidea.actions.file.ShowFileHistoryForSelectionAction"/>
+      <separator/>
       <action id="Jujutsu.RestoreFile" class="in.kkkev.jjidea.actions.file.RestoreSelectionAction"/>
       <reference ref="Jujutsu.RestoreToChange"/>
       <separator/>

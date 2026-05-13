@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Compare with Local, Compare Before with Local, and Restore to This now appear and work in historical file editors
 - Compare with Another Commit now appears in the changes tree context menu (details panel and working copy panel)
 - Restore to This registered in editor Jujutsu menu
+- Restore (working copy) correctly hidden in historical file editor context
+- Jujutsu editor submenu grouped with separators matching the commit details panel layout
 
 ## [0.6.7] - 2026-05-12
 
