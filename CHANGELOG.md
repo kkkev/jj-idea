@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-05-14
+
+### Fixed
+- "Open in Remote" now appears in the working copy panel context menu and resolves to the nearest pushed ancestor
+- "Open in Remote" for historical file editors now correctly resolves unpushed commits to their nearest pushed ancestor instead of using the commit hash directly (which would produce a broken URL)
+
 ## [0.6.8] - 2026-05-13
 
 ### Fixed

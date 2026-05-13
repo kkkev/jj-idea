@@ -145,8 +145,9 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Menu has "Compare Before with Another Commit" ❌ jj-idea-lo7u
 - [ ] Show diff for multiple files opens multiple editors ✅
 - [ ] Open for multiple files opens multiple editors ✅
-- [ ] Menu has Open in -> remote ❌ jj-idea-x43h
-- [ ] Open in -> remote for single parent opens that parent
+- [ ] Menu has Open in -> remote ✅
+- [ ] Open in -> remote for single parent opens that parent (resolves to pushed ancestor)
+- [ ] Open in -> remote hidden when no pushed ancestor exists
 
 ### Settings (Version Control > Jujutsu)
 
@@ -210,4 +211,4 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Annotate fetches annotations for the correct revision
 - [ ] has open in -> remote ✅
 - [ ] open in -> remote for single parent opens that parent ✅
-- [ ] open in -> remote for unambiguous remote ancestor parent opens that ancestor ❌ jj-idea-i2mj
+- [ ] open in -> remote for unpushed historical version resolves to nearest pushed ancestor ✅

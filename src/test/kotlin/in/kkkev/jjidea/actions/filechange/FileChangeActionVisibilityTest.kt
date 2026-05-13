@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.actions.file.CompareFileWithBranchAction
 import `in`.kkkev.jjidea.actions.file.RestoreSelectionAction
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.GitRemote
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
@@ -82,12 +83,13 @@ class FileChangeActionVisibilityTest {
         }
     )
 
-    private fun workingCopyEntry() = LogEntry(
+    private fun workingCopyEntry(hasPushedAncestor: Boolean = false) = LogEntry(
         repo = repo,
         id = ChangeId("wc1234567890", "wc12"),
         commitId = CommitId("wc000000000000000000000000000000000000000000"),
         underlyingDescription = "WC",
-        isWorkingCopy = true
+        isWorkingCopy = true,
+        hasPushedAncestor = hasPushedAncestor
     )
 
     /** A Change whose after-revision is a historical (non-working-copy) version */
@@ -343,11 +345,20 @@ class FileChangeActionVisibilityTest {
         }
 
         @Test
-        fun `hidden when LOG_ENTRY is working copy`() {
-            withLogEntry(workingCopyEntry())
+        fun `hidden when LOG_ENTRY is working copy with no pushed ancestor`() {
+            withLogEntry(workingCopyEntry(hasPushedAncestor = false))
             withChanges(historicalChange("Main.kt"))
             OpenFileInRemoteGroup().update(event)
             presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `visible when LOG_ENTRY is working copy with pushed ancestor`() {
+            every { repo.gitRemotes } returns listOf(GitRemote("origin", "https://github.com/user/repo.git"))
+            withLogEntry(workingCopyEntry(hasPushedAncestor = true))
+            withChanges(historicalChange("Main.kt"))
+            OpenFileInRemoteGroup().update(event)
+            presentation.isVisible shouldBe true
         }
 
         @Test

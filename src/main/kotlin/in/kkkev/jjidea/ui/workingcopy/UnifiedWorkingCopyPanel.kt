@@ -22,6 +22,7 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.stateModel
@@ -317,6 +318,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     override fun uiDataSnapshot(sink: DataSink) {
         sink[VcsDataKeys.CHANGES] = changesTree.selectedChanges.toTypedArray()
+        controlsPanel.boundRepository?.workingCopy?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
     }
 
     private fun getSelectedChange() = changesTree.selectedChanges.firstOrNull()

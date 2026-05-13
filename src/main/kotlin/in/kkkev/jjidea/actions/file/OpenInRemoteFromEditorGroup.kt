@@ -26,6 +26,8 @@ import `in`.kkkev.jjidea.actions.git.applyRemoteVisibility
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.vcs.possibleLogEntryFor
@@ -103,13 +105,14 @@ private fun editorRemoteAction(remote: ClassifiedRemote) = object : DumbAwareAct
         val localRepo = e.repoForFile
         if (localFile != null && localRepo != null) {
             val logEntry = project.possibleLogEntryFor(localFile)
-            val pinnedCommitId = logEntry?.takeUnless { it.isWorkingCopy }?.commitId
+            val pinnedEntry = logEntry?.takeUnless { it.isWorkingCopy }
             openInRemote(
                 project,
                 localRepo,
                 remote,
                 localRepo.getRelativePath(localFile),
-                pinnedCommitId,
+                pinnedEntry,
+                null,
                 localLineRange,
                 localText
             )
@@ -122,6 +125,7 @@ private fun editorRemoteAction(remote: ClassifiedRemote) = object : DumbAwareAct
             info.repo,
             remote,
             info.repo.getRelativePath(info.filePath),
+            null,
             info.commitId,
             localLineRange,
             localText
@@ -134,6 +138,7 @@ private fun openInRemote(
     repo: JujutsuRepository,
     remote: ClassifiedRemote,
     relativePath: String,
+    pinnedEntry: LogEntry?,
     pinnedCommitId: CommitId?,
     localLineRange: IntRange?,
     localText: String?
@@ -141,11 +146,16 @@ private fun openInRemote(
     runInBackground {
         val commitHash: String
         val remoteLineRange: IntRange?
-        if (pinnedCommitId != null) {
-            commitHash = pinnedCommitId.full
+        if (pinnedEntry != null && pinnedEntry.immutable) {
+            commitHash = pinnedEntry.commitId.full
             remoteLineRange = localLineRange
         } else {
-            val resolved = repo.commandExecutor.latestPushedAncestorCommitId(remote.name)
+            val revision: Revision? = pinnedEntry?.id ?: pinnedCommitId
+            val resolved = if (revision != null) {
+                repo.commandExecutor.latestPushedAncestorCommitId(revision, remote.name)
+            } else {
+                repo.commandExecutor.latestPushedAncestorCommitId(remote.name)
+            }
             if (resolved == null) {
                 JujutsuNotifications.notify(
                     project,
