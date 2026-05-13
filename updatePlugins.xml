@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.7/jj-idea-0.6.7.zip" version="0.6.7">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.8/jj-idea-0.6.8.zip" version="0.6.8">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,27 +23,18 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.7</h3>
+      <h3>0.6.8</h3>
       
-<h4>Added</h4>
-<li>Jujutsu context menu available when viewing historical file versions</li>
-<li>Show diff for historical change</li>
-<li>Compare historical change with another commit</li>
-<li>Custom history provider replaces built-in VCS history tabs</li>
-
 <h4>Fixed</h4>
-<li>Diffs, change lists, and annotation gutters now show the correct base content for merge commits, using the auto-merged parent tree instead of the first parent's content</li>
-<li>Diffs work for files that have been renamed</li>
-<li>Open in Remote finds last pushed revision</li>
-<li>Restore Selection action no longer evaluates repository resolution unnecessarily when hidden in historical context</li>
-
-<h4>Changed</h4>
-<li>"Restore to This" now supports multiple file selections</li>
-<li>Removed spurious opening of files from working copy window when selecting a file</li>
-<li>Consolidated "Open File" and "Open Repository Version"</li>
-<li>Split and squash actions consolidated for working copy and historical revisions</li>
-<li>Open in Remote works for multiple files</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.7">full release notes</a> for details.</p>
+<li>"Open File in Remote" no longer causes IDE errors when hovering the context menu in large repos (eliminated synchronous jj subprocess call from action update)</li>
+<li>Diff on a directory opens diff views on all changed files under that directory</li>
+<li>Cmd+D (Show Diff) now works in working copy tool window regardless of which component has focus</li>
+<li>Compare with Local, Compare Before with Local, and Restore to This now appear and work in historical file editors</li>
+<li>Compare with Another Commit now appears in the changes tree context menu (details panel and working copy panel)</li>
+<li>Restore to This registered in editor Jujutsu menu</li>
+<li>Restore (working copy) correctly hidden in historical file editor context</li>
+<li>Jujutsu editor submenu grouped with separators matching the commit details panel layout</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.8">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

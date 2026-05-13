@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-05-13
+
 ### Fixed
 - "Open File in Remote" no longer causes IDE errors when hovering the context menu in large repos (eliminated synchronous jj subprocess call from action update)
 - Diff on a directory opens diff views on all changed files under that directory
@@ -426,7 +428,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.7...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.8...HEAD
+[0.6.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.8
 [0.6.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.7
 [0.6.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.6
 [0.6.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.5
