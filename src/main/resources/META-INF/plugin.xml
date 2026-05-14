@@ -90,6 +90,8 @@
   <actions>
     <action id="Jujutsu.ResolveConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveConflictsAction"/>
+    <action id="Jujutsu.ResolveSelectedConflicts"
+            class="in.kkkev.jjidea.actions.file.ResolveSelectedConflictsAction"/>
 
     <action id="Jujutsu.Init" class="in.kkkev.jjidea.actions.top.InitAction">
       <add-to-group group-id="Vcs.Import"/>
@@ -143,7 +145,7 @@
       <action id="Jujutsu.RestoreFile" class="in.kkkev.jjidea.actions.file.RestoreSelectionAction"/>
       <reference ref="Jujutsu.RestoreToChange"/>
       <separator/>
-      <reference ref="Jujutsu.ResolveConflicts"/>
+      <reference ref="Jujutsu.ResolveSelectedConflicts"/>
       <separator/>
       <reference ref="Jujutsu.SquashFiles"/>
       <reference ref="Jujutsu.SplitFiles"/>

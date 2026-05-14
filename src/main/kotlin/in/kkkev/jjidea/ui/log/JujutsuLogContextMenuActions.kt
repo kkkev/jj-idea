@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
+import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
 import `in`.kkkev.jjidea.actions.change.copyIdAction
 import `in`.kkkev.jjidea.actions.change.describeAction
 import `in`.kkkev.jjidea.actions.change.editChangeAction
@@ -58,6 +59,7 @@ object JujutsuLogContextMenuActions {
         // Can abandon any mutable change including working copy
         // TODO Allow abandon on multiple if all entries are immutable
         add(abandonChangeAction(project, entry?.takeIf { !it.immutable }))
+        add(resolveConflictsAction(project, entry))
 
         addSeparator()
 

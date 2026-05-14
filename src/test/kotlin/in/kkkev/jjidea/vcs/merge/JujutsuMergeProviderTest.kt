@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 class JujutsuMergeProviderTest {
     private val project = mockk<Project>()
     private val extractor = mockk<ConflictExtractor>()
-    private val provider = JujutsuMergeProvider(project, extractor)
+    private val provider = JujutsuMergeProvider(project, extractor, repoFor = { null })
 
     @Test
     fun `loadRevisions - conflict content - returns correct MergeData`() {

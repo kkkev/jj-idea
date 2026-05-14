@@ -16,6 +16,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * - Separator
  * - Restore (Jujutsu.RestoreFile) - visible in working copy context
  * - Restore to This (Jujutsu.RestoreToChange) - visible in historical context
+ * - Resolve Conflicts (Jujutsu.ResolveSelectedConflicts) - visible when selection contains conflicted files
  *
  * Actions self-filter their visibility based on the data context
  * (specifically [in.kkkev.jjidea.actions.JujutsuDataKeys.LOG_ENTRY]).
@@ -40,6 +41,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     // Restore actions self-filter: RestoreFile visible for working copy, RestoreToChange for historical
     actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.RestoreToChange")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.ResolveSelectedConflicts")?.let { group.add(it) }
 
     group.addSeparator()
 

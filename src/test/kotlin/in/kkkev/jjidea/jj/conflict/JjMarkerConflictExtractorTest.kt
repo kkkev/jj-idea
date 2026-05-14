@@ -83,16 +83,16 @@ class JjMarkerConflictExtractorTest {
     }
 
     @Test
-    fun `new format - diff-style section plus content section`() {
-        // Format produced by current JJ versions: %%%%%%% diff + \\\\\\\ to + +++++++ content
+    fun `diff format - side1 then diff section (real jj format)`() {
+        // Real jj diff format: +++++++ side1 comes FIRST, then %%%%%%% diff from base to side2
         val input = """
             |context before
             |<<<<<<< conflict 1 of 1
-            |%%%%%%% diff from: abc123 "side A parent"
-            |\\\\\\\ to: def456 "side A"
-            |+ours content
-            |+++++++ ghi789 "side B"
-            |theirs content
+            |+++++++ abc123 "side A"
+            |ours content
+            |%%%%%%% diff from: parent "base"
+            |\\\\\\\ to: def456 "side B"
+            |+theirs content
             |>>>>>>> conflict 1 of 1 ends
             |context after
         """.trimMargin()
@@ -106,24 +106,97 @@ class JjMarkerConflictExtractorTest {
     }
 
     @Test
-    fun `new format - diff section with additions and deletions`() {
+    fun `git format - single conflict with base`() {
+        // Format used with `ui.conflict-marker-style = "git"` (jj 0.28+)
+        val input = """
+            |context before
+            |<<<<<<< abc123 "side A" (rebase destination)
+            |ours content
+            |||||||| parent123 "base" (parents of rebased revision)
+            |base content
+            |=======
+            |theirs content
+            |>>>>>>> def456 "side B" (rebased revision)
+            |context after
+        """.trimMargin()
+
+        val result = extractor.extract(input.toByteArray(Charsets.UTF_8))
+
+        result shouldNotBe null
+        result!!.CURRENT.toString(Charsets.UTF_8) shouldBe "context before\nours content\ncontext after"
+        result.ORIGINAL.toString(Charsets.UTF_8) shouldBe "context before\nbase content\ncontext after"
+        result.LAST.toString(Charsets.UTF_8) shouldBe "context before\ntheirs content\ncontext after"
+    }
+
+    @Test
+    fun `git format - multiple conflict blocks`() {
+        val input = """
+            |line1
+            |<<<<<<< abc "side A"
+            |ours-A
+            |||||||| base "parent"
+            |base-A
+            |=======
+            |theirs-A
+            |>>>>>>> def "side B"
+            |line2
+            |<<<<<<< abc "side A"
+            |ours-B
+            |||||||| base "parent"
+            |base-B
+            |=======
+            |theirs-B
+            |>>>>>>> def "side B"
+            |line3
+        """.trimMargin()
+
+        val result = extractor.extract(input.toByteArray(Charsets.UTF_8))
+
+        result shouldNotBe null
+        result!!.CURRENT.toString(Charsets.UTF_8) shouldBe "line1\nours-A\nline2\nours-B\nline3"
+        result.ORIGINAL.toString(Charsets.UTF_8) shouldBe "line1\nbase-A\nline2\nbase-B\nline3"
+        result.LAST.toString(Charsets.UTF_8) shouldBe "line1\ntheirs-A\nline2\ntheirs-B\nline3"
+    }
+
+    @Test
+    fun `git format - empty base section`() {
+        // Base is empty (content was added on one side, nothing on the other)
+        val input = """
+            |<<<<<<< abc "side A" (rebase destination)
+            |ours content
+            |||||||| parent "base"
+            |=======
+            |theirs content
+            |>>>>>>> def "side B"
+        """.trimMargin()
+
+        val result = extractor.extract(input.toByteArray(Charsets.UTF_8))
+
+        result shouldNotBe null
+        result!!.CURRENT.toString(Charsets.UTF_8) shouldBe "ours content"
+        result.ORIGINAL.toString(Charsets.UTF_8) shouldBe ""
+        result.LAST.toString(Charsets.UTF_8) shouldBe "theirs content"
+    }
+
+    @Test
+    fun `diff format - diff section with context additions and deletions`() {
         val input = """
             |<<<<<<< conflict 1 of 1
-            |%%%%%%% diff from: abc123 "parent"
-            |\\\\\\\ to: def456 "side A"
+            |+++++++ abc123 "side A"
+            |ours content
+            |%%%%%%% diff from: parent "base"
+            |\\\\\\\ to: def456 "side B"
             |unchanged line
             |+added line
             |-removed line
-            |+++++++ ghi789 "side B"
-            |theirs content
             |>>>>>>> conflict 1 of 1 ends
         """.trimMargin()
 
         val result = extractor.extract(input.toByteArray(Charsets.UTF_8))
 
         result shouldNotBe null
-        result!!.CURRENT.toString(Charsets.UTF_8) shouldBe "unchanged line\nadded line"
+        result!!.CURRENT.toString(Charsets.UTF_8) shouldBe "ours content"
         result.ORIGINAL.toString(Charsets.UTF_8) shouldBe "unchanged line\nremoved line"
-        result.LAST.toString(Charsets.UTF_8) shouldBe "theirs content"
+        result.LAST.toString(Charsets.UTF_8) shouldBe "unchanged line\nadded line"
     }
 }

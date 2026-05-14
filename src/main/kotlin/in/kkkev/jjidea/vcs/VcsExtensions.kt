@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.vcs
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
@@ -15,6 +16,13 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 
 private val log = Logger.getInstance("in.kkkev.jjidea.vcs.VcsExtensions")
+
+/**
+ * Find JujutsuVcs for a project. Returns null if not found.
+ * Use when VCS might not be available (e.g., general actions that could run in any context).
+ */
+val Project.possibleJujutsuVcs
+    get() = ProjectLevelVcsManager.getInstance(this).findVcsByName(JujutsuVcs.VCS_NAME) as? JujutsuVcs
 
 val Project?.isJujutsu get() = this?.stateModel?.isJujutsu == true
 

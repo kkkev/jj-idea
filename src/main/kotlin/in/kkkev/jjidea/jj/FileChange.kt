@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.Change
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.locator
@@ -19,6 +20,7 @@ sealed interface FileChange {
     }
 
     val status: Status
+    val isConflicted: Boolean get() = false
     val before: FileAtVersion?
     val after: FileAtVersion?
 
@@ -30,7 +32,11 @@ sealed interface FileChange {
      */
     val filePath: FilePath
 
-    data class Modified(override val before: FileAtVersion, override val after: FileAtVersion) : FileChange {
+    data class Modified(
+        override val before: FileAtVersion,
+        override val after: FileAtVersion,
+        override val isConflicted: Boolean = false
+    ) : FileChange {
         override val status = Status.MODIFIED
 
         override val filePath = after.filePath
@@ -71,13 +77,13 @@ sealed interface FileChange {
         fun from(change: Change): FileChange {
             val before = change.beforeRevision
             val after = change.afterRevision
+            val conflicted = change.fileStatus == FileStatus.MERGED_WITH_CONFLICTS
             return when {
                 after == null -> Deleted(
                     change.filePath.fileAt(requireNotNull(before) { "Change has no before or after revision" }.locator)
                 )
-
                 before == null -> Added(after.fileAtVersion)
-                before.file == after.file -> Modified(before.fileAtVersion, after.fileAtVersion)
+                before.file == after.file -> Modified(before.fileAtVersion, after.fileAtVersion, conflicted)
                 else -> Renamed(before.fileAtVersion, after.fileAtVersion)
             }
         }

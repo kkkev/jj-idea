@@ -52,6 +52,8 @@ class JjMarkerConflictExtractor : ConflictExtractor {
         val sections = mutableListOf<Pair<Kind, List<String>>>()
         var kind: Kind? = null
         val buf = mutableListOf<String>()
+        // Collects lines before the first format-specific marker (SIDE1 in git-style format)
+        val preHeaderBuf = mutableListOf<String>()
         var closed = false
 
         while (i < lines.size) {
@@ -59,14 +61,42 @@ class JjMarkerConflictExtractor : ConflictExtractor {
             when {
                 line.startsWith(">>>>>>>") -> {
                     kind?.let { sections.add(it to buf.toList()) }
+                        ?: run { if (preHeaderBuf.isNotEmpty()) sections.add(Kind.SIDE1 to preHeaderBuf.toList()) }
                     closed = true
                     i++
                     break
                 }
+                // Git conflict style (jj 0.28+, also used with `ui.conflict-marker-style = "git"`):
+                //   <<<<<<< side1 info
+                //   ... side1 content ...
+                //   ||||||| base info
+                //   ... base content ...
+                //   =======
+                //   ... side2 content ...
+                //   >>>>>>> side2 info
+                line.startsWith("|||||||") -> {
+                    kind?.let { sections.add(it to buf.toList()) } ?: sections.add(Kind.SIDE1 to preHeaderBuf.toList())
+                    buf.clear()
+                    kind = Kind.BASE
+                }
+                line == "=======" && (kind == null || kind == Kind.BASE) -> {
+                    if (kind == null) sections.add(Kind.SIDE1 to preHeaderBuf.toList())
+                    else sections.add(Kind.BASE to buf.toList())
+                    buf.clear()
+                    kind = Kind.SIDE2
+                }
+                // Old/snapshot conflict style (+++++++/-------) and diff style (%%%%%%%):
+                //   <<<<<<< Conflict N of M
+                //   +++++++ Contents of side #1
+                //   ...
+                //   ------- base
+                //   ...
+                //   +++++++ Contents of side #2
+                //   ...
+                //   >>>>>>>
                 line.startsWith("+++++++") -> {
                     kind?.let { sections.add(it to buf.toList()) }
                     buf.clear()
-                    // Header lines set section and are intentionally not added to content
                     kind = when {
                         line.contains("Contents of side #1") -> Kind.SIDE1
                         line.contains("Contents of side #2") -> Kind.SIDE2
@@ -85,38 +115,48 @@ class JjMarkerConflictExtractor : ConflictExtractor {
                 }
                 // Skip the "\\\\\\\ to: ..." diff-section header continuation line
                 line.startsWith("\\\\\\") -> Unit
-                else -> kind?.let { buf.add(line) }
+                else -> kind?.let { buf.add(line) } ?: preHeaderBuf.add(line)
             }
             i++
         }
 
         if (!closed) return null
 
-        // Old format: explicit SIDE1 + BASE + SIDE2
+        // Git format (with base): side1 + base + side2
         val side1 = sections.find { it.first == Kind.SIDE1 }?.second
         val base = sections.find { it.first == Kind.BASE }?.second
         val side2 = sections.find { it.first == Kind.SIDE2 }?.second
         if (side1 != null && base != null && side2 != null) {
             return Block(side1, base, side2, i)
         }
+        // Git format (without base): side1 + side2
+        if (side1 != null && side2 != null) {
+            return Block(side1, emptyList(), side2, i)
+        }
 
-        // New format: DIFF section (reconstruct sides from unified diff) + CONTENT section(s)
+        // Diff format: CONTENT section (full side1) + DIFF section (unified diff from base to side2)
+        //   +++++++  side1 content  →  Kind.CONTENT
+        //   %%%%%%%  diff …         →  Kind.DIFF
+        //   \\\\\\\  to: …          →  (skipped)
+        //   - base line
+        //   + side2 line
         val diffLines = sections.find { it.first == Kind.DIFF }?.second
         val contentSections = sections.filter { it.first == Kind.CONTENT }
         if (diffLines != null) {
-            val cur = mutableListOf<String>()
+            // Reconstruct base (orig) and side2 (theirs) from the unified diff.
+            // Context lines (no prefix) appear in both; - lines are base-only; + lines are side2-only.
+            val side2 = mutableListOf<String>()
             val orig = mutableListOf<String>()
             for (dl in diffLines) {
                 when {
-                    dl.startsWith("+") -> cur.add(dl.substring(1))
+                    dl.startsWith("+") -> side2.add(dl.substring(1))
                     dl.startsWith("-") -> orig.add(dl.substring(1))
-                    else -> {
-                        cur.add(dl)
-                        orig.add(dl)
-                    }
+                    else -> { side2.add(dl); orig.add(dl) }
                 }
             }
-            return Block(cur, orig, contentSections.lastOrNull()?.second ?: emptyList(), i)
+            // side1 (ours) is the full content from the +++++++  CONTENT section
+            val side1 = contentSections.lastOrNull()?.second ?: emptyList()
+            return Block(side1, orig, side2, i)
         }
 
         // Fallback: treat collected CONTENT sections as CURRENT and LAST

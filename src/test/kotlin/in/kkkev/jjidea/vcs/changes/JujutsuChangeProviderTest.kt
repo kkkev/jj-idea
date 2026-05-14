@@ -265,7 +265,7 @@ class JujutsuChangeProviderTest {
 
         val filePathSlot = slot<FilePath>()
         every {
-            repo.createRevision(capture(filePathSlot), any())
+            repo.createContentRevision(capture(filePathSlot), any<ContentLocator>())
         } answers {
             val result = mockk<ContentRevision>()
             every { result.file } returns filePathSlot.captured
@@ -293,7 +293,7 @@ class JujutsuChangeProviderTest {
         } returns Unit
 
         every {
-            repo.createRevision(any(), any())
+            repo.createContentRevision(any(), any<ContentLocator>())
         } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
@@ -341,13 +341,13 @@ class JujutsuChangeProviderTest {
 
         val output = mixedConflictStatus(
             listOf("M conflict.txt", "M clean.txt"),
-            listOf("conflict.txt    2-sided conflict"),
+            listOf("conflict.txt    2-sided conflict")
         )
 
         val changes = mutableListOf<Change>()
         every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
 
-        every { repo.createRevision(any(), any()) } answers {
+        every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
         }
@@ -366,13 +366,13 @@ class JujutsuChangeProviderTest {
         val output = mixedConflictStatus(
             listOf("M conflict.txt"),
             listOf("conflict.txt    2-sided conflict"),
-            trailingWarning = "Warning: These bookmarks have conflicts:",
+            trailingWarning = "Warning: These bookmarks have conflicts:"
         )
 
         val changes = mutableListOf<Change>()
         every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
 
-        every { repo.createRevision(any(), any()) } answers {
+        every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
         }
@@ -393,7 +393,7 @@ class JujutsuChangeProviderTest {
         every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
-        every { repo.createRevision(capture(filePathSlot), any()) } answers {
+        every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
             mockk<ContentRevision> { every { file } returns filePathSlot.captured }
         }
 
@@ -412,13 +412,13 @@ class JujutsuChangeProviderTest {
 
         val output = emptyMergeWithConflicts(
             "a.txt    2-sided conflict",
-            "b.txt    2-sided conflict",
+            "b.txt    2-sided conflict"
         )
 
         val changes = mutableListOf<Change>()
         every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
 
-        every { repo.createRevision(any(), any()) } answers {
+        every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
         }
@@ -427,7 +427,7 @@ class JujutsuChangeProviderTest {
 
         changes.map { it.fileStatus } shouldBe listOf(
             FileStatus.MERGED_WITH_CONFLICTS,
-            FileStatus.MERGED_WITH_CONFLICTS,
+            FileStatus.MERGED_WITH_CONFLICTS
         )
     }
 
@@ -439,12 +439,12 @@ class JujutsuChangeProviderTest {
 
         val output = mixedConflictStatus(
             listOf("M $longPath", "M model/outgoingdatasender.go"),
-            listOf("$longPath 2-sided conflict"),
+            listOf("$longPath 2-sided conflict")
         )
 
         val changes = mutableListOf<Change>()
         every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
-        every { repo.createRevision(any(), any()) } answers {
+        every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
         }
@@ -458,18 +458,19 @@ class JujutsuChangeProviderTest {
 
     @Test
     fun `parseConflictPaths parses jj resolve -l output`() {
-        val output = """
+        val output =
+            """
             gateway/lib/gatewaysnapshotvolatileservice.go 2-sided conflict
             gateway/lib/gatewaywrapper.go       2-sided conflict
             gateway/lib/snapshotworker.go       2-sided conflict including 1 deletion
-        """.trimIndent()
+            """.trimIndent()
 
         val paths = jcp.parseConflictPaths(output)
 
         paths shouldBe setOf(
             "gateway/lib/gatewaysnapshotvolatileservice.go",
             "gateway/lib/gatewaywrapper.go",
-            "gateway/lib/snapshotworker.go",
+            "gateway/lib/snapshotworker.go"
         )
     }
 
@@ -481,13 +482,13 @@ class JujutsuChangeProviderTest {
 
         val statusOutput = mixedConflictStatus(
             listOf("M $longPath", "M model/clean.go"),
-            emptyList(),
+            emptyList()
         )
         val explicitConflictPaths = setOf(longPath)
 
         val changes = mutableListOf<Change>()
         every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
-        every { repo.createRevision(any(), any()) } answers {
+        every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
         }
@@ -519,7 +520,7 @@ private fun emptyMergeWithConflicts(vararg conflictLines: String) =
 private fun mixedConflictStatus(
     statusLines: List<String>,
     conflictLines: List<String>,
-    trailingWarning: String = "",
+    trailingWarning: String = ""
 ) = """
     Working copy changes:
     ${statusLines.joinToString("\n")}

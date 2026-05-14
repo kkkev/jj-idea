@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Conflict resolution: conflicted files detected via `jj resolve --list` appear in red (MERGED_WITH_CONFLICTS) in the working copy panel
+- Three-way merge dialog opens on conflicted files showing ours / base / theirs; supports bulk Accept Yours / Accept Theirs
+- "Resolve Conflicts…" context menu action scoped to the selected files in the working copy panel, or the focused file in the editor; only visible when the selection contains conflicted files
+- Conflicted files now appear highlighted in the log details pane when a conflicted commit is selected
+- "Resolve Conflicts…" in the log row context menu for the working copy entry when conflicts are present
+- "Resolve Conflicts…" in the log details pane changes tree for working copy entries
+
+### Fixed
+- Conflict marker parsing handles all three jj formats — snapshot (`+++++++`), diff (`%%%%%%%`), and git (`|||||||`/`=======`) — including the git format introduced as the default in jj 0.37
+
 ## [0.6.9] - 2026-05-14
 
 ### Fixed

@@ -198,6 +198,97 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] has open in -> remote ✅
 - [ ] open in -> remote for single parent opens that parent ✅
 
+### Conflict Resolution
+
+#### Test setup
+
+Create a reproducible conflict in a scratch jj repo:
+
+```bash
+mkdir /tmp/jj-conflict-test && cd /tmp/jj-conflict-test
+jj git init
+echo -e "line 1\nshared line\nline 3" > file.txt
+jj describe -m "initial"
+jj new -m "change A"
+echo -e "line 1\nchanged by A\nline 3" > file.txt
+jj new -r @- -m "change B"
+echo -e "line 1\nchanged by B\nline 3" > file.txt
+jj rebase -r @- -d @   # rebase change A onto change B → conflict
+```
+
+The working copy is now change A rebased on change B, with `file.txt` in conflict.
+
+To test each conflict marker style (jj 0.37+ defaults to `git`):
+```bash
+jj config set ui.conflict-marker-style git       # <<<<<<< / ||||||| / ======= / >>>>>>>
+jj config set ui.conflict-marker-style snapshot  # +++++++ / ------- / +++++++
+jj config set ui.conflict-marker-style diff      # +++++++ / %%%%%%% / \\\\\\\
+```
+After each `config set`, rerun `jj rebase` (or `jj restore`) to regenerate conflict markers in the chosen format.
+
+Open `/tmp/jj-conflict-test` as a project in the plugin IDE (`./gradlew runIde`).
+
+#### Detection
+
+- [ ] `file.txt` appears in the Working Copy panel with red (MERGED_WITH_CONFLICTS) status
+- [ ] All three marker styles (git, snapshot, diff) correctly mark the file as conflicted
+
+#### "Resolve Conflicts" context menu action (selection-scoped)
+
+- [ ] Right-clicking a **non-conflicted** file in the Working Copy panel: "Resolve Conflicts…" is **not visible**
+- [ ] Right-clicking `file.txt` (conflicted): "Resolve Conflicts…" **is visible**
+- [ ] Invoking it opens the merge dialog containing **only** `file.txt`, not unrelated files
+- [ ] Multi-select: selecting one conflicted + one non-conflicted file → dialog contains only the conflicted file
+- [ ] Multi-select: selecting two conflicted files → dialog contains both
+
+#### "Resolve Conflicts" global action (editor / project view / VCS menu)
+
+- [ ] Right-clicking any file or directory in the Project view → Jujutsu → Resolve Conflicts…: opens dialog with **all** conflicted files
+- [ ] Opening `file.txt` in the editor, right-clicking → Jujutsu → Resolve Conflicts…: opens all conflicted files (global action, not scoped to editor file)
+
+#### Three-way merge dialog — content correctness
+
+- [ ] Left pane shows "ours" content (`changed by A`, the rebased change)
+- [ ] Right pane shows "theirs" content (`changed by B`, the destination)
+- [ ] Center pane is editable; initially shows a proposed merge result (not identical to left or right)
+- [ ] Left and right panes are **not** identical — conflict regions are highlighted
+- [ ] Works correctly for all three marker styles (git, snapshot, diff)
+
+#### Resolving via the merge dialog
+
+- [ ] Edit the center pane to a desired resolution and click Apply / Save
+- [ ] After closing the dialog, `file.txt` content on disk reflects the resolution (no conflict markers)
+- [ ] `file.txt` disappears from the Working Copy panel's conflict list (status updates on next refresh)
+
+#### Accept Yours / Accept Theirs (bulk)
+
+- [ ] In the multi-file merge dialog, selecting `file.txt` and clicking **Accept Yours**: file on disk contains "ours" content with no conflict markers
+- [ ] Status refreshes: `file.txt` leaves conflicted state
+- [ ] **Accept Theirs** analogously writes "theirs" content
+
+#### Log details pane (commit selected in log table)
+
+Use the same conflict setup above. The test repo has a conflicted commit that is **not** the working copy (e.g., run `jj new` to create an empty working copy on top of the conflicted change).
+
+- [ ] Selecting the **conflicted historical commit** in the log: conflicted file appears in the details panel with red (MERGED_WITH_CONFLICTS) status
+- [ ] Selecting the **conflicted historical commit**: "Resolve Conflicts…" is **not visible** in the details panel context menu (only working copy conflicts are resolvable)
+- [ ] Selecting the **working copy commit** (empty, inherits conflict): "Resolve Conflicts…" **is visible** in the details panel context menu and opens the merge dialog for the inherited conflicted files
+
+#### Log row context menu
+
+- [ ] Right-clicking the **working copy entry** when conflicts exist: "Resolve Conflicts…" appears in the context menu
+- [ ] Right-clicking the **working copy entry** when no conflicts exist: "Resolve Conflicts…" is **not visible** (hidden, not just disabled)
+- [ ] Right-clicking a **non-working-copy entry** (even one with conflicts): "Resolve Conflicts…" is **not visible**
+- [ ] Invoking "Resolve Conflicts…" from the log row context menu opens the merge dialog with all conflicted files
+
+#### Multi-repo scoping
+
+In a project with two jj roots each having conflicts:
+
+- [ ] Right-clicking a conflicted file in root A's Working Copy panel → dialog shows only root A's conflicts
+- [ ] Right-clicking a conflicted file in root B's → dialog shows only root B's conflicts
+- [ ] Global action (VCS menu) → dialog shows conflicts from both roots
+
 ### Editors for Historical Versions
 - [ ] has title including change id ✅
 - [ ] has Jujutsu menu ✅

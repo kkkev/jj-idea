@@ -39,9 +39,14 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
                     val conflictedPaths = if (workingCopyInConflict(result.stdout)) {
                         val resolveResult = repo.commandExecutor.resolveList()
-                        if (resolveResult.isSuccess) parseConflictPaths(resolveResult.stdout)
-                        else collectConflictPathsFromStatus(result.stdout)
-                    } else emptySet()
+                        if (resolveResult.isSuccess) {
+                            parseConflictPaths(resolveResult.stdout)
+                        } else {
+                            collectConflictPathsFromStatus(result.stdout)
+                        }
+                    } else {
+                        emptySet()
+                    }
 
                     parseStatus(result.stdout, repo, builder, conflictedPaths)
                 } catch (e: ProcessCanceledException) {
@@ -71,7 +76,14 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         output: String,
         repo: JujutsuRepository,
         builder: ChangelistBuilder,
-        conflictedPaths: Set<String> = if (workingCopyInConflict(output)) collectConflictPathsFromStatus(output) else emptySet()
+        conflictedPaths: Set<String> = if (workingCopyInConflict(
+                output
+            )
+        ) {
+            collectConflictPathsFromStatus(output)
+        } else {
+            emptySet()
+        }
     ) {
         val lines = output.lines()
         val addedConflictPaths = mutableSetOf<String>()
