@@ -122,6 +122,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
                 addRenamedChange(filePath, repo, builder)
             }
 
+            'C' -> {
+                // Conflicted file
+                addConflictedChange(path, repo, builder)
+            }
+
             else -> {
                 log.debug("Unknown status '$status' for file: $filePath")
             }
@@ -152,6 +157,16 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
         builder.processChange(
             Change(beforeRevision, null, FileStatus.DELETED),
+            vcs.keyInstanceMethod
+        )
+    }
+
+    private fun addConflictedChange(path: FilePath, repo: JujutsuRepository, builder: ChangelistBuilder) {
+        val beforeRevision = repo.createContentRevision(path, repo.workingCopy.parentContentLocator)
+        val afterRevision = CurrentContentRevision(path)
+
+        builder.processChange(
+            Change(beforeRevision, afterRevision, FileStatus.MERGED_WITH_CONFLICTS),
             vcs.keyInstanceMethod
         )
     }

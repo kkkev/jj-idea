@@ -174,6 +174,9 @@ interface CommandExecutor {
      */
     fun restore(filePaths: List<FilePath>, revision: Revision): CommandResult
 
+    /** Lists all conflicted file paths in the given revision (infrastructure for the future Conflicts tool window). */
+    fun resolveList(revision: Revision = WorkingCopy): CommandResult
+
     /**
      * Rebase revisions onto a new destination.
      * @param revisions Revisions to rebase
