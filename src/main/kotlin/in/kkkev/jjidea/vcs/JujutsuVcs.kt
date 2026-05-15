@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
 import `in`.kkkev.jjidea.vcs.diff.JujutsuDiffProvider
 import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
+import `in`.kkkev.jjidea.vcs.merge.JujutsuMergeProvider
 
 /**
  * Main VCS implementation for Jujutsu
@@ -20,6 +21,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     private val lazyDiffProvider by lazy { JujutsuDiffProvider(project) }
     private val lazyHistoryProvider by lazy { JujutsuHistoryProvider(project) }
     private val lazyAnnotationProvider by lazy { JujutsuAnnotationProvider(myProject, this) }
+    private val lazyMergeProvider by lazy { JujutsuMergeProvider(myProject) }
 
     override fun getChangeProvider() = lazyChangeProvider
 
@@ -30,6 +32,8 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun getVcsBlockHistoryProvider() = lazyHistoryProvider
 
     override fun getAnnotationProvider() = lazyAnnotationProvider
+
+    override fun getMergeProvider() = lazyMergeProvider
 
     override fun getDisplayName(): String = JujutsuBundle.message("vcs.displayname")
 
