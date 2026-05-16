@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-05-16
+
 ### Added
 - Conflict resolution: conflicted files detected via `jj resolve --list` appear in red (MERGED_WITH_CONFLICTS) in the working copy panel
 - Three-way merge dialog opens on conflicted files showing ours / base / theirs; supports bulk Accept Yours / Accept Theirs
@@ -445,7 +447,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.8...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.9...HEAD
+[0.6.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.9
 [0.6.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.8
 [0.6.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.7
 [0.6.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.6

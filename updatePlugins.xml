@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.8/jj-idea-0.6.8.zip" version="0.6.8">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.9/jj-idea-0.6.9.zip" version="0.6.9">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,18 +23,19 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.8</h3>
+      <h3>0.6.9</h3>
       
+<h4>Added</h4>
+<li>Conflict resolution: conflicted files detected via `jj resolve --list` appear in red (MERGED_WITH_CONFLICTS) in the working copy panel</li>
+<li>Three-way merge dialog opens on conflicted files showing ours / base / theirs; supports bulk Accept Yours / Accept Theirs</li>
+<li>"Resolve Conflicts…" context menu action scoped to the selected files in the working copy panel, or the focused file in the editor; only visible when the selection contains conflicted files</li>
+<li>Conflicted files now appear highlighted in the log details pane when a conflicted commit is selected</li>
+<li>"Resolve Conflicts…" in the log row context menu for the working copy entry when conflicts are present</li>
+<li>"Resolve Conflicts…" in the log details pane changes tree for working copy entries</li>
+
 <h4>Fixed</h4>
-<li>"Open File in Remote" no longer causes IDE errors when hovering the context menu in large repos (eliminated synchronous jj subprocess call from action update)</li>
-<li>Diff on a directory opens diff views on all changed files under that directory</li>
-<li>Cmd+D (Show Diff) now works in working copy tool window regardless of which component has focus</li>
-<li>Compare with Local, Compare Before with Local, and Restore to This now appear and work in historical file editors</li>
-<li>Compare with Another Commit now appears in the changes tree context menu (details panel and working copy panel)</li>
-<li>Restore to This registered in editor Jujutsu menu</li>
-<li>Restore (working copy) correctly hidden in historical file editor context</li>
-<li>Jujutsu editor submenu grouped with separators matching the commit details panel layout</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.8">full release notes</a> for details.</p>
+<li>Conflict marker parsing handles all three jj formats — snapshot (`+++++++`), diff (`%%%%%%%`), and git (`|||||||`/`=======`) — including the git format introduced as the default in jj 0.37</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.9">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
