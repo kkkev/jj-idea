@@ -8,9 +8,11 @@ import java.awt.Component
 import java.util.concurrent.Future
 
 fun saveAllDocuments() {
-    if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
-        ApplicationManager.getApplication().runWriteIntentReadAction<Unit, Nothing> {
-            FileDocumentManager.getInstance().saveAllDocuments()
+    ApplicationManager.getApplication().invokeAndWait {
+        if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
+            ApplicationManager.getApplication().runWriteIntentReadAction<Unit, Nothing> {
+                FileDocumentManager.getInstance().saveAllDocuments()
+            }
         }
     }
 }
