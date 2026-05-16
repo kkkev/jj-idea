@@ -177,7 +177,6 @@ class CliExecutor(
     override fun show(filePath: FilePath, revision: Revision) =
         execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root!!)))
 
-
     override fun isAvailable() = try {
         val result = execute(null, listOf("--version"))
         result.isSuccess

@@ -57,7 +57,11 @@ class JujutsuMergeProvider(
         // Called on a background thread inside a modal task
         override fun acceptFilesRevisions(files: List<VirtualFile>, resolution: MergeSession.Resolution) {
             for (file in files) {
-                val mergeData = try { loadRevisions(file) } catch (_: VcsException) { continue }
+                val mergeData = try {
+                    loadRevisions(file)
+                } catch (_: VcsException) {
+                    continue
+                }
                 val content = when (resolution) {
                     MergeSession.Resolution.AcceptedYours -> mergeData.CURRENT
                     MergeSession.Resolution.AcceptedTheirs -> mergeData.LAST

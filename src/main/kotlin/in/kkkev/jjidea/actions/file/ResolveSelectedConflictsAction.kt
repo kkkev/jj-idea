@@ -41,15 +41,17 @@ class ResolveSelectedConflictsAction : DumbAwareAction(
         if (fromChanges.isNotEmpty()) return fromChanges
 
         val changeListManager = e.project?.let { ChangeListManager.getInstance(it) } ?: return emptyList()
-        return (if (e.logEntry?.isWorkingCopy == true) {
-            // Working copy log entry with inherited conflicts: the entry's own changes tree is empty
-            // because jj diff --summary shows 0 changes, but conflicts propagated from the parent are
-            // still materialised on disk and tracked by ChangeListManager.
-            changeListManager.allChanges
-        } else {
-            // Editor / project view: fall back to the single focused file
-            listOfNotNull(e.file?.let { file -> changeListManager.getChange(file) })
-        }).filter { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
+        return (
+            if (e.logEntry?.isWorkingCopy == true) {
+                // Working copy log entry with inherited conflicts: the entry's own changes tree is empty
+                // because jj diff --summary shows 0 changes, but conflicts propagated from the parent are
+                // still materialised on disk and tracked by ChangeListManager.
+                changeListManager.allChanges
+            } else {
+                // Editor / project view: fall back to the single focused file
+                listOfNotNull(e.file?.let { file -> changeListManager.getChange(file) })
+            }
+        ).filter { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
             .mapNotNull { it.virtualFile }
     }
 }

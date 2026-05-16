@@ -17,7 +17,9 @@ fun resolveConflictsAction(project: Project, entry: LogEntry?): DumbAwareAction 
         ChangeListManager.getInstance(project).allChanges
             .filter { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
             .mapNotNull { it.virtualFile }
-    } else emptyList()
+    } else {
+        emptyList()
+    }
 
     return object : DumbAwareAction(
         JujutsuBundle.message("action.resolve.conflicts"),

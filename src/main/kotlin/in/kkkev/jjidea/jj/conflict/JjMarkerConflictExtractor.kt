@@ -80,8 +80,11 @@ class JjMarkerConflictExtractor : ConflictExtractor {
                     kind = Kind.BASE
                 }
                 line == "=======" && (kind == null || kind == Kind.BASE) -> {
-                    if (kind == null) sections.add(Kind.SIDE1 to preHeaderBuf.toList())
-                    else sections.add(Kind.BASE to buf.toList())
+                    if (kind == null) {
+                        sections.add(Kind.SIDE1 to preHeaderBuf.toList())
+                    } else {
+                        sections.add(Kind.BASE to buf.toList())
+                    }
                     buf.clear()
                     kind = Kind.SIDE2
                 }
@@ -151,7 +154,10 @@ class JjMarkerConflictExtractor : ConflictExtractor {
                 when {
                     dl.startsWith("+") -> side2.add(dl.substring(1))
                     dl.startsWith("-") -> orig.add(dl.substring(1))
-                    else -> { side2.add(dl); orig.add(dl) }
+                    else -> {
+                        side2.add(dl)
+                        orig.add(dl)
+                    }
                 }
             }
             // side1 (ours) is the full content from the +++++++  CONTENT section

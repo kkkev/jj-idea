@@ -40,10 +40,11 @@ object ChangeService {
             }
             val afterContentRevision = fileChange.after?.let { after -> repo.createContentRevision(after) }
             val relativePath = fileChange.filePath.path.removePrefix(repo.directory.path + "/")
-            if (relativePath in conflictedPaths)
+            if (relativePath in conflictedPaths) {
                 Change(beforeContentRevision, afterContentRevision, FileStatus.MERGED_WITH_CONFLICTS)
-            else
+            } else {
                 Change(beforeContentRevision, afterContentRevision)
+            }
         }
         // jj diff --summary omits conflicted files; synthesise Change objects for them explicitly.
         val missingConflictChanges = (conflictedPaths - fileChangePaths).map { relativePath ->

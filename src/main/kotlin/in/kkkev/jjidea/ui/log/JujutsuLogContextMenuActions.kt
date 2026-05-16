@@ -10,12 +10,12 @@ import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
-import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
 import `in`.kkkev.jjidea.actions.change.copyIdAction
 import `in`.kkkev.jjidea.actions.change.describeAction
 import `in`.kkkev.jjidea.actions.change.editChangeAction
 import `in`.kkkev.jjidea.actions.change.newChangeFromAction
 import `in`.kkkev.jjidea.actions.change.rebaseAction
+import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
 import `in`.kkkev.jjidea.actions.change.splitAction
 import `in`.kkkev.jjidea.actions.change.squashAction
 import `in`.kkkev.jjidea.actions.change.squashableEntry
