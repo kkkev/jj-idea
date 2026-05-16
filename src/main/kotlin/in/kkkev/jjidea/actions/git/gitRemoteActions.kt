@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.invalidate
@@ -103,7 +104,7 @@ fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Re
         if (!dryRun.isSuccess) {
             if (dryRun.stderr.contains("Refusing to create new remote bookmark")) {
                 runLater {
-                    if (confirmUntrackedPush(project)) performPush(spec, project, revision)
+                    if (confirmUntrackedPush(project)) performPush(spec, project, revision, allowNew = true)
                 }
             } else {
                 runLater { dryRun.tellUser(project, "action.git.push.error") }
@@ -121,15 +122,22 @@ fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Re
     }
 }
 
-private fun performPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Revision?) {
+internal fun resolveAllowNew(forceAllowNew: Boolean, bookmark: Bookmark?) =
+    forceAllowNew || (bookmark != null && !bookmark.tracked)
+
+private fun performPush(
+    spec: GitPushDialog.GitPushSpec,
+    project: Project,
+    revision: Revision?,
+    allowNew: Boolean = false
+) {
     spec.repo.commandExecutor
         .createCommand {
-            val bm = spec.bookmark
             gitPush(
                 spec.remote,
-                bm,
+                spec.bookmark,
                 spec.allBookmarks,
-                allowNew = bm != null && !bm.tracked,
+                allowNew = resolveAllowNew(allowNew, spec.bookmark),
                 revision = revision
             )
         }

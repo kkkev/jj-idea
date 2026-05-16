@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Push dialog "Tracking bookmarks (default)" option now works correctly when new bookmarks need to be created on the remote — after the user confirms, the push proceeds with `--allow-new`
+
 ## [0.6.9] - 2026-05-16
 
 ### Added

@@ -1,10 +1,34 @@
 package `in`.kkkev.jjidea.actions.git
 
+import `in`.kkkev.jjidea.jj.Bookmark
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class GitPushActionTest {
+    @Nested
+    inner class `resolveAllowNew` {
+        @Test
+        fun `default scope without confirmation does not allow new`() =
+            resolveAllowNew(forceAllowNew = false, bookmark = null) shouldBe false
+
+        @Test
+        fun `default scope with user confirmation allows new`() =
+            resolveAllowNew(forceAllowNew = true, bookmark = null) shouldBe true
+
+        @Test
+        fun `specific untracked bookmark allows new`() =
+            resolveAllowNew(forceAllowNew = false, bookmark = Bookmark("feature", tracked = false)) shouldBe true
+
+        @Test
+        fun `specific tracked bookmark does not allow new`() =
+            resolveAllowNew(forceAllowNew = false, bookmark = Bookmark("main", tracked = true)) shouldBe false
+
+        @Test
+        fun `force plus tracked bookmark still allows new`() =
+            resolveAllowNew(forceAllowNew = true, bookmark = Bookmark("main", tracked = true)) shouldBe true
+    }
+
     @Nested
     inner class `parseForcePushBookmarks` {
         @Test

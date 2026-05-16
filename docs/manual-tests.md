@@ -149,6 +149,16 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Open in -> remote for single parent opens that parent (resolves to pushed ancestor)
 - [ ] Open in -> remote hidden when no pushed ancestor exists
 
+### Git Push Dialog
+
+Setup: have a local bookmark that has never been pushed to the remote.
+
+- [ ] Open push dialog (VCS menu → Push) → "Tracking bookmarks (default)" selected → OK → push completes (shows success notification)
+- [ ] Open push dialog → "Tracking bookmarks (default)" → if new bookmark exists, confirmation dialog appears asking whether to create remote bookmark → confirm → push succeeds with `--allow-new`
+- [ ] Open push dialog → "Specific bookmark" → select an untracked bookmark → OK → push succeeds with `--allow-new`
+- [ ] Open push dialog → "All bookmarks" → OK → pushes all bookmarks
+- [ ] Cancel push dialog → no push occurs
+
 ### Settings (Version Control > Jujutsu)
 
 - [ ] JJ executable path can be configured
