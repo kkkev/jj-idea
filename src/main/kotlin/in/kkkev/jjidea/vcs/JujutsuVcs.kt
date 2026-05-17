@@ -52,7 +52,18 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
      * This also bypasses a slow FileIndexFacade.isValidAncestor() check in MappingsToRoots
      * that would otherwise cause EDT slow operation warnings.
      */
+    override fun createCheckinEnvironment() = JujutsuCheckinEnvironment()
+
     override fun allowsNestedRoots() = true
+
+    /**
+     * Disables the standard IDEA commit dialog (Ctrl+K) for Jujutsu projects.
+     * Jujutsu has no "commit" concept — changes auto-snapshot to the working copy.
+     * Returning true here prevents the commit dialog from opening in Jujutsu-only projects.
+     * In mixed VCS projects (e.g. Jujutsu + Git), the platform skips this check when
+     * multiple VCS roots are active, so Git roots remain unaffected.
+     */
+    override fun isCommitActionDisabled() = true
 
     /**
      * The roots for this VCS.

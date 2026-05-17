@@ -104,6 +104,14 @@
     <action id="Jujutsu.GitFetch" class="in.kkkev.jjidea.actions.git.GitFetchAction"/>
     <action id="Jujutsu.GitPush" class="in.kkkev.jjidea.actions.git.GitPushAction"/>
 
+    <!-- Describe working copy: Ctrl+K replacement for Jujutsu projects -->
+    <action id="Jujutsu.DescribeWorkingCopy"
+            class="in.kkkev.jjidea.actions.change.DescribeWorkingCopyAction">
+      <keyboard-shortcut first-keystroke="control K" keymap="$default"/>
+      <keyboard-shortcut first-keystroke="meta K" keymap="Mac OS X"/>
+      <keyboard-shortcut first-keystroke="meta K" keymap="Mac OS X 10.5+"/>
+    </action>
+
     <!-- Open custom Jujutsu log tab -->
     <action id="Jujutsu.OpenLogTab"
             class="in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction">

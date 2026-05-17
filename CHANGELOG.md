@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Pressing Cmd+K in a Jujutsu project now opens the Describe Working Copy dialog instead of IntelliJ's commit dialog
+
 ### Fixed
+- Cmd+K (commit shortcut) is disabled in Jujutsu-only projects where it previously silently discarded the commit message; in mixed Jujutsu+Git projects, Jujutsu changes now show a clear error instead of being silently dropped
 - Push dialog "Tracking bookmarks (default)" option now works correctly when new bookmarks need to be created on the remote — after the user confirms, the push proceeds with `--allow-new`
 - Fetch action no longer throws an EDT threading error when clicked
 
