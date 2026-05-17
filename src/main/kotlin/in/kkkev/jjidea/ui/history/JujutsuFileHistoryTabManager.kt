@@ -45,6 +45,7 @@ class JujutsuFileHistoryTabManager(private val project: Project) : Disposable {
                 // Tab exists, just select it
                 val changesViewContentManager = ChangesViewContentManager.getInstance(project)
                 changesViewContentManager.setSelectedContent(existingContent)
+                ChangesViewContentManager.getToolWindowFor(project, existingContent.displayName)?.activate(null)
                 log.info("Selected existing file history tab for: ${filePath.name}")
                 return@runLater
             }
@@ -72,6 +73,7 @@ class JujutsuFileHistoryTabManager(private val project: Project) : Disposable {
             val changesViewContentManager = ChangesViewContentManager.getInstance(project)
             changesViewContentManager.addContent(content)
             changesViewContentManager.setSelectedContent(content)
+            ChangesViewContentManager.getToolWindowFor(project, content.displayName)?.activate(null)
 
             // Track the tab
             openTabs[pathKey] = content
