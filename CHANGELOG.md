@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Open Local File" action in the log detail panel and editor context menu: opens the working copy version of a file when viewing a historical revision
+
+### Fixed
+- Historical file editor tabs no longer lose their change ID suffix when the local version of the same file is opened
+
 ## [0.6.10] - 2026-05-17
 
 ### Added

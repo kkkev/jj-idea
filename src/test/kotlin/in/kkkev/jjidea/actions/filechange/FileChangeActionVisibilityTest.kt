@@ -109,6 +109,43 @@ class FileChangeActionVisibilityTest {
         CurrentContentRevision(LocalFilePath("/project/$path", false))
     )
 
+    // ── OpenLocalFileAction ───────────────────────────────────────────────────
+
+    @Nested
+    inner class `OpenLocalFile` {
+        @Test
+        fun `hidden when no LOG_ENTRY (working copy panel context)`() {
+            withChanges(historicalChange("Main.kt"))
+            OpenLocalFileAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `hidden when LOG_ENTRY is working copy`() {
+            withLogEntry(workingCopyEntry())
+            withChanges(historicalChange("Main.kt"))
+            OpenLocalFileAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `visible but disabled when historical entry with no changes and no file`() {
+            withLogEntry(historicalEntry())
+            OpenLocalFileAction().update(event)
+            presentation.isVisible shouldBe true
+            presentation.isEnabled shouldBe false
+        }
+
+        @Test
+        fun `visible and enabled when historical entry with historical changes`() {
+            withLogEntry(historicalEntry())
+            withChanges(historicalChange("Main.kt"))
+            OpenLocalFileAction().update(event)
+            presentation.isVisible shouldBe true
+            presentation.isEnabled shouldBe true
+        }
+    }
+
     // ── CompareWithLocalAction ────────────────────────────────────────────────
 
     @Nested
