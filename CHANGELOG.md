@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-05-17
+
 ### Added
 - Pressing Cmd+K in a Jujutsu project now opens the Describe Working Copy dialog instead of IntelliJ's commit dialog
 
@@ -456,7 +458,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.9...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.10...HEAD
+[0.6.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.10
 [0.6.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.9
 [0.6.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.8
 [0.6.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.7
