@@ -31,16 +31,18 @@ class CompareFileWithBranchAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
-        val files = e.files
-        val repo = e.singleRepoForFiles ?: return
+        runInBackground {
+            val files = e.files
+            val repo = e.singleRepoForFiles ?: return@runInBackground
 
-        if (!files.isEmpty()) {
-            RevisionSelectorPopup.show(
-                "action.compare.branch.popup.title",
-                repo,
-                RevisionSelectorPopup.Filter(true, true)
-            ) { chosen ->
-                showDiff(repo, files, chosen)
+            if (!files.isEmpty()) {
+                RevisionSelectorPopup.show(
+                    "action.compare.branch.popup.title",
+                    repo,
+                    RevisionSelectorPopup.Filter(true, true)
+                ) { chosen ->
+                    showDiff(repo, files, chosen)
+                }
             }
         }
     }

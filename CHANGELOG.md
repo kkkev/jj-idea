@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Historical file editor tabs no longer lose their change ID suffix when the local version of the same file is opened
 
+### Changed
+- Revision selector allows for search by commit id
+
 ## [0.6.10] - 2026-05-17
 
 ### Added

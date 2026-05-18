@@ -52,6 +52,8 @@ object RevisionSelectorPopup {
                 query.isEmpty() ||
                     entry.id.short.contains(query, ignoreCase = true) ||
                     entry.id.full.contains(query, ignoreCase = true) ||
+                    entry.commitId.short.contains(query, ignoreCase = true) ||
+                    entry.commitId.full.contains(query, ignoreCase = true) ||
                     entry.description.display.contains(query, ignoreCase = true)
             )
     }
@@ -121,7 +123,7 @@ object RevisionSelectorPopup {
         private val onSelected: (Revision) -> Unit
     ) : JPanel(BorderLayout()) {
         val searchField = SearchTextField(false).apply {
-            textEditor.emptyText.text = "Search by change ID or description..."
+            textEditor.emptyText.text = JujutsuBundle.message("dialog.revisionselector.search.emptytext")
         }
 
         private val listModel = DefaultListModel<CompareItem>()
