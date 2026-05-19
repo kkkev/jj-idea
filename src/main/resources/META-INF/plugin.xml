@@ -53,6 +53,8 @@
     <applicationService serviceImplementation="in.kkkev.jjidea.settings.JujutsuApplicationSettings"/>
     <vcs name="Jujutsu" vcsClass="in.kkkev.jjidea.vcs.JujutsuVcs" administrativeAreaName=".jj"/>
     <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" order="first"/>
+    <!-- Promotes Jujutsu.ShowChangesDiff over built-in Compare.SameVersion/LastVersion for Ctrl+D -->
+    <actionPromoter implementation="in.kkkev.jjidea.vcs.JujutsuActionPromoter"/>
 
     <!-- Bootstrap state model and tool window management on project open -->
     <postStartupActivity implementation="in.kkkev.jjidea.ui.services.JujutsuStartupActivity"/>

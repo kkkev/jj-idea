@@ -39,12 +39,13 @@ data class ChangeIdRevisionNumber(val changeId: ChangeId) : JujutsuRevisionNumbe
     override fun asString() = changeId.toString()
 
     /**
-     * Compares revision numbers by comparing the underlying revisions. Used when building changelists. Ordering doesn't
-     * matter - just equality.
+     * Compares revision numbers by equality only — ordering is meaningless for change IDs.
+     * Lexicographic comparison of change ID strings would cause IntelliJ to unpredictably invert
+     * diff sides in DiffActionExecutor.
      */
-    override fun compareTo(other: VcsRevisionNumber?) = if (other !is ChangeIdRevisionNumber) {
-        0
-    } else {
-        changeId.toString().compareTo(other.changeId.toString())
+    override fun compareTo(other: VcsRevisionNumber?) = when {
+        other !is ChangeIdRevisionNumber -> 0
+        changeId == other.changeId -> 0
+        else -> -1
     }
 }

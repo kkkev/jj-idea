@@ -7,7 +7,6 @@ import com.intellij.openapi.vcs.diff.DiffProvider
 import com.intellij.openapi.vcs.diff.ItemLatestState
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.contentLocator
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
@@ -30,9 +29,7 @@ class JujutsuDiffProvider(private val project: Project) : DiffProvider {
         project.jujutsuRepositoryFor(filePath).createContentRevision(filePath, it.contentLocator)
     }
 
-    // TODO When addressing jj-idea-3jo, ensure that these return the correct change ids
-    override fun getCurrentRevision(file: VirtualFile) =
-        ChangeIdRevisionNumber(project.jujutsuRepositoryFor(file).workingCopy.id)
+    override fun getCurrentRevision(file: VirtualFile) = getLatestCommittedRevision(file)
 
     override fun getLatestCommittedRevision(file: VirtualFile) =
         project.jujutsuRepositoryFor(file).revisionNumberFor(file.filePath)
