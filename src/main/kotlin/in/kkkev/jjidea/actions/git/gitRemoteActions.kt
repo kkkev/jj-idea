@@ -17,33 +17,54 @@ import `in`.kkkev.jjidea.util.runLater
 
 private val log = Logger.getInstance("in.kkkev.jjidea.actions.git.gitRemoteActions")
 
+internal fun noRemoteNotification(project: Project) =
+    JujutsuNotifications.notify(
+        project,
+        JujutsuBundle.message("action.git.no.remote.title"),
+        JujutsuBundle.message("action.git.no.remote.message"),
+        NotificationType.WARNING
+    )
+
+internal fun performFetch(spec: GitFetchDialog.GitFetchSpec, project: Project) {
+    spec.repos.forEach { repo ->
+        val remoteLabel = when {
+            spec.allRemotes -> JujutsuBundle.message("action.git.fetch.remote.all")
+            spec.remote != null -> spec.remote.name
+            else -> repo.gitRemotes.firstOrNull()?.name ?: repo.displayName
+        }
+        repo.commandExecutor
+            .createCommand { gitFetch(spec.remote, spec.allRemotes) }
+            .onSuccess {
+                repo.invalidate(vfsChanged = true)
+                log.info("Fetched for ${repo.displayName}")
+            }
+            .onFailure { tellUser(project, "action.git.fetch.error") }
+            .executeWithProgress(project, JujutsuBundle.message("progress.git.fetch", remoteLabel))
+    }
+}
+
 /**
  * Factory action for fetching from Git remote for a specific repository.
  * Used in log context menu where a single repo is known.
+ * Skips the dialog when there is only one remote (nothing to choose).
  */
 fun gitFetchAction(project: Project, repo: JujutsuRepository?) =
     nullAndDumbAwareAction(repo, "log.action.git.fetch", AllIcons.Vcs.Fetch) {
         runInBackground {
-            val remotes = GitPushDialog.loadRemotes(target)
-            if (remotes.isEmpty()) {
-                runLater {
-                    JujutsuNotifications.notify(
-                        project,
-                        JujutsuBundle.message("action.git.no.remote.title"),
-                        JujutsuBundle.message("action.git.no.remote.message"),
-                        NotificationType.WARNING
-                    )
-                }
+            val data = GitFetchDialog.loadDialogData(target)
+            if (data.remotes.isEmpty()) {
+                runLater { noRemoteNotification(project) }
                 return@runInBackground
             }
-            target.commandExecutor
-                .createCommand { gitFetch() }
-                .onSuccess {
-                    target.invalidate()
-                    log.info("Fetched for ${target.displayName}")
-                }
-                .onFailure { tellUser(project, "action.git.fetch.error") }
-                .executeWithProgress(project, JujutsuBundle.message("progress.git.fetch"))
+            if (data.remotes.size == 1) {
+                performFetch(GitFetchDialog.GitFetchSpec(listOf(target), remote = null, allRemotes = false), project)
+                return@runInBackground
+            }
+            runLater {
+                val dialog = GitFetchDialog(project, mapOf(target to data), target)
+                if (!dialog.showAndGet()) return@runLater
+                performFetch(dialog.result ?: return@runLater, project)
+            }
         }
     }
 

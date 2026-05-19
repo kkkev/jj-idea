@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Fetch dialog with repository and remote selection: when multiple repos or remotes are configured, Fetch now opens a dialog to choose which repository (or all) and which remote (default, specific, or all remotes) to fetch from
+
 ## [0.6.12] - 2026-05-19
 
 ### Added
