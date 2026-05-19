@@ -15,6 +15,7 @@ class JujutsuVirtualFile(private val fileAtVersion: FileAtVersion, private val r
 
     init {
         putUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY, repo.getLogEntry(contentLocator))
+        setRevision(fileAtVersion.contentLocator.title)
     }
 
     override fun contentsToByteArray() = contents

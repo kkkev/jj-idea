@@ -141,6 +141,7 @@
            popup="true">
       <reference ref="Jujutsu.ShowChangesDiff"/>
       <separator/>
+      <action id="Jujutsu.OpenLocalFile" class="in.kkkev.jjidea.actions.filechange.OpenLocalFileAction"/>
       <reference ref="Jujutsu.CompareWithLocal"/>
       <reference ref="Jujutsu.CompareBeforeWithLocal"/>
       <reference ref="Jujutsu.CompareWithBranch"/>

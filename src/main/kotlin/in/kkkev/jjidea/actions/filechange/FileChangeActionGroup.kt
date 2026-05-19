@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * - Show Diff (Jujutsu.ShowChangesDiff)
  * - Open File (Jujutsu.OpenChangeFile)
  * - Separator
+ * - Open Local File (Jujutsu.OpenLocalFile) - visible in historical context
  * - Compare with Local (Jujutsu.CompareWithLocal) - visible in historical context
  * - Compare Before with Local (Jujutsu.CompareBeforeWithLocal) - visible in historical context with parents
  * - Open Repository Version (Jujutsu.OpenRepositoryVersion) - visible in historical context
@@ -30,7 +31,8 @@ fun fileChangeActionGroup(): DefaultActionGroup {
 
     group.addSeparator()
 
-    // Compare actions (self-filter: historical only)
+    // Compare/navigate actions (self-filter: historical only)
+    actionManager.getAction("Jujutsu.OpenLocalFile")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareWithLocal")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareBeforeWithLocal")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareWithBranch")?.let { group.add(it) }

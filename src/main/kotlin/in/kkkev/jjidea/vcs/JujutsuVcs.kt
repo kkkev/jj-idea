@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.AbstractVcs
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsKey
+import com.intellij.openapi.vcs.VcsType
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider
@@ -36,6 +37,8 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun getMergeProvider() = lazyMergeProvider
 
     override fun getDisplayName(): String = JujutsuBundle.message("vcs.displayname")
+
+    override fun getType() = VcsType.distributed
 
     override fun activate() {
         log.info("Jujutsu VCS activated for project: ${myProject.name}")
