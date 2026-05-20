@@ -363,6 +363,39 @@ In a project with two jj roots each having conflicts:
 - [ ] Right-clicking a conflicted file in root B's → dialog shows only root B's conflicts
 - [ ] Global action (VCS menu) → dialog shows conflicts from both roots
 
+### .gitignore File Status (jj-idea-ww5)
+
+**Setup**: open this project itself in `./gradlew runIde` — it has a `.gitignore` with `build/`, `.gradle/`, etc.
+
+#### Project Tool Window — ignored file coloring
+
+- [ ] `build/` directory is displayed with grayed-out (IGNORED) color in the Project tree
+- [ ] `.gradle/` directory is grayed out
+- [ ] `src/` and tracked source files are NOT grayed out
+- [ ] Nested files inside `build/` (e.g. `build/classes/Main.class`) are also grayed out (parent propagation)
+
+#### Local Changes — Ignored Files node
+
+- [ ] Version Control → Local Changes shows an "Ignored Files" group
+- [ ] `build/` and its contents appear under "Ignored Files"
+- [ ] Tracked modified files (e.g. a file you just edited) do NOT appear under "Ignored Files"; they appear as changes
+
+#### Reactive update on .gitignore edit
+
+Note: order matters — jj auto-tracks files created before the matching gitignore rule exists,
+so adding a file to .gitignore after it's already tracked will not untrack it (same as git).
+
+- [ ] Add `*.xyz` to `.gitignore` and save first
+- [ ] Then create a new file `test-ignored.xyz` in the repo root
+- [ ] It should appear gray (IGNORED color) in the Project tree immediately (jj did not auto-track it)
+- [ ] Remove `*.xyz` from `.gitignore` and save → `test-ignored.xyz` turns unversioned color (green/teal)
+- [ ] Delete `test-ignored.xyz` when done
+
+#### Tracked files not wrongly ignored
+
+- [ ] Edit a tracked file (e.g. `CHANGELOG.md`) — it should remain non-gray and appear in working copy changes
+- [ ] Even if `.gitignore` contained a pattern matching `CHANGELOG.md`, a tracked file would not be grayed (not tested here — tracked files are never passed to the ignore check)
+
 ### Editors for Historical Versions
 - [ ] has title including change id ✅
 - [ ] has Jujutsu menu ✅

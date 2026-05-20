@@ -24,6 +24,7 @@ import `in`.kkkev.jjidea.util.notifiableState
 import `in`.kkkev.jjidea.util.simpleNotifier
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
+import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.io.path.Path
@@ -231,6 +232,27 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                                 }
                             }
                         }
+                    }
+
+                    // When .gitignore or .git/info/exclude changes, invalidate the ignore cache
+                    // and mark the repo dirty recursively so getChanges re-enumerates ignored files.
+                    val ignoreService = JujutsuIgnoreService.getInstance(project)
+                    for (event in events) {
+                        if (event !is VFileContentChangeEvent &&
+                            event !is VFileCreateEvent &&
+                            event !is VFileDeleteEvent
+                        ) {
+                            continue
+                        }
+                        val file = event.file ?: continue
+                        val isGitignore = file.name == ".gitignore" ||
+                            file.path.endsWith(".git/info/exclude")
+                        if (!isGitignore) continue
+                        val repo = repos.firstOrNull { VfsUtil.isAncestor(it.directory, file, true) }
+                            ?: continue
+                        ignoreService.invalidate(repo)
+                        dirtyScopeManager.dirDirtyRecursively(repo.directory)
+                        hasRepoChanges = true
                     }
 
                     if (hasRepoChanges) {

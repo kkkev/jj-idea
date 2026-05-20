@@ -6,10 +6,14 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
+import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
+import java.io.File
 
 /**
  * Provides change information for jujutsu working copy
@@ -49,6 +53,10 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
                     }
 
                     parseStatus(result.stdout, repo, builder, conflictedPaths)
+
+                    val ignoreService = JujutsuIgnoreService.getInstance(vcs.project)
+                    val trackedPaths = collectTrackedAbsolutePaths(result.stdout, repo)
+                    reportIgnoredFiles(dirtyScope, repo, trackedPaths, builder, ignoreService)
                 } catch (e: ProcessCanceledException) {
                     throw e
                 } catch (e: Exception) {
@@ -196,6 +204,61 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             Change(beforeRevision, afterRevision, FileStatus.MERGED_WITH_CONFLICTS),
             vcs.keyInstanceMethod
         )
+    }
+
+    private fun collectTrackedAbsolutePaths(statusOutput: String, repo: JujutsuRepository): Set<String> {
+        val paths = mutableSetOf<String>()
+        var inWorkingCopy = false
+        for (line in statusOutput.lines()) {
+            val trimmed = line.trim()
+            when {
+                trimmed.startsWith("Working copy changes:") -> inWorkingCopy = true
+                trimmed.isEmpty() || trimmed.startsWith("Warning:") -> inWorkingCopy = false
+                inWorkingCopy && !trimmed.startsWith("Working copy") && trimmed.length >= 3 -> {
+                    val filePart = trimmed.substring(2).trim()
+                    if (filePart.isNotEmpty()) paths.add(repo.directory.path + "/$filePart")
+                }
+            }
+        }
+        return paths
+    }
+
+    private fun reportIgnoredFiles(
+        dirtyScope: VcsDirtyScope,
+        repo: JujutsuRepository,
+        trackedAbsolutePaths: Set<String>,
+        builder: ChangelistBuilder,
+        ignoreService: JujutsuIgnoreService
+    ) {
+        val repoRoot = File(repo.directory.path)
+        val cache = ignoreService.getCache(repo.directory)
+
+        fun coversRepo(dirPath: FilePath): Boolean {
+            val dirFile = dirPath.virtualFile ?: return repo.directory.path.startsWith(dirPath.path)
+            return VfsUtil.isAncestor(repo.directory, dirFile, false) ||
+                VfsUtil.isAncestor(dirFile, repo.directory, false)
+        }
+        val needsFullScan = dirtyScope.wasEveryThingDirty() ||
+            dirtyScope.recursivelyDirtyDirectories.any { coversRepo(it) }
+
+        if (needsFullScan) {
+            repoRoot.walk()
+                .onEnter { dir -> dir.name != ".jj" && dir.name != ".git" }
+                .filter { it.isFile }
+                .filter { it.path !in trackedAbsolutePaths }
+                .forEach { file ->
+                    val relPath = file.toRelativeString(repoRoot).replace('\\', '/')
+                    if (cache.isIgnored(relPath, false)) {
+                        builder.processIgnoredFile(VcsUtil.getFilePath(file))
+                    }
+                }
+        } else {
+            dirtyScope.dirtyFiles
+                .filter { fp -> fp.path.startsWith(repo.directory.path + "/") }
+                .filter { fp -> fp.path !in trackedAbsolutePaths }
+                .filter { fp -> ignoreService.isIgnored(fp, repo.directory) }
+                .forEach { fp -> builder.processIgnoredFile(fp) }
+        }
     }
 
     /**
