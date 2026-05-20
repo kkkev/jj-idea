@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.6.12/jj-idea-0.6.12.zip" version="0.6.12">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.0/jj-idea-0.7.0.zip" version="0.7.0">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,18 +23,13 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.6.12</h3>
+      <h3>0.7.0</h3>
       
 <h4>Added</h4>
-<li>"Open Local File" action in the log detail panel and editor context menu: opens the working copy version of a file when viewing a historical revision</li>
-
-<h4>Fixed</h4>
-<li>Historical file editor tabs no longer lose their change ID suffix when the local version of the same file is opened</li>
-<li>Ctrl+D from the project tree now correctly shows parent vs working copy diff instead of two identical sides</li>
-
-<h4>Changed</h4>
-<li>Revision selector allows for search by commit id</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.6.12">full release notes</a> for details.</p>
+<li>Files matching `.gitignore` patterns (e.g. `build/`, `.gradle/`) are now grayed out in the Project tool window and listed in the "Ignored Files" node of Local Changes, matching the behavior of the Git plugin. Ignore rules are re-evaluated automatically when `.gitignore` or `.git/info/exclude` changes.</li>
+<li>"Squash Into..." action in the log context menu: squash one or more selected mutable changes into an arbitrary destination change via `jj squash --from ... --into ...`. Supports multi-source selection, file-level selection, description editing (auto-populated from destination + sources), and a keep-emptied option. The destination picker searches by change ID, description, or bookmark name and excludes invalid targets.</li>
+<li>Fetch dialog with repository and remote selection: when multiple repos or remotes are configured, Fetch now opens a dialog to choose which repository (or all) and which remote (default, specific, or all remotes) to fetch from</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.0">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

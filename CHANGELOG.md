@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-20
+
 ### Added
 - Files matching `.gitignore` patterns (e.g. `build/`, `.gradle/`) are now grayed out in the Project tool window and listed in the "Ignored Files" node of Local Changes, matching the behavior of the Git plugin. Ignore rules are re-evaluated automatically when `.gitignore` or `.git/info/exclude` changes.
 - "Squash Into..." action in the log context menu: squash one or more selected mutable changes into an arbitrary destination change via `jj squash --from ... --into ...`. Supports multi-source selection, file-level selection, description editing (auto-populated from destination + sources), and a keep-emptied option. The destination picker searches by change ID, description, or bookmark name and excludes invalid targets.
@@ -476,7 +478,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.6.12...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.0
 [0.6.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.12
 [0.6.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.11
 [0.6.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.10
