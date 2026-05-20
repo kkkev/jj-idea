@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- "Compare To Commit" now allows comparing versus change IDs, bookmarks, git branches, or git SHAs. Also shows results immediately while loading, and supports typing any free-form revision.
+
 ## [0.6.12] - 2026-05-19
 
 ### Added
 - "Open Local File" action in the log detail panel and editor context menu: opens the working copy version of a file when viewing a historical revision
-
+Can
 ### Fixed
 - Historical file editor tabs no longer lose their change ID suffix when the local version of the same file is opened
 - Ctrl+D from the project tree now correctly shows parent vs working copy diff instead of two identical sides
