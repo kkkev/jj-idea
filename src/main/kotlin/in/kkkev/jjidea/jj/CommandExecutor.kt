@@ -232,6 +232,23 @@ interface CommandExecutor {
     ): CommandResult
 
     /**
+     * Squash one or more source changes into a destination change.
+     * Uses `jj squash --from <SRC>... --into <DEST>`. Incompatible with the parent-only [squash].
+     * @param sources Revisions whose changes will be moved (must be mutable, non-empty)
+     * @param destination Revision to receive the changes (must be mutable, not in [sources])
+     * @param filePaths Specific files to squash (empty = all files)
+     * @param description Description for the combined result at [destination] (null = let jj merge)
+     * @param keepEmptied Keep emptied source changes
+     */
+    fun squashInto(
+        sources: List<Revision>,
+        destination: Revision,
+        filePaths: List<FilePath> = emptyList(),
+        description: Description? = null,
+        keepEmptied: Boolean = false
+    ): CommandResult
+
+    /**
      * Split a change into two changes.
      * @param revision The revision to split (default: working copy)
      * @param filePaths Files to keep in the first commit (empty = interactive, but UI always provides paths)

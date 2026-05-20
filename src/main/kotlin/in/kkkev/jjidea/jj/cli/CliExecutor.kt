@@ -121,6 +121,29 @@ internal fun gitCloneArgs(source: String, destination: String, colocate: Boolean
     add(destination)
 }
 
+/** Build the argument list for `jj squash --from ... --into ...`. */
+internal fun squashIntoArgs(
+    sources: List<Revision>,
+    destination: Revision,
+    filePaths: List<String> = emptyList(),
+    description: Description? = null,
+    keepEmptied: Boolean = false
+): List<String> = buildList {
+    add("squash")
+    add("--into")
+    add(destination.toString())
+    sources.forEach {
+        add("--from")
+        add(it.toString())
+    }
+    if (description != null) add("--message=${description.actual}")
+    if (keepEmptied) add("--keep-emptied")
+    if (filePaths.isNotEmpty()) {
+        add("--")
+        addAll(filePaths)
+    }
+}
+
 /** Build the argument list for `jj rebase`. */
 internal fun rebaseArgs(
     revisions: List<Revision>,
@@ -310,6 +333,23 @@ class CliExecutor(
         description: Description?,
         keepEmptied: Boolean
     ) = execute(root, squashArgs(revision, filePaths.map { it.relativeTo(root!!) }, description, keepEmptied))
+
+    override fun squashInto(
+        sources: List<Revision>,
+        destination: Revision,
+        filePaths: List<FilePath>,
+        description: Description?,
+        keepEmptied: Boolean
+    ) = execute(
+        root,
+        squashIntoArgs(
+            sources,
+            destination,
+            filePaths.map { it.relativeTo(root!!) },
+            description,
+            keepEmptied
+        )
+    )
 
     override fun split(
         revision: Revision,

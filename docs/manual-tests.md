@@ -72,6 +72,70 @@ Use this checklist:
 - [ ] **Describe** action opens dialog and updates description
 - [ ] **Abandon** action removes change after confirmation
 
+### Squash Into...
+
+#### Test setup
+
+Create a small jj repo with a few independent changes:
+
+```bash
+mkdir /tmp/jj-squash-test && cd /tmp/jj-squash-test
+jj git init
+echo "base" > base.txt && jj describe -m "base"
+jj new -m "change A" && echo "A content" > a.txt
+jj new -r @- -m "change B" && echo "B content" > b.txt
+jj new -r @- -m "change C" && echo "C content" > c.txt
+```
+
+Open `/tmp/jj-squash-test` in the plugin IDE.
+
+#### Availability / enablement
+
+- [ ] "Squash Into..." is present in context menu for a single mutable change- [ ] "Squash Into..." is present when 2+ mutable changes are selected- [ ] "Squash Into..." is **disabled** when any selected change is immutable- [ ] "Squash Into..." is **disabled** when selections span multiple repos (multi-root project)- [ ] "Squash into Parent..." still works for single-parent mutable changes (regression)
+#### Destination picker
+
+- [ ] Dialog opens with source change(s) listed at the top- [ ] Destination table shows all mutable changes except sources and their descendants- [ ] Source change itself is **not** selectable as destination- [ ] Immutable changes are **not** shown in the destination table- [ ] Typing in the search field filters by change ID, description, and bookmark name- [ ] Clearing the search restores the full filtered list- [ ] Selecting a destination populates the description field (if user hasn't typed)
+#### Description auto-population
+
+- [ ] Selecting a destination populates description with: `<dest desc>\n\n<source desc>`- [ ] Multi-source: all source descriptions appended in order after dest description- [ ] Editing the description field prevents further auto-updates on destination change- [ ] Destination with empty description → field shows source description only- [ ] Both empty → field is empty
+#### Validation
+
+- [ ] "Squash" button is active initially (if destination pre-selected after load)- [ ] Clicking "Squash" with no destination selected shows inline error "Select a destination"- [ ] Unchecking all files in the tree shows inline error "Select at least one file"
+#### Whole squash (all files, single source)
+
+1. Select "change A" in the log, right-click → "Squash Into..."
+2. Pick "change B" as destination, leave all files selected
+3. Click "Squash"
+- [ ] Log refreshes: "change A" disappears (abandoned)- [ ] "change B" still exists and now contains `a.txt`- [ ] "change B" description is the merged result- [ ] Log selection moves to "change B"
+#### Selective file squash
+
+1. Add two files to one change: `jj new -m "multi" && echo "x" > x.txt && echo "y" > y.txt`
+2. Select that change → "Squash Into..." → pick any destination
+3. Uncheck `y.txt` in the file tree, leave `x.txt` checked
+4. Click "Squash"
+- [ ] Only `x.txt` moves to the destination- [ ] Source change still exists (now containing only `y.txt`)
+#### Keep emptied
+
+1. Select a change → "Squash Into..." → pick destination → check "Keep emptied source changes"
+2. Click "Squash"
+- [ ] Source change remains in log (now empty)- [ ] Destination has combined content- [ ] Log selection stays on source change
+#### Multi-source squash
+
+1. Ctrl/Cmd+click to select "change A" and "change B" → "Squash Into..."
+2. File tree shows files from both A and B combined
+3. Pick "change C" as destination → click "Squash"
+- [ ] Both A and B disappear from log- [ ] "change C" now contains files from both A and B
+#### Working copy as source
+
+1. Make sure `@` is on a mutable change with some content
+2. Select `@` → "Squash Into..." → pick a non-parent destination
+3. Click "Squash"
+- [ ] Old `@` is abandoned- [ ] Working copy moves to the destination (which is now `@`)- [ ] No stranded empty change left behind
+#### Merge commit target
+
+1. Create a merge: `jj new -m "merge" change_a change_b`
+2. Select the merge commit → "Squash Into..."
+- [ ] Merge commit appears as a valid destination in the picker- [ ] Squashing into the merge commit succeeds
 ### Toolbar & Filters
 
 - [ ] Refresh button reloads data

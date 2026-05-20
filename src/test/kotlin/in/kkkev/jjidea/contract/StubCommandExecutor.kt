@@ -194,6 +194,14 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         keepEmptied: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun squashInto(
+        sources: List<Revision>,
+        destination: Revision,
+        filePaths: List<FilePath>,
+        description: Description?,
+        keepEmptied: Boolean
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
     override fun split(
         revision: Revision,
         filePaths: List<FilePath>,

@@ -130,6 +130,7 @@
 
     <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.actions.filechange.RestoreToChangeAction"/>
     <action id="Jujutsu.SquashFiles" class="in.kkkev.jjidea.actions.filechange.SquashFilesAction"/>
+    <action id="Jujutsu.SquashIntoFiles" class="in.kkkev.jjidea.actions.filechange.SquashIntoFilesAction"/>
     <action id="Jujutsu.SplitFiles" class="in.kkkev.jjidea.actions.filechange.SplitFilesAction"/>
     <action id="Jujutsu.CompareWithLocal" class="in.kkkev.jjidea.actions.filechange.CompareWithLocalAction"/>
     <action id="Jujutsu.CompareBeforeWithLocal"
@@ -159,6 +160,7 @@
       <reference ref="Jujutsu.ResolveSelectedConflicts"/>
       <separator/>
       <reference ref="Jujutsu.SquashFiles"/>
+      <reference ref="Jujutsu.SquashIntoFiles"/>
       <reference ref="Jujutsu.SplitFiles"/>
       <add-to-group group-id="EditorLangPopupMenu" anchor="after" relative-to-action="VersionControlsGroup"/>
       <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="VersionControlsGroup"/>

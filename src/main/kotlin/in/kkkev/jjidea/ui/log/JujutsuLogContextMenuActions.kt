@@ -18,6 +18,8 @@ import `in`.kkkev.jjidea.actions.change.rebaseAction
 import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
 import `in`.kkkev.jjidea.actions.change.splitAction
 import `in`.kkkev.jjidea.actions.change.squashAction
+import `in`.kkkev.jjidea.actions.change.squashIntoAction
+import `in`.kkkev.jjidea.actions.change.squashIntoSources
 import `in`.kkkev.jjidea.actions.change.squashableEntry
 import `in`.kkkev.jjidea.actions.git.gitFetchAction
 import `in`.kkkev.jjidea.actions.git.gitPushAction
@@ -68,6 +70,15 @@ object JujutsuLogContextMenuActions {
         val rebaseRepo = uniqueRepo?.takeIf { mutableEntries.isNotEmpty() }
         add(rebaseAction(project, rebaseRepo, mutableEntries, allEntries))
         add(squashAction(project, squashableEntry(entry, allEntries), allEntries))
+        val squashIntoSrcs = squashIntoSources(entries)
+        add(
+            squashIntoAction(
+                project,
+                uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() },
+                squashIntoSrcs,
+                allEntries
+            )
+        )
         add(splitAction(project, entry?.takeIf { !it.immutable }, allEntries))
 
         addSeparator()

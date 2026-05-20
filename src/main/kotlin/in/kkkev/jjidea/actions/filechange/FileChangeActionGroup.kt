@@ -49,6 +49,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
 
     // Squash/split actions — self-filter based on entry mutability
     actionManager.getAction("Jujutsu.SquashFiles")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.SquashIntoFiles")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.SplitFiles")?.let { group.add(it) }
 
     return group

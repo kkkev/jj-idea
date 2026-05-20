@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- "Squash Into..." action in the log context menu: squash one or more selected mutable changes into an arbitrary destination change via `jj squash --from ... --into ...`. Supports multi-source selection, file-level selection, description editing (auto-populated from destination + sources), and a keep-emptied option. The destination picker searches by change ID, description, or bookmark name and excludes invalid targets.
 - Fetch dialog with repository and remote selection: when multiple repos or remotes are configured, Fetch now opens a dialog to choose which repository (or all) and which remote (default, specific, or all remotes) to fetch from
 
 ## [0.6.12] - 2026-05-19

@@ -35,15 +35,14 @@ data class SquashSpec(
 )
 
 /**
- * Merge descriptions from parent and source entries for the combined change.
- * Non-empty descriptions are joined with a blank line; empty ones are skipped.
+ * Merge descriptions for a combined change.
+ * Non-empty descriptions are joined with blank lines; empty ones are skipped.
  */
-fun mergeDescriptions(parentDescription: String, sourceDescription: String): String = when {
-    parentDescription.isNotEmpty() && sourceDescription.isNotEmpty() -> "$parentDescription\n\n$sourceDescription"
-    parentDescription.isNotEmpty() -> parentDescription
-    sourceDescription.isNotEmpty() -> sourceDescription
-    else -> ""
-}
+fun mergeDescriptions(parent: String, sources: List<String>): String =
+    (listOf(parent) + sources).filter { it.isNotEmpty() }.joinToString("\n\n")
+
+fun mergeDescriptions(parent: String, source: String): String =
+    mergeDescriptions(parent, listOf(source))
 
 /**
  * Dialog for configuring a `jj squash` operation.
