@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Log column widths are now correctly persisted across sessions. Previously, programmatic width assignments during panel initialization were triggering the save listener and overwriting user-adjusted widths with defaults before they could be restored.
+
 ## [0.7.0] - 2026-05-20
 
 ### Added

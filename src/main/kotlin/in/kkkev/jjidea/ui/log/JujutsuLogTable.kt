@@ -216,6 +216,11 @@ class JujutsuLogTable(
         columnModel.addColumnModelListener(
             object : TableColumnModelListener {
                 override fun columnMarginChanged(e: ChangeEvent) {
+                    // Only persist user-initiated resizes — tableHeader.resizingColumn is null
+                    // for programmatic changes (installRenderers, loadColumnWidths, etc.).
+                    // Saving during init would clobber user-saved widths with defaults before
+                    // they can be restored. Same idiom as VcsLogGraphTable.MyTableColumnModel.
+                    if (tableHeader.resizingColumn == null) return
                     saveColumnWidths()
                 }
 
@@ -360,13 +365,11 @@ class JujutsuLogTable(
      */
     private fun saveColumnWidths() {
         val settings = JujutsuSettings.getInstance(project)
-        val widths = mutableMapOf<Int, Int>()
-
+        val widths = settings.state.customLogColumnWidths.toMutableMap()
         for (i in 0 until columnModel.columnCount) {
             val column = columnModel.getColumn(i)
             widths[column.modelIndex] = column.width
         }
-
         settings.state.customLogColumnWidths = widths
     }
 
