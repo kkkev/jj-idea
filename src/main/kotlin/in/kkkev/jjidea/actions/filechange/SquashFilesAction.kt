@@ -22,7 +22,7 @@ import `in`.kkkev.jjidea.util.runLater
  * - Commit details panel / historical editor: uses LOG_ENTRY from data context
  * - Project view / current editor: uses working copy
  *
- * Hidden when the entry is immutable or has != 1 parent.
+ * Hidden when the entry is immutable or has no parents.
  * Immutable parents are filtered out from the candidate list at action time.
  */
 class SquashFilesAction : DumbAwareAction(
@@ -34,7 +34,7 @@ class SquashFilesAction : DumbAwareAction(
 
     override fun update(e: AnActionEvent) {
         val entry = resolveEntry(e)
-        e.presentation.isEnabledAndVisible = entry != null && !entry.immutable && entry.parentIds.size == 1
+        e.presentation.isEnabledAndVisible = entry != null && !entry.immutable && entry.parentIds.isNotEmpty()
     }
 
     override fun actionPerformed(e: AnActionEvent) {

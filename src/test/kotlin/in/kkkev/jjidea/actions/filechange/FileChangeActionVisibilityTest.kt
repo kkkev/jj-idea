@@ -331,10 +331,10 @@ class FileChangeActionVisibilityTest {
         }
 
         @Test
-        fun `hidden when entry has multiple parents (merge commit)`() {
+        fun `visible when entry has multiple parents (merge commit)`() {
             withLogEntry(historicalEntry(immutable = false, parentCount = 2))
             SquashFilesAction().update(event)
-            presentation.isEnabledAndVisible shouldBe false
+            presentation.isEnabledAndVisible shouldBe true
         }
 
         @Test

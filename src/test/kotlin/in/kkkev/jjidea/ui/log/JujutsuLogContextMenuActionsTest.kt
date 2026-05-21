@@ -422,10 +422,10 @@ class JujutsuLogContextMenuActionsTest {
         }
 
         @Test
-        fun `merge commit with multiple parents disables squash`() {
+        fun `merge commit with at least one mutable parent allows squash`() {
             val entry = createEntry("abc123", immutable = false, parentIds = listOf("parent1", "parent2"))
 
-            squashableEntry(entry, allEntries).shouldBeNull()
+            squashableEntry(entry, allEntries).shouldNotBeNull()
         }
 
         @Test
@@ -436,10 +436,10 @@ class JujutsuLogContextMenuActionsTest {
         }
 
         @Test
-        fun `parent not in allEntries still allows squash`() {
+        fun `parent not in allEntries disables squash`() {
             val entry = createEntry("abc123", immutable = false, parentIds = listOf("unknown"))
 
-            squashableEntry(entry, allEntries).shouldNotBeNull()
+            squashableEntry(entry, allEntries).shouldBeNull()
         }
     }
 

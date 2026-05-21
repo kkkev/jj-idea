@@ -163,9 +163,15 @@ class SquashIntoDialog(
             add(keepEmptiedCheckBox.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
         }
 
-        // Destination table fills the top half, file selection fills the bottom half
         val destScrollPane = JBScrollPane(destinationTable).apply {
             border = JBUI.Borders.empty()
+            // In parent mode, fix the height to exactly the number of candidate rows so the
+            // file-selection panel gets all remaining space. In free mode, let the splitter decide.
+            if (parentMode) {
+                val fixedHeight = candidateDestinations!!.size * destinationTable.rowHeight + JBUI.scale(4)
+                preferredSize = Dimension(0, fixedHeight)
+                maximumSize = Dimension(Int.MAX_VALUE, fixedHeight)
+            }
         }
         val filePanel = JPanel(BorderLayout()).apply {
             add(
@@ -174,15 +180,24 @@ class SquashIntoDialog(
             )
             add(fileSelection, BorderLayout.CENTER)
         }
-        val splitter = OnePixelSplitter(true, 0.6f).apply {
-            firstComponent = destScrollPane
-            secondComponent = filePanel
+        // In parent mode: fixed-height destination box above, file panel takes the rest.
+        // In free mode: splitter lets the user resize the two halves.
+        val centerContent: JComponent = if (parentMode) {
+            JPanel(BorderLayout()).apply {
+                add(destScrollPane, BorderLayout.NORTH)
+                add(filePanel, BorderLayout.CENTER)
+            }
+        } else {
+            OnePixelSplitter(true, 0.6f).apply {
+                firstComponent = destScrollPane
+                secondComponent = filePanel
+            }
         }
 
         val wrapper = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(8)
             add(topSection, BorderLayout.NORTH)
-            add(splitter, BorderLayout.CENTER)
+            add(centerContent, BorderLayout.CENTER)
             add(bottomSection, BorderLayout.SOUTH)
         }
         wrapper.preferredSize = Dimension(JBUI.scale(800), JBUI.scale(650))

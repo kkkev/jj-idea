@@ -74,6 +74,17 @@ class SquashIntoDialogParentModeTest {
     }
 
     @Test
+    fun `multiple parent candidates pre-select first and seed description`() {
+        val source = createEntry("src1", description = "source desc")
+        val parent1 = createEntry("par1", description = "parent one")
+        val parent2 = createEntry("par2", description = "parent two")
+        val dialog = dialog(source, listOf(parent1, parent2))
+
+        dialog.descriptionText shouldBe "parent one\n\nsource desc"
+        disposeDialog(dialog)
+    }
+
+    @Test
     fun `file selection shows changes and all included by default`() {
         val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
         val source = createEntry("src1", description = "desc")

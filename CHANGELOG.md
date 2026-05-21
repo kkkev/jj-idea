@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Log column widths are now correctly persisted across sessions. Previously, programmatic width assignments during panel initialization were triggering the save listener and overwriting user-adjusted widths with defaults before they could be restored.
+- "Squash into Parent…" is now enabled for merge commits. The dialog shows a destination picker restricted to the source's mutable parents; the user picks which parent to squash into. Previously the action was silently disabled for any commit with more than one parent.
 
 ## [0.7.0] - 2026-05-20
 

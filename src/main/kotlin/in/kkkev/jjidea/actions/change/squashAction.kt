@@ -13,9 +13,10 @@ import `in`.kkkev.jjidea.util.runLater
  * Squash action. Loads changes on a background thread, opens a dialog to configure
  * file selection, description, and options, then executes `jj squash`.
  *
- * The entry must be mutable, have exactly one parent, and that parent must also be mutable.
+ * The entry must be mutable and have at least one mutable parent. Merge commits are supported:
+ * the dialog presents all mutable parents as candidate destinations and the user picks one.
  *
- * Delegates to [executeSquashInto] using the parent as the sole candidate destination.
+ * Delegates to [executeSquashInto] using the mutable parents as candidate destinations.
  * When squashing the working copy without "keep emptied", the working copy moves to the
  * destination (handled in [executeSquashInto]).
  */
@@ -43,14 +44,14 @@ fun squashAction(project: Project, entry: LogEntry?, allEntries: List<LogEntry>)
 
 /**
  * Determine whether a squash action should be enabled for the given entry.
- * Requires: single selection, mutable, exactly one parent, and that parent must be mutable.
+ * Requires: single selection, mutable, at least one parent, and at least one parent must be mutable.
  */
 fun squashableEntry(entry: LogEntry?, allEntries: List<LogEntry>): LogEntry? {
     val e = entry?.takeIf { !it.immutable } ?: return null
-    // Disable for merge commits (multiple parents) and root commits (no parents)
-    if (e.parentIds.size != 1) return null
-    // Disable if parent is immutable
-    val parent = allEntries.firstOrNull { it.id == e.parentIds.first() }
-    if (parent?.immutable == true) return null
+    // Disable for root commits (no parents)
+    if (e.parentIds.isEmpty()) return null
+    // Disable if all parents are immutable or none are visible in the log
+    val hasAnyMutableParent = allEntries.any { it.id in e.parentIds.toSet() && !it.immutable }
+    if (!hasAnyMutableParent) return null
     return e
 }
