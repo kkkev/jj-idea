@@ -21,14 +21,14 @@ import org.junit.jupiter.api.Test
 @Tag("platform")
 @TestApplication
 @RunInEdt
-class SquashDialogTest {
+class SquashIntoDialogParentModeTest {
     private val project = projectFixture()
 
     @Test
     fun `description pre-populated with both descriptions`() {
         val source = createEntry("src1", description = "source desc")
         val parent = createEntry("par1", description = "parent desc")
-        val dialog = SquashDialog(project.get(), source, parent, emptyList())
+        val dialog = dialog(source, listOf(parent))
 
         dialog.descriptionText shouldBe "parent desc\n\nsource desc"
         disposeDialog(dialog)
@@ -38,7 +38,7 @@ class SquashDialogTest {
     fun `description pre-populated when source empty`() {
         val source = createEntry("src1", description = "")
         val parent = createEntry("par1", description = "parent desc")
-        val dialog = SquashDialog(project.get(), source, parent, emptyList())
+        val dialog = dialog(source, listOf(parent))
 
         dialog.descriptionText shouldBe "parent desc"
         disposeDialog(dialog)
@@ -48,7 +48,7 @@ class SquashDialogTest {
     fun `description pre-populated when parent empty`() {
         val source = createEntry("src1", description = "source desc")
         val parent = createEntry("par1", description = "")
-        val dialog = SquashDialog(project.get(), source, parent, emptyList())
+        val dialog = dialog(source, listOf(parent))
 
         dialog.descriptionText shouldBe "source desc"
         disposeDialog(dialog)
@@ -58,16 +58,16 @@ class SquashDialogTest {
     fun `description empty when both empty`() {
         val source = createEntry("src1", description = "")
         val parent = createEntry("par1", description = "")
-        val dialog = SquashDialog(project.get(), source, parent, emptyList())
+        val dialog = dialog(source, listOf(parent))
 
         dialog.descriptionText shouldBe ""
         disposeDialog(dialog)
     }
 
     @Test
-    fun `description pre-populated without parent entry`() {
+    fun `description pre-populated with source when no candidates`() {
         val source = createEntry("src1", description = "source desc")
-        val dialog = SquashDialog(project.get(), source, null, emptyList())
+        val dialog = dialog(source, emptyList())
 
         dialog.descriptionText shouldBe "source desc"
         disposeDialog(dialog)
@@ -77,7 +77,8 @@ class SquashDialogTest {
     fun `file selection shows changes and all included by default`() {
         val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
         val source = createEntry("src1", description = "desc")
-        val dialog = SquashDialog(project.get(), source, null, changes)
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
 
         waitForRefresh(dialog.fileSelection)
         dialog.fileSelection.includedChanges shouldHaveSize 2
@@ -89,7 +90,8 @@ class SquashDialogTest {
     fun `unchecking file updates selection`() {
         val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"), change("README.md"))
         val source = createEntry("src1", description = "desc")
-        val dialog = SquashDialog(project.get(), source, null, changes)
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
 
         waitForRefresh(dialog.fileSelection)
         dialog.fileSelection.changesTree.setIncludedChanges(changes.take(1))
@@ -98,6 +100,18 @@ class SquashDialogTest {
         dialog.fileSelection.allIncluded shouldBe false
         disposeDialog(dialog)
     }
+
+    private fun dialog(
+        source: LogEntry,
+        candidates: List<LogEntry>,
+        changes: List<Change> = emptyList()
+    ) = SquashIntoDialog(
+        project.get(),
+        source.repo,
+        listOf(source),
+        changes,
+        candidateDestinations = candidates
+    )
 
     private fun createEntry(id: String, description: String = "") = LogEntry(
         repo = mockk(relaxed = true),

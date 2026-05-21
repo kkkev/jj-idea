@@ -27,7 +27,9 @@ import javax.swing.*
 import javax.swing.event.DocumentEvent
 
 /**
- * Result of the squash-into dialog — the user's chosen parameters.
+ * Result of the squash dialog — the user's chosen parameters.
+ *
+ * Used by both "Squash into Parent" and "Squash Into" flows.
  */
 data class SquashIntoSpec(
     val sources: List<Revision>,
@@ -38,10 +40,24 @@ data class SquashIntoSpec(
 )
 
 /**
+ * Merge descriptions for a combined change.
+ * Non-empty descriptions are joined with blank lines; empty ones are skipped.
+ */
+fun mergeDescriptions(parent: String, sources: List<String>): String =
+    (listOf(parent) + sources).filter { it.isNotEmpty() }.joinToString("\n\n")
+
+fun mergeDescriptions(parent: String, source: String): String =
+    mergeDescriptions(parent, listOf(source))
+
+/**
  * Dialog for configuring a `jj squash --from ... --into ...` operation.
  *
- * Shows the source changes and a searchable destination picker (log table), a file
- * selection panel, a description field, and a "keep emptied" option.
+ * Operates in two modes:
+ * - **Free mode** (`candidateDestinations == null`): full searchable destination picker over all mutable changes.
+ * - **Parent mode** (`candidateDestinations != null`): destination restricted to the given list (typically the source's parents).
+ *   Search field is hidden; the table is pre-populated and pre-selected.
+ *
+ * Used by both "Squash into Parent" (parent mode, single source) and "Squash Into" (free mode, one or more sources).
  */
 class SquashIntoDialog(
     private val project: Project,
@@ -49,11 +65,13 @@ class SquashIntoDialog(
     private val sourceEntries: List<LogEntry>,
     changes: List<Change>,
     allEntries: List<LogEntry> = emptyList(),
-    preSelectedFiles: Set<FilePath> = emptySet()
+    preSelectedFiles: Set<FilePath> = emptySet(),
+    private val candidateDestinations: List<LogEntry>? = null
 ) : DialogWrapper(project) {
     var result: SquashIntoSpec? = null
         private set
 
+    private val parentMode = candidateDestinations != null
     private val repoEntries = allEntries.filter { it.repo == repo }
     private val sourceIds = sourceEntries.map { it.id }.toSet()
 
@@ -71,13 +89,16 @@ class SquashIntoDialog(
     }
 
     internal val fileSelection = FileSelectionPanel(project)
+    internal val descriptionText: String get() = descriptionField.text
 
     private var userEditedDescription = false
     private val descriptionField = JBTextArea(4, 0)
     private val keepEmptiedCheckBox = JBCheckBox(JujutsuBundle.message("dialog.squash.into.keep.emptied"))
 
     init {
-        title = JujutsuBundle.message("dialog.squash.into.title")
+        title = JujutsuBundle.message(
+            if (parentMode) "dialog.squash.into.parent.title" else "dialog.squash.into.title"
+        )
         setOKButtonText(JujutsuBundle.message("dialog.squash.into.button"))
 
         if (preSelectedFiles.isNotEmpty()) {
@@ -101,13 +122,17 @@ class SquashIntoDialog(
 
         init()
 
-        loadDestinations("")
+        if (parentMode) {
+            setupCandidateMode()
+        } else {
+            loadDestinations("")
+        }
         hideExtraColumns()
         updateDestRenderer()
     }
 
     override fun createCenterPanel(): JComponent {
-        // Fixed-height top: source pane + separator + destination label + search field
+        // Fixed-height top: source pane + separator + destination label + optional search field
         val topSection = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.source")))
@@ -117,9 +142,11 @@ class SquashIntoDialog(
             add(JSeparator().apply { alignmentX = JPanel.LEFT_ALIGNMENT })
             add(Box.createVerticalStrut(JBUI.scale(8)))
             add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.destination")))
-            add(Box.createVerticalStrut(JBUI.scale(4)))
-            add(searchField.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
-            add(Box.createVerticalStrut(JBUI.scale(4)))
+            if (!parentMode) {
+                add(Box.createVerticalStrut(JBUI.scale(4)))
+                add(searchField.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
+                add(Box.createVerticalStrut(JBUI.scale(4)))
+            }
         }
 
         // Fixed-height bottom: description + keep emptied
@@ -182,6 +209,18 @@ class SquashIntoDialog(
         }
     }
 
+    private fun setupCandidateMode() {
+        val candidates = candidateDestinations!!
+        destTableModel.setEntries(candidates)
+        destGraphNodes = CommitGraphBuilder().buildGraph(candidates)
+        if (candidates.isNotEmpty()) {
+            destinationTable.setRowSelectionInterval(0, 0)
+            // selection listener fires → updateDescription()
+        } else {
+            updateDescription()
+        }
+    }
+
     private fun loadDestinations(query: String) {
         val trimmed = query.trim()
         val excluded = RebaseSimulator.excludedDestinationIds(
@@ -238,9 +277,11 @@ class SquashIntoDialog(
 
     private fun updateDescription() {
         if (userEditedDescription) return
-        val destEntry = selectedDestinationEntry() ?: return
+        val destEntry = selectedDestinationEntry()
+        // In free mode, skip update until user selects a destination
+        if (destEntry == null && !parentMode) return
         val merged = mergeDescriptions(
-            destEntry.description.actual,
+            destEntry?.description?.actual ?: "",
             sourceEntries.map { it.description.actual }
         )
         // Temporarily stop listening to avoid setting the dirty flag

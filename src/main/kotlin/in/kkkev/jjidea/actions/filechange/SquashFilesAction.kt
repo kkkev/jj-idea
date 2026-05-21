@@ -3,15 +3,14 @@ package `in`.kkkev.jjidea.actions.filechange
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.change.executeSquash
+import `in`.kkkev.jjidea.actions.change.executeSquashInto
 import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.ui.squash.SquashDialog
+import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
@@ -24,7 +23,7 @@ import `in`.kkkev.jjidea.util.runLater
  * - Project view / current editor: uses working copy
  *
  * Hidden when the entry is immutable or has != 1 parent.
- * Parent immutability is checked at action time when parent data is loaded.
+ * Immutable parents are filtered out from the candidate list at action time.
  */
 class SquashFilesAction : DumbAwareAction(
     JujutsuBundle.message("action.squash.files"),
@@ -45,24 +44,20 @@ class SquashFilesAction : DumbAwareAction(
 
         runInBackground {
             val changes = ChangeService.loadChanges(entry)
-            // TODO What if this is a merge? See jj-idea-25t7
-            val parentEntry = entry.parentIds.firstOrNull()?.let {
-                entry.repo.getLogEntry(it)
-            }
+            val candidateParents = entry.parentIds.mapNotNull { entry.repo.getLogEntry(it) }
+                .filter { !it.immutable }
 
             runLater {
-                if (parentEntry?.immutable == true) {
-                    Messages.showWarningDialog(
-                        project,
-                        JujutsuBundle.message("action.squash.files.error.message", "Parent change is immutable"),
-                        JujutsuBundle.message("action.squash.files.error.title")
-                    )
-                    return@runLater
-                }
-
-                val dialog = SquashDialog(project, entry, parentEntry, changes, preSelectedFiles)
+                val dialog = SquashIntoDialog(
+                    project,
+                    entry.repo,
+                    listOf(entry),
+                    changes,
+                    preSelectedFiles = preSelectedFiles,
+                    candidateDestinations = candidateParents
+                )
                 if (dialog.showAndGet()) {
-                    dialog.result?.let { executeSquash(project, entry, parentEntry, it, "action.squash.files.error") }
+                    dialog.result?.let { executeSquashInto(project, entry.repo, listOf(entry), it) }
                 }
             }
         }
