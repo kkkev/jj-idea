@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Squash dialogs no longer automatically move the working copy to the destination after a squash. A new "Delete empty source change and move working copy to destination" checkbox gives explicit control over this behaviour; the last-used state is persisted per project and defaults to unchecked (matching vanilla `jj squash` semantics).
+
 ### Fixed
+- "Squash Into…" destination picker now includes descendants of the source change. Previously descendants were incorrectly excluded (using rebase cycle-prevention logic that does not apply to squash).
+- Squash dialogs no longer send `--message` when jj would handle the description naturally. Descriptions are now only combined and sent when both the source and destination have non-empty descriptions and the squash is full (source will be abandoned). For partial squashes the destination description is left unchanged.
 - Log column widths are now correctly persisted across sessions. Previously, programmatic width assignments during panel initialization were triggering the save listener and overwriting user-adjusted widths with defaults before they could be restored.
 - "Squash into Parent…" is now enabled for merge commits. The dialog shows a destination picker restricted to the source's mutable parents; the user picks which parent to squash into. Previously the action was silently disabled for any commit with more than one parent.
 

@@ -13,5 +13,6 @@ data class JujutsuSettingsState(
     // Column widths for custom log table (column index -> width in pixels)
     var customLogColumnWidths: MutableMap<Int, Int> = mutableMapOf(),
     var repositoryOverrides: MutableMap<String, RepositoryConfig> = mutableMapOf(),
-    var settingsVersion: Int = 0
+    var settingsVersion: Int = 0,
+    var squashDeleteEmptyAndMove: Boolean = false
 )

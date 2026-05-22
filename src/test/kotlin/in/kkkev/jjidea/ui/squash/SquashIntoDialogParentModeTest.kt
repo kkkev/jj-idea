@@ -11,6 +11,7 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -144,6 +145,49 @@ class SquashIntoDialogParentModeTest {
             UIUtil.dispatchAllInvocationEvents()
         }
         refreshed shouldBe true
+    }
+
+    @Test
+    fun `delete empty and move checkbox defaults to unchecked (per settings)`() {
+        val source = createEntry("src1", description = "source desc")
+        val parent = createEntry("par1", description = "parent desc")
+        val dialog = dialog(source, listOf(parent))
+
+        dialog.deleteEmptyAndMoveIsSelected shouldBe false
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `delete empty and move checkbox initializes from persisted settings`() {
+        JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove = true
+        try {
+            val source = createEntry("src1", description = "desc")
+            val parent = createEntry("par1", description = "")
+            val dialog = dialog(source, listOf(parent))
+
+            dialog.deleteEmptyAndMoveIsSelected shouldBe true
+            disposeDialog(dialog)
+        } finally {
+            JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove = false
+        }
+    }
+
+    @Test
+    fun `doOKAction persists checkbox state and sets spec field`() {
+        JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove = false
+        val changes = listOf(change("src/Main.kt"))
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.deleteEmptyAndMoveIsSelected = true
+        dialog.performOKForTest()
+
+        dialog.result?.deleteEmptyAndMoveWorkingCopy shouldBe true
+        JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove shouldBe true
+        JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove = false
+        disposeDialog(dialog)
     }
 
     private fun disposeDialog(dialog: DialogWrapper) {

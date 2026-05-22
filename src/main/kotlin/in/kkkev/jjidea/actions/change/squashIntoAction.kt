@@ -56,7 +56,8 @@ internal fun executeSquashInto(
     spec: SquashIntoSpec
 ) {
     val workingCopyIsSource = sources.any { it.isWorkingCopy }
-    val editDestinationAfter = workingCopyIsSource && !spec.keepEmptied
+    val deleteAndMove = spec.deleteEmptyAndMoveWorkingCopy
+    val editDestinationAfter = workingCopyIsSource && deleteAndMove
     repo.commandExecutor
         .createCommand {
             val result = squashInto(
@@ -64,13 +65,13 @@ internal fun executeSquashInto(
                 spec.destination,
                 spec.filePaths,
                 spec.description,
-                spec.keepEmptied
+                keepEmptied = !deleteAndMove
             )
             if (!result.isSuccess) return@createCommand result
             if (editDestinationAfter) edit(spec.destination) else result
         }
         .onSuccess {
-            val selectId: Revision = if (spec.keepEmptied) sources.first().id else spec.destination
+            val selectId: Revision = if (deleteAndMove) spec.destination else sources.first().id
             repo.invalidate(select = selectId, vfsChanged = true)
             squashIntoLog.info("Squashed ${spec.sources} into ${spec.destination}")
         }

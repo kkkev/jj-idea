@@ -76,66 +76,129 @@ Use this checklist:
 
 #### Test setup
 
-Create a small jj repo with a few independent changes:
+Create a small jj repo with a few stacked changes:
 
 ```bash
 mkdir /tmp/jj-squash-test && cd /tmp/jj-squash-test
 jj git init
 echo "base" > base.txt && jj describe -m "base"
 jj new -m "change A" && echo "A content" > a.txt
-jj new -r @- -m "change B" && echo "B content" > b.txt
-jj new -r @- -m "change C" && echo "C content" > c.txt
+jj new -m "change B" && echo "B content" > b.txt
+jj new -m "change C" && echo "C content" > c.txt
 ```
+
+This gives a linear stack: base → A → B → C (@ = C).
 
 Open `/tmp/jj-squash-test` in the plugin IDE.
 
 #### Availability / enablement
 
-- [ ] "Squash Into..." is present in context menu for a single mutable change- [ ] "Squash Into..." is present when 2+ mutable changes are selected- [ ] "Squash Into..." is **disabled** when any selected change is immutable- [ ] "Squash Into..." is **disabled** when selections span multiple repos (multi-root project)- [ ] "Squash into Parent..." still works for single-parent mutable changes (regression)
+- [ ] "Squash Into..." is present in context menu for a single mutable change
+- [ ] "Squash Into..." is present when 2+ mutable changes are selected
+- [ ] "Squash Into..." is **disabled** when any selected change is immutable
+- [ ] "Squash Into..." is **disabled** when selections span multiple repos (multi-root project)
+- [ ] "Squash into Parent..." still works for single-parent mutable changes (regression)
+
 #### Destination picker
 
-- [ ] Dialog opens with source change(s) listed at the top- [ ] Destination table shows all mutable changes except sources and their descendants- [ ] Source change itself is **not** selectable as destination- [ ] Immutable changes are **not** shown in the destination table- [ ] Typing in the search field filters by change ID, description, and bookmark name- [ ] Clearing the search restores the full filtered list- [ ] Selecting a destination populates the description field (if user hasn't typed)
-#### Description auto-population
+- [ ] Dialog opens with source change(s) listed at the top
+- [ ] Source change itself is **not** selectable as destination
+- [ ] Immutable changes are **not** shown in the destination table
+- [ ] **Descendants of the source ARE shown** as valid destinations (e.g. selecting "change A", "change B" and "change C" should both appear)
+- [ ] Typing in the search field filters by change ID, description, and bookmark name
+- [ ] Clearing the search restores the full filtered list
+- [ ] Selecting a destination populates the description field (if user hasn't typed)
 
-- [ ] Selecting a destination populates description with: `<dest desc>\n\n<source desc>`- [ ] Multi-source: all source descriptions appended in order after dest description- [ ] Editing the description field prevents further auto-updates on destination change- [ ] Destination with empty description → field shows source description only- [ ] Both empty → field is empty
+#### Description auto-population (full squash — all files selected)
+
+- [ ] Source and destination both have descriptions → field pre-fills with `<dest desc>\n\n<source desc>`
+- [ ] Destination description empty, source non-empty → field shows source description only (jj will use it)
+- [ ] Source description empty, destination non-empty → field shows destination description only
+- [ ] Both empty → field is empty
+- [ ] Multi-source: all non-empty source descriptions appended after dest description
+- [ ] Editing the description field prevents further auto-updates on destination change
+
+#### Description auto-population (partial squash — some files unchecked)
+
+- [ ] Field shows **only the destination description**, regardless of what the source description is
+- [ ] Switching back to all-files-selected restores the combined pre-fill (if user hasn't edited)
+
 #### Validation
 
-- [ ] "Squash" button is active initially (if destination pre-selected after load)- [ ] Clicking "Squash" with no destination selected shows inline error "Select a destination"- [ ] Unchecking all files in the tree shows inline error "Select at least one file"
-#### Whole squash (all files, single source)
+- [ ] "Squash" button is active initially (if destination pre-selected after load)
+- [ ] Clicking "Squash" with no destination selected shows inline error "Select a destination"
+- [ ] Unchecking all files in the tree shows inline error "Select at least one file"
 
-1. Select "change A" in the log, right-click → "Squash Into..."
-2. Pick "change B" as destination, leave all files selected
-3. Click "Squash"
-- [ ] Log refreshes: "change A" disappears (abandoned)- [ ] "change B" still exists and now contains `a.txt`- [ ] "change B" description is the merged result- [ ] Log selection moves to "change B"
-#### Selective file squash
+#### "Delete empty source and move working copy" checkbox
 
-1. Add two files to one change: `jj new -m "multi" && echo "x" > x.txt && echo "y" > y.txt`
+- [ ] Checkbox is **enabled** when all files are selected (full squash)
+- [ ] Checkbox is **disabled** (grayed out) when any file is unchecked (partial squash — source won't be empty)
+- [ ] Checkbox defaults to unchecked
+- [ ] Last-used state is remembered across dialog opens
+
+**Full squash, checkbox unchecked (default):**
+1. Select "change A" → "Squash Into..." → pick "change B", leave all files
+2. Leave checkbox unchecked → click "Squash"
+- [ ] "change A" is kept (now empty) — it was NOT abandoned
+- [ ] Working copy stays where it was (@ does not move to B)
+- [ ] Log selection stays on "change A"
+
+**Full squash, checkbox checked:**
+1. Select "change A" → "Squash Into..." → pick "change B", leave all files
+2. **Check** the checkbox → click "Squash"
+- [ ] "change A" disappears (abandoned)
+- [ ] "change B" now contains `a.txt`
+- [ ] If "change A" was the working copy (@), working copy moves to "change B"
+
+**Partial squash, checkbox disabled:**
+1. Add two files: `jj new -m "multi" && echo "x" > x.txt && echo "y" > y.txt`
 2. Select that change → "Squash Into..." → pick any destination
-3. Uncheck `y.txt` in the file tree, leave `x.txt` checked
+3. Uncheck `y.txt` in the file tree
+- [ ] Checkbox is grayed out and cannot be checked
 4. Click "Squash"
-- [ ] Only `x.txt` moves to the destination- [ ] Source change still exists (now containing only `y.txt`)
-#### Keep emptied
+- [ ] Only `x.txt` moves to the destination
+- [ ] Source change still exists (now containing only `y.txt`)
+- [ ] Source description is unchanged (no `--message` sent)
+- [ ] Destination description is unchanged
 
-1. Select a change → "Squash Into..." → pick destination → check "Keep emptied source changes"
-2. Click "Squash"
-- [ ] Source change remains in log (now empty)- [ ] Destination has combined content- [ ] Log selection stays on source change
+#### Squashing a parent into a child (descendant target)
+
+1. Select "change A" → "Squash Into..." → pick "change C" as destination
+- [ ] "change C" appears in the destination picker
+2. Leave all files selected → click "Squash" (checkbox unchecked)
+- [ ] Squash completes without error
+- [ ] "change A"'s content is now in "change C"
+
 #### Multi-source squash
 
 1. Ctrl/Cmd+click to select "change A" and "change B" → "Squash Into..."
 2. File tree shows files from both A and B combined
 3. Pick "change C" as destination → click "Squash"
-- [ ] Both A and B disappear from log- [ ] "change C" now contains files from both A and B
+- [ ] Both A and B disappear from log (or are kept if checkbox unchecked — check either way)
+- [ ] "change C" now contains files from both A and B
+
 #### Working copy as source
 
-1. Make sure `@` is on a mutable change with some content
-2. Select `@` → "Squash Into..." → pick a non-parent destination
-3. Click "Squash"
-- [ ] Old `@` is abandoned- [ ] Working copy moves to the destination (which is now `@`)- [ ] No stranded empty change left behind
+1. Make sure `@` is on "change C" with some content
+2. Select `@` → "Squash Into..." → pick "change B" as destination
+
+**Without checkbox:**
+3. Leave checkbox unchecked → click "Squash"
+- [ ] Working copy stays on "change C" (now empty or partial)
+- [ ] "change B" has the squashed content
+
+**With checkbox:**
+3. Check the checkbox → click "Squash"
+- [ ] "change C" (old @) is abandoned
+- [ ] Working copy moves to "change B" (now @)
+- [ ] No stranded empty change left behind
+
 #### Merge commit target
 
 1. Create a merge: `jj new -m "merge" change_a change_b`
 2. Select the merge commit → "Squash Into..."
-- [ ] Merge commit appears as a valid destination in the picker- [ ] Squashing into the merge commit succeeds
+- [ ] Merge commit appears as a valid destination in the picker
+- [ ] Squashing into the merge commit succeeds
 ### Toolbar & Filters
 
 - [ ] Refresh button reloads data

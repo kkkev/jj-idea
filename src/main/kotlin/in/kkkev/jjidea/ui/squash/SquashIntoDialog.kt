@@ -15,6 +15,7 @@ import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.*
@@ -35,8 +36,8 @@ data class SquashIntoSpec(
     val sources: List<Revision>,
     val destination: Revision,
     val filePaths: List<FilePath>,
-    val description: Description,
-    val keepEmptied: Boolean
+    val description: Description?,
+    val deleteEmptyAndMoveWorkingCopy: Boolean
 )
 
 /**
@@ -90,10 +91,22 @@ class SquashIntoDialog(
 
     internal val fileSelection = FileSelectionPanel(project)
     internal val descriptionText: String get() = descriptionField.text
+    internal var deleteEmptyAndMoveIsSelected: Boolean
+        get() = deleteEmptyAndMoveCheckBox.isSelected
+        set(value) {
+            deleteEmptyAndMoveCheckBox.isSelected = value
+        }
+
+    @org.jetbrains.annotations.TestOnly
+    internal fun performOKForTest() = doOKAction()
 
     private var userEditedDescription = false
     private val descriptionField = JBTextArea(4, 0)
-    private val keepEmptiedCheckBox = JBCheckBox(JujutsuBundle.message("dialog.squash.into.keep.emptied"))
+    private val deleteEmptyAndMoveCheckBox = JBCheckBox(
+        JujutsuBundle.message("dialog.squash.into.delete.empty.and.move")
+    ).apply {
+        isSelected = JujutsuSettings.getInstance(project).state.squashDeleteEmptyAndMove
+    }
 
     init {
         title = JujutsuBundle.message(
@@ -120,6 +133,12 @@ class SquashIntoDialog(
             }
         })
 
+        fileSelection.addInclusionListener {
+            updateDeleteEmptyEnabled()
+            updateDescription()
+        }
+        fileSelection.changesTree.invokeAfterRefresh { updateDeleteEmptyEnabled() }
+
         init()
 
         if (parentMode) {
@@ -129,6 +148,11 @@ class SquashIntoDialog(
         }
         hideExtraColumns()
         updateDestRenderer()
+        updateDeleteEmptyEnabled()
+    }
+
+    private fun updateDeleteEmptyEnabled() {
+        deleteEmptyAndMoveCheckBox.isEnabled = fileSelection.allIncluded
     }
 
     override fun createCenterPanel(): JComponent {
@@ -160,7 +184,7 @@ class SquashIntoDialog(
                 maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(80))
             }
             add(scrollPane)
-            add(keepEmptiedCheckBox.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
+            add(deleteEmptyAndMoveCheckBox.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
         }
 
         val destScrollPane = JBScrollPane(destinationTable).apply {
@@ -241,7 +265,7 @@ class SquashIntoDialog(
         val excluded = RebaseSimulator.excludedDestinationIds(
             repoEntries,
             sourceIds,
-            RebaseSourceMode.SOURCE
+            RebaseSourceMode.REVISION
         )
         val matchesSearch = { entry: LogEntry ->
             trimmed.isEmpty() ||
@@ -295,13 +319,14 @@ class SquashIntoDialog(
         val destEntry = selectedDestinationEntry()
         // In free mode, skip update until user selects a destination
         if (destEntry == null && !parentMode) return
-        val merged = mergeDescriptions(
-            destEntry?.description?.actual ?: "",
-            sourceEntries.map { it.description.actual }
-        )
+        val destDesc = destEntry?.description?.actual ?: ""
+        val sourceDescs = sourceEntries.map { it.description.actual }
+        // For a full squash the source will be abandoned — show what jj would produce.
+        // For a partial squash the destination description is unchanged — show it only.
+        val text = if (fileSelection.allIncluded) mergeDescriptions(destDesc, sourceDescs) else destDesc
         // Temporarily stop listening to avoid setting the dirty flag
         userEditedDescription = true
-        descriptionField.text = merged
+        descriptionField.text = text
         userEditedDescription = false
     }
 
@@ -319,7 +344,7 @@ class SquashIntoDialog(
             )
         }
         if (fileSelection.includedChanges.isEmpty()) {
-            return ValidationInfo(JujutsuBundle.message("dialog.squash.no.files"), fileSelection)
+            return ValidationInfo(JujutsuBundle.message("dialog.squash.into.no.files"), fileSelection)
         }
         return null
     }
@@ -330,14 +355,22 @@ class SquashIntoDialog(
             if (fileSelection.allIncluded) {
                 emptyList()
             } else {
-                fileSelection.includedChanges.mapNotNull { it.filePath }
+                fileSelection.includedChanges.map { it.filePath }
             }
+        val deleteAndMove = deleteEmptyAndMoveCheckBox.isEnabled && deleteEmptyAndMoveCheckBox.isSelected
+        if (deleteEmptyAndMoveCheckBox.isEnabled) {
+            JujutsuSettings.getInstance(project).state.squashDeleteEmptyAndMove = deleteAndMove
+        }
+        val destDesc = destEntry.description.actual
+        val sourceDescs = sourceEntries.map { it.description.actual }
+        val combining = fileSelection.allIncluded && destDesc.isNotEmpty() && sourceDescs.any { it.isNotEmpty() }
+        val description = if (userEditedDescription || combining) Description(descriptionField.text.trim()) else null
         result = SquashIntoSpec(
             sources = sourceEntries.map { it.id },
             destination = destEntry.id,
             filePaths = filePaths,
-            description = Description(descriptionField.text.trim()),
-            keepEmptied = keepEmptiedCheckBox.isSelected
+            description = description,
+            deleteEmptyAndMoveWorkingCopy = deleteAndMove
         )
         super.doOKAction()
     }
