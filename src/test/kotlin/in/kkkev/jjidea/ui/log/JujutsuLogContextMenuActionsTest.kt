@@ -444,6 +444,43 @@ class JujutsuLogContextMenuActionsTest {
     }
 
     @Nested
+    inner class `Squash Into Here action availability` {
+        @Test
+        fun `mutable single selection enables action`() {
+            val entry = createEntry("abc123", immutable = false)
+
+            val target = entry.takeIf { !it.immutable }
+
+            target.shouldNotBeNull()
+        }
+
+        @Test
+        fun `immutable entry disables action`() {
+            val entry = createEntry("abc123", immutable = true)
+
+            val target = entry.takeIf { !it.immutable }
+
+            target.shouldBeNull()
+        }
+
+        @Test
+        fun `working copy mutable entry enables action`() {
+            val entry = createEntry("abc123", isWorkingCopy = true, immutable = false)
+
+            val target = entry.takeIf { !it.immutable }
+
+            target.shouldNotBeNull()
+        }
+
+        @Test
+        fun `multi-select returns null disabling action`() {
+            val entries = listOf(createEntry("abc123"), createEntry("def456"))
+
+            entries.singleOrNull().shouldBeNull()
+        }
+    }
+
+    @Nested
     inner class `Split action availability` {
         @Test
         fun `immutable entry filtered out`() {

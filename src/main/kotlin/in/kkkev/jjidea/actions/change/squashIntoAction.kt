@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
 import `in`.kkkev.jjidea.ui.squash.SquashIntoSpec
+import `in`.kkkev.jjidea.ui.squash.SquashMode
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
@@ -32,7 +33,7 @@ fun squashIntoAction(
     runInBackground {
         val changes = ChangeService.loadChanges(sources)
         runLater {
-            val dialog = SquashIntoDialog(project, target, sources, changes, allEntries)
+            val dialog = SquashIntoDialog(project, target, SquashMode.PickDestination(sources), changes, allEntries)
             if (!dialog.showAndGet()) return@runLater
             val spec = dialog.result ?: return@runLater
             executeSquashInto(project, target, sources, spec)

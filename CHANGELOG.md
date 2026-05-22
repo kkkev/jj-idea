@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Squash Into Here from..." action in the log context menu: right-click on a destination change to pick one or more source changes to fold into it via `jj squash --from ... --into ...`. This is the inverse of "Squash from Here into..." — destination is pre-selected, sources are chosen. The working copy is pre-selected as a source when it is mutable. Supports multi-source selection, partial file selection, description combining, and the delete/move working-copy option.
+
 ### Changed
 - Squash dialogs no longer automatically move the working copy to the destination after a squash. A new "Delete empty source change and move working copy to destination" checkbox gives explicit control over this behaviour; the last-used state is persisted per project and defaults to unchecked (matching vanilla `jj squash` semantics).
 
@@ -20,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Files matching `.gitignore` patterns (e.g. `build/`, `.gradle/`) are now grayed out in the Project tool window and listed in the "Ignored Files" node of Local Changes, matching the behavior of the Git plugin. Ignore rules are re-evaluated automatically when `.gitignore` or `.git/info/exclude` changes.
-- "Squash Into..." action in the log context menu: squash one or more selected mutable changes into an arbitrary destination change via `jj squash --from ... --into ...`. Supports multi-source selection, file-level selection, description editing (auto-populated from destination + sources), and a keep-emptied option. The destination picker searches by change ID, description, or bookmark name and excludes invalid targets.
+- "Squash from Here into..." action in the log context menu: squash one or more selected mutable changes into an arbitrary destination change via `jj squash --from ... --into ...`. Supports multi-source selection, file-level selection, description editing (auto-populated from destination + sources), and a keep-emptied option. The destination picker searches by change ID, description, or bookmark name and excludes invalid targets.
 - Fetch dialog with repository and remote selection: when multiple repos or remotes are configured, Fetch now opens a dialog to choose which repository (or all) and which remote (default, specific, or all remotes) to fetch from
 
 ## [0.6.12] - 2026-05-19

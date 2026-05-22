@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
+import `in`.kkkev.jjidea.ui.squash.SquashMode
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -120,9 +121,8 @@ class SquashIntoDialogParentModeTest {
     ) = SquashIntoDialog(
         project.get(),
         source.repo,
-        listOf(source),
-        changes,
-        candidateDestinations = candidates
+        SquashMode.PickDestination(listOf(source), candidates),
+        changes
     )
 
     private fun createEntry(id: String, description: String = "") = LogEntry(

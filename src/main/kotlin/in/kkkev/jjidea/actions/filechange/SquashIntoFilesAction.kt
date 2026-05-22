@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
+import `in`.kkkev.jjidea.ui.squash.SquashMode
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
@@ -54,7 +55,7 @@ class SquashIntoFilesAction : DumbAwareAction(
                 val dialog = SquashIntoDialog(
                     project,
                     repo,
-                    listOf(entry),
+                    SquashMode.PickDestination(listOf(entry)),
                     changes,
                     allEntries,
                     preSelectedFiles

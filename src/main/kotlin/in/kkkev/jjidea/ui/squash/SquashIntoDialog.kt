@@ -20,6 +20,8 @@ import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.ui.rebase.RebaseSimulator
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -28,9 +30,29 @@ import javax.swing.*
 import javax.swing.event.DocumentEvent
 
 /**
+ * Determines which side of the squash dialog is fixed and which is picked by the user.
+ *
+ * - [PickDestination]: sources are fixed, user picks a destination.
+ *   [candidates] restricts the picker to specific entries (parent mode); null means all mutable.
+ * - [PickSources]: destination is fixed, user multi-selects one or more sources.
+ *   Used by "Squash Into Here" (right-click on destination commit).
+ */
+sealed interface SquashMode {
+    data class PickDestination(
+        val sources: List<LogEntry>,
+        val candidates: List<LogEntry>? = null
+    ) : SquashMode
+
+    data class PickSources(
+        val destination: LogEntry,
+        val candidates: List<LogEntry>? = null
+    ) : SquashMode
+}
+
+/**
  * Result of the squash dialog — the user's chosen parameters.
  *
- * Used by both "Squash into Parent" and "Squash Into" flows.
+ * Used by all squash flows.
  */
 data class SquashIntoSpec(
     val sources: List<Revision>,
@@ -53,37 +75,46 @@ fun mergeDescriptions(parent: String, source: String): String =
 /**
  * Dialog for configuring a `jj squash --from ... --into ...` operation.
  *
- * Operates in two modes:
- * - **Free mode** (`candidateDestinations == null`): full searchable destination picker over all mutable changes.
- * - **Parent mode** (`candidateDestinations != null`): destination restricted to the given list (typically the source's parents).
- *   Search field is hidden; the table is pre-populated and pre-selected.
- *
- * Used by both "Squash into Parent" (parent mode, single source) and "Squash Into" (free mode, one or more sources).
+ * Operates in two fundamental modes (see [SquashMode]):
+ * - [SquashMode.PickDestination]: sources are fixed, user picks a destination.
+ *   Sub-modes: free (searchable) or predefined-candidates (parent mode).
+ * - [SquashMode.PickSources]: destination is fixed, user multi-selects sources.
  */
 class SquashIntoDialog(
     private val project: Project,
     private val repo: JujutsuRepository,
-    private val sourceEntries: List<LogEntry>,
+    private val mode: SquashMode,
     changes: List<Change>,
     allEntries: List<LogEntry> = emptyList(),
-    preSelectedFiles: Set<FilePath> = emptySet(),
-    private val candidateDestinations: List<LogEntry>? = null
+    preSelectedFiles: Set<FilePath> = emptySet()
 ) : DialogWrapper(project) {
     var result: SquashIntoSpec? = null
         private set
 
-    private val parentMode = candidateDestinations != null
+    private val pickingSources = mode is SquashMode.PickSources
+    private val hasPredefinedCandidates = mode is SquashMode.PickDestination && mode.candidates != null
     private val repoEntries = allEntries.filter { it.repo == repo }
-    private val sourceIds = sourceEntries.map { it.id }.toSet()
+    private val sourceIds = (mode as? SquashMode.PickDestination)?.sources?.map { it.id }?.toSet() ?: emptySet()
 
-    // Destination picker
     private val searchField = SearchTextField(false).apply {
-        textEditor.emptyText.text = JujutsuBundle.message("dialog.squash.into.destination.search")
+        textEditor.emptyText.text = JujutsuBundle.message(
+            if (pickingSources) {
+                "dialog.squash.into.source.search"
+            } else {
+                "dialog.squash.into.destination.search"
+            }
+        )
     }
-    private val destTableModel = JujutsuLogTableModel()
-    private var destGraphNodes: Map<ChangeId, GraphNode> = emptyMap()
-    private val destinationTable = JBTable(destTableModel).apply {
-        setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+    private val pickerTableModel = JujutsuLogTableModel()
+    private var pickerGraphNodes: Map<ChangeId, GraphNode> = emptyMap()
+    private val pickerTable = JBTable(pickerTableModel).apply {
+        setSelectionMode(
+            if (pickingSources) {
+                ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
+            } else {
+                ListSelectionModel.SINGLE_SELECTION
+            }
+        )
         tableHeader.isVisible = false
         rowHeight = JBUI.scale(22)
         setStriped(true)
@@ -100,7 +131,14 @@ class SquashIntoDialog(
     @org.jetbrains.annotations.TestOnly
     internal fun performOKForTest() = doOKAction()
 
+    @org.jetbrains.annotations.TestOnly
+    internal fun selectPickerRowsForTest(vararg rows: Int) {
+        pickerTable.clearSelection()
+        rows.forEach { pickerTable.addRowSelectionInterval(it, it) }
+    }
+
     private var userEditedDescription = false
+    private var loadGeneration = 0
     private val descriptionField = JBTextArea(4, 0)
     private val deleteEmptyAndMoveCheckBox = JBCheckBox(
         JujutsuBundle.message("dialog.squash.into.delete.empty.and.move")
@@ -109,23 +147,29 @@ class SquashIntoDialog(
     }
 
     init {
-        title = JujutsuBundle.message(
-            if (parentMode) "dialog.squash.into.parent.title" else "dialog.squash.into.title"
-        )
+        title = when {
+            pickingSources -> JujutsuBundle.message("dialog.squash.from.title")
+            hasPredefinedCandidates -> JujutsuBundle.message("dialog.squash.into.parent.title")
+            else -> JujutsuBundle.message("dialog.squash.into.title")
+        }
         setOKButtonText(JujutsuBundle.message("dialog.squash.into.button"))
 
-        if (preSelectedFiles.isNotEmpty()) {
-            val included = changes.filter { it.filePath in preSelectedFiles }
-            fileSelection.setChanges(changes, included)
-        } else {
-            fileSelection.setChanges(changes)
+        if (mode is SquashMode.PickDestination) {
+            if (preSelectedFiles.isNotEmpty()) {
+                fileSelection.setChanges(changes, changes.filter { it.filePath in preSelectedFiles })
+            } else {
+                fileSelection.setChanges(changes)
+            }
         }
 
         searchField.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent) = loadDestinations(searchField.text)
+            override fun textChanged(e: DocumentEvent) = loadCandidates(searchField.text)
         })
 
-        destinationTable.selectionModel.addListSelectionListener { updateDescription() }
+        pickerTable.selectionModel.addListSelectionListener {
+            updateDescription()
+            if (pickingSources) reloadChangesForSelection()
+        }
 
         descriptionField.document.addDocumentListener(object : DocumentAdapter() {
             override fun textChanged(e: DocumentEvent) {
@@ -136,18 +180,20 @@ class SquashIntoDialog(
         fileSelection.addInclusionListener {
             updateDeleteEmptyEnabled()
             updateDescription()
+            initValidation()
         }
         fileSelection.changesTree.invokeAfterRefresh { updateDeleteEmptyEnabled() }
 
         init()
 
-        if (parentMode) {
-            setupCandidateMode()
+        if (hasPredefinedCandidates) {
+            setupPredefinedCandidates()
         } else {
-            loadDestinations("")
+            loadCandidates("")
+            if (pickingSources) preSelectWorkingCopy()
         }
         hideExtraColumns()
-        updateDestRenderer()
+        updatePickerRenderer()
         updateDeleteEmptyEnabled()
     }
 
@@ -156,24 +202,29 @@ class SquashIntoDialog(
     }
 
     override fun createCenterPanel(): JComponent {
-        // Fixed-height top: source pane + separator + destination label + optional search field
+        val fixedLabel = JujutsuBundle.message(
+            if (pickingSources) "dialog.squash.into.destination" else "dialog.squash.into.source"
+        )
+        val pickerLabel = JujutsuBundle.message(
+            if (pickingSources) "dialog.squash.into.source" else "dialog.squash.into.destination"
+        )
+
         val topSection = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
-            add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.source")))
+            add(createSectionLabel(fixedLabel))
             add(Box.createVerticalStrut(JBUI.scale(4)))
-            add(createSourcePane())
+            add(createFixedSidePane())
             add(Box.createVerticalStrut(JBUI.scale(8)))
             add(JSeparator().apply { alignmentX = JPanel.LEFT_ALIGNMENT })
             add(Box.createVerticalStrut(JBUI.scale(8)))
-            add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.destination")))
-            if (!parentMode) {
+            add(createSectionLabel(pickerLabel))
+            if (!hasPredefinedCandidates) {
                 add(Box.createVerticalStrut(JBUI.scale(4)))
                 add(searchField.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
                 add(Box.createVerticalStrut(JBUI.scale(4)))
             }
         }
 
-        // Fixed-height bottom: description + keep emptied
         val bottomSection = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             add(Box.createVerticalStrut(JBUI.scale(8)))
@@ -187,33 +238,27 @@ class SquashIntoDialog(
             add(deleteEmptyAndMoveCheckBox.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
         }
 
-        val destScrollPane = JBScrollPane(destinationTable).apply {
+        val pickerScrollPane = JBScrollPane(pickerTable).apply {
             border = JBUI.Borders.empty()
-            // In parent mode, fix the height to exactly the number of candidate rows so the
-            // file-selection panel gets all remaining space. In free mode, let the splitter decide.
-            if (parentMode) {
-                val fixedHeight = candidateDestinations!!.size * destinationTable.rowHeight + JBUI.scale(4)
+            if (hasPredefinedCandidates) {
+                val candidates = (mode as SquashMode.PickDestination).candidates!!
+                val fixedHeight = candidates.size * pickerTable.rowHeight + JBUI.scale(4)
                 preferredSize = Dimension(0, fixedHeight)
                 maximumSize = Dimension(Int.MAX_VALUE, fixedHeight)
             }
         }
         val filePanel = JPanel(BorderLayout()).apply {
-            add(
-                createSectionLabel(JujutsuBundle.message("dialog.squash.into.files")),
-                BorderLayout.NORTH
-            )
+            add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.files")), BorderLayout.NORTH)
             add(fileSelection, BorderLayout.CENTER)
         }
-        // In parent mode: fixed-height destination box above, file panel takes the rest.
-        // In free mode: splitter lets the user resize the two halves.
-        val centerContent: JComponent = if (parentMode) {
+        val centerContent: JComponent = if (hasPredefinedCandidates) {
             JPanel(BorderLayout()).apply {
-                add(destScrollPane, BorderLayout.NORTH)
+                add(pickerScrollPane, BorderLayout.NORTH)
                 add(filePanel, BorderLayout.CENTER)
             }
         } else {
             OnePixelSplitter(true, 0.6f).apply {
-                firstComponent = destScrollPane
+                firstComponent = pickerScrollPane
                 secondComponent = filePanel
             }
         }
@@ -234,10 +279,14 @@ class SquashIntoDialog(
         border = JBUI.Borders.empty(4, 0)
     }
 
-    private fun createSourcePane() = IconAwareHtmlPane(project).apply {
+    private fun createFixedSidePane() = IconAwareHtmlPane(project).apply {
         alignmentX = JPanel.LEFT_ALIGNMENT
+        val entries = when (mode) {
+            is SquashMode.PickDestination -> mode.sources
+            is SquashMode.PickSources -> listOf(mode.destination)
+        }
         text = htmlString {
-            append(sourceEntries, separator = "\n") { entry ->
+            append(entries, separator = "\n") { entry ->
                 appendStatusIndicators(entry)
                 append(entry.id)
                 append(" ")
@@ -248,25 +297,19 @@ class SquashIntoDialog(
         }
     }
 
-    private fun setupCandidateMode() {
-        val candidates = candidateDestinations!!
-        destTableModel.setEntries(candidates)
-        destGraphNodes = CommitGraphBuilder().buildGraph(candidates)
+    private fun setupPredefinedCandidates() {
+        val candidates = (mode as SquashMode.PickDestination).candidates!!
+        pickerTableModel.setEntries(candidates)
+        pickerGraphNodes = CommitGraphBuilder().buildGraph(candidates)
         if (candidates.isNotEmpty()) {
-            destinationTable.setRowSelectionInterval(0, 0)
-            // selection listener fires → updateDescription()
+            pickerTable.setRowSelectionInterval(0, 0)
         } else {
             updateDescription()
         }
     }
 
-    private fun loadDestinations(query: String) {
+    private fun loadCandidates(query: String) {
         val trimmed = query.trim()
-        val excluded = RebaseSimulator.excludedDestinationIds(
-            repoEntries,
-            sourceIds,
-            RebaseSourceMode.REVISION
-        )
         val matchesSearch = { entry: LogEntry ->
             trimmed.isEmpty() ||
                 entry.id.short.contains(trimmed, ignoreCase = true) ||
@@ -274,41 +317,80 @@ class SquashIntoDialog(
                 entry.description.display.contains(trimmed, ignoreCase = true) ||
                 entry.bookmarks.any { it.name.contains(trimmed, ignoreCase = true) }
         }
-        val previousSelection = selectedDestinationId()
-        val filtered = repoEntries.filter {
-            it.id !in excluded && !it.immutable && matchesSearch(it)
+        val filtered = when (mode) {
+            is SquashMode.PickDestination -> {
+                val excluded = RebaseSimulator.excludedDestinationIds(repoEntries, sourceIds, RebaseSourceMode.REVISION)
+                repoEntries.filter { it.id !in excluded && !it.immutable && matchesSearch(it) }
+            }
+            is SquashMode.PickSources -> {
+                val destId = mode.destination.id
+                repoEntries.filter { it.id != destId && !it.immutable && matchesSearch(it) }
+            }
         }
 
-        destTableModel.setEntries(filtered)
-        destGraphNodes = CommitGraphBuilder().buildGraph(filtered)
-        updateDestRenderer()
+        val previousSelection = if (pickingSources) {
+            selectedSourceIds()
+        } else {
+            selectedDestinationId()?.let { setOf(it) }
+                ?: emptySet()
+        }
 
-        // Restore previous selection if still available
-        if (previousSelection != null) {
-            for (i in 0 until destTableModel.rowCount) {
-                if (destTableModel.getEntry(i)?.id == previousSelection) {
-                    destinationTable.setRowSelectionInterval(i, i)
+        pickerTableModel.setEntries(filtered)
+        pickerGraphNodes = CommitGraphBuilder().buildGraph(filtered)
+        updatePickerRenderer()
+
+        if (previousSelection.isNotEmpty()) {
+            if (pickingSources) pickerTable.clearSelection()
+            for (i in 0 until pickerTableModel.rowCount) {
+                val id = pickerTableModel.getEntry(i)?.id ?: continue
+                if (id !in previousSelection) continue
+                if (pickingSources) {
+                    pickerTable.addRowSelectionInterval(i, i)
+                } else {
+                    pickerTable.setRowSelectionInterval(i, i)
                     break
                 }
             }
         }
     }
 
-    private fun hideExtraColumns() {
-        val toRemove = (destinationTable.columnCount - 1 downTo 0)
-            .filter { it != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
-        for (col in toRemove) {
-            if (col < destinationTable.columnModel.columnCount) {
-                destinationTable.removeColumn(destinationTable.columnModel.getColumn(col))
+    private fun preSelectWorkingCopy() {
+        for (i in 0 until pickerTableModel.rowCount) {
+            if (pickerTableModel.getEntry(i)?.isWorkingCopy == true) {
+                pickerTable.addRowSelectionInterval(i, i)
+                break
             }
         }
     }
 
-    private fun updateDestRenderer() {
-        for (i in 0 until destinationTable.columnModel.columnCount) {
-            val column = destinationTable.columnModel.getColumn(i)
+    private fun reloadChangesForSelection() {
+        val sources = selectedSourceEntries()
+        val gen = ++loadGeneration
+        if (sources.isEmpty()) {
+            fileSelection.setChanges(emptyList())
+            return
+        }
+        runInBackground {
+            val loaded = ChangeService.loadChanges(sources)
+            runLater { if (loadGeneration == gen) fileSelection.setChanges(loaded) }
+        }
+    }
+
+    private fun hideExtraColumns() {
+        val toRemove = (pickerTable.columnCount - 1 downTo 0)
+            .filter { it != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
+        for (col in toRemove) {
+            if (col < pickerTable.columnModel.columnCount) {
+                pickerTable.removeColumn(pickerTable.columnModel.getColumn(col))
+            }
+        }
+    }
+
+    private fun updatePickerRenderer() {
+        for (i in 0 until pickerTable.columnModel.columnCount) {
+            val column = pickerTable.columnModel.getColumn(i)
             if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(destGraphNodes)
+                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(pickerGraphNodes)
                 break
             }
         }
@@ -316,32 +398,48 @@ class SquashIntoDialog(
 
     private fun updateDescription() {
         if (userEditedDescription) return
-        val destEntry = selectedDestinationEntry()
-        // In free mode, skip update until user selects a destination
-        if (destEntry == null && !parentMode) return
-        val destDesc = destEntry?.description?.actual ?: ""
-        val sourceDescs = sourceEntries.map { it.description.actual }
-        // For a full squash the source will be abandoned — show what jj would produce.
-        // For a partial squash the destination description is unchanged — show it only.
+        val destDesc: String
+        val sourceDescs: List<String>
+        when (mode) {
+            is SquashMode.PickDestination -> {
+                val destEntry = selectedDestinationEntry()
+                if (destEntry == null && !hasPredefinedCandidates) return
+                destDesc = destEntry?.description?.actual ?: ""
+                sourceDescs = mode.sources.map { it.description.actual }
+            }
+            is SquashMode.PickSources -> {
+                val sources = selectedSourceEntries()
+                if (sources.isEmpty()) return
+                destDesc = mode.destination.description.actual
+                sourceDescs = sources.map { it.description.actual }
+            }
+        }
         val text = if (fileSelection.allIncluded) mergeDescriptions(destDesc, sourceDescs) else destDesc
-        // Temporarily stop listening to avoid setting the dirty flag
         userEditedDescription = true
         descriptionField.text = text
         userEditedDescription = false
     }
 
     private fun selectedDestinationId(): ChangeId? =
-        destinationTable.selectedRow.takeIf { it >= 0 }?.let { destTableModel.getEntry(it)?.id }
+        pickerTable.selectedRow.takeIf { it >= 0 }?.let { pickerTableModel.getEntry(it)?.id }
 
     private fun selectedDestinationEntry(): LogEntry? =
-        destinationTable.selectedRow.takeIf { it >= 0 }?.let { destTableModel.getEntry(it) }
+        pickerTable.selectedRow.takeIf { it >= 0 }?.let { pickerTableModel.getEntry(it) }
+
+    private fun selectedSourceIds(): Set<ChangeId> =
+        pickerTable.selectedRows.toList().mapNotNull { pickerTableModel.getEntry(it)?.id }.toSet()
+
+    private fun selectedSourceEntries(): List<LogEntry> =
+        pickerTable.selectedRows.toList().mapNotNull { pickerTableModel.getEntry(it) }
 
     override fun doValidate(): ValidationInfo? {
-        if (selectedDestinationId() == null) {
-            return ValidationInfo(
-                JujutsuBundle.message("dialog.squash.into.destination.none"),
-                destinationTable
-            )
+        when {
+            pickingSources -> if (selectedSourceEntries().isEmpty()) {
+                return ValidationInfo(JujutsuBundle.message("dialog.squash.into.source.none"), pickerTable)
+            }
+            else -> if (selectedDestinationId() == null) {
+                return ValidationInfo(JujutsuBundle.message("dialog.squash.into.destination.none"), pickerTable)
+            }
         }
         if (fileSelection.includedChanges.isEmpty()) {
             return ValidationInfo(JujutsuBundle.message("dialog.squash.into.no.files"), fileSelection)
@@ -350,28 +448,60 @@ class SquashIntoDialog(
     }
 
     override fun doOKAction() {
-        val destEntry = selectedDestinationEntry() ?: return
-        val filePaths =
-            if (fileSelection.allIncluded) {
-                emptyList()
-            } else {
-                fileSelection.includedChanges.map { it.filePath }
-            }
+        val filePaths = if (fileSelection.allIncluded) {
+            emptyList()
+        } else {
+            fileSelection.includedChanges.map { it.filePath }
+        }
         val deleteAndMove = deleteEmptyAndMoveCheckBox.isEnabled && deleteEmptyAndMoveCheckBox.isSelected
         if (deleteEmptyAndMoveCheckBox.isEnabled) {
             JujutsuSettings.getInstance(project).state.squashDeleteEmptyAndMove = deleteAndMove
         }
-        val destDesc = destEntry.description.actual
-        val sourceDescs = sourceEntries.map { it.description.actual }
-        val combining = fileSelection.allIncluded && destDesc.isNotEmpty() && sourceDescs.any { it.isNotEmpty() }
-        val description = if (userEditedDescription || combining) Description(descriptionField.text.trim()) else null
-        result = SquashIntoSpec(
-            sources = sourceEntries.map { it.id },
-            destination = destEntry.id,
-            filePaths = filePaths,
-            description = description,
-            deleteEmptyAndMoveWorkingCopy = deleteAndMove
-        )
+        when (mode) {
+            is SquashMode.PickDestination -> {
+                val destEntry = selectedDestinationEntry() ?: return
+                val destDesc = destEntry.description.actual
+                val sourceDescs = mode.sources.map { it.description.actual }
+                val combining =
+                    fileSelection.allIncluded && destDesc.isNotEmpty() && sourceDescs.any { it.isNotEmpty() }
+                val description = if (userEditedDescription ||
+                    combining
+                ) {
+                    Description(descriptionField.text.trim())
+                } else {
+                    null
+                }
+                result = SquashIntoSpec(
+                    sources = mode.sources.map { it.id },
+                    destination = destEntry.id,
+                    filePaths = filePaths,
+                    description = description,
+                    deleteEmptyAndMoveWorkingCopy = deleteAndMove
+                )
+            }
+            is SquashMode.PickSources -> {
+                val sourceEntries = selectedSourceEntries()
+                if (sourceEntries.isEmpty()) return
+                val destDesc = mode.destination.description.actual
+                val sourceDescs = sourceEntries.map { it.description.actual }
+                val combining =
+                    fileSelection.allIncluded && destDesc.isNotEmpty() && sourceDescs.any { it.isNotEmpty() }
+                val description = if (userEditedDescription ||
+                    combining
+                ) {
+                    Description(descriptionField.text.trim())
+                } else {
+                    null
+                }
+                result = SquashIntoSpec(
+                    sources = sourceEntries.map { it.id },
+                    destination = mode.destination.id,
+                    filePaths = filePaths,
+                    description = description,
+                    deleteEmptyAndMoveWorkingCopy = deleteAndMove
+                )
+            }
+        }
         super.doOKAction()
     }
 }

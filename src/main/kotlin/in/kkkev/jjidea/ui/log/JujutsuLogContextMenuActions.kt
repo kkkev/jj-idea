@@ -18,6 +18,7 @@ import `in`.kkkev.jjidea.actions.change.rebaseAction
 import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
 import `in`.kkkev.jjidea.actions.change.splitAction
 import `in`.kkkev.jjidea.actions.change.squashAction
+import `in`.kkkev.jjidea.actions.change.squashFromAction
 import `in`.kkkev.jjidea.actions.change.squashIntoAction
 import `in`.kkkev.jjidea.actions.change.squashIntoSources
 import `in`.kkkev.jjidea.actions.change.squashableEntry
@@ -79,6 +80,7 @@ object JujutsuLogContextMenuActions {
                 allEntries
             )
         )
+        add(squashFromAction(project, entry?.takeIf { !it.immutable }, allEntries))
         add(splitAction(project, entry?.takeIf { !it.immutable }, allEntries))
 
         addSeparator()

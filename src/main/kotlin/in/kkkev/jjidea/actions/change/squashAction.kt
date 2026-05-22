@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
+import `in`.kkkev.jjidea.ui.squash.SquashMode
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
@@ -31,9 +32,8 @@ fun squashAction(project: Project, entry: LogEntry?, allEntries: List<LogEntry>)
                 val dialog = SquashIntoDialog(
                     project,
                     target.repo,
-                    listOf(target),
-                    changes,
-                    candidateDestinations = candidateParents
+                    SquashMode.PickDestination(listOf(target), candidateParents),
+                    changes
                 )
                 if (!dialog.showAndGet()) return@runLater
                 val spec = dialog.result ?: return@runLater
