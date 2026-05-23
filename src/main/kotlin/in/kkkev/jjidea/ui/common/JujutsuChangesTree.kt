@@ -1,6 +1,6 @@
 package `in`.kkkev.jjidea.ui.common
 
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
@@ -53,10 +53,6 @@ class JujutsuChangesTree(project: Project, showCheckboxes: Boolean = false) :
         additionalDataProvider?.invoke(sink)
     }
 
-    /**
-     * Install standard handler for popup.
-     * TODO How should default action/enter/double-click register?
-     */
     fun installHandlers() {
         installPopupHandler(fileChangeActionGroup())
     }

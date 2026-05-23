@@ -27,6 +27,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     val group = DefaultActionGroup()
 
     actionManager.getAction("Jujutsu.ShowChangesDiff")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.ShowDiffInNewTab")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.OpenChangeFile")?.let { group.add(it) }
 
     group.addSeparator()

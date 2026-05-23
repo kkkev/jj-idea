@@ -129,6 +129,7 @@
       <keyboard-shortcut first-keystroke="meta D" keymap="Mac OS X 10.5+"/>
     </action>
 
+    <action id="Jujutsu.ShowDiffInNewTab" class="in.kkkev.jjidea.actions.filechange.ShowDiffInNewTabAction"/>
     <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.actions.filechange.RestoreToChangeAction"/>
     <action id="Jujutsu.SquashFiles" class="in.kkkev.jjidea.actions.filechange.SquashFilesAction"/>
     <action id="Jujutsu.SquashIntoFiles" class="in.kkkev.jjidea.actions.filechange.SquashIntoFilesAction"/>

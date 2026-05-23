@@ -55,7 +55,12 @@ Use this checklist:
 ### Details Changes Panel
 
 - [ ] File change tree shows correct files
-- [ ] Double-click file opens it in editor
+- [ ] Double-click file opens diff in a single editor tab (preview tab)
+- [ ] Enter on selected file opens the same diff tab
+- [ ] Clicking a different file while the diff tab is open swaps its content; tab count stays at 1
+- [ ] Escape inside the diff tab closes it
+- [ ] Cmd/Ctrl+D opens the same diff preview tab (routes through preview when available)
+- [ ] F4 still opens the file in a regular editor tab
 - [ ] Menu has "Compare with Another Commit" ❌ jj-idea-7d9p
 - [ ] Menu has "Compare Before with Another Commit" ❌ jj-idea-lo7u
 - [ ] open file for historical opens correct version ✅
@@ -264,13 +269,18 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] "New Change" button creates new change via `jj new`
 - [ ] Changed files tree shows correct status colors
 - [ ] File type icons display correctly
-- [ ] Double-click opens file in editor
+- [ ] Double-click opens diff in a single editor tab (preview tab)
+- [ ] Enter on selected file opens the same diff tab
+- [ ] Clicking a different file while the diff tab is open swaps its content; tab count stays at 1
+- [ ] Single click does nothing if diff tab is not open ✅
+- [ ] Single click swaps diff content if diff tab is already open
+- [ ] Escape inside the diff tab closes it
+- [ ] Cmd/Ctrl+D opens the same diff preview tab
+- [ ] F4 still opens the file in a regular editor tab
 - [ ] Right-click shows context menu with file actions
 - [ ] Open shows working copy as editable ✅
-- [ ] Single click does nothing ❌ jj-idea-c82g
 - [ ] Menu has "Compare with Another Commit" ❌ jj-idea-7d9p
 - [ ] Menu has "Compare Before with Another Commit" ❌ jj-idea-lo7u
-- [ ] Show diff for multiple files opens multiple editors ✅
 - [ ] Open for multiple files opens multiple editors ✅
 - [ ] Menu has Open in -> remote ✅
 - [ ] Open in -> remote for single parent opens that parent (resolves to pushed ancestor)

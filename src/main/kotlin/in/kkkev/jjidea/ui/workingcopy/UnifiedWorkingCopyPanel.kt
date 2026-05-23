@@ -1,15 +1,16 @@
 package `in`.kkkev.jjidea.ui.workingcopy
 
+import com.intellij.diff.tools.util.DiffDataKeys
 import com.intellij.icons.AllIcons
 import com.intellij.ide.CommonActionsManager
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Splitter
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
@@ -28,14 +29,12 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
+import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
 import `in`.kkkev.jjidea.ui.services.showVcsMappingsSettings
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
-import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.CardLayout
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JPanel
@@ -64,6 +63,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     // UI Components
     private val changesTree = JujutsuChangesTree(project)
+    private val diffPreview = JujutsuEditorTabDiffPreview(changesTree) { "@" }
     private val controlsPanel = WorkingCopyControlsPanel(project)
     private val emptyStatePanel = createEmptyStatePanel()
     private var notInstalledPanel: JPanel = JPanel() // Placeholder, updated when status changes
@@ -89,6 +89,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         // Handle dropdown selection
         controlsPanel.onRepositorySelected = { controlsPanel.boundRepository = it }
 
+        Disposer.register(this, diffPreview)
         createUI()
         setupTreeInteractions()
         setupTreeExpansionTracking()
@@ -304,24 +305,14 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun setupTreeInteractions() {
-        // Single-click: open file in preview tab (unique to working copy panel)
-        changesTree.addMouseListener(object : MouseAdapter() {
-            override fun mouseClicked(e: MouseEvent) {
-                if (e.clickCount == 1 && !e.isPopupTrigger) {
-                    getSelectedChange()?.let { openFileInPreview(it) }
-                }
-            }
-        })
-
         changesTree.installHandlers()
     }
 
     override fun uiDataSnapshot(sink: DataSink) {
         sink[VcsDataKeys.CHANGES] = changesTree.selectedChanges.toTypedArray()
         controlsPanel.boundRepository?.workingCopy?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+        sink[DiffDataKeys.EDITOR_TAB_DIFF_PREVIEW] = diffPreview
     }
-
-    private fun getSelectedChange() = changesTree.selectedChanges.firstOrNull()
 
     /**
      * Refresh button handler - triggers full refresh including external changes.
@@ -401,11 +392,6 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             val child = changesTree.model.getChild(node, i)
             collapseMatchingPaths(path.pathByAddingChild(child))
         }
-    }
-
-    private fun openFileInPreview(change: Change) {
-        val virtualFile = change.filePath?.virtualFile ?: return
-        OpenFileDescriptor(project, virtualFile).navigate(true)
     }
 
     private fun loadCollapsedPaths(): MutableSet<String> {

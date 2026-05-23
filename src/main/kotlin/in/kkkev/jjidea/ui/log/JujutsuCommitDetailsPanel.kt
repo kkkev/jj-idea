@@ -1,12 +1,16 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.diff.tools.util.DiffDataKeys
 import com.intellij.ide.CommonActionsManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
@@ -18,6 +22,7 @@ import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
+import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -34,7 +39,7 @@ import javax.swing.JPanel
  * Note: This panel works with entries from any repository. The repository context
  * is obtained from the `LogEntry.repo` field when needed.
  */
-class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disposable {
+class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val log = Logger.getInstance(javaClass)
 
     private val metadataPanel = JPanel(BorderLayout())
@@ -46,11 +51,20 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
 
     // Changes tree
     private val changesTree = JujutsuChangesTree(project)
+    private val diffPreview = JujutsuEditorTabDiffPreview(changesTree) {
+        when (currentEntries.size) {
+            0 -> null
+            1 -> currentEntries.first().id.short
+            else -> "${currentEntries.size} changes"
+        }
+    }
 
     // Current selected entries
     private var currentEntries: List<LogEntry> = emptyList()
 
     init {
+        Disposer.register(this, diffPreview)
+
         // Configure metadata pane
         metadataPane.apply {
             background = UIUtil.getTextFieldBackground()
@@ -113,6 +127,10 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
             .apply {
                 targetComponent = changesTree
             }
+    }
+
+    override fun uiDataSnapshot(sink: DataSink) {
+        sink[DiffDataKeys.EDITOR_TAB_DIFF_PREVIEW] = diffPreview
     }
 
     private fun setupTreeInteractions() {

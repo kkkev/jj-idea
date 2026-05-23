@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Show Diff in New Tab" context menu action on file-change trees: opens a fresh diff editor tab each time, allowing multiple diffs to be open simultaneously alongside the reusable preview tab.
+- Diff preview editor tabs now show context in their title: working copy diffs show `@: filename`, log-detail diffs show `<short-change-id>: filename`, and multi-selection shows the count (e.g. `3 changes: filename`).
+
+### Fixed
+- Double-clicking a file in the working copy or log details file-change tree now opens a diff preview editor tab. Subsequent single-clicks on other files swap the diff content in the same tab rather than opening new tabs. Escape closes the preview. Cmd/Ctrl+D routes through the same preview tab when invoked from these panels.
+- Single-clicking a file in the working copy panel no longer opens a new editor tab on every click.
+
 ## [0.7.1] - 2026-05-23
 
 ### Added
