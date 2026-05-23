@@ -22,6 +22,7 @@
         <li><b>Compare &amp; Diff</b> — Compare any file against any revision or bookmark using a visual revision picker. Show diffs of working copy changes or historical commits. Compare historical versions against local working copy.</li>
         <li><b>Git Remotes</b> — Fetch and push to Git remotes without leaving the IDE. Push dialog with remote selector and bookmark scope options. Dry-run detection warns before non-fast-forward bookmark moves; sideways pushes require explicit confirmation.</li>
         <li><b>File History &amp; Annotations</b> — Full file history with diff viewer and Show History for Selection (line-range history). Line-by-line blame annotations showing who changed what and when.</li>
+        <li><b>Conflict Resolution</b> — Conflicted files are flagged in the working copy and log; open the 3-way merge editor from the context menu to resolve them, with bulk Accept Yours / Accept Theirs. Handles all three jj conflict marker formats (snapshot, diff, and git).</li>
         <li><b>Open in GitHub / GitLab</b> — Right-click any commit, file-history entry, or diff to jump to it on the remote, with line-number fragments for editor selections.</li>
         <li><b>Bookmark Management</b> — Create, delete, rename, and move bookmarks from the log. Track and untrack remote bookmarks; tracked vs. untracked are visually distinct.</li>
         <li><b>Clone &amp; First-Run Setup</b> — Clone Git repos with jj from File &gt; New &gt; Project from Version Control, with colocate option. Plugin detects your jj install and walks you through user.name / user.email setup.</li>
@@ -41,7 +42,7 @@
     </ol>
 
     <h3>Roadmap</h3>
-    <p>Coming soon: hunk-level squash/split with destination picker, branches panel and bookmark toolbar widget, conflict resolution UI, operation log with undo/redo, remote management, and forge (PR/MR) integration. See the full <a href="https://github.com/kkkev/jj-idea/blob/master/ROADMAP.md">roadmap</a>.</p>
+    <p>Coming soon: hunk-level squash &amp; split, a branches panel and bookmark toolbar widget, large repository support, issue tracker link rendering, operation log with undo/redo, and forge (PR/MR) integration. See the full <a href="https://github.com/kkkev/jj-idea/blob/master/ROADMAP.md">roadmap</a>.</p>
 
     <p><a href="https://github.com/kkkev/jj-idea">GitHub</a> · <a href="https://github.com/kkkev/jj-idea/issues">Issues</a></p>
     ]]></description>

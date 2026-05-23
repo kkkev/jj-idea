@@ -74,7 +74,7 @@ Then install from `build/distributions/` via **Settings → Plugins → Install 
 
 ## Roadmap
 
-See **[ROADMAP.md](ROADMAP.md)** for planned features, including remote bookmark management, squash/split from file selection, conflict resolution UI, and more.
+See **[ROADMAP.md](ROADMAP.md)** for planned features, including hunk-level squash & split, a bookmark widget and branches panel, operation log & undo, and forge integration.
 
 ## Documentation
 
