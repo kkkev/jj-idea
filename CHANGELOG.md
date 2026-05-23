@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-05-23
+
 ### Added
 - "Squash Into Here from..." action in the log context menu: right-click on a destination change to pick one or more source changes to fold into it via `jj squash --from ... --into ...`. This is the inverse of "Squash from Here into..." — destination is pre-selected, sources are chosen. The working copy is pre-selected as a source when it is mutable. Supports multi-source selection, partial file selection, description combining, and the delete/move working-copy option.
 
@@ -490,7 +492,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.1
 [0.7.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.0
 [0.6.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.12
 [0.6.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.11
