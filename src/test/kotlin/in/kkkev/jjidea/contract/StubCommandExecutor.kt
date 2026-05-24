@@ -135,6 +135,9 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun bookmarkDelete(name: Bookmark): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
+    override fun bookmarkForget(name: Bookmark): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
     override fun bookmarkRename(
         oldName: Bookmark,
         newName: Bookmark

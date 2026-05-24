@@ -34,6 +34,14 @@ class CliExecutorBookmarkTest {
     }
 
     @Nested
+    inner class `bookmark forget` {
+        @Test
+        fun `forget bookmark`() {
+            bookmarkForgetArgs(Bookmark("main")) shouldBe listOf("bookmark", "forget", "main")
+        }
+    }
+
+    @Nested
     inner class `bookmark rename` {
         @Test
         fun `rename bookmark`() {

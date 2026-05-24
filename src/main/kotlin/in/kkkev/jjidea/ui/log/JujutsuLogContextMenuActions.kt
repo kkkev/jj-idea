@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.addPopup
 import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.deleteBookmarkAction
+import `in`.kkkev.jjidea.actions.bookmark.forgetBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
@@ -93,6 +94,7 @@ object JujutsuLogContextMenuActions {
                     }
                     if (!bookmark.isRemote) {
                         add(deleteBookmarkAction(entry.repo, bookmark))
+                        add(forgetBookmarkAction(entry.repo, bookmark))
                         add(renameBookmarkAction(entry.repo, bookmark))
                     }
                     if (bookmark.isRemote) {

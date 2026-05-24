@@ -19,6 +19,8 @@ internal fun bookmarkCreateArgs(name: Bookmark, revision: Revision = WorkingCopy
 
 internal fun bookmarkDeleteArgs(name: Bookmark) = listOf("bookmark", "delete", name.toString())
 
+internal fun bookmarkForgetArgs(name: Bookmark) = listOf("bookmark", "forget", name.toString())
+
 internal fun bookmarkRenameArgs(oldName: Bookmark, newName: Bookmark) =
     listOf("bookmark", "rename", oldName, newName).map(Any::toString)
 
@@ -300,6 +302,8 @@ class CliExecutor(
     override fun bookmarkCreate(name: Bookmark, revision: Revision) = execute(root, bookmarkCreateArgs(name, revision))
 
     override fun bookmarkDelete(name: Bookmark) = execute(root, bookmarkDeleteArgs(name))
+
+    override fun bookmarkForget(name: Bookmark) = execute(root, bookmarkForgetArgs(name))
 
     override fun bookmarkRename(oldName: Bookmark, newName: Bookmark) =
         execute(root, bookmarkRenameArgs(oldName, newName))

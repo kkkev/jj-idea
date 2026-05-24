@@ -149,6 +149,8 @@ interface CommandExecutor {
 
     fun bookmarkSet(name: Bookmark, revision: Revision = WorkingCopy, allowBackwards: Boolean = false): CommandResult
 
+    fun bookmarkForget(name: Bookmark): CommandResult
+
     fun bookmarkTrack(name: Bookmark): CommandResult
 
     fun bookmarkUntrack(name: Bookmark): CommandResult
