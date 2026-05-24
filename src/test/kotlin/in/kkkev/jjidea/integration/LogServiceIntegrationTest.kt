@@ -277,7 +277,7 @@ class LogServiceIntegrationTest {
 
             bookmarks shouldHaveSize 1
             bookmarks[0].bookmark.name shouldBe "main"
-            bookmarks[0].id.full.shouldNotBeBlank()
+            bookmarks[0].id!!.full.shouldNotBeBlank()
         }
 
         @Test

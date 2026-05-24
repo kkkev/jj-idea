@@ -228,17 +228,23 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val conflict = booleanField("conflict")
         val empty = booleanField("empty")
         private val localBookmarkTemplate =
-            """bookmarks.map(|b| ${TemplateParts.nameWithRemote("b")}""" +
-                """ ++ ";" ++ if(b.remote(), b.tracked(), "true")).join(",")"""
+            """bookmarks.map(|b| ${TemplateParts.nameWithRemote(
+                "b"
+            )} ++ ";" ++ if(b.remote(), b.tracked(), "true") ++ ";" ++ b.conflict() ++ ";" ++ b.tracking_ahead_count().lower() ++ ";" ++ b.tracking_behind_count().lower()).join(",")"""
         private val remoteBookmarkTemplate =
-            """remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote()""" +
-                """ ++ ";" ++ b.tracked()).join(",")"""
+            """remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote() ++ ";" ++ b.tracked() ++ ";" ++ b.conflict() ++ ";" ++ b.tracking_ahead_count().lower() ++ ";" ++ b.tracking_behind_count().lower()).join(",")"""
         val bookmarks = singleField(
             """separate(",", $localBookmarkTemplate, $remoteBookmarkTemplate)"""
         ) {
             it.splitByComma { part ->
-                val (nameStr, trackedStr) = part.split(";")
-                Bookmark(nameStr, trackedStr == "true")
+                val parts = part.split(";")
+                Bookmark(
+                    name = parts[0],
+                    tracked = parts.getOrNull(1) == "true",
+                    conflict = parts.getOrNull(2) == "true",
+                    aheadCount = parts.getOrNull(3)?.toIntOrNull() ?: 0,
+                    behindCount = parts.getOrNull(4)?.toIntOrNull() ?: 0
+                )
             }.distinctBy { b -> b.name }
         }
         val parents = singleField(
@@ -327,6 +333,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val bookmarkListTemplate = object : LogTemplate<BookmarkItem?>(
             booleanField("present"),
             stringField(TemplateParts.nameWithRemote()),
+            booleanField("conflict"),
             singleField("if(present,${TemplateParts.qualifiedChangeId("normal_target")},\"\")") {
                 optionalChangeId.parse(it)
             }
@@ -334,8 +341,13 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             override fun take(input: Iterator<String>): BookmarkItem? = try {
                 val present = fields[0].take(input) as Boolean
                 val name = fields[1].take(input) as String
-                val id = fields[2].take(input) as ChangeId?
-                if (present && id != null) BookmarkItem(Bookmark(name), id) else null
+                val conflict = fields[2].take(input) as Boolean
+                val id = fields[3].take(input) as ChangeId?
+                when {
+                    present && id != null -> BookmarkItem(Bookmark(name, conflict = conflict), id)
+                    !present -> BookmarkItem(Bookmark(name, deleted = true, conflict = conflict), null)
+                    else -> null
+                }
             } catch (_: Exception) {
                 null
             }

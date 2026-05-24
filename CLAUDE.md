@@ -389,6 +389,22 @@ class ExampleTest {
 }
 ```
 
+### Automate vs. manual
+
+- **Automate** parser round-trips, data model invariants, template field changes, and argument-building functions — these have no UI dependency and catch regressions cheaply. See `LogTemplateTest.kt`, `CliExecutorBookmarkTest.kt`, `JujutsuCompareWithPopupTest.kt`, and `LogServiceIntegrationTest.kt` for patterns.
+- **Manual** (via `./gradlew runIde`) any change that affects visible rendering: cell renderers, TextCanvas output, icon placement, tooltip text, context menus, dialog content, and keyboard shortcuts. Automated tests cannot catch these.
+- After every implementation, describe the exact manual smoke steps for this specific change so the user can verify the golden path without guessing.
+
+### Manual test patterns
+
+**Rendering surfaces**: bookmark and status decorations appear in three places — the Decorations column (`SeparateDecorationsCellRenderer`), the inlined graph column (`JujutsuGraphAndDescriptionRenderer`), and the commit details panel (`HtmlTextCanvas` via `appendSummaryAndStatuses`). Always check all three when changing bookmark rendering.
+
+**Log state changes**: use `jj bookmark create/delete/set/track` in the sandbox repo, then trigger a refresh (file save or toolbar button) and verify the log updates. Auto-refresh fires after ~300 ms debounce.
+
+**Popup filter correctness**: the `RevisionSelectorPopup` (right-click → "Compare with Another Commit…") must only show bookmarks that are valid revision targets. Verify that bookmarks in unusual states (deleted, conflict) are filtered out or displayed appropriately.
+
+**Tooltip content**: hover over icons and decorated names in the log to confirm tooltip text matches `JujutsuBundle.properties` keys. HTML canvas tooltips render Swing HTML — check for tag mismatches when editing `HtmlTextCanvas`.
+
 ## Building & Running
 
 ```bash
@@ -539,27 +555,33 @@ Fix any failures before proceeding.
   - `task` for refactoring or cleanup needed
   - `feature` for missed functionality
 
-### 3. Update Changelog
+### 3. Tell the user what to test manually
+
+After every implementation that touches UI (renderers, dialogs, actions, icons, tooltips, menus):
+- State the exact `./gradlew runIde` smoke steps for this specific change.
+- For parser/model-only changes with no UI, confirm automated tests cover the change and say so explicitly.
+
+### 4. Update Changelog
 Add entries to the `[Unreleased]` section of `CHANGELOG.md`:
 - `### Added` - New features
 - `### Fixed` - Bug fixes
 - `### Changed` - Changes to existing functionality
 - `### Removed` - Removed features
 
-### 4. Sync Remotes
+### 5. Sync Remotes
 ```bash
 jj git fetch --remote github                    # Get any automated updates
 jj new master@github master@origin -m "Merge github and origin master branches"  # If diverged
 jj bookmark set master
 ```
 
-### 5. Export Beads and Push
+### 6. Export Beads and Push
 ```bash
 bd export -o .beads/issues.jsonl   # Sync beads to version control (jj bypasses git hooks)
 jj git push --remote origin
 ```
 
-### 6. Release Decision
+### 7. Release Decision
 Ask if user wants to release:
 - **No release**: Done (code stays on origin only)
 - **Release**:

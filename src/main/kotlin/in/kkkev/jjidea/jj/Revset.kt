@@ -20,12 +20,22 @@ sealed interface Revision : Revset {
  */
 sealed interface Ref : Revision
 
-data class Bookmark(val name: String, val tracked: Boolean = true) : Ref {
+data class Bookmark(
+    val name: String,
+    val tracked: Boolean = true,
+    val deleted: Boolean = false,
+    val conflict: Boolean = false,
+    val aheadCount: Int = 0,
+    val behindCount: Int = 0
+) : Ref {
     override fun toString() = name
 
     val isRemote get() = '@' in name
     val localName get() = name.substringBefore('@')
     val remote get() = name.substringAfter('@', "")
+    val isDiverged get() = aheadCount > 0 && behindCount > 0
+    val isAhead get() = aheadCount > 0 && behindCount == 0
+    val isBehind get() = aheadCount == 0 && behindCount > 0
 }
 
 /**

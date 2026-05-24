@@ -36,11 +36,14 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
         val bold = (style and Font.BOLD) != 0
         val italic = (style and Font.ITALIC) != 0
         val smaller = (style and SimpleTextAttributes.STYLE_SMALLER) != 0
+        val strikeout = (style and SimpleTextAttributes.STYLE_STRIKEOUT) != 0
 
         if (bold) sb.append("<b>")
         if (italic) sb.append("<i>")
         if (smaller) sb.append("<span style='font-size: 85%'>")
+        if (strikeout) sb.append("<s>")
         super.styled(style, builder)
+        if (strikeout) sb.append("</s>")
         if (smaller) sb.append("</span>")
         if (italic) sb.append("</i>")
         if (bold) sb.append("</b>")

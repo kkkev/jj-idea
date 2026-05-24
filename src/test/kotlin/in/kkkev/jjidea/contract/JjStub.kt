@@ -466,6 +466,7 @@ class JjStub(override val workDir: Path) : JjBackend {
                     isFullBookmarkTemplate(template) -> {
                         field("true") // present (all stub bookmarks are local)
                         field(name) // nameWithRemote (no remotes in stub)
+                        field("false") // conflict (no conflicts in stub)
                         field(qualifiedChangeId(change))
                     }
 

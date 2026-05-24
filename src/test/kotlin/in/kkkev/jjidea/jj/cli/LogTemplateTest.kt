@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj.cli
 
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
@@ -53,7 +54,7 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Feature work",
-            "main;true,feature;true",
+            "main;true;false;0;0,feature;true;false;0;0",
             "",
             "true",
             "false",
@@ -237,5 +238,64 @@ class LogTemplateTest {
         entry.committer!!.name shouldBe "Cherry Picker"
         entry.committer.email shouldBe "picker@example.com"
         entry.committerTimestamp shouldBe Instant.fromEpochSeconds(2000000000)
+    }
+
+    @Test
+    fun `basicLogTemplate parses bookmark conflict and ahead-behind counts`() {
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Feature work",
+            "main;true;false;0;0,feature@origin;true;true;3;1",
+            "",
+            "false",
+            "false",
+            "false",
+            "false",
+            "false"
+        )
+
+        val entry = basicLogTemplate.take(fields.iterator())
+
+        entry.bookmarks shouldHaveSize 2
+        val main = entry.bookmarks.first { it.name == "main" }
+        main.conflict shouldBe false
+        main.aheadCount shouldBe 0
+        main.behindCount shouldBe 0
+        val remote = entry.bookmarks.first { it.name == "feature@origin" }
+        remote.conflict shouldBe true
+        remote.aheadCount shouldBe 3
+        remote.behindCount shouldBe 1
+        remote.isDiverged shouldBe true
+    }
+
+    private val bookmarkListTemplate = cliLogService.logTemplates.bookmarkListTemplate
+
+    @Test
+    fun `bookmarkListTemplate parses present bookmark`() {
+        val fields = listOf("true", "main", "false", "qpvuntsm~q~")
+        val item = bookmarkListTemplate.take(fields.iterator())
+
+        item!!.bookmark shouldBe Bookmark("main", conflict = false)
+        item.id shouldBe ChangeId("qpvuntsm", "q", null)
+    }
+
+    @Test
+    fun `bookmarkListTemplate parses pending-delete bookmark`() {
+        val fields = listOf("false", "feature", "false", "")
+        val item = bookmarkListTemplate.take(fields.iterator())
+
+        item!!.bookmark.name shouldBe "feature"
+        item.bookmark.deleted shouldBe true
+        item.id shouldBe null
+    }
+
+    @Test
+    fun `bookmarkListTemplate parses conflicted bookmark`() {
+        val fields = listOf("true", "main", "true", "qpvuntsm~q~")
+        val item = bookmarkListTemplate.take(fields.iterator())
+
+        item!!.bookmark.conflict shouldBe true
+        item.id shouldBe ChangeId("qpvuntsm", "q", null)
     }
 }

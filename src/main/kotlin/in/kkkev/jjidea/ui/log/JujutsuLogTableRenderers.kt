@@ -218,26 +218,47 @@ class SeparateDecorationsCellRenderer : TextTableCellRenderer<LogEntry>() {
         if (value.bookmarks.isNotEmpty()) {
             if (hasContent) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
 
-            icon = if (value.bookmarks.any { it.tracked }) JujutsuIcons.BookmarkTracked else JujutsuIcons.Bookmark
+            icon = when {
+                value.bookmarks.any { it.conflict } -> JujutsuIcons.Conflict
+                value.bookmarks.any { it.tracked } -> JujutsuIcons.BookmarkTracked
+                else -> JujutsuIcons.Bookmark
+            }
 
             val groups = value.bookmarks.grouped()
             var first = true
             for (group in groups) {
-                group.local?.let {
+                group.local?.let { local ->
                     if (!first) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
-                    append(group.localName, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                    append(group.localName, bookmarkNameAttrs(local.deleted))
                     first = false
                 }
                 for (remote in group.remotes) {
                     if (!first) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
                     val label = if (group.local != null) "@${remote.remote}" else remote.name
-                    append(label, SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES)
+                    append(label, bookmarkNameAttrs(remote.deleted))
+                    if (remote.aheadCount > 0 || remote.behindCount > 0) {
+                        val badge = buildString {
+                            if (remote.aheadCount > 0) append("↑${remote.aheadCount}")
+                            if (remote.behindCount > 0) append("↓${remote.behindCount}")
+                        }
+                        append(badge, SimpleTextAttributes(SimpleTextAttributes.STYLE_SMALLER, JujutsuColors.DIVERGENT))
+                    }
                     first = false
                 }
             }
         }
     }
 }
+
+private fun bookmarkNameAttrs(deleted: Boolean) =
+    if (deleted) {
+        SimpleTextAttributes(
+            SimpleTextAttributes.STYLE_SMALLER or SimpleTextAttributes.STYLE_STRIKEOUT,
+            SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES.fgColor
+        )
+    } else {
+        SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES
+    }
 
 /**
  * Default column widths (sensible defaults that can be overridden by user preferences).

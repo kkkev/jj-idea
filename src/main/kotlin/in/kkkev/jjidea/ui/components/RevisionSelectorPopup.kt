@@ -39,12 +39,13 @@ object RevisionSelectorPopup {
     private const val DEFAULT_LIMIT = 10
 
     data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, val query: String = "") {
-        fun matches(bookmark: BookmarkItem) = (!bookmark.bookmark.isRemote || includeRemote) &&
+        fun matches(bookmark: BookmarkItem) = !bookmark.bookmark.deleted &&
+            (!bookmark.bookmark.isRemote || includeRemote) &&
             (
                 query.isEmpty() ||
                     bookmark.bookmark.name.contains(query, ignoreCase = true) ||
-                    bookmark.id.full.contains(query, ignoreCase = true) ||
-                    bookmark.id.short.contains(query, ignoreCase = true)
+                    bookmark.id?.full?.contains(query, ignoreCase = true) == true ||
+                    bookmark.id?.short?.contains(query, ignoreCase = true) == true
             )
 
         fun matches(entry: LogEntry) = includeLogEntries &&
@@ -75,7 +76,7 @@ object RevisionSelectorPopup {
         /** Named bookmark with change ID */
         data class Bookmark(
             val item: BookmarkItem,
-            override val displayName: String = "${item.bookmark.name} (${item.id.short})",
+            override val displayName: String = "${item.bookmark.name}${item.id?.let { " (${it.short})" } ?: ""}",
             override val revision: Revision = item.bookmark
         ) : CompareItem(displayName, revision)
     }
@@ -155,9 +156,11 @@ object RevisionSelectorPopup {
 
                     is CompareItem.Bookmark -> htmlString {
                         append(item.item.bookmark)
-                        append(" (")
-                        append(item.item.id)
-                        append(")")
+                        item.item.id?.let { id ->
+                            append(" (")
+                            append(id)
+                            append(")")
+                        }
                     }
 
                     else -> null
@@ -297,20 +300,24 @@ object RevisionSelectorPopup {
      * Custom renderer for compare items with icons
      */
     private class CompareItemRenderer : TextListCellRenderer<CompareItem>() {
-        override fun render(canvas: TextCanvas, value: CompareItem) = with(canvas) {
-            when (value) {
-                is CompareItem.Bookmark -> {
-                    append(value.item.bookmark)
-                    append(" (")
-                    append(value.item.id)
-                    append(")")
-                }
+        override fun render(canvas: TextCanvas, value: CompareItem) {
+            with(canvas) {
+                when (value) {
+                    is CompareItem.Bookmark -> {
+                        append(value.item.bookmark)
+                        value.item.id?.let { id ->
+                            append(" (")
+                            append(id)
+                            append(")")
+                        }
+                    }
 
-                is CompareItem.Change -> {
-                    append(icon(AllIcons.Vcs::CommitNode))
-                    append(value.id)
-                    append(" ")
-                    append(value.description)
+                    is CompareItem.Change -> {
+                        append(icon(AllIcons.Vcs::CommitNode))
+                        append(value.id)
+                        append(" ")
+                        append(value.description)
+                    }
                 }
             }
         }

@@ -49,6 +49,7 @@ interface TextCanvas {
     fun italic(builder: TextCanvas.() -> Unit) = styled(Font.ITALIC, builder)
 
     fun smaller(builder: TextCanvas.() -> Unit) = styled(SimpleTextAttributes.STYLE_SMALLER, builder)
+    fun strikethrough(builder: TextCanvas.() -> Unit) = styled(SimpleTextAttributes.STYLE_STRIKEOUT, builder)
 
     fun colored(color: Color, builder: TextCanvas.() -> Unit)
     fun grey(builder: TextCanvas.() -> Unit) = colored(JBColor.GRAY, builder)
@@ -154,9 +155,16 @@ fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelativ
 fun TextCanvas.append(bookmark: Bookmark) {
     colored(JujutsuColors.BOOKMARK) {
         smaller {
+            if (bookmark.conflict) append(icon(JujutsuIcons::Conflict))
             val iconRef = if (bookmark.tracked) JujutsuIcons::BookmarkTracked else JujutsuIcons::Bookmark
             append(icon(iconRef))
-            append(bookmark.name)
+            if (bookmark.deleted) strikethrough { append(bookmark.name) } else append(bookmark.name)
+            if (bookmark.aheadCount > 0 || bookmark.behindCount > 0) {
+                colored(JujutsuColors.DIVERGENT) {
+                    if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
+                    if (bookmark.behindCount > 0) append("↓${bookmark.behindCount}")
+                }
+            }
         }
     }
 }
@@ -164,14 +172,23 @@ fun TextCanvas.append(bookmark: Bookmark) {
 fun TextCanvas.append(group: BookmarkGroup) {
     colored(JujutsuColors.BOOKMARK) {
         smaller {
-            group.local?.let {
+            group.local?.let { local ->
+                if (local.conflict) append(icon(JujutsuIcons::Conflict))
                 append(icon(JujutsuIcons::BookmarkTracked))
-                append(group.localName)
+                if (local.deleted) strikethrough { append(group.localName) } else append(group.localName)
             }
             group.remotes.forEach { remote ->
                 val iconRef = if (remote.tracked) JujutsuIcons::BookmarkTracked else JujutsuIcons::Bookmark
+                if (remote.conflict) append(icon(JujutsuIcons::Conflict))
                 append(icon(iconRef))
-                if (group.local != null) append("@${remote.remote}") else append(remote.name)
+                val label = if (group.local != null) "@${remote.remote}" else remote.name
+                if (remote.deleted) strikethrough { append(label) } else append(label)
+                if (remote.aheadCount > 0 || remote.behindCount > 0) {
+                    colored(JujutsuColors.DIVERGENT) {
+                        if (remote.aheadCount > 0) append("↑${remote.aheadCount}")
+                        if (remote.behindCount > 0) append("↓${remote.behindCount}")
+                    }
+                }
             }
         }
     }
