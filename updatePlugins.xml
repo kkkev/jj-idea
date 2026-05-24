@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.1/jj-idea-0.7.1.zip" version="0.7.1">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.2/jj-idea-0.7.2.zip" version="0.7.2">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,20 +23,16 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.1</h3>
+      <h3>0.7.2</h3>
       
 <h4>Added</h4>
-<li>"Squash Into Here from..." action in the log context menu: right-click on a destination change to pick one or more source changes to fold into it via `jj squash --from ... --into ...`. This is the inverse of "Squash from Here into..." — destination is pre-selected, sources are chosen. The working copy is pre-selected as a source when it is mutable. Supports multi-source selection, partial file selection, description combining, and the delete/move working-copy option.</li>
-
-<h4>Changed</h4>
-<li>Squash dialogs no longer automatically move the working copy to the destination after a squash. A new "Delete empty source change and move working copy to destination" checkbox gives explicit control over this behaviour; the last-used state is persisted per project and defaults to unchecked (matching vanilla `jj squash` semantics).</li>
+<li>"Show Diff in New Tab" context menu action on file-change trees: opens a fresh diff editor tab each time, allowing multiple diffs to be open simultaneously alongside the reusable preview tab.</li>
+<li>Diff preview editor tabs now show context in their title: working copy diffs show `@: filename`, log-detail diffs show `<short-change-id>: filename`, and multi-selection shows the count (e.g. `3 changes: filename`).</li>
 
 <h4>Fixed</h4>
-<li>"Squash Into…" destination picker now includes descendants of the source change. Previously descendants were incorrectly excluded (using rebase cycle-prevention logic that does not apply to squash).</li>
-<li>Squash dialogs no longer send `--message` when jj would handle the description naturally. Descriptions are now only combined and sent when both the source and destination have non-empty descriptions and the squash is full (source will be abandoned). For partial squashes the destination description is left unchanged.</li>
-<li>Log column widths are now correctly persisted across sessions. Previously, programmatic width assignments during panel initialization were triggering the save listener and overwriting user-adjusted widths with defaults before they could be restored.</li>
-<li>"Squash into Parent…" is now enabled for merge commits. The dialog shows a destination picker restricted to the source's mutable parents; the user picks which parent to squash into. Previously the action was silently disabled for any commit with more than one parent.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.1">full release notes</a> for details.</p>
+<li>Double-clicking a file in the working copy or log details file-change tree now opens a diff preview editor tab. Subsequent single-clicks on other files swap the diff content in the same tab rather than opening new tabs. Escape closes the preview. Cmd/Ctrl+D routes through the same preview tab when invoked from these panels.</li>
+<li>Single-clicking a file in the working copy panel no longer opens a new editor tab on every click.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.2">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

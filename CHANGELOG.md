@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-05-24
+
 ### Added
 - "Show Diff in New Tab" context menu action on file-change trees: opens a fresh diff editor tab each time, allowing multiple diffs to be open simultaneously alongside the reusable preview tab.
 - Diff preview editor tabs now show context in their title: working copy diffs show `@: filename`, log-detail diffs show `<short-change-id>: filename`, and multi-selection shows the count (e.g. `3 changes: filename`).
@@ -500,7 +502,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.2...HEAD
+[0.7.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.2
 [0.7.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.1
 [0.7.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.0
 [0.6.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.6.12
