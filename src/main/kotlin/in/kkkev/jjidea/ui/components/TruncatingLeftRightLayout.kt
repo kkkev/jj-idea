@@ -13,7 +13,7 @@ import javax.swing.JPanel
 /** Scale factor applied to icons inside `smaller { }` blocks, matching the text scale in [FragmentLayout]. */
 internal const val SMALLER_SCALE = 0.85f
 
-class TextCanvasPanel : JPanel() {
+open class TextCanvasPanel : JPanel() {
     init {
         layout = BoxLayout(this, X_AXIS)
     }
