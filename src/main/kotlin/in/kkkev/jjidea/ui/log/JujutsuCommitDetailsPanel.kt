@@ -18,6 +18,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.message
@@ -27,6 +28,8 @@ import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.JPanel
 
 /**
@@ -70,6 +73,25 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
             background = UIUtil.getTextFieldBackground()
             border = JBUI.Borders.empty(8)
         }
+
+        // Right-click on a bookmark chip in the metadata pane → per-bookmark context menu
+        metadataPane.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) = handlePopupTrigger(e)
+            override fun mouseReleased(e: MouseEvent) = handlePopupTrigger(e)
+
+            private fun handlePopupTrigger(e: MouseEvent) {
+                if (!e.isPopupTrigger) return
+                val uri = metadataPane.bookmarkUriAt(e.point) ?: return
+                val changeIdStr = uri.rawQuery?.substringBefore("&")?.takeIf { it.isNotEmpty() } ?: return
+                val entry = currentEntries.find { it.id == ChangeId(changeIdStr) } ?: return
+                val click = JujutsuLogContextMenuActions.resolveBookmarkClick(uri, entry) ?: return
+                val actionGroup = JujutsuLogContextMenuActions.createBookmarkActionGroup(project, click)
+                ActionManager.getInstance()
+                    .createActionPopupMenu("JujutsuBookmarkPopup", actionGroup)
+                    .component.show(metadataPane, e.x, e.y)
+                e.consume()
+            }
+        })
 
         metadataPanel.add(JBScrollPane(metadataPane), BorderLayout.CENTER)
 

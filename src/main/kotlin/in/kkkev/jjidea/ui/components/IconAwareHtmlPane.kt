@@ -23,10 +23,13 @@ import kotlin.math.roundToInt
 import kotlin.reflect.KClass
 
 private val CHANGE_ID_URL_PARSER = Pattern.compile("^jjc://([^?]+)\\?(.+)$")
+private val BOOKMARK_URL_PARSER = Pattern.compile("^jjb://([^?]+)\\?([^&]+)&bookmark=(.+)$")
 
 /**
  * An HTML pane that can resolve icons from a set of icon libraries, including IDEA's icons
  * [com.intellij.icons.AllIcons].
+ *
+ * Navigates on `jjc://` (change ID) and `jjb://` (bookmark) hyperlinks.
  */
 class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     JBHtmlPaneStyleConfiguration(),
@@ -36,14 +39,37 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
         isOpaque = false
         addHyperlinkListener { e ->
             if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
-                with(CHANGE_ID_URL_PARSER.matcher(e.description)) {
+                val url = e.description ?: return@addHyperlinkListener
+                with(CHANGE_ID_URL_PARSER.matcher(url)) {
                     if (matches()) {
-                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(this.group(1), true))
-                            .invalidate(ChangeId(this.group(2)))
+                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(group(1), true))
+                            .invalidate(ChangeId(group(2)))
+                        return@addHyperlinkListener
+                    }
+                }
+                with(BOOKMARK_URL_PARSER.matcher(url)) {
+                    if (matches()) {
+                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(group(1), true))
+                            .invalidate(ChangeId(group(2)))
                     }
                 }
             }
         }
+    }
+
+    /** Parse a `jjb://` href from the HTML element under [point], or null if not a bookmark link. */
+    fun bookmarkUriAt(point: java.awt.Point): java.net.URI? {
+        val offset = viewToModel2D(point).toInt()
+        val doc = document as? javax.swing.text.html.HTMLDocument ?: return null
+        var elem: javax.swing.text.Element? = doc.getCharacterElement(offset)
+        while (elem != null) {
+            val href = elem.attributes.getAttribute(javax.swing.text.html.HTML.Attribute.HREF) as? String
+            if (href != null && BOOKMARK_URL_PARSER.matcher(href).matches()) {
+                return runCatching { java.net.URI(href) }.getOrNull()
+            }
+            elem = elem.parentElement
+        }
+        return null
     }
 }
 

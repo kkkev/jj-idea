@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.deleteBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.forgetBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkAction
+import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkToChangeAction
 import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
@@ -28,6 +29,8 @@ import `in`.kkkev.jjidea.actions.git.gitPushAction
 import `in`.kkkev.jjidea.actions.git.openInRemoteGroup
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import java.net.URI
+import java.net.URLDecoder
 
 /**
  * Context menu actions for the custom Jujutsu log table.
@@ -109,5 +112,34 @@ object JujutsuLogContextMenuActions {
         add(gitFetchAction(project, uniqueRepo))
         add(gitPushAction(project, uniqueRepo, entry?.id))
         entry?.let { add(openInRemoteGroup(it.repo, it.commitId, it.immutable)) }
+    }
+
+    /** Build the per-bookmark context menu for a right-click on a bookmark chip. */
+    fun createBookmarkActionGroup(project: Project, click: BookmarkClick): DefaultActionGroup =
+        DefaultActionGroup().apply {
+            val repo = click.repo
+            val bookmark = click.bookmark
+            if (bookmark.isRemote) {
+                add(toggleTrackBookmarkAction(repo, bookmark))
+            } else {
+                add(renameBookmarkAction(repo, bookmark))
+                add(deleteBookmarkAction(repo, bookmark))
+                add(forgetBookmarkAction(repo, bookmark))
+                add(moveBookmarkToChangeAction(repo, bookmark))
+            }
+        }
+
+    /**
+     * Resolve a `jjb://` URI against a [LogEntry]'s bookmark list, returning the
+     * [BookmarkClick] for the specific bookmark, or null if the URI is not a `jjb://` link
+     * or the bookmark is not found.
+     */
+    fun resolveBookmarkClick(uri: URI, entry: LogEntry): BookmarkClick? {
+        if (uri.scheme != "jjb") return null
+        val query = uri.rawQuery ?: return null
+        val bookmarkParam = query.substringAfter("bookmark=", "").takeIf { it.isNotEmpty() } ?: return null
+        val bookmarkName = URLDecoder.decode(bookmarkParam, "UTF-8")
+        val bookmark = entry.bookmarks.find { it.name == bookmarkName } ?: return null
+        return BookmarkClick(entry.repo, entry, bookmark)
     }
 }

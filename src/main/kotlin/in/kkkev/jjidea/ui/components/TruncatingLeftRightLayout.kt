@@ -36,14 +36,21 @@ open class TextCanvasPanel : JPanel() {
                             add(it)
                         }
                     }
-                    currentScc.append(fragment.text, fragment.style)
+                    currentScc.append(fragment.text, fragment.style, fragment.linkTarget)
                 }
 
                 is Fragment.Icon -> {
                     currentScc = null
                     IconResolver.resolveIcon(fragment.icon.qualified)?.let { icon ->
                         val scaled = if (fragment.style.isSmaller) ScaledIcon(icon, SMALLER_SCALE) else icon
-                        add(JLabel(scaled).also { it.isOpaque = false })
+                        add(
+                            JLabel(scaled).also {
+                                it.isOpaque = false
+                                if (fragment.linkTarget != null) {
+                                    it.putClientProperty("jjLinkTarget", fragment.linkTarget)
+                                }
+                            }
+                        )
                     }
                 }
             }

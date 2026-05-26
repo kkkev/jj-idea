@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
+import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
@@ -15,10 +16,13 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
+import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.resolveBookmarkClick
 import kotlinx.datetime.Instant
 import java.awt.Component
+import java.awt.Cursor
 import java.awt.Point
 import java.awt.event.*
+import java.net.URI
 import javax.swing.JComponent
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
@@ -184,6 +188,12 @@ class JujutsuLogTable(
                         tooltipCol = newCol
                         IdeTooltipManager.getInstance().hideCurrentNow(false)
                     }
+                    // Show hand cursor when hovering over a bookmark chip
+                    cursor = if (bookmarkClickAt(e) != null) {
+                        Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                    } else {
+                        Cursor.getDefaultCursor()
+                    }
                 }
             }
         )
@@ -234,15 +244,32 @@ class JujutsuLogTable(
             }
         )
 
-        // Add context menu support
+        // Handle left-click on bookmark chips for navigation
+        addMouseListener(
+            object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) {
+                    if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
+                    val click = bookmarkClickAt(e) ?: return
+                    project.stateModel.changeSelection.notify(ChangeKey(click.repo, click.entry.id))
+                    e.consume()
+                }
+            }
+        )
+
+        // Add context menu support (checks bookmark chips before falling through to row menu)
         addMouseListener(
             object : PopupHandler() {
-                override fun invokePopup(
-                    comp: Component,
-                    x: Int,
-                    y: Int
-                ) {
-                    showContextMenu(comp, x, y)
+                override fun invokePopup(comp: Component, x: Int, y: Int) {
+                    val syntheticEvent = MouseEvent(this@JujutsuLogTable, 0, 0, 0, x, y, 1, false)
+                    val click = bookmarkClickAt(syntheticEvent)
+                    if (click != null) {
+                        val group = JujutsuLogContextMenuActions.createBookmarkActionGroup(project, click)
+                        ActionManager.getInstance()
+                            .createActionPopupMenu(ActionPlaces.UNKNOWN, group)
+                            .component.show(comp, x, y)
+                    } else {
+                        showContextMenu(comp, x, y)
+                    }
                 }
             }
         )
@@ -255,6 +282,33 @@ class JujutsuLogTable(
                 }
             }
         )
+    }
+
+    /**
+     * Return the [BookmarkClick] under [e], or null if the event is not over a bookmark chip.
+     * Handles both the Decorations column (SCC-based) and the graph+description column (fragment canvas).
+     */
+    private fun bookmarkClickAt(e: MouseEvent): BookmarkClick? {
+        val row = rowAtPoint(e.point).takeIf { it >= 0 } ?: return null
+        val col = columnAtPoint(e.point).takeIf { it >= 0 } ?: return null
+        val modelRow = convertRowIndexToModel(row)
+        val entry = logModel.getEntry(modelRow) ?: return null
+        val cellRect = getCellRect(row, col, false)
+        val localX = e.x - cellRect.x
+        val modelCol = convertColumnIndexToModel(col)
+        val uri = when (modelCol) {
+            JujutsuLogTableModel.COLUMN_DECORATIONS -> {
+                val scc = prepareRenderer(getCellRenderer(row, col), row, col) as? SimpleColoredComponent
+                scc?.getFragmentTagAt(localX) as? URI
+            }
+            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
+            JujutsuLogTableModel.COLUMN_DESCRIPTION -> {
+                val frc = getFontMetrics(font).fontRenderContext
+                findInlinedBookmarkUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations)
+            }
+            else -> null
+        } ?: return null
+        return resolveBookmarkClick(uri, entry)
     }
 
     /**

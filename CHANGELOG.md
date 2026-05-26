@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bookmark decorations now show pending deletions (strikethrough), local/remote divergence (↑n ↓n), and bookmark conflicts (conflict icon) in the log gutter, graph column decorations, and commit details panel.
 - "Forget" context menu action on local bookmarks: removes a bookmark locally without creating a pending remote deletion. A confirmation dialog explains that the bookmark will reappear on the next fetch.
 - "Move Bookmark Here…" opens a searchable dialog that classifies bookmarks into Forward and Backward/Sideways sections with directional icons and full-width section dividers. Forward bookmarks can be selected immediately; backward or sideways moves are shown at 50% opacity and require checking "Allow backward or sideways move" to enable selection. If the repository state changes between opening the dialog and confirming, a fallback prompt handles the race condition.
+- Bookmark chips in the log table (Decorations column and inlined graph/description column) are now interactive: hovering shows a hand cursor, left-clicking navigates the log to the change that bookmark points at, and right-clicking opens a per-bookmark context menu with Rename, Delete, Forget, Track/Untrack, and Move To… actions.
+- Bookmark chips in the commit details panel are now interactive with the same left-click navigation and right-click context menu.
+- "Move \<bookmark\> To…" context menu action: opens a searchable change-picker dialog showing candidate destinations classified as Forward (descendants) or Backward (ancestors), with an "Allow backward move" checkbox to gate ancestor selection.
 
 ## [0.7.2] - 2026-05-24
 

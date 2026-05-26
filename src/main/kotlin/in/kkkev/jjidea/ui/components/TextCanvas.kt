@@ -14,6 +14,7 @@ import kotlinx.datetime.Instant
 import java.awt.Color
 import java.awt.Font
 import java.net.URI
+import java.net.URLEncoder
 
 /**
  * A canvas onto which to paint styled text and icons. Functions provide a DSL that applies styling to embedded content,
@@ -152,13 +153,23 @@ fun TextCanvas.append(user: VcsUser) = user.email.takeIf { it.isNotEmpty() }
 
 fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelative(instant))
 
-fun TextCanvas.append(bookmark: Bookmark) {
+/** Canonical `jjb://` URI identifying a specific bookmark on a log entry. */
+fun bookmarkUri(entry: LogEntry, bookmark: Bookmark): URI {
+    val encoded = URLEncoder.encode(bookmark.name, "UTF-8")
+    return URI("jjb://${entry.repo.directory.path}?${entry.id}&bookmark=$encoded")
+}
+
+private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) {
     colored(JujutsuColors.BOOKMARK) {
         smaller {
             if (bookmark.conflict) append(icon(JujutsuIcons::Conflict))
-            val iconRef = if (bookmark.tracked) JujutsuIcons::BookmarkTracked else JujutsuIcons::Bookmark
+            val iconRef = if (!bookmark.isRemote || bookmark.tracked) {
+                JujutsuIcons::BookmarkTracked
+            } else {
+                JujutsuIcons::Bookmark
+            }
             append(icon(iconRef))
-            if (bookmark.deleted) strikethrough { append(bookmark.name) } else append(bookmark.name)
+            if (bookmark.deleted) strikethrough { append(label) } else append(label)
             if (bookmark.aheadCount > 0 || bookmark.behindCount > 0) {
                 colored(JujutsuColors.DIVERGENT) {
                     if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
@@ -169,29 +180,11 @@ fun TextCanvas.append(bookmark: Bookmark) {
     }
 }
 
+fun TextCanvas.append(bookmark: Bookmark) = appendBookmarkChip(bookmark, bookmark.name)
+
 fun TextCanvas.append(group: BookmarkGroup) {
-    colored(JujutsuColors.BOOKMARK) {
-        smaller {
-            group.local?.let { local ->
-                if (local.conflict) append(icon(JujutsuIcons::Conflict))
-                append(icon(JujutsuIcons::BookmarkTracked))
-                if (local.deleted) strikethrough { append(group.localName) } else append(group.localName)
-            }
-            group.remotes.forEach { remote ->
-                val iconRef = if (remote.tracked) JujutsuIcons::BookmarkTracked else JujutsuIcons::Bookmark
-                if (remote.conflict) append(icon(JujutsuIcons::Conflict))
-                append(icon(iconRef))
-                val label = if (group.local != null) "@${remote.remote}" else remote.name
-                if (remote.deleted) strikethrough { append(label) } else append(label)
-                if (remote.aheadCount > 0 || remote.behindCount > 0) {
-                    colored(JujutsuColors.DIVERGENT) {
-                        if (remote.aheadCount > 0) append("↑${remote.aheadCount}")
-                        if (remote.behindCount > 0) append("↓${remote.behindCount}")
-                    }
-                }
-            }
-        }
-    }
+    group.local?.let { appendBookmarkChip(it, group.localName) }
+    group.remotes.forEach { appendBookmarkChip(it, if (group.local != null) "@${it.remote}" else it.name) }
 }
 
 fun TextCanvas.append(repo: JujutsuRepository) {
@@ -264,8 +257,24 @@ fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
     }
 }
 
-fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") =
-    append(entry.bookmarks.grouped(), separator = " ", suffix = suffix) { append(it) }
+fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
+    val groups = entry.bookmarks.grouped()
+    var first = true
+    for (group in groups) {
+        group.local?.let { local ->
+            if (!first) append(" ")
+            first = false
+            linked(bookmarkUri(entry, local)) { appendBookmarkChip(local, group.localName) }
+        }
+        for (remote in group.remotes) {
+            if (!first) append(" ")
+            first = false
+            val label = if (group.local != null) "@${remote.remote}" else remote.name
+            linked(bookmarkUri(entry, remote)) { appendBookmarkChip(remote, label) }
+        }
+    }
+    if (suffix.isNotEmpty()) append(suffix)
+}
 
 fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     if (entry.parentIds.isNotEmpty()) {

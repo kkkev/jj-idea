@@ -16,6 +16,8 @@ import kotlinx.datetime.Instant
 import java.awt.Color
 import java.awt.Component
 import java.awt.Font
+import java.awt.font.FontRenderContext
+import java.net.URI
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
 
@@ -229,19 +231,24 @@ class SeparateDecorationsCellRenderer : TextTableCellRenderer<LogEntry>() {
             for (group in groups) {
                 group.local?.let { local ->
                     if (!first) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
-                    append(group.localName, bookmarkNameAttrs(local.deleted))
+                    append(group.localName, bookmarkNameAttrs(local.deleted), bookmarkUri(value, local))
                     first = false
                 }
                 for (remote in group.remotes) {
                     if (!first) append(" ", SimpleTextAttributes.REGULAR_ATTRIBUTES)
                     val label = if (group.local != null) "@${remote.remote}" else remote.name
-                    append(label, bookmarkNameAttrs(remote.deleted))
+                    val remoteTag = bookmarkUri(value, remote)
+                    append(label, bookmarkNameAttrs(remote.deleted), remoteTag)
                     if (remote.aheadCount > 0 || remote.behindCount > 0) {
                         val badge = buildString {
                             if (remote.aheadCount > 0) append("↑${remote.aheadCount}")
                             if (remote.behindCount > 0) append("↓${remote.behindCount}")
                         }
-                        append(badge, SimpleTextAttributes(SimpleTextAttributes.STYLE_SMALLER, JujutsuColors.DIVERGENT))
+                        append(
+                            badge,
+                            SimpleTextAttributes(SimpleTextAttributes.STYLE_SMALLER, JujutsuColors.DIVERGENT),
+                            remoteTag
+                        )
                     }
                     first = false
                 }
@@ -259,6 +266,42 @@ private fun bookmarkNameAttrs(deleted: Boolean) =
     } else {
         SimpleTextAttributes.GRAYED_SMALL_ATTRIBUTES
     }
+
+/**
+ * Compute the bookmark group hit at [localX] within the inlined decorations of the graph-description column.
+ *
+ * The decorations are rendered on the right side of the cell, starting at `colWidth - rightWidth`.
+ * We measure fragment widths from the canvas to locate the target without Swing layout.
+ *
+ * @param entry   the log entry for the row being hit-tested
+ * @param localX  x position relative to the left edge of the full cell
+ * @param colWidth full column width in pixels
+ * @param font    base font of the table
+ * @param frc     font render context from the table
+ * @param showDecorations whether the decoration inlining is enabled
+ */
+internal fun findInlinedBookmarkUri(
+    entry: LogEntry,
+    localX: Int,
+    colWidth: Int,
+    font: Font,
+    frc: FontRenderContext,
+    showDecorations: Boolean
+): URI? {
+    if (!showDecorations) return null
+    val rightCanvas = entryCanvas(entry, Color.BLACK) { appendDecorations(entry) }
+    val rightWidth = rightCanvas.fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
+    val rightStart = colWidth - rightWidth
+    if (localX < rightStart) return null
+    var xAccum = 0.0
+    val xInRight = localX - rightStart
+    for (fragment in rightCanvas.fragments) {
+        val w = FragmentLayout.fragmentWidth(fragment, font, frc)
+        if (xAccum + w > xInRight) return fragment.linkTarget as? URI
+        xAccum += w
+    }
+    return null
+}
 
 /**
  * Default column widths (sensible defaults that can be overridden by user preferences).
