@@ -134,9 +134,12 @@ fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Re
         }
 
         val forcePushBookmarks = parseForcePushBookmarks(dryRun.stderr)
+        val deletedBookmarks = parseDeletedBookmarks(dryRun.stderr)
 
         runLater {
-            if (forcePushBookmarks.isEmpty() || confirmForcePush(project, forcePushBookmarks)) {
+            if ((forcePushBookmarks.isEmpty() && deletedBookmarks.isEmpty()) ||
+                confirmPush(project, forcePushBookmarks, deletedBookmarks)
+            ) {
                 performPush(spec, project, revision)
             }
         }
@@ -187,6 +190,19 @@ internal fun parseForcePushBookmarks(stderr: String): List<String> =
         .map { (line, marker) -> line.substringAfter(marker).substringBefore(" from ") }
         .filter { it.isNotEmpty() }
 
+// jj outputs "Delete bookmark X from Y" for bookmarks pending local deletion being pushed.
+private const val DELETE_MARKER = "Delete bookmark "
+
+/** Parses dry-run stderr for pending bookmark deletions, returning the bookmark names. */
+internal fun parseDeletedBookmarks(stderr: String): List<String> =
+    stderr.lines()
+        .mapNotNull { line ->
+            line.takeIf { it.contains(DELETE_MARKER) }
+                ?.substringAfter(DELETE_MARKER)
+                ?.substringBefore(" from ")
+                ?.takeIf { it.isNotEmpty() }
+        }
+
 private fun confirmUntrackedPush(project: Project) =
     Messages.showYesNoDialog(
         project,
@@ -197,11 +213,20 @@ private fun confirmUntrackedPush(project: Project) =
         Messages.getWarningIcon()
     ) == Messages.YES
 
-private fun confirmForcePush(project: Project, bookmarks: List<String>): Boolean {
-    val bookmarkList = bookmarks.joinToString("\n") { "  • $it" }
+private fun confirmPush(project: Project, forcePushBookmarks: List<String>, deletedBookmarks: List<String>): Boolean {
+    val parts = buildList {
+        if (forcePushBookmarks.isNotEmpty()) {
+            val list = forcePushBookmarks.joinToString("\n") { "  • $it" }
+            add(JujutsuBundle.message("action.git.push.confirm.force.message", list))
+        }
+        if (deletedBookmarks.isNotEmpty()) {
+            val list = deletedBookmarks.joinToString("\n") { "  • $it" }
+            add(JujutsuBundle.message("action.git.push.confirm.delete.message", list))
+        }
+    }
     return Messages.showYesNoDialog(
         project,
-        JujutsuBundle.message("action.git.push.sideways.message", bookmarkList),
+        parts.joinToString("\n\n"),
         JujutsuBundle.message("action.git.push.sideways.title"),
         JujutsuBundle.message("action.git.push.sideways.push"),
         JujutsuBundle.message("action.git.push.sideways.cancel"),
