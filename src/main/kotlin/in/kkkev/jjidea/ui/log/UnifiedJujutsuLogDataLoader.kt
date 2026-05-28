@@ -63,6 +63,7 @@ class UnifiedJujutsuLogDataLoader(
                 indicator.isIndeterminate = false
 
                 val latch = CountDownLatch(repos.size)
+                val deletedNamesByRepo = ConcurrentHashMap<JujutsuRepository, Set<String>>()
 
                 repos.forEachIndexed { index, repo ->
                     runInBackground {
@@ -83,6 +84,13 @@ class UnifiedJujutsuLogDataLoader(
                                 errors[repo] = e
                                 log.warn("Failed to load commits from $repo: ${e.message}")
                             }
+
+                            repo.logService.getBookmarks().onSuccess { bookmarkItems ->
+                                deletedNamesByRepo[repo] = bookmarkItems
+                                    .filter { it.bookmark.deleted && !it.bookmark.isRemote }
+                                    .map { it.bookmark.localName }
+                                    .toSet()
+                            }
                         } catch (e: Exception) {
                             errors[repo] = e
                             log.warn("Exception loading commits from $repo: ${e.message}")
@@ -100,6 +108,7 @@ class UnifiedJujutsuLogDataLoader(
                 }
 
                 allEntries = topologicalSort(entriesByRepo.values.flatten())
+                    .map { entry -> enrichWithDeletedBookmarks(entry, deletedNamesByRepo[entry.repo] ?: emptySet()) }
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
                 graphNodes = graphBuilder.buildGraph(allEntries)
             },
@@ -114,6 +123,25 @@ class UnifiedJujutsuLogDataLoader(
         log.info("Refreshing unified log")
         loadCommits()
     }
+}
+
+/**
+ * Injects pending-deletion local bookmarks into log entries and zeroes out garbage ahead/behind counts.
+ *
+ * When a local bookmark is deleted (`jj bookmark delete foo`) but the remote `foo@origin` still exists,
+ * `jj log` omits the deleted local from the entry (it has no target) while `foo@origin` reports a huge
+ * `tracking_ahead_count` (distance from absent local to root). This function corrects both problems:
+ * - Injects `Bookmark("foo", tracked=true, deleted=true)` at the entry that carries `foo@origin`
+ * - Replaces `foo@origin` with zeroed ahead/behind counts (the original values are meaningless)
+ */
+internal fun enrichWithDeletedBookmarks(entry: LogEntry, deletedNames: Set<String>): LogEntry {
+    if (deletedNames.isEmpty()) return entry
+    val remotes = entry.bookmarks.filter { it.isRemote && it.localName in deletedNames }
+    if (remotes.isEmpty()) return entry
+    val injectedLocals = remotes.map { Bookmark(it.localName, tracked = true, deleted = true) }
+    val cleanedRemotes = remotes.map { it.copy(aheadCount = 0, behindCount = 0) }
+    val remaining = entry.bookmarks.filter { !it.isRemote || it.localName !in deletedNames }
+    return entry.copy(bookmarks = remaining + injectedLocals + cleanedRemotes)
 }
 
 /**
