@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.components
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.DocumentAdapter
@@ -60,28 +59,6 @@ object RevisionSelectorPopup {
     }
 
     /**
-     * Item in the comparison popup
-     */
-    sealed class CompareItem(open val displayName: String, open val revision: Revision) {
-        /** Recent change with description */
-        data class Change(
-            val entry: LogEntry,
-            override val displayName: String = "${entry.id.short} ${entry.description.summary}",
-            override val revision: Revision = entry.id
-        ) : CompareItem(displayName, revision) {
-            val id: ChangeId get() = entry.id
-            val description: Description get() = entry.description
-        }
-
-        /** Named bookmark with change ID */
-        data class Bookmark(
-            val item: BookmarkItem,
-            override val displayName: String = "${item.bookmark.name}${item.id?.let { " (${it.short})" } ?: ""}",
-            override val revision: Revision = item.bookmark
-        ) : CompareItem(displayName, revision)
-    }
-
-    /**
      * Show popup to select revision/bookmark for comparison
      * Features search field with dynamic filtering
      * Loads data in background to avoid EDT blocking
@@ -127,8 +104,8 @@ object RevisionSelectorPopup {
             textEditor.emptyText.text = JujutsuBundle.message("dialog.revisionselector.search.emptytext")
         }
 
-        private val listModel = DefaultListModel<CompareItem>()
-        private val list = object : JBList<CompareItem>(listModel) {
+        private val listModel = DefaultListModel<RevisionChoice>()
+        private val list = object : JBList<RevisionChoice>(listModel) {
             // Make list fill viewport width instead of expanding to content width
             override fun getScrollableTracksViewportWidth() = true
 
@@ -137,7 +114,7 @@ object RevisionSelectorPopup {
                 if (index < 0) return null
 
                 return when (val item = model.getElementAt(index)) {
-                    is CompareItem.Change -> htmlString {
+                    is RevisionChoice.Change -> htmlString {
                         append(item.entry.id)
                         append(" (")
                         append(item.entry.commitId)
@@ -154,7 +131,7 @@ object RevisionSelectorPopup {
                         appendSummary(item.entry.description)
                     }
 
-                    is CompareItem.Bookmark -> htmlString {
+                    is RevisionChoice.Bookmark -> htmlString {
                         append(item.item.bookmark)
                         item.item.id?.let { id ->
                             append(" (")
@@ -162,13 +139,11 @@ object RevisionSelectorPopup {
                             append(")")
                         }
                     }
-
-                    else -> null
                 }
             }
         }.apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
-            cellRenderer = CompareItemRenderer()
+            cellRenderer = RevisionChoiceRenderer()
             visibleRowCount = 15 // Show 15 items without scrolling
         }
 
@@ -282,7 +257,7 @@ object RevisionSelectorPopup {
         /**
          * Select an item and close popup
          */
-        private fun selectItem(item: CompareItem) {
+        private fun selectItem(item: RevisionChoice) {
             onSelected(item.revision)
             // Close the popup
             currentPopup?.cancel()
@@ -297,30 +272,10 @@ object RevisionSelectorPopup {
     }
 
     /**
-     * Custom renderer for compare items with icons
+     * Custom renderer for revision choices with icons
      */
-    private class CompareItemRenderer : TextListCellRenderer<CompareItem>() {
-        override fun render(canvas: TextCanvas, value: CompareItem) {
-            with(canvas) {
-                when (value) {
-                    is CompareItem.Bookmark -> {
-                        append(value.item.bookmark)
-                        value.item.id?.let { id ->
-                            append(" (")
-                            append(id)
-                            append(")")
-                        }
-                    }
-
-                    is CompareItem.Change -> {
-                        append(icon(AllIcons.Vcs::CommitNode))
-                        append(value.id)
-                        append(" ")
-                        append(value.description)
-                    }
-                }
-            }
-        }
+    private class RevisionChoiceRenderer : TextListCellRenderer<RevisionChoice>() {
+        override fun render(canvas: TextCanvas, value: RevisionChoice) = canvas.append(value)
     }
 
     /**
@@ -328,37 +283,19 @@ object RevisionSelectorPopup {
      * Should be called from background thread
      * Filters based on query and limits results
      */
-    internal fun buildItemList(repo: JujutsuRepository, filter: Filter): List<CompareItem> {
-        val items = mutableListOf<CompareItem>()
-        val cache = LogCache.getInstance(repo.project)
+    internal fun buildItemList(repo: JujutsuRepository, filter: Filter): List<RevisionChoice> {
+        val items = mutableListOf<RevisionChoice>()
 
         // Add bookmarks - always show all bookmarks filtered by query
-        val logService = repo.logService
-        val bookmarkResult = logService.getBookmarks()
+        val bookmarkResult = repo.logService.getBookmarks()
         if (bookmarkResult.isSuccess) {
-            val bookmarks = bookmarkResult.getOrNull() ?: emptyList()
-
-            // Filter bookmarks by query
-            val filteredBookmarks = bookmarks.filter(filter::matches)
-
-            items.addAll(filteredBookmarks.map(CompareItem::Bookmark))
+            val filteredBookmarks = bookmarkResult.getOrNull().orEmpty().filter(filter::matches)
+            items.addAll(filteredBookmarks.map(RevisionChoice::Bookmark))
         }
 
         if (filter.includeLogEntries) {
-            // Add recent changes - limit to DEFAULT_LIMIT and filter by query
-            // Try to get from cache first
-            val entries = cache.get(Expression.ALL) ?: run {
-                // Not in cache, fetch from jj and cache it
-                val logResult = logService.getLogBasic(revset = Expression.ALL)
-                logResult.getOrNull()?.also { fetchedEntries ->
-                    cache.put(Expression.ALL, emptyList(), fetchedEntries)
-                } ?: emptyList()
-            }
-
-            // Filter changes by query
-            val filteredEntries = entries.filter(filter::matches).take(DEFAULT_LIMIT)
-
-            items.addAll(filteredEntries.map(CompareItem::Change))
+            val filteredEntries = repo.cachedEntries().filter(filter::matches).take(DEFAULT_LIMIT)
+            items.addAll(filteredEntries.map(RevisionChoice::Change))
         }
 
         return items

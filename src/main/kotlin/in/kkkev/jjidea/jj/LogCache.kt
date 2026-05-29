@@ -83,3 +83,10 @@ class LogCache(project: Project) : Disposable {
         fun getInstance(project: Project): LogCache = project.getService(LogCache::class.java)
     }
 }
+
+fun JujutsuRepository.cachedEntries(revset: Revset = Expression.ALL): List<LogEntry> {
+    val cache = LogCache.getInstance(project)
+    return cache.get(revset) ?: logService.getLogBasic(revset = revset).getOrNull()?.also { entries ->
+        cache.put(revset, emptyList(), entries)
+    } ?: emptyList()
+}

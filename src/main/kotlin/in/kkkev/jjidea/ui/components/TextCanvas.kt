@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.vcs.log.VcsUser
@@ -282,6 +283,25 @@ fun TextCanvas.appendParents(entry: LogEntry) = smaller {
         append(entry.parentIds.map { ChangeKey(entry.repo, it) }, partBuilder = TextCanvas::append, prefix = " ")
     } else {
         append(message("details.parents.none"))
+    }
+}
+
+fun TextCanvas.append(choice: RevisionChoice) {
+    when (choice) {
+        is RevisionChoice.Bookmark -> {
+            append(choice.item.bookmark)
+            choice.item.id?.let { id ->
+                append(" (")
+                append(id)
+                append(")")
+            }
+        }
+        is RevisionChoice.Change -> {
+            append(icon(AllIcons.Vcs::CommitNode))
+            append(choice.id)
+            append(" ")
+            append(choice.description)
+        }
     }
 }
 
