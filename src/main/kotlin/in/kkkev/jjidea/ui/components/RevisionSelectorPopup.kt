@@ -64,7 +64,6 @@ object RevisionSelectorPopup {
      * Loads data in background to avoid EDT blocking
      */
     fun show(titleKey: String, repo: JujutsuRepository, filter: Filter, onSelected: (Revision) -> Unit) {
-        // Create UI on EDT
         runLater {
             val panel = createPopupPanel(repo, filter, onSelected)
 
@@ -76,25 +75,15 @@ object RevisionSelectorPopup {
                 .setRequestFocus(true)
                 .createPopup()
 
-            // Set popup reference so panel can close it
             panel.setPopup(popup)
-
             popup.showCenteredInCurrentWindow(repo.project)
-
-            // Load initial data after popup is shown
             panel.loadData()
         }
     }
 
-    /**
-     * Create the popup panel with search field and list
-     */
     private fun createPopupPanel(repo: JujutsuRepository, filter: Filter, onSelected: (Revision) -> Unit) =
         PopupPanel(repo, filter, onSelected)
 
-    /**
-     * Panel containing search field and results list
-     */
     private class PopupPanel(
         private val repo: JujutsuRepository,
         private var filter: Filter,
@@ -106,7 +95,6 @@ object RevisionSelectorPopup {
 
         private val listModel = DefaultListModel<RevisionChoice>()
         private val list = object : JBList<RevisionChoice>(listModel) {
-            // Make list fill viewport width instead of expanding to content width
             override fun getScrollableTracksViewportWidth() = true
 
             override fun getToolTipText(event: MouseEvent): String? {
@@ -144,29 +132,20 @@ object RevisionSelectorPopup {
         }.apply {
             selectionMode = ListSelectionModel.SINGLE_SELECTION
             cellRenderer = RevisionChoiceRenderer()
-            visibleRowCount = 15 // Show 15 items without scrolling
+            visibleRowCount = 15
         }
 
         private var currentPopup: JBPopup? = null
 
         init {
-            // Search field
             add(searchField, BorderLayout.NORTH)
-
-            // Results list - fills available panel space
-            val scrollPane = JBScrollPane(list).apply {
-                border = JBUI.Borders.empty()
-            }
+            val scrollPane = JBScrollPane(list).apply { border = JBUI.Borders.empty() }
             add(scrollPane, BorderLayout.CENTER)
-
-            // Set preferred width only - let height be determined by list's visibleRowCount
-            // Add small buffer for borders and padding
             preferredSize = Dimension(
                 JBUI.scale(700),
                 scrollPane.preferredSize.height + searchField.preferredSize.height + JBUI.scale(12)
             )
 
-            // Listen to search field changes
             searchField.addDocumentListener(
                 object : DocumentAdapter() {
                     override fun textChanged(e: DocumentEvent) {
@@ -176,7 +155,6 @@ object RevisionSelectorPopup {
                 }
             )
 
-            // Handle up/down keys in search field to navigate list
             searchField.textEditor.addKeyListener(
                 object : KeyAdapter() {
                     override fun keyPressed(e: KeyEvent) {
@@ -212,7 +190,6 @@ object RevisionSelectorPopup {
                 }
             )
 
-            // Handle Enter key to select
             list.addKeyListener(
                 object : KeyAdapter() {
                     override fun keyPressed(e: KeyEvent) {
@@ -223,7 +200,6 @@ object RevisionSelectorPopup {
                 }
             )
 
-            // Handle double-click to select
             list.addMouseListener(
                 object : MouseAdapter() {
                     override fun mouseClicked(e: MouseEvent) {
@@ -235,58 +211,38 @@ object RevisionSelectorPopup {
             )
         }
 
-        /**
-         * Load and filter data based on search query
-         */
         fun loadData() {
             runInBackground {
                 val items = buildItemList(repo, filter)
-
                 runLater {
                     listModel.clear()
                     items.forEach { listModel.addElement(it) }
-
-                    // Select first item by default
-                    if (listModel.size() > 0) {
-                        list.selectedIndex = 0
-                    }
+                    if (listModel.size() > 0) list.selectedIndex = 0
                 }
             }
         }
 
-        /**
-         * Select an item and close popup
-         */
         private fun selectItem(item: RevisionChoice) {
             onSelected(item.revision)
-            // Close the popup
             currentPopup?.cancel()
         }
 
-        /**
-         * Set the popup reference so we can close it
-         */
         fun setPopup(popup: JBPopup) {
             currentPopup = popup
         }
     }
 
-    /**
-     * Custom renderer for revision choices with icons
-     */
     private class RevisionChoiceRenderer : TextListCellRenderer<RevisionChoice>() {
         override fun render(canvas: TextCanvas, value: RevisionChoice) = canvas.append(value)
     }
 
     /**
-     * Build list of items to show in popup
-     * Should be called from background thread
-     * Filters based on query and limits results
+     * Build list of items to show in popup.
+     * Should be called from a background thread.
      */
     internal fun buildItemList(repo: JujutsuRepository, filter: Filter): List<RevisionChoice> {
         val items = mutableListOf<RevisionChoice>()
 
-        // Add bookmarks - always show all bookmarks filtered by query
         val bookmarkResult = repo.logService.getBookmarks()
         if (bookmarkResult.isSuccess) {
             val filteredBookmarks = bookmarkResult.getOrNull().orEmpty().filter(filter::matches)

@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Selecting an immutable change in the status-bar working-copy switcher no longer fails with "Commit … is immutable". The switcher now queries jj directly for the selected revision's immutability (no longer limited to the 10 most recent changes), acts on the commit id to avoid divergent-change ambiguity, and shows a confirmation dialog before switching. Immutable items are also dimmed with a lock icon in the popup.
+
 ### Added
+- A working-copy switcher widget now appears in the bottom-right status bar for JJ-managed projects. It shows the current local bookmark name, falling back to the change description or `(no description set)`. Clicking opens a speed-searchable popup listing local bookmarks at the top, then up to 10 recent changes; bookmarks and changes are rendered with the same icons, colors, and styled IDs as the "Compare with Another Commit…" revision selector. Selecting an item shows a confirmation dialog to choose **Edit** or **New on Top** (`jj edit` / `jj new`); immutable targets offer only New on Top. The widget auto-refreshes reactively via the state model and hides for non-JJ projects.
 - Log table now correctly shows pending-deletion bookmarks: entries carrying a remote bookmark (e.g. `main@origin`) whose local counterpart has been deleted now display the deleted local (`main` with strikethrough) at that commit, and the remote no longer shows a spurious large ahead count.
 - Pending-deletion bookmarks (bookmarks deleted locally but still present on the remote) now appear in the "Specific bookmark" dropdown in the push dialog, shown with strikethrough and a "(deleted)" label. The confirmation dialog before a push now also warns when pending deletions will be included.
 - Bookmark decorations now show pending deletions (strikethrough), local/remote divergence (↑n ↓n), and bookmark conflicts (conflict icon) in the log gutter, graph column decorations, and commit details panel.
