@@ -6,7 +6,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.components.RevisionChoice
+import `in`.kkkev.jjidea.ui.components.Filter
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
@@ -36,48 +36,49 @@ class JujutsuWorkingCopySwitcherTest {
     }
 
     @Test
-    fun `actionRevision - change returns commit id`() {
-        val entry = makeEntry("aa")
-        val item = RevisionChoice.Change(entry)
-        JujutsuWorkingCopySwitcher.actionRevision(item) shouldBe entry.commitId
+    fun `Filter matches bookmark by name`() {
+        val filter = Filter(includeRemote = false, includeLogEntries = false, query = "main")
+        val item = BookmarkItem(Bookmark("main"), changeId("aa"))
+        filter.matches(item) shouldBe true
     }
 
     @Test
-    fun `actionRevision - bookmark returns bookmark`() {
-        val bookmark = Bookmark("main")
-        val item = RevisionChoice.Bookmark(BookmarkItem(bookmark, changeId("bb")))
-        JujutsuWorkingCopySwitcher.actionRevision(item) shouldBe bookmark
+    fun `Filter excludes deleted bookmarks`() {
+        val filter = Filter(includeRemote = false, includeLogEntries = false)
+        val item = BookmarkItem(Bookmark("main", deleted = true), changeId("aa"))
+        filter.matches(item) shouldBe false
     }
 
     @Test
-    fun `immutableHint - change id in set returns true`() {
-        val entry = makeEntry("cc")
-        val item = RevisionChoice.Change(entry)
-        JujutsuWorkingCopySwitcher.immutableHint(item, setOf(entry.id.full)) shouldBe true
+    fun `Filter excludes remote bookmarks when includeRemote is false`() {
+        val filter = Filter(includeRemote = false, includeLogEntries = false)
+        val item = BookmarkItem(Bookmark("main@origin"), null)
+        filter.matches(item) shouldBe false
     }
 
     @Test
-    fun `immutableHint - change id not in set returns false`() {
-        val item = RevisionChoice.Change(makeEntry("dd"))
-        JujutsuWorkingCopySwitcher.immutableHint(item, emptySet()) shouldBe false
+    fun `Filter includes remote bookmarks when includeRemote is true`() {
+        val filter = Filter(includeRemote = true, includeLogEntries = false)
+        val item = BookmarkItem(Bookmark("main@origin"), null)
+        filter.matches(item) shouldBe true
     }
 
     @Test
-    fun `immutableHint - bookmark change id in set returns true`() {
-        val id = changeId("ee")
-        val item = RevisionChoice.Bookmark(BookmarkItem(Bookmark("feature"), id))
-        JujutsuWorkingCopySwitcher.immutableHint(item, setOf(id.full)) shouldBe true
+    fun `Filter matches log entry by description`() {
+        val filter = Filter(includeRemote = false, includeLogEntries = true, query = "hello")
+        val entry = LogEntry(
+            repo = repo,
+            id = changeId("aa"),
+            commitId = commitId("aa"),
+            underlyingDescription = "hello world"
+        )
+        filter.matches(entry) shouldBe true
     }
 
     @Test
-    fun `immutableHint - bookmark change id not in set returns false`() {
-        val item = RevisionChoice.Bookmark(BookmarkItem(Bookmark("feature"), changeId("ff")))
-        JujutsuWorkingCopySwitcher.immutableHint(item, emptySet()) shouldBe false
-    }
-
-    @Test
-    fun `immutableHint - bookmark with null change id returns false`() {
-        val item = RevisionChoice.Bookmark(BookmarkItem(Bookmark("orphan"), null))
-        JujutsuWorkingCopySwitcher.immutableHint(item, setOf("anything")) shouldBe false
+    fun `Filter excludes log entries when includeLogEntries is false`() {
+        val filter = Filter(includeRemote = false, includeLogEntries = false)
+        val entry = makeEntry("bb")
+        filter.matches(entry) shouldBe false
     }
 }

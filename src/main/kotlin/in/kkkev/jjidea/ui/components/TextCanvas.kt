@@ -286,21 +286,21 @@ fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     }
 }
 
-fun TextCanvas.append(choice: RevisionChoice) {
+fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyList()) {
     when (choice) {
         is RevisionChoice.Bookmark -> {
             append(choice.item.bookmark)
-            choice.item.id?.let { id ->
-                append(" (")
-                append(id)
-                append(")")
+            val entry = choice.item.id?.let { id -> entries.find { it.id == id } }
+            if (entry != null) {
+                append(" ")
+                appendSummary(entry.description)
             }
         }
         is RevisionChoice.Change -> {
             append(icon(AllIcons.Vcs::CommitNode))
             append(choice.id)
             append(" ")
-            append(choice.description)
+            appendSummary(choice.description)
         }
     }
 }

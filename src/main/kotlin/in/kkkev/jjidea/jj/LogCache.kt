@@ -36,8 +36,8 @@ class LogCache(project: Project) : Disposable {
     /**
      * Get cached log entries or null if not cached
      */
-    fun get(revisions: Revset, filePaths: List<String> = emptyList()): List<LogEntry>? {
-        val key = cacheKey(revisions, filePaths)
+    fun get(repoPath: String, revisions: Revset, filePaths: List<String> = emptyList()): List<LogEntry>? {
+        val key = cacheKey(repoPath, revisions, filePaths)
         val cached = cache[key]
 
         // Cache is valid for 30 seconds
@@ -58,8 +58,8 @@ class LogCache(project: Project) : Disposable {
     /**
      * Store log entries in cache
      */
-    fun put(revisions: Revset, filePaths: List<String> = emptyList(), entries: List<LogEntry>) {
-        val key = cacheKey(revisions, filePaths)
+    fun put(repoPath: String, revisions: Revset, filePaths: List<String> = emptyList(), entries: List<LogEntry>) {
+        val key = cacheKey(repoPath, revisions, filePaths)
         cache[key] = CachedLogResult(entries)
         log.debug("Cached ${entries.size} entries for $key")
     }
@@ -72,8 +72,8 @@ class LogCache(project: Project) : Disposable {
         log.debug("Cleared log cache")
     }
 
-    private fun cacheKey(revisions: Revset, filePaths: List<String>) =
-        "$revisions|${filePaths.sorted().joinToString(",")}"
+    private fun cacheKey(repoPath: String, revisions: Revset, filePaths: List<String>) =
+        "$repoPath|$revisions|${filePaths.sorted().joinToString(",")}"
 
     override fun dispose() {
         clear()
@@ -86,7 +86,8 @@ class LogCache(project: Project) : Disposable {
 
 fun JujutsuRepository.cachedEntries(revset: Revset = Expression.ALL): List<LogEntry> {
     val cache = LogCache.getInstance(project)
-    return cache.get(revset) ?: logService.getLogBasic(revset = revset).getOrNull()?.also { entries ->
-        cache.put(revset, emptyList(), entries)
+    val repoPath = directory.path
+    return cache.get(repoPath, revset) ?: logService.getLogBasic(revset = revset).getOrNull()?.also { entries ->
+        cache.put(repoPath, revset, emptyList(), entries)
     } ?: emptyList()
 }

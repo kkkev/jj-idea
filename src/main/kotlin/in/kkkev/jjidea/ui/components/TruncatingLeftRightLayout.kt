@@ -5,6 +5,7 @@ import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
 import java.awt.BorderLayout
 import java.awt.Color
+import java.awt.Dimension
 import javax.swing.BoxLayout
 import javax.swing.BoxLayout.X_AXIS
 import javax.swing.JLabel
@@ -55,6 +56,9 @@ open class TextCanvasPanel : JPanel() {
                 }
             }
         }
+        // Cap each component's max width at its preferred width so BoxLayout cannot
+        // redistribute horizontal space across siblings (which would centre-justify content).
+        components.forEach { it.maximumSize = Dimension(it.preferredSize.width, Short.MAX_VALUE.toInt()) }
     }
 }
 

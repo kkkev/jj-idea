@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.diffRequest
 import `in`.kkkev.jjidea.jj.fileAt
+import `in`.kkkev.jjidea.ui.components.Filter
 import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -39,7 +40,7 @@ class CompareFileWithBranchAction : DumbAwareAction(
                 RevisionSelectorPopup.show(
                     "action.compare.branch.popup.title",
                     repo,
-                    RevisionSelectorPopup.Filter(true, true)
+                    Filter(true, true)
                 ) { chosen ->
                     showDiff(repo, files, chosen)
                 }

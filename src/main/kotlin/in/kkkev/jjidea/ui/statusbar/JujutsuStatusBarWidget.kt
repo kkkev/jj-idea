@@ -4,6 +4,7 @@ import com.intellij.dvcs.repo.Repository
 import com.intellij.dvcs.repo.RepositoryImpl
 import com.intellij.dvcs.ui.DvcsStatusWidget
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.vcs.AbstractVcs
@@ -13,7 +14,6 @@ import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
@@ -24,6 +24,21 @@ class JujutsuStatusBarWidget(project: Project) :
     DvcsStatusWidget<JujutsuStatusBarWidget.WidgetRepository>(project, "Jujutsu") {
     private var listenersInstalled = false
     private val cachedEntries = ConcurrentHashMap<String, LogEntry>()
+
+    companion object {
+        private val log: Logger = Logger.getInstance(JujutsuStatusBarWidget::class.java)
+        private const val MAX_DISPLAY_LEN = 40
+
+        fun displayTextFor(entry: LogEntry): String {
+            val sortedBookmarks = entry.bookmarks.sortedBy { it.isRemote }
+            val text = when {
+                sortedBookmarks.isNotEmpty() -> sortedBookmarks.joinToString(", ") { it.name }
+                !entry.description.empty -> entry.description.summary
+                else -> "(no description set)"
+            }
+            return if (text.length > MAX_DISPLAY_LEN) text.take(MAX_DISPLAY_LEN - 1) + "…" else text
+        }
+    }
 
     override fun ID() = JujutsuStatusBarWidgetFactory.ID
 
@@ -51,7 +66,10 @@ class JujutsuStatusBarWidget(project: Project) :
 
     override fun guessCurrentRepository(project: Project, file: VirtualFile?): WidgetRepository? {
         val repo = JujutsuWidgetSupport.currentRepository(project, file) ?: return null
-        val entry = loadWorkingCopyEntry(repo) ?: return null
+        val entry = loadWorkingCopyEntry(repo) ?: run {
+            log.debug("Widget: no entry for ${repo.directory.path}")
+            return null
+        }
         return WidgetRepository(project, repo, entry)
     }
 
@@ -97,20 +115,8 @@ class JujutsuStatusBarWidget(project: Project) :
             return entry
         }
         cachedEntries[key]?.let { return it }
-        val loadedEntry = repo.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull() ?: return null
-        cachedEntries[key] = loadedEntry
-        return loadedEntry
-    }
-
-    companion object {
-        fun displayTextFor(entry: LogEntry): String {
-            val sortedBookmarks = entry.bookmarks.sortedBy { it.isRemote }
-            return when {
-                sortedBookmarks.isNotEmpty() -> sortedBookmarks.joinToString(", ") { it.name }
-                !entry.description.empty -> entry.description.summary
-                else -> "(no description set)"
-            }
-        }
+        log.debug("Widget loadWorkingCopyEntry: miss for $key")
+        return null
     }
 
     class WidgetRepository(
