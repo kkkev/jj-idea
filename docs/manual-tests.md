@@ -217,6 +217,32 @@ Open `/tmp/jj-squash-test` in the plugin IDE.
 - [ ] Clear filters (X button) resets all filters
 - [ ] Filters combine correctly (AND logic)
 
+### Bookmark Widget
+
+#### Single-repo project
+
+- [ ] "Bookmark: \<name\>" label appears in the log toolbar to the left of the Reference filter when @ has a local bookmark
+- [ ] Label shows "Bookmark:" with nothing after it when @ has no local bookmarks (no placeholder text)
+- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal, save any file, label changes to "Bookmark: foo" without restarting
+- [ ] Click the widget — dropdown opens with "Create Bookmark Here…" at the top
+- [ ] Dropdown lists all local bookmarks in the repo (not just those on @), each as a sub-menu
+- [ ] For a bookmark **on @**: sub-menu contains Rename…, Delete, Forget (no Move Here)
+- [ ] For a bookmark **not on @**: sub-menu contains Move…, Rename…, Delete, Forget
+- [ ] Remote bookmarks (e.g. `master@origin`) are folded into the corresponding local bookmark's sub-menu as Track/Untrack, not shown as separate top-level items
+- [ ] "Create Bookmark Here…" → dialog appears → enter name → confirm → bookmark created at @, label updates, log decorations update
+- [ ] Rename… → dialog → confirm → bookmark renamed in log and label
+- [ ] Delete → bookmark removed; if it was on @, label reverts to blank
+- [ ] Forget (for a remote bookmark entry) → remote tracking removed
+
+#### Multi-repo project
+
+- [ ] Bookmark widget is present in the toolbar (not hidden)
+- [ ] Label shows "Bookmark:" with nothing after it regardless of which bookmarks exist
+- [ ] Click the widget — dropdown shows one sub-menu **per repo**, named by repo display name
+- [ ] Each repo sub-menu contains the same structure as the single-repo dropdown: "Create Bookmark Here…" at the top, then the repo's bookmark sub-menus
+- [ ] "Create Bookmark Here…" inside repo-a's sub-menu creates a bookmark at **repo-a's** working copy, not repo-b's (check via `jj bookmark list` in each repo)
+- [ ] Rename/Delete/Forget in repo-b's sub-menu affects only repo-b
+
 ### Multi-Repository (if applicable)
 
 - [ ] Root filter appears for multi-root projects

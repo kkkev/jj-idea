@@ -197,6 +197,29 @@ class RequirementsTest {
         // Implementation: JujutsuContentRevision.getContent() calls jj file show
     }
 
+    // ========== BOOKMARK WIDGET ==========
+
+    @Test
+    @Disabled("UI test - requires IDE environment")
+    fun `Bookmark widget appears in log toolbar showing current working-copy bookmark`() {
+        // Implementation: JujutsuBookmarkWidget extends JujutsuFilterComponent,
+        //   subscribes to project.stateModel.workingCopies; added in UnifiedJujutsuLogPanel
+    }
+
+    @Test
+    @Disabled("UI test - requires IDE environment")
+    fun `Bookmark widget dropdown shows Create and per-bookmark management actions`() {
+        // Implementation: JujutsuBookmarkWidget.repoActionGroup() + bookmarkSubGroup();
+        //   remotes folded into their local bookmark's sub-group via BookmarkGroup.grouped()
+    }
+
+    @Test
+    @Disabled("UI test - requires IDE environment")
+    fun `Bookmark widget groups bookmarks by repo sub-menu in multi-repo projects`() {
+        // Implementation: createActionGroup() wraps repoActionGroup() per repo when repos.size > 1;
+        //   label is blank in multi-repo (getCurrentText() returns "" when wcEntries.size != 1)
+    }
+
     // ========== THREADING & PERFORMANCE ==========
 
     @Test

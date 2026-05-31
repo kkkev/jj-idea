@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
@@ -100,6 +101,12 @@ class UnifiedJujutsuLogPanel(project: Project) :
             isVisible = false
         }
         filterPanel.add(rootFilterComponent)
+        filterPanel.add(Box.createHorizontalStrut(5))
+
+        // Bookmark widget
+        val widget = JujutsuBookmarkWidget(project, logTable)
+        Disposer.register(this, widget)
+        filterPanel.add(widget)
         filterPanel.add(Box.createHorizontalStrut(5))
     }
 
