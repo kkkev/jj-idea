@@ -177,13 +177,12 @@ class SquashIntoDialogPickSourcesModeTest {
 
     private fun dialog(
         destination: LogEntry,
-        allEntries: List<LogEntry>
+        candidates: List<LogEntry>
     ) = SquashIntoDialog(
         project.get(),
         destination.repo,
-        SquashMode.PickSources(destination),
-        emptyList(),
-        allEntries
+        SquashMode.PickSources(destination, candidates),
+        emptyList()
     )
 
     private fun createEntry(

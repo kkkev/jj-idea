@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.rebase
 
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
@@ -13,6 +14,8 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.*
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.*
@@ -37,13 +40,12 @@ data class RebaseSpec(
 class RebaseDialog(
     private val project: Project,
     private val repo: JujutsuRepository,
-    private val sourceEntries: List<LogEntry>,
-    allEntries: List<LogEntry> = emptyList()
+    private val sourceEntries: List<LogEntry>
 ) : DialogWrapper(project) {
     var result: RebaseSpec? = null
         private set
 
-    private val repoEntries = allEntries.filter { it.repo == repo }
+    private var repoEntries: List<LogEntry> = emptyList()
 
     // Source mode radio buttons
     private val sourceModeRevision = JRadioButton(JujutsuBundle.message("dialog.rebase.source.mode.revision")).apply {
@@ -119,12 +121,20 @@ class RebaseDialog(
 
         init()
 
-        // Populate destination table from pre-loaded entries
-        previewPanel.setEntries(repoEntries)
-        loadDestinations("")
-        // Hide extra columns once after initial population — setEntries doesn't recreate columns
+        // Hide extra columns once — doesn't depend on data
         hideExtraColumns()
         updateDestRenderer()
+
+        runInBackground(ModalityState.any()) {
+            val entries = loadRepoEntries(project, repo)
+            runLater {
+                if (!isDisposed) {
+                    repoEntries = entries
+                    previewPanel.setEntries(repoEntries)
+                    loadDestinations("")
+                }
+            }
+        }
     }
 
     override fun createCenterPanel(): JComponent {

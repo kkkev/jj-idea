@@ -43,14 +43,13 @@ internal fun parseRemainingChangeId(stderr: String): ChangeId? {
  */
 fun splitAction(
     project: Project,
-    entry: LogEntry?,
-    allEntries: List<LogEntry> = emptyList()
+    entry: LogEntry?
 ) = nullAndDumbAwareAction(entry, "log.action.split", JujutsuIcons.Split) {
     runInBackground {
         val changes = ChangeService.loadChanges(target)
 
         runLater {
-            val dialog = SplitDialog(project, target, changes, allEntries)
+            val dialog = SplitDialog(project, target, changes)
             if (!dialog.showAndGet()) return@runLater
 
             val spec = dialog.result ?: return@runLater

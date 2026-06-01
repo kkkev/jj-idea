@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.squash
 
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
@@ -87,15 +88,14 @@ class SquashIntoDialog(
     private val repo: JujutsuRepository,
     private val mode: SquashMode,
     changes: List<Change>,
-    allEntries: List<LogEntry> = emptyList(),
     preSelectedFiles: Set<FilePath> = emptySet()
 ) : DialogWrapper(project) {
     var result: SquashIntoSpec? = null
         private set
 
     private val pickingSources = mode is SquashMode.PickSources
-    private val hasPredefinedCandidates = mode is SquashMode.PickDestination && mode.candidates != null
-    private val repoEntries = allEntries.filter { it.repo == repo }
+    private val hasPredefinedCandidates = mode.candidates != null
+    private var repoEntries: List<LogEntry> = emptyList()
     private val sourceIds = (mode as? SquashMode.PickDestination)?.sources?.map { it.id }?.toSet() ?: emptySet()
 
     private val searchField = SearchTextField(false).apply {
@@ -190,9 +190,18 @@ class SquashIntoDialog(
 
         if (hasPredefinedCandidates) {
             setupPredefinedCandidates()
-        } else {
-            loadCandidates("")
             if (pickingSources) preSelectWorkingCopy()
+        } else {
+            runInBackground(ModalityState.any()) {
+                val entries = loadRepoEntries(project, repo)
+                runLater {
+                    if (!isDisposed) {
+                        repoEntries = entries
+                        loadCandidates("")
+                        if (pickingSources) preSelectWorkingCopy()
+                    }
+                }
+            }
         }
         hideExtraColumns()
         updatePickerRenderer()
@@ -243,8 +252,7 @@ class SquashIntoDialog(
         val pickerScrollPane = JBScrollPane(pickerTable).apply {
             border = JBUI.Borders.empty()
             if (hasPredefinedCandidates) {
-                val candidates = (mode as SquashMode.PickDestination).candidates!!
-                val fixedHeight = candidates.size * pickerTable.rowHeight + JBUI.scale(4)
+                val fixedHeight = mode.candidates!!.size * pickerTable.rowHeight + JBUI.scale(4)
                 preferredSize = Dimension(0, fixedHeight)
                 maximumSize = Dimension(Int.MAX_VALUE, fixedHeight)
             }
@@ -300,11 +308,11 @@ class SquashIntoDialog(
     }
 
     private fun setupPredefinedCandidates() {
-        val candidates = (mode as SquashMode.PickDestination).candidates!!
+        val candidates = mode.candidates!!
         pickerTableModel.setEntries(candidates)
         pickerGraphNodes = CommitGraphBuilder().buildGraph(candidates)
         if (candidates.isNotEmpty()) {
-            pickerTable.setRowSelectionInterval(0, 0)
+            if (!pickingSources) pickerTable.setRowSelectionInterval(0, 0)
         } else {
             updateDescription()
         }

@@ -6,6 +6,7 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
@@ -20,12 +21,15 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.appendDecorations
 import `in`.kkkev.jjidea.ui.log.appendStatusIndicators
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -66,7 +70,6 @@ class SplitDialog(
     private val project: Project,
     private val sourceEntry: LogEntry,
     changes: List<Change>,
-    allEntries: List<LogEntry> = emptyList(),
     preSelectedFiles: Set<FilePath>? = null
 ) : DialogWrapper(project) {
     var result: SplitSpec? = null
@@ -113,7 +116,6 @@ class SplitDialog(
 
     // Preview
     private val previewPanel = SplitPreviewPanel()
-    private val repoEntries = allEntries.filter { it.repo == sourceEntry.repo }
 
     /** Current parent description text, exposed for testing. */
     internal val parentDescriptionText: String get() = parentDescriptionField.text
@@ -141,11 +143,22 @@ class SplitDialog(
 
         updateDynamicLabels()
         refreshTrees()
-
-        previewPanel.setEntries(repoEntries)
         updatePreview()
 
         init()
+
+        val id = sourceEntry.id.short
+        runInBackground(ModalityState.any()) {
+            val entries = sourceEntry.repo.logService
+                .getLogBasic(Expression("ancestors($id, 3) | $id | descendants($id, 3)"))
+                .getOrNull().orEmpty()
+            runLater {
+                if (!isDisposed) {
+                    previewPanel.setEntries(entries)
+                    updatePreview()
+                }
+            }
+        }
     }
 
     private fun updateDynamicLabels() {
@@ -207,7 +220,6 @@ class SplitDialog(
     }
 
     private fun updatePreview() {
-        if (repoEntries.isEmpty()) return
         val parallel = parallelCheckBox.isSelected
         val parentKey = if (parallel) "dialog.split.legend.first" else "dialog.split.legend.parent"
         val childKey = if (parallel) "dialog.split.legend.second" else "dialog.split.legend.child"

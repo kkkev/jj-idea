@@ -380,29 +380,25 @@ class JujutsuLogContextMenuActionsTest {
 
     @Nested
     inner class `Squash action availability` {
-        private val parent by lazy { createEntry("parent1", immutable = false) }
-        private val immutableParent by lazy { createEntry("parent2", immutable = true) }
-        private val allEntries by lazy { listOf(parent, immutableParent) }
-
         @Test
         fun `immutable entry filtered out`() {
             val entry = createEntry("abc123", immutable = true, parentIds = listOf("parent1"))
 
-            squashableEntry(entry, allEntries).shouldBeNull()
+            squashableEntry(entry).shouldBeNull()
         }
 
         @Test
-        fun `mutable entry with mutable parent passes through`() {
+        fun `mutable entry with parent passes through`() {
             val entry = createEntry("abc123", immutable = false, parentIds = listOf("parent1"))
 
-            squashableEntry(entry, allEntries).shouldNotBeNull()
+            squashableEntry(entry).shouldNotBeNull()
         }
 
         @Test
         fun `working copy mutable entry passes through`() {
             val entry = createEntry("abc123", isWorkingCopy = true, immutable = false, parentIds = listOf("parent1"))
 
-            val result = squashableEntry(entry, allEntries)
+            val result = squashableEntry(entry)
             result.shouldNotBeNull()
             result.isWorkingCopy shouldBe true
         }
@@ -415,31 +411,35 @@ class JujutsuLogContextMenuActionsTest {
         }
 
         @Test
-        fun `immutable parent disables squash`() {
+        fun `entry with immutable parent enables squash (mutability checked in dialog)`() {
+            // Parent mutability is no longer checked at action-enable time;
+            // it's verified when the dialog opens so parents outside the log window aren't missed.
             val entry = createEntry("abc123", immutable = false, parentIds = listOf("parent2"))
 
-            squashableEntry(entry, allEntries).shouldBeNull()
+            squashableEntry(entry).shouldNotBeNull()
         }
 
         @Test
-        fun `merge commit with at least one mutable parent allows squash`() {
+        fun `merge commit with parents allows squash`() {
             val entry = createEntry("abc123", immutable = false, parentIds = listOf("parent1", "parent2"))
 
-            squashableEntry(entry, allEntries).shouldNotBeNull()
+            squashableEntry(entry).shouldNotBeNull()
         }
 
         @Test
         fun `root commit with no parents disables squash`() {
             val entry = createEntry("abc123", immutable = false, parentIds = emptyList())
 
-            squashableEntry(entry, allEntries).shouldBeNull()
+            squashableEntry(entry).shouldBeNull()
         }
 
         @Test
-        fun `parent not in allEntries disables squash`() {
+        fun `entry with parent outside visible log enables squash (optimistic)`() {
+            // Parent not in the visible window: action is optimistically enabled so entries
+            // with mutable parents beyond the logChangeLimit are not incorrectly disabled.
             val entry = createEntry("abc123", immutable = false, parentIds = listOf("unknown"))
 
-            squashableEntry(entry, allEntries).shouldBeNull()
+            squashableEntry(entry).shouldNotBeNull()
         }
     }
 

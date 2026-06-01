@@ -44,8 +44,7 @@ object JujutsuLogContextMenuActions {
      */
     fun createActionGroup(
         project: Project,
-        entries: List<LogEntry>,
-        allEntries: List<LogEntry> = emptyList()
+        entries: List<LogEntry>
     ): DefaultActionGroup = DefaultActionGroup().apply {
         val entry = entries.singleOrNull()
         entry?.run { add(copyIdAction(id)) }
@@ -73,19 +72,12 @@ object JujutsuLogContextMenuActions {
         // Offer "Rebase" for mutable changes (single or multi-select, same root)
         val mutableEntries = entries.filter { !it.immutable }
         val rebaseRepo = uniqueRepo?.takeIf { mutableEntries.isNotEmpty() }
-        add(rebaseAction(project, rebaseRepo, mutableEntries, allEntries))
-        add(squashAction(project, squashableEntry(entry, allEntries), allEntries))
+        add(rebaseAction(project, rebaseRepo, mutableEntries))
+        add(squashAction(project, squashableEntry(entry)))
         val squashIntoSrcs = squashIntoSources(entries)
-        add(
-            squashIntoAction(
-                project,
-                uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() },
-                squashIntoSrcs,
-                allEntries
-            )
-        )
-        add(squashFromAction(project, entry?.takeIf { !it.immutable }, allEntries))
-        add(splitAction(project, entry?.takeIf { !it.immutable }, allEntries))
+        add(squashIntoAction(project, uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() }, squashIntoSrcs))
+        add(squashFromAction(project, entry?.takeIf { !it.immutable }))
+        add(splitAction(project, entry?.takeIf { !it.immutable }))
 
         addSeparator()
         add(createBookmarkAction(entry))

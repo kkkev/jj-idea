@@ -316,11 +316,7 @@ class JujutsuLogTable(
      * Called when user right-clicks on the table.
      */
     private fun showContextMenu(component: Component, x: Int, y: Int) {
-        val actionGroup = JujutsuLogContextMenuActions.createActionGroup(
-            project,
-            selectedEntries,
-            logModel.getAllEntries()
-        )
+        val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, selectedEntries)
         val popupMenu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
         popupMenu.component.show(component, x, y)
     }

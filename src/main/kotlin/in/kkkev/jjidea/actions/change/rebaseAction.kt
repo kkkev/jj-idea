@@ -15,11 +15,10 @@ import `in`.kkkev.jjidea.ui.rebase.RebaseDialog
 fun rebaseAction(
     project: Project,
     repo: JujutsuRepository?,
-    entries: List<LogEntry>,
-    allEntries: List<LogEntry> = emptyList()
+    entries: List<LogEntry>
 ) =
     nullAndDumbAwareAction(repo, "log.action.rebase", JujutsuIcons.Rebase) {
-        val dialog = RebaseDialog(project, target, entries, allEntries)
+        val dialog = RebaseDialog(project, target, entries)
         if (!dialog.showAndGet()) return@nullAndDumbAwareAction
 
         val spec = dialog.result ?: return@nullAndDumbAwareAction

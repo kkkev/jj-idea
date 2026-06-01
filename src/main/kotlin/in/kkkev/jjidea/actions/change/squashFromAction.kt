@@ -3,9 +3,11 @@ package `in`.kkkev.jjidea.actions.change
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.loadRepoEntries
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
 import `in`.kkkev.jjidea.ui.squash.SquashMode
+import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
 /**
@@ -19,15 +21,16 @@ import `in`.kkkev.jjidea.util.runLater
  */
 fun squashFromAction(
     project: Project,
-    destination: LogEntry?,
-    allEntries: List<LogEntry> = emptyList()
+    destination: LogEntry?
 ) = nullAndDumbAwareAction(destination, "log.action.squash.from", JujutsuIcons.Squash) {
     runLater {
-        val dialog = SquashIntoDialog(project, target.repo, SquashMode.PickSources(target), emptyList(), allEntries)
+        val dialog = SquashIntoDialog(project, target.repo, SquashMode.PickSources(target), emptyList())
         if (!dialog.showAndGet()) return@runLater
         val spec = dialog.result ?: return@runLater
         val specSourceIds = spec.sources.toSet()
-        val sourceEntries = allEntries.filter { it.id in specSourceIds }
-        executeSquashInto(project, target.repo, sourceEntries, spec)
+        runInBackground {
+            val sourceEntries = loadRepoEntries(project, target.repo).filter { it.id in specSourceIds }
+            executeSquashInto(project, target.repo, sourceEntries, spec)
+        }
     }
 }

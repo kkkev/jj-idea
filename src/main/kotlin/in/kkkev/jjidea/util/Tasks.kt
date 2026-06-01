@@ -19,15 +19,15 @@ fun saveAllDocuments() {
 
 private val capturedModality = ThreadLocal<ModalityState>()
 
-fun <T> runInBackground(action: () -> T): Future<T> {
-    val modality = ModalityState.defaultModalityState()
-    return ApplicationManager.getApplication().executeOnPooledThread<T> {
-        capturedModality.set(modality)
-        try {
-            action()
-        } finally {
-            capturedModality.remove()
-        }
+fun <T> runInBackground(
+    modalityState: ModalityState = ModalityState.defaultModalityState(),
+    action: () -> T
+): Future<T> = ApplicationManager.getApplication().executeOnPooledThread<T> {
+    capturedModality.set(modalityState)
+    try {
+        action()
+    } finally {
+        capturedModality.remove()
     }
 }
 

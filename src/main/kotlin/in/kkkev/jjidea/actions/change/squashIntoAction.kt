@@ -27,13 +27,12 @@ private val squashIntoLog = Logger.getInstance("in.kkkev.jjidea.actions.change.s
 fun squashIntoAction(
     project: Project,
     repo: JujutsuRepository?,
-    sources: List<LogEntry>,
-    allEntries: List<LogEntry> = emptyList()
+    sources: List<LogEntry>
 ) = nullAndDumbAwareAction(repo, "log.action.squash.into", JujutsuIcons.Squash) {
     runInBackground {
         val changes = ChangeService.loadChanges(sources)
         runLater {
-            val dialog = SquashIntoDialog(project, target, SquashMode.PickDestination(sources), changes, allEntries)
+            val dialog = SquashIntoDialog(project, target, SquashMode.PickDestination(sources), changes)
             if (!dialog.showAndGet()) return@runLater
             val spec = dialog.result ?: return@runLater
             executeSquashInto(project, target, sources, spec)
