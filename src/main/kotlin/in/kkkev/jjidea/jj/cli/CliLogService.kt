@@ -126,25 +126,25 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 'M' -> FileChange.Modified(filePath.fileAt(beforeContentLocator), filePath.fileAt(afterChangeId))
                 'A' -> FileChange.Added(filePath.fileAt(afterChangeId))
                 'D' -> FileChange.Deleted(filePath.fileAt(beforeContentLocator))
-                'R' -> {
+                'R', 'C' -> {
                     val (prefix, before, after, suffix) = requireNotNull(
                         Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(changeFileSpec)
                     ) {
-                        "Invalid rename format: $changeFileSpec"
+                        "Invalid rename/copy format: $changeFileSpec"
                     }.destructured
-                    // Remove braces and parse
 
                     val oldPath = prefix + before + suffix
                     val newPath = prefix + after + suffix
 
-                    log.info("Detected rename: $oldPath => $newPath")
+                    if (statusChar == 'R') {
+                        log.info("Detected rename: $oldPath => $newPath")
+                    } else {
+                        log.info("Detected copy: $oldPath => $newPath")
+                    }
 
-                    // Create file paths
-                    val beforePath = repo.directory.getChildPath(oldPath)
-                    val afterPath = repo.directory.getChildPath(newPath)
                     FileChange.Renamed(
-                        beforePath.fileAt(beforeContentLocator),
-                        afterPath.fileAt(afterChangeId)
+                        repo.directory.getChildPath(oldPath).fileAt(beforeContentLocator),
+                        repo.directory.getChildPath(newPath).fileAt(afterChangeId)
                     )
                 }
 

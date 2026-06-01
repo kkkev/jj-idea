@@ -176,7 +176,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             'A' -> addAddedChange(path, builder)
             'D' -> addDeletedChange(path, repo, builder)
             'R' -> addRenamedChange(filePath, repo, builder)
-            'C' -> addConflictedChange(path, repo, builder)
+            'C' -> addCopiedChange(filePath, repo, builder)
             else -> log.debug("Unknown status '$status' for file: $filePath")
         }
     }
@@ -261,31 +261,36 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         }
     }
 
-    /**
-     * Parse rename status and add change
-     * Format: "{oldname => newname}" or "prefix{oldname => newname}"
-     */
-    private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
+    private fun parseRenameOrCopySpec(spec: String): Pair<String, String> {
         val (prefix, before, after, suffix) = requireNotNull(
-            Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(renameSpec)
-        ) {
-            "Invalid rename format: $renameSpec"
-        }.destructured
+            Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(spec)
+        ) { "Invalid rename/copy format: $spec" }.destructured
+        return prefix + before + suffix to prefix + after + suffix
+    }
 
-        val oldPath = prefix + before + suffix
-        val newPath = prefix + after + suffix
-
+    private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
+        val (oldPath, newPath) = parseRenameOrCopySpec(renameSpec)
         log.info("Detected rename: $oldPath => $newPath")
-
-        val beforePath = repo.directory.getChildPath(oldPath)
-        val afterPath = repo.directory.getChildPath(newPath)
-
-        val beforeRevision = repo.createContentRevision(beforePath, repo.workingCopy.parentContentLocator)
-        val afterRevision = CurrentContentRevision(afterPath)
-
+        val beforeRevision = repo.createContentRevision(
+            repo.directory.getChildPath(oldPath),
+            repo.workingCopy.parentContentLocator
+        )
+        val afterRevision = CurrentContentRevision(repo.directory.getChildPath(newPath))
         val change = Change(beforeRevision, afterRevision, FileStatus.MODIFIED)
         change.isIsReplaced = true
+        builder.processChange(change, vcs.keyInstanceMethod)
+    }
 
+    private fun addCopiedChange(copySpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
+        val (oldPath, newPath) = parseRenameOrCopySpec(copySpec)
+        log.info("Detected copy: $oldPath => $newPath")
+        val beforeRevision = repo.createContentRevision(
+            repo.directory.getChildPath(oldPath),
+            repo.workingCopy.parentContentLocator
+        )
+        val afterRevision = CurrentContentRevision(repo.directory.getChildPath(newPath))
+        val change = Change(beforeRevision, afterRevision, FileStatus.MODIFIED)
+        change.isIsReplaced = true
         builder.processChange(change, vcs.keyInstanceMethod)
     }
 }

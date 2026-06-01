@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Copied files (`C` status in `jj status`) are no longer displayed as merge conflicts in the working copy panel. They now render as rename-style entries (source → destination). Copies in commit history (log/diff view) are also no longer silently dropped.
+
 ## [0.7.3] - 2026-06-01
 
 ### Fixed

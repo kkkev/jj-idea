@@ -253,55 +253,115 @@ class JujutsuChangeProviderTest {
     }
 
     @Test
-    fun `single conflict`() {
-        directory.addChild(getOrCreateVirtualFile(false, "foo.txt"))
+    fun `simple copy`() {
+        directory.addChild(getOrCreateVirtualFile(false, "bar.txt"))
 
-        val output = statusOutput("C foo.txt")
+        val output = statusOutput("C {foo.txt => bar.txt}")
 
         val changeSlot = slot<Change>()
-        every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
-        } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
-        every {
-            repo.createContentRevision(capture(filePathSlot), any<ContentLocator>())
-        } answers {
-            val result = mockk<ContentRevision>()
-            every { result.file } returns filePathSlot.captured
-            result
+        every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
+            mockk<ContentRevision> { every { file } returns filePathSlot.captured }
         }
 
         jcp.parseStatus(output, repo, builder)
 
         val change = changeSlot.captured
-        change.fileStatus shouldBe FileStatus.MERGED_WITH_CONFLICTS
+        change.fileStatus shouldBe FileStatus.MODIFIED
         change.beforeRevision?.file?.relativeTo(directory) shouldBe "foo.txt"
-        change.afterRevision?.file?.relativeTo(directory) shouldBe "foo.txt"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "bar.txt"
     }
 
     @Test
-    fun `conflict alongside modify`() {
-        directory.addChild(getOrCreateVirtualFile(false, "conflict.txt"))
-        directory.addChild(getOrCreateVirtualFile(false, "modified.txt"))
+    fun `copy across subdirectories`() {
+        val subdir = getOrCreateVirtualFile(true, "bar")
+        subdir.addChild(getOrCreateVirtualFile(false, "bam.txt"))
 
-        val output = statusOutput("C conflict.txt", "M modified.txt")
+        val output = statusOutput("C {foo/bar.txt => bar/bam.txt}")
+
+        val changeSlot = slot<Change>()
+        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
+            mockk<ContentRevision> { every { file } returns filePathSlot.captured }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        val change = changeSlot.captured
+        change.fileStatus shouldBe FileStatus.MODIFIED
+        change.beforeRevision?.file?.relativeTo(directory) shouldBe "foo/bar.txt"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "bar/bam.txt"
+    }
+
+    @Test
+    fun `copy with shared prefix`() {
+        val subdir = getOrCreateVirtualFile(true, "foo")
+        subdir.addChild(getOrCreateVirtualFile(false, "bam.txt"))
+
+        val output = statusOutput("C foo/{bar.txt => bam.txt}")
+
+        val changeSlot = slot<Change>()
+        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
+            mockk<ContentRevision> { every { file } returns filePathSlot.captured }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        val change = changeSlot.captured
+        change.fileStatus shouldBe FileStatus.MODIFIED
+        change.beforeRevision?.file?.relativeTo(directory) shouldBe "foo/bar.txt"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "foo/bam.txt"
+    }
+
+    @Test
+    fun `copy with shared suffix`() {
+        val subdir = getOrCreateVirtualFile(true, "bar")
+        subdir.addChild(getOrCreateVirtualFile(false, "bar.txt"))
+
+        val output = statusOutput("C {foo => bar}/bar.txt")
+
+        val changeSlot = slot<Change>()
+        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
+            mockk<ContentRevision> { every { file } returns filePathSlot.captured }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        val change = changeSlot.captured
+        change.fileStatus shouldBe FileStatus.MODIFIED
+        change.beforeRevision?.file?.relativeTo(directory) shouldBe "foo/bar.txt"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "bar/bar.txt"
+    }
+
+    @Test
+    fun `copy alongside modify`() {
+        directory.addChild(getOrCreateVirtualFile(false, "bookmarkAction.svg"))
+        directory.addChild(getOrCreateVirtualFile(false, "other.txt"))
+
+        val output = statusOutput("C {bookmark.svg => bookmarkAction.svg}", "M other.txt")
 
         val changes = mutableListOf<Change>()
-        every {
-            builder.processChange(capture(changes), JujutsuVcs.getKey())
-        } returns Unit
-
-        every {
-            repo.createContentRevision(any(), any<ContentLocator>())
-        } answers {
+        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
         }
 
         jcp.parseStatus(output, repo, builder)
 
-        changes.map { it.fileStatus } shouldBe listOf(FileStatus.MERGED_WITH_CONFLICTS, FileStatus.MODIFIED)
+        changes.map { it.fileStatus } shouldBe listOf(FileStatus.MODIFIED, FileStatus.MODIFIED)
+        changes[0].beforeRevision?.file?.relativeTo(directory) shouldBe "bookmark.svg"
+        changes[0].afterRevision?.file?.relativeTo(directory) shouldBe "bookmarkAction.svg"
     }
 
     @Test
