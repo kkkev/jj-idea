@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-06-01
+
 ### Fixed
 - Selecting an immutable change in the status-bar working-copy switcher no longer fails with "Commit … is immutable". The switcher now queries jj directly for the selected revision's immutability (no longer limited to the 10 most recent changes), acts on the commit id to avoid divergent-change ambiguity, and shows a confirmation dialog before switching. Immutable items are also dimmed with a lock icon in the popup.
 
@@ -520,7 +522,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.3
 [0.7.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.2
 [0.7.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.1
 [0.7.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.0
