@@ -1,32 +1,34 @@
 package `in`.kkkev.jjidea.ui.statusbar
 
-import com.intellij.dvcs.repo.Repository
-import com.intellij.dvcs.repo.RepositoryImpl
-import com.intellij.dvcs.ui.DvcsStatusWidget
-import com.intellij.icons.AllIcons
-import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.popup.JBPopup
-import com.intellij.openapi.vcs.AbstractVcs
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
+import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
-import java.util.concurrent.ConcurrentHashMap
+import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
+import `in`.kkkev.jjidea.ui.components.RevisionChoice
+import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
+import `in`.kkkev.jjidea.ui.components.append
+import java.awt.BorderLayout
+import java.awt.Graphics
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import javax.swing.JComponent
+import javax.swing.JLabel
+import javax.swing.JPanel
 
-@Suppress("UnstableApiUsage")
-class JujutsuStatusBarWidget(project: Project) :
-    DvcsStatusWidget<JujutsuStatusBarWidget.WidgetRepository>(project, "Jujutsu") {
-    private var listenersInstalled = false
-    private val cachedEntries = ConcurrentHashMap<String, LogEntry>()
+class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidget {
+    private val panel = WidgetPanel()
+    private var currentRepo: JujutsuRepository? = null
 
     companion object {
-        private val log: Logger = Logger.getInstance(JujutsuStatusBarWidget::class.java)
         private const val MAX_DISPLAY_LEN = 40
 
         fun displayTextFor(entry: LogEntry): String {
@@ -41,57 +43,87 @@ class JujutsuStatusBarWidget(project: Project) :
     }
 
     override fun ID() = JujutsuStatusBarWidgetFactory.ID
-
-    override fun copy(): StatusBarWidget = JujutsuStatusBarWidget(project)
+    override fun getComponent(): JComponent = panel
+    override fun getPresentation(): StatusBarWidget.WidgetPresentation? = null
 
     override fun install(statusBar: StatusBar) {
-        super.install(statusBar)
-        if (listenersInstalled) return
-        listenersInstalled = true
-        preloadSwitcherItems()
-        project.stateModel.initialisedRepositories.connect(this) { repos ->
-            repos.values.forEach(JujutsuWorkingCopySwitcher::preload)
-            updateLater()
-        }
-        project.stateModel.workingCopies.connect(this) { workingCopies ->
-            cachedEntries.putAll(workingCopies)
-            workingCopies.values.forEach { JujutsuWorkingCopySwitcher.preload(it.repo) }
-            updateLater()
-        }
-        project.stateModel.logRefresh.connect(this) { _ ->
-            preloadSwitcherItems()
-            updateLater()
-        }
+        panel.onClick = ::openPopup
+
+        project.stateModel.workingCopies.connect(this) { _ -> refresh() }
+
+        project.messageBus.connect(this).subscribe(
+            FileEditorManagerListener.FILE_EDITOR_MANAGER,
+            object : FileEditorManagerListener {
+                override fun selectionChanged(event: FileEditorManagerEvent) = refresh()
+            }
+        )
+
+        refresh()
     }
 
-    override fun guessCurrentRepository(project: Project, file: VirtualFile?): WidgetRepository? {
-        val repo = JujutsuWidgetSupport.currentRepository(project, file) ?: return null
-        val entry = loadWorkingCopyEntry(repo) ?: run {
-            log.debug("Widget: no entry for ${repo.directory.path}")
-            return null
+    private fun refresh() {
+        val selectedFile = FileEditorManager.getInstance(project).selectedEditor?.file
+        val repo = JujutsuWidgetSupport.currentRepository(project, selectedFile)
+        val entry = repo?.let { project.stateModel.workingCopies.value[it.directory.path] }
+        currentRepo = repo
+        panel.update(repo, entry, isMultiRoot = project.stateModel.initialisedRepositories.value.size > 1)
+    }
+
+    private fun openPopup() {
+        val repo = currentRepo ?: return
+        JujutsuWidgetSupport.rememberRecentRoot(project, repo.directory.path)
+        JujutsuWorkingCopySwitcher.createPopup(repo).showUnderneathOf(panel)
+    }
+
+    override fun dispose() {
+        currentRepo = null
+    }
+
+    private class WidgetPanel : JPanel(BorderLayout()) {
+        var onClick: (() -> Unit)? = null
+        private val content = TextCanvasPanel()
+        private val arrow = JLabel(" ▾")
+        private var hovered = false
+
+        init {
+            border = JBUI.Borders.empty(0, 4)
+            isOpaque = false
+            add(content, BorderLayout.CENTER)
+            add(arrow, BorderLayout.EAST)
+            cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) = onClick?.invoke() ?: Unit
+                override fun mouseEntered(e: MouseEvent) {
+                    hovered = true
+                    repaint()
+                }
+
+                override fun mouseExited(e: MouseEvent) {
+                    hovered = false
+                    repaint()
+                }
+            })
         }
-        return WidgetRepository(project, repo, entry)
-    }
 
-    override fun getFullBranchName(repository: WidgetRepository): String = displayTextFor(repository.entry)
+        override fun paintComponent(g: Graphics) {
+            if (hovered) {
+                g.color = UIUtil.getPanelBackground().darker()
+                g.fillRect(0, 0, width, height)
+            }
+            super.paintComponent(g)
+        }
 
-    override fun getIcon(repository: WidgetRepository) =
-        if (repository.entry.hasConflict) AllIcons.General.Warning else AllIcons.Vcs.Branch
+        fun update(repo: JujutsuRepository?, entry: LogEntry?, isMultiRoot: Boolean) {
+            val canvas = FragmentRecordingCanvas()
+            entry?.let { canvas.append(RevisionChoice.Change(it)) }
+            content.renderFrom(canvas)
+            isVisible = repo != null
+            toolTipText = if (entry != null) buildTooltip(entry, repo, isMultiRoot) else null
+            revalidate()
+            repaint()
+        }
 
-    override fun isMultiRoot(project: Project) = project.initialisedJujutsuRepositories.size > 1
-
-    override fun getWidgetPopup(project: Project, repository: WidgetRepository): JBPopup {
-        JujutsuWidgetSupport.rememberRecentRoot(project, repository.root.path)
-        return JujutsuWorkingCopySwitcher.createPopup(repository.repo)
-    }
-
-    override fun rememberRecentRoot(path: String) {
-        JujutsuWidgetSupport.rememberRecentRoot(project, path)
-    }
-
-    override fun getToolTip(repository: WidgetRepository?): String? {
-        val entry = repository?.entry ?: return null
-        return buildString {
+        private fun buildTooltip(entry: LogEntry, repo: JujutsuRepository?, isMultiRoot: Boolean) = buildString {
             append("Jujutsu: ")
             if (entry.bookmarks.isNotEmpty()) {
                 append(entry.bookmarks.sortedBy { it.isRemote }.joinToString(", ") { it.name })
@@ -99,45 +131,8 @@ class JujutsuStatusBarWidget(project: Project) :
             }
             append("(${entry.id.short})")
             if (!entry.description.empty) append(" — ${entry.description.summary}")
-            if (isMultiRoot(project)) append("\nRoot: ${repository.root.name}")
+            if (isMultiRoot && repo != null) append("\nRoot: ${repo.directory.name}")
             append("\nClick to switch working copy")
         }
-    }
-
-    private fun preloadSwitcherItems() {
-        project.initialisedJujutsuRepositories.forEach(JujutsuWorkingCopySwitcher::preload)
-    }
-
-    private fun loadWorkingCopyEntry(repo: JujutsuRepository): LogEntry? {
-        val key = repo.directory.path
-        project.stateModel.workingCopies.value[key]?.let { entry ->
-            cachedEntries[key] = entry
-            return entry
-        }
-        cachedEntries[key]?.let { return it }
-        log.debug("Widget loadWorkingCopyEntry: miss for $key")
-        return null
-    }
-
-    class WidgetRepository(
-        project: Project,
-        val repo: JujutsuRepository,
-        val entry: LogEntry
-    ) : RepositoryImpl(project, repo.directory) {
-        override fun getState(): Repository.State =
-            if (entry.hasConflict) Repository.State.MERGING else Repository.State.NORMAL
-
-        override fun getCurrentBranchName(): String =
-            entry.bookmarks.firstOrNull { !it.isRemote }?.name ?: entry.id.short
-
-        override fun getVcs(): AbstractVcs =
-            ProjectLevelVcsManager.getInstance(project).findVcsByName(JujutsuVcs.VCS_NAME)
-                ?: error("Jujutsu VCS is not registered for project ${project.name}")
-
-        override fun getCurrentRevision(): String = entry.commitId.full
-
-        override fun update() = Unit
-
-        override fun toLogString(): String = repo.toString()
     }
 }
