@@ -7,6 +7,7 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.project.Project
 import com.intellij.util.xmlb.XmlSerializerUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
 
 /**
  * Persistent configuration for Jujutsu plugin.
@@ -36,7 +37,22 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
             state.jjExecutablePath = "jj"
         }
 
-        state.settingsVersion = 2
+        // Migration v3: int-keyed column widths → string-keyed
+        if (state.settingsVersion < 3 && state.customLogColumnWidths.isNotEmpty() && state.columnWidths.isEmpty()) {
+            val legacyMap = mapOf(
+                0 to JujutsuLogTableModel.KEY_ROOT_GUTTER,
+                1 to JujutsuLogTableModel.KEY_GRAPH_AND_DESCRIPTION,
+                6 to JujutsuLogTableModel.KEY_AUTHOR,
+                7 to JujutsuLogTableModel.KEY_COMMITTER,
+                8 to JujutsuLogTableModel.KEY_DATE
+            )
+            for ((idx, width) in state.customLogColumnWidths) {
+                legacyMap[idx]?.let { key -> state.columnWidths[key] = width }
+            }
+            state.customLogColumnWidths = mutableMapOf()
+        }
+
+        state.settingsVersion = 3
         XmlSerializerUtil.copyBean(state, this.state)
     }
 

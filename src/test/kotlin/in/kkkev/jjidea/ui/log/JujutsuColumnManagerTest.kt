@@ -7,29 +7,45 @@ import org.junit.jupiter.api.Test
 
 class JujutsuColumnManagerTest {
     @Test
-    fun `default manager shows combined mode`() {
+    fun `default manager shows all elements`() {
         val manager = JujutsuColumnManager()
 
-        // Separate columns hidden by default
-        manager.showChangeIdColumn shouldBe false
-        manager.showDescriptionColumn shouldBe false
-        manager.showDecorationsColumn shouldBe false
-
-        // Standard columns visible
-        manager.showAuthorColumn shouldBe true
-        manager.showDateColumn shouldBe true
-
-        // Elements shown in graph when separate columns hidden
+        manager.showStatus shouldBe true
         manager.showChangeId shouldBe true
         manager.showDescription shouldBe true
         manager.showDecorations shouldBe true
+
+        manager.showAuthorColumn shouldBe true
+        manager.showDateColumn shouldBe true
+        manager.showCommitterColumn shouldBe false
+        manager.showRootGutterColumn shouldBe false
     }
 
     @Test
-    fun `graph column is always visible`() {
+    fun `combined column is always visible`() {
         val manager = JujutsuColumnManager()
 
         manager.isColumnVisible(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) shouldBe true
+    }
+
+    @Test
+    fun `combined column always in getVisibleColumns`() {
+        val manager = JujutsuColumnManager()
+
+        manager.getVisibleColumns() shouldContain JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
+    }
+
+    @Test
+    fun `element toggles do not affect column list`() {
+        val manager = JujutsuColumnManager()
+        val baseColumns = manager.getVisibleColumns()
+
+        manager.showStatus = false
+        manager.showChangeId = false
+        manager.showDescription = false
+        manager.showDecorations = false
+
+        manager.getVisibleColumns() shouldBe baseColumns
     }
 
     @Test
@@ -53,7 +69,7 @@ class JujutsuColumnManagerTest {
     }
 
     @Test
-    fun `getVisibleColumns includes all columns by default`() {
+    fun `getVisibleColumns includes graph and standard columns by default`() {
         val manager = JujutsuColumnManager()
 
         val visible = manager.getVisibleColumns()
@@ -88,70 +104,22 @@ class JujutsuColumnManagerTest {
     }
 
     @Test
-    fun `separate change id column hides it from graph`() {
+    fun `root gutter column hidden by default`() {
         val manager = JujutsuColumnManager()
 
-        // Initially shown in graph
-        manager.showChangeId shouldBe true
+        manager.isColumnVisible(JujutsuLogTableModel.COLUMN_ROOT_GUTTER) shouldBe false
 
-        // Enable separate column
-        manager.showChangeIdColumn = true
-
-        // No longer shown in graph
-        manager.showChangeId shouldBe false
+        manager.showRootGutterColumn = true
+        manager.isColumnVisible(JujutsuLogTableModel.COLUMN_ROOT_GUTTER) shouldBe true
     }
 
     @Test
-    fun `separate description column hides it from graph`() {
-        val manager = JujutsuColumnManager()
-
-        // Initially shown in graph
-        manager.showDescription shouldBe true
-
-        // Enable separate column
-        manager.showDescriptionColumn = true
-
-        // No longer shown in graph
-        manager.showDescription shouldBe false
-    }
-
-    @Test
-    fun `separate decorations column hides it from graph`() {
-        val manager = JujutsuColumnManager()
-
-        // Initially shown in graph
-        manager.showDecorations shouldBe true
-
-        // Enable separate column
-        manager.showDecorationsColumn = true
-
-        // No longer shown in graph
-        manager.showDecorations shouldBe false
-    }
-
-    @Test
-    fun `getVisibleColumns includes separate columns when enabled`() {
-        val manager = JujutsuColumnManager()
-        manager.showChangeIdColumn = true
-        manager.showDescriptionColumn = true
-        manager.showDecorationsColumn = true
-
-        val visible = manager.getVisibleColumns()
-
-        visible shouldContain JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
-        visible shouldContain JujutsuLogTableModel.COLUMN_ID
-        visible shouldContain JujutsuLogTableModel.COLUMN_DESCRIPTION
-        visible shouldContain JujutsuLogTableModel.COLUMN_DECORATIONS
-        visible shouldContain JujutsuLogTableModel.COLUMN_AUTHOR
-        visible shouldContain JujutsuLogTableModel.COLUMN_DATE
-    }
-
-    @Test
-    fun `default instance has all elements visible`() {
+    fun `default instance has all elements and standard columns visible`() {
         val manager = JujutsuColumnManager.DEFAULT
 
         manager.showAuthorColumn shouldBe true
         manager.showDateColumn shouldBe true
+        manager.showStatus shouldBe true
         manager.showChangeId shouldBe true
         manager.showDescription shouldBe true
         manager.showDecorations shouldBe true

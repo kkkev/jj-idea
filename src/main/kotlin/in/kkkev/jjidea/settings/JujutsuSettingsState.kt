@@ -10,8 +10,9 @@ data class JujutsuSettingsState(
     var jjExecutablePath: String = "jj",
     var logChangeLimit: Int = 500,
     var logRevset: String = "all()",
-    // Column widths for custom log table (column index -> width in pixels)
+    // Legacy int-keyed column widths kept for migration deserialization only (v3 migration)
     var customLogColumnWidths: MutableMap<Int, Int> = mutableMapOf(),
+    var columnWidths: MutableMap<String, Int> = mutableMapOf(),
     var repositoryOverrides: MutableMap<String, RepositoryConfig> = mutableMapOf(),
     var settingsVersion: Int = 0,
     var squashDeleteEmptyAndMove: Boolean = false

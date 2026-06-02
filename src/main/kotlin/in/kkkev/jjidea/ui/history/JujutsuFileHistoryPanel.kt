@@ -11,7 +11,7 @@ import `in`.kkkev.jjidea.ui.common.CommitTablePanel
  * Panel for displaying file history with the same styling as the custom log view.
  *
  * Reuses components from the log panel:
- * - JujutsuLogTable (with showGraphColumn = false)
+ * - JujutsuLogTable
  * - JujutsuLogTableModel
  * - JujutsuCommitDetailsPanel
  * - All standard renderers
@@ -22,13 +22,7 @@ class JujutsuFileHistoryPanel(project: Project, private val filePath: FilePath, 
     CommitTablePanel<List<LogEntry>>(
         project,
         "JujutsuFileHistoryToolbar",
-        { JujutsuFileHistoryDataLoader(repo, filePath, it) },
-        columnManagerConfig = {
-            showGraphColumn = false
-            // Show change ID and description as separate columns since there's no graph
-            showChangeIdColumn = true
-            showDescriptionColumn = true
-        }
+        { JujutsuFileHistoryDataLoader(repo, filePath, it) }
     ) {
     private val log = Logger.getInstance(javaClass)
 
@@ -42,6 +36,7 @@ class JujutsuFileHistoryPanel(project: Project, private val filePath: FilePath, 
 
     override fun updateTableStuff() {
         updateColumnVisibility()
+        logTable.repaint()
     }
 
     override fun dispose() {

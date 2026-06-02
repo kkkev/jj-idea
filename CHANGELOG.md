@@ -8,9 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- Copied files (`C` status in `jj status`) are no longer displayed as merge conflicts in the working copy panel. They now render as rename-style entries (source → destination). Copies in commit history (log/diff view) are also no longer silently dropped.
-- Split, Rebase, Squash Into, and Squash From dialogs no longer silently fail when the relevant commits fall outside the visible log window (beyond `logChangeLimit` or filtered by `logRevset`). Dialogs now self-load the entries they need via `jj` queries rather than relying on a snapshot of the currently loaded log. The Split preview graph now appears even when opened from a file context (right-click → Split in the Changes view).
-- Squash Into, Squash From, and Rebase destination/source pickers now populate correctly after opening. Previously `runInBackground` captured a `NON_MODAL` modality state before the dialog was shown, so the async load's `runLater` callback was silently deferred until after the dialog closed. The fix passes `ModalityState.any()` to `runInBackground` for dialog-internal loads, ensuring callbacks fire inside the modal event loop.
+- Toggling Description, Change ID, Status, or Decorations in the Columns menu now correctly shows or hides that content in the log view, rather than adding a duplicate column.
+- Copied files are no longer shown as merge conflicts in the working copy panel. They now appear as rename-style entries (source → destination) and are correctly shown in commit history.
+- Split, Rebase, Squash Into, and Squash From dialogs no longer silently fail when the relevant changes are not currently visible in the log (e.g. outside the display limit or filtered by the active revset). The Split preview graph now also appears when Split is opened from the Changes view.
+- Squash Into, Squash From, and Rebase destination/source pickers now populate immediately when the dialog opens.
 
 ## [0.7.3] - 2026-06-01
 

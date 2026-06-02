@@ -138,12 +138,12 @@ class JujutsuGraphAndDescriptionRenderer(
             val fg = if (isSelected) table.selectionForeground else table.foreground
 
             val leftCanvas = entryCanvas(entry, fg) {
-                appendStatusIndicators(entry)
+                if (columnManager.showStatus) appendStatusIndicators(entry)
                 if (columnManager.showChangeId) {
                     append(entry.id)
                     append(" ")
                 }
-                appendDescriptionAndEmptyIndicator(entry)
+                if (columnManager.showDescription) appendDescriptionAndEmptyIndicator(entry)
             }
 
             val rightCanvas = if (columnManager.showDecorations) {

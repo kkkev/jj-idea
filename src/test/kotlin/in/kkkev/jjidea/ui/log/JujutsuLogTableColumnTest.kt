@@ -7,7 +7,6 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
@@ -16,14 +15,13 @@ import org.junit.jupiter.api.Test
  * Tests for column functionality in JujutsuLogTable.
  *
  * ## Column Visibility
- * - Thoroughly tested in JujutsuColumnManagerTest.kt (14 tests)
+ * - Thoroughly tested in JujutsuColumnManagerTest.kt
  * - Tests cover enabling/disabling individual columns
  * - Tests cover getVisibleColumns() logic
- * - Tests cover interaction between separate columns and graph column content
  *
  * ## Column Resizing
  * - Implementation: JujutsuLogTable.saveColumnWidths() and loadColumnWidths()
- * - Column widths persisted to JujutsuSettings.customLogColumnWidths
+ * - Column widths persisted to JujutsuSettings.columnWidths (string-keyed)
  * - Resizing enabled via tableHeader.resizingAllowed = true
  * - Manual testing required (needs Swing environment)
  *
@@ -59,9 +57,9 @@ class JujutsuLogTableColumnTest {
     fun `table model provides correct column count`() {
         val model = JujutsuLogTableModel()
 
-        // Always 9 columns in the model (visibility controlled separately)
-        // Columns: Root Gutter, Graph+Desc, Status, ChangeID, Desc, Decorations, Author, Committer, Date
-        model.columnCount shouldBe 9
+        // Always 5 columns in the model (visibility controlled separately)
+        // Columns: Root Gutter, Graph+Desc, Author, Committer, Date
+        model.columnCount shouldBe 5
     }
 
     @Test
@@ -72,26 +70,6 @@ class JujutsuLogTableColumnTest {
 
         val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
         value shouldBe entry
-    }
-
-    @Test
-    fun `table model returns correct values for change id column`() {
-        val model = JujutsuLogTableModel()
-        val entry = createTestEntry("abc123")
-        model.setEntries(listOf(entry))
-
-        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_ID)
-        value shouldBe entry.id
-    }
-
-    @Test
-    fun `table model returns correct values for description column`() {
-        val model = JujutsuLogTableModel()
-        val entry = createTestEntry("abc123", description = "Test commit")
-        model.setEntries(listOf(entry))
-
-        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_DESCRIPTION)
-        value shouldBe entry.description
     }
 
     @Test
@@ -194,13 +172,13 @@ class JujutsuLogTableColumnTest {
                 JujutsuLogTableModel.COLUMN_DATE
             )
 
-        // Show change ID column
-        manager.showChangeIdColumn = true
+        // Show committer column
+        manager.showCommitterColumn = true
         visible = manager.getVisibleColumns()
         visible shouldContainExactly
             listOf(
                 JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
-                JujutsuLogTableModel.COLUMN_ID,
+                JujutsuLogTableModel.COLUMN_COMMITTER,
                 JujutsuLogTableModel.COLUMN_DATE
             )
     }
@@ -233,48 +211,6 @@ class JujutsuLogTableColumnTest {
 
         val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_DATE)
         value shouldBe null
-    }
-
-    @Test
-    fun `table model status column shows entry when has conflict`() {
-        val model = JujutsuLogTableModel()
-        val entry = createTestEntry("abc123", hasConflict = true)
-        model.setEntries(listOf(entry))
-
-        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_STATUS)
-        value shouldNotBe null
-        value shouldBe entry
-    }
-
-    @Test
-    fun `table model status column shows entry when is empty`() {
-        val model = JujutsuLogTableModel()
-        val entry = createTestEntry("abc123", isEmpty = true)
-        model.setEntries(listOf(entry))
-
-        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_STATUS)
-        value shouldNotBe null
-        value shouldBe entry
-    }
-
-    @Test
-    fun `table model status column shows null when no conflict or empty`() {
-        val model = JujutsuLogTableModel()
-        val entry = createTestEntry("abc123", hasConflict = false, isEmpty = false)
-        model.setEntries(listOf(entry))
-
-        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_STATUS)
-        value shouldBe null
-    }
-
-    @Test
-    fun `table model decorations column returns full entry`() {
-        val model = JujutsuLogTableModel()
-        val entry = createTestEntry("abc123")
-        model.setEntries(listOf(entry))
-
-        val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_DECORATIONS)
-        value shouldBe entry
     }
 
     // Helper function to create test log entries

@@ -8,7 +8,6 @@ import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
-import com.intellij.ui.SimpleColoredComponent
 import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
@@ -22,7 +21,6 @@ import java.awt.Component
 import java.awt.Cursor
 import java.awt.Point
 import java.awt.event.*
-import java.net.URI
 import javax.swing.JComponent
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
@@ -297,12 +295,7 @@ class JujutsuLogTable(
         val localX = e.x - cellRect.x
         val modelCol = convertColumnIndexToModel(col)
         val uri = when (modelCol) {
-            JujutsuLogTableModel.COLUMN_DECORATIONS -> {
-                val scc = prepareRenderer(getCellRenderer(row, col), row, col) as? SimpleColoredComponent
-                scc?.getFragmentTagAt(localX) as? URI
-            }
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
-            JujutsuLogTableModel.COLUMN_DESCRIPTION -> {
+            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 val frc = getFontMetrics(font).fontRenderContext
                 findInlinedBookmarkUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations)
             }
@@ -415,12 +408,14 @@ class JujutsuLogTable(
      */
     private fun saveColumnWidths() {
         val settings = JujutsuSettings.getInstance(project)
-        val widths = settings.state.customLogColumnWidths.toMutableMap()
+        val widths = settings.state.columnWidths.toMutableMap()
         for (i in 0 until columnModel.columnCount) {
             val column = columnModel.getColumn(i)
-            widths[column.modelIndex] = column.width
+            JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key ->
+                widths[key] = column.width
+            }
         }
-        settings.state.customLogColumnWidths = widths
+        settings.state.columnWidths = widths
     }
 
     /**
@@ -429,17 +424,13 @@ class JujutsuLogTable(
      */
     fun loadColumnWidths() {
         val settings = JujutsuSettings.getInstance(project)
-        val savedWidths = settings.state.customLogColumnWidths
-
-        if (savedWidths.isEmpty()) {
-            return // No saved widths, use defaults
-        }
-
+        val savedWidths = settings.state.columnWidths
+        if (savedWidths.isEmpty()) return
         for (i in 0 until columnModel.columnCount) {
             val column = columnModel.getColumn(i)
-            val savedWidth = savedWidths[column.modelIndex]
+            val key = JujutsuLogTableModel.columnKey(column.modelIndex) ?: continue
+            val savedWidth = savedWidths[key]
             if (savedWidth != null && savedWidth > 0) {
-                // Set both to override defaults but still allow resizing
                 column.preferredWidth = savedWidth
                 column.width = savedWidth
             }
@@ -451,36 +442,16 @@ class JujutsuLogTable(
      * Runs on component resize.
      */
     private fun adjustDescriptionColumnWidth() {
-        // Skip if no columns
         if (columnModel.columnCount == 0) return
-
-        // Find the description column (either combined or separate)
-        val descColumnIndex = if (columnManager.showDescriptionColumn) {
-            // Using separate description column
-            JujutsuLogTableModel.COLUMN_DESCRIPTION
-        } else {
-            // Using combined graph+description column
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
-        }
-
-        // Find the actual column in the column model
-        val descColumn =
-            (0 until columnModel.columnCount)
-                .map { columnModel.getColumn(it) }
-                .firstOrNull { it.modelIndex == descColumnIndex }
-                ?: return
-
-        // Calculate total width of other columns
-        val otherColumnsWidth =
-            (0 until columnModel.columnCount)
-                .map { columnModel.getColumn(it) }
-                .filter { it != descColumn }
-                .sumOf { it.width }
-
-        // Calculate available width for description
+        val descColumn = (0 until columnModel.columnCount)
+            .map { columnModel.getColumn(it) }
+            .firstOrNull { it.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
+            ?: return
+        val otherColumnsWidth = (0 until columnModel.columnCount)
+            .map { columnModel.getColumn(it) }
+            .filter { it != descColumn }
+            .sumOf { it.width }
         val availableWidth = width - otherColumnsWidth
-
-        // Set description column width (respect minimum)
         if (availableWidth > descColumn.minWidth) {
             descColumn.preferredWidth = availableWidth
             descColumn.width = availableWidth
@@ -496,14 +467,10 @@ class JujutsuLogTable(
  *
  * Columns:
  * 0. Root Gutter - Colored strip showing repository (only visible with multiple roots)
- * 1. Graph+Description - Combined column (optional elements controlled by column manager)
- * 2. Status - Conflict/empty indicators (optional)
- * 3. Change ID - Separate column (optional)
- * 4. Description - Separate column (optional)
- * 5. Decorations - Separate column for bookmarks/tags (optional)
- * 6. Author - Author name
- * 7. Committer - Committer name (optional)
- * 8. Date - Commit timestamp
+ * 1. Graph+Description - Combined column (status, change ID, description, decorations controlled by column manager)
+ * 2. Author - Author name
+ * 3. Committer - Committer name (optional)
+ * 4. Date - Commit timestamp
  */
 class JujutsuLogTableModel : AbstractTableModel() {
     private val entries = mutableListOf<LogEntry>()
@@ -522,15 +489,26 @@ class JujutsuLogTableModel : AbstractTableModel() {
     companion object {
         const val COLUMN_ROOT_GUTTER = 0
         const val COLUMN_GRAPH_AND_DESCRIPTION = 1
-        const val COLUMN_STATUS = 2
-        const val COLUMN_ID = 3
-        const val COLUMN_DESCRIPTION = 4
-        const val COLUMN_DECORATIONS = 5
-        const val COLUMN_AUTHOR = 6
-        const val COLUMN_COMMITTER = 7
-        const val COLUMN_DATE = 8
+        const val COLUMN_AUTHOR = 2
+        const val COLUMN_COMMITTER = 3
+        const val COLUMN_DATE = 4
 
-        const val NUM_COLUMNS = 9
+        const val NUM_COLUMNS = 5
+
+        const val KEY_ROOT_GUTTER = "rootGutter"
+        const val KEY_GRAPH_AND_DESCRIPTION = "graph"
+        const val KEY_AUTHOR = "author"
+        const val KEY_COMMITTER = "committer"
+        const val KEY_DATE = "date"
+
+        fun columnKey(modelIndex: Int) = when (modelIndex) {
+            COLUMN_ROOT_GUTTER -> KEY_ROOT_GUTTER
+            COLUMN_GRAPH_AND_DESCRIPTION -> KEY_GRAPH_AND_DESCRIPTION
+            COLUMN_AUTHOR -> KEY_AUTHOR
+            COLUMN_COMMITTER -> KEY_COMMITTER
+            COLUMN_DATE -> KEY_DATE
+            else -> null
+        }
     }
 
     override fun getRowCount() = filteredEntries.size
@@ -542,16 +520,10 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
     override fun getValueAt(rowIndex: Int, columnIndex: Int): Any? {
         if (rowIndex < 0 || rowIndex >= filteredEntries.size) return null
-
         val entry = filteredEntries[rowIndex]
-
         return when (columnIndex) {
-            COLUMN_ROOT_GUTTER -> entry // Return full entry for gutter renderer
-            COLUMN_GRAPH_AND_DESCRIPTION -> entry // Return full entry for combined renderer
-            COLUMN_STATUS -> if (entry.hasConflict || entry.isEmpty || entry.immutable) entry else null
-            COLUMN_ID -> entry.id
-            COLUMN_DESCRIPTION -> entry.description
-            COLUMN_DECORATIONS -> entry // Return full entry to access both isWorkingCopy and bookmarks
+            COLUMN_ROOT_GUTTER -> entry
+            COLUMN_GRAPH_AND_DESCRIPTION -> entry
             COLUMN_AUTHOR -> entry.author
             COLUMN_COMMITTER -> entry.committer ?: entry.author
             COLUMN_DATE -> entry.authorTimestamp ?: entry.committerTimestamp

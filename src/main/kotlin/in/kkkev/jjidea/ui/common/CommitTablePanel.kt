@@ -29,8 +29,7 @@ import kotlin.reflect.KMutableProperty1
 abstract class CommitTablePanel<D>(
     protected val project: Project,
     private val toolbarPlace: String,
-    dataLoaderFactory: (CommitTablePanel<D>) -> DataLoader,
-    columnManagerConfig: JujutsuColumnManager.() -> Unit = {}
+    dataLoaderFactory: (CommitTablePanel<D>) -> DataLoader
 ) : JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
@@ -90,9 +89,6 @@ abstract class CommitTablePanel<D>(
     init {
         // Create filter field with extension toolbar
         filterField = createFilterField()
-
-        // Apply column manager configuration before installing renderers
-        columnManager.apply(columnManagerConfig)
 
         // Install custom renderers
         logTable.installRenderers()
@@ -356,10 +352,10 @@ abstract class CommitTablePanel<D>(
     }
 
     fun createColumnsActionGroup() = DefaultActionGroup().apply {
-        addAction(ToggleColumnAction("status", JujutsuColumnManager::showStatusColumn))
-        addAction(ToggleColumnAction("changeid", JujutsuColumnManager::showChangeIdColumn))
-        addAction(ToggleColumnAction("description", JujutsuColumnManager::showDescriptionColumn))
-        addAction(ToggleColumnAction("decorations", JujutsuColumnManager::showDecorationsColumn))
+        addAction(ToggleColumnAction("status", JujutsuColumnManager::showStatus))
+        addAction(ToggleColumnAction("changeid", JujutsuColumnManager::showChangeId))
+        addAction(ToggleColumnAction("description", JujutsuColumnManager::showDescription))
+        addAction(ToggleColumnAction("decorations", JujutsuColumnManager::showDecorations))
         addSeparator()
         addAction(ToggleColumnAction("author", JujutsuColumnManager::showAuthorColumn))
         addAction(ToggleColumnAction("committer", JujutsuColumnManager::showCommitterColumn))
