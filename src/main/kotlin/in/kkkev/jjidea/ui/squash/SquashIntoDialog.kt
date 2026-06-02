@@ -38,14 +38,16 @@ import javax.swing.event.DocumentEvent
  *   Used by "Squash Into Here" (right-click on destination commit).
  */
 sealed interface SquashMode {
+    val candidates: List<LogEntry>?
+
     data class PickDestination(
         val sources: List<LogEntry>,
-        val candidates: List<LogEntry>? = null
+        override val candidates: List<LogEntry>? = null
     ) : SquashMode
 
     data class PickSources(
         val destination: LogEntry,
-        val candidates: List<LogEntry>? = null
+        override val candidates: List<LogEntry>? = null
     ) : SquashMode
 }
 
