@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.addPopup
@@ -46,6 +47,9 @@ object JujutsuLogContextMenuActions {
         project: Project,
         entries: List<LogEntry>
     ): DefaultActionGroup = DefaultActionGroup().apply {
+        ActionManager.getInstance().getAction("Jujutsu.ShowChangesDiff")?.let { add(it) }
+        addSeparator()
+
         val entry = entries.singleOrNull()
         entry?.run { add(copyIdAction(id)) }
         add(copyDescriptionAction(entry?.description?.actual))

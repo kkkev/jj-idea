@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.common
 
+import com.intellij.diff.tools.util.DiffDataKeys
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
@@ -30,7 +31,7 @@ abstract class CommitTablePanel<D>(
     protected val project: Project,
     private val toolbarPlace: String,
     dataLoaderFactory: (CommitTablePanel<D>) -> DataLoader
-) : JPanel(BorderLayout()), Disposable {
+) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val log = Logger.getInstance(javaClass)
 
     val columnManager = JujutsuColumnManager()
@@ -333,6 +334,10 @@ abstract class CommitTablePanel<D>(
 
         // Re-install renderers
         logTable.installRenderers()
+    }
+
+    override fun uiDataSnapshot(sink: DataSink) {
+        sink[DiffDataKeys.EDITOR_TAB_DIFF_PREVIEW] = detailsPanel.diffPreview
     }
 
     abstract fun onDataLoaded(newData: D)

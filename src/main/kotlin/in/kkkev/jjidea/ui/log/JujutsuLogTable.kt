@@ -5,6 +5,8 @@ import com.intellij.ide.IdeTooltipManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
@@ -12,6 +14,7 @@ import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
@@ -38,7 +41,7 @@ import javax.swing.table.AbstractTableModel
 class JujutsuLogTable(
     private val project: Project,
     val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
-) : JBTable(JujutsuLogTableModel()), Disposable {
+) : JBTable(JujutsuLogTableModel()), Disposable, UiDataProvider {
     private val log = Logger.getInstance(javaClass)
 
     // Graph nodes for rendering (populated when data is loaded)
@@ -311,6 +314,7 @@ class JujutsuLogTable(
     private fun showContextMenu(component: Component, x: Int, y: Int) {
         val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, selectedEntries)
         val popupMenu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
+        popupMenu.setTargetComponent(this)
         popupMenu.component.show(component, x, y)
     }
 
@@ -456,6 +460,10 @@ class JujutsuLogTable(
             descColumn.preferredWidth = availableWidth
             descColumn.width = availableWidth
         }
+    }
+
+    override fun uiDataSnapshot(sink: DataSink) {
+        selectedEntry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
     }
 
     override fun dispose() {

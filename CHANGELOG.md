@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Cmd+D / Ctrl+D on a selected log entry now opens the native diff preview — the same embedded tree+diff view you get by double-clicking a file in the commit details panel, with directory grouping and a `"abc1234: FileName.kt"` tab title. The action is also available in the log table's right-click context menu. "Open in New Tab" opens a standalone chain-viewer tab and likewise now works from a selected log entry.
+
 ### Fixed
 - Toggling Description, Change ID, Status, or Decorations in the Columns menu now correctly shows or hides that content in the log view, rather than adding a duplicate column.
 - Copied files are no longer shown as merge conflicts in the working copy panel. They now appear as rename-style entries (source → destination) and are correctly shown in commit history.

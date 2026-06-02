@@ -1,6 +1,9 @@
 package `in`.kkkev.jjidea.actions.filechange
 
+import com.intellij.diff.chains.SimpleDiffRequestChain
+import com.intellij.diff.editor.ChainDiffVirtualFile
 import com.intellij.diff.requests.DiffRequest
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.FileChange
@@ -10,6 +13,11 @@ import `in`.kkkev.jjidea.vcs.fileAtVersion
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import `in`.kkkev.jjidea.vcs.possibleLogEntryFor
+
+fun openDiffChain(project: Project, requests: List<DiffRequest>, tabTitle: String) {
+    val file = ChainDiffVirtualFile(SimpleDiffRequestChain(requests), tabTitle)
+    FileEditorManager.getInstance(project).openFile(file, true)
+}
 
 fun buildDiffRequests(
     project: Project,

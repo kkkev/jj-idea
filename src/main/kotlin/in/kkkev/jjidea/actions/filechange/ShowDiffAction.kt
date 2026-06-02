@@ -9,6 +9,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -44,6 +45,6 @@ class ShowDiffAction :
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = e.changes.isNotEmpty() || e.repoForFile != null
+        e.presentation.isEnabledAndVisible = e.changes.isNotEmpty() || e.repoForFile != null || e.logEntry != null
     }
 }

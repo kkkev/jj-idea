@@ -54,7 +54,7 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
 
     // Changes tree
     private val changesTree = JujutsuChangesTree(project)
-    private val diffPreview = JujutsuEditorTabDiffPreview(changesTree) {
+    internal val diffPreview = JujutsuEditorTabDiffPreview(changesTree) {
         when (currentEntries.size) {
             0 -> null
             1 -> currentEntries.first().id.short
