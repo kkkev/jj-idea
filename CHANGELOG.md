@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-06-02
+
 ### Added
 - Cmd+D / Ctrl+D on a selected log entry now opens the native diff preview — the same embedded tree+diff view you get by double-clicking a file in the commit details panel, with directory grouping and a `"abc1234: FileName.kt"` tab title. The action is also available in the log table's right-click context menu. "Open in New Tab" opens a standalone chain-viewer tab and likewise now works from a selected log entry.
 
@@ -531,7 +533,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.3...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.4...HEAD
+[0.7.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.4
 [0.7.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.3
 [0.7.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.2
 [0.7.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.1

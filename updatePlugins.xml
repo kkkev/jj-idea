@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.3/jj-idea-0.7.3.zip" version="0.7.3">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.4/jj-idea-0.7.4.zip" version="0.7.4">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,26 +23,17 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.3</h3>
+      <h3>0.7.4</h3>
       
-<h4>Fixed</h4>
-<li>Selecting an immutable change in the status-bar working-copy switcher no longer fails with "Commit … is immutable". The switcher now queries jj directly for the selected revision's immutability (no longer limited to the 10 most recent changes), acts on the commit id to avoid divergent-change ambiguity, and shows a confirmation dialog before switching. Immutable items are also dimmed with a lock icon in the popup.</li>
-
-<h4>Changed</h4>
-<li>Status-bar working-copy widget now renders a full styled row (commit icon + change ID + truncated description) via the shared `TextCanvas` renderer, replacing the plain-text display. The widget is no longer built on the internal `DvcsStatusWidget` API and now uses `CustomStatusBarWidget` for proper platform integration. Widget refresh is coalesced into a single handler and is freeze-safe; a `FileEditorManagerListener` updates the displayed repository when switching files in multi-root projects.</li>
-
 <h4>Added</h4>
-<li>A bookmark management widget now appears in the log toolbar. In single-repo projects it shows the current working-copy bookmark name(s) and opens a dropdown with per-bookmark sub-menus (Create, Rename, Delete, Forget; remote bookmarks folded in as Track/Untrack). In multi-repo projects the label is blank and the dropdown groups bookmarks under one sub-menu per repository, with "Create Bookmark Here…" scoped to each repo's working copy.</li>
-<li>A working-copy switcher widget now appears in the bottom-right status bar for JJ-managed projects. It shows the current local bookmark name, falling back to the change description or `(no description set)`. Clicking opens a speed-searchable popup listing local bookmarks at the top, then up to 10 recent changes; bookmarks and changes are rendered with the same icons, colors, and styled IDs as the "Compare with Another Commit…" revision selector. Selecting an item shows a confirmation dialog to choose **Edit** or **New on Top** (`jj edit` / `jj new`); immutable targets offer only New on Top. The widget auto-refreshes reactively via the state model and hides for non-JJ projects.</li>
-<li>Log table now correctly shows pending-deletion bookmarks: entries carrying a remote bookmark (e.g. `main@origin`) whose local counterpart has been deleted now display the deleted local (`main` with strikethrough) at that commit, and the remote no longer shows a spurious large ahead count.</li>
-<li>Pending-deletion bookmarks (bookmarks deleted locally but still present on the remote) now appear in the "Specific bookmark" dropdown in the push dialog, shown with strikethrough and a "(deleted)" label. The confirmation dialog before a push now also warns when pending deletions will be included.</li>
-<li>Bookmark decorations now show pending deletions (strikethrough), local/remote divergence (↑n ↓n), and bookmark conflicts (conflict icon) in the log gutter, graph column decorations, and commit details panel.</li>
-<li>"Forget" context menu action on local bookmarks: removes a bookmark locally without creating a pending remote deletion. A confirmation dialog explains that the bookmark will reappear on the next fetch.</li>
-<li>"Move Bookmark Here…" opens a searchable dialog that classifies bookmarks into Forward and Backward/Sideways sections with directional icons and full-width section dividers. Forward bookmarks can be selected immediately; backward or sideways moves are shown at 50% opacity and require checking "Allow backward or sideways move" to enable selection. If the repository state changes between opening the dialog and confirming, a fallback prompt handles the race condition.</li>
-<li>Bookmark chips in the log table (Decorations column and inlined graph/description column) are now interactive: hovering shows a hand cursor, left-clicking navigates the log to the change that bookmark points at, and right-clicking opens a per-bookmark context menu with Rename, Delete, Forget, Track/Untrack, and Move To… actions.</li>
-<li>Bookmark chips in the commit details panel are now interactive with the same left-click navigation and right-click context menu.</li>
-<li>"Move \<bookmark\> To…" context menu action: opens a searchable change-picker dialog showing candidate destinations classified as Forward (descendants) or Backward (ancestors), with an "Allow backward move" checkbox to gate ancestor selection.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.3">full release notes</a> for details.</p>
+<li>Cmd+D / Ctrl+D on a selected log entry now opens the native diff preview — the same embedded tree+diff view you get by double-clicking a file in the commit details panel, with directory grouping and a `"abc1234: FileName.kt"` tab title. The action is also available in the log table's right-click context menu. "Open in New Tab" opens a standalone chain-viewer tab and likewise now works from a selected log entry.</li>
+
+<h4>Fixed</h4>
+<li>Toggling Description, Change ID, Status, or Decorations in the Columns menu now correctly shows or hides that content in the log view, rather than adding a duplicate column.</li>
+<li>Copied files are no longer shown as merge conflicts in the working copy panel. They now appear as rename-style entries (source → destination) and are correctly shown in commit history.</li>
+<li>Split, Rebase, Squash Into, and Squash From dialogs no longer silently fail when the relevant changes are not currently visible in the log (e.g. outside the display limit or filtered by the active revset). The Split preview graph now also appears when Split is opened from the Changes view.</li>
+<li>Squash Into, Squash From, and Rebase destination/source pickers now populate immediately when the dialog opens.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.4">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
