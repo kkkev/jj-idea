@@ -41,6 +41,6 @@ class JujutsuFileHistoryPanel(project: Project, private val filePath: FilePath, 
 
     override fun dispose() {
         log.info("JujutsuFileHistoryPanel disposed")
-        detailsPanel.dispose()
+        // detailsPanel is registered as a child via Disposer — no manual dispose needed
     }
 }

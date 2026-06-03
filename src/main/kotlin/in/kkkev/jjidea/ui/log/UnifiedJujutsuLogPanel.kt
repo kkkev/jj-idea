@@ -126,7 +126,6 @@ class UnifiedJujutsuLogPanel(project: Project) :
 
     override fun dispose() {
         log.info("UnifiedJujutsuLogPanel disposed")
-        detailsPanel.dispose()
-        // Other cleanup will happen automatically
+        // detailsPanel is registered as a child via Disposer — no manual dispose needed
     }
 }

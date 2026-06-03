@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed a memory leak reported on IDE shutdown: `JujutsuCommitDetailsPanel` was registered in the Disposer tree under `ROOT_DISPOSABLE` instead of its owning panel, causing a `RuntimeException` on quit.
+
 ### Changed
 - Rebase, squash, move-bookmark, and revision-picker dialogs now open without issuing extra `jj log` calls when the main log is already loaded — they reuse the cached commit data instead.
 - After a VCS operation (e.g. `jj new`, `jj edit`), immutable commits are no longer evicted and re-fetched during the log refresh; only mutable commits are invalidated. This makes post-operation refreshes faster in repos with a large immutable history.

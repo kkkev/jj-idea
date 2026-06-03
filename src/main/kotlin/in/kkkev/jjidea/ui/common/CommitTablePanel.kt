@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
@@ -88,6 +89,8 @@ abstract class CommitTablePanel<D>(
     }
 
     init {
+        Disposer.register(this, detailsPanel)
+
         // Create filter field with extension toolbar
         filterField = createFilterField()
 
