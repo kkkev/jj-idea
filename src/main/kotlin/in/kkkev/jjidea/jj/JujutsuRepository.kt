@@ -33,6 +33,7 @@ interface JujutsuRepository {
     val displayName: String
     val commandExecutor: CommandExecutor
     val logService: LogService
+    val logCache: LogCache
     val isInitialised: Boolean
 
     /** Git remotes for this repository, lazily fetched once per session. */
@@ -75,6 +76,7 @@ data class JujutsuRepositoryImpl(
         }
 
     override val logService: LogService by lazy { CliLogService(this) }
+    override val logCache: LogCache by lazy { RepoLogCache(this) }
 
     private val gitRemotesFuture: CompletableFuture<List<GitRemote>> = CompletableFuture.supplyAsync(
         {

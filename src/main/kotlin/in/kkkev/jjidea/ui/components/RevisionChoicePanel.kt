@@ -8,10 +8,8 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.BookmarkItem
-import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.cachedEntries
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -58,22 +56,10 @@ internal fun buildRevisionChoices(repo: JujutsuRepository, filter: Filter): List
             .mapTo(items, RevisionChoice::Bookmark)
     }
     if (filter.includeLogEntries) {
-        repo.cachedEntries().filter(filter::matches).take(DEFAULT_LIMIT)
+        repo.logCache.all.filter(filter::matches).take(DEFAULT_LIMIT)
             .mapTo(items, RevisionChoice::Change)
     }
     return items
-}
-
-private fun computeImmutableChangeIds(repo: JujutsuRepository, items: List<RevisionChoice>): Set<String> {
-    if (items.isEmpty()) return emptySet()
-    val revs = items.map {
-        when (it) {
-            is RevisionChoice.Change -> it.entry.commitId.full
-            is RevisionChoice.Bookmark -> it.item.bookmark.name
-        }
-    }
-    val expr = Expression("(${revs.joinToString("|")}) & immutable()")
-    return repo.logService.getLogBasic(revset = expr).getOrNull()?.map { it.id.full }?.toSet() ?: emptySet()
 }
 
 abstract class RevisionChoicePanel(
@@ -181,9 +167,9 @@ abstract class RevisionChoicePanel(
 
     fun loadData() {
         runInBackground {
-            val entries = repo.cachedEntries()
+            val entries = repo.logCache.all
             val items = buildItems(filter)
-            val immutable = computeImmutableChangeIds(repo, items)
+            val immutable = entries.filter { it.immutable }.map { it.id.full }.toSet()
             runLater {
                 allEntries = entries
                 immutableChangeIds = immutable

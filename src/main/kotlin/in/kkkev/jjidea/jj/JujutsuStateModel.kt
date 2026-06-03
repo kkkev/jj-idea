@@ -361,7 +361,7 @@ fun JujutsuRepository.invalidate(select: Revision? = null, vfsChanged: Boolean =
     if (vfsChanged) {
         VfsUtil.markDirtyAndRefresh(true, true, true, directory)
     }
-    LogCache.getInstance(project).clear()
+    logCache.invalidateMutable()
     val stateModel = project.stateModel
     stateModel.workingCopies.invalidate()
     stateModel.logRefresh.notify(Unit)

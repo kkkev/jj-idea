@@ -110,6 +110,7 @@ class UnifiedJujutsuLogDataLoader(
                 allEntries = topologicalSort(entriesByRepo.values.flatten())
                     .map { entry -> enrichWithDeletedBookmarks(entry, deletedNamesByRepo[entry.repo] ?: emptySet()) }
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
+                allEntries.groupBy { it.repo }.forEach { (repo, entries) -> repo.logCache.store(entries) }
                 graphNodes = graphBuilder.buildGraph(allEntries)
             },
             onSuccess = {

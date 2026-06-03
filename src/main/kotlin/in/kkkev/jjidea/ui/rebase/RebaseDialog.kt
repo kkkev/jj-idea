@@ -126,7 +126,7 @@ class RebaseDialog(
         updateDestRenderer()
 
         runInBackground(ModalityState.any()) {
-            val entries = loadRepoEntries(project, repo)
+            val entries = repo.logCache.all
             runLater {
                 if (!isDisposed) {
                     repoEntries = entries

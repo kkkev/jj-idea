@@ -7,11 +7,12 @@ import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.util.concurrency.AppExecutorUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.BookmarkName
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.jj.cachedEntries
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.components.Filter
 import `in`.kkkev.jjidea.ui.components.RevisionChoice
@@ -43,7 +44,7 @@ object JujutsuWorkingCopySwitcher {
         if (!refreshInFlight.add(key)) return
         AppExecutorUtil.getAppExecutorService().execute {
             try {
-                repo.cachedEntries()
+                repo.logCache.all
             } finally {
                 refreshInFlight.remove(key)
             }
@@ -94,7 +95,11 @@ object JujutsuWorkingCopySwitcher {
                 is RevisionChoice.Bookmark -> item.item.bookmark.name
             }
             runInBackground {
-                val resolved = repo.logService.getLogBasic(revset = revision).getOrNull()?.firstOrNull()
+                val resolved = when (revision) {
+                    is CommitId -> repo.logCache[revision]
+                    is BookmarkName -> repo.logCache[revision]
+                    else -> null
+                }
                 runLater {
                     if (resolved == null) {
                         Messages.showErrorDialog(

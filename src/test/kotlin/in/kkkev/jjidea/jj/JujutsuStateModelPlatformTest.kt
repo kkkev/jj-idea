@@ -44,6 +44,7 @@ class JujutsuStateModelPlatformTest {
 
             val repo = mockk<JujutsuRepository> {
                 every { project } returns this@JujutsuStateModelPlatformTest.project.get()
+                every { logCache } returns mockk(relaxed = true)
             }
             repo.invalidate()
             UIUtil.dispatchAllInvocationEvents()
@@ -66,6 +67,7 @@ class JujutsuStateModelPlatformTest {
 
             val repo = mockk<JujutsuRepository> {
                 every { project } returns this@JujutsuStateModelPlatformTest.project.get()
+                every { logCache } returns mockk(relaxed = true)
             }
             repo.invalidate(select = WorkingCopy)
             UIUtil.dispatchAllInvocationEvents()

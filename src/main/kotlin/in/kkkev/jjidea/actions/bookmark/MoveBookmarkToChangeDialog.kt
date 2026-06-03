@@ -17,7 +17,6 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.icon
@@ -344,12 +343,8 @@ class MoveBookmarkToChangeDialog(
         }
 
         fun loadData(repo: JujutsuRepository, bookmark: Bookmark): List<Pair<LogEntry, MoveDirection>> {
-            val settings = JujutsuSettings.getInstance(repo.project)
-            val limit = settings.logChangeLimit(repo)
-            val entries = repo.logService.getLog(limit = limit).getOrElse {
-                log.warn("Failed to load log for move-to-change dialog", it)
-                return emptyList()
-            }
+            val entries = repo.logCache.all
+            if (entries.isEmpty()) return emptyList()
 
             // Exclude the entry the bookmark is currently on (no point in "moving" there)
             val currentId = repo.logService.getBookmarks().getOrNull()
