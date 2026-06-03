@@ -503,7 +503,7 @@ class CliExecutor(
         // Add color=never to avoid ANSI codes in output
         commandLine.environment["NO_COLOR"] = "1"
 
-        val cmdName = args.firstOrNull()?.toString() ?: "unknown"
+        val cmdName = args.joinToString(" ")
         log.info("Executing: jj $cmdName (${Thread.currentThread().name})")
 
         val startTime = System.currentTimeMillis()
