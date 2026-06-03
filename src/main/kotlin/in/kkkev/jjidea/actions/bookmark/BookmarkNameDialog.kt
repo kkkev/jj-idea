@@ -8,7 +8,7 @@ import com.intellij.ui.dsl.builder.COLUMNS_MEDIUM
 import com.intellij.ui.dsl.builder.columns
 import com.intellij.ui.dsl.builder.panel
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.invalidate
@@ -18,10 +18,10 @@ abstract class BookmarkNameDialog(private val repo: JujutsuRepository, private v
     val log = Logger.getInstance(javaClass)
     val nameField = JBTextField()
 
-    val bookmark get() = Bookmark(nameField.text)
+    val bookmark get() = BookmarkName(nameField.text)
 
     // Cache failed bookmarks and errors, so continuous validation picks them up
-    val failedNames = mutableMapOf<Bookmark, String>()
+    val failedNames = mutableMapOf<BookmarkName, String>()
 
     init {
         title = JujutsuBundle.message("dialog.bookmark.$actionType.input.title")

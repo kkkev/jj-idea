@@ -46,7 +46,7 @@ class JujutsuCompareWithPopupTest {
         val result = parseBookmarks(output)
 
         result shouldHaveSize 1
-        result[0].bookmark.name shouldBe "main"
+        result[0].bookmark.name.name shouldBe "main"
         result[0].id!!.full shouldBe "mzmoywwptovqwlnzxvvsxknnruoypnxr"
         result[0].id!!.short shouldBe "mz"
     }
@@ -58,7 +58,7 @@ class JujutsuCompareWithPopupTest {
         val result = parseBookmarks(output)
 
         result shouldHaveSize 3
-        result.map { it.bookmark.name } shouldBe listOf("main", "feature", "bugfix")
+        result.map { it.bookmark.name.name } shouldBe listOf("main", "feature", "bugfix")
         result[0].id!!.short shouldBe "mz"
         result[1].id!!.short shouldBe "vy"
         result[2].id!!.short shouldBe "qr"
@@ -74,7 +74,7 @@ class JujutsuCompareWithPopupTest {
         val result = parseBookmarks(output)
 
         result shouldHaveSize 3
-        result.map { it.bookmark.name } shouldBe listOf("main-branch", "feature_v2", "bug-fix_123")
+        result.map { it.bookmark.name.name } shouldBe listOf("main-branch", "feature_v2", "bug-fix_123")
     }
 
     @Test

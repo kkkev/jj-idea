@@ -91,7 +91,7 @@ object JujutsuWorkingCopySwitcher {
             val project = repo.project
             val revision = when (item) {
                 is RevisionChoice.Change -> item.entry.commitId
-                is RevisionChoice.Bookmark -> item.item.bookmark
+                is RevisionChoice.Bookmark -> item.item.bookmark.name
             }
             runInBackground {
                 val resolved = repo.logService.getLogBasic(revset = revision).getOrNull()?.firstOrNull()

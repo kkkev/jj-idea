@@ -15,19 +15,19 @@ fun forgetBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark) = nullAndD
 ) {
     if (Messages.showYesNoDialog(
             repo.project,
-            JujutsuBundle.message("action.bookmark.forget.confirm.message", bookmark),
-            JujutsuBundle.message("action.bookmark.forget.confirm.title", bookmark),
+            JujutsuBundle.message("action.bookmark.forget.confirm.message", bookmark.name),
+            JujutsuBundle.message("action.bookmark.forget.confirm.title", bookmark.name),
             Messages.getWarningIcon()
         ) != Messages.YES
     ) {
-        log.info("User cancelled forgetting bookmark $bookmark")
+        log.info("User cancelled forgetting bookmark ${bookmark.name}")
         return@nullAndDumbAwareAction
     }
 
-    repo.commandExecutor.createCommand { bookmarkForget(bookmark) }
+    repo.commandExecutor.createCommand { bookmarkForget(bookmark.name) }
         .onSuccess {
             repo.invalidate()
-            log.info("Forgot bookmark $bookmark")
+            log.info("Forgot bookmark ${bookmark.name}")
         }.onFailure { tellUser(repo.project, "action.bookmark.forget.error") }
         .executeAsync()
 }

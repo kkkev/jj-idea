@@ -125,7 +125,7 @@ fun TextCanvas.append(changeKey: ChangeKey) {
         with(changeKey.revision) {
             when (this) {
                 is ChangeId -> append(this)
-                is Bookmark -> append(this)
+                is BookmarkName -> append(this)
                 else -> append(this.toString())
             }
         }
@@ -156,9 +156,17 @@ fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelativ
 
 /** Canonical `jjb://` URI identifying a specific bookmark on a log entry. */
 fun bookmarkUri(entry: LogEntry, bookmark: Bookmark): URI {
-    val encoded = URLEncoder.encode(bookmark.name, "UTF-8")
+    val encoded = URLEncoder.encode(bookmark.name.name, "UTF-8")
     return URI("jjb://${entry.repo.directory.path}?${entry.id}&bookmark=$encoded")
 }
+
+fun TextCanvas.append(name: BookmarkName) =
+    colored(JujutsuColors.BOOKMARK) {
+        smaller {
+            append(icon(JujutsuIcons::Bookmark))
+            append(name.name)
+        }
+    }
 
 private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) {
     colored(JujutsuColors.BOOKMARK) {
@@ -181,11 +189,11 @@ private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) {
     }
 }
 
-fun TextCanvas.append(bookmark: Bookmark) = appendBookmarkChip(bookmark, bookmark.name)
+fun TextCanvas.append(bookmark: Bookmark) = appendBookmarkChip(bookmark, bookmark.name.name)
 
 fun TextCanvas.append(group: BookmarkGroup) {
     group.local?.let { appendBookmarkChip(it, group.localName) }
-    group.remotes.forEach { appendBookmarkChip(it, if (group.local != null) "@${it.remote}" else it.name) }
+    group.remotes.forEach { appendBookmarkChip(it, if (group.local != null) "@${it.remote}" else it.name.name) }
 }
 
 fun TextCanvas.append(repo: JujutsuRepository) {
@@ -270,7 +278,7 @@ fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
         for (remote in group.remotes) {
             if (!first) append(" ")
             first = false
-            val label = if (group.local != null) "@${remote.remote}" else remote.name
+            val label = if (group.local != null) "@${remote.remote}" else remote.name.name
             linked(bookmarkUri(entry, remote)) { appendBookmarkChip(remote, label) }
         }
     }

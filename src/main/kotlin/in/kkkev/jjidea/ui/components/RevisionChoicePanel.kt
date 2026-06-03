@@ -33,7 +33,7 @@ data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, va
         (!bookmark.bookmark.isRemote || includeRemote) &&
         (
             query.isEmpty() ||
-                bookmark.bookmark.name.contains(query, ignoreCase = true) ||
+                bookmark.bookmark.name.name.contains(query, ignoreCase = true) ||
                 bookmark.id?.full?.contains(query, ignoreCase = true) == true ||
                 bookmark.id?.short?.contains(query, ignoreCase = true) == true
         )

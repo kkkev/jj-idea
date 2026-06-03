@@ -135,7 +135,7 @@ object JujutsuLogContextMenuActions {
         val query = uri.rawQuery ?: return null
         val bookmarkParam = query.substringAfter("bookmark=", "").takeIf { it.isNotEmpty() } ?: return null
         val bookmarkName = URLDecoder.decode(bookmarkParam, "UTF-8")
-        val bookmark = entry.bookmarks.find { it.name == bookmarkName } ?: return null
+        val bookmark = entry.bookmarks.find { it.name.name == bookmarkName } ?: return null
         return BookmarkClick(entry.repo, entry, bookmark)
     }
 }

@@ -9,14 +9,14 @@ import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 fun toggleTrackBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark) =
     if (bookmark.tracked) {
         nullAndDumbAwareAction(bookmark, "action.bookmark.untrack", JujutsuIcons.BookmarkAction) {
-            repo.commandExecutor.createCommand { bookmarkUntrack(target) }
+            repo.commandExecutor.createCommand { bookmarkUntrack(target.name) }
                 .onSuccess { repo.invalidate() }
                 .onFailure { tellUser(repo.project, "action.bookmark.untrack.error") }
                 .executeAsync()
         }
     } else {
         nullAndDumbAwareAction(bookmark, "action.bookmark.track", JujutsuIcons.BookmarkTrackedAction) {
-            repo.commandExecutor.createCommand { bookmarkTrack(target) }
+            repo.commandExecutor.createCommand { bookmarkTrack(target.name) }
                 .onSuccess { repo.invalidate() }
                 .onFailure { tellUser(repo.project, "action.bookmark.track.error") }
                 .executeAsync()

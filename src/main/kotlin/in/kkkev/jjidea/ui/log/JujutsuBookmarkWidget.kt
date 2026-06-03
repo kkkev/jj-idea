@@ -37,7 +37,7 @@ class JujutsuBookmarkWidget(
     override fun getCurrentText(): String {
         if (wcEntries.size != 1) return ""
         val bookmarks = wcEntries.first().bookmarks.filter { !it.isRemote }
-        val text = bookmarks.joinToString(", ") { it.name }
+        val text = bookmarks.joinToString(", ") { it.name.name }
         return if (text.length > 30) text.take(29) + "…" else text
     }
 
@@ -46,10 +46,10 @@ class JujutsuBookmarkWidget(
     override fun doResetFilter() = Unit
 
     override fun createActionGroup(): ActionGroup {
-        val wcBookmarkNames = wcEntries.flatMap { it.bookmarks.map { b -> b.name } }.toSet()
+        val wcBookmarkNames = wcEntries.flatMap { it.bookmarks.map { b -> b.name.name } }.toSet()
 
         val repoByBookmark: Map<String, JujutsuRepository> = logTable.logModel.getAllEntries()
-            .flatMap { entry -> entry.bookmarks.map { it.name to entry.repo } }
+            .flatMap { entry -> entry.bookmarks.map { it.name.name to entry.repo } }
             .toMap()
 
         val allGroups = logTable.logModel.getAllEntries()
@@ -68,7 +68,7 @@ class JujutsuBookmarkWidget(
         } else {
             val items: List<AnAction> = repos.map { repo ->
                 val repoGroups = allGroups.filter {
-                    repoByBookmark[it.localName] == repo || repoByBookmark[it.remotes.firstOrNull()?.name] == repo
+                    repoByBookmark[it.localName] == repo || repoByBookmark[it.remotes.firstOrNull()?.name?.name] == repo
                 }
                 val wcEntry = wcEntries.firstOrNull { it.repo == repo }
                 DefaultActionGroup(repo.displayName, true).apply {
@@ -92,7 +92,7 @@ class JujutsuBookmarkWidget(
             groups.forEach { group ->
                 val groupRepo = repo
                     ?: repoByBookmark[group.localName]
-                    ?: repoByBookmark[group.remotes.firstOrNull()?.name]
+                    ?: repoByBookmark[group.remotes.firstOrNull()?.name?.name]
                     ?: return@forEach
                 add(bookmarkSubGroup(group, groupRepo, onWc = group.localName in wcBookmarkNames))
             }

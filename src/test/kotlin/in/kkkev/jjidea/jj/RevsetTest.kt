@@ -13,7 +13,7 @@ class RevsetTest {
     @Test
     fun `Bookmark name property is accessible`() {
         val bookmark = Bookmark("feature-branch")
-        bookmark.name shouldBe "feature-branch"
+        bookmark.name shouldBe BookmarkName("feature-branch")
     }
 
     @Test
@@ -71,8 +71,8 @@ class RevsetTest {
     }
 
     @Test
-    fun `Bookmark parent returns expression with minus suffix`() {
-        val bookmark = Bookmark("main")
+    fun `BookmarkName parent returns expression with minus suffix`() {
+        val bookmark = BookmarkName("main")
         val parent = bookmark.parent
         parent.toString() shouldBe "main-"
     }
@@ -90,8 +90,8 @@ class RevsetTest {
     }
 
     @Test
-    fun `Bookmark implements Ref which implements Revision`() {
-        val bookmark: Revision = Bookmark("test")
+    fun `BookmarkName implements Ref which implements Revision`() {
+        val bookmark: Revision = BookmarkName("test")
         bookmark.toString() shouldBe "test"
     }
 
@@ -172,12 +172,12 @@ class RevsetTest {
 
         val mainGroup = groups[0]
         mainGroup.local shouldBe Bookmark("main")
-        mainGroup.remotes.map { it.name } shouldBe listOf("main@origin", "main@github")
+        mainGroup.remotes.map { it.name.name } shouldBe listOf("main@origin", "main@github")
         mainGroup.tracked shouldBe true
 
         val featureGroup = groups[1]
         featureGroup.local shouldBe null
-        featureGroup.remotes.map { it.name } shouldBe listOf("feature@origin")
+        featureGroup.remotes.map { it.name.name } shouldBe listOf("feature@origin")
         featureGroup.tracked shouldBe false
     }
 

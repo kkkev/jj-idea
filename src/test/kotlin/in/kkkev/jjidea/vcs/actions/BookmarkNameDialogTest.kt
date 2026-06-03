@@ -1,6 +1,6 @@
 package `in`.kkkev.jjidea.vcs.actions
 
-import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.BookmarkName
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -18,8 +18,8 @@ class BookmarkNameDialogTest {
     inner class `Error code mapping` {
         @Test
         fun `exit code 1 maps to already exists error`() {
-            val failedNames = mutableMapOf<Bookmark, String>()
-            val bookmark = Bookmark("main")
+            val failedNames = mutableMapOf<BookmarkName, String>()
+            val bookmark = BookmarkName("main")
             val exitCode = 1
 
             failedNames[bookmark] = when (exitCode) {
@@ -33,8 +33,8 @@ class BookmarkNameDialogTest {
 
         @Test
         fun `exit code 2 maps to incorrect format error`() {
-            val failedNames = mutableMapOf<Bookmark, String>()
-            val bookmark = Bookmark("invalid name")
+            val failedNames = mutableMapOf<BookmarkName, String>()
+            val bookmark = BookmarkName("invalid name")
             val exitCode = 2
 
             failedNames[bookmark] = when (exitCode) {
@@ -48,8 +48,8 @@ class BookmarkNameDialogTest {
 
         @Test
         fun `unexpected exit code maps to unknown error`() {
-            val failedNames = mutableMapOf<Bookmark, String>()
-            val bookmark = Bookmark("test")
+            val failedNames = mutableMapOf<BookmarkName, String>()
+            val bookmark = BookmarkName("test")
             val exitCode = 99
 
             failedNames[bookmark] = when (exitCode) {
@@ -63,18 +63,18 @@ class BookmarkNameDialogTest {
 
         @Test
         fun `failed names cache accumulates errors`() {
-            val failedNames = mutableMapOf<Bookmark, String>()
+            val failedNames = mutableMapOf<BookmarkName, String>()
 
-            failedNames[Bookmark("main")] = "dialog.bookmark.create.error.already.exists"
-            failedNames[Bookmark("bad name")] = "dialog.bookmark.create.error.incorrect.format"
+            failedNames[BookmarkName("main")] = "dialog.bookmark.create.error.already.exists"
+            failedNames[BookmarkName("bad name")] = "dialog.bookmark.create.error.incorrect.format"
 
             failedNames.size shouldBe 2
         }
 
         @Test
         fun `retrying same name overwrites previous error`() {
-            val failedNames = mutableMapOf<Bookmark, String>()
-            val bookmark = Bookmark("main")
+            val failedNames = mutableMapOf<BookmarkName, String>()
+            val bookmark = BookmarkName("main")
 
             failedNames[bookmark] = "dialog.bookmark.create.error.already.exists"
             failedNames[bookmark] = "dialog.bookmark.create.error.unknown"
@@ -87,30 +87,30 @@ class BookmarkNameDialogTest {
     inner class `Validation logic` {
         @Test
         fun `remote bookmark name is rejected`() {
-            val bookmark = Bookmark("main@origin")
+            val bookmark = BookmarkName("main@origin")
 
             bookmark.isRemote shouldBe true
         }
 
         @Test
         fun `local bookmark name is accepted`() {
-            val bookmark = Bookmark("feature-branch")
+            val bookmark = BookmarkName("feature-branch")
 
             bookmark.isRemote shouldBe false
         }
 
         @Test
         fun `unknown bookmark not in failed cache returns null`() {
-            val failedNames = mutableMapOf<Bookmark, String>()
+            val failedNames = mutableMapOf<BookmarkName, String>()
 
-            failedNames[Bookmark("unknown")].shouldBeNull()
+            failedNames[BookmarkName("unknown")].shouldBeNull()
         }
 
         @Test
         fun `validation checks remote before failed cache`() {
             // The doValidate logic: isRemote is checked first, then failedNames
-            val bookmark = Bookmark("main@origin")
-            val failedNames = mutableMapOf<Bookmark, String>()
+            val bookmark = BookmarkName("main@origin")
+            val failedNames = mutableMapOf<BookmarkName, String>()
             failedNames[bookmark] = "dialog.bookmark.create.error.already.exists"
 
             // Remote check takes precedence
@@ -124,8 +124,8 @@ class BookmarkNameDialogTest {
 
         @Test
         fun `validation returns failed cache error for local bookmark`() {
-            val bookmark = Bookmark("main")
-            val failedNames = mutableMapOf<Bookmark, String>()
+            val bookmark = BookmarkName("main")
+            val failedNames = mutableMapOf<BookmarkName, String>()
             failedNames[bookmark] = "dialog.bookmark.create.error.already.exists"
 
             val errorKey = when {
@@ -138,8 +138,8 @@ class BookmarkNameDialogTest {
 
         @Test
         fun `validation returns null for valid local bookmark not in cache`() {
-            val bookmark = Bookmark("new-branch")
-            val failedNames = mutableMapOf<Bookmark, String>()
+            val bookmark = BookmarkName("new-branch")
+            val failedNames = mutableMapOf<BookmarkName, String>()
 
             val errorKey = when {
                 bookmark.isRemote -> "dialog.bookmark.create.error.not.remote"
@@ -151,7 +151,7 @@ class BookmarkNameDialogTest {
 
         @Test
         fun `empty failed names cache means no validation errors`() {
-            val failedNames = mutableMapOf<Bookmark, String>()
+            val failedNames = mutableMapOf<BookmarkName, String>()
 
             failedNames.shouldBeEmpty()
         }

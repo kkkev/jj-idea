@@ -258,7 +258,7 @@ class RebaseDialog(
                 entry.id.short.contains(trimmed, ignoreCase = true) ||
                 entry.id.full.contains(trimmed, ignoreCase = true) ||
                 entry.description.display.contains(trimmed, ignoreCase = true) ||
-                entry.bookmarks.any { it.name.contains(trimmed, ignoreCase = true) }
+                entry.bookmarks.any { it.name.name.contains(trimmed, ignoreCase = true) }
         }
         val filtered = repoEntries.filter { it.id !in excluded && matchesSearch(it) }
 

@@ -19,19 +19,19 @@ fun deleteBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark) = nullAndD
 ) {
     if (Messages.showYesNoDialog(
             repo.project,
-            JujutsuBundle.message("action.bookmark.delete.confirm.message", bookmark),
-            JujutsuBundle.message("action.bookmark.delete.confirm.title", bookmark),
+            JujutsuBundle.message("action.bookmark.delete.confirm.message", bookmark.name),
+            JujutsuBundle.message("action.bookmark.delete.confirm.title", bookmark.name),
             Messages.getWarningIcon()
         ) != Messages.YES
     ) {
-        log.info("User cancelled deletion of bookmark $bookmark")
+        log.info("User cancelled deletion of bookmark ${bookmark.name}")
         return@nullAndDumbAwareAction
     }
 
-    repo.commandExecutor.createCommand { bookmarkDelete(bookmark) }
+    repo.commandExecutor.createCommand { bookmarkDelete(bookmark.name) }
         .onSuccess {
             repo.invalidate()
-            log.info("Deleted bookmark $bookmark")
+            log.info("Deleted bookmark ${bookmark.name}")
         }.onFailure { tellUser(repo.project, "action.bookmark.delete.error") }
         .executeAsync()
 }

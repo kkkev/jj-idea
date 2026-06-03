@@ -614,7 +614,7 @@ class JujutsuLogContextMenuActionsTest {
             val entry = createEntry("abc123", bookmarks = bookmarks)
 
             entry.bookmarks.size shouldBe 3
-            entry.bookmarks.map { it.name } shouldBe listOf("main", "feature", "release-v2")
+            entry.bookmarks.map { it.name.name } shouldBe listOf("main", "feature", "release-v2")
         }
 
         @Test
@@ -622,7 +622,7 @@ class JujutsuLogContextMenuActionsTest {
             val entry = createEntry("abc123", bookmarks = listOf(Bookmark("main")))
 
             entry.bookmarks.size shouldBe 1
-            entry.bookmarks[0].name shouldBe "main"
+            entry.bookmarks[0].name.name shouldBe "main"
         }
     }
 

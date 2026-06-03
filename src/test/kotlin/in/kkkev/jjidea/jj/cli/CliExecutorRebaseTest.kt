@@ -18,7 +18,7 @@ class CliExecutorRebaseTest {
         fun `rebase -r revision -d destination`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
-                listOf(Bookmark("main"))
+                listOf(BookmarkName("main"))
             )
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "main")
@@ -28,7 +28,7 @@ class CliExecutorRebaseTest {
         fun `rebase -s revision -d destination`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
-                listOf(Bookmark("main")),
+                listOf(BookmarkName("main")),
                 RebaseSourceMode.SOURCE
             )
 
@@ -39,7 +39,7 @@ class CliExecutorRebaseTest {
         fun `rebase -b revision -d destination`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
-                listOf(Bookmark("main")),
+                listOf(BookmarkName("main")),
                 RebaseSourceMode.BRANCH
             )
 
@@ -50,7 +50,7 @@ class CliExecutorRebaseTest {
     @Nested
     inner class `destination modes` {
         private val revision = ChangeId("abc123def456", "abc123de", null)
-        private val destination = Bookmark("main")
+        private val destination = BookmarkName("main")
 
         @Test
         fun `insert after uses -A flag`() {
@@ -84,7 +84,7 @@ class CliExecutorRebaseTest {
                     ChangeId("abc123def456", "abc123de", null),
                     ChangeId("fed987cba654", "fed987cb", null)
                 ),
-                listOf(Bookmark("main"))
+                listOf(BookmarkName("main"))
             )
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-r", "fed987cba654", "-d", "main")
@@ -97,7 +97,7 @@ class CliExecutorRebaseTest {
                     ChangeId("abc123def456", "abc123de", null),
                     ChangeId("fed987cba654", "fed987cb", null)
                 ),
-                listOf(Bookmark("main")),
+                listOf(BookmarkName("main")),
                 RebaseSourceMode.SOURCE
             )
 
@@ -111,7 +111,7 @@ class CliExecutorRebaseTest {
         fun `multiple destinations each get destination flag for merge`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
-                listOf(Bookmark("main"), Bookmark("feature"))
+                listOf(BookmarkName("main"), BookmarkName("feature"))
             )
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "main", "-d", "feature")
@@ -138,7 +138,7 @@ class CliExecutorRebaseTest {
         fun `working copy as source`() {
             val result = rebaseArgs(
                 listOf(WorkingCopy),
-                listOf(Bookmark("main")),
+                listOf(BookmarkName("main")),
                 RebaseSourceMode.BRANCH
             )
 
@@ -172,7 +172,7 @@ class CliExecutorRebaseTest {
         fun `defaults to REVISION source mode and ONTO destination mode`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
-                listOf(Bookmark("main"))
+                listOf(BookmarkName("main"))
             )
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "main")

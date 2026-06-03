@@ -19,6 +19,6 @@ sealed class RevisionChoice(open val displayName: String, open val revision: Rev
     data class Bookmark(
         val item: BookmarkItem,
         override val displayName: String = "${item.bookmark.name}${item.id?.let { " (${it.short})" } ?: ""}",
-        override val revision: Revision = item.bookmark
+        override val revision: Revision = item.bookmark.name
     ) : RevisionChoice(displayName, revision)
 }

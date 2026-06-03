@@ -286,7 +286,7 @@ class MoveBookmarkDialog(
         val filtered = if (query.isEmpty()) {
             classified
         } else {
-            classified.filter { it.item.bookmark.name.contains(query, ignoreCase = true) }
+            classified.filter { it.item.bookmark.name.name.contains(query, ignoreCase = true) }
         }
 
         val forwards = filtered.filter { it.direction == MoveDirection.FORWARD }

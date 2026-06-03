@@ -91,7 +91,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
 
             // Collect bookmarks (tags not yet supported in log template)
             entry.bookmarks.forEach { bookmark ->
-                bookmarks.add(bookmark.name)
+                bookmarks.add(bookmark.name.name)
             }
         }
 
@@ -118,7 +118,7 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
                 return@find true
             }
             // Check if it has the bookmark/tag
-            entry.bookmarks.any { it.name == referenceName }
+            entry.bookmarks.any { it.name.name == referenceName }
         } ?: return emptySet()
 
         // Start with the referenced commit

@@ -128,31 +128,31 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         TODO("Not needed for integration tests")
 
     override fun bookmarkCreate(
-        name: Bookmark,
+        name: BookmarkName,
         revision: Revision
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
-    override fun bookmarkDelete(name: Bookmark): CommandExecutor.CommandResult =
+    override fun bookmarkDelete(name: BookmarkName): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
-    override fun bookmarkForget(name: Bookmark): CommandExecutor.CommandResult =
+    override fun bookmarkForget(name: BookmarkName): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
     override fun bookmarkRename(
-        oldName: Bookmark,
-        newName: Bookmark
+        oldName: BookmarkName,
+        newName: BookmarkName
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun bookmarkSet(
-        name: Bookmark,
+        name: BookmarkName,
         revision: Revision,
         allowBackwards: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
-    override fun bookmarkTrack(name: Bookmark): CommandExecutor.CommandResult =
+    override fun bookmarkTrack(name: BookmarkName): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
-    override fun bookmarkUntrack(name: Bookmark): CommandExecutor.CommandResult =
+    override fun bookmarkUntrack(name: BookmarkName): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =

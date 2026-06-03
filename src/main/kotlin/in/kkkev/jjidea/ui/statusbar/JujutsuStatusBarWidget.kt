@@ -34,7 +34,7 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
         fun displayTextFor(entry: LogEntry): String {
             val sortedBookmarks = entry.bookmarks.sortedBy { it.isRemote }
             val text = when {
-                sortedBookmarks.isNotEmpty() -> sortedBookmarks.joinToString(", ") { it.name }
+                sortedBookmarks.isNotEmpty() -> sortedBookmarks.joinToString(", ") { it.name.name }
                 !entry.description.empty -> entry.description.summary
                 else -> "(no description set)"
             }
@@ -126,7 +126,7 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
         private fun buildTooltip(entry: LogEntry, repo: JujutsuRepository?, isMultiRoot: Boolean) = buildString {
             append("Jujutsu: ")
             if (entry.bookmarks.isNotEmpty()) {
-                append(entry.bookmarks.sortedBy { it.isRemote }.joinToString(", ") { it.name })
+                append(entry.bookmarks.sortedBy { it.isRemote }.joinToString(", ") { it.name.name })
                 append(" ")
             }
             append("(${entry.id.short})")

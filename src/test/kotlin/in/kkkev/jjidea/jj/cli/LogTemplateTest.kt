@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
@@ -66,7 +67,7 @@ class LogTemplateTest {
         val entry = basicLogTemplate.take(fields.iterator())
 
         entry.bookmarks shouldHaveSize 2
-        entry.bookmarks.map { it.name } shouldBe listOf("main", "feature")
+        entry.bookmarks.map { it.name.name } shouldBe listOf("main", "feature")
         entry.isWorkingCopy shouldBe true
     }
 
@@ -258,11 +259,11 @@ class LogTemplateTest {
         val entry = basicLogTemplate.take(fields.iterator())
 
         entry.bookmarks shouldHaveSize 2
-        val main = entry.bookmarks.first { it.name == "main" }
+        val main = entry.bookmarks.first { it.name.name == "main" }
         main.conflict shouldBe false
         main.aheadCount shouldBe 0
         main.behindCount shouldBe 0
-        val remote = entry.bookmarks.first { it.name == "feature@origin" }
+        val remote = entry.bookmarks.first { it.name.name == "feature@origin" }
         remote.conflict shouldBe true
         remote.aheadCount shouldBe 3
         remote.behindCount shouldBe 1
@@ -285,7 +286,7 @@ class LogTemplateTest {
         val fields = listOf("false", "feature", "false", "")
         val item = bookmarkListTemplate.take(fields.iterator())
 
-        item!!.bookmark.name shouldBe "feature"
+        item!!.bookmark.name shouldBe BookmarkName("feature")
         item.bookmark.deleted shouldBe true
         item.id shouldBe null
     }

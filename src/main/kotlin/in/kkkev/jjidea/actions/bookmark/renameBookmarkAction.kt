@@ -21,9 +21,9 @@ fun renameBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark) = nullAndD
 class RenameBookmarkDialog(repo: JujutsuRepository, private val oldBookmark: Bookmark) :
     BookmarkNameDialog(repo, "rename") {
     override fun execute(executor: CommandExecutor) =
-        executor.bookmarkRename(oldBookmark, bookmark)
+        executor.bookmarkRename(oldBookmark.name, bookmark)
 
     override fun onSuccess() {
-        log.info("Renamed bookmark $oldBookmark to $bookmark")
+        log.info("Renamed bookmark ${oldBookmark.name} to ${bookmark.name}")
     }
 }

@@ -145,7 +145,7 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
     private fun findDisplayName(id: ChangeId): String {
         val entry = allEntries.find { it.id == id }
         return if (entry != null && entry.bookmarks.isNotEmpty()) {
-            entry.bookmarks.first().name
+            entry.bookmarks.first().name.name
         } else {
             id.short
         }

@@ -88,8 +88,8 @@ class BookmarkClassifierTest {
         fun `marks forward items whose id is in forwardIds`() {
             val items = listOf(item("main", "aaa"), item("dev", "bbb"))
             val result = BookmarkClassifier.classify(items, setOf("aaa"))
-            result.find { it.item.bookmark.name == "main" }!!.direction shouldBe MoveDirection.FORWARD
-            result.find { it.item.bookmark.name == "dev" }!!.direction shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
+            result.find { it.item.bookmark.name.name == "main" }!!.direction shouldBe MoveDirection.FORWARD
+            result.find { it.item.bookmark.name.name == "dev" }!!.direction shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
         }
 
         @Test

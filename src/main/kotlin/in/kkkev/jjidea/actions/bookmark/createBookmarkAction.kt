@@ -12,7 +12,7 @@ fun createBookmarkAction(logEntry: LogEntry?) =
 
 class CreateBookmarkDialog(private val target: LogEntry) : BookmarkNameDialog(target.repo, "create") {
     override fun onSuccess() {
-        log.info("Created bookmark $bookmark")
+        log.info("Created bookmark ${bookmark.name}")
     }
 
     override fun execute(executor: CommandExecutor) = executor.bookmarkCreate(bookmark, target.id)

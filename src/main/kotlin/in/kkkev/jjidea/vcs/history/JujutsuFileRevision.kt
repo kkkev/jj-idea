@@ -29,7 +29,7 @@ class JujutsuFileRevision(
 
     override fun getRevisionNumber(): VcsRevisionNumber = ChangeIdRevisionNumber(entry.id)
 
-    override fun getBranchName(): String = entry.bookmarks.firstOrNull()?.name ?: ""
+    override fun getBranchName(): String = entry.bookmarks.firstOrNull()?.name?.name ?: ""
 
     override fun getRevisionDate() = entry.authorTimestamp?.toJavaDate()
 

@@ -95,7 +95,7 @@ class LogServiceIntegrationTest {
             val entries = logService.getLogBasic().getOrThrow()
             val wc = entries.first { it.isWorkingCopy }
 
-            wc.bookmarks.map { it.name } shouldBe listOf("my-bookmark")
+            wc.bookmarks.map { it.name.name } shouldBe listOf("my-bookmark")
         }
 
         @Test
@@ -276,7 +276,7 @@ class LogServiceIntegrationTest {
             val bookmarks = logService.getBookmarks().getOrThrow()
 
             bookmarks shouldHaveSize 1
-            bookmarks[0].bookmark.name shouldBe "main"
+            bookmarks[0].bookmark.name.name shouldBe "main"
             bookmarks[0].id!!.full.shouldNotBeBlank()
         }
 
@@ -290,7 +290,7 @@ class LogServiceIntegrationTest {
             val bookmarks = logService.getBookmarks().getOrThrow()
 
             bookmarks shouldHaveSize 2
-            bookmarks.map { it.bookmark.name }.toSet() shouldBe setOf("alpha", "beta")
+            bookmarks.map { it.bookmark.name.name }.toSet() shouldBe setOf("alpha", "beta")
         }
     }
 }

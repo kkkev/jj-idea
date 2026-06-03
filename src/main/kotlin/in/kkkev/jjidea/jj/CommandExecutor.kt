@@ -141,19 +141,23 @@ interface CommandExecutor {
         revision: Revision? = null
     ): CommandResult
 
-    fun bookmarkCreate(name: Bookmark, revision: Revision = WorkingCopy): CommandResult
+    fun bookmarkCreate(name: BookmarkName, revision: Revision = WorkingCopy): CommandResult
 
-    fun bookmarkDelete(name: Bookmark): CommandResult
+    fun bookmarkDelete(name: BookmarkName): CommandResult
 
-    fun bookmarkRename(oldName: Bookmark, newName: Bookmark): CommandResult
+    fun bookmarkRename(oldName: BookmarkName, newName: BookmarkName): CommandResult
 
-    fun bookmarkSet(name: Bookmark, revision: Revision = WorkingCopy, allowBackwards: Boolean = false): CommandResult
+    fun bookmarkSet(
+        name: BookmarkName,
+        revision: Revision = WorkingCopy,
+        allowBackwards: Boolean = false
+    ): CommandResult
 
-    fun bookmarkForget(name: Bookmark): CommandResult
+    fun bookmarkForget(name: BookmarkName): CommandResult
 
-    fun bookmarkTrack(name: Bookmark): CommandResult
+    fun bookmarkTrack(name: BookmarkName): CommandResult
 
-    fun bookmarkUntrack(name: Bookmark): CommandResult
+    fun bookmarkUntrack(name: BookmarkName): CommandResult
 
     /**
      * Get git-format diff for a revision (to detect renames)

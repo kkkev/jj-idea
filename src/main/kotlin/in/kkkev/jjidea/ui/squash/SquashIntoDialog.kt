@@ -325,7 +325,7 @@ class SquashIntoDialog(
                 entry.id.short.contains(trimmed, ignoreCase = true) ||
                 entry.id.full.contains(trimmed, ignoreCase = true) ||
                 entry.description.display.contains(trimmed, ignoreCase = true) ||
-                entry.bookmarks.any { it.name.contains(trimmed, ignoreCase = true) }
+                entry.bookmarks.any { it.name.name.contains(trimmed, ignoreCase = true) }
         }
         val filtered = when (mode) {
             is SquashMode.PickDestination -> {

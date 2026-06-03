@@ -20,22 +20,55 @@ sealed interface Revision : Revset {
  */
 sealed interface Ref : Revision
 
-data class Bookmark(
-    val name: String,
-    val tracked: Boolean = true,
-    val deleted: Boolean = false,
-    val conflict: Boolean = false,
-    val aheadCount: Int = 0,
-    val behindCount: Int = 0
-) : Ref {
+/**
+ * A strongly-typed bookmark name, used as a [Ref] in revsets and passed to `jj bookmark` commands.
+ * This is the key / identifier for a bookmark. For the richer status representation
+ * (tracked/deleted/conflict/ahead/behind) obtained from `jj log`, use [Bookmark].
+ */
+@JvmInline
+value class BookmarkName(val name: String) : Ref {
     override fun toString() = name
 
     val isRemote get() = '@' in name
     val localName get() = name.substringBefore('@')
     val remote get() = name.substringAfter('@', "")
+}
+
+/**
+ * A bookmark with its full status, as parsed from `jj log` or `jj bookmark list`.
+ * Not a [Ref] — use [name] when a revision reference is needed.
+ */
+data class Bookmark(
+    val name: BookmarkName,
+    val tracked: Boolean = true,
+    val deleted: Boolean = false,
+    val conflict: Boolean = false,
+    val aheadCount: Int = 0,
+    val behindCount: Int = 0
+) {
+    /**
+     * Convenience factory for construction sites that have a raw name string.
+     * Defined as a companion [invoke] rather than a secondary constructor to avoid
+     * a JVM platform-declaration clash with the primary constructor once [BookmarkName]
+     * is erased to [String] as an inline value class.
+     */
+    companion object {
+        operator fun invoke(
+            name: String,
+            tracked: Boolean = true,
+            deleted: Boolean = false,
+            conflict: Boolean = false,
+            aheadCount: Int = 0,
+            behindCount: Int = 0
+        ) = Bookmark(BookmarkName(name), tracked, deleted, conflict, aheadCount, behindCount)
+    }
+
+    override fun toString() = name.name
+
+    val isRemote get() = name.isRemote
+    val localName get() = name.localName
+    val remote get() = name.remote
     val isDiverged get() = aheadCount > 0 && behindCount > 0
-    val isAhead get() = aheadCount > 0 && behindCount == 0
-    val isBehind get() = aheadCount == 0 && behindCount > 0
 }
 
 /**

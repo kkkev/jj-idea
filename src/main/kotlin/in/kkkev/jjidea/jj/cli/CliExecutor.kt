@@ -14,23 +14,23 @@ import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
-internal fun bookmarkCreateArgs(name: Bookmark, revision: Revision = WorkingCopy) =
+internal fun bookmarkCreateArgs(name: BookmarkName, revision: Revision = WorkingCopy) =
     listOf("bookmark", "create", name, "-r", revision).map(Any::toString)
 
-internal fun bookmarkDeleteArgs(name: Bookmark) = listOf("bookmark", "delete", name.toString())
+internal fun bookmarkDeleteArgs(name: BookmarkName) = listOf("bookmark", "delete", name.toString())
 
-internal fun bookmarkForgetArgs(name: Bookmark) = listOf("bookmark", "forget", name.toString())
+internal fun bookmarkForgetArgs(name: BookmarkName) = listOf("bookmark", "forget", name.toString())
 
-internal fun bookmarkRenameArgs(oldName: Bookmark, newName: Bookmark) =
+internal fun bookmarkRenameArgs(oldName: BookmarkName, newName: BookmarkName) =
     listOf("bookmark", "rename", oldName, newName).map(Any::toString)
 
-internal fun bookmarkTrackArgs(name: Bookmark) =
+internal fun bookmarkTrackArgs(name: BookmarkName) =
     listOf("bookmark", "track", name.localName, "--remote", name.remote)
 
-internal fun bookmarkUntrackArgs(name: Bookmark) =
+internal fun bookmarkUntrackArgs(name: BookmarkName) =
     listOf("bookmark", "untrack", name.localName, "--remote", name.remote)
 
-internal fun bookmarkSetArgs(name: Bookmark, revision: Revision = WorkingCopy, allowBackwards: Boolean = false) =
+internal fun bookmarkSetArgs(name: BookmarkName, revision: Revision = WorkingCopy, allowBackwards: Boolean = false) =
     buildList {
         addAll(listOf("bookmark", "set", name.toString(), "-r", revision.toString()))
         if (allowBackwards) add("-B")
@@ -67,7 +67,7 @@ internal fun gitPushArgs(
         add("--all")
     } else if (bookmark != null) {
         add("--bookmark")
-        add(bookmark.name)
+        add(bookmark.name.name)
     }
     if (allowNew) add("--allow-new")
     if (revision != null && bookmark == null && !allBookmarks) {
@@ -299,21 +299,22 @@ class CliExecutor(
         return execute(root, args)
     }
 
-    override fun bookmarkCreate(name: Bookmark, revision: Revision) = execute(root, bookmarkCreateArgs(name, revision))
+    override fun bookmarkCreate(name: BookmarkName, revision: Revision) =
+        execute(root, bookmarkCreateArgs(name, revision))
 
-    override fun bookmarkDelete(name: Bookmark) = execute(root, bookmarkDeleteArgs(name))
+    override fun bookmarkDelete(name: BookmarkName) = execute(root, bookmarkDeleteArgs(name))
 
-    override fun bookmarkForget(name: Bookmark) = execute(root, bookmarkForgetArgs(name))
+    override fun bookmarkForget(name: BookmarkName) = execute(root, bookmarkForgetArgs(name))
 
-    override fun bookmarkRename(oldName: Bookmark, newName: Bookmark) =
+    override fun bookmarkRename(oldName: BookmarkName, newName: BookmarkName) =
         execute(root, bookmarkRenameArgs(oldName, newName))
 
-    override fun bookmarkSet(name: Bookmark, revision: Revision, allowBackwards: Boolean) =
+    override fun bookmarkSet(name: BookmarkName, revision: Revision, allowBackwards: Boolean) =
         execute(root, bookmarkSetArgs(name, revision, allowBackwards))
 
-    override fun bookmarkTrack(name: Bookmark) = execute(root, bookmarkTrackArgs(name))
+    override fun bookmarkTrack(name: BookmarkName) = execute(root, bookmarkTrackArgs(name))
 
-    override fun bookmarkUntrack(name: Bookmark) = execute(root, bookmarkUntrackArgs(name))
+    override fun bookmarkUntrack(name: BookmarkName) = execute(root, bookmarkUntrackArgs(name))
 
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("diff", "--git", "-r", revision))

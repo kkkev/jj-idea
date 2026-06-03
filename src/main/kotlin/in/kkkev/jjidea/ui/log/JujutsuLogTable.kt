@@ -627,7 +627,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
      * Get all unique bookmarks in the current entries (for filter UI).
      */
     fun getAllBookmarks(): List<String> =
-        entries.flatMap { it.bookmarks.map { bookmark -> bookmark.name } }.distinct().sorted()
+        entries.flatMap { it.bookmarks.map { bookmark -> bookmark.name.name } }.distinct().sorted()
 
     /**
      * Get all entries (unfiltered) for computing ancestors.

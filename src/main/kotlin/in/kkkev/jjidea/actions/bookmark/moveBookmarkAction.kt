@@ -30,7 +30,7 @@ private fun executeMove(
     targetId: ChangeId,
     allowBackwards: Boolean
 ) {
-    repo.commandExecutor.createCommand { bookmarkSet(bookmark, targetId, allowBackwards) }
+    repo.commandExecutor.createCommand { bookmarkSet(bookmark.name, targetId, allowBackwards) }
         .onSuccess { repo.invalidate() }
         .onFailure {
             if (!allowBackwards && exitCode == 1 && stderr.contains("backwards or sideways")) {
@@ -51,7 +51,7 @@ private fun promptRaceBackwards(
 ) {
     if (Messages.showYesNoDialog(
             project,
-            JujutsuBundle.message("action.bookmark.move.backwards.message", bookmark),
+            JujutsuBundle.message("action.bookmark.move.backwards.message", bookmark.name),
             JujutsuBundle.message("action.bookmark.move.backwards.title"),
             Messages.getWarningIcon()
         ) == Messages.YES
