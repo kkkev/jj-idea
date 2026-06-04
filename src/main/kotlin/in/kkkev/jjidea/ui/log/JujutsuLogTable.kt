@@ -313,7 +313,7 @@ class JujutsuLogTable(
      */
     private fun showContextMenu(component: Component, x: Int, y: Int) {
         val actionGroup = JujutsuLogContextMenuActions.createActionGroup(project, selectedEntries)
-        val popupMenu = ActionManager.getInstance().createActionPopupMenu(ActionPlaces.UNKNOWN, actionGroup)
+        val popupMenu = ActionManager.getInstance().createActionPopupMenu("Jujutsu.LogTable", actionGroup)
         popupMenu.setTargetComponent(this)
         popupMenu.component.show(component, x, y)
     }
