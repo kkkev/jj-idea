@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -29,17 +30,22 @@ class UnifiedJujutsuLogDataLoader(
 
     data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeId, GraphNode>, val limit: Int)
 
+    @Volatile private var lastLimit: Int = 0
+
+    // Per-repo expansion entries accumulated by navigation; keyed by repo identity.
+    // Never discarded by loadCommits — only cleared on explicit Refresh (clearExpansions).
+    private val expansionEntriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
+
     override fun load() = loadCommits()
 
     private fun notify(data: Data) {
+        lastLimit = data.limit
         panel.onDataLoaded(data)
         log.info("Table updated with ${data.entries.size} commits and graph layout")
     }
 
     /**
      * Load commits from all repositories in the background.
-     *
-     * @param revset Revision expression to load (default: all commits)
      */
     fun loadCommits() {
         val repos = repositories()
@@ -119,6 +125,28 @@ class UnifiedJujutsuLogDataLoader(
             }
         )
     }
+
+    fun loadExpanding(repo: JujutsuRepository, changeId: ChangeId) {
+        val limit = lastLimit
+        runInBackground {
+            repo.logCache.loadContext(changeId).takeUnless { it.isEmpty() }?.let { expansion ->
+                expansionEntriesByRepo[repo] = expansion
+                // For each repo: combine loadCommits entries (from cache) with the expansion
+                // entries accumulated through navigation. This keeps other repos' expansions
+                // intact even if their caches have been partially overwritten by loadCommits.
+                val allEntries = repositories().flatMap { r ->
+                    val regular = r.logCache.all
+                    val expanded = expansionEntriesByRepo[r] ?: emptyList()
+                    regular + expanded
+                }
+                val merged = topologicalSort(allEntries.distinctBy { it.id })
+                val data = Data(merged, graphBuilder.buildGraph(merged), limit)
+                runLater { notify(data) }
+            }
+        }
+    }
+
+    override fun clearExpansions() = expansionEntriesByRepo.clear()
 
     override fun refresh() {
         log.info("Refreshing unified log")

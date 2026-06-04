@@ -107,13 +107,36 @@ class JujutsuLogTable(
     @Volatile
     private var pendingSelection: ChangeKey? = null
 
+    // Set by requestSelection(), kept alive until clearNavigation() so loadCommits overwrites can
+    // trigger re-expansion from the cache.
+    private var pendingSelectionIsExplicit = false
+
+    // True while an expansion background task is in flight; prevents duplicate concurrent loads.
+    private var expansionPending = false
+
+    var onSelectionExpansionNeeded: ((ChangeKey) -> Unit)? = null
+
     fun requestSelection(changeKey: ChangeKey) {
         // Try immediate selection from current model data (e.g., annotation click with no pending refresh).
         // Store as pending regardless so setEntries() can apply it if a refresh is in flight.
         pendingSelection = changeKey
+        pendingSelectionIsExplicit = true
+        expansionPending = false
         if (!selectEntry(changeKey.repo, changeKey.revision)) {
-            log.info("requestSelection: entry not in current model, will apply on next setEntries()")
+            log.info("requestSelection: entry not in current model, triggering expansion")
+            expansionPending = true
+            onSelectionExpansionNeeded?.invoke(changeKey)
         }
+    }
+
+    /**
+     * Clear navigation state. Call when the user explicitly refreshes so the log returns to the
+     * configured revset rather than the expansion view.
+     */
+    fun clearNavigation() {
+        pendingSelection = null
+        pendingSelectionIsExplicit = false
+        expansionPending = false
     }
 
     /**
@@ -348,6 +371,12 @@ class JujutsuLogTable(
         pendingSelection?.let {
             if (selectEntry(it.repo, it.revision)) {
                 pendingSelection = null
+                expansionPending = false
+                // pendingSelectionIsExplicit stays true: if a concurrent loadCommits later
+                // overwrites this expansion result, the next setEntries() will re-fire from cache.
+            } else if (pendingSelectionIsExplicit && !expansionPending) {
+                expansionPending = true
+                onSelectionExpansionNeeded?.invoke(it)
             }
         }
     }

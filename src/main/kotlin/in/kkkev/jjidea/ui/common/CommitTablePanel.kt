@@ -426,10 +426,13 @@ abstract class CommitTablePanel<D>(
     }
 
     /**
-     * Refresh the file history.
+     * Refresh the file history. Clears any active navigation-expansion so the log returns
+     * to the configured revset/limit view.
      */
     fun refresh() {
         log.info("Refreshing log entries")
+        logTable.clearNavigation()
+        dataLoader.clearExpansions()
         dataLoader.refresh()
     }
 }

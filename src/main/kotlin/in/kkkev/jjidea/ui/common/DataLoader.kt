@@ -6,4 +6,7 @@ package `in`.kkkev.jjidea.ui.common
 interface DataLoader {
     fun load()
     fun refresh()
+
+    /** Clear any per-repo expansion state accumulated by navigation. Called on explicit Refresh. */
+    fun clearExpansions() {}
 }

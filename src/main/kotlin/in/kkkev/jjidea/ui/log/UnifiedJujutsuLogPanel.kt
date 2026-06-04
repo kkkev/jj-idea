@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
@@ -45,6 +46,11 @@ class UnifiedJujutsuLogPanel(project: Project) :
         // Listen for change selection requests (data reload is handled by repositoryStates listener)
         project.stateModel.changeSelection.connect(this) { key ->
             logTable.requestSelection(key)
+        }
+
+        logTable.onSelectionExpansionNeeded = { key ->
+            val rev = key.revision
+            if (rev is ChangeId) (dataLoader as UnifiedJujutsuLogDataLoader).loadExpanding(key.repo, rev)
         }
 
         log.info("UnifiedJujutsuLogPanel initialized for project: ${project.name}")

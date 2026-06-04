@@ -37,6 +37,15 @@ interface LogCache {
     operator fun get(name: BookmarkName): LogEntry?
 
     /**
+     * Fetch a context window around [id]: `ancestors(id, window) | id | descendants(id, window)`.
+     * Stores all returned entries in the cache as a side effect (same fetch-and-store pattern as [all]).
+     * Returns an empty list if [id] does not exist in the repository.
+     * Always call from a background thread.
+     */
+    @RequiresBackgroundThread
+    fun loadContext(id: ChangeId, window: Int = 10): List<LogEntry>
+
+    /**
      * Populate the cache with freshly fetched entries.
      * Called by data loaders after a `jj log` fetch; general consumers should use [all] or [get].
      * Always call from a background thread.
@@ -60,8 +69,10 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     private val byBookmark = ConcurrentHashMap<BookmarkName, ChangeId>()
 
     // Tracks insertion order so snapshot() returns entries in the same order they were stored
-    // (topological order from the data loader). Rebuilt atomically on each store() call.
+    // (topological order from the data loader). Updated under orderLock to prevent lost-write races
+    // between concurrent loadContext and loadCommits calls.
     @Volatile private var orderedIds: List<ChangeId> = emptyList()
+    private val orderLock = Any()
 
     init {
         repo.project.messageBus.connect(repo.project as Disposable).subscribe(
@@ -95,6 +106,18 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
             ?: repo.logService.getLogBasic(revset = name).getOrNull()?.firstOrNull()
                 ?.also { store(listOf(it)) }
 
+    override fun loadContext(id: ChangeId, window: Int): List<LogEntry> {
+        // Fast path: if the target is already cached (e.g., from a previous loadContext call that
+        // was then overwritten by loadCommits), return the full snapshot which includes both the
+        // loadCommits entries and the previously-fetched context window.
+        if (immutableStore.containsKey(id) || mutableStore.containsKey(id)) {
+            return snapshot() ?: emptyList()
+        }
+        val revset = Expression("ancestors(${id.short}, $window) | ${id.short} | descendants(${id.short}, $window)")
+        return repo.logService.getLogBasic(revset).getOrNull()
+            ?.also { store(it) } ?: emptyList()
+    }
+
     override fun store(entries: List<LogEntry>) {
         for (entry in entries) {
             val store = if (entry.immutable) immutableStore else mutableStore
@@ -104,7 +127,9 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
             entry.bookmarks.forEach { byBookmark[it.name] = entry.id }
         }
         val newIds = entries.map { it.id }.toHashSet()
-        orderedIds = orderedIds.filterNot { it in newIds } + entries.map { it.id }
+        synchronized(orderLock) {
+            orderedIds = orderedIds.filterNot { it in newIds } + entries.map { it.id }
+        }
         log.debug(
             "Stored ${entries.size} entries (${entries.count { it.immutable }} immutable, repo=${repo.displayName})"
         )
@@ -119,7 +144,9 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
                 evicted++
             }
         }
-        orderedIds = orderedIds.filter { immutableStore.containsKey(it) }
+        synchronized(orderLock) {
+            orderedIds = orderedIds.filter { immutableStore.containsKey(it) }
+        }
         log.debug(
             "Evicted $evicted mutable entries, ${immutableStore.size} immutable retained (repo=${repo.displayName})"
         )
