@@ -11,8 +11,12 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Per-repository log cache providing indexed access to [LogEntry] objects.
  *
- * Immutable entries survive [invalidateMutable]; mutable entries are evicted after VCS operations.
- * Obtain via [JujutsuRepository.logCache].
+ * Entries are cached between VCS operations and fully evicted via [clear] after any operation
+ * (bookmark, fetch, describe, new, edit, …). Obtain via [JujutsuRepository.logCache].
+ *
+ * Note: [LogEntry.immutable] reflects jj's immutability of commit *content* (description, parents,
+ * tree) but does not cover ref-derived data (bookmarks, ahead/behind counts, working-copy flag).
+ * Those fields can change on any VCS operation, so we do not bucket by immutability.
  */
 interface LogCache {
     /**
@@ -54,17 +58,16 @@ interface LogCache {
     fun store(entries: List<LogEntry>)
 
     /**
-     * Evict all mutable entries. Call after any VCS operation.
+     * Evict all cached entries. Call after any VCS operation.
      * Safe from any thread — pure map operations, no I/O.
      */
-    fun invalidateMutable()
+    fun clear()
 }
 
 internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     private val log = Logger.getInstance(javaClass)
 
-    private val immutableStore = ConcurrentHashMap<ChangeId, LogEntry>()
-    private val mutableStore = ConcurrentHashMap<ChangeId, LogEntry>()
+    private val store = ConcurrentHashMap<ChangeId, LogEntry>()
     private val byCommitId = ConcurrentHashMap<CommitId, ChangeId>()
     private val byBookmark = ConcurrentHashMap<BookmarkName, ChangeId>()
 
@@ -77,7 +80,7 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     init {
         repo.project.messageBus.connect(repo.project as Disposable).subscribe(
             ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED,
-            VcsListener { invalidateAll() }
+            VcsListener { clear() }
         )
     }
 
@@ -92,7 +95,7 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         }
 
     override operator fun get(id: ChangeId): LogEntry? =
-        (immutableStore[id] ?: mutableStore[id])
+        store[id]
             ?: repo.logService.getLogBasic(revset = id).getOrNull()?.firstOrNull()
                 ?.also { store(listOf(it)) }
 
@@ -102,7 +105,7 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
                 ?.also { store(listOf(it)) }
 
     override operator fun get(name: BookmarkName): LogEntry? =
-        byBookmark[name]?.let { immutableStore[it] ?: mutableStore[it] }
+        byBookmark[name]?.let { store[it] }
             ?: repo.logService.getLogBasic(revset = name).getOrNull()?.firstOrNull()
                 ?.also { store(listOf(it)) }
 
@@ -110,7 +113,7 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         // Fast path: if the target is already cached (e.g., from a previous loadContext call that
         // was then overwritten by loadCommits), return the full snapshot which includes both the
         // loadCommits entries and the previously-fetched context window.
-        if (immutableStore.containsKey(id) || mutableStore.containsKey(id)) {
+        if (store.containsKey(id)) {
             return snapshot() ?: emptyList()
         }
         val revset = Expression("ancestors(${id.short}, $window) | ${id.short} | descendants(${id.short}, $window)")
@@ -120,7 +123,6 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
 
     override fun store(entries: List<LogEntry>) {
         for (entry in entries) {
-            val store = if (entry.immutable) immutableStore else mutableStore
             store[entry.id]?.bookmarks?.forEach { byBookmark.remove(it.name) }
             store[entry.id] = entry
             byCommitId[entry.commitId] = entry.id
@@ -130,38 +132,20 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         synchronized(orderLock) {
             orderedIds = orderedIds.filterNot { it in newIds } + entries.map { it.id }
         }
-        log.debug(
-            "Stored ${entries.size} entries (${entries.count { it.immutable }} immutable, repo=${repo.displayName})"
-        )
+        log.debug("Stored ${entries.size} entries (repo=${repo.displayName})")
     }
 
-    override fun invalidateMutable() {
-        var evicted = 0
-        mutableStore.keys.toSet().forEach { id ->
-            mutableStore.remove(id)?.also { e ->
-                byCommitId.remove(e.commitId)
-                e.bookmarks.forEach { byBookmark.remove(it.name) }
-                evicted++
-            }
-        }
-        synchronized(orderLock) {
-            orderedIds = orderedIds.filter { immutableStore.containsKey(it) }
-        }
-        log.debug(
-            "Evicted $evicted mutable entries, ${immutableStore.size} immutable retained (repo=${repo.displayName})"
-        )
-    }
-
-    private fun invalidateAll() {
-        val total = immutableStore.size + mutableStore.size
-        immutableStore.clear()
-        mutableStore.clear()
+    override fun clear() {
+        val total = store.size
+        store.clear()
         byCommitId.clear()
         byBookmark.clear()
-        orderedIds = emptyList()
-        log.debug("Evicted all $total entries (repo=${repo.displayName})")
+        synchronized(orderLock) {
+            orderedIds = emptyList()
+        }
+        log.debug("Cleared $total entries (repo=${repo.displayName})")
     }
 
     private fun snapshot(): List<LogEntry>? =
-        orderedIds.mapNotNull { immutableStore[it] ?: mutableStore[it] }.ifEmpty { null }
+        orderedIds.mapNotNull { store[it] }.ifEmpty { null }
 }
