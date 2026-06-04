@@ -11,14 +11,27 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
  */
 class JujutsuVirtualFile(private val fileAtVersion: FileAtVersion, private val repo: JujutsuRepository) :
     AbstractVcsVirtualFile(fileAtVersion.filePath) {
-    val contents by lazy { repo.createContentRevision(fileAtVersion).content?.toByteArray() ?: byteArrayOf() }
+    private val logEntry = repo.getLogEntry(contentLocator)
+    private val isImmutable = logEntry?.immutable == true
+
+    // Cache content so EDT reads are non-blocking (cacheContents() pre-populates on a background thread).
+    // Mutable revisions have their cache cleared by MutableContentRegistry on logRefresh.
+    @Volatile private var cached: ByteArray? = null
 
     init {
-        putUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY, repo.getLogEntry(contentLocator))
+        putUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY, logEntry)
         setRevision(fileAtVersion.contentLocator.title)
+        if (!isImmutable) MutableContentRegistry.getInstance(repo.project).register(this)
     }
 
-    override fun contentsToByteArray() = contents
+    override fun contentsToByteArray() = cached ?: fetch().also { cached = it }
+
+    /** Called by [MutableContentRegistry] on logRefresh to evict stale content. */
+    internal fun invalidateContent() {
+        cached = null
+    }
+
+    private fun fetch() = repo.createContentRevision(fileAtVersion).content?.toByteArray() ?: byteArrayOf()
 
     override fun isDirectory() = false
     override fun getPresentableName() = fileAtVersion.title

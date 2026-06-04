@@ -53,6 +53,7 @@
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceImplementation="in.kkkev.jjidea.settings.JujutsuApplicationSettings"/>
     <projectService serviceImplementation="in.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService"/>
+    <projectService serviceImplementation="in.kkkev.jjidea.vcs.MutableContentRegistry"/>
     <vcs name="Jujutsu" vcsClass="in.kkkev.jjidea.vcs.JujutsuVcs" administrativeAreaName=".jj"/>
     <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" order="first"/>
     <!-- Promotes Jujutsu.ShowChangesDiff over built-in Compare.SameVersion/LastVersion for Ctrl+D -->
