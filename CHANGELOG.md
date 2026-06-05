@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-06-05
+
 ### Added
 - Navigating to a commit that is outside the configured log limit (e.g. clicking a parent change ID in the details panel or an annotation line) now expands the log to show a context window around the target commit and selects it. In multi-repository projects, each repo's expansion accumulates additively — expanding a commit in repo A then repo B shows both context windows together. Clicking the Refresh toolbar button returns the log to the configured limit view.
 
@@ -547,7 +549,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.4...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.5...HEAD
+[0.7.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.5
 [0.7.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.4
 [0.7.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.3
 [0.7.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.2
