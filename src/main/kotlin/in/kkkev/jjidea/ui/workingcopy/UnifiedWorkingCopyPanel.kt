@@ -214,6 +214,9 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
                 if (currentRepo == null || new.none { it.value.repo == currentRepo }) {
                     sortedRepos.firstOrNull()?.let { controlsPanel.boundRepository = it }
                 }
+                // Sync changes tree — handles the case where the panel was created after
+                // changeListUpdateDone already fired (ChangeListManager already has the data).
+                reloadChangesFromCache()
             }
         }
 

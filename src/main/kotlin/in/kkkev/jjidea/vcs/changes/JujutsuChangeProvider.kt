@@ -9,6 +9,7 @@ import com.intellij.openapi.vcs.changes.*
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
@@ -32,6 +33,10 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         dirtyScope.affectedContentRoots.mapNotNull { vcs.project.possibleJujutsuRepositoryFor(it) }.toSet()
             .forEach { repo ->
                 try {
+                    if (vcs.project.stateModel.workingCopies.value[repo.directory.path] == null) {
+                        log.info("getChanges: working copy not yet loaded for $repo, deferring")
+                        return@forEach
+                    }
                     val startTime = System.currentTimeMillis()
                     val result = repo.commandExecutor.status()
                     log.info("jj status for $repo took ${System.currentTimeMillis() - startTime}ms")

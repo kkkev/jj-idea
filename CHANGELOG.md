@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Navigating to a commit that is outside the configured log limit (e.g. clicking a parent change ID in the details panel or an annotation line) now expands the log to show a context window around the target commit and selects it. In multi-repository projects, each repo's expansion accumulates additively — expanding a commit in repo A then repo B shows both context windows together. Clicking the Refresh toolbar button returns the log to the configured limit view.
 
 ### Fixed
+- Working copy changes no longer require a manual refresh to appear on startup. Two fixes: (1) the change provider skips `jj status` until the working copy state is loaded (eliminating a wasted invocation), and (2) the working copy panel now reads from the `ChangeListManager` cache when it connects to `workingCopies`, so changes are visible immediately even if the panel was created after the initial VCS scan completed.
 - Fixed a memory leak reported on IDE shutdown: `JujutsuCommitDetailsPanel` was registered in the Disposer tree under `ROOT_DISPOSABLE` instead of its owning panel, causing a `RuntimeException` on quit.
 - Diff views for mutable revisions no longer show stale content after the revision is edited: cached file bytes are invalidated on `logRefresh` and re-fetched lazily on next access.
 

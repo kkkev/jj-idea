@@ -132,9 +132,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             a.mapValues { it.value.stateKey } == b.mapValues { it.value.stateKey }
         }
     ) {
-        // Use initialisedRoots.value to only load state for initialised repositories
-        // This avoids errors from uninitialised JJ VCS mappings
-        initialisedRepositories.value.mapNotNull { (_, it) ->
+        initialisedRepositories.immediateValue.mapNotNull { (_, it) ->
             it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
         }.associateBy { it.repo.directory.path }
     }
@@ -148,9 +146,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             a.map { it.stateKey }.toSet() == b.map { it.stateKey }.toSet()
         }
     ) {
-        // Use initialisedRoots.value to only load state for initialised repositories
-        // This avoids errors from uninitialised JJ VCS mappings
-        initialisedRepositories.value.mapNotNull { (_, it) ->
+        initialisedRepositories.immediateValue.mapNotNull { (_, it) ->
             it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
         }.toSet()
     }
