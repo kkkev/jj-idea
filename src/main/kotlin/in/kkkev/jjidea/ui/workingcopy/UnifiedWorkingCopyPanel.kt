@@ -190,7 +190,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun subscribeToStateModel() {
-        // repositoryStates fires on EDT already (via invokeLater in SimpleNotifiableState)
+        // workingCopies fires on EDT already (via invokeLater in SimpleNotifiableState)
         project.stateModel.workingCopies.connect(this) { new ->
             // Only update repo state if jj is available
             val status = JjAvailabilityChecker.getInstance(project).status.value
@@ -323,7 +323,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      * Steps:
      * 1. VFS sync to detect external file changes
      * 2. Mark all repo directories dirty to trigger ChangeProvider
-     * 3. Invalidate repositoryStates to reload descriptions
+     * 3. Invalidate workingCopies to reload descriptions
      * 4. Reload from cache (the listener chain may also trigger reloadChangesFromCache)
      */
     fun refresh() {

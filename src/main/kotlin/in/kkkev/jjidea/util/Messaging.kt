@@ -103,7 +103,7 @@ fun <T : Any> notifiableState(
  * ## Initialization
  * Does NOT auto-invalidate on construction. Callers must call [invalidate] explicitly to trigger the
  * first load. This avoids wasted loads when downstream states depend on upstream state that hasn't
- * loaded yet (e.g., repositoryStates depends on initializedRoots).
+ * loaded yet (e.g., workingCopies depends on initialisedRepositories).
  */
 class SimpleNotifiableState<T : Any>(
     val project: Project,

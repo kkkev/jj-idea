@@ -39,14 +39,14 @@ import kotlin.io.path.Path
  *   VFS_CHANGES (.jj create/delete) ──┐
  *   VCS_CONFIGURATION_CHANGED ────────┼──→ initializedRoots.invalidate()
  *   VCS_ACTIVATED ────────────────────┘        │
- *                                              ├──→ repositoryStates.invalidate()
+ *                                              ├──→ workingCopies.invalidate()
  *                                              ├──→ logRefresh.notify()
  *                                              └──→ ToolWindowEnabler
  *
- *   VFS_CHANGES (file content) ──→ 300ms debounce ──→ repositoryStates.invalidate()
+ *   VFS_CHANGES (file content) ──→ 300ms debounce ──→ workingCopies.invalidate()
  *                                                     + logRefresh.notify()
  *
- *   repo.invalidate(select) ──→ repositoryStates.invalidate()
+ *   repo.invalidate(select) ──→ workingCopies.invalidate()
  *     (VCS operations)          + logRefresh.notify()
  *                               + changeSelection.notify()
  * ```
@@ -62,7 +62,7 @@ import kotlin.io.path.Path
  *
  * 1. Constructor registers all subscriptions (VFS, VCS config, VCS activated)
  * 2. Explicit [initialisedRepositories.invalidate] fires initial root scan
- * 3. initializedRoots cascade → repositoryStates + logRefresh
+ * 3. initializedRoots cascade → workingCopies + logRefresh
  * 4. ToolWindowEnabler connects to initializedRoots separately
  *
  * Note: [SimpleNotifiableState] does NOT auto-invalidate on construction.
@@ -160,20 +160,6 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             }
             repo.directory.path to remotes
         }
-    }
-
-    @Deprecated("Use working copies by repo instead")
-    val repositoryStates = notifiableState(
-        project,
-        "Jujutsu Repository States",
-        emptySet(),
-        equalityCheck = { a, b ->
-            a.map { it.stateKey }.toSet() == b.map { it.stateKey }.toSet()
-        }
-    ) {
-        initialisedRepositories.immediateValue.mapNotNull { (_, it) ->
-            it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
-        }.toSet()
     }
 
     /**
@@ -283,7 +269,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                         }
                         log.info(
                             "File changes detected (${events.size} events on " +
-                                "${Thread.currentThread().name}), scheduling repositoryStates invalidation"
+                                "${Thread.currentThread().name}), scheduling workingCopies invalidation"
                         )
                         scheduleRepositoryRefresh()
                     }
@@ -303,7 +289,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         )
 
         // When jj becomes available (e.g., user upgrades from VersionTooOld, or changes path),
-        // reload repository states and log. Without this, repositoryStates stays empty from the
+        // reload repository states and log. Without this, workingCopies stays empty from the
         // failed load when jj was unavailable, and the working copy panel shows "No repositories".
         JjAvailabilityChecker.getInstance(project).status.connect(this) { status ->
             if (status is JjAvailabilityStatus.Available) {
@@ -333,7 +319,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             }
         )
 
-        // Invalidate repositoryStates since it depends on initializedRoots
+        // Invalidate workingCopies since it depends on initialisedRepositories
         initialisedRepositories.connect(this) { new ->
             log.info("Initialized roots changed to ${new.size} roots")
             // Reload repository states now that we have the current roots

@@ -418,7 +418,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             checker.recheck()
             // Directly trigger downstream refresh — initializedRoots.invalidate() alone
             // may produce data-class-equal repos (same project+directory), suppressing the
-            // change notification. Explicitly refreshing repositoryStates and logRefresh
+            // change notification. Explicitly refreshing workingCopies and logRefresh
             // ensures the UI picks up the new executable immediately.
             project.stateModel.workingCopies.invalidate()
             project.stateModel.logRefresh.notify(Unit)

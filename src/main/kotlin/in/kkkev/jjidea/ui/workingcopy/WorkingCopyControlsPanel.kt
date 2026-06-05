@@ -20,7 +20,6 @@ import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import `in`.kkkev.jjidea.ui.components.appendParents
 import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.htmlString
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
@@ -279,7 +278,6 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         }
 
         updateDescriptionLabel()
-        loadCurrentDescription(repo)
     }
 
     /**
@@ -360,29 +358,6 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         currentChangeLabel.text = htmlString {
             appendSummary(entry)
             appendParents(entry)
-        }
-    }
-
-    private fun loadCurrentDescription(repo: JujutsuRepository) {
-        runInBackground {
-            val result = repo.logService.getLog(WorkingCopy)
-            runLater {
-                if (boundRepository != repo) return@runLater // Repo changed while loading
-
-                result.onSuccess { entries ->
-                    entries.firstOrNull()?.let { entry ->
-                        persistedDescription = entry.description
-                        if (!isDescriptionModified) {
-                            descriptionArea.text = persistedDescription.actual
-                        }
-                        isDescriptionModified = descriptionArea.text != persistedDescription.actual
-                        updateDescriptionLabel()
-                        updateWorkingCopyLabel(entry)
-                    }
-                }.onFailure { error ->
-                    log.warn("Failed to load current description: ${error.message}")
-                }
-            }
         }
     }
 

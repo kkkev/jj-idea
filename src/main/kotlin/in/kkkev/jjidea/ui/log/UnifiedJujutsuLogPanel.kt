@@ -43,7 +43,7 @@ class UnifiedJujutsuLogPanel(project: Project) :
         // Subscribe to state changes from all repositories
         setupStateListener()
 
-        // Listen for change selection requests (data reload is handled by repositoryStates listener)
+        // Listen for change selection requests (data reload is handled by logRefresh listener)
         project.stateModel.changeSelection.connect(this) { key ->
             logTable.requestSelection(key)
         }
@@ -57,7 +57,7 @@ class UnifiedJujutsuLogPanel(project: Project) :
     }
 
     private fun setupStateListener() {
-        // Listen for log refresh signals (from VCS operations and repositoryStates cascade)
+        // Listen for log refresh signals (from VCS operations and workingCopies cascade)
         // (Selection handling is done by the data loader)
         // Note: don't call updateRootFilterVisibility() here — the table still has stale data.
         // onDataLoaded() calls it after the table is updated with fresh data.

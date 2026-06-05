@@ -45,7 +45,7 @@ data class LogEntry(
 
     /**
      * Projection of LogEntry that excludes volatile fields (timestamps) from equality.
-     * Used by repositoryStates to avoid spurious invalidations when only timestamps change.
+     * Used by workingCopies to avoid spurious invalidations when only timestamps change.
      */
     data class StateKey(
         val repo: JujutsuRepository,
