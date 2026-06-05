@@ -503,8 +503,13 @@ class CliExecutor(
         // Add color=never to avoid ANSI codes in output
         commandLine.environment["NO_COLOR"] = "1"
 
-        val cmdName = args.joinToString(" ")
-        log.info("Executing: jj $cmdName (${Thread.currentThread().name})")
+        val cmdName = args.joinToString(" ") {
+            val s = it.toString()
+            val truncatePoint =
+                listOfNotNull(20, s.length, s.indexOfFirst { it.isWhitespace() }.takeIf { it >= 0 }).min()
+            if (truncatePoint < s.length) s.substring(0..truncatePoint - 1) + "..." else s
+        }
+        log.info("Executing in ${workingDir?.path ?: "."}: jj $cmdName (${Thread.currentThread().name})")
 
         val startTime = System.currentTimeMillis()
 
@@ -524,7 +529,7 @@ class CliExecutor(
         val output: ProcessOutput = processHandler.runProcess(timeout.toInt())
         val duration = System.currentTimeMillis() - startTime
 
-        log.info("Completed: jj $cmdName in ${duration}ms (exit=${output.exitCode})")
+        log.info("Completed in ${workingDir?.path ?: "."}: jj $cmdName in ${duration}ms (exit=${output.exitCode})")
 
         if (warnOnFailure) {
             output.takeIf { it.exitCode != 0 }

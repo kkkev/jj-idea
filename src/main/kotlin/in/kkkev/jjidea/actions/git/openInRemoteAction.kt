@@ -26,19 +26,19 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
  */
 fun openInRemoteGroup(repo: JujutsuRepository, commitId: CommitId, isPushed: Boolean): DefaultActionGroup =
     object : DefaultActionGroup() {
-        private val remotes by lazy { RemoteUrlBuilder.recognizedRemotes(repo.gitRemotes, commitId.full, isPushed) }
+        private fun remotes() = RemoteUrlBuilder.recognizedRemotes(repo.gitRemotes, commitId.full, isPushed)
 
         override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
         override fun getChildren(e: AnActionEvent?): Array<AnAction> =
-            if (isPushed) remotes.map { commitAction(it) }.toTypedArray() else emptyArray()
+            if (isPushed) remotes().map { commitAction(it) }.toTypedArray() else emptyArray()
 
         override fun update(e: AnActionEvent) {
             if (!isPushed) {
                 e.presentation.isVisible = false
                 return
             }
-            applyRemoteVisibility(e, remotes.size)
+            applyRemoteVisibility(e, remotes().size)
         }
     }
 

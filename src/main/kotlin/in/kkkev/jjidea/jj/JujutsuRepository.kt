@@ -11,7 +11,6 @@ import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.util.concurrency.AppExecutorUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
@@ -21,7 +20,6 @@ import `in`.kkkev.jjidea.util.GitDiffReverseApplier
 import `in`.kkkev.jjidea.vcs.*
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
-import java.util.concurrent.CompletableFuture
 
 /**
  * A (possible) JJ repository. "Possible" because the directory could be uninitialised, as this class allows
@@ -36,7 +34,7 @@ interface JujutsuRepository {
     val logCache: LogCache
     val isInitialised: Boolean
 
-    /** Git remotes for this repository, lazily fetched once per session. */
+    /** Git remotes for this repository. Call from BGT only — may block on first access if not yet loaded. */
     val gitRemotes: List<GitRemote>
 
     fun getLogEntry(revision: Revision): LogEntry
@@ -78,23 +76,14 @@ data class JujutsuRepositoryImpl(
     override val logService: LogService by lazy { CliLogService(this) }
     override val logCache: LogCache by lazy { RepoLogCache(this) }
 
-    private val gitRemotesFuture: CompletableFuture<List<GitRemote>> = CompletableFuture.supplyAsync(
-        {
-            val result = executor.gitRemoteList()
-            if (!result.isSuccess) return@supplyAsync emptyList()
-            result.stdout.lines()
-                .map { it.trim() }
-                .filter { it.isNotEmpty() }
-                .mapNotNull { line ->
-                    val name = line.substringBefore(' ')
-                    val url = line.substringAfter(' ', "").trim()
-                    if (url.isEmpty()) null else GitRemote(name, url)
-                }
-        },
-        AppExecutorUtil.getAppExecutorService()
-    ).exceptionally { emptyList() }
-
-    override val gitRemotes: List<GitRemote> get() = gitRemotesFuture.getNow(emptyList())
+    /**
+     * Git remotes for this repository. Delegates to [JujutsuStateModel.gitRemotes] via
+     * [NotifiableState.immediateValue] — call from BGT only. For non-blocking access (accepting a
+     * possible empty result before the first load completes), read [project.stateModel.gitRemotes]
+     * directly. For notification-driven updates, connect to that state.
+     */
+    override val gitRemotes: List<GitRemote>
+        get() = project.stateModel.gitRemotes.immediateValue[directory.path].orEmpty()
 
     private fun requireInitialised() {
         check(isInitialised) { "Repository at ${directory.path} is not initialized. Use initExecutor for gitInit." }

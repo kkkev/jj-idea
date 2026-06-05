@@ -137,6 +137,31 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         }.associateBy { it.repo.directory.path }
     }
 
+    /**
+     * Git remotes for each initialised repository, keyed by [VirtualFile.path].
+     *
+     * Safe to read from BGT via [JujutsuRepository.gitRemotes] (uses [NotifiableState.immediateValue]).
+     * For EDT callers or notification-driven updates, read [value] or [connect] here directly.
+     */
+    val gitRemotes = notifiableState(project, "Jujutsu Git Remotes", emptyMap()) {
+        initialisedRepositories.immediateValue.values.associate { repo ->
+            val result = repo.commandExecutor.gitRemoteList()
+            val remotes = if (!result.isSuccess) {
+                emptyList()
+            } else {
+                result.stdout.lines()
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
+                    .mapNotNull { line ->
+                        val name = line.substringBefore(' ')
+                        val url = line.substringAfter(' ', "").trim()
+                        if (url.isEmpty()) null else GitRemote(name, url)
+                    }
+            }
+            repo.directory.path to remotes
+        }
+    }
+
     @Deprecated("Use working copies by repo instead")
     val repositoryStates = notifiableState(
         project,
@@ -313,6 +338,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             log.info("Initialized roots changed to ${new.size} roots")
             // Reload repository states now that we have the current roots
             workingCopies.invalidate()
+            gitRemotes.invalidate()
             // Also reload the log
             logRefresh.notify(Unit)
         }

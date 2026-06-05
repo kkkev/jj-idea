@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Diff views for mutable revisions no longer show stale content after the revision is edited: cached file bytes are invalidated on `logRefresh` and re-fetched lazily on next access.
 
 ### Changed
+- Git remote lookup is now backed by `NotifiableState` (consistent with working copy and repository state) instead of a per-repository `CompletableFuture`. Remotes are refreshed whenever the repository set changes, and BGT callers are guaranteed a loaded result via `immediateValue` rather than silently receiving an empty list during startup.
 - Rebase, squash, move-bookmark, and revision-picker dialogs now open without issuing extra `jj log` calls when the main log is already loaded — they reuse the cached commit data instead.
 - The status-bar working-copy switcher resolves bookmark and commit-ID selections from the cache on a cache hit, avoiding an extra `jj log` call per switch.
 
