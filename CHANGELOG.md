@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- "Compare with local" and "Compare before with local" no longer crash with a `VcsException` when the selected file does not exist in the current working copy (`@`). The diff now opens with an "(empty)" local side instead.
+
 ## [0.7.6] - 2026-06-06
 
 ### Fixed

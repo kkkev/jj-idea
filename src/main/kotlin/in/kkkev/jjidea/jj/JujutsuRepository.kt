@@ -51,7 +51,7 @@ interface JujutsuRepository {
 
     fun createDiffSideFor(fileAtVersion: FileAtVersion?): DiffSide
 
-    fun getVirtualFile(fileAtVersion: FileAtVersion): VirtualFile
+    fun getVirtualFile(fileAtVersion: FileAtVersion): VirtualFile?
 
     fun getRelativePath(filePath: FilePath): String
     fun getRelativePath(file: VirtualFile): String
@@ -159,7 +159,7 @@ data class JujutsuRepositoryImpl(
         )?.isWorkingCopy ==
         true
     ) {
-        fileAtVersion.filePath.virtualFile ?: throw VcsException("Cannot find virtual file for $fileAtVersion")
+        fileAtVersion.filePath.virtualFile
     } else {
         JujutsuVirtualFile(fileAtVersion, this)
     }

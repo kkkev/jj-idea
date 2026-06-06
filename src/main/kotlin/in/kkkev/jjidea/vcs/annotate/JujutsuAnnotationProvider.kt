@@ -57,6 +57,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
         // If there is no change, then can just use the parent
         val before = change?.before ?: FileAtVersion(file.filePath, repo.workingCopy.parentContentLocator)
         val beforeFile = repo.getVirtualFile(before)
+            ?: throw VcsException("Cannot find virtual file for $before")
         val beforeRevision = (before.contentLocator as? Revision)
             ?: ((contentLocator as? Revision) ?: WorkingCopy).parent
 
