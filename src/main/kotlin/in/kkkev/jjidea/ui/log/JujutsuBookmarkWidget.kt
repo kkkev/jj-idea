@@ -14,16 +14,26 @@ import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkToChangeAction
 import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
 import `in`.kkkev.jjidea.jj.BookmarkGroup
+import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.grouped
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 
 class JujutsuBookmarkWidget(
-    project: Project,
+    private val project: Project,
     private val logTable: JujutsuLogTable
 ) : JujutsuFilterComponent("Bookmark"), Disposable {
     private var wcEntries: List<LogEntry> = emptyList()
+
+    /**
+     * Bookmarks per repository, sourced from [LogCache.bookmarks] (complete jj bookmark list,
+     * including bookmarks on commits beyond the log limit). Pre-loaded in the background and
+     * refreshed on [logRefresh]; read on the EDT in [createActionGroup].
+     */
+    private var bookmarksByRepo: Map<JujutsuRepository, List<BookmarkItem>> = emptyMap()
 
     init {
         initUi()
@@ -31,6 +41,19 @@ class JujutsuBookmarkWidget(
         project.stateModel.workingCopies.connect(this) { copies ->
             wcEntries = copies.values.toList()
             repaint()
+        }
+        loadBookmarks()
+        project.stateModel.logRefresh.connect(this) { loadBookmarks() }
+    }
+
+    private fun loadBookmarks() {
+        val repos = project.stateModel.initialisedRepositories.value.values.toList()
+        runInBackground {
+            val loaded = repos.associateWith { it.logCache.bookmarks }
+            runLater {
+                bookmarksByRepo = loaded
+                repaint()
+            }
         }
     }
 
@@ -47,29 +70,25 @@ class JujutsuBookmarkWidget(
 
     override fun createActionGroup(): ActionGroup {
         val wcBookmarkNames = wcEntries.flatMap { it.bookmarks.map { b -> b.name.name } }.toSet()
-
-        val repoByBookmark: Map<String, JujutsuRepository> = logTable.logModel.getAllEntries()
-            .flatMap { entry -> entry.bookmarks.map { it.name.name to entry.repo } }
+        val repos = bookmarksByRepo.keys.toList()
+        val repoByBookmark: Map<String, JujutsuRepository> = bookmarksByRepo.entries
+            .flatMap { (repo, items) -> items.map { it.bookmark.name.name to repo } }
             .toMap()
-
-        val allGroups = logTable.logModel.getAllEntries()
-            .flatMap { it.bookmarks }
-            .distinctBy { it.name }
-            .grouped()
-
-        val repos = logTable.logModel.getAllEntries().map { it.repo }.distinct()
+        val allGroups = bookmarksByRepo.values.flatten().map { it.bookmark }.distinctBy { it.name }.grouped()
 
         return if (repos.size <= 1) {
-            val wcEntry = wcEntries.firstOrNull()
             BackgroundActionGroup(
-                *repoActionGroup(repos.firstOrNull(), wcEntry, allGroups, wcBookmarkNames, repoByBookmark)
-                    .toTypedArray()
+                *repoActionGroup(
+                    repos.firstOrNull(),
+                    wcEntries.firstOrNull(),
+                    allGroups,
+                    wcBookmarkNames,
+                    repoByBookmark
+                ).toTypedArray()
             )
         } else {
             val items: List<AnAction> = repos.map { repo ->
-                val repoGroups = allGroups.filter {
-                    repoByBookmark[it.localName] == repo || repoByBookmark[it.remotes.firstOrNull()?.name?.name] == repo
-                }
+                val repoGroups = bookmarksByRepo[repo].orEmpty().map { it.bookmark }.grouped()
                 val wcEntry = wcEntries.firstOrNull { it.repo == repo }
                 DefaultActionGroup(repo.displayName, true).apply {
                     repoActionGroup(repo, wcEntry, repoGroups, wcBookmarkNames, repoByBookmark).forEach(::add)

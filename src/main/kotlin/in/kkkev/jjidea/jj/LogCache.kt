@@ -50,6 +50,14 @@ interface LogCache {
     fun loadContext(id: ChangeId, window: Int = 10): List<LogEntry>
 
     /**
+     * All bookmarks for this repo (`jj bookmark list`), including out-of-limit and deleted,
+     * in jj's listing order. Loads on miss (synchronous I/O).
+     * Always call from a background thread.
+     */
+    @get:RequiresBackgroundThread
+    val bookmarks: List<BookmarkItem>
+
+    /**
      * Populate the cache with freshly fetched entries.
      * Called by data loaders after a `jj log` fetch; general consumers should use [all] or [get].
      * Always call from a background thread.
@@ -77,12 +85,18 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     @Volatile private var orderedIds: List<ChangeId> = emptyList()
     private val orderLock = Any()
 
+    @Volatile private var bookmarkCache: List<BookmarkItem>? = null
+
     init {
         repo.project.messageBus.connect(repo.project as Disposable).subscribe(
             ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED,
             VcsListener { clear() }
         )
     }
+
+    override val bookmarks: List<BookmarkItem>
+        get() = bookmarkCache
+            ?: repo.logService.getBookmarks().getOrNull().orEmpty().also { bookmarkCache = it }
 
     override val all: List<LogEntry>
         get() {
@@ -140,6 +154,7 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         store.clear()
         byCommitId.clear()
         byBookmark.clear()
+        bookmarkCache = null
         synchronized(orderLock) {
             orderedIds = emptyList()
         }

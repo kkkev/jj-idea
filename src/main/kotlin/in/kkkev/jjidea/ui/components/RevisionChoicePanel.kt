@@ -49,12 +49,9 @@ data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, va
 
 internal fun buildRevisionChoices(repo: JujutsuRepository, filter: Filter): List<RevisionChoice> {
     val items = mutableListOf<RevisionChoice>()
-    val bookmarkResult = repo.logService.getBookmarks()
-    if (bookmarkResult.isSuccess) {
-        bookmarkResult.getOrNull().orEmpty()
-            .filter(filter::matches)
-            .mapTo(items, RevisionChoice::Bookmark)
-    }
+    repo.logCache.bookmarks
+        .filter(filter::matches)
+        .mapTo(items, RevisionChoice::Bookmark)
     if (filter.includeLogEntries) {
         repo.logCache.all.filter(filter::matches).take(DEFAULT_LIMIT)
             .mapTo(items, RevisionChoice::Change)
@@ -87,6 +84,10 @@ abstract class RevisionChoicePanel(
     private var popup: JBPopup? = null
     private var immutableChangeIds: Set<String> = emptySet()
     private var allEntries: List<LogEntry> = emptyList()
+
+    // Incremented on every loadData() call; EDT updates that arrive after a newer call was
+    // dispatched are dropped, preventing stale results from overwriting a more recent load.
+    @Volatile private var loadVersion = 0
 
     init {
         add(searchField, BorderLayout.NORTH)
@@ -166,11 +167,13 @@ abstract class RevisionChoicePanel(
     }
 
     fun loadData() {
+        val version = ++loadVersion
         runInBackground {
             val entries = repo.logCache.all
             val items = buildItems(filter)
             val immutable = entries.filter { it.immutable }.map { it.id.full }.toSet()
             runLater {
+                if (version != loadVersion) return@runLater
                 allEntries = entries
                 immutableChangeIds = immutable
                 listModel.clear()
