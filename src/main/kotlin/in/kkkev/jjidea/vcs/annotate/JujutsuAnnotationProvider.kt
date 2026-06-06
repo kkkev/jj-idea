@@ -17,6 +17,7 @@ import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.contentLocator
 import `in`.kkkev.jjidea.vcs.filePath
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 
@@ -76,16 +77,13 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
         return annotateInternal(beforeFile, beforeRevision, repo)
     }
 
-    /**
-     * Annotate a file at a specific revision (used for "Annotate This/Previous Revision").
-     */
+    /** Annotate a file at a specific revision (used for "Annotate This/Previous Revision"). */
     override fun annotate(file: VirtualFile, revision: VcsFileRevision?): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
-        return annotateInternal(
-            file,
-            (revision as? JujutsuFileRevision)?.entry?.id ?: repo.workingCopy.id,
-            repo
-        )
+        val revisionId = (revision as? JujutsuFileRevision)?.entry?.id
+            ?: (revision?.revisionNumber as? ChangeIdRevisionNumber)?.changeId
+            ?: repo.workingCopy.id
+        return annotateInternal(file, revisionId, repo)
     }
 
     override fun isAnnotationValid(rev: VcsFileRevision) = true

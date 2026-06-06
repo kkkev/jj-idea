@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `JujutsuAnnotationProvider.populateCache` no longer logs a spurious "control-flow exception" warning when the annotation preloader task fires after a project has begun disposing. The method now exits early on a disposed project and rethrows `ProcessCanceledException` so the platform can handle the race cleanly.
 - "Compare with local" and "Compare before with local" no longer crash with a `VcsException` when the selected file does not exist in the current working copy (`@`). The diff now opens with an "(empty)" local side instead.
 - `⌘D` / `Ctrl+D` in editor tabs no longer hijacks the Duplicate Line shortcut. `Jujutsu.ShowChangesDiff` now only activates on keyboard shortcut when there is an actual change or log selection in context; context-menu invocations are unaffected. The action promoter likewise only promotes the action over the built-in `Compare.SameVersion` when VCS or log data is present.
+- "Annotate Previous Revision" from the annotation gutter no longer shows a line-count mismatch warning. Previously the provider failed to recognise the revision type returned by `FileAnnotation.getRevisions()` and silently annotated at the working copy instead of the requested historical revision.
 
 ## [0.7.6] - 2026-06-06
 
