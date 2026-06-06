@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-06-06
+
 ### Fixed
 - `JujutsuVirtualFile.contentsToByteArray()` no longer calls `jj file show` while a ReadAction lock is held, eliminating the threading violation and potential UI freeze. When the platform requests content under read access with a cold cache, the call returns an empty array immediately and launches a background load; once that load completes it fires a VFS `contentsChanged` event so any open editor reloads automatically with the real content.
 
@@ -552,7 +554,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.5...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.6...HEAD
+[0.7.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.6
 [0.7.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.5
 [0.7.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.4
 [0.7.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.3
