@@ -47,11 +47,24 @@ class JujutsuVirtualFileTest {
         return Pair(repo, contentRevision)
     }
 
+    /** Convenience: create a [JujutsuVirtualFile] with test-safe defaults (no real Application needed). */
+    private fun makeFile(
+        repo: JujutsuRepository,
+        readAccessAllowed: () -> Boolean = { false },
+        backgroundExecutor: (Runnable) -> Unit = { /* no-op: tests control threading explicitly */ }
+    ) = JujutsuVirtualFile(
+        FileAtVersion(mockFilePath(), contentLocator),
+        repo,
+        isReadAccessAllowed = readAccessAllowed,
+        backgroundExecutor = backgroundExecutor
+    )
+
+    /** Background path (no read access held): should fetch and cache synchronously. */
     @Test
     fun `immutable revision caches content and never re-fetches`() {
         val logEntry = mockk<LogEntry>().also { every { it.immutable } returns true }
         val (repo, contentRevision) = mockRepo(logEntry)
-        val file = JujutsuVirtualFile(FileAtVersion(mockFilePath(), contentLocator), repo)
+        val file = makeFile(repo)
 
         file.contentsToByteArray() shouldBe "a".toByteArray()
         file.contentsToByteArray() shouldBe "a".toByteArray()
@@ -65,7 +78,7 @@ class JujutsuVirtualFileTest {
         val (repo) = mockRepo(logEntry)
         val project = repo.project
         val registry = project.getService(MutableContentRegistry::class.java)
-        val file = JujutsuVirtualFile(FileAtVersion(mockFilePath(), contentLocator), repo)
+        val file = makeFile(repo)
 
         verify(exactly = 0) { registry.register(file) }
     }
@@ -74,7 +87,7 @@ class JujutsuVirtualFileTest {
     fun `mutable revision cache invalidates and re-fetches on next access`() {
         val logEntry = mockk<LogEntry>().also { every { it.immutable } returns false }
         val (repo) = mockRepo(logEntry)
-        val file = JujutsuVirtualFile(FileAtVersion(mockFilePath(), contentLocator), repo)
+        val file = makeFile(repo)
 
         file.contentsToByteArray() shouldBe "a".toByteArray()
         file.invalidateContent()
@@ -87,7 +100,7 @@ class JujutsuVirtualFileTest {
         val (repo) = mockRepo(logEntry)
         val project = repo.project
         val registry = project.getService(MutableContentRegistry::class.java)
-        val file = JujutsuVirtualFile(FileAtVersion(mockFilePath(), contentLocator), repo)
+        val file = makeFile(repo)
 
         verify(exactly = 1) { registry.register(file) }
     }
@@ -95,7 +108,7 @@ class JujutsuVirtualFileTest {
     @Test
     fun `null log entry treated as mutable and invalidates on request`() {
         val (repo) = mockRepo(logEntry = null)
-        val file = JujutsuVirtualFile(FileAtVersion(mockFilePath(), contentLocator), repo)
+        val file = makeFile(repo)
 
         file.contentsToByteArray() shouldBe "a".toByteArray()
         file.invalidateContent()
@@ -107,8 +120,40 @@ class JujutsuVirtualFileTest {
         val (repo) = mockRepo(logEntry = null)
         val project = repo.project
         val registry = project.getService(MutableContentRegistry::class.java)
-        val file = JujutsuVirtualFile(FileAtVersion(mockFilePath(), contentLocator), repo)
+        val file = makeFile(repo)
 
         verify(exactly = 1) { registry.register(file) }
+    }
+
+    /** Guard path (read access held, cache cold): must NOT call the CLI; must return empty immediately. */
+    @Test
+    fun `cold read under read access does not fetch and returns empty`() {
+        val logEntry = mockk<LogEntry>().also { every { it.immutable } returns true }
+        val (repo, contentRevision) = mockRepo(logEntry)
+        val file = makeFile(repo, readAccessAllowed = { true })
+
+        val result = file.contentsToByteArray()
+
+        result shouldBe byteArrayOf()
+        verify(exactly = 0) { contentRevision.content }
+    }
+
+    /** Guard path (read access held, cache warm): must return cached content without re-fetching. */
+    @Test
+    fun `warm read under read access returns cached content without fetching`() {
+        val logEntry = mockk<LogEntry>().also { every { it.immutable } returns true }
+        val (repo, contentRevision) = mockRepo(logEntry)
+        var readAccessAllowed = false
+        val file = makeFile(repo, readAccessAllowed = { readAccessAllowed })
+
+        // Pre-warm on background thread (read access not held)
+        file.contentsToByteArray() shouldBe "a".toByteArray()
+        verify(exactly = 1) { contentRevision.content }
+
+        // Simulate read access held — should hit cache, not re-fetch
+        readAccessAllowed = true
+        file.contentsToByteArray() shouldBe "a".toByteArray()
+
+        verify(exactly = 1) { contentRevision.content } // still just 1 call
     }
 }
