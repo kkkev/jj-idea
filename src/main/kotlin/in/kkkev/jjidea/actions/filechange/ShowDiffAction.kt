@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.actions.filechange
 import com.intellij.diff.DiffManager
 import com.intellij.diff.tools.util.DiffDataKeys
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
@@ -45,6 +46,12 @@ class ShowDiffAction :
     }
 
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = e.changes.isNotEmpty() || e.repoForFile != null || e.logEntry != null
+        val hasChanges = e.changes.isNotEmpty()
+        val hasLogEntry = e.logEntry != null
+        val hasRepo = e.repoForFile != null
+        e.presentation.isEnabledAndVisible =
+            hasChanges ||
+            hasLogEntry ||
+            (hasRepo && e.place != ActionPlaces.KEYBOARD_SHORTCUT)
     }
 }

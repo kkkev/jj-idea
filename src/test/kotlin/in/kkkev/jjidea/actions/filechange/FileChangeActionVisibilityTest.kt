@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.actions.filechange
 
+import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.Presentation
@@ -11,6 +12,7 @@ import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.file.CompareFileWithBranchAction
 import `in`.kkkev.jjidea.actions.file.RestoreSelectionAction
+import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.GitRemote
@@ -20,6 +22,9 @@ import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkAll
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -303,6 +308,67 @@ class FileChangeActionVisibilityTest {
             withChanges(historicalChange("Main.kt"))
             ShowDiffAction().update(event)
             presentation.isEnabledAndVisible shouldBe true
+        }
+
+        @Test
+        fun `visible when log entry is present`() {
+            withLogEntry(historicalEntry())
+            ShowDiffAction().update(event)
+            presentation.isEnabledAndVisible shouldBe true
+        }
+
+        @Nested
+        inner class `keyboard shortcut place` {
+            @BeforeEach
+            fun setupPlace() {
+                every { event.place } returns ActionPlaces.KEYBOARD_SHORTCUT
+                mockkStatic("in.kkkev.jjidea.actions.ActionEventExtensionsKt")
+            }
+
+            @AfterEach
+            fun teardown() = unmockkAll()
+
+            @Test
+            fun `disabled when only repo in context (no changes, no log entry)`() {
+                every { event.repoForFile } returns repo
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe false
+            }
+
+            @Test
+            fun `enabled when changes are present`() {
+                every { event.repoForFile } returns repo
+                withChanges(historicalChange("Main.kt"))
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
+
+            @Test
+            fun `enabled when log entry is present`() {
+                every { event.repoForFile } returns repo
+                withLogEntry(historicalEntry())
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
+        }
+
+        @Nested
+        inner class `non-keyboard place` {
+            @BeforeEach
+            fun setupPlace() {
+                every { event.place } returns ActionPlaces.EDITOR_POPUP
+                mockkStatic("in.kkkev.jjidea.actions.ActionEventExtensionsKt")
+            }
+
+            @AfterEach
+            fun teardown() = unmockkAll()
+
+            @Test
+            fun `enabled when only repo in context (context menu)`() {
+                every { event.repoForFile } returns repo
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
         }
     }
 
