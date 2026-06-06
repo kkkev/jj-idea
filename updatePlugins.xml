@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.4/jj-idea-0.7.4.zip" version="0.7.4">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.5/jj-idea-0.7.5.zip" version="0.7.5">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,17 +23,22 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.4</h3>
+      <h3>0.7.5</h3>
       
 <h4>Added</h4>
-<li>Cmd+D / Ctrl+D on a selected log entry now opens the native diff preview — the same embedded tree+diff view you get by double-clicking a file in the commit details panel, with directory grouping and a `"abc1234: FileName.kt"` tab title. The action is also available in the log table's right-click context menu. "Open in New Tab" opens a standalone chain-viewer tab and likewise now works from a selected log entry.</li>
+<li>Navigating to a commit that is outside the configured log limit (e.g. clicking a parent change ID in the details panel or an annotation line) now expands the log to show a context window around the target commit and selects it. In multi-repository projects, each repo's expansion accumulates additively — expanding a commit in repo A then repo B shows both context windows together. Clicking the Refresh toolbar button returns the log to the configured limit view.</li>
 
 <h4>Fixed</h4>
-<li>Toggling Description, Change ID, Status, or Decorations in the Columns menu now correctly shows or hides that content in the log view, rather than adding a duplicate column.</li>
-<li>Copied files are no longer shown as merge conflicts in the working copy panel. They now appear as rename-style entries (source → destination) and are correctly shown in commit history.</li>
-<li>Split, Rebase, Squash Into, and Squash From dialogs no longer silently fail when the relevant changes are not currently visible in the log (e.g. outside the display limit or filtered by the active revset). The Split preview graph now also appears when Split is opened from the Changes view.</li>
-<li>Squash Into, Squash From, and Rebase destination/source pickers now populate immediately when the dialog opens.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.4">full release notes</a> for details.</p>
+<li>Working copy changes no longer require a manual refresh to appear on startup. Two fixes: (1) the change provider skips `jj status` until the working copy state is loaded (eliminating a wasted invocation), and (2) the working copy panel now reads from the `ChangeListManager` cache when it connects to `workingCopies`, so changes are visible immediately even if the panel was created after the initial VCS scan completed.</li>
+<li>Fixed a memory leak reported on IDE shutdown: `JujutsuCommitDetailsPanel` was registered in the Disposer tree under `ROOT_DISPOSABLE` instead of its owning panel, causing a `RuntimeException` on quit.</li>
+<li>Diff views for mutable revisions no longer show stale content after the revision is edited: cached file bytes are invalidated on `logRefresh` and re-fetched lazily on next access.</li>
+
+<h4>Changed</h4>
+<li>Git remote lookup is now backed by `NotifiableState` (consistent with working copy and repository state) instead of a per-repository `CompletableFuture`. Remotes are refreshed whenever the repository set changes, and BGT callers are guaranteed a loaded result via `immediateValue` rather than silently receiving an empty list during startup.</li>
+<li>Rebase, squash, move-bookmark, and revision-picker dialogs now open without issuing extra `jj log` calls when the main log is already loaded — they reuse the cached commit data instead.</li>
+<li>Single-revision lookups via `getLogEntry` now route through the in-memory `LogCache` for `ChangeId`, `CommitId`, and `BookmarkName` targets, falling back to a targeted `jj log -r` shell-out only on a cache miss or unknown revision type. Removed the dead `repositoryStates` state (superseded by `workingCopies`) and eliminated the redundant `jj log` fetch fired when the working-copy panel binds to a repository (the cached working copy entry from `workingCopies` is already applied by the `boundRepository` setter).</li>
+<li>The status-bar working-copy switcher resolves bookmark and commit-ID selections from the cache on a cache hit, avoiding an extra `jj log` call per switch.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.5">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
