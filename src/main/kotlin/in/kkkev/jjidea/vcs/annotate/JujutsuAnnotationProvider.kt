@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.vcs.annotate
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.annotate.AnnotationProvider
@@ -29,8 +30,11 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
     private val cache = mutableMapOf<VirtualFile, FileAnnotation>()
 
     override fun populateCache(file: VirtualFile) {
+        if (project.isDisposed) return
         try {
             cache[file] = annotate(file)
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             log.warn("Failed to populate annotation cache for ${file.path}", e)
         }
