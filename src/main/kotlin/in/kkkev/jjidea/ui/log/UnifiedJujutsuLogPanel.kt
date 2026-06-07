@@ -53,6 +53,15 @@ class UnifiedJujutsuLogPanel(project: Project) :
             if (rev is ChangeId) (dataLoader as UnifiedJujutsuLogDataLoader).loadExpanding(key.repo, rev)
         }
 
+        referenceFilterComponent.onReferenceExpansionNeeded = { referenceName ->
+            project.stateModel.references.value.forEach { (repo, references) ->
+                val changeId =
+                    references.bookmarks.firstOrNull { it.bookmark.name.name == referenceName }?.id
+                        ?: references.tags.firstOrNull { it.tag.name == referenceName }?.id
+                changeId?.let { (dataLoader as UnifiedJujutsuLogDataLoader).loadExpanding(repo, it) }
+            }
+        }
+
         log.info("UnifiedJujutsuLogPanel initialized for project: ${project.name}")
     }
 
@@ -66,15 +75,13 @@ class UnifiedJujutsuLogPanel(project: Project) :
         }
     }
 
-    override fun onDataLoaded(data: UnifiedJujutsuLogDataLoader.Data) {
-        logTable.setEntries(data.entries)
-        logTable.updateGraph(data.graphNodes)
+    override fun onDataLoaded(newData: UnifiedJujutsuLogDataLoader.Data) {
+        logTable.setEntries(newData.entries)
+        logTable.updateGraph(newData.graphNodes)
         updateRootFilterVisibility()
-        updateStatusBar(data.entries.size, data.limit)
-        // Refresh detail panel with the (possibly updated) selected entry.
-        // fireTableDataChanged() doesn't change the selection, so the ListSelectionListener
-        // won't fire — but the entry data may have changed (e.g., empty flag, file changes).
+        updateStatusBar(newData.entries.size, newData.limit)
         detailsPanel.showCommits(logTable.selectedEntries)
+        referenceFilterComponent.retryFilter()
     }
 
     /**
@@ -110,7 +117,7 @@ class UnifiedJujutsuLogPanel(project: Project) :
         filterPanel.add(Box.createHorizontalStrut(5))
 
         // Bookmark widget
-        val widget = JujutsuBookmarkWidget(project, logTable)
+        val widget = JujutsuBookmarkWidget(project)
         Disposer.register(this, widget)
         filterPanel.add(widget)
         filterPanel.add(Box.createHorizontalStrut(5))

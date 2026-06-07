@@ -7,31 +7,15 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
-import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.deleteBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.forgetBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkToChangeAction
-import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
-import `in`.kkkev.jjidea.jj.BookmarkGroup
-import `in`.kkkev.jjidea.jj.BookmarkItem
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.grouped
-import `in`.kkkev.jjidea.jj.stateModel
-import `in`.kkkev.jjidea.util.runInBackground
-import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.actions.bookmark.*
+import `in`.kkkev.jjidea.jj.*
 
-class JujutsuBookmarkWidget(
-    private val project: Project,
-    private val logTable: JujutsuLogTable
-) : JujutsuFilterComponent("Bookmark"), Disposable {
+class JujutsuBookmarkWidget(project: Project) : JujutsuFilterComponent("Bookmark"), Disposable {
     private var wcEntries: List<LogEntry> = emptyList()
 
     /**
-     * Bookmarks per repository, sourced from [LogCache.bookmarks] (complete jj bookmark list,
-     * including bookmarks on commits beyond the log limit). Pre-loaded in the background and
-     * refreshed on [logRefresh]; read on the EDT in [createActionGroup].
+     * Bookmarks per repository — sourced from [in.kkkev.jjidea.jj.JujutsuStateModel.references] and kept current via
+     * subscription.
      */
     private var bookmarksByRepo: Map<JujutsuRepository, List<BookmarkItem>> = emptyMap()
 
@@ -42,18 +26,10 @@ class JujutsuBookmarkWidget(
             wcEntries = copies.values.toList()
             repaint()
         }
-        loadBookmarks()
-        project.stateModel.logRefresh.connect(this) { loadBookmarks() }
-    }
-
-    private fun loadBookmarks() {
-        val repos = project.stateModel.initialisedRepositories.value.values.toList()
-        runInBackground {
-            val loaded = repos.associateWith { it.logCache.bookmarks }
-            runLater {
-                bookmarksByRepo = loaded
-                repaint()
-            }
+        bookmarksByRepo = project.stateModel.references.value.mapValues { it.value.bookmarks }
+        project.stateModel.references.connect(this) { references ->
+            bookmarksByRepo = references.mapValues { it.value.bookmarks }
+            repaint()
         }
     }
 

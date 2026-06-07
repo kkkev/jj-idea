@@ -11,7 +11,9 @@ import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RepositoryReferences
 import `in`.kkkev.jjidea.jj.TagItem
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -54,12 +56,9 @@ data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, va
 
 internal fun buildRevisionChoices(repo: JujutsuRepository, filter: Filter): List<RevisionChoice> {
     val items = mutableListOf<RevisionChoice>()
-    repo.logCache.bookmarks
-        .filter(filter::matches)
-        .mapTo(items, RevisionChoice::Ref)
-    repo.logCache.tags
-        .filter(filter::matches)
-        .mapTo(items, RevisionChoice::Ref)
+    val references = repo.project.stateModel.references.value[repo] ?: RepositoryReferences()
+    references.bookmarks.filter(filter::matches).mapTo(items, RevisionChoice::Ref)
+    references.tags.filter(filter::matches).mapTo(items, RevisionChoice::Ref)
     if (filter.includeLogEntries) {
         repo.logCache.all.filter(filter::matches).take(DEFAULT_LIMIT)
             .mapTo(items, RevisionChoice::Change)

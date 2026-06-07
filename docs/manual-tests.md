@@ -217,15 +217,29 @@ Open `/tmp/jj-squash-test` in the plugin IDE.
 - [ ] Clear filters (X button) resets all filters
 - [ ] Filters combine correctly (AND logic)
 
+### Reference Filter (bookmark/tag dropdown)
+
+Use a repo where the log limit is **smaller** than total history, with at least one bookmark and
+one tag pointing at commits **beyond** the limit. The stress-test repo at limit 100 works: `main`
+and the `release-*` bookmarks/tags sit deep in history, and `main`'s ancestry is immutable.
+
+- [ ] Dropdown lists **all** local bookmarks, not only those on loaded log rows
+- [ ] Dropdown lists **all** tags (with the tag icon), including tags beyond the log limit
+- [ ] Creating/deleting a bookmark or tag in the terminal updates the dropdown after the auto-refresh (~300 ms) — without clicking Refresh or saving a file (external jj ops are detected via the op-heads watch)
+- [ ] Selecting a reference that **is** on a loaded row filters the log to that commit and its ancestors
+- [ ] Selecting a reference whose target is **outside** the log limit expands the log to a context window around that commit, then applies the ancestor filter (no silent empty result)
+- [ ] Selecting "@" (working copy) filters to the working copy and its ancestors
+- [ ] Clearing the filter restores the full (limited) log
+
 ### Bookmark Widget
 
 #### Single-repo project
 
 - [ ] "Bookmark: \<name\>" label appears in the log toolbar to the left of the Reference filter when @ has a local bookmark
 - [ ] Label shows "Bookmark:" with nothing after it when @ has no local bookmarks (no placeholder text)
-- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal, save any file, label changes to "Bookmark: foo" without restarting
+- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "Bookmark: foo" within ~300 ms, without saving a file or restarting (external jj ops detected via the op-heads watch)
 - [ ] Click the widget — dropdown opens with "Create Bookmark Here…" at the top
-- [ ] Dropdown lists all local bookmarks in the repo (not just those on @), each as a sub-menu
+- [ ] Dropdown lists all local bookmarks in the repo (not just those on @, and including bookmarks beyond the log limit), each as a sub-menu
 - [ ] For a bookmark **on @**: sub-menu contains Rename…, Delete, Forget (no Move Here)
 - [ ] For a bookmark **not on @**: sub-menu contains Move…, Rename…, Delete, Forget
 - [ ] Remote bookmarks (e.g. `master@origin`) are folded into the corresponding local bookmark's sub-menu as Track/Untrack, not shown as separate top-level items
@@ -255,6 +269,7 @@ Open `/tmp/jj-squash-test` in the plugin IDE.
 
 - [ ] Log refreshes when files change in working copy
 - [ ] Log refreshes after VCS operations (describe, new, edit)
+- [ ] Log refreshes after an **external** jj operation run in a terminal (e.g. `jj new`, `jj bookmark create`) within ~300 ms, without saving a file (op-heads watch)
 - [ ] Working copy (@) selection maintained after refresh
 - [ ] No flickering during refresh
 

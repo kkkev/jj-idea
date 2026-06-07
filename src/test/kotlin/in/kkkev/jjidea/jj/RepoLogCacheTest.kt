@@ -181,46 +181,6 @@ class RepoLogCacheTest {
         }
     }
 
-    // ─── bookmarks cache ─────────────────────────────────────────────────────
-
-    private fun bookmarkItem(name: String, id: String? = null) =
-        BookmarkItem(Bookmark(name, tracked = true), id?.let { ChangeId(it, it, null) })
-
-    @Test
-    fun `bookmarks loads from logService on cold cache and caches result`() {
-        val items = listOf(bookmarkItem("main", "aaa"), bookmarkItem("dev", "bbb"))
-        every { logService.getBookmarks() } returns Result.success(items)
-
-        cache.bookmarks shouldBe items
-        // second call served from cache
-        cache.bookmarks shouldBe items
-        verify(exactly = 1) { logService.getBookmarks() }
-    }
-
-    @Test
-    fun `bookmarks returns empty list when logService fails`() {
-        every { logService.getBookmarks() } returns Result.failure(RuntimeException("jj error"))
-
-        cache.bookmarks shouldBe emptyList()
-    }
-
-    @Test
-    fun `clear evicts bookmarks cache so next access reloads from logService`() {
-        val before = listOf(bookmarkItem("main", "aaa"))
-        val after = listOf(bookmarkItem("main", "bbb"), bookmarkItem("dev", "ccc"))
-        every { logService.getBookmarks() } returnsMany listOf(
-            Result.success(before),
-            Result.success(after)
-        )
-
-        cache.bookmarks shouldBe before
-
-        cache.clear()
-
-        cache.bookmarks shouldBe after
-        verify(exactly = 2) { logService.getBookmarks() }
-    }
-
     // ─── ordering / deduplication ─────────────────────────────────────────────
 
     @Test

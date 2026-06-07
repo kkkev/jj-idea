@@ -41,6 +41,8 @@ abstract class CommitTablePanel<D>(
 
     val dataLoader = dataLoaderFactory.invoke(this)
 
+    lateinit var referenceFilterComponent: JujutsuReferenceFilterComponent
+
     // Details panel showing selected commit info
     val detailsPanel = JujutsuCommitDetailsPanel(project)
 
@@ -191,12 +193,13 @@ abstract class CommitTablePanel<D>(
         createOtherFilterComponents(this)
 
         // Reference filter (bookmarks, tags, @)
-        add(
-            JujutsuReferenceFilterComponent(logTable.logModel).apply {
+        referenceFilterComponent =
+            JujutsuReferenceFilterComponent(logTable.logModel, project, this@CommitTablePanel).apply {
                 initUi()
                 initialize()
             }
-        )
+        Disposer.register(this@CommitTablePanel, referenceFilterComponent)
+        add(referenceFilterComponent)
         add(Box.createHorizontalStrut(5))
 
         // Author filter
