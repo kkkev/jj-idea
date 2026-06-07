@@ -52,4 +52,10 @@ interface LogService {
      * @return List of bookmarks with their associated change IDs
      */
     fun getBookmarks(): Result<List<BookmarkItem>>
+
+    /**
+     * Get all tags in the repository
+     * @return List of tags with their associated change IDs
+     */
+    fun getTags(): Result<List<TagItem>>
 }

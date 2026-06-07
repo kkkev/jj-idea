@@ -1,0 +1,7 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .accent { stroke: #20a070 }
+  </style>
+  <path d="M2.5 2.5 H8.5 L13.5 7.5 L8.5 13.5 L2.5 8.5 Z" class="accent" stroke-linejoin="round"/>
+  <circle cx="6" cy="6" r="1.2" class="accent"/>
+</svg>

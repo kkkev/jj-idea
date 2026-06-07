@@ -73,6 +73,19 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         )
     )
 
+    override fun tagList(template: String?) = toResult(
+        stub.run(
+            *buildList {
+                add("tag")
+                add("list")
+                if (template != null) {
+                    add("-T")
+                    add(template)
+                }
+            }.toTypedArray()
+        )
+    )
+
     override fun annotate(
         file: VirtualFile,
         revision: Revision,

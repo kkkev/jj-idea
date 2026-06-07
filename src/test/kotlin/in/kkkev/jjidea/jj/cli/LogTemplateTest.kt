@@ -5,6 +5,7 @@ import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.mockRepo
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -26,8 +27,9 @@ class LogTemplateTest {
             "qpvuntsm~q~3",
             "abc123def456~ab",
             "Add new feature",
-            "",
-            "",
+            "", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "false",
             "false",
@@ -55,8 +57,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Feature work",
-            "main;true;false;0;0,feature;true;false;0;0",
-            "",
+            "main;true;false;0;0,feature;true;false;0;0", // bookmarks
+            "", // tags
+            "", // parents
             "true",
             "false",
             "false",
@@ -77,8 +80,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Merge commit",
-            "",
-            "plkvukqt~p~|bcd123~bc,rlvkpnrz~rl~34|cde234~cde",
+            "", // bookmarks
+            "", // tags
+            "plkvukqt~p~|bcd123~bc,rlvkpnrz~rl~34|cde234~cde", // parents
             "false",
             "false",
             "false",
@@ -99,8 +103,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "First line\nSecond line\nThird line",
-            "",
-            "",
+            "", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "false",
             "false",
@@ -119,8 +124,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "",
-            "",
-            "",
+            "", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "false",
             "true",
@@ -140,8 +146,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~abc",
             "", // Empty description
-            "",
-            "",
+            "", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "false",
             "false", // Not empty
@@ -162,8 +169,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Conflicted change",
-            "",
-            "",
+            "", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "true",
             "false",
@@ -182,8 +190,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Add new feature",
-            "",
-            "",
+            "", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "false",
             "false",
@@ -216,8 +225,9 @@ class LogTemplateTest {
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Cherry-picked commit",
-            "",
-            "",
+            "", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "false",
             "false",
@@ -242,13 +252,56 @@ class LogTemplateTest {
     }
 
     @Test
+    fun `basicLogTemplate parses entry with tags`() {
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Tagged release",
+            "", // bookmarks
+            "v1.0,v1.0-rc1", // tags
+            "", // parents
+            "false",
+            "false",
+            "false",
+            "false",
+            "false"
+        )
+
+        val entry = basicLogTemplate.take(fields.iterator())
+
+        entry.tags shouldBe listOf(Tag("v1.0"), Tag("v1.0-rc1"))
+    }
+
+    @Test
+    fun `basicLogTemplate parses entry with empty tags`() {
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "No tags",
+            "", // bookmarks
+            "", // tags (empty)
+            "", // parents
+            "false",
+            "false",
+            "false",
+            "false",
+            "false"
+        )
+
+        val entry = basicLogTemplate.take(fields.iterator())
+
+        entry.tags.shouldBeEmpty()
+    }
+
+    @Test
     fun `basicLogTemplate parses bookmark conflict and ahead-behind counts`() {
         val fields = listOf(
             "qpvuntsm~q~",
             "abc123def456~ab",
             "Feature work",
-            "main;true;false;0;0,feature@origin;true;true;3;1",
-            "",
+            "main;true;false;0;0,feature@origin;true;true;3;1", // bookmarks
+            "", // tags
+            "", // parents
             "false",
             "false",
             "false",
@@ -268,6 +321,25 @@ class LogTemplateTest {
         remote.aheadCount shouldBe 3
         remote.behindCount shouldBe 1
         remote.isDiverged shouldBe true
+    }
+
+    private val tagListTemplate = cliLogService.logTemplates.tagListTemplate
+
+    @Test
+    fun `tagListTemplate parses tag`() {
+        val fields = listOf("v1.0")
+        val item = tagListTemplate.take(fields.iterator())
+
+        item!!.tag shouldBe Tag("v1.0")
+        item.id shouldBe null
+    }
+
+    @Test
+    fun `tagListTemplate returns null for empty name`() {
+        val fields = listOf("")
+        val item = tagListTemplate.take(fields.iterator())
+
+        item shouldBe null
     }
 
     private val bookmarkListTemplate = cliLogService.logTemplates.bookmarkListTemplate

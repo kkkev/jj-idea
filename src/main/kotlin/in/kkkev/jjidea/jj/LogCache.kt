@@ -41,6 +41,15 @@ interface LogCache {
     operator fun get(name: BookmarkName): LogEntry?
 
     /**
+     * Name-based lookup for any [Ref] (bookmark, tag, or other named ref).
+     * Bookmarks hit the in-memory fast-path; other refs fall back to `jj log -r <name>`.
+     * Returns null only if the ref does not resolve to a known revision.
+     * Always call from a background thread.
+     */
+    @RequiresBackgroundThread
+    operator fun get(ref: Ref): LogEntry?
+
+    /**
      * Fetch a context window around [id]: `ancestors(id, window) | id | descendants(id, window)`.
      * Stores all returned entries in the cache as a side effect (same fetch-and-store pattern as [all]).
      * Returns an empty list if [id] does not exist in the repository.
@@ -56,6 +65,14 @@ interface LogCache {
      */
     @get:RequiresBackgroundThread
     val bookmarks: List<BookmarkItem>
+
+    /**
+     * All tags for this repo (`jj tag list`), in jj's listing order.
+     * Loads on miss (synchronous I/O).
+     * Always call from a background thread.
+     */
+    @get:RequiresBackgroundThread
+    val tags: List<TagItem>
 
     /**
      * Populate the cache with freshly fetched entries.
@@ -87,6 +104,8 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
 
     @Volatile private var bookmarkCache: List<BookmarkItem>? = null
 
+    @Volatile private var tagCache: List<TagItem>? = null
+
     init {
         repo.project.messageBus.connect(repo.project as Disposable).subscribe(
             ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED,
@@ -97,6 +116,10 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     override val bookmarks: List<BookmarkItem>
         get() = bookmarkCache
             ?: repo.logService.getBookmarks().getOrNull().orEmpty().also { bookmarkCache = it }
+
+    override val tags: List<TagItem>
+        get() = tagCache
+            ?: repo.logService.getTags().getOrNull().orEmpty().also { tagCache = it }
 
     override val all: List<LogEntry>
         get() {
@@ -121,6 +144,11 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     override operator fun get(name: BookmarkName): LogEntry? =
         byBookmark[name]?.let { store[it] }
             ?: repo.logService.getLogBasic(revset = name).getOrNull()?.firstOrNull()
+                ?.also { store(listOf(it)) }
+
+    override operator fun get(ref: Ref): LogEntry? =
+        (ref as? BookmarkName)?.let { byBookmark[it]?.let { id -> store[id] } }
+            ?: repo.logService.getLogBasic(revset = ref).getOrNull()?.firstOrNull()
                 ?.also { store(listOf(it)) }
 
     override fun loadContext(id: ChangeId, window: Int): List<LogEntry> {
@@ -155,6 +183,7 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         byCommitId.clear()
         byBookmark.clear()
         bookmarkCache = null
+        tagCache = null
         synchronized(orderLock) {
             orderedIds = emptyList()
         }

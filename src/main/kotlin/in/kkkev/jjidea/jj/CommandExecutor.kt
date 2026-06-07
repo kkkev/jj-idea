@@ -130,6 +130,13 @@ interface CommandExecutor {
     fun annotate(file: VirtualFile, revision: Revision = WorkingCopy, template: String? = null): CommandResult
 
     /**
+     * List all tags in the repository
+     * @param template Optional template for output formatting
+     * @return Command result with tag list
+     */
+    fun tagList(template: String? = null): CommandResult
+
+    /**
      * List all bookmarks in the repository
      * @param template Optional template for output formatting
      * @return Command result with bookmark list

@@ -251,6 +251,7 @@ fun TextCanvas.appendSummary(entry: LogEntry) {
     append(")\n")
 
     appendBookmarks(entry, "\n")
+    appendTags(entry, "\n")
 }
 
 /** Append the description summary and "(empty)" indicator for a log entry. */
@@ -285,6 +286,23 @@ fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
     if (suffix.isNotEmpty()) append(suffix)
 }
 
+fun TextCanvas.append(tag: Tag) = colored(JujutsuColors.TAG) {
+    smaller {
+        append(icon(JujutsuIcons::Tag))
+        append(tag.name)
+    }
+}
+
+fun TextCanvas.appendTags(entry: LogEntry, suffix: String = "") {
+    var first = true
+    for (tag in entry.tags) {
+        if (!first) append(" ")
+        first = false
+        append(tag)
+    }
+    if (entry.tags.isNotEmpty() && suffix.isNotEmpty()) append(suffix)
+}
+
 fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     if (entry.parentIds.isNotEmpty()) {
         append(message("details.parents.label"))
@@ -294,10 +312,15 @@ fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     }
 }
 
+fun TextCanvas.append(item: RefItem) = when (item) {
+    is BookmarkItem -> append(item.bookmark)
+    is TagItem -> append(item.tag)
+}
+
 fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyList()) {
     when (choice) {
-        is RevisionChoice.Bookmark -> {
-            append(choice.item.bookmark)
+        is RevisionChoice.Ref -> {
+            append(choice.item)
             val entry = choice.item.id?.let { id -> entries.find { it.id == id } }
             if (entry != null) {
                 append(" ")

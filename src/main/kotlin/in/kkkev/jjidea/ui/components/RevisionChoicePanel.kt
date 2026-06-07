@@ -8,8 +8,10 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.BookmarkItem
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.TagItem
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -27,14 +29,17 @@ import javax.swing.event.DocumentEvent
 private const val DEFAULT_LIMIT = 10
 
 data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, val query: String = "") {
+    private fun matchesQuery(name: String, id: ChangeId?) =
+        query.isEmpty() ||
+            name.contains(query, ignoreCase = true) ||
+            id?.full?.contains(query, ignoreCase = true) == true ||
+            id?.short?.contains(query, ignoreCase = true) == true
+
     fun matches(bookmark: BookmarkItem) = !bookmark.bookmark.deleted &&
         (!bookmark.bookmark.isRemote || includeRemote) &&
-        (
-            query.isEmpty() ||
-                bookmark.bookmark.name.name.contains(query, ignoreCase = true) ||
-                bookmark.id?.full?.contains(query, ignoreCase = true) == true ||
-                bookmark.id?.short?.contains(query, ignoreCase = true) == true
-        )
+        matchesQuery(bookmark.bookmark.name.name, bookmark.id)
+
+    fun matches(tag: TagItem) = matchesQuery(tag.tag.name, tag.id)
 
     fun matches(entry: LogEntry) = includeLogEntries &&
         (
@@ -51,7 +56,10 @@ internal fun buildRevisionChoices(repo: JujutsuRepository, filter: Filter): List
     val items = mutableListOf<RevisionChoice>()
     repo.logCache.bookmarks
         .filter(filter::matches)
-        .mapTo(items, RevisionChoice::Bookmark)
+        .mapTo(items, RevisionChoice::Ref)
+    repo.logCache.tags
+        .filter(filter::matches)
+        .mapTo(items, RevisionChoice::Ref)
     if (filter.includeLogEntries) {
         repo.logCache.all.filter(filter::matches).take(DEFAULT_LIMIT)
             .mapTo(items, RevisionChoice::Change)
@@ -152,8 +160,8 @@ abstract class RevisionChoicePanel(
             append("\n")
             appendSummary(item.entry.description)
         }
-        is RevisionChoice.Bookmark -> htmlString {
-            append(item.item.bookmark)
+        is RevisionChoice.Ref -> htmlString {
+            append(item.item)
             item.item.id?.let { id ->
                 append(" (")
                 append(id)
@@ -206,7 +214,10 @@ abstract class RevisionChoicePanel(
         override fun render(canvas: TextCanvas, value: RevisionChoice) {
             val isImmutable = when (value) {
                 is RevisionChoice.Change -> value.entry.id.full in immutableChangeIds
-                is RevisionChoice.Bookmark -> value.item.id?.full in immutableChangeIds
+                is RevisionChoice.Ref -> when (val item = value.item) {
+                    is TagItem -> allEntries.find { e -> e.tags.any { it.name == item.tag.name } }?.immutable == true
+                    else -> item.id?.full in immutableChangeIds
+                }
             }
             val isWorkingCopy = value is RevisionChoice.Change && value.entry.isWorkingCopy
             fun doRender() {

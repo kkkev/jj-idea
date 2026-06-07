@@ -18,6 +18,11 @@ object JujutsuColors {
     val BOOKMARK = JBColor(0xF0C674, 0xD4A574)
 
     /**
+     * Tag color (distinct from bookmark gold).
+     */
+    val TAG = JBColor(0x6FAF6F, 0x5FA85F)
+
+    /**
      * Conflict indicator color.
      */
     val CONFLICT = JBColor.RED

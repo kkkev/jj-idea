@@ -276,6 +276,15 @@ class CliExecutor(
         return execute(root, args, warnOnFailure = false)
     }
 
+    override fun tagList(template: String?): CommandExecutor.CommandResult {
+        val args = mutableListOf("tag", "list")
+        if (template != null) {
+            args.add("-T")
+            args.add(template)
+        }
+        return execute(root, args)
+    }
+
     override fun bookmarkList(
         template: String?,
         remote: Remote?,

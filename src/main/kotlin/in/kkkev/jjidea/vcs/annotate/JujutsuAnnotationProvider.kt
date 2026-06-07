@@ -15,9 +15,9 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.contentLocator
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 

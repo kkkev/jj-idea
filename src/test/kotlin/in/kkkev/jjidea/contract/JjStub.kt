@@ -556,11 +556,12 @@ class JjStub(override val workDir: Path) : JjBackend {
         val isWc = change === workingCopy
         val isEmpty = computeDiffs(change).isEmpty()
 
-        // 9 basic fields
+        // 10 basic fields (changeId, commitId, description, bookmarks, tags, parents, ...)
         field(qualifiedChangeId(change))
         field(qualifiedCommitId(change))
         field(desc)
         field(change.bookmarks.joinToString(",") { "$it;true" })
+        field("") // tags (not yet supported in stub)
         field(formatParents(change))
         field(if (isWc) "true" else "false")
         field("false") // conflict

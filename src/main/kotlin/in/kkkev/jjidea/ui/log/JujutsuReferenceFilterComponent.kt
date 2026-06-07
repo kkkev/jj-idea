@@ -81,24 +81,19 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
     private fun getAllReferences(): References {
         val allEntries = tableModel.getAllEntries()
         val bookmarks = mutableSetOf<String>()
+        val tags = mutableSetOf<String>()
         var workingCopy: String? = null
 
         allEntries.forEach { entry ->
-            // Check for working copy
-            if (entry.isWorkingCopy) {
-                workingCopy = WorkingCopy.REF
-            }
-
-            // Collect bookmarks (tags not yet supported in log template)
-            entry.bookmarks.forEach { bookmark ->
-                bookmarks.add(bookmark.name.name)
-            }
+            if (entry.isWorkingCopy) workingCopy = WorkingCopy.REF
+            entry.bookmarks.forEach { bookmarks.add(it.name.name) }
+            entry.tags.forEach { tags.add(it.name) }
         }
 
         return References(
             workingCopy = workingCopy,
             bookmarks = bookmarks.sorted(),
-            tags = emptyList()
+            tags = tags.sorted()
         )
     }
 
@@ -117,8 +112,9 @@ class JujutsuReferenceFilterComponent(private val tableModel: JujutsuLogTableMod
             if (referenceName == WorkingCopy.REF && entry.isWorkingCopy) {
                 return@find true
             }
-            // Check if it has the bookmark/tag
-            entry.bookmarks.any { it.name.name == referenceName }
+            // Check if it has the bookmark or tag
+            entry.bookmarks.any { it.name.name == referenceName } ||
+                entry.tags.any { it.name == referenceName }
         } ?: return emptySet()
 
         // Start with the referenced commit

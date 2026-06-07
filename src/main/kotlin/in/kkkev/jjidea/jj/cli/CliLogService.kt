@@ -62,17 +62,28 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     override fun getLogAndFileStatuses(revset: Revset, filePath: FilePath, limit: Int?) =
         getLog(logTemplates.fileStatusesFor(filePath), revset, listOf(filePath), limit)
 
-    override fun getBookmarks(): Result<List<BookmarkItem>> {
-        log.debug("Getting bookmarks")
+    override fun getBookmarks() = getRefs("bookmark", logTemplates.bookmarkListTemplate) {
+        executor.bookmarkList(it)
+    }
 
-        val result = executor.bookmarkList(logTemplates.bookmarkListTemplate.spec)
+    override fun getTags() = getRefs("tag", logTemplates.tagListTemplate) {
+        executor.tagList(it)
+    }
+
+    private fun <T> getRefs(
+        noun: String,
+        template: LogTemplate<T?>,
+        list: (String) -> CommandExecutor.CommandResult
+    ): Result<List<T>> {
+        log.debug("Getting ${noun}s")
+        val result = list(template.spec)
         return if (result.isSuccess) {
-            toResult("Failed to parse bookmarks") {
-                parse(logTemplates.bookmarkListTemplate, result.stdout).filterNotNull()
+            toResult("Failed to parse ${noun}s") {
+                parse(template, result.stdout).filterNotNull()
             }
         } else {
-            log.warn("Bookmark list command failed: ${result.stderr}")
-            Result.failure(VcsException("Error from jj bookmark list: " + result.stderr))
+            log.warn("${noun.replaceFirstChar { it.uppercase() }} list command failed: ${result.stderr}")
+            Result.failure(VcsException("Error from jj $noun list: " + result.stderr))
         }
     }
 
@@ -247,6 +258,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 )
             }.distinctBy { b -> b.name }
         }
+        val tags = singleField("""tags.map(|t| t.name()).join(",")""") {
+            it.splitByComma { name -> Tag(name) }
+        }
         val parents = singleField(
             """
                 |parents.map(|c|
@@ -272,6 +286,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             commitId,
             description,
             bookmarks,
+            tags,
             parents,
             currentWorkingCopy,
             conflict,
@@ -285,6 +300,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 commitId.take(it),
                 description.take(it),
                 bookmarks.take(it),
+                tags.take(it),
                 parents.take(it),
                 currentWorkingCopy.take(it),
                 conflict.take(it),
@@ -323,6 +339,20 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             return logTemplate(basicLogTemplate, fileStatus) {
                 val basic = basicLogTemplate.take(it)
                 FileRevision(basic, fileStatus.take(it))
+            }
+        }
+
+        /**
+         * Template for tag list parsing.
+         * jj tag list only exposes `name` in its template context; there is no `target` keyword.
+         * Target commit resolution happens on demand via logCache.get(tag) → jj log -r <name>.
+         */
+        val tagListTemplate = object : LogTemplate<TagItem?>(stringField("name")) {
+            override fun take(input: Iterator<String>): TagItem? = try {
+                val name = fields[0].take(input) as String
+                if (name.isNotEmpty()) TagItem(Tag(name), null) else null
+            } catch (_: Exception) {
+                null
             }
         }
 

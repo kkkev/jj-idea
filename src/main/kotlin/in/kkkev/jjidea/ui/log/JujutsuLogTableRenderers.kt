@@ -54,9 +54,13 @@ fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
     }
 }
 
-/** Append right-side decorations: bookmarks and working copy indicator. */
+/** Append right-side decorations: bookmarks, tags, and working copy indicator. */
 fun TextCanvas.appendDecorations(entry: LogEntry) {
     appendBookmarks(entry)
+    if (entry.tags.isNotEmpty()) {
+        if (entry.bookmarks.isNotEmpty()) append(" ")
+        appendTags(entry)
+    }
     if (entry.isWorkingCopy) {
         append(" ")
         colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }

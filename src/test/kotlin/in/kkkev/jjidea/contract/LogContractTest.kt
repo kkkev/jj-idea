@@ -27,6 +27,7 @@ abstract class LogContractTest {
         fields.commitId,
         fields.description,
         fields.bookmarks,
+        fields.tags,
         fields.parents,
         fields.currentWorkingCopy,
         fields.conflict,
@@ -110,11 +111,11 @@ abstract class LogContractTest {
         val fields = result.stdout.trim().split("\u0000")
 
         val booleanFields = listOf(
-            5 to "currentWorkingCopy",
-            6 to "conflict",
-            7 to "empty",
-            8 to "immutable",
-            9 to "hasPushedAncestor"
+            6 to "currentWorkingCopy",
+            7 to "conflict",
+            8 to "empty",
+            9 to "immutable",
+            10 to "hasPushedAncestor"
         )
         booleanFields.forEach { (idx, name) ->
             fields[idx] shouldMatch Regex("true|false")
@@ -131,7 +132,7 @@ abstract class LogContractTest {
 
         val allFields = result.stdout.trim().split("\u0000")
         val records = allFields.chunked(BASIC_FIELD_COUNT).filter { it.size == BASIC_FIELD_COUNT }
-        val workingCopyCount = records.count { it[5] == "true" }
+        val workingCopyCount = records.count { it[6] == "true" }
 
         workingCopyCount shouldBe 1
     }
@@ -157,9 +158,9 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", fullSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        // Author timestamp at index 12, committer timestamp at index 15
-        val authorTs = fields[12]
-        val committerTs = fields[15]
+        // Author timestamp at index 13, committer timestamp at index 16
+        val authorTs = fields[13]
+        val committerTs = fields[16]
 
         authorTs.toLong() shouldBeGreaterThan 0L
         committerTs.toLong() shouldBeGreaterThan 0L
@@ -184,7 +185,7 @@ abstract class LogContractTest {
 
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
         val fields = result.stdout.trim().split("\u0000")
-        val parentsField = fields[4]
+        val parentsField = fields[5]
 
         // Should have at least one parent with changeId|commitId format
         parentsField.length shouldBeGreaterThan 0
@@ -220,11 +221,11 @@ abstract class LogContractTest {
         result.isSuccess shouldBe true
 
         val fields = result.stdout.trim().split("\u0000")
-        fields[9] shouldBe "false"
+        fields[10] shouldBe "false"
     }
 
     companion object {
-        private const val BASIC_FIELD_COUNT = 10
-        private const val FULL_FIELD_COUNT = 16
+        private const val BASIC_FIELD_COUNT = 11
+        private const val FULL_FIELD_COUNT = 17
     }
 }

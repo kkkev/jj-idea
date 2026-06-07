@@ -35,6 +35,7 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
             val sortedBookmarks = entry.bookmarks.sortedBy { it.isRemote }
             val text = when {
                 sortedBookmarks.isNotEmpty() -> sortedBookmarks.joinToString(", ") { it.name.name }
+                entry.tags.isNotEmpty() -> entry.tags.joinToString(", ") { it.name }
                 !entry.description.empty -> entry.description.summary
                 else -> "(no description set)"
             }
@@ -127,6 +128,10 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
             append("Jujutsu: ")
             if (entry.bookmarks.isNotEmpty()) {
                 append(entry.bookmarks.sortedBy { it.isRemote }.joinToString(", ") { it.name.name })
+                append(" ")
+            }
+            if (entry.tags.isNotEmpty()) {
+                append(entry.tags.joinToString(", ") { it.name })
                 append(" ")
             }
             append("(${entry.id.short})")

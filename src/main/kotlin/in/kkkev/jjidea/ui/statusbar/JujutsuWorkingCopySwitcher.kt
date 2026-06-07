@@ -7,11 +7,11 @@ import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.util.concurrency.AppExecutorUtil
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Ref
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.components.Filter
@@ -92,12 +92,12 @@ object JujutsuWorkingCopySwitcher {
             val project = repo.project
             val revision = when (item) {
                 is RevisionChoice.Change -> item.entry.commitId
-                is RevisionChoice.Bookmark -> item.item.bookmark.name
+                is RevisionChoice.Ref -> item.item.ref
             }
             runInBackground {
                 val resolved = when (revision) {
                     is CommitId -> repo.logCache[revision]
-                    is BookmarkName -> repo.logCache[revision]
+                    is Ref -> repo.logCache[revision]
                     else -> null
                 }
                 runLater {

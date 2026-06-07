@@ -1,9 +1,9 @@
 package `in`.kkkev.jjidea.ui.components
 
-import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RefItem
 import `in`.kkkev.jjidea.jj.Revision
 
 sealed class RevisionChoice(open val displayName: String, open val revision: Revision) {
@@ -16,9 +16,9 @@ sealed class RevisionChoice(open val displayName: String, open val revision: Rev
         val description: Description get() = entry.description
     }
 
-    data class Bookmark(
-        val item: BookmarkItem,
-        override val displayName: String = "${item.bookmark.name}${item.id?.let { " (${it.short})" } ?: ""}",
-        override val revision: Revision = item.bookmark.name
+    data class Ref(
+        val item: RefItem,
+        override val displayName: String = "${item.ref}${item.id?.let { " (${it.short})" } ?: ""}",
+        override val revision: Revision = item.ref
     ) : RevisionChoice(displayName, revision)
 }

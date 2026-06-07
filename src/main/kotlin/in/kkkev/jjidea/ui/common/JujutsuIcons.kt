@@ -33,6 +33,9 @@ object JujutsuIcons {
     val Bookmark: Icon = load("/icons/bookmark.svg").accented(GREY)
 
     @JvmField
+    val Tag: Icon = load("/icons/tag.svg").accented(GREY)
+
+    @JvmField
     val BookmarkTracked: Icon = load("/icons/bookmarkTracked.svg").accented(GREY)
 
     @JvmField
