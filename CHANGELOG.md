@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-06-08
+
 ### Fixed
 - Moving a file from a parent directory into a new child directory (e.g. `pages/{ => blankExperience}/blankExperience.tsx`) no longer causes the entire change to fail with "Invalid rename/copy format". Both sides of the `{old => new}` rename spec can now be empty, and the rename/copy parser is deduplicated into a single implementation.
 
@@ -574,7 +576,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.6...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.7...HEAD
+[0.7.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.7
 [0.7.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.6
 [0.7.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.5
 [0.7.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.4

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.6/jj-idea-0.7.6.zip" version="0.7.6">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.7/jj-idea-0.7.7.zip" version="0.7.7">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,11 +23,28 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.6</h3>
+      <h3>0.7.7</h3>
       
 <h4>Fixed</h4>
-<li>`JujutsuVirtualFile.contentsToByteArray()` no longer calls `jj file show` while a ReadAction lock is held, eliminating the threading violation and potential UI freeze. When the platform requests content under read access with a cold cache, the call returns an empty array immediately and launches a background load; once that load completes it fires a VFS `contentsChanged` event so any open editor reloads automatically with the real content.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.6">full release notes</a> for details.</p>
+<li>Moving a file from a parent directory into a new child directory (e.g. `pages/{ => blankExperience}/blankExperience.tsx`) no longer causes the entire change to fail with "Invalid rename/copy format". Both sides of the `{old => new}` rename spec can now be empty, and the rename/copy parser is deduplicated into a single implementation.</li>
+
+<h4>Added</h4>
+<li>jj tags now appear as decoration chips in the log table (Decorations column, inlined graph column, and commit details panel), the "Compare with Another Commit…" popup, and the working-copy switcher. Tags resolve as selectable revision targets alongside bookmarks, with a dedicated tag icon and a distinct green chip colour. A `jj tag list` cache ensures tags beyond the log limit are included in selectors.</li>
+<li>Tags in the working-copy switcher and revision selector now show the target commit's description alongside the tag name, matching the existing behaviour for bookmarks.</li>
+
+<h4>Fixed</h4>
+<li>Typing in the "Compare with Commit" revision selector no longer freezes the UI on large repos. The cell renderer now reuses a single component instead of allocating a new one per cell (eliminating an O(n²) `ArrayList.indexOf` accumulation in `CellRendererPane`); list-model updates are applied in one batch call instead of one-at-a-time; per-render reflection (`IconSpec.javaField`) is hoisted to constants; and tag immutability is precomputed off the EDT instead of re-scanned linearly on each paint.</li>
+<li>Out-of-limit revisions loaded for navigation expansion (annotation-line click, parent change-ID click in the details panel) no longer render with empty Author and Date columns. `RepoLogCache` now fetches with the full log template so every cached entry carries author/committer signatures, matching the main log load.</li>
+<li>Reference filter (bookmark/tag dropdown in the log toolbar) now shows **all** bookmarks and tags regardless of the log limit. Selecting an out-of-limit reference automatically expands the log to include a context window around that commit (same behaviour as navigate-to-out-of-limit), then applies the filter normally. Selecting a tag or bookmark no longer mismatches when a tag and bookmark share the same name on different commits.</li>
+<li>Bookmark toolbar widget now shows **all** bookmarks regardless of the configured log limit; previously only bookmarks attached to loaded log entries were displayed (missing out-of-limit bookmarks in large repos).</li>
+<li>"Compare with Another Commit…" popup no longer runs `jj bookmark list` on every search keystroke; bookmarks are fetched once and filtered in memory, eliminating per-keystroke lag with 100+ bookmarks.</li>
+<li>`JujutsuAnnotationProvider.populateCache` no longer logs a spurious "control-flow exception" warning when the annotation preloader task fires after a project has begun disposing. The method now exits early on a disposed project and rethrows `ProcessCanceledException` so the platform can handle the race cleanly.</li>
+<li>"Compare with local" and "Compare before with local" no longer crash with a `VcsException` when the selected file does not exist in the current working copy (`@`). The diff now opens with an "(empty)" local side instead.</li>
+<li>`⌘D` / `Ctrl+D` in editor tabs no longer hijacks the Duplicate Line shortcut. `Jujutsu.ShowChangesDiff` now only activates on keyboard shortcut when there is an actual change or log selection in context; context-menu invocations are unaffected. The action promoter likewise only promotes the action over the built-in `Compare.SameVersion` when VCS or log data is present.</li>
+<li>**Show Diff** (`⌘D` / `Ctrl+D`) no longer throws a `VcsException` when invoked while a diff editor tab is focused. Synthetic diff-tab virtual files (`ChainDiffVirtualFile`) that have no Jujutsu VCS root are now silently skipped instead of causing an error.</li>
+<li>**Compare with Another Commit…** now works when invoked from inside a diff editor (previously a silent no-op). Focusing a diff side and invoking the action correctly opens the revision selector for that file.</li>
+<li>"Annotate Previous Revision" from the annotation gutter no longer shows a line-count mismatch warning. Previously the provider failed to recognise the revision type returned by `FileAnnotation.getRevisions()` and silently annotated at the working copy instead of the requested historical revision.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.7">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
