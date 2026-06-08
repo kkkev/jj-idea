@@ -27,27 +27,13 @@ interface LogCache {
     val all: List<LogEntry>
 
     /**
-     * Point lookup — falls back to a targeted `jj log -r <id>` if not cached.
-     * Returns null only if jj has no such revision (not merely a cold cache).
-     * Always call from a background thread.
+     * Lookup for any [Revision]. If a [ChangeId], then this is a point lookup falling back to a targeted
+     * `jj log -r <id>` if not cached. If it is a commit id or bookmark name, then looks up by name, with fallback to
+     * the log if not yet cached.
+     * @throws IllegalArgumentException if [revision] does not point at a single change.
      */
     @RequiresBackgroundThread
-    operator fun get(id: ChangeId): LogEntry?
-
-    @RequiresBackgroundThread
-    operator fun get(id: CommitId): LogEntry?
-
-    @RequiresBackgroundThread
-    operator fun get(name: BookmarkName): LogEntry?
-
-    /**
-     * Name-based lookup for any [Ref] (bookmark, tag, or other named ref).
-     * Bookmarks hit the in-memory fast-path; other refs fall back to `jj log -r <name>`.
-     * Returns null only if the ref does not resolve to a known revision.
-     * Always call from a background thread.
-     */
-    @RequiresBackgroundThread
-    operator fun get(ref: Ref): LogEntry?
+    operator fun get(revision: Revision): LogEntry
 
     /**
      * Fetch a context window around [id]: `ancestors(id, window) | id | descendants(id, window)`.
@@ -57,6 +43,15 @@ interface LogCache {
      */
     @RequiresBackgroundThread
     fun loadContext(id: ChangeId, window: Int = 10): List<LogEntry>
+
+    /**
+     * Force a fresh reload: evict the cache and re-fetch all entries from jj.
+     * Used by the log data loader on refresh so abandoned/rewritten commits are dropped.
+     * @throws if the underlying [LogService.getLog] call fails.
+     * Always call from a background thread.
+     */
+    @RequiresBackgroundThread
+    fun reload(): List<LogEntry>
 
     /**
      * Populate the cache with freshly fetched entries.
@@ -103,19 +98,19 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
             return fetch(revset, limit = limit)
         }
 
-    override operator fun get(id: ChangeId) = store[id] ?: fetchOne(id)
-
-    override operator fun get(id: CommitId) = byCommitId[id]?.let { get(it) } ?: fetchOne(id)
-
-    override operator fun get(name: BookmarkName) = byBookmark[name]?.let { store[it] } ?: fetchOne(name)
-
-    override operator fun get(ref: Ref): LogEntry? = (ref as? BookmarkName)
-        ?.let { byBookmark[it]?.let { id -> store[id] } } ?: fetchOne(ref)
+    override fun get(revision: Revision): LogEntry = requireNotNull(
+        when (revision) {
+            is ChangeId -> store[revision]
+            is CommitId -> byCommitId[revision]?.let(this::get)
+            is BookmarkName -> byBookmark[revision]?.let(this::get)
+            else -> null
+        } ?: fetchOne(revision)
+    ) { "Expression $revision does not point to a single LogEntry" }
 
     private fun fetchOne(revision: Revision) = fetch(revision).firstOrNull()
 
     private fun fetch(revset: Revset, limit: Int? = null) = repo.logService.getLog(revset = revset, limit = limit)
-        .getOrNull().orEmpty().also(this::store)
+        .getOrThrow().also(this::store)
 
     // Fast path: if the target is already cached (e.g., from a previous loadContext call that
     // was then overwritten by loadCommits), return the full snapshot which includes both the
@@ -125,6 +120,11 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     } else {
         val revset = Expression("ancestors(${id.short}, $window) | ${id.short} | descendants(${id.short}, $window)")
         fetch(revset)
+    }
+
+    override fun reload(): List<LogEntry> {
+        clear()
+        return all
     }
 
     override fun store(entries: List<LogEntry>) {

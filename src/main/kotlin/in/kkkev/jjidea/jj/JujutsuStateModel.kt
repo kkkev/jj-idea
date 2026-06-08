@@ -10,11 +10,7 @@ import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.ex.ProjectLevelVcsManagerEx
 import com.intellij.openapi.vcs.ex.VcsActivationListener
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.VfsUtilCore
-import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.*
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileContentChangeEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileCreateEvent
@@ -170,9 +166,9 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             a.mapValues { it.value.stateKey } == b.mapValues { it.value.stateKey }
         }
     ) {
-        initialisedRepositories.immediateValue.mapNotNull { (_, it) ->
-            it.logService.getLog(WorkingCopy).getOrNull()?.firstOrNull()
-        }.associateBy { it.repo.directory.path }
+        initialisedRepositories.immediateValue
+            .map { (_, it) -> it.logCache[WorkingCopy] }
+            .associateBy { it.repo.directory.path }
     }
 
     /**

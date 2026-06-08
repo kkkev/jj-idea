@@ -138,12 +138,7 @@ data class JujutsuRepositoryImpl(
     override fun createContentRevision(fileAtVersion: FileAtVersion) =
         createContentRevision(fileAtVersion.filePath, fileAtVersion.contentLocator)
 
-    override fun getLogEntry(revision: Revision) = when (revision) {
-        is ChangeId -> logCache[revision]
-        is CommitId -> logCache[revision]
-        is BookmarkName -> logCache[revision]
-        else -> logService.getLog(revision).getOrThrow().singleOrNull()
-    } ?: throw VcsException("No log entry found for revision $revision")
+    override fun getLogEntry(revision: Revision) = logCache[revision]
 
     override fun getLogEntry(contentLocator: ContentLocator) = (contentLocator as? Revision)?.let(this::getLogEntry)
 
@@ -154,15 +149,12 @@ data class JujutsuRepositoryImpl(
     override fun createDiffSideFor(fileAtVersion: FileAtVersion?): DiffSide =
         DiffSideImpl(fileAtVersion?.let(this::getVirtualFile))
 
-    override fun getVirtualFile(fileAtVersion: FileAtVersion) = if (getLogEntry(
-            fileAtVersion.contentLocator
-        )?.isWorkingCopy ==
-        true
-    ) {
-        fileAtVersion.filePath.virtualFile
-    } else {
-        JujutsuVirtualFile(fileAtVersion, this)
-    }
+    override fun getVirtualFile(fileAtVersion: FileAtVersion) =
+        if (getLogEntry(fileAtVersion.contentLocator)?.isWorkingCopy == true) {
+            fileAtVersion.filePath.virtualFile
+        } else {
+            JujutsuVirtualFile(fileAtVersion, this)
+        }
 
     /**
      * Represents the content of a file prior to a merge.

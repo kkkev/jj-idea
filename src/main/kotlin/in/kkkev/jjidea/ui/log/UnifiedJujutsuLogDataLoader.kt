@@ -77,19 +77,9 @@ class UnifiedJujutsuLogDataLoader(
                             indicator.text2 = "Loading from ${repo.displayName}..."
                             indicator.fraction = index.toDouble() / repos.size
 
-                            val repoLimit = settings.logChangeLimit(repo)
-                            val revsetSetting = settings.logRevset(repo)
-                            val revset: Revset =
-                                if (revsetSetting.isBlank()) Revset.Default else Expression(revsetSetting)
-                            val result = repo.logService.getLog(revset, limit = repoLimit)
-
-                            result.onSuccess { loadedEntries ->
-                                entriesByRepo[repo] = loadedEntries
-                                log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
-                            }.onFailure { e ->
-                                errors[repo] = e
-                                log.warn("Failed to load commits from $repo: ${e.message}")
-                            }
+                            val loadedEntries = repo.logCache.reload()
+                            entriesByRepo[repo] = loadedEntries
+                            log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
 
                             repo.logService.getBookmarks().onSuccess { bookmarkItems ->
                                 deletedNamesByRepo[repo] = bookmarkItems

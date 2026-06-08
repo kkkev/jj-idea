@@ -1,6 +1,8 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.project.Project
+import `in`.kkkev.jjidea.settings.JujutsuSettings
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
@@ -13,6 +15,7 @@ import org.junit.jupiter.api.Test
 class RepoLogCacheTest {
     private lateinit var repo: JujutsuRepository
     private lateinit var logService: LogService
+    private lateinit var project: Project
     private lateinit var cache: RepoLogCache
 
     @BeforeEach
@@ -20,14 +23,22 @@ class RepoLogCacheTest {
         logService = mockk()
         // project must be a relaxed mock so that the RepoLogCache init block's
         // messageBus.connect().subscribe() calls succeed without a real platform.
-        val project = mockk<Project>(relaxed = true)
+        project = mockk<Project>(relaxed = true)
         repo = mockk {
-            every { this@mockk.project } returns project
+            every { this@mockk.project } returns this@RepoLogCacheTest.project
             every { this@mockk.logService } returns this@RepoLogCacheTest.logService
             every { displayName } returns "test-repo"
         }
         cache = RepoLogCache(repo)
     }
+
+    /** Stubs [JujutsuSettings.getInstance] for tests that exercise the [LogCache.all] path. */
+    private fun stubSettings(logRevset: String = "", logChangeLimit: Int = 100): JujutsuSettings =
+        mockk<JujutsuSettings>(relaxed = true).also { settings ->
+            every { settings.logRevset(repo) } returns logRevset
+            every { settings.logChangeLimit(repo) } returns logChangeLimit
+            every { project.getService(JujutsuSettings::class.java) } returns settings
+        }
 
     // ─── helpers ─────────────────────────────────────────────────────────────
 
@@ -88,11 +99,32 @@ class RepoLogCacheTest {
     }
 
     @Test
-    fun `get by change id returns null when logService returns empty`() {
+    fun `get by change id throws when logService returns empty`() {
         val id = ChangeId("missing", "missing", null)
         every { logService.getLog(revset = id) } returns Result.success(emptyList())
 
-        cache[id] shouldBe null
+        shouldThrow<IllegalArgumentException> { cache[id] }
+    }
+
+    @Test
+    fun `all throws when logService returns failure`() {
+        val cause = RuntimeException("jj not found")
+        stubSettings()
+        // cache is empty → snapshot() is null → all calls fetch(Revset.Default, limit=100)
+        every { logService.getLog(revset = Revset.Default, limit = 100) } returns Result.failure(cause)
+
+        val thrown = shouldThrow<RuntimeException> { cache.all }
+        thrown.message shouldBe "jj not found"
+    }
+
+    @Test
+    fun `get throws original exception when logService returns failure`() {
+        val id = ChangeId("aaa", "aaa", null)
+        val cause = RuntimeException("jj not found")
+        every { logService.getLog(revset = id) } returns Result.failure(cause)
+
+        val thrown = shouldThrow<RuntimeException> { cache[id] }
+        thrown.message shouldBe "jj not found"
     }
 
     // ─── bookmark index correctness ───────────────────────────────────────────
@@ -120,9 +152,9 @@ class RepoLogCacheTest {
         // re-store the same change id without the bookmark (e.g. after jj bookmark delete + refresh)
         cache.store(listOf(entry("aaa", immutable = true)))
 
-        // byBookmark should no longer point at entryA; fallback hits logService
+        // byBookmark should no longer point at entryA; fallback hits logService, returns empty → throws
         every { logService.getLog(revset = bm.name) } returns Result.success(emptyList())
-        cache[bm.name] shouldBe null
+        shouldThrow<IllegalArgumentException> { cache[bm.name] }
     }
 
     // ─── clear ───────────────────────────────────────────────────────────────
@@ -137,16 +169,16 @@ class RepoLogCacheTest {
 
             cache.clear()
 
-            // After clear both fall through to logService; stub them to return empty
+            // After clear both fall through to logService; stub them to return empty → throws
             every { logService.getLog(revset = mutableE.id) } returns Result.success(emptyList())
             every { logService.getLog(revset = immutableE.id) } returns Result.success(emptyList())
 
-            cache[mutableE.id] shouldBe null
-            cache[immutableE.id] shouldBe null
+            shouldThrow<IllegalArgumentException> { cache[mutableE.id] }
+            shouldThrow<IllegalArgumentException> { cache[immutableE.id] }
         }
 
         @Test
-        fun `get by bookmark returns null after clear (no stale index)`() {
+        fun `get by bookmark throws after clear (no stale index)`() {
             val bm = bookmark("main")
             val e = entry("aaa", immutable = true, bookmarks = listOf(bm))
             cache.store(listOf(e))
@@ -154,18 +186,18 @@ class RepoLogCacheTest {
             cache.clear()
 
             every { logService.getLog(revset = bm.name) } returns Result.success(emptyList())
-            cache[bm.name] shouldBe null
+            shouldThrow<IllegalArgumentException> { cache[bm.name] }
         }
 
         @Test
-        fun `get by commit id returns null after clear (no stale index)`() {
+        fun `get by commit id throws after clear (no stale index)`() {
             val e = entry("aaa", immutable = true)
             cache.store(listOf(e))
 
             cache.clear()
 
             every { logService.getLog(revset = e.commitId) } returns Result.success(emptyList())
-            cache[e.commitId] shouldBe null
+            shouldThrow<IllegalArgumentException> { cache[e.commitId] }
         }
 
         @Test
@@ -193,5 +225,27 @@ class RepoLogCacheTest {
         // Should return the latest version
         cache[e.id] shouldNotBe null
         cache[e.id]?.commitId shouldBe updated.commitId
+    }
+
+    // ─── reload ───────────────────────────────────────────────────────────────
+
+    @Test
+    fun `reload evicts existing entries and re-fetches from logService`() {
+        val old = entry("aaa")
+        cache.store(listOf(old))
+
+        val fresh = entry("bbb")
+        stubSettings()
+        // cache is empty after clear → all calls fetch(Revset.Default, limit=100) via stubbed settings
+        every { logService.getLog(revset = Revset.Default, limit = 100) } returns Result.success(listOf(fresh))
+
+        val result = cache.reload()
+
+        // Returns the freshly fetched entries and has stored them
+        result shouldBe listOf(fresh)
+        cache[fresh.id] shouldBe fresh
+        // Old entry was evicted (clear was called before re-fetch)
+        cache.all.none { it.id == old.id } shouldBe true
+        verify(exactly = 1) { logService.getLog(revset = Revset.Default, limit = 100, filePaths = emptyList()) }
     }
 }

@@ -5,22 +5,14 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.util.concurrency.AppExecutorUtil
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.Ref
-import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.components.Filter
 import `in`.kkkev.jjidea.ui.components.RevisionChoice
 import `in`.kkkev.jjidea.ui.components.RevisionChoicePanel
 import `in`.kkkev.jjidea.ui.components.buildRevisionChoices
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
-import java.util.concurrent.ConcurrentHashMap
 
 object JujutsuWorkingCopySwitcher {
     internal val defaultFilter = Filter(includeRemote = false, includeLogEntries = true)
@@ -37,18 +29,6 @@ object JujutsuWorkingCopySwitcher {
             .also { panel.setPopup(it) }
         panel.loadData()
         return popup
-    }
-
-    fun preload(repo: JujutsuRepository) {
-        val key = repo.directory.path
-        if (!refreshInFlight.add(key)) return
-        AppExecutorUtil.getAppExecutorService().execute {
-            try {
-                repo.logCache.all
-            } finally {
-                refreshInFlight.remove(key)
-            }
-        }
     }
 
     private enum class SwitchMode { EDIT, NEW, CANCEL }
@@ -95,41 +75,40 @@ object JujutsuWorkingCopySwitcher {
                 is RevisionChoice.Ref -> item.item.ref
             }
             runInBackground {
-                val resolved = when (revision) {
-                    is CommitId -> repo.logCache[revision]
-                    is Ref -> repo.logCache[revision]
-                    else -> null
-                }
-                runLater {
-                    if (resolved == null) {
+                try {
+                    val resolved = repo.logCache[revision]
+
+                    runLater {
+                        when (chooseSwitchMode(project, resolved)) {
+                            SwitchMode.EDIT -> {
+                                repo.commandExecutor
+                                    .createCommand { edit(resolved.commitId) }
+                                    .onSuccess { repo.invalidate(select = resolved.commitId, vfsChanged = true) }
+                                    .onFailure { tellUser(project, "statusbar.switch.edit.error") }
+                                    .executeAsync()
+                            }
+
+                            SwitchMode.NEW -> {
+                                repo.commandExecutor
+                                    .createCommand { new(Description.EMPTY, listOf(resolved.commitId)) }
+                                    .onSuccess { repo.invalidate(select = WorkingCopy, vfsChanged = true) }
+                                    .onFailure { tellUser(project, "statusbar.switch.new.error") }
+                                    .executeAsync()
+                            }
+
+                            SwitchMode.CANCEL -> {}
+                        }
+                    }
+                } catch (_: Exception) {
+                    runLater {
                         Messages.showErrorDialog(
                             project,
                             JujutsuBundle.message("statusbar.switch.resolve.error.message"),
                             JujutsuBundle.message("statusbar.switch.resolve.error.title")
                         )
-                        return@runLater
-                    }
-                    when (chooseSwitchMode(project, resolved)) {
-                        SwitchMode.EDIT -> {
-                            repo.commandExecutor
-                                .createCommand { edit(resolved.commitId) }
-                                .onSuccess { repo.invalidate(select = resolved.commitId, vfsChanged = true) }
-                                .onFailure { tellUser(project, "statusbar.switch.edit.error") }
-                                .executeAsync()
-                        }
-                        SwitchMode.NEW -> {
-                            repo.commandExecutor
-                                .createCommand { new(Description.EMPTY, listOf(resolved.commitId)) }
-                                .onSuccess { repo.invalidate(select = WorkingCopy, vfsChanged = true) }
-                                .onFailure { tellUser(project, "statusbar.switch.new.error") }
-                                .executeAsync()
-                        }
-                        SwitchMode.CANCEL -> {}
                     }
                 }
             }
         }
     }
-
-    private val refreshInFlight = ConcurrentHashMap.newKeySet<String>()
 }

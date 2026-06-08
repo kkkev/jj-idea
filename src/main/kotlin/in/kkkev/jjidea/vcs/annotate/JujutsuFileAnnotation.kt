@@ -184,8 +184,7 @@ private class AnnotationFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val revision = RevisionExpression(line.id.full)
-        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, revision) }
+        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, line.id) }
         val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
         if (!result.isSuccess) throw VcsException("Failed to load content at ${line.id}: ${result.stderr}")
         return result.stdout.toByteArray()
