@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tags in the working-copy switcher and revision selector now show the target commit's description alongside the tag name, matching the existing behaviour for bookmarks.
 
 ### Fixed
+- Out-of-limit revisions loaded for navigation expansion (annotation-line click, parent change-ID click in the details panel) no longer render with empty Author and Date columns. `RepoLogCache` now fetches with the full log template so every cached entry carries author/committer signatures, matching the main log load.
 - Reference filter (bookmark/tag dropdown in the log toolbar) now shows **all** bookmarks and tags regardless of the log limit. Selecting an out-of-limit reference automatically expands the log to include a context window around that commit (same behaviour as navigate-to-out-of-limit), then applies the filter normally. Selecting a tag or bookmark no longer mismatches when a tag and bookmark share the same name on different commits.
 - Bookmark toolbar widget now shows **all** bookmarks regardless of the configured log limit; previously only bookmarks attached to loaded log entries were displayed (missing out-of-limit bookmarks in large repos).
 - "Compare with Another Commit…" popup no longer runs `jj bookmark list` on every search keystroke; bookmarks are fetched once and filtered in memory, eliminating per-keystroke lag with 100+ bookmarks.

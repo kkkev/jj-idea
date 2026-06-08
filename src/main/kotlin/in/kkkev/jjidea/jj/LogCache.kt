@@ -83,7 +83,8 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     // Tracks insertion order so snapshot() returns entries in the same order they were stored
     // (topological order from the data loader). Updated under orderLock to prevent lost-write races
     // between concurrent loadContext and loadCommits calls.
-    @Volatile private var orderedIds: List<ChangeId> = emptyList()
+    @Volatile
+    private var orderedIds: List<ChangeId> = emptyList()
     private val orderLock = Any()
 
     init {
@@ -99,40 +100,31 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
             val settings = JujutsuSettings.getInstance(repo.project)
             val revset = settings.logRevset(repo).let { if (it.isBlank()) Revset.Default else Expression(it) }
             val limit = settings.logChangeLimit(repo)
-            return repo.logService.getLogBasic(revset, limit = limit).getOrNull()
-                ?.also { store(it) } ?: emptyList()
+            return fetch(revset, limit = limit)
         }
 
-    override operator fun get(id: ChangeId): LogEntry? =
-        store[id]
-            ?: repo.logService.getLogBasic(revset = id).getOrNull()?.firstOrNull()
-                ?.also { store(listOf(it)) }
+    override operator fun get(id: ChangeId) = store[id] ?: fetchOne(id)
 
-    override operator fun get(id: CommitId): LogEntry? =
-        byCommitId[id]?.let { get(it) }
-            ?: repo.logService.getLogBasic(revset = id).getOrNull()?.firstOrNull()
-                ?.also { store(listOf(it)) }
+    override operator fun get(id: CommitId) = byCommitId[id]?.let { get(it) } ?: fetchOne(id)
 
-    override operator fun get(name: BookmarkName): LogEntry? =
-        byBookmark[name]?.let { store[it] }
-            ?: repo.logService.getLogBasic(revset = name).getOrNull()?.firstOrNull()
-                ?.also { store(listOf(it)) }
+    override operator fun get(name: BookmarkName) = byBookmark[name]?.let { store[it] } ?: fetchOne(name)
 
-    override operator fun get(ref: Ref): LogEntry? =
-        (ref as? BookmarkName)?.let { byBookmark[it]?.let { id -> store[id] } }
-            ?: repo.logService.getLogBasic(revset = ref).getOrNull()?.firstOrNull()
-                ?.also { store(listOf(it)) }
+    override operator fun get(ref: Ref): LogEntry? = (ref as? BookmarkName)
+        ?.let { byBookmark[it]?.let { id -> store[id] } } ?: fetchOne(ref)
 
-    override fun loadContext(id: ChangeId, window: Int): List<LogEntry> {
-        // Fast path: if the target is already cached (e.g., from a previous loadContext call that
-        // was then overwritten by loadCommits), return the full snapshot which includes both the
-        // loadCommits entries and the previously-fetched context window.
-        if (store.containsKey(id)) {
-            return snapshot() ?: emptyList()
-        }
+    private fun fetchOne(revision: Revision) = fetch(revision).firstOrNull()
+
+    private fun fetch(revset: Revset, limit: Int? = null) = repo.logService.getLog(revset = revset, limit = limit)
+        .getOrNull().orEmpty().also(this::store)
+
+    // Fast path: if the target is already cached (e.g., from a previous loadContext call that
+    // was then overwritten by loadCommits), return the full snapshot which includes both the
+    // loadCommits entries and the previously-fetched context window.
+    override fun loadContext(id: ChangeId, window: Int) = if (store.containsKey(id)) {
+        snapshot() ?: emptyList()
+    } else {
         val revset = Expression("ancestors(${id.short}, $window) | ${id.short} | descendants(${id.short}, $window)")
-        return repo.logService.getLogBasic(revset).getOrNull()
-            ?.also { store(it) } ?: emptyList()
+        fetch(revset)
     }
 
     override fun store(entries: List<LogEntry>) {

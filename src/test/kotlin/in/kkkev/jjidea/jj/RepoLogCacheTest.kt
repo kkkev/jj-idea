@@ -77,20 +77,20 @@ class RepoLogCacheTest {
     @Test
     fun `get by change id falls back to logService on miss and stores result`() {
         val e = entry("zzz")
-        every { logService.getLogBasic(revset = e.id) } returns Result.success(listOf(e))
+        every { logService.getLog(revset = e.id) } returns Result.success(listOf(e))
 
         val result = cache[e.id]
 
         result shouldBe e
         // second call should be served from cache — no extra logService calls
         cache[e.id] shouldBe e
-        verify(exactly = 1) { logService.getLogBasic(revset = e.id) }
+        verify(exactly = 1) { logService.getLog(revset = e.id) }
     }
 
     @Test
     fun `get by change id returns null when logService returns empty`() {
         val id = ChangeId("missing", "missing", null)
-        every { logService.getLogBasic(revset = id) } returns Result.success(emptyList())
+        every { logService.getLog(revset = id) } returns Result.success(emptyList())
 
         cache[id] shouldBe null
     }
@@ -121,7 +121,7 @@ class RepoLogCacheTest {
         cache.store(listOf(entry("aaa", immutable = true)))
 
         // byBookmark should no longer point at entryA; fallback hits logService
-        every { logService.getLogBasic(revset = bm.name) } returns Result.success(emptyList())
+        every { logService.getLog(revset = bm.name) } returns Result.success(emptyList())
         cache[bm.name] shouldBe null
     }
 
@@ -138,8 +138,8 @@ class RepoLogCacheTest {
             cache.clear()
 
             // After clear both fall through to logService; stub them to return empty
-            every { logService.getLogBasic(revset = mutableE.id) } returns Result.success(emptyList())
-            every { logService.getLogBasic(revset = immutableE.id) } returns Result.success(emptyList())
+            every { logService.getLog(revset = mutableE.id) } returns Result.success(emptyList())
+            every { logService.getLog(revset = immutableE.id) } returns Result.success(emptyList())
 
             cache[mutableE.id] shouldBe null
             cache[immutableE.id] shouldBe null
@@ -153,7 +153,7 @@ class RepoLogCacheTest {
 
             cache.clear()
 
-            every { logService.getLogBasic(revset = bm.name) } returns Result.success(emptyList())
+            every { logService.getLog(revset = bm.name) } returns Result.success(emptyList())
             cache[bm.name] shouldBe null
         }
 
@@ -164,7 +164,7 @@ class RepoLogCacheTest {
 
             cache.clear()
 
-            every { logService.getLogBasic(revset = e.commitId) } returns Result.success(emptyList())
+            every { logService.getLog(revset = e.commitId) } returns Result.success(emptyList())
             cache[e.commitId] shouldBe null
         }
 
