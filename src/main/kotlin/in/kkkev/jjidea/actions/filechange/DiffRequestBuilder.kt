@@ -33,9 +33,9 @@ fun buildDiffRequests(
         )
     }
 } else if (files.isNotEmpty()) {
-    val filesByLogEntry = files.groupBy { file ->
-        project.possibleLogEntryFor(file) ?: project.jujutsuRepositoryFor(file).workingCopy
-    }
+    val filesByLogEntry = files
+        .mapNotNull { file -> project.possibleLogEntryFor(file)?.let { it to file } }
+        .groupBy({ it.first }, { it.second })
     val changesByLogEntry = filesByLogEntry.keys.associateWith { entry ->
         entry.repo.logService.getFileChanges(entry).getOrNull()
             ?.filter { it.after != null }

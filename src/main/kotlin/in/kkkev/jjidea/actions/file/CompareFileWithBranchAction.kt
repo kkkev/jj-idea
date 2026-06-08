@@ -7,7 +7,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.actions.jujutsuFiles
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.fileAtVersion
 import `in`.kkkev.jjidea.vcs.filePath
+import `in`.kkkev.jjidea.vcs.singleJujutsuRepository
 
 /**
  * Action to compare current file with a bookmark, change, or revision
@@ -32,18 +33,16 @@ class CompareFileWithBranchAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun actionPerformed(e: AnActionEvent) {
+        val project = e.project ?: return
         runInBackground {
-            val files = e.files
-            val repo = e.singleRepoForFiles ?: return@runInBackground
-
-            if (!files.isEmpty()) {
-                RevisionSelectorPopup.show(
-                    "action.compare.branch.popup.title",
-                    repo,
-                    Filter(true, true)
-                ) { chosen ->
-                    showDiff(repo, files, chosen)
-                }
+            val files = e.jujutsuFiles
+            val repo = files.singleJujutsuRepository(project) ?: return@runInBackground
+            RevisionSelectorPopup.show(
+                "action.compare.branch.popup.title",
+                repo,
+                Filter(true, true)
+            ) { chosen ->
+                showDiff(repo, files, chosen)
             }
         }
     }

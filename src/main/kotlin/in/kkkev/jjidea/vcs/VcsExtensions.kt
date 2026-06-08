@@ -51,6 +51,13 @@ fun Project.possibleJujutsuRepositoryFor(filePath: FilePath) =
 fun Project.jujutsuRepositoryFor(filePath: FilePath) = possibleJujutsuRepositoryFor(filePath)
     ?: throw VcsException(JujutsuBundle.message("vcs.error.no.root", filePath))
 
+fun List<VirtualFile>.filterInJujutsuProject(project: Project) = filter {
+    project.possibleJujutsuRepositoryFor(it) != null
+}
+
+fun List<VirtualFile>.singleJujutsuRepository(project: Project) =
+    mapNotNull { project.possibleJujutsuRepositoryFor(it) }.toSet().singleOrNull()
+
 fun Project.possibleVirtualFileFor(fileAtVersion: FileAtVersion): VirtualFile? {
     val filePath = fileAtVersion.filePath
     return possibleJujutsuRepositoryFor(filePath)?.getVirtualFile(fileAtVersion) ?: filePath.virtualFile

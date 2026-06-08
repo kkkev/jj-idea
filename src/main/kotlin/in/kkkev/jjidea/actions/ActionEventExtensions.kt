@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.filePath
+import `in`.kkkev.jjidea.vcs.filterInJujutsuProject
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import `in`.kkkev.jjidea.vcs.possibleLogEntryFor
@@ -27,6 +28,18 @@ val AnActionEvent.files: List<VirtualFile>
         ?: changes.mapNotNull {
             project?.let { p -> it.after?.let(p::possibleVirtualFileFor) }
         }
+
+/**
+ * Files for this event that resolve to a Jujutsu repository: the selected file array filtered to those with a
+ * VCS root, falling back to the single focused file. Filters out synthetic files such as the diff-tab
+ * [com.intellij.diff.editor.ChainDiffVirtualFile] (which has no root) so diff/compare actions keep working from
+ * inside a diff editor.
+ */
+val AnActionEvent.jujutsuFiles: List<VirtualFile>
+    get() = project?.let { p ->
+        files.filterInJujutsuProject(p)
+            .ifEmpty { listOfNotNull(file).filterInJujutsuProject(p) }
+    } ?: emptyList()
 val AnActionEvent.filePaths: List<FilePath>
     get() = this.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()?.map { it.filePath }
         ?: changes.mapNotNull { it.after?.filePath }
