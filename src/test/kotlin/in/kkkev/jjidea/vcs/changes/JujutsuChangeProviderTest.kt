@@ -395,6 +395,51 @@ class JujutsuChangeProviderTest {
     }
 
     @Test
+    fun `rename into new child directory - empty before side`() {
+        val subdir = getOrCreateVirtualFile(true, "blankExperience")
+        subdir.addChild(getOrCreateVirtualFile(false, "blankExperience.tsx"))
+
+        val output = statusOutput("R pages/{ => blankExperience}/blankExperience.tsx")
+
+        val changeSlot = slot<Change>()
+        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
+            mockk<ContentRevision> { every { file } returns filePathSlot.captured }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        val change = changeSlot.captured
+        change.fileStatus shouldBe FileStatus.MODIFIED
+        change.beforeRevision?.file?.relativeTo(directory) shouldBe "pages/blankExperience.tsx"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "pages/blankExperience/blankExperience.tsx"
+    }
+
+    @Test
+    fun `rename from child directory to parent - empty after side`() {
+        directory.addChild(getOrCreateVirtualFile(false, "blankExperience.tsx"))
+
+        val output = statusOutput("R pages/{blankExperience => }/blankExperience.tsx")
+
+        val changeSlot = slot<Change>()
+        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+
+        val filePathSlot = slot<FilePath>()
+        every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
+            mockk<ContentRevision> { every { file } returns filePathSlot.captured }
+        }
+
+        jcp.parseStatus(output, repo, builder)
+
+        val change = changeSlot.captured
+        change.fileStatus shouldBe FileStatus.MODIFIED
+        change.beforeRevision?.file?.relativeTo(directory) shouldBe "pages/blankExperience/blankExperience.tsx"
+        change.afterRevision?.file?.relativeTo(directory) shouldBe "pages/blankExperience.tsx"
+    }
+
+    @Test
     fun `modified file that also appears in conflict warning is reported as conflicted not modified`() {
         directory.addChild(getOrCreateVirtualFile(false, "conflict.txt"))
         directory.addChild(getOrCreateVirtualFile(false, "clean.txt"))

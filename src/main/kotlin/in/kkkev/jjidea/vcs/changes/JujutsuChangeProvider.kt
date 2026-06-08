@@ -9,6 +9,7 @@ import com.intellij.openapi.vcs.changes.*
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
@@ -266,15 +267,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         }
     }
 
-    private fun parseRenameOrCopySpec(spec: String): Pair<String, String> {
-        val (prefix, before, after, suffix) = requireNotNull(
-            Regex("([^{)]*)\\{([^}]+) => ([^}]+)}(.*)").find(spec)
-        ) { "Invalid rename/copy format: $spec" }.destructured
-        return prefix + before + suffix to prefix + after + suffix
-    }
-
     private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val (oldPath, newPath) = parseRenameOrCopySpec(renameSpec)
+        val (oldPath, newPath) = parseRenameSpec(renameSpec)
         log.info("Detected rename: $oldPath => $newPath")
         val beforeRevision = repo.createContentRevision(
             repo.directory.getChildPath(oldPath),
@@ -287,7 +281,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     private fun addCopiedChange(copySpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
-        val (oldPath, newPath) = parseRenameOrCopySpec(copySpec)
+        val (oldPath, newPath) = parseRenameSpec(copySpec)
         log.info("Detected copy: $oldPath => $newPath")
         val beforeRevision = repo.createContentRevision(
             repo.directory.getChildPath(oldPath),
