@@ -68,7 +68,7 @@ fun TextCanvas.appendDecorations(entry: LogEntry) {
 }
 
 /**
- * Compute the bookmark group hit at [localX] within the inlined decorations of the graph-description column.
+ * Compute the ref chip hit at [localX] within the inlined decorations of the graph-description column.
  *
  * The decorations are rendered on the right side of the cell, starting at `colWidth - rightWidth`.
  * We measure fragment widths from the canvas to locate the target without Swing layout.
@@ -80,7 +80,7 @@ fun TextCanvas.appendDecorations(entry: LogEntry) {
  * @param frc     font render context from the table
  * @param showDecorations whether the decoration inlining is enabled
  */
-internal fun findInlinedBookmarkUri(
+internal fun findInlinedRefUri(
     entry: LogEntry,
     localX: Int,
     colWidth: Int,

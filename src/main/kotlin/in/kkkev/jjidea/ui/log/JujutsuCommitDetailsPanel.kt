@@ -74,20 +74,20 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
             border = JBUI.Borders.empty(8)
         }
 
-        // Right-click on a bookmark chip in the metadata pane → per-bookmark context menu
+        // Right-click on a ref chip (bookmark or tag) in the metadata pane → per-ref context menu
         metadataPane.addMouseListener(object : MouseAdapter() {
             override fun mousePressed(e: MouseEvent) = handlePopupTrigger(e)
             override fun mouseReleased(e: MouseEvent) = handlePopupTrigger(e)
 
             private fun handlePopupTrigger(e: MouseEvent) {
                 if (!e.isPopupTrigger) return
-                val uri = metadataPane.bookmarkUriAt(e.point) ?: return
+                val uri = metadataPane.refUriAt(e.point) ?: return
                 val changeIdStr = uri.rawQuery?.substringBefore("&")?.takeIf { it.isNotEmpty() } ?: return
                 val entry = currentEntries.find { it.id == ChangeId(changeIdStr) } ?: return
-                val click = JujutsuLogContextMenuActions.resolveBookmarkClick(uri, entry) ?: return
-                val actionGroup = JujutsuLogContextMenuActions.createBookmarkActionGroup(project, click)
+                val target = LogClickTarget.resolve(uri, entry) ?: return
+                val actionGroup = JujutsuLogContextMenuActions.clickActionGroup(project, target)
                 ActionManager.getInstance()
-                    .createActionPopupMenu("JujutsuBookmarkPopup", actionGroup)
+                    .createActionPopupMenu("JujutsuRefPopup", actionGroup)
                     .component.show(metadataPane, e.x, e.y)
                 e.consume()
             }

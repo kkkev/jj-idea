@@ -154,11 +154,9 @@ fun TextCanvas.append(user: VcsUser) = user.email.takeIf { it.isNotEmpty() }
 
 fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelative(instant))
 
-/** Canonical `jjb://` URI identifying a specific bookmark on a log entry. */
-fun bookmarkUri(entry: LogEntry, bookmark: Bookmark): URI {
-    val encoded = URLEncoder.encode(bookmark.name.name, "UTF-8")
-    return URI("jjb://${entry.repo.directory.path}?${entry.id}&bookmark=$encoded")
-}
+/** Canonical `jjref://` URI identifying a specific clickable ref (bookmark or tag) on a log entry. */
+fun refUri(entry: LogEntry, kind: String, name: String): URI =
+    URI("jjref://${entry.repo.directory.path}?${entry.id}&kind=$kind&name=${URLEncoder.encode(name, "UTF-8")}")
 
 fun TextCanvas.append(name: BookmarkName) =
     colored(JujutsuColors.BOOKMARK) {
@@ -274,13 +272,13 @@ fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
         group.local?.let { local ->
             if (!first) append(" ")
             first = false
-            linked(bookmarkUri(entry, local)) { appendBookmarkChip(local, group.localName) }
+            linked(refUri(entry, "bookmark", local.name.name)) { appendBookmarkChip(local, group.localName) }
         }
         for (remote in group.remotes) {
             if (!first) append(" ")
             first = false
             val label = if (group.local != null) "@${remote.remote}" else remote.name.name
-            linked(bookmarkUri(entry, remote)) { appendBookmarkChip(remote, label) }
+            linked(refUri(entry, "bookmark", remote.name.name)) { appendBookmarkChip(remote, label) }
         }
     }
     if (suffix.isNotEmpty()) append(suffix)
@@ -298,7 +296,7 @@ fun TextCanvas.appendTags(entry: LogEntry, suffix: String = "") {
     for (tag in entry.tags) {
         if (!first) append(" ")
         first = false
-        append(tag)
+        linked(refUri(entry, "tag", tag.name)) { append(tag) }
     }
     if (entry.tags.isNotEmpty() && suffix.isNotEmpty()) append(suffix)
 }

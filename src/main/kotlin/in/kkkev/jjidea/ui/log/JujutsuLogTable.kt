@@ -18,7 +18,7 @@ import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
-import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.resolveBookmarkClick
+import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
 import kotlinx.datetime.Instant
 import java.awt.Component
 import java.awt.Cursor
@@ -212,8 +212,8 @@ class JujutsuLogTable(
                         tooltipCol = newCol
                         IdeTooltipManager.getInstance().hideCurrentNow(false)
                     }
-                    // Show hand cursor when hovering over a bookmark chip
-                    cursor = if (bookmarkClickAt(e) != null) {
+                    // Show hand cursor when hovering over a ref chip (bookmark or tag)
+                    cursor = if (clickTargetAt(e) != null) {
                         Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     } else {
                         Cursor.getDefaultCursor()
@@ -268,26 +268,26 @@ class JujutsuLogTable(
             }
         )
 
-        // Handle left-click on bookmark chips for navigation
+        // Handle left-click on ref chips (bookmarks, tags) for navigation
         addMouseListener(
             object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
-                    val click = bookmarkClickAt(e) ?: return
-                    project.stateModel.changeSelection.notify(ChangeKey(click.repo, click.entry.id))
+                    val target = clickTargetAt(e) ?: return
+                    project.stateModel.changeSelection.notify(ChangeKey(target.repo, target.entry.id))
                     e.consume()
                 }
             }
         )
 
-        // Add context menu support (checks bookmark chips before falling through to row menu)
+        // Add context menu support (checks ref chips before falling through to row menu)
         addMouseListener(
             object : PopupHandler() {
                 override fun invokePopup(comp: Component, x: Int, y: Int) {
                     val syntheticEvent = MouseEvent(this@JujutsuLogTable, 0, 0, 0, x, y, 1, false)
-                    val click = bookmarkClickAt(syntheticEvent)
-                    if (click != null) {
-                        val group = JujutsuLogContextMenuActions.createBookmarkActionGroup(project, click)
+                    val target = clickTargetAt(syntheticEvent)
+                    if (target != null) {
+                        val group = clickActionGroup(project, target)
                         ActionManager.getInstance()
                             .createActionPopupMenu(ActionPlaces.UNKNOWN, group)
                             .component.show(comp, x, y)
@@ -309,10 +309,11 @@ class JujutsuLogTable(
     }
 
     /**
-     * Return the [BookmarkClick] under [e], or null if the event is not over a bookmark chip.
+     * Return the [LogClickTarget] under [e] (a bookmark or tag chip), or null if the event
+     * is not over a clickable ref chip.
      * Handles both the Decorations column (SCC-based) and the graph+description column (fragment canvas).
      */
-    private fun bookmarkClickAt(e: MouseEvent): BookmarkClick? {
+    private fun clickTargetAt(e: MouseEvent): LogClickTarget? {
         val row = rowAtPoint(e.point).takeIf { it >= 0 } ?: return null
         val col = columnAtPoint(e.point).takeIf { it >= 0 } ?: return null
         val modelRow = convertRowIndexToModel(row)
@@ -323,11 +324,11 @@ class JujutsuLogTable(
         val uri = when (modelCol) {
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 val frc = getFontMetrics(font).fontRenderContext
-                findInlinedBookmarkUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations)
+                findInlinedRefUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations)
             }
             else -> null
         } ?: return null
-        return resolveBookmarkClick(uri, entry)
+        return LogClickTarget.resolve(uri, entry)
     }
 
     /**

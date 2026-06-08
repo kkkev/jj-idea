@@ -36,6 +36,14 @@ internal fun bookmarkSetArgs(name: BookmarkName, revision: Revision = WorkingCop
         if (allowBackwards) add("-B")
     }
 
+internal fun tagSetArgs(tag: Tag, revision: Revision = WorkingCopy, allowMove: Boolean = false) =
+    buildList {
+        addAll(listOf("tag", "set", tag.name, "-r", revision.toString()))
+        if (allowMove) add("--allow-move")
+    }
+
+internal fun tagDeleteArgs(tag: Tag) = listOf("tag", "delete", tag.name)
+
 /** Build the argument list for `jj git fetch`. */
 internal fun gitFetchArgs(remote: Remote? = null, allRemotes: Boolean = false): List<String> = buildList {
     add("git")
@@ -284,6 +292,11 @@ class CliExecutor(
         }
         return execute(root, args)
     }
+
+    override fun tagSet(tag: Tag, revision: Revision, allowMove: Boolean) =
+        execute(root, tagSetArgs(tag, revision, allowMove))
+
+    override fun tagDelete(tag: Tag) = execute(root, tagDeleteArgs(tag))
 
     override fun bookmarkList(
         template: String?,

@@ -168,6 +168,12 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun bookmarkUntrack(name: BookmarkName): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
+    override fun tagSet(tag: Tag, revision: Revision, allowMove: Boolean): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
+    override fun tagDelete(tag: Tag): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
     override fun diffGit(revision: Revision): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 

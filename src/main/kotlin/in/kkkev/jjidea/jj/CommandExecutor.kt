@@ -136,6 +136,10 @@ interface CommandExecutor {
      */
     fun tagList(template: String? = null): CommandResult
 
+    fun tagSet(tag: Tag, revision: Revision = WorkingCopy, allowMove: Boolean = false): CommandResult
+
+    fun tagDelete(tag: Tag): CommandResult
+
     /**
      * List all bookmarks in the repository
      * @param template Optional template for output formatting
