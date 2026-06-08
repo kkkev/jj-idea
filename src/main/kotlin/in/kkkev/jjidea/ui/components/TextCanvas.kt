@@ -322,6 +322,7 @@ fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyLis
         is RevisionChoice.Ref -> {
             append(choice.item)
             val entry = choice.item.id?.let { id -> entries.find { it.id == id } }
+                ?: (choice.item as? TagItem)?.let { t -> entries.find { e -> e.tags.any { it.name == t.tag.name } } }
             if (entry != null) {
                 append(" ")
                 appendSummary(entry.description)

@@ -25,7 +25,9 @@ class JujutsuReferenceFilterComponent(
     private val project: Project,
     parentDisposable: Disposable
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.reference")), Disposable {
-    private var selectedReference: String? = null
+    private data class SelectedRef(val name: String, val type: ReferenceType)
+
+    private var selectedReference: SelectedRef? = null
 
     private var allBookmarkNames: Set<String> = emptySet()
     private var allTagNames: Set<String> = emptySet()
@@ -50,7 +52,7 @@ class JujutsuReferenceFilterComponent(
         repaint()
     }
 
-    override fun getCurrentText(): String = selectedReference ?: ""
+    override fun getCurrentText(): String = selectedReference?.name ?: ""
 
     override fun isValueSelected(): Boolean = selectedReference != null
 
@@ -88,11 +90,11 @@ class JujutsuReferenceFilterComponent(
     }
 
     private fun applyFilter() {
-        if (selectedReference == null) {
+        val ref = selectedReference ?: run {
             tableModel.setBookmarkFilter(emptySet())
             return
         }
-        val ancestorIds = getAncestorIds(selectedReference!!)
+        val ancestorIds = getAncestorIds(ref)
         when {
             ancestorIds != null -> {
                 expansionInFlight = false
@@ -102,7 +104,7 @@ class JujutsuReferenceFilterComponent(
             !expansionInFlight -> {
                 expansionInFlight = true
                 tableModel.setBookmarkFilter(emptySet())
-                onReferenceExpansionNeeded?.invoke(selectedReference!!)
+                onReferenceExpansionNeeded?.invoke(ref.name)
             }
             // expansion already in flight — wait for retryFilter()
         }
@@ -119,15 +121,17 @@ class JujutsuReferenceFilterComponent(
         )
     }
 
-    private fun getAncestorIds(referenceName: String): Set<ChangeId>? {
+    private fun getAncestorIds(ref: SelectedRef): Set<ChangeId>? {
         val allEntries = tableModel.getAllEntries()
         val result = mutableSetOf<ChangeId>()
         val toVisit = mutableSetOf<ChangeId>()
 
         val referencedEntry = allEntries.find { entry ->
-            if (referenceName == WorkingCopy.REF && entry.isWorkingCopy) return@find true
-            entry.bookmarks.any { it.name.name == referenceName } ||
-                entry.tags.any { it.name == referenceName }
+            when (ref.type) {
+                ReferenceType.WORKING_COPY -> entry.isWorkingCopy
+                ReferenceType.BOOKMARK -> entry.bookmarks.any { it.name.name == ref.name }
+                ReferenceType.TAG -> entry.tags.any { it.name == ref.name }
+            }
         } ?: return null
 
         toVisit.add(referencedEntry.id)
@@ -142,11 +146,11 @@ class JujutsuReferenceFilterComponent(
         return result
     }
 
-    private inner class SelectReferenceAction(private val reference: String, type: ReferenceType) :
+    private inner class SelectReferenceAction(private val reference: String, private val type: ReferenceType) :
         ToggleAction(reference, null, type.icon) {
-        override fun isSelected(e: AnActionEvent): Boolean = selectedReference == reference
+        override fun isSelected(e: AnActionEvent): Boolean = selectedReference == SelectedRef(reference, type)
         override fun setSelected(e: AnActionEvent, state: Boolean) {
-            selectedReference = if (state) reference else null
+            selectedReference = if (state) SelectedRef(reference, type) else null
             expansionInFlight = false
             notifyFilterChanged()
         }
