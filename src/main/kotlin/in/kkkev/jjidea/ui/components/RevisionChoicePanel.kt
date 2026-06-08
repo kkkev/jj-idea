@@ -30,6 +30,10 @@ import javax.swing.event.DocumentEvent
 
 private const val DEFAULT_LIMIT = 10
 
+// Hoisted to avoid per-render reflection (IconSpec.name eagerly calls icon.javaField).
+private val ICON_MUTABLE = icon(JujutsuIcons::Mutable)
+private val ICON_IMMUTABLE = icon(JujutsuIcons::Immutable)
+
 data class Filter(val includeRemote: Boolean, val includeLogEntries: Boolean, val query: String = "") {
     private fun matchesQuery(name: String, id: ChangeId?) =
         query.isEmpty() ||
@@ -90,6 +94,7 @@ abstract class RevisionChoicePanel(
     private var filter: Filter = initialFilter
     private var popup: JBPopup? = null
     private var immutableChangeIds: Set<String> = emptySet()
+    private var immutableTagNames: Set<String> = emptySet()
     private var allEntries: List<LogEntry> = emptyList()
 
     // Incremented on every loadData() call; EDT updates that arrive after a newer call was
@@ -178,13 +183,18 @@ abstract class RevisionChoicePanel(
         runInBackground {
             val entries = repo.logCache.all
             val items = buildItems(filter)
-            val immutable = entries.filter { it.immutable }.map { it.id.full }.toSet()
+            val immutableIds = entries.filter { it.immutable }.map { it.id.full }.toSet()
+            val immutableTags = entries
+                .filter { it.immutable }
+                .flatMap { e -> e.tags.map { it.name } }
+                .toSet()
             runLater {
                 if (version != loadVersion) return@runLater
                 allEntries = entries
-                immutableChangeIds = immutable
+                immutableChangeIds = immutableIds
+                immutableTagNames = immutableTags
                 listModel.clear()
-                items.forEach { listModel.addElement(it) }
+                listModel.addAll(items)
                 if (listModel.size() > 0) list.selectedIndex = 0
             }
         }
@@ -214,13 +224,13 @@ abstract class RevisionChoicePanel(
             val isImmutable = when (value) {
                 is RevisionChoice.Change -> value.entry.id.full in immutableChangeIds
                 is RevisionChoice.Ref -> when (val item = value.item) {
-                    is TagItem -> allEntries.find { e -> e.tags.any { it.name == item.tag.name } }?.immutable == true
+                    is TagItem -> item.tag.name in immutableTagNames
                     else -> item.id?.full in immutableChangeIds
                 }
             }
             val isWorkingCopy = value is RevisionChoice.Change && value.entry.isWorkingCopy
             fun doRender() {
-                canvas.append(icon(if (isImmutable) JujutsuIcons::Immutable else JujutsuIcons::Mutable))
+                canvas.append(if (isImmutable) ICON_IMMUTABLE else ICON_MUTABLE)
                 canvas.append(" ")
                 canvas.append(value, allEntries)
             }

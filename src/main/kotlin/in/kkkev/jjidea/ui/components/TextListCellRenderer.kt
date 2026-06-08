@@ -6,13 +6,18 @@ import javax.swing.JList
 import javax.swing.ListCellRenderer
 
 abstract class TextListCellRenderer<T>() : ListCellRenderer<T> {
+    // Single reused panel — standard Swing renderer pattern. Returning a new
+    // component per call causes the JList's CellRendererPane to accumulate
+    // unbounded children, making its per-add indexOf scan O(n²).
+    private val panel = TextCanvasPanel()
+
     override fun getListCellRendererComponent(
         list: JList<out T?>,
         value: T?,
         index: Int,
         isSelected: Boolean,
         cellHasFocus: Boolean
-    ) = TextCanvasPanel().apply {
+    ) = panel.apply {
         font = list.font
         background = if (isSelected) list.selectionBackground else null
 
