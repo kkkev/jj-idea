@@ -70,7 +70,7 @@ class JujutsuSettingsTest {
         settings.loadState(state)
 
         settings.state.logChangeLimit shouldBe 500
-        settings.state.settingsVersion shouldBe 3
+        settings.state.settingsVersion shouldBe 4
     }
 
     @Test
@@ -83,10 +83,10 @@ class JujutsuSettingsTest {
     }
 
     @Test
-    fun `settingsVersion is set to 3 after load`() {
+    fun `settingsVersion is set to 4 after load`() {
         val settings = JujutsuSettings()
         settings.loadState(JujutsuSettingsState(settingsVersion = 0))
-        settings.state.settingsVersion shouldBe 3
+        settings.state.settingsVersion shouldBe 4
     }
 
     private fun mockRepo(path: String): JujutsuRepository {

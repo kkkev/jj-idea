@@ -65,6 +65,28 @@ class JujutsuReferenceFilterComponent(
         if (selectedReference != null) applyFilter()
     }
 
+    /** Returns the name of the currently selected reference, or "" if none. */
+    fun getSelectedReferenceName(): String = selectedReference?.name ?: ""
+
+    /**
+     * Pre-sets the selected reference from a persisted name so it is applied when [retryFilter] is
+     * called from [onDataLoaded]. Determines the reference type from the known bookmark/tag lists;
+     * falls back to BOOKMARK for unknown names (e.g., stale state before the lists are populated).
+     */
+    fun setInitialReference(name: String) {
+        if (name.isEmpty()) return
+        val type = when {
+            name == "@" -> ReferenceType.WORKING_COPY
+            name in allTagNames -> ReferenceType.TAG
+            else -> ReferenceType.BOOKMARK
+        }
+        selectedReference = SelectedRef(name, type)
+        // Refresh the button icon and label without calling notifyFilterChanged(), because at init
+        // time the table model is empty and calling applyFilter() would spuriously set
+        // expansionInFlight=true before onReferenceExpansionNeeded is wired up.
+        refreshPresentation()
+    }
+
     override fun createActionGroup(): ActionGroup {
         val group = BackgroundActionGroup()
         val references = getAllReferences()

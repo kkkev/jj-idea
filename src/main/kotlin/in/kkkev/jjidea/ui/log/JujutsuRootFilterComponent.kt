@@ -39,6 +39,20 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
         }
     }
 
+    /** Returns the paths of all currently selected roots (defensive copy). */
+    fun getSelectedRootPaths(): Set<String> = selectedRoots.map { it.directory.path }.toSet()
+
+    /**
+     * Restores a persisted root-filter selection from repository paths.
+     * Matches [paths] against repos currently in the table model (loaded entries).
+     * Should be called from [onDataLoaded] after the model is populated.
+     */
+    fun setSelectedRoots(paths: Set<String>) {
+        selectedRoots.clear()
+        tableModel.getAllRoots().filterTo(selectedRoots) { it.directory.path in paths }
+        notifyFilterChanged()
+    }
+
     /**
      * Check if this filter should be visible.
      * Only show when there are multiple roots.

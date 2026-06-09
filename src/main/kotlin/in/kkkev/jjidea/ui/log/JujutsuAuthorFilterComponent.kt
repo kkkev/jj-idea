@@ -25,6 +25,19 @@ class JujutsuAuthorFilterComponent(private val tableModel: JujutsuLogTableModel)
         }
     }
 
+    /** Returns the set of currently selected authors (defensive copy). */
+    fun getSelectedAuthors(): Set<String> = selectedAuthors.toSet()
+
+    /**
+     * Restores a persisted author selection and immediately applies the filter.
+     * Clears any previously selected authors first.
+     */
+    fun setSelectedAuthors(authors: Collection<String>) {
+        selectedAuthors.clear()
+        selectedAuthors.addAll(authors)
+        notifyFilterChanged()
+    }
+
     override fun createActionGroup(): ActionGroup {
         val group = BackgroundActionGroup()
 

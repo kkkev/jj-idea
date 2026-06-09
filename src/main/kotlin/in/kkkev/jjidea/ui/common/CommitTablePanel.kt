@@ -31,17 +31,21 @@ import kotlin.reflect.KMutableProperty1
 abstract class CommitTablePanel<D>(
     protected val project: Project,
     private val toolbarPlace: String,
-    dataLoaderFactory: (CommitTablePanel<D>) -> DataLoader
+    dataLoaderFactory: (CommitTablePanel<D>) -> DataLoader,
+    initialDetailsOnRight: Boolean = true,
+    configureColumnManager: (JujutsuColumnManager) -> Unit = {}
 ) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val log = Logger.getInstance(javaClass)
 
-    val columnManager = JujutsuColumnManager()
+    val columnManager = JujutsuColumnManager().also(configureColumnManager)
 
     val logTable = JujutsuLogTable(project, columnManager)
 
     val dataLoader = dataLoaderFactory.invoke(this)
 
     lateinit var referenceFilterComponent: JujutsuReferenceFilterComponent
+    protected lateinit var authorFilterComponent: JujutsuAuthorFilterComponent
+    protected lateinit var dateFilterComponent: JujutsuDateFilterComponent
 
     // Details panel showing selected commit info
     val detailsPanel = JujutsuCommitDetailsPanel(project)
@@ -50,22 +54,33 @@ abstract class CommitTablePanel<D>(
     var splitter: OnePixelSplitter
 
     // Details panel position (true = right, false = bottom)
-    var detailsOnRight = true
+    var detailsOnRight = initialDetailsOnRight
 
     // Filter panel using SearchFieldWithExtension
     private val filterField: SearchFieldWithExtension
 
     // Base search field with history
-    private val searchTextField = SearchTextField(true).apply {
+    protected val searchTextField = SearchTextField(true).apply {
         textEditor.emptyText.text = JujutsuBundle.message("log.filter.text.placeholder")
         toolTipText = JujutsuBundle.message("log.filter.text.tooltip")
 
         // Listen for text changes
         textEditor.document.addDocumentListener(
             object : DocumentListener {
-                override fun insertUpdate(e: DocumentEvent?) = applyFilter()
-                override fun removeUpdate(e: DocumentEvent?) = applyFilter()
-                override fun changedUpdate(e: DocumentEvent?) = applyFilter()
+                override fun insertUpdate(e: DocumentEvent?) {
+                    applyFilter()
+                    onConfigChanged()
+                }
+
+                override fun removeUpdate(e: DocumentEvent?) {
+                    applyFilter()
+                    onConfigChanged()
+                }
+
+                override fun changedUpdate(e: DocumentEvent?) {
+                    applyFilter()
+                    onConfigChanged()
+                }
             }
         )
 
@@ -203,21 +218,19 @@ abstract class CommitTablePanel<D>(
         add(Box.createHorizontalStrut(5))
 
         // Author filter
-        add(
-            JujutsuAuthorFilterComponent(logTable.logModel).apply {
-                initUi()
-                initialize()
-            }
-        )
+        authorFilterComponent = JujutsuAuthorFilterComponent(logTable.logModel).apply {
+            initUi()
+            initialize()
+        }
+        add(authorFilterComponent)
         add(Box.createHorizontalStrut(5))
 
         // Date filter
-        add(
-            JujutsuDateFilterComponent(logTable.logModel).apply {
-                initUi()
-                initialize()
-            }
-        )
+        dateFilterComponent = JujutsuDateFilterComponent(logTable.logModel).apply {
+            initUi()
+            initialize()
+        }
+        add(dateFilterComponent)
         // Note: Paths filter is omitted in unified mode as it requires a single root
     }
 
@@ -230,6 +243,12 @@ abstract class CommitTablePanel<D>(
         ColumnsAction(),
         DetailsPositionAction()
     )
+
+    /**
+     * Hook called whenever any persisted UI state changes (column visibility, details position,
+     * filter options, or search text). Subclasses override to persist to their [LogWindowConfig].
+     */
+    open fun onConfigChanged() {}
 
     /**
      * Refresh action - reload commits from all repositories.
@@ -305,6 +324,7 @@ abstract class CommitTablePanel<D>(
         override fun setSelected(e: AnActionEvent, state: Boolean) {
             property.set(this@CommitTablePanel, state)
             applyFilter()
+            onConfigChanged()
         }
     }
 
@@ -359,6 +379,7 @@ abstract class CommitTablePanel<D>(
         override fun setSelected(e: AnActionEvent, state: Boolean) {
             property.setter.invoke(columnManager, state)
             updateTableStuff()
+            onConfigChanged()
         }
     }
 
@@ -424,6 +445,8 @@ abstract class CommitTablePanel<D>(
         // Refresh UI
         revalidate()
         repaint()
+
+        onConfigChanged()
 
         log.info("Details panel position toggled to ${if (detailsOnRight) "right" else "bottom"}")
     }

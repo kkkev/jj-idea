@@ -9,11 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Working-copy switcher widget no longer paints doubled (two icons and two copies of the text).
+- Filter components (reference, author, date) now show the correct X close icon immediately after IDE restart when a filter is active — previously the icon stayed as a dropdown arrow until the filter was interacted with.
+- Status bar widget no longer throws an EDT-access exception on startup in projects with Jujutsu repositories.
 
 ### Changed
 - Improved log performance when expanding context around a commit in large repositories.
 
 ### Added
+- Multiple independent log windows: click the **+** button in the VCS tool window tab strip to open a new tab (all repos, default name). In projects with both Git and Jujutsu, the action appears in Git's existing "▼" dropdown. Right-click any Jujutsu log tab → **Rename…** to rename it inline. All filter state (search text, reference, author, date, root filter selection) and layout (column visibility, widths, details position) persists per-window across restarts.
 - Tag create/set and delete actions (requires jj 0.37+): right-click a commit in the log to set a tag at that revision, or expand the "Tag" submenu to delete an existing tag. Right-clicking a tag chip directly also offers a delete action. Moving an existing tag prompts for confirmation. The bookmark and tag chip plumbing (URI scheme, hit-testing, popup dispatch) is now unified.
 - Show repository roots in change trees and bookmark widget menus using coloured repository icons.
 

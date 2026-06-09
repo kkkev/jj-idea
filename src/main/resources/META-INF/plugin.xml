@@ -132,6 +132,24 @@
       <!-- Not added to VcsGroup to avoid StandardVcsGroup requirement -->
     </action>
 
+    <!--
+      Open a new Jujutsu log tab with a default name and all repositories.
+      Appears as "+" in the tab strip (pure-JJ) and in Git's "▼" dropdown (mixed Git+JJ).
+    -->
+    <action id="Jujutsu.NewLogTab"
+            class="in.kkkev.jjidea.actions.top.NewLogTabAction">
+      <add-to-group group-id="LocalChangesView.TabActions"/>
+      <add-to-group group-id="Vcs.Log.ToolWindow.TabActions.DropDown"
+                    anchor="after" relative-to-action="Vcs.ShowConsoleTab"/>
+    </action>
+
+    <!-- Right-click "Rename…" for Jujutsu log tabs in the VCS tool window. -->
+    <action id="Jujutsu.RenameLogTab"
+            class="in.kkkev.jjidea.actions.log.RenameJujutsuLogTabAction"
+            text="Rename…">
+      <add-to-group group-id="ToolWindowContextMenu" anchor="last"/>
+    </action>
+
     <!-- Show Diff action - defined before EditorGroup so it can be referenced -->
     <action id="Jujutsu.ShowChangesDiff" class="in.kkkev.jjidea.actions.filechange.ShowDiffAction">
       <keyboard-shortcut first-keystroke="control D" keymap="$default"/>

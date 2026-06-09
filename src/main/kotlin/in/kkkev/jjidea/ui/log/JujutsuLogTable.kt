@@ -438,27 +438,50 @@ class JujutsuLogTable(
     }
 
     /**
-     * Save current column widths to settings.
+     * When set, column widths are read from / written to this map instead of global settings.
+     * Set by [in.kkkev.jjidea.ui.log.UnifiedJujutsuLogPanel] to point at the per-window config map.
+     */
+    var columnWidthsStorage: MutableMap<String, Int>? = null
+
+    /**
+     * Called after a per-window column-width save so the panel can persist the whole config.
+     * Only invoked when [columnWidthsStorage] is set.
+     */
+    var onColumnWidthsSaved: (() -> Unit)? = null
+
+    /**
+     * Save current column widths.
+     *
+     * If [columnWidthsStorage] is set, writes there and calls [onColumnWidthsSaved].
+     * Otherwise falls back to the global [JujutsuSettings.state.columnWidths].
      */
     private fun saveColumnWidths() {
-        val settings = JujutsuSettings.getInstance(project)
-        val widths = settings.state.columnWidths.toMutableMap()
-        for (i in 0 until columnModel.columnCount) {
-            val column = columnModel.getColumn(i)
-            JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key ->
-                widths[key] = column.width
+        val storage = columnWidthsStorage
+        if (storage != null) {
+            for (i in 0 until columnModel.columnCount) {
+                val column = columnModel.getColumn(i)
+                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> storage[key] = column.width }
             }
+            onColumnWidthsSaved?.invoke()
+        } else {
+            val settings = JujutsuSettings.getInstance(project)
+            val widths = settings.state.columnWidths.toMutableMap()
+            for (i in 0 until columnModel.columnCount) {
+                val column = columnModel.getColumn(i)
+                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> widths[key] = column.width }
+            }
+            settings.state.columnWidths = widths
         }
-        settings.state.columnWidths = widths
     }
 
     /**
-     * Load saved column widths from settings and apply them to columns.
+     * Load saved column widths and apply them to the current columns.
+     *
+     * Reads from [columnWidthsStorage] when set, otherwise from [JujutsuSettings.state.columnWidths].
      * Should be called after columns are set up.
      */
     fun loadColumnWidths() {
-        val settings = JujutsuSettings.getInstance(project)
-        val savedWidths = settings.state.columnWidths
+        val savedWidths = columnWidthsStorage ?: JujutsuSettings.getInstance(project).state.columnWidths
         if (savedWidths.isEmpty()) return
         for (i in 0 until columnModel.columnCount) {
             val column = columnModel.getColumn(i)

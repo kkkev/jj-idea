@@ -28,6 +28,28 @@ class JujutsuColumnManager {
         else -> false
     }
 
+    /** Restore visibility state from a persisted [config]. Does not touch [showRootGutterColumn] (always dynamic). */
+    fun loadFrom(config: `in`.kkkev.jjidea.settings.LogWindowConfig) {
+        showAuthorColumn = config.showAuthorColumn
+        showCommitterColumn = config.showCommitterColumn
+        showDateColumn = config.showDateColumn
+        showStatus = config.showStatus
+        showChangeId = config.showChangeId
+        showDescription = config.showDescription
+        showDecorations = config.showDecorations
+    }
+
+    /** Persist current visibility state into [config]. Does not include [showRootGutterColumn] (dynamic). */
+    fun saveTo(config: `in`.kkkev.jjidea.settings.LogWindowConfig) {
+        config.showAuthorColumn = showAuthorColumn
+        config.showCommitterColumn = showCommitterColumn
+        config.showDateColumn = showDateColumn
+        config.showStatus = showStatus
+        config.showChangeId = showChangeId
+        config.showDescription = showDescription
+        config.showDecorations = showDecorations
+    }
+
     companion object {
         val DEFAULT = JujutsuColumnManager()
     }

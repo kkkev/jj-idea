@@ -103,6 +103,19 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
     }
 
     /**
+     * Refreshes the button icon and value label to match the current filter state without
+     * notifying model change listeners. Use this after silently mutating selection state
+     * (e.g. restoring persisted state at init time) when triggering [notifyFilterChanged]
+     * would have undesirable side-effects on the data model.
+     */
+    protected fun refreshPresentation() {
+        setDefaultForeground()
+        updateFilterButton()
+        valueLabel.revalidate()
+        valueLabel.repaint()
+    }
+
+    /**
      * Get the current display text for the filter value.
      * Returns empty string when no filter is active.
      */

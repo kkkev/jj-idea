@@ -24,6 +24,23 @@ class JujutsuDateFilterComponent(private val tableModel: JujutsuLogTableModel) :
         }
     }
 
+    /**
+     * Returns the [DatePeriod.name] of the currently selected period, or "" if none.
+     * Suitable for round-trip persistence in [in.kkkev.jjidea.settings.LogWindowConfig.dateFilterPeriodName].
+     */
+    fun getSelectedPeriodName(): String = selectedPeriod?.name ?: ""
+
+    /**
+     * Restores a persisted date filter from a [DatePeriod.name] string and applies it.
+     * A blank or unknown [periodName] clears the filter.
+     */
+    fun setSelectedPeriod(periodName: String) {
+        selectedPeriod = periodName.takeIf { it.isNotEmpty() }?.let {
+            runCatching { DatePeriod.valueOf(it) }.getOrNull()
+        }
+        notifyFilterChanged()
+    }
+
     override fun createActionGroup(): ActionGroup {
         val group = BackgroundActionGroup()
 

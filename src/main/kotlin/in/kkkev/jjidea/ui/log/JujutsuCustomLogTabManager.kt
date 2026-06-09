@@ -6,11 +6,14 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
+import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.settings.LogWindowConfig
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -20,41 +23,45 @@ import java.awt.CardLayout
 import javax.swing.JPanel
 
 /**
- * Service that manages opening custom Jujutsu log tabs.
+ * Service that manages opening and restoring custom Jujutsu log tabs.
  *
- * Creates a unified log tab that shows commits from all JJ repositories
- * with filtering capability by root.
- *
- * Built from scratch using JTable - no dependency on VcsLogUi.
+ * Supports multiple independent log windows, each backed by a [LogWindowConfig] that is persisted
+ * across IDE restarts. Mirrors the multi-tab pattern from [JujutsuFileHistoryTabManager].
  */
 @Service(Service.Level.PROJECT)
 class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
 
-    // Single unified log tab content
-    private var unifiedLogContent: Content? = null
-    private var unifiedLogPanel: UnifiedJujutsuLogPanel? = null
+    private data class LogTabHandle(
+        val config: LogWindowConfig,
+        val content: Content,
+        val panel: UnifiedJujutsuLogPanel,
+        val wrapper: JPanel,
+        val cardLayout: CardLayout,
+        var notInstalledPanel: JPanel
+    )
 
-    // Wrapper panel with CardLayout for switching between log and not-installed states
-    private var wrapperPanel: JPanel? = null
-    private var cardLayout: CardLayout? = null
-    private var notInstalledPanel: JPanel? = null
+    /** Open tabs keyed by [LogWindowConfig.id]. */
+    private val openTabs = mutableMapOf<String, LogTabHandle>()
 
     companion object {
         private const val CARD_LOG = "log"
         private const val CARD_NOT_INSTALLED = "notInstalled"
 
+        /** User-data key marking every [Content] that belongs to a Jujutsu log window. */
+        val JUJUTSU_LOG_CONTENT_KEY: Key<Boolean> = Key.create("jujutsu.log.content")
+
         fun getInstance(project: Project): JujutsuCustomLogTabManager = project.service()
     }
 
     /**
-     * Opens the unified Jujutsu log tab.
+     * Opens or restores all persisted log windows.
      *
-     * Creates a single tab showing commits from all JJ repositories
-     * with a root filter for multi-root projects.
+     * On first run creates a default window via [JujutsuSettings.ensureDefaultWindow].
+     * Already-open tabs are skipped (dedup by config id). The default window is selected.
      */
     fun openCustomLogTab() {
-        log.info("Opening unified Jujutsu log tab")
+        log.info("Opening Jujutsu log tab(s)")
 
         runInBackground {
             try {
@@ -63,85 +70,89 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
                     return@runInBackground
                 }
 
-                val contentFactory = ContentFactory.getInstance()
+                val settings = JujutsuSettings.getInstance(project)
+                val windows = settings.logWindows().ifEmpty { listOf(settings.ensureDefaultWindow()) }
+
                 val changesViewContentManager = ChangesViewContentManager.getInstance(project)
 
                 runLater {
-                    // Only create one unified tab if not already open
-                    if (unifiedLogContent == null) {
-                        // Create wrapper panel with CardLayout
-                        val layout = CardLayout()
-                        cardLayout = layout
-                        val wrapper = JPanel(layout)
-                        wrapperPanel = wrapper
-
-                        // Create unified log panel for all roots
-                        val logPanel = UnifiedJujutsuLogPanel(project)
-                        unifiedLogPanel = logPanel
-
-                        // Register for disposal
-                        Disposer.register(this, logPanel)
-
-                        // Add log panel to wrapper
-                        wrapper.add(logPanel, CARD_LOG)
-
-                        // Create placeholder not-installed panel (will be updated by status listener)
-                        val notInstalled = JPanel(BorderLayout())
-                        notInstalledPanel = notInstalled
-                        wrapper.add(notInstalled, CARD_NOT_INSTALLED)
-
-                        // Subscribe to availability status changes
-                        subscribeToAvailabilityStatus()
-
-                        // Create content tab
-                        val content = contentFactory.createContent(wrapper, "Jujutsu Log", false)
-                            .apply {
-                                isCloseable = false
-                                preferredFocusableComponent = wrapper
-                            }
-
-                        // Add to changes view (Git tool window area)
-                        changesViewContentManager.addContent(content)
-                        changesViewContentManager.setSelectedContent(content)
-
-                        unifiedLogContent = content
-                    } else {
-                        // Tab already exists, just select it
-                        unifiedLogContent?.let { changesViewContentManager.setSelectedContent(it) }
+                    for (config in windows) {
+                        if (openTabs.containsKey(config.id)) continue
+                        val handle = createTab(config)
+                        openTabs[config.id] = handle
+                        changesViewContentManager.addContent(handle.content)
                     }
+                    // Select the default window (or first available)
+                    val defaultTab = openTabs[JujutsuSettings.DEFAULT_LOG_WINDOW_ID] ?: openTabs.values.firstOrNull()
+                    defaultTab?.let { changesViewContentManager.setSelectedContent(it.content) }
                 }
 
-                log.info("Unified Jujutsu log tab opened successfully")
+                log.info("Jujutsu log tab(s) opened successfully")
             } catch (e: Exception) {
-                log.error("Failed to open unified Jujutsu log tab", e)
+                log.error("Failed to open Jujutsu log tab(s)", e)
             }
         }
     }
 
-    private fun subscribeToAvailabilityStatus() {
-        val checker = JjAvailabilityChecker.getInstance(project)
-        checker.status.connect(this) { status -> updateForAvailabilityStatus(status) }
+    /**
+     * Opens a new log tab for the given [config], persisting it to settings and selecting it.
+     */
+    fun openNewLogTab(config: LogWindowConfig) {
+        log.info("Opening new log tab: ${config.name}")
+        JujutsuSettings.getInstance(project).upsertLogWindow(config)
 
-        // Check current status immediately
-        updateForAvailabilityStatus(checker.status.value)
+        val changesViewContentManager = ChangesViewContentManager.getInstance(project)
+        runLater {
+            val handle = createTab(config)
+            openTabs[config.id] = handle
+            changesViewContentManager.addContent(handle.content)
+            changesViewContentManager.setSelectedContent(handle.content)
+        }
     }
 
-    private fun updateForAvailabilityStatus(status: JjAvailabilityStatus) {
-        val wrapper = wrapperPanel ?: return
-        val layout = cardLayout ?: return
+    private fun createTab(config: LogWindowConfig): LogTabHandle {
+        val layout = CardLayout()
+        val wrapper = JPanel(layout)
 
-        when (status) {
-            is JjAvailabilityStatus.Available -> {
-                layout.show(wrapper, CARD_LOG)
+        val logPanel = UnifiedJujutsuLogPanel(project, config)
+        Disposer.register(this, logPanel)
+        wrapper.add(logPanel, CARD_LOG)
+
+        val notInstalled = JPanel(BorderLayout())
+        wrapper.add(notInstalled, CARD_NOT_INSTALLED)
+
+        val isDefault = config.id == JujutsuSettings.DEFAULT_LOG_WINDOW_ID
+        val content = ContentFactory.getInstance().createContent(wrapper, config.name, false).apply {
+            isCloseable = !isDefault
+            preferredFocusableComponent = wrapper
+            putUserData(JUJUTSU_LOG_CONTENT_KEY, true)
+            if (!isDefault) {
+                setDisposer {
+                    openTabs.remove(config.id)
+                    JujutsuSettings.getInstance(project).removeLogWindow(config.id)
+                    log.info("Log tab closed and removed from settings: ${config.name}")
+                }
             }
+        }
 
+        // Subscribe to availability status (per-tab card switching)
+        val checker = JjAvailabilityChecker.getInstance(project)
+        checker.status.connect(this) { status -> updateTabForAvailabilityStatus(config.id, status) }
+        updateTabForAvailabilityStatus(config.id, checker.status.value)
+
+        return LogTabHandle(config, content, logPanel, wrapper, layout, notInstalled)
+    }
+
+    private fun updateTabForAvailabilityStatus(tabId: String, status: JjAvailabilityStatus) {
+        val handle = openTabs[tabId] ?: return
+        when (status) {
+            is JjAvailabilityStatus.Available -> handle.cardLayout.show(handle.wrapper, CARD_LOG)
             else -> {
-                // Replace the not-installed panel with fresh content (including Checking state)
-                notInstalledPanel?.let { wrapper.remove(it) }
-                val newNotInstalledPanel = JjNotInstalledPanel(project, status)
-                notInstalledPanel = newNotInstalledPanel
-                wrapper.add(newNotInstalledPanel, CARD_NOT_INSTALLED)
-                layout.show(wrapper, CARD_NOT_INSTALLED)
+                handle.wrapper.remove(handle.notInstalledPanel)
+                val fresh = JjNotInstalledPanel(project, status)
+                handle.notInstalledPanel = fresh
+                handle.wrapper.add(fresh, CARD_NOT_INSTALLED)
+                handle.cardLayout.show(handle.wrapper, CARD_NOT_INSTALLED)
             }
         }
     }
@@ -151,41 +162,47 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
      * Used when navigating to a commit from annotations or other entry points.
      */
     fun activateLogTab() {
-        val content = unifiedLogContent ?: return
+        val handle = openTabs[JujutsuSettings.DEFAULT_LOG_WINDOW_ID] ?: openTabs.values.firstOrNull() ?: return
         val changesViewContentManager = ChangesViewContentManager.getInstance(project)
-        changesViewContentManager.setSelectedContent(content)
-        ChangesViewContentManager.getToolWindowFor(project, content.displayName)?.activate(null)
+        changesViewContentManager.setSelectedContent(handle.content)
+        ChangesViewContentManager.getToolWindowFor(project, handle.content.displayName)?.activate(null)
     }
 
     /**
-     * Closes the unified Jujutsu log tab.
+     * Closes all open Jujutsu log tabs.
      *
-     * Called when JJ roots are removed from the project, allowing the native VCS log to return.
+     * Called when JJ roots are removed from the project so the native VCS log can return.
      */
     fun closeCustomLogTab() {
-        log.info("Closing unified Jujutsu log tab")
+        log.info("Closing all Jujutsu log tabs")
 
         runLater {
-            unifiedLogContent?.let { content ->
+            val contentManager = ChangesViewContentManager.getInstance(project)
+            for (handle in openTabs.values) {
                 try {
-                    ChangesViewContentManager.getInstance(project).removeContent(content)
-                    log.info("Unified Jujutsu log tab closed successfully")
+                    contentManager.removeContent(handle.content)
                 } catch (e: Exception) {
-                    log.warn("Failed to close unified Jujutsu log tab", e)
+                    log.warn("Failed to close log tab: ${handle.config.name}", e)
                 }
             }
-            unifiedLogContent = null
-            unifiedLogPanel = null
+            openTabs.clear()
         }
+    }
+
+    /**
+     * Renames the given [content] tab and persists the new name to settings.
+     * Called from [in.kkkev.jjidea.actions.log.RenameJujutsuLogTabAction].
+     */
+    fun renameTab(content: Content, newName: String) {
+        content.displayName = newName
+        val handle = openTabs.values.firstOrNull { it.content === content } ?: return
+        handle.config.name = newName
+        JujutsuSettings.getInstance(project).upsertLogWindow(handle.config)
     }
 
     override fun dispose() {
         log.info("Disposing JujutsuCustomLogTabManager")
-        unifiedLogContent = null
-        unifiedLogPanel = null
-        wrapperPanel = null
-        cardLayout = null
-        notInstalledPanel = null
-        // Cleanup happens automatically via Disposer
+        openTabs.clear()
+        // Child disposables (panels) are cleaned up automatically via Disposer
     }
 }
