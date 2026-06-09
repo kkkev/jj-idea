@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.bookmark.*
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.common.RepositoryIcons
 
 class JujutsuBookmarkWidget(project: Project) : JujutsuFilterComponent("Bookmark"), Disposable {
     private var wcEntries: List<LogEntry> = emptyList()
@@ -67,6 +68,7 @@ class JujutsuBookmarkWidget(project: Project) : JujutsuFilterComponent("Bookmark
                 val repoGroups = bookmarksByRepo[repo].orEmpty().map { it.bookmark }.grouped()
                 val wcEntry = wcEntries.firstOrNull { it.repo == repo }
                 DefaultActionGroup(repo.displayName, true).apply {
+                    templatePresentation.icon = RepositoryIcons[repo]
                     repoActionGroup(repo, wcEntry, repoGroups, wcBookmarkNames, repoByBookmark).forEach(::add)
                 }
             }

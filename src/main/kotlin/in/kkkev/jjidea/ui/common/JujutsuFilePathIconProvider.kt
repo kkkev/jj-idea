@@ -3,9 +3,6 @@ package `in`.kkkev.jjidea.ui.common
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.FilePathIconProvider
-import `in`.kkkev.jjidea.ui.components.IconResolver
-import `in`.kkkev.jjidea.ui.components.icon
-import `in`.kkkev.jjidea.ui.log.RepositoryColors
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
@@ -17,9 +14,6 @@ class JujutsuFilePathIconProvider : FilePathIconProvider {
     override fun getIcon(filePath: FilePath, isDirectory: Boolean, project: Project?) = project
         ?.possibleJujutsuRepositoryFor(filePath)
         ?.takeIf { it.directory.filePath == filePath }
-        ?.let { repo ->
-            val fillColor = RepositoryColors.getColor(repo)
-            val iconSpec = icon(JujutsuIcons::Repo).copy(fillColor = fillColor)
-            IconResolver.resolveIcon(iconSpec.qualified)
-        }
+        ?.let { repo -> RepositoryIcons[repo] }
 }
+
