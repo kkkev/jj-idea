@@ -76,11 +76,9 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     private val byBookmark = ConcurrentHashMap<BookmarkName, ChangeId>()
 
     // Tracks insertion order so snapshot() returns entries in the same order they were stored
-    // (topological order from the data loader). Updated under orderLock to prevent lost-write races
-    // between concurrent loadContext and loadCommits calls.
-    @Volatile
-    private var orderedIds: List<ChangeId> = emptyList()
-    private val orderLock = Any()
+    // (topological order from the data loader). LinkedHashSet gives O(1) remove+reinsert vs the
+    // O(n) filterNot+concat that a List requires. All reads and writes synchronize on orderedIds.
+    private val orderedIds = LinkedHashSet<ChangeId>()
 
     init {
         repo.project.messageBus.connect(repo.project as Disposable).subscribe(
@@ -134,9 +132,11 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
             byCommitId[entry.commitId] = entry.id
             entry.bookmarks.forEach { byBookmark[it.name] = entry.id }
         }
-        val newIds = entries.map { it.id }.toHashSet()
-        synchronized(orderLock) {
-            orderedIds = orderedIds.filterNot { it in newIds } + entries.map { it.id }
+        synchronized(orderedIds) {
+            for (entry in entries) {
+                orderedIds.remove(entry.id)
+                orderedIds.add(entry.id)
+            }
         }
         log.debug("Stored ${entries.size} entries (repo=${repo.displayName})")
     }
@@ -146,12 +146,14 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         store.clear()
         byCommitId.clear()
         byBookmark.clear()
-        synchronized(orderLock) {
-            orderedIds = emptyList()
+        synchronized(orderedIds) {
+            orderedIds.clear()
         }
         log.debug("Cleared $total entries (repo=${repo.displayName})")
     }
 
-    private fun snapshot(): List<LogEntry>? =
-        orderedIds.mapNotNull { store[it] }.ifEmpty { null }
+    private fun snapshot(): List<LogEntry>? {
+        val ids = synchronized(orderedIds) { orderedIds.toList() }
+        return ids.mapNotNull { store[it] }.ifEmpty { null }
+    }
 }

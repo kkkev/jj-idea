@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- `RepoLogCache.store()` is now O(|batch|) per call instead of O(n): replaced the `List` + `filterNot`+concat with a `LinkedHashSet` that does O(1) remove+reinsert per entry.
+
 ### Added
 - Tag create/set and delete actions (requires jj 0.37+): right-click a commit in the log to set a tag at that revision, or expand the "Tag" submenu to delete an existing tag. Right-clicking a tag chip directly also offers a delete action. Moving an existing tag prompts for confirmation. The bookmark and tag chip plumbing (URI scheme, hit-testing, popup dispatch) is now unified.
 - Show repository roots in change trees and bookmark widget menus using coloured repository icons.
