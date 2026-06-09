@@ -260,7 +260,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                     if (repos.isEmpty()) return
 
                     val dirtyScopeManager = VcsDirtyScopeManager.getInstance(project)
-                    var hasRepoChanges = false
+                    val dirtyFiles = mutableListOf<VirtualFile>()
                     events.forEach { event ->
                         when (event) {
                             is VFileContentChangeEvent, is VFileCreateEvent, is VFileDeleteEvent -> {
@@ -268,13 +268,14 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                                     if (repos.any { VfsUtil.isAncestor(it.directory, file, false) } &&
                                         !isUnderJjDirectory(file, repos)
                                     ) {
-                                        dirtyScopeManager.fileDirty(file)
-                                        hasRepoChanges = true
+                                        dirtyFiles.add(file)
                                     }
                                 }
                             }
                         }
                     }
+                    if (dirtyFiles.isNotEmpty()) dirtyScopeManager.filesDirty(dirtyFiles, null)
+                    var hasRepoChanges = dirtyFiles.isNotEmpty()
 
                     // When .gitignore or .git/info/exclude changes, invalidate the ignore cache
                     // and mark the repo dirty recursively so getChanges re-enumerates ignored files.

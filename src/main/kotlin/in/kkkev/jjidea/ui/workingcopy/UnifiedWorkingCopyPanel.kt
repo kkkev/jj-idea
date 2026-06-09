@@ -22,6 +22,8 @@ import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.update.MergingUpdateQueue
+import com.intellij.util.ui.update.Update
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
@@ -77,6 +79,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     // Flag to ignore programmatic expand/collapse events
     private var ignoreExpansionEvents = true
+
+    // Coalesces rapid change-list / working-copy events into a single tree rebuild.
+    // Both listener paths (changeListUpdateDone + workingCopies) queue the same identity
+    // Update, so an editing burst rebuilds once per window instead of per event.
+    private val reloadQueue = MergingUpdateQueue("wcReload", 200, true, null, this)
 
     init {
         userCollapsedPaths = loadCollapsedPaths()
@@ -216,7 +223,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
                 }
                 // Sync changes tree — handles the case where the panel was created after
                 // changeListUpdateDone already fired (ChangeListManager already has the data).
-                reloadChangesFromCache()
+                scheduleReloadChanges()
             }
         }
 
@@ -296,12 +303,15 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             }.takeIf { it.isNotEmpty() }
             ?.joinToString("/")
 
+    private fun scheduleReloadChanges() =
+        reloadQueue.queue(Update.create("reload") { reloadChangesFromCache() })
+
     private fun setupVfsListener() {
         project.messageBus.connect(this).subscribe(
             ChangeListListener.TOPIC,
             object : ChangeListListener {
                 override fun changeListUpdateDone() {
-                    reloadChangesFromCache()
+                    scheduleReloadChanges()
                 }
             }
         )

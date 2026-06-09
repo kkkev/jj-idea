@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Working-copy switcher widget no longer paints doubled (two icons and two copies of the text).
 - Filter components (reference, author, date) now show the correct X close icon immediately after IDE restart when a filter is active — previously the icon stayed as a dropdown arrow until the filter was interacted with.
 - Status bar widget no longer throws an EDT-access exception on startup in projects with Jujutsu repositories.
+- Working-copy panel no longer flickers or lags with 40+ changed files. Rapid file-save bursts (e.g. save-all over a large working copy) are coalesced into a single tree rebuild per 200ms window using `MergingUpdateQueue`, and bulk VFS events now issue a single batched `filesDirty()` call instead of one call per file.
 
 ### Changed
 - Improved log performance when expanding context around a commit in large repositories.
