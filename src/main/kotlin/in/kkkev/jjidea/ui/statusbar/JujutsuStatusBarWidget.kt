@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.statusbar
 
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -17,6 +16,7 @@ import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
 import `in`.kkkev.jjidea.ui.components.RevisionChoice
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Graphics
 import java.awt.event.MouseAdapter
@@ -26,9 +26,6 @@ import javax.swing.JLabel
 import javax.swing.JPanel
 
 class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidget {
-    // DIAGNOSTIC: remove once doubled-widget bug is diagnosed
-    private val log = Logger.getInstance(JujutsuStatusBarWidget::class.java)
-
     private val panel = WidgetPanel()
     private var currentRepo: JujutsuRepository? = null
 
@@ -52,31 +49,30 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
     override fun getPresentation(): StatusBarWidget.WidgetPresentation? = null
 
     override fun install(statusBar: StatusBar) {
-        // DIAGNOSTIC: detect double-install
-        log.info("install: thread=${Thread.currentThread().name} widget=$this")
-
         panel.onClick = ::openPopup
 
-        project.stateModel.workingCopies.connect(this) { _ -> refresh("workingCopies") }
+        project.stateModel.workingCopies.connect(this) { _ -> refresh() }
 
         project.messageBus.connect(this).subscribe(
             FileEditorManagerListener.FILE_EDITOR_MANAGER,
             object : FileEditorManagerListener {
-                override fun selectionChanged(event: FileEditorManagerEvent) = refresh("selectionChanged")
+                override fun selectionChanged(event: FileEditorManagerEvent) = refresh()
             }
         )
 
-        refresh("install")
+        refresh()
     }
 
-    private fun refresh(source: String = "?") {
-        // DIAGNOSTIC: log call site and thread for each refresh
-        log.info("refresh($source): thread=${Thread.currentThread().name} widget=$this")
+    private fun refresh() {
         val selectedFile = FileEditorManager.getInstance(project).selectedEditor?.file
         val repo = JujutsuWidgetSupport.currentRepository(project, selectedFile)
         val entry = repo?.let { project.stateModel.workingCopies.value[it.directory.path] }
-        currentRepo = repo
-        panel.update(repo, entry, isMultiRoot = project.stateModel.initialisedRepositories.value.size > 1)
+        val isMultiRoot = project.stateModel.initialisedRepositories.value.size > 1
+        // Data can be read on any thread; UI mutation must happen on EDT.
+        runLater {
+            currentRepo = repo
+            panel.update(repo, entry, isMultiRoot = isMultiRoot)
+        }
     }
 
     private fun openPopup() {
@@ -90,9 +86,6 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
     }
 
     private class WidgetPanel : JPanel(BorderLayout()) {
-        // DIAGNOSTIC: remove once doubled-widget bug is diagnosed
-        private val log = Logger.getInstance(WidgetPanel::class.java)
-
         var onClick: (() -> Unit)? = null
         private val content = TextCanvasPanel()
         private val arrow = JLabel(" ▾")
@@ -129,10 +122,7 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
         fun update(repo: JujutsuRepository?, entry: LogEntry?, isMultiRoot: Boolean) {
             val canvas = FragmentRecordingCanvas()
             entry?.let { canvas.append(RevisionChoice.Change(it)) }
-            // DIAGNOSTIC: log content component count before/after to detect accumulation
-            log.info("WidgetPanel.update: panel=$this contentBefore=${content.componentCount}")
             content.renderFrom(canvas)
-            log.info("WidgetPanel.update: contentAfter=${content.componentCount}")
             isVisible = repo != null
             toolTipText = if (entry != null) buildTooltip(entry, repo, isMultiRoot) else null
             revalidate()

@@ -16,4 +16,3 @@ class JujutsuFilePathIconProvider : FilePathIconProvider {
         ?.takeIf { it.directory.filePath == filePath }
         ?.let { repo -> RepositoryIcons[repo] }
 }
-
