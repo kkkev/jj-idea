@@ -95,6 +95,9 @@
         id="in.kkkev.jjidea.clone.JujutsuCloneExtension"
         implementation="in.kkkev.jjidea.clone.JujutsuCloneExtension"
         order="after com.intellij.util.ui.cloneDialog.RepositoryUrlCloneDialogExtension"/>
+
+    <openapi.vcs.changes.ui.filePathIconProvider
+        implementation="in.kkkev.jjidea.ui.common.JujutsuFilePathIconProvider"/>
   </extensions>
 
   <actions>
