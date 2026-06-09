@@ -1,5 +1,7 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.ui.SimpleColoredComponent
 import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
@@ -15,6 +17,9 @@ import javax.swing.JPanel
 internal const val SMALLER_SCALE = 0.85f
 
 open class TextCanvasPanel : JPanel() {
+    // DIAGNOSTIC: remove once doubled-widget bug is diagnosed
+    private val log = Logger.getInstance(TextCanvasPanel::class.java)
+
     init {
         layout = BoxLayout(this, X_AXIS)
     }
@@ -25,6 +30,9 @@ open class TextCanvasPanel : JPanel() {
      * share the same SCC to avoid unnecessary component boundaries.
      */
     fun renderFrom(canvas: FragmentRecordingCanvas) {
+        // DIAGNOSTIC: assert EDT and log component count before/after to diagnose doubling
+        ApplicationManager.getApplication().assertIsDispatchThread()
+        log.info("renderFrom: thread=${Thread.currentThread().name} componentsBefore=$componentCount fragmentCount=${canvas.fragments.size}")
         removeAll()
         this.layout = BoxLayout(this, X_AXIS)
         var currentScc: SimpleColoredComponent? = null
@@ -59,6 +67,8 @@ open class TextCanvasPanel : JPanel() {
         // Cap each component's max width at its preferred width so BoxLayout cannot
         // redistribute horizontal space across siblings (which would centre-justify content).
         components.forEach { it.maximumSize = Dimension(it.preferredSize.width, Short.MAX_VALUE.toInt()) }
+        // DIAGNOSTIC: log component count after rebuild
+        log.info("renderFrom: componentsAfter=$componentCount")
     }
 }
 
