@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
+import `in`.kkkev.jjidea.vcs.ignore.FileScanNode
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import java.io.File
@@ -62,7 +63,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
                     val ignoreService = JujutsuIgnoreService.getInstance(vcs.project)
                     val trackedPaths = collectTrackedAbsolutePaths(result.stdout, repo)
-                    reportIgnoredFiles(dirtyScope, repo, trackedPaths, builder, ignoreService)
+                    reportIgnoredFiles(dirtyScope, repo, trackedPaths, builder, ignoreService, progress)
                 } catch (e: ProcessCanceledException) {
                     throw e
                 } catch (e: Exception) {
@@ -234,7 +235,8 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         repo: JujutsuRepository,
         trackedAbsolutePaths: Set<String>,
         builder: ChangelistBuilder,
-        ignoreService: JujutsuIgnoreService
+        ignoreService: JujutsuIgnoreService,
+        progress: ProgressIndicator
     ) {
         val repoRoot = File(repo.directory.path)
         val cache = ignoreService.getCache(repo.directory)
@@ -248,16 +250,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             dirtyScope.recursivelyDirtyDirectories.any { coversRepo(it) }
 
         if (needsFullScan) {
-            repoRoot.walk()
-                .onEnter { dir -> dir.name != ".jj" && dir.name != ".git" }
-                .filter { it.isFile }
-                .filter { it.path !in trackedAbsolutePaths }
-                .forEach { file ->
-                    val relPath = file.toRelativeString(repoRoot).replace('\\', '/')
-                    if (cache.isIgnored(relPath, false)) {
-                        builder.processIgnoredFile(VcsUtil.getFilePath(file))
-                    }
+            cache.collectIgnored(FileScanNode(repoRoot), { progress.checkCanceled() }) { relPath, isDir ->
+                if (repo.directory.path + "/" + relPath !in trackedAbsolutePaths) {
+                    builder.processIgnoredFile(VcsUtil.getFilePath(File(repoRoot, relPath), isDir))
                 }
+            }
         } else {
             dirtyScope.dirtyFiles
                 .filter { fp -> fp.path.startsWith(repo.directory.path + "/") }

@@ -50,6 +50,49 @@ class GitignoreCache(private val repoRoot: File) {
         return false
     }
 
+    /**
+     * Pruning scan: visits only non-ignored entries, reporting ignored directories as single
+     * entries (never descending into them). O(non-ignored entries) work.
+     *
+     * The [root] abstraction allows injection of in-memory trees in tests.
+     * [checkCanceled] is called once per directory entered; it should throw on cancellation.
+     * [onIgnored] receives the repo-relative path and isDirectory for each ignored entry.
+     */
+    fun collectIgnored(
+        root: IgnoreScanNode,
+        checkCanceled: () -> Unit = {},
+        onIgnored: (relPath: String, isDirectory: Boolean) -> Unit
+    ) {
+        fun recurse(node: IgnoreScanNode, dirParts: List<String>, stack: List<PatternList?>) {
+            checkCanceled()
+            for (child in node.children()) {
+                if (child.isDirectory && (child.name == ".jj" || child.name == ".git")) continue
+                val parts = dirParts + child.name
+                if (matchesStack(stack, parts, child.isDirectory)) {
+                    // Prune: report the dir itself; git semantics forbid re-including children
+                    onIgnored(parts.joinToString("/"), child.isDirectory)
+                } else if (child.isDirectory) {
+                    recurse(child, parts, stack + getNode(parts))
+                }
+            }
+        }
+        recurse(root, emptyList(), listOf(getNode(emptyList())))
+    }
+
+    // stack[i] = PatternList from the .gitignore at depth i (root=0). Deepest wins.
+    private fun matchesStack(stack: List<PatternList?>, parts: List<String>, isDir: Boolean): Boolean {
+        for (depth in stack.indices.reversed()) {
+            val node = stack[depth] ?: continue
+            val entryPath = parts.subList(depth, parts.size).joinToString("/")
+            when (node.match(entryPath, isDir)) {
+                MatchResult.IGNORED -> return true
+                MatchResult.NOT_IGNORED -> return false
+                MatchResult.NO_MATCH -> {}
+            }
+        }
+        return false
+    }
+
     private fun getNode(dirParts: List<String>): PatternList? {
         val key = dirParts.joinToString("/")
         return nodes.computeIfAbsent(key) { k ->
@@ -81,6 +124,20 @@ class GitignoreCache(private val repoRoot: File) {
             return result
         }
     }
+}
+
+/** Minimal tree abstraction so [GitignoreCache.collectIgnored] can be tested with in-memory trees. */
+interface IgnoreScanNode {
+    val name: String
+    val isDirectory: Boolean
+    fun children(): List<IgnoreScanNode>
+}
+
+/** Production [IgnoreScanNode] backed by a real [File]. */
+internal class FileScanNode(private val file: File) : IgnoreScanNode {
+    override val name get() = file.name
+    override val isDirectory get() = file.isDirectory
+    override fun children() = file.listFiles()?.map { FileScanNode(it) } ?: emptyList()
 }
 
 private class GitignorePattern(

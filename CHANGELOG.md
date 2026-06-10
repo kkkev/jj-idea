@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Ignore scan no longer walks into ignored directories (e.g. `node_modules`, `build`) on every working-copy refresh. Ignored directories are now pruned at entry and reported as a single entry, fixing the multi-second stall and 10s shutdown hang reported in GitHub #35.
 - Read-access error (`RuntimeExceptionWithAttachments`) no longer logged when showing a diff from the History view or using Compare with Local, Compare Before with Local, Open File, or Compare File with Branch actions.
 - Working-copy switcher widget no longer paints doubled (two icons and two copies of the text).
 - Filter components (reference, author, date) now show the correct X close icon immediately after IDE restart when a filter is active — previously the icon stayed as a dropdown arrow until the filter was interacted with.
