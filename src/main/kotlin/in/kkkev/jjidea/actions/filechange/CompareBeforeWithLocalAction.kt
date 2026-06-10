@@ -35,9 +35,11 @@ class CompareBeforeWithLocalAction :
     override fun actionPerformed(e: AnActionEvent) {
         val logEntry = e.logEntryForFile ?: return
         val repo = logEntry.repo
+        val changes = e.changes
+        val file = e.file
 
         runInBackground {
-            val requests = e.changes.mapNotNull { change ->
+            val requests = changes.mapNotNull { change ->
                 change.before?.let { before ->
                     val filePath = before.filePath
                     val localDiffSide = repo.createDiffSideFor(filePath.fileAtWorkingCopy)
@@ -47,7 +49,7 @@ class CompareBeforeWithLocalAction :
                 }
             }.ifEmpty {
                 // Editor context: no changes in DataSink, use the file and entry's parent content locator
-                e.file?.let { f ->
+                file?.let { f ->
                     listOf(
                         diffRequest(
                             f.name,

@@ -28,9 +28,10 @@ class OpenChangeFileAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
+        val files = e.files
 
         runInBackground {
-            e.files.takeUnless { it.isEmpty() }?.let { files ->
+            files.takeUnless { it.isEmpty() }?.let { files ->
                 files.forEach { it.cacheContents() }
                 runLater {
                     val fileEditorManager = FileEditorManager.getInstance(project)

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Read-access error (`RuntimeExceptionWithAttachments`) no longer logged when showing a diff from the History view or using Compare with Local, Compare Before with Local, Open File, or Compare File with Branch actions.
 - Working-copy switcher widget no longer paints doubled (two icons and two copies of the text).
 - Filter components (reference, author, date) now show the correct X close icon immediately after IDE restart when a filter is active — previously the icon stayed as a dropdown arrow until the filter was interacted with.
 - Status bar widget no longer throws an EDT-access exception on startup in projects with Jujutsu repositories.

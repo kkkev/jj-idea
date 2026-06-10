@@ -36,8 +36,10 @@ class ShowDiffAction :
         val preview = e.getData(DiffDataKeys.EDITOR_TAB_DIFF_PREVIEW)
         if (preview != null && preview.performDiffAction()) return
 
+        val changes = e.changes
+        val files = e.files
         runInBackground {
-            val requests = buildDiffRequests(project, e.changes, e.files)
+            val requests = buildDiffRequests(project, changes, files)
             if (requests.isNotEmpty()) {
                 val diffManager = DiffManager.getInstance()
                 runLater { requests.forEach { diffManager.showDiff(project, it) } }

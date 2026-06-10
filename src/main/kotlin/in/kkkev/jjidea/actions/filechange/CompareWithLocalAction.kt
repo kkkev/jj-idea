@@ -30,8 +30,10 @@ class CompareWithLocalAction : HistoricalVersionAction("action.compare.with.loca
         val logEntry = e.logEntryForFile ?: return
         val repo = logEntry.repo
 
+        val changes = e.changes
+        val file = e.file
         runInBackground {
-            val requests = e.changes.mapNotNull { change ->
+            val requests = changes.mapNotNull { change ->
                 change.after?.let { after ->
                     val filePath = after.filePath
                     val localSide = repo.createDiffSideFor(filePath.fileAtWorkingCopy)
@@ -40,7 +42,7 @@ class CompareWithLocalAction : HistoricalVersionAction("action.compare.with.loca
                 }
             }.ifEmpty {
                 // Editor context: no changes in DataSink, use the file directly
-                e.file?.let { f ->
+                file?.let { f ->
                     listOf(
                         diffRequest(
                             f.name,

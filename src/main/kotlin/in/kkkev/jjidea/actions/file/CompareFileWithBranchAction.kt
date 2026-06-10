@@ -34,8 +34,8 @@ class CompareFileWithBranchAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
+        val files = e.jujutsuFiles
         runInBackground {
-            val files = e.jujutsuFiles
             val repo = files.singleJujutsuRepository(project) ?: return@runInBackground
             RevisionSelectorPopup.show(
                 "action.compare.branch.popup.title",
