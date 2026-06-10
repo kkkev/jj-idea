@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Working-copy switcher widget no longer paints doubled (two icons and two copies of the text). `IdeStatusBarImpl` calls `install()` on a background coroutine thread; the previous code mutated Swing components directly on that thread, racing with an EDT replay triggered by the same `install()` call. All Swing mutation is now marshalled through `invokeLater`.
+
 ### Changed
 - Improved log performance when expanding context around a commit in large repositories.
 
@@ -16,14 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.7.7] - 2026-06-08
 
-### Fixed
-- Moving a file from a parent directory into a new child directory (e.g. `pages/{ => blankExperience}/blankExperience.tsx`) no longer causes the entire change to fail with "Invalid rename/copy format". Both sides of the `{old => new}` rename spec can now be empty, and the rename/copy parser is deduplicated into a single implementation.
-
 ### Added
 - jj tags now appear as decoration chips in the log table (Decorations column, inlined graph column, and commit details panel), the "Compare with Another Commit…" popup, and the working-copy switcher. Tags resolve as selectable revision targets alongside bookmarks, with a dedicated tag icon and a distinct green chip colour. A `jj tag list` cache ensures tags beyond the log limit are included in selectors.
 - Tags in the working-copy switcher and revision selector now show the target commit's description alongside the tag name, matching the existing behaviour for bookmarks.
 
 ### Fixed
+- Moving a file from a parent directory into a new child directory (e.g. `pages/{ => blankExperience}/blankExperience.tsx`) no longer causes the entire change to fail with "Invalid rename/copy format". Both sides of the `{old => new}` rename spec can now be empty, and the rename/copy parser is deduplicated into a single implementation.
 - Typing in the "Compare with Commit" revision selector no longer freezes the UI on large repos. The cell renderer now reuses a single component instead of allocating a new one per cell (eliminating an O(n²) `ArrayList.indexOf` accumulation in `CellRendererPane`); list-model updates are applied in one batch call instead of one-at-a-time; per-render reflection (`IconSpec.javaField`) is hoisted to constants; and tag immutability is precomputed off the EDT instead of re-scanned linearly on each paint.
 - Out-of-limit revisions loaded for navigation expansion (annotation-line click, parent change-ID click in the details panel) no longer render with empty Author and Date columns. `RepoLogCache` now fetches with the full log template so every cached entry carries author/committer signatures, matching the main log load.
 - Reference filter (bookmark/tag dropdown in the log toolbar) now shows **all** bookmarks and tags regardless of the log limit. Selecting an out-of-limit reference automatically expands the log to include a context window around that commit (same behaviour as navigate-to-out-of-limit), then applies the filter normally. Selecting a tag or bookmark no longer mismatches when a tag and bookmark share the same name on different commits.
