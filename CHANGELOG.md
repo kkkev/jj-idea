@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- Working-copy switcher widget no longer paints doubled (two icons and two copies of the text). `IdeStatusBarImpl` calls `install()` on a background coroutine thread; the previous code mutated Swing components directly on that thread, racing with an EDT replay triggered by the same `install()` call. All Swing mutation is now marshalled through `invokeLater`.
+- Working-copy switcher widget no longer paints doubled (two icons and two copies of the text).
 
 ### Changed
 - Improved log performance when expanding context around a commit in large repositories.
