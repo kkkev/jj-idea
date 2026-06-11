@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-06-11
+
 ### Fixed
 - Ignore scan no longer walks into ignored directories (e.g. `node_modules`, `build`) on every working-copy refresh. Ignored directories are now pruned at entry and reported as a single entry, fixing the multi-second stall and 10s shutdown hang reported in GitHub #35.
 - Read-access error (`RuntimeExceptionWithAttachments`) no longer logged when showing a diff from the History view or using Compare with Local, Compare Before with Local, Open File, or Compare File with Branch actions.
@@ -590,7 +592,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.7...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.8...HEAD
+[0.7.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.8
 [0.7.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.7
 [0.7.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.6
 [0.7.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.5
