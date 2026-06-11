@@ -11,8 +11,8 @@ import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
-import `in`.kkkev.jjidea.actions.restorePaths
 import `in`.kkkev.jjidea.actions.logEntryForFile
+import `in`.kkkev.jjidea.actions.restorePaths
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.vcs.filePath
 

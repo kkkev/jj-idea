@@ -35,6 +35,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
         dirtyScope.affectedContentRoots.mapNotNull { vcs.project.possibleJujutsuRepositoryFor(it) }.toSet()
             .forEach { repo ->
+                @Suppress("IncorrectCancellationExceptionHandling")
                 log.measurePerf("getChanges", repo.directory.name) { _ ->
                     try {
                         if (vcs.project.stateModel.workingCopies.value[repo.directory.path] == null) {
@@ -214,15 +215,16 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         )
     }
 
-    private fun collectTrackedAbsolutePaths(statusOutput: String, repo: JujutsuRepository): Set<String> {
+    internal fun collectTrackedAbsolutePaths(statusOutput: String, repo: JujutsuRepository): Set<String> {
         val paths = mutableSetOf<String>()
         var inWorkingCopy = false
         for (line in statusOutput.lines()) {
             val trimmed = line.trim()
             when {
                 trimmed.startsWith("Working copy changes:") -> inWorkingCopy = true
-                trimmed.isEmpty() || trimmed.startsWith("Warning:") -> inWorkingCopy = false
-                inWorkingCopy && !trimmed.startsWith("Working copy") && trimmed.length >= 3 -> {
+                trimmed.startsWith("Working copy") || trimmed.isEmpty() || trimmed.startsWith("Warning:") ->
+                    inWorkingCopy = false
+                inWorkingCopy && trimmed.length >= 3 -> {
                     val filePart = trimmed.substring(2).trim()
                     if (filePart.isNotEmpty()) paths.add(repo.directory.path + "/$filePart")
                 }
