@@ -32,6 +32,12 @@ sealed interface FileChange {
      */
     val filePath: FilePath
 
+    /**
+     * Every path this change touches: both source and target for renames, the single path for all other change types.
+     * Use this when an operation must address all sides of a change (e.g. restore).
+     */
+    val allPaths: List<FilePath> get() = listOfNotNull(before?.filePath, after?.filePath).distinct()
+
     data class Modified(
         override val before: FileAtVersion,
         override val after: FileAtVersion,

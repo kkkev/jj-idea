@@ -11,7 +11,7 @@ import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
-import `in`.kkkev.jjidea.actions.filePaths
+import `in`.kkkev.jjidea.actions.restorePaths
 import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.vcs.filePath
@@ -38,7 +38,7 @@ class RestoreToChangeAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val entry = e.logEntryForFile ?: return
-        val filePaths = (e.filePaths.takeUnless { it.isEmpty() } ?: e.file?.let { listOf(it.filePath) }) ?: return
+        val filePaths = (e.restorePaths.takeUnless { it.isEmpty() } ?: e.file?.let { listOf(it.filePath) }) ?: return
 
         val fileNames = filePaths.joinToString { it.name }
         val changeId = entry.id

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Restoring a renamed or deleted file now correctly undoes the change. Previously, restoring a rename would delete the target file without recreating the source (leaving the working copy in a broken state), and deleted files could not be restored at all because the Restore action was hidden.
+
 ## [0.7.8] - 2026-06-11
 
 ### Fixed

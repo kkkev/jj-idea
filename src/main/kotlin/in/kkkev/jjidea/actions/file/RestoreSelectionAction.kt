@@ -7,9 +7,9 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntryForFile
-import `in`.kkkev.jjidea.actions.singleRepoForFiles
+import `in`.kkkev.jjidea.actions.restorePaths
+import `in`.kkkev.jjidea.actions.singleRepoForRestore
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
 
@@ -30,8 +30,8 @@ class RestoreSelectionAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val filePaths = e.filePaths
-        val repo = e.singleRepoForFiles ?: return
+        val filePaths = e.restorePaths
+        val repo = e.singleRepoForRestore ?: return
 
         // Show confirmation dialog
         val title = if (filePaths.size == 1) {
@@ -68,6 +68,6 @@ class RestoreSelectionAction : DumbAwareAction(
         // Hide when in historical context (entry is present and not working copy)
         // In that case, RestoreToChangeAction should be used instead
         val isHistoricalContext = entry != null && !entry.isWorkingCopy
-        e.presentation.isEnabledAndVisible = !isHistoricalContext && e.singleRepoForFiles != null
+        e.presentation.isEnabledAndVisible = !isHistoricalContext && e.singleRepoForRestore != null
     }
 }

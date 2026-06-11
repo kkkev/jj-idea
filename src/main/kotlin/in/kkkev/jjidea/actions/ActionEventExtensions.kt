@@ -43,6 +43,12 @@ val AnActionEvent.jujutsuFiles: List<VirtualFile>
 val AnActionEvent.filePaths: List<FilePath>
     get() = this.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()?.map { it.filePath }
         ?: changes.mapNotNull { it.after?.filePath }
+
+/** Like [filePaths] but includes the source path of renames and the path of deletes. Use in restore operations. */
+val AnActionEvent.restorePaths: List<FilePath>
+    get() = this.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()?.map { it.filePath }
+        ?: changes.flatMap { it.allPaths }.distinct()
+
 val AnActionEvent.editor: Editor? get() = this.getData(CommonDataKeys.EDITOR)
 
 val AnActionEvent.changes: List<FileChange>
@@ -66,3 +72,10 @@ val AnActionEvent.repoForFile: JujutsuRepository?
  */
 val AnActionEvent.singleRepoForFiles: JujutsuRepository?
     get() = filePaths.map { project?.possibleJujutsuRepositoryFor(it) }.toSet().singleOrNull()
+
+/**
+ * Like [singleRepoForFiles] but uses [restorePaths], so it resolves a repository even when the selection
+ * contains only deleted or renamed-source files (which have no after path).
+ */
+val AnActionEvent.singleRepoForRestore: JujutsuRepository?
+    get() = restorePaths.mapNotNull { project?.possibleJujutsuRepositoryFor(it) }.toSet().singleOrNull()
