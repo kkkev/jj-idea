@@ -8,5 +8,8 @@ package `in`.kkkev.jjidea.settings
  */
 data class RepositoryConfig(
     var logChangeLimit: Int? = null,
-    var logRevset: String? = null
-)
+    var logRevset: String? = null,
+    var disableIgnoredFileScanning: Boolean? = null
+) {
+    fun isEmpty() = logChangeLimit == null && logRevset == null && disableIgnoredFileScanning == null
+}

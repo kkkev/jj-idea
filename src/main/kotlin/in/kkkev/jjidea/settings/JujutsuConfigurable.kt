@@ -74,6 +74,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         val limitField: JBTextField,
         val revsetCb: JBCheckBox,
         val revsetField: JBTextField,
+        val disableScanCb: JBCheckBox,
         val revsetValidationLabel: JBLabel = JBLabel(),
         var revsetError: String? = null
     )
@@ -220,6 +221,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     val limitField = JBTextField()
                     val revsetCb = JBCheckBox(JujutsuBundle.message("settings.repo.logrevset.override"))
                     val revsetField = JBTextField()
+                    val disableScanCb = JBCheckBox(JujutsuBundle.message("settings.repo.disableignorescan"))
 
                     fun updateIdentityEnabled() {
                         nameField.isEnabled = identityCb.isSelected
@@ -246,6 +248,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         updateRevsetEnabled()
                         repoSettingsDirty = true
                     }
+                    disableScanCb.addActionListener { repoSettingsDirty = true }
                     nameField.document.addDocumentListener(dirtyListener)
                     emailField.document.addDocumentListener(dirtyListener)
                     limitField.document.addDocumentListener(dirtyListener)
@@ -258,6 +261,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     limitField.text = repoConfig?.logChangeLimit?.toString() ?: ""
                     revsetCb.isSelected = repoConfig?.logRevset != null
                     revsetField.text = repoConfig?.logRevset ?: ""
+                    disableScanCb.isSelected = repoConfig?.disableIgnoredFileScanning == true
 
                     // Load identity from jj config (background): prefer repo-scoped, fall back to effective
                     runInBackground {
@@ -284,7 +288,8 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         limitCb,
                         limitField,
                         revsetCb,
-                        revsetField
+                        revsetField,
+                        disableScanCb
                     )
                     revsetField.document.addDocumentListener(clearErrorListener { repoPanel.revsetError = null })
                     repoSettingsPanels.add(repoPanel)
@@ -336,6 +341,10 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         row("") {
                             cell(repoPanel.revsetValidationLabel)
                         }
+                        row {
+                            cell(disableScanCb)
+                                .comment(JujutsuBundle.message("settings.repo.disableignorescan.comment"))
+                        }
                     }.apply { expanded = repos.size == 1 }
                 }
             }
@@ -384,15 +393,19 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         repoSettingsPanels.forEach { panel ->
             val repoPath = panel.repo.directory.path
 
-            // Save log limit and revset overrides to plugin settings
+            // Save log limit, revset, and ignore-scan overrides to plugin settings
             var currentOverride = settings.state.repositoryOverrides[repoPath]
             val newLimit = if (panel.limitCb.isSelected) panel.limitField.text.trim().toIntOrNull() else null
             val newRevset = if (panel.revsetCb.isSelected) panel.revsetField.text.trim() else null
+            val newDisableScan = panel.disableScanCb.isSelected.takeIf { it }
 
-            if (newLimit != currentOverride?.logChangeLimit || newRevset != currentOverride?.logRevset) {
+            if (newLimit != currentOverride?.logChangeLimit ||
+                newRevset != currentOverride?.logRevset ||
+                newDisableScan != currentOverride?.disableIgnoredFileScanning
+            ) {
                 val updated = (currentOverride ?: RepositoryConfig())
-                    .copy(logChangeLimit = newLimit, logRevset = newRevset)
-                if (updated.logChangeLimit == null && updated.logRevset == null) {
+                    .copy(logChangeLimit = newLimit, logRevset = newRevset, disableIgnoredFileScanning = newDisableScan)
+                if (updated.isEmpty()) {
                     settings.state.repositoryOverrides.remove(repoPath)
                 } else {
                     settings.state.repositoryOverrides[repoPath] = updated

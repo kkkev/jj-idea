@@ -11,6 +11,8 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
@@ -241,6 +243,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         ignoreService: JujutsuIgnoreService,
         progress: ProgressIndicator
     ) {
+        if (JujutsuSettings.getInstance(vcs.project).disableIgnoredFileScanning(repo)) {
+            log.info("ignore-scan: skipped for ${repo.directory.name} (disabled in settings)")
+            return
+        }
+
         val repoRoot = File(repo.directory.path)
         val cache = ignoreService.getCache(repo.directory)
 
@@ -253,10 +260,20 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             dirtyScope.recursivelyDirtyDirectories.any { coversRepo(it) }
 
         if (needsFullScan) {
+            val scanStart = System.currentTimeMillis()
+            var watchdogFired = false
             log.measurePerf("ignore-scan", repo.directory.name) { report ->
                 val stats = cache.collectIgnored(
                     FileScanNode(repoRoot),
-                    { progress.checkCanceled() }
+                    {
+                        progress.checkCanceled()
+                        if (!watchdogFired && System.currentTimeMillis() - scanStart > IGNORE_SCAN_WATCHDOG_MS) {
+                            watchdogFired = true
+                            val elapsed = System.currentTimeMillis() - scanStart
+                            log.warn("ignore-scan: watchdog triggered after ${elapsed}ms for ${repo.directory.name}")
+                            JujutsuNotifications.notifyIgnoreScanSlow(vcs.project, repo, elapsed)
+                        }
+                    }
                 ) { relPath, isDir ->
                     if (repo.directory.path + "/" + relPath !in trackedAbsolutePaths) {
                         builder.processIgnoredFile(VcsUtil.getFilePath(File(repoRoot, relPath), isDir))
@@ -272,6 +289,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
                 .filter { fp -> ignoreService.isIgnored(fp, repo.directory) }
                 .forEach { fp -> builder.processIgnoredFile(fp) }
         }
+    }
+
+    companion object {
+        /** Fire the slow-scan notification after this many milliseconds. */
+        internal const val IGNORE_SCAN_WATCHDOG_MS = 5_000L
     }
 
     private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {

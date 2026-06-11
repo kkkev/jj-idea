@@ -108,6 +108,20 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     fun logRevset(repo: JujutsuRepository): String =
         state.repositoryOverrides[repo.directory.path]?.logRevset ?: state.logRevset
 
+    fun disableIgnoredFileScanning(repo: JujutsuRepository) =
+        state.repositoryOverrides[repo.directory.path]?.disableIgnoredFileScanning ?: false
+
+    fun setDisableIgnoredFileScanning(repo: JujutsuRepository, disabled: Boolean) {
+        val path = repo.directory.path
+        val current = state.repositoryOverrides[path] ?: RepositoryConfig()
+        val updated = current.copy(disableIgnoredFileScanning = disabled.takeIf { it })
+        if (updated.isEmpty()) {
+            state.repositoryOverrides.remove(path)
+        } else {
+            state.repositoryOverrides[path] = updated
+        }
+    }
+
     companion object {
         const val DEFAULT_LOG_WINDOW_ID = "default"
 

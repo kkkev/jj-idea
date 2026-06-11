@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.services
 
+import com.intellij.ide.BrowserUtil
 import com.intellij.notification.Notification
 import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
@@ -8,13 +9,18 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.CustomizedDataContext
 import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.performAction
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
+import java.awt.datatransfer.StringSelection
 import java.util.concurrent.ConcurrentHashMap
 
 fun Notification.addExpiringAction(messageKey: String, action: () -> Unit) {
@@ -184,6 +190,44 @@ object JujutsuNotifications {
             .getNotificationGroup(GROUP_ID)
             .createNotification(title, message, type)
             .notify(project)
+    }
+
+    // Track repos for which a slow-scan notification has already been shown this session
+    private val notifiedSlowScans: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /**
+     * Show a one-time-per-session warning when the ignored-file scan exceeds the watchdog budget.
+     *
+     * Offers two actions:
+     * - Disable scanning for this repo (writes the per-repo setting and triggers a refresh)
+     * - Report the issue (copies stats to clipboard and opens the GitHub issues page)
+     */
+    fun notifyIgnoreScanSlow(project: Project, repo: JujutsuRepository, elapsedMs: Long) {
+        if (!notifiedSlowScans.add(repo.directory.path)) return
+
+        val repoName = repo.displayName
+        val stats = "$repoName: ${elapsedMs}ms"
+
+        val notification = NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("notification.ignorescan.slow.title"),
+                JujutsuBundle.message("notification.ignorescan.slow.content", repoName),
+                NotificationType.WARNING
+            )
+
+        notification.addExpiringAction("notification.ignorescan.action.disable") {
+            JujutsuSettings.getInstance(project).setDisableIgnoredFileScanning(repo, true)
+            JujutsuIgnoreService.getInstance(project).invalidate(repo)
+            VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
+        }
+
+        notification.addExpiringAction("notification.ignorescan.action.report") {
+            CopyPasteManager.getInstance().setContents(StringSelection(stats))
+            BrowserUtil.browse("https://github.com/kkkev/jj-idea/issues")
+        }
+
+        notification.notify(project)
     }
 
     // Track which repo keys we've already notified about in this session (key = repoName ?: "global")

@@ -89,6 +89,99 @@ class JujutsuSettingsTest {
         settings.state.settingsVersion shouldBe 4
     }
 
+    // ── RepositoryConfig.isEmpty ────────────────────────────────────────────────
+
+    @Test
+    fun `RepositoryConfig isEmpty returns true when all fields are null`() {
+        RepositoryConfig().isEmpty() shouldBe true
+    }
+
+    @Test
+    fun `RepositoryConfig isEmpty returns false when logChangeLimit is set`() {
+        RepositoryConfig(logChangeLimit = 100).isEmpty() shouldBe false
+    }
+
+    @Test
+    fun `RepositoryConfig isEmpty returns false when logRevset is set`() {
+        RepositoryConfig(logRevset = "all()").isEmpty() shouldBe false
+    }
+
+    @Test
+    fun `RepositoryConfig isEmpty returns false when disableIgnoredFileScanning is set`() {
+        RepositoryConfig(disableIgnoredFileScanning = true).isEmpty() shouldBe false
+    }
+
+    // ── disableIgnoredFileScanning resolver ────────────────────────────────────
+
+    @Test
+    fun `disableIgnoredFileScanning returns false when no override`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState())
+        settings.disableIgnoredFileScanning(mockRepo("/repo")) shouldBe false
+    }
+
+    @Test
+    fun `disableIgnoredFileScanning returns true when override is true`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(disableIgnoredFileScanning = true))
+            )
+        )
+        settings.disableIgnoredFileScanning(mockRepo("/repo")) shouldBe true
+    }
+
+    @Test
+    fun `disableIgnoredFileScanning returns false when override is null`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(disableIgnoredFileScanning = null))
+            )
+        )
+        settings.disableIgnoredFileScanning(mockRepo("/repo")) shouldBe false
+    }
+
+    // ── setDisableIgnoredFileScanning ─────────────────────────────────────────
+
+    @Test
+    fun `setDisableIgnoredFileScanning creates override when set to true`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState())
+        val repo = mockRepo("/repo")
+        settings.setDisableIgnoredFileScanning(repo, true)
+        settings.state.repositoryOverrides["/repo"]?.disableIgnoredFileScanning shouldBe true
+    }
+
+    @Test
+    fun `setDisableIgnoredFileScanning removes override when set to false and no other fields`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(disableIgnoredFileScanning = true))
+            )
+        )
+        val repo = mockRepo("/repo")
+        settings.setDisableIgnoredFileScanning(repo, false)
+        settings.state.repositoryOverrides["/repo"] shouldBe null
+    }
+
+    @Test
+    fun `setDisableIgnoredFileScanning preserves other override fields when clearing`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                repositoryOverrides = mutableMapOf(
+                    "/repo" to RepositoryConfig(logChangeLimit = 200, disableIgnoredFileScanning = true)
+                )
+            )
+        )
+        val repo = mockRepo("/repo")
+        settings.setDisableIgnoredFileScanning(repo, false)
+        settings.state.repositoryOverrides["/repo"]?.logChangeLimit shouldBe 200
+        settings.state.repositoryOverrides["/repo"]?.disableIgnoredFileScanning shouldBe null
+    }
+
     private fun mockRepo(path: String): JujutsuRepository {
         val dir = mockk<VirtualFile>()
         every { dir.path } returns path
