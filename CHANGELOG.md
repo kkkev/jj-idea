@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.9] - 2026-06-11
+
 ### Added
 - Per-repository setting to disable ignored-file scanning (Settings → Version Control → Jujutsu → expand the repository section). Useful for very large repositories where the scan causes a startup hang.
 - Slow-scan watchdog: if the ignored-file walk exceeds 5 seconds, a notification appears offering to disable scanning for that repository or copy diagnostic stats to the clipboard for a bug report.
@@ -600,7 +602,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.8...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.9...HEAD
+[0.7.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.9
 [0.7.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.8
 [0.7.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.7
 [0.7.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.6

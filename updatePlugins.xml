@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.8/jj-idea-0.7.8.zip" version="0.7.8">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.9/jj-idea-0.7.9.zip" version="0.7.9">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,24 +23,16 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.8</h3>
+      <h3>0.7.9</h3>
       
-<h4>Fixed</h4>
-<li>Ignore scan no longer walks into ignored directories (e.g. `node_modules`, `build`) on every working-copy refresh. Ignored directories are now pruned at entry and reported as a single entry, fixing the multi-second stall and 10s shutdown hang reported in GitHub #35.</li>
-<li>Read-access error (`RuntimeExceptionWithAttachments`) no longer logged when showing a diff from the History view or using Compare with Local, Compare Before with Local, Open File, or Compare File with Branch actions.</li>
-<li>Working-copy switcher widget no longer paints doubled (two icons and two copies of the text).</li>
-<li>Filter components (reference, author, date) now show the correct X close icon immediately after IDE restart when a filter is active — previously the icon stayed as a dropdown arrow until the filter was interacted with.</li>
-<li>Status bar widget no longer throws an EDT-access exception on startup in projects with Jujutsu repositories.</li>
-<li>Working-copy panel no longer flickers or lags with 40+ changed files. Rapid file-save bursts (e.g. save-all over a large working copy) are coalesced into a single tree rebuild per 200ms window using `MergingUpdateQueue`, and bulk VFS events now issue a single batched `filesDirty()` call instead of one call per file.</li>
-
-<h4>Changed</h4>
-<li>Improved log performance when expanding context around a commit in large repositories.</li>
-
 <h4>Added</h4>
-<li>Multiple independent log windows: click the **+** button in the VCS tool window tab strip to open a new tab (all repos, default name). In projects with both Git and Jujutsu, the action appears in Git's existing "▼" dropdown. Right-click any Jujutsu log tab → **Rename…** to rename it inline. All filter state (search text, reference, author, date, root filter selection) and layout (column visibility, widths, details position) persists per-window across restarts.</li>
-<li>Tag create/set and delete actions (requires jj 0.37+): right-click a commit in the log to set a tag at that revision, or expand the "Tag" submenu to delete an existing tag. Right-clicking a tag chip directly also offers a delete action. Moving an existing tag prompts for confirmation. The bookmark and tag chip plumbing (URI scheme, hit-testing, popup dispatch) is now unified.</li>
-<li>Show repository roots in change trees and bookmark widget menus using coloured repository icons.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.8">full release notes</a> for details.</p>
+<li>Per-repository setting to disable ignored-file scanning (Settings → Version Control → Jujutsu → expand the repository section). Useful for very large repositories where the scan causes a startup hang.</li>
+<li>Slow-scan watchdog: if the ignored-file walk exceeds 5 seconds, a notification appears offering to disable scanning for that repository or copy diagnostic stats to the clipboard for a bug report.</li>
+
+<h4>Fixed</h4>
+<li>Restoring a renamed or deleted file now correctly undoes the change. Previously, restoring a rename would delete the target file without recreating the source (leaving the working copy in a broken state), and deleted files could not be restored at all because the Restore action was hidden.</li>
+<li>`collectTrackedAbsolutePaths` no longer includes the `Parent commit (@-):` summary line as a phantom tracked path (status output without a blank line between sections).</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.9">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
