@@ -1,9 +1,11 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.ui.JBColor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
 import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
+import `in`.kkkev.jjidea.util.measurePerf
 import java.awt.Color
 
 /*
@@ -48,6 +50,8 @@ interface GraphableEntry {
  * the result to [GraphNode] objects for rendering.
  */
 class CommitGraphBuilder {
+    private val log = Logger.getInstance(javaClass)
+
     // Graph colors with light/dark theme variants for good contrast
     private val colors: List<Color> = listOf(
         JBColor(0x4285F4, 0x6AA1FF), // Blue
@@ -70,22 +74,19 @@ class CommitGraphBuilder {
      * @param entries List of commits (newest first, as returned by jj log)
      * @return Map of changeId -> GraphNode
      */
-    fun buildGraph(entries: List<GraphableEntry>): Map<ChangeId, GraphNode> {
-        // Convert to GraphEntry for the layout calculator
-        val graphEntries = entries.map { GraphEntry(it.id, it.parentIds) }
-
-        // Calculate layout using the algorithm
-        val layout = layoutCalculator.calculate(graphEntries)
-
-        // Convert RowLayout to GraphNode
-        return layout.rows.associate { row ->
-            row.id to GraphNode(
-                lane = row.lane,
-                color = colorForLane(row.lane),
-                parentLanes = row.parentLanes,
-                childLanes = row.childLanes,
-                passthroughLanes = row.passthroughLanes
-            )
+    fun buildGraph(entries: List<GraphableEntry>): Map<ChangeId, GraphNode> =
+        log.measurePerf("graph-layout") { report ->
+            report.count("rows", entries.size.toLong())
+            val graphEntries = entries.map { GraphEntry(it.id, it.parentIds) }
+            val layout = layoutCalculator.calculate(graphEntries)
+            layout.rows.associate { row ->
+                row.id to GraphNode(
+                    lane = row.lane,
+                    color = colorForLane(row.lane),
+                    parentLanes = row.parentLanes,
+                    childLanes = row.childLanes,
+                    passthroughLanes = row.passthroughLanes
+                )
+            }
         }
-    }
 }

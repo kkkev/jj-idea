@@ -4,6 +4,9 @@ import java.io.File
 import java.util.Optional
 import java.util.concurrent.ConcurrentHashMap
 
+/** Work-count summary returned by [GitignoreCache.collectIgnored]. */
+data class ScanStats(val visited: Long, val ignored: Long)
+
 /**
  * Per-repository cache of parsed .gitignore rules.
  *
@@ -62,14 +65,18 @@ class GitignoreCache(private val repoRoot: File) {
         root: IgnoreScanNode,
         checkCanceled: () -> Unit = {},
         onIgnored: (relPath: String, isDirectory: Boolean) -> Unit
-    ) {
+    ): ScanStats {
+        var visited = 0L
+        var ignored = 0L
         fun recurse(node: IgnoreScanNode, dirParts: List<String>, stack: List<PatternList?>) {
             checkCanceled()
             for (child in node.children()) {
                 if (child.isDirectory && (child.name == ".jj" || child.name == ".git")) continue
+                visited++
                 val parts = dirParts + child.name
                 if (matchesStack(stack, parts, child.isDirectory)) {
                     // Prune: report the dir itself; git semantics forbid re-including children
+                    ignored++
                     onIgnored(parts.joinToString("/"), child.isDirectory)
                 } else if (child.isDirectory) {
                     recurse(child, parts, stack + getNode(parts))
@@ -77,6 +84,7 @@ class GitignoreCache(private val repoRoot: File) {
             }
         }
         recurse(root, emptyList(), listOf(getNode(emptyList())))
+        return ScanStats(visited, ignored)
     }
 
     // stack[i] = PatternList from the .gitignore at depth i (root=0). Deepest wins.

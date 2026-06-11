@@ -145,10 +145,13 @@ class GitignoreScanTest {
 
             val cache = GitignoreCache(this@GitignoreScanTest.root)
             val reported = mutableListOf<String>()
-            cache.collectIgnored(root) { relPath, _ -> reported.add(relPath) }
+            val stats = cache.collectIgnored(root) { relPath, _ -> reported.add(relPath) }
 
             reported shouldContainExactlyInAnyOrder listOf("node_modules")
             nodeModules.childrenCalls.get() shouldBe 0
+            // ScanStats: 2 children iterated at root level (srcMain + nodeModules); 1 ignored
+            stats.visited shouldBe 2L
+            stats.ignored shouldBe 1L
         }
 
         @Test
@@ -162,13 +165,16 @@ class GitignoreScanTest {
 
             val cache = GitignoreCache(this@GitignoreScanTest.root)
             val reported = mutableListOf<String>()
-            cache.collectIgnored(rootNode) { relPath, _ -> reported.add(relPath) }
+            val stats = cache.collectIgnored(rootNode) { relPath, _ -> reported.add(relPath) }
 
             reported shouldContainExactlyInAnyOrder listOf("node_modules")
             // root + src each had children() called exactly once; node_modules never
             nodeModules.childrenCalls.get() shouldBe 0
             rootNode.childrenCalls.get() shouldBe 1
             src.childrenCalls.get() shouldBe 1
+            // visited: 2 at root (src + nodeModules) + 1 at src (Main.kt) = 3; ignored: 1 (nodeModules)
+            stats.visited shouldBe 3L
+            stats.ignored shouldBe 1L
         }
 
         @Test

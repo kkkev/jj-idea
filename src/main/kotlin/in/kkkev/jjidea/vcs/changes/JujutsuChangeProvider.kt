@@ -11,6 +11,7 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
 import `in`.kkkev.jjidea.vcs.ignore.FileScanNode
@@ -34,40 +35,40 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
 
         dirtyScope.affectedContentRoots.mapNotNull { vcs.project.possibleJujutsuRepositoryFor(it) }.toSet()
             .forEach { repo ->
-                try {
-                    if (vcs.project.stateModel.workingCopies.value[repo.directory.path] == null) {
-                        log.info("getChanges: working copy not yet loaded for $repo, deferring")
-                        return@forEach
-                    }
-                    val startTime = System.currentTimeMillis()
-                    val result = repo.commandExecutor.status()
-                    log.info("jj status for $repo took ${System.currentTimeMillis() - startTime}ms")
-
-                    if (!result.isSuccess) {
-                        log.warn("Failed to get jj status for $repo: ${result.stderr}")
-                        return@forEach // Continue to next root instead of returning from entire method
-                    }
-
-                    val conflictedPaths = if (workingCopyInConflict(result.stdout)) {
-                        val resolveResult = repo.commandExecutor.resolveList()
-                        if (resolveResult.isSuccess) {
-                            parseConflictPaths(resolveResult.stdout)
-                        } else {
-                            collectConflictPathsFromStatus(result.stdout)
+                log.measurePerf("getChanges", repo.directory.name) { _ ->
+                    try {
+                        if (vcs.project.stateModel.workingCopies.value[repo.directory.path] == null) {
+                            log.info("getChanges: working copy not yet loaded for $repo, deferring")
+                            return@measurePerf
                         }
-                    } else {
-                        emptySet()
+                        val result = repo.commandExecutor.status()
+
+                        if (!result.isSuccess) {
+                            log.warn("Failed to get jj status for $repo: ${result.stderr}")
+                            return@measurePerf
+                        }
+
+                        val conflictedPaths = if (workingCopyInConflict(result.stdout)) {
+                            val resolveResult = repo.commandExecutor.resolveList()
+                            if (resolveResult.isSuccess) {
+                                parseConflictPaths(resolveResult.stdout)
+                            } else {
+                                collectConflictPathsFromStatus(result.stdout)
+                            }
+                        } else {
+                            emptySet()
+                        }
+
+                        parseStatus(result.stdout, repo, builder, conflictedPaths)
+
+                        val ignoreService = JujutsuIgnoreService.getInstance(vcs.project)
+                        val trackedPaths = collectTrackedAbsolutePaths(result.stdout, repo)
+                        reportIgnoredFiles(dirtyScope, repo, trackedPaths, builder, ignoreService, progress)
+                    } catch (e: ProcessCanceledException) {
+                        throw e
+                    } catch (e: Exception) {
+                        log.warn("Error getting changes for $repo: ${e.message}")
                     }
-
-                    parseStatus(result.stdout, repo, builder, conflictedPaths)
-
-                    val ignoreService = JujutsuIgnoreService.getInstance(vcs.project)
-                    val trackedPaths = collectTrackedAbsolutePaths(result.stdout, repo)
-                    reportIgnoredFiles(dirtyScope, repo, trackedPaths, builder, ignoreService, progress)
-                } catch (e: ProcessCanceledException) {
-                    throw e
-                } catch (e: Exception) {
-                    log.warn("Error getting changes for $repo: ${e.message}")
                 }
             }
     }
@@ -250,10 +251,17 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
             dirtyScope.recursivelyDirtyDirectories.any { coversRepo(it) }
 
         if (needsFullScan) {
-            cache.collectIgnored(FileScanNode(repoRoot), { progress.checkCanceled() }) { relPath, isDir ->
-                if (repo.directory.path + "/" + relPath !in trackedAbsolutePaths) {
-                    builder.processIgnoredFile(VcsUtil.getFilePath(File(repoRoot, relPath), isDir))
+            log.measurePerf("ignore-scan", repo.directory.name) { report ->
+                val stats = cache.collectIgnored(
+                    FileScanNode(repoRoot),
+                    { progress.checkCanceled() }
+                ) { relPath, isDir ->
+                    if (repo.directory.path + "/" + relPath !in trackedAbsolutePaths) {
+                        builder.processIgnoredFile(VcsUtil.getFilePath(File(repoRoot, relPath), isDir))
+                    }
                 }
+                report.count("visited", stats.visited)
+                report.count("ignored", stats.ignored)
             }
         } else {
             dirtyScope.dirtyFiles

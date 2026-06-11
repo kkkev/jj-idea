@@ -4,8 +4,10 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.vcs.getChildPath
 import kotlinx.datetime.Instant
+import java.io.File
 
 interface LogSpec<T> {
     val spec: String
@@ -167,13 +169,16 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         limit: Int? = null
     ): Result<List<T>> {
         log.debug("Getting log for revset: $revset, files: $filePaths, limit: $limit")
-
-        val result = executor.log(revset, template.spec, filePaths, limit)
-        return if (result.isSuccess) {
-            toResult("Failed to parse") { parse(template, result.stdout) }
-        } else {
-            // TODO Improve logging
-            Result.failure(VcsException("Error from jj log: " + result.stderr))
+        val context = "${File(repo.directory.path).name}:${limit ?: "∞"}"
+        return log.measurePerf("log-load", context) { report ->
+            val result = executor.log(revset, template.spec, filePaths, limit)
+            if (result.isSuccess) {
+                toResult("Failed to parse") { parse(template, result.stdout) }
+                    .also { r -> r.onSuccess { report.count("entries", it.size.toLong()) } }
+            } else {
+                // TODO Improve logging
+                Result.failure(VcsException("Error from jj log: " + result.stderr))
+            }
         }
     }
 

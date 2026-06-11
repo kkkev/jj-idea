@@ -447,6 +447,24 @@ class ExampleTest {
 - Run with: `./gradlew runIde --debug-jvm`
 - All jj commands are logged by `CliExecutor`
 
+### Performance Logging
+
+Hot paths emit structured perf lines to `idea.log` via `util/Perf.kt::measurePerf`:
+
+```
+perf: ignore-scan took 41000ms [visited=1,843,201, ignored=12] (myrepo)
+perf: getChanges took 41200ms (myrepo)
+perf: log-load took 320ms [entries=5000] (myrepo:∞)
+perf: graph-layout took 85ms [rows=5000]
+perf: wc-rebuild took 12ms [changes=42] (MyProject)
+```
+
+- **INFO** for normal operation; **WARN** when duration > 500ms or any count > 50,000
+- A WARN line in a user-submitted log is a strong scale-regression signal — `visited` count is the key indicator (GitHub #35 blew up to 1.8M entries)
+- Helper location: `src/main/kotlin/in/kkkev/jjidea/util/Perf.kt`
+- Thresholds (`PERF_DURATION_WARN_MS = 500`, `PERF_COUNT_WARN = 50_000`) are compile-time constants; runtime overrides are planned under issue jj-idea-edjs.7
+- Grep for `perf:` in `idea.log` to find all instrumented operations
+
 ## Issue Tracking
 
 Use beads for all task management:

@@ -33,6 +33,7 @@ import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
 import `in`.kkkev.jjidea.ui.services.showVcsMappingsSettings
+import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -370,7 +371,10 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     private fun updateChangesView(changes: List<Change>) {
         if (changes != changesTree.changes) {
-            changesTree.setChangesToDisplay(changes)
+            log.measurePerf("wc-rebuild", project.name) { report ->
+                report.count("changes", changes.size.toLong())
+                changesTree.setChangesToDisplay(changes)
+            }
 
             changesTree.invokeAfterRefresh {
                 ignoreExpansionEvents = true
