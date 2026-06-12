@@ -582,14 +582,14 @@ class JujutsuChangeProviderTest {
     @Test
     fun `collectTrackedAbsolutePaths - single file does not include summary lines`() {
         val output = statusOutput("M foo.txt")
-        val paths = jcp.collectTrackedAbsolutePaths(output, repo)
+        val paths = collectTrackedAbsolutePaths(output, repo)
         paths shouldBe setOf("${directory.path}/foo.txt")
     }
 
     @Test
     fun `collectTrackedAbsolutePaths - multiple files do not include Parent commit line`() {
         val output = statusOutput("M foo.txt", "A bar/baz.kt", "D old.txt")
-        val paths = jcp.collectTrackedAbsolutePaths(output, repo)
+        val paths = collectTrackedAbsolutePaths(output, repo)
         paths shouldBe setOf("${directory.path}/foo.txt", "${directory.path}/bar/baz.kt", "${directory.path}/old.txt")
     }
 

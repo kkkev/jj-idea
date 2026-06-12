@@ -6,20 +6,13 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
-import `in`.kkkev.jjidea.settings.JujutsuSettings
-import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
-import `in`.kkkev.jjidea.vcs.ignore.FileScanNode
-import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
-import java.io.File
 
 /**
  * Provides change information for jujutsu working copy
@@ -63,10 +56,6 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
                         }
 
                         parseStatus(result.stdout, repo, builder, conflictedPaths)
-
-                        val ignoreService = JujutsuIgnoreService.getInstance(vcs.project)
-                        val trackedPaths = collectTrackedAbsolutePaths(result.stdout, repo)
-                        reportIgnoredFiles(dirtyScope, repo, trackedPaths, builder, ignoreService, progress)
                     } catch (e: ProcessCanceledException) {
                         throw e
                     } catch (e: Exception) {
@@ -217,85 +206,6 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         )
     }
 
-    internal fun collectTrackedAbsolutePaths(statusOutput: String, repo: JujutsuRepository): Set<String> {
-        val paths = mutableSetOf<String>()
-        var inWorkingCopy = false
-        for (line in statusOutput.lines()) {
-            val trimmed = line.trim()
-            when {
-                trimmed.startsWith("Working copy changes:") -> inWorkingCopy = true
-                trimmed.startsWith("Working copy") || trimmed.isEmpty() || trimmed.startsWith("Warning:") ->
-                    inWorkingCopy = false
-                inWorkingCopy && trimmed.length >= 3 -> {
-                    val filePart = trimmed.substring(2).trim()
-                    if (filePart.isNotEmpty()) paths.add(repo.directory.path + "/$filePart")
-                }
-            }
-        }
-        return paths
-    }
-
-    private fun reportIgnoredFiles(
-        dirtyScope: VcsDirtyScope,
-        repo: JujutsuRepository,
-        trackedAbsolutePaths: Set<String>,
-        builder: ChangelistBuilder,
-        ignoreService: JujutsuIgnoreService,
-        progress: ProgressIndicator
-    ) {
-        if (JujutsuSettings.getInstance(vcs.project).disableIgnoredFileScanning(repo)) {
-            log.info("ignore-scan: skipped for ${repo.directory.name} (disabled in settings)")
-            return
-        }
-
-        val repoRoot = File(repo.directory.path)
-        val cache = ignoreService.getCache(repo.directory)
-
-        fun coversRepo(dirPath: FilePath): Boolean {
-            val dirFile = dirPath.virtualFile ?: return repo.directory.path.startsWith(dirPath.path)
-            return VfsUtil.isAncestor(repo.directory, dirFile, false) ||
-                VfsUtil.isAncestor(dirFile, repo.directory, false)
-        }
-        val needsFullScan = dirtyScope.wasEveryThingDirty() ||
-            dirtyScope.recursivelyDirtyDirectories.any { coversRepo(it) }
-
-        if (needsFullScan) {
-            val scanStart = System.currentTimeMillis()
-            var watchdogFired = false
-            log.measurePerf("ignore-scan", repo.directory.name) { report ->
-                val stats = cache.collectIgnored(
-                    FileScanNode(repoRoot),
-                    {
-                        progress.checkCanceled()
-                        if (!watchdogFired && System.currentTimeMillis() - scanStart > IGNORE_SCAN_WATCHDOG_MS) {
-                            watchdogFired = true
-                            val elapsed = System.currentTimeMillis() - scanStart
-                            log.warn("ignore-scan: watchdog triggered after ${elapsed}ms for ${repo.directory.name}")
-                            JujutsuNotifications.notifyIgnoreScanSlow(vcs.project, repo, elapsed)
-                        }
-                    }
-                ) { relPath, isDir ->
-                    if (repo.directory.path + "/" + relPath !in trackedAbsolutePaths) {
-                        builder.processIgnoredFile(VcsUtil.getFilePath(File(repoRoot, relPath), isDir))
-                    }
-                }
-                report.count("visited", stats.visited)
-                report.count("ignored", stats.ignored)
-            }
-        } else {
-            dirtyScope.dirtyFiles
-                .filter { fp -> fp.path.startsWith(repo.directory.path + "/") }
-                .filter { fp -> fp.path !in trackedAbsolutePaths }
-                .filter { fp -> ignoreService.isIgnored(fp, repo.directory) }
-                .forEach { fp -> builder.processIgnoredFile(fp) }
-        }
-    }
-
-    companion object {
-        /** Fire the slow-scan notification after this many milliseconds. */
-        internal const val IGNORE_SCAN_WATCHDOG_MS = 5_000L
-    }
-
     private fun addRenamedChange(renameSpec: String, repo: JujutsuRepository, builder: ChangelistBuilder) {
         val (oldPath, newPath) = parseRenameSpec(renameSpec)
         log.info("Detected rename: $oldPath => $newPath")
@@ -321,4 +231,28 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
         change.isIsReplaced = true
         builder.processChange(change, vcs.keyInstanceMethod)
     }
+}
+
+/**
+ * Extracts the absolute paths of all files reported as working-copy changes from `jj status` output.
+ *
+ * Used by [JujutsuIgnoredFilesService] to exclude already-tracked files from the ignored set
+ * (a force-added, gitignored file should appear as a change, not as ignored).
+ */
+internal fun collectTrackedAbsolutePaths(statusOutput: String, repo: JujutsuRepository): Set<String> {
+    val paths = mutableSetOf<String>()
+    var inWorkingCopy = false
+    for (line in statusOutput.lines()) {
+        val trimmed = line.trim()
+        when {
+            trimmed.startsWith("Working copy changes:") -> inWorkingCopy = true
+            trimmed.startsWith("Working copy") || trimmed.isEmpty() || trimmed.startsWith("Warning:") ->
+                inWorkingCopy = false
+            inWorkingCopy && trimmed.length >= 3 -> {
+                val filePart = trimmed.substring(2).trim()
+                if (filePart.isNotEmpty()) paths.add(repo.directory.path + "/$filePart")
+            }
+        }
+    }
+    return paths
 }

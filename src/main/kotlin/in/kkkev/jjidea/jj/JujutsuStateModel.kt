@@ -18,6 +18,7 @@ import com.intellij.openapi.vfs.newvfs.events.VFileDeleteEvent
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.util.Alarm
 import com.intellij.util.CommonProcessors
+import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.notifiableState
 import `in`.kkkev.jjidea.util.runInBackground
@@ -25,6 +26,7 @@ import `in`.kkkev.jjidea.util.simpleNotifier
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
+import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
@@ -274,7 +276,18 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                             }
                         }
                     }
-                    if (dirtyFiles.isNotEmpty()) dirtyScopeManager.filesDirty(dirtyFiles, null)
+                    if (dirtyFiles.isNotEmpty()) {
+                        dirtyScopeManager.filesDirty(dirtyFiles, null)
+                        // Also forward to the async ignored-files holder so it can do an incremental re-check
+                        val ignoredFilesService = JujutsuIgnoredFilesService.getInstance(project)
+                        dirtyFiles
+                            .groupBy { file -> repos.firstOrNull { VfsUtil.isAncestor(it.directory, file, false) } }
+                            .forEach { (repo, files) ->
+                                if (repo != null) {
+                                    ignoredFilesService.markDirty(repo, files.map { VcsUtil.getFilePath(it) })
+                                }
+                            }
+                    }
                     var hasRepoChanges = dirtyFiles.isNotEmpty()
 
                     // When .gitignore or .git/info/exclude changes, invalidate the ignore cache
@@ -294,6 +307,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                         val repo = repos.firstOrNull { VfsUtil.isAncestor(it.directory, file, true) }
                             ?: continue
                         ignoreService.invalidate(repo)
+                        JujutsuIgnoredFilesService.getInstance(project).invalidate(repo)
                         dirtyScopeManager.dirDirtyRecursively(repo.directory)
                         hasRepoChanges = true
                     }
@@ -369,6 +383,9 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             workingCopies.invalidate()
             gitRemotes.invalidate()
             logRefresh.notify(Unit)
+            // Trigger a full ignored-file scan for each newly discovered repo
+            val ignoredFilesService = JujutsuIgnoredFilesService.getInstance(project)
+            new.values.forEach { repo -> ignoredFilesService.invalidate(repo) }
         }
 
         // When repository states change (VCS operations completed), mark directories dirty
