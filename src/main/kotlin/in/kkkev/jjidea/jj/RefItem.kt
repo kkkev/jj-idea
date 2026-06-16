@@ -10,4 +10,7 @@ sealed interface RefItem {
 
     /** Target change ID, or null if the reference points to nothing (e.g. deleted bookmark). */
     val id: ChangeId?
+
+    /** Whether the target commit is immutable. Defaults to false for unresolved targets. */
+    val immutable: Boolean
 }

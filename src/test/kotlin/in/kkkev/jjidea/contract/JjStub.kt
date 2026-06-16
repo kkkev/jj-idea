@@ -78,6 +78,7 @@ class JjStub(override val workDir: Path) : JjBackend {
         args.startsWith("file", "show") -> cmdFileShow(args)
         args.startsWith("file", "annotate") -> cmdFileAnnotate(args)
         args.startsWith("bookmark") -> dispatchBookmark(args)
+        args.startsWith("tag", "list") -> cmdTagList(args)
         else -> throw StubError("Unknown command: ${args.joinToString(" ")}")
     }
 
@@ -468,6 +469,7 @@ class JjStub(override val workDir: Path) : JjBackend {
                         field(name) // nameWithRemote (no remotes in stub)
                         field("false") // conflict (no conflicts in stub)
                         field(qualifiedChangeId(change))
+                        field(if (change.immutable) "true" else "false") // immutable
                     }
 
                     isBookmarkTemplate(template) -> {
@@ -480,6 +482,14 @@ class JjStub(override val workDir: Path) : JjBackend {
             }
         }
         return ok(output)
+    }
+
+    // -- Tag commands --
+
+    private fun cmdTagList(args: List<String>): JjBackend.Result {
+        // Stub has no tag data model; return empty output (no tags in stub repos).
+        // The template argument is accepted but ignored.
+        return ok()
     }
 
     // -- Git remote commands --

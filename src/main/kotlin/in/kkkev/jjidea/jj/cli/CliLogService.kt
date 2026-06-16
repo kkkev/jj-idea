@@ -342,21 +342,31 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         /**
          * Template for tag list parsing.
-         * jj tag list only exposes `name` in its template context; there is no `target` keyword.
-         * Target commit resolution happens on demand via logCache.get(tag) → jj log -r <name>.
+         * Fields: present, name, change_id (qualified), immutable
+         * Note: jj tag list exposes `normal_target` (same as bookmarks) since jj 0.37+.
          */
-        val tagListTemplate = object : LogTemplate<TagItem?>(stringField("name")) {
+        val tagListTemplate = object : LogTemplate<TagItem?>(
+            booleanField("present"),
+            stringField("name"),
+            singleField("if(present,${TemplateParts.qualifiedChangeId("normal_target")},\"\")") {
+                optionalChangeId.parse(it)
+            },
+            singleField("""if(present, if(normal_target.immutable(), "true", "false"), "false")""") { it.toBoolean() }
+        ) {
             override fun take(input: Iterator<String>): TagItem? = try {
-                val name = fields[0].take(input) as String
-                if (name.isNotEmpty()) TagItem(Tag(name), null) else null
+                val present = fields[0].take(input) as Boolean
+                val name = fields[1].take(input) as String
+                val id = fields[2].take(input) as ChangeId?
+                val immutable = fields[3].take(input) as Boolean
+                if (name.isNotEmpty()) TagItem(Tag(name), id, immutable) else null
             } catch (_: Exception) {
                 null
             }
         }
 
         /**
-         * Template for bookmark list parsing
-         * Uses: jj bookmark list -T 'name ++ "\0" ++ normal_target.change_id() ++ "~" ++ normal_target.change_id().shortest() ++ "\0"'
+         * Template for bookmark list parsing.
+         * Fields: present, name, conflict, change_id (qualified), immutable
          */
         val bookmarkListTemplate = object : LogTemplate<BookmarkItem?>(
             booleanField("present"),
@@ -364,15 +374,17 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             booleanField("conflict"),
             singleField("if(present,${TemplateParts.qualifiedChangeId("normal_target")},\"\")") {
                 optionalChangeId.parse(it)
-            }
+            },
+            singleField("""if(present, if(normal_target.immutable(), "true", "false"), "false")""") { it.toBoolean() }
         ) {
             override fun take(input: Iterator<String>): BookmarkItem? = try {
                 val present = fields[0].take(input) as Boolean
                 val name = fields[1].take(input) as String
                 val conflict = fields[2].take(input) as Boolean
                 val id = fields[3].take(input) as ChangeId?
+                val immutable = fields[4].take(input) as Boolean
                 when {
-                    present && id != null -> BookmarkItem(Bookmark(name, conflict = conflict), id)
+                    present && id != null -> BookmarkItem(Bookmark(name, conflict = conflict), id, immutable)
                     !present -> BookmarkItem(Bookmark(name, deleted = true, conflict = conflict), null)
                     else -> null
                 }

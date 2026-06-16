@@ -94,7 +94,6 @@ abstract class RevisionChoicePanel(
     private var filter: Filter = initialFilter
     private var popup: JBPopup? = null
     private var immutableChangeIds: Set<String> = emptySet()
-    private var immutableTagNames: Set<String> = emptySet()
     private var allEntries: List<LogEntry> = emptyList()
 
     // Incremented on every loadData() call; EDT updates that arrive after a newer call was
@@ -184,15 +183,10 @@ abstract class RevisionChoicePanel(
             val entries = repo.logCache.all
             val items = buildItems(filter)
             val immutableIds = entries.filter { it.immutable }.map { it.id.full }.toSet()
-            val immutableTags = entries
-                .filter { it.immutable }
-                .flatMap { e -> e.tags.map { it.name } }
-                .toSet()
             runLater {
                 if (version != loadVersion) return@runLater
                 allEntries = entries
                 immutableChangeIds = immutableIds
-                immutableTagNames = immutableTags
                 listModel.clear()
                 listModel.addAll(items)
                 if (listModel.size() > 0) list.selectedIndex = 0
@@ -223,10 +217,7 @@ abstract class RevisionChoicePanel(
         override fun render(canvas: TextCanvas, value: RevisionChoice) {
             val isImmutable = when (value) {
                 is RevisionChoice.Change -> value.entry.id.full in immutableChangeIds
-                is RevisionChoice.Ref -> when (val item = value.item) {
-                    is TagItem -> item.tag.name in immutableTagNames
-                    else -> item.id?.full in immutableChangeIds
-                }
+                is RevisionChoice.Ref -> value.item.immutable
             }
             val isWorkingCopy = value is RevisionChoice.Change && value.entry.isWorkingCopy
             fun doRender() {

@@ -326,17 +326,28 @@ class LogTemplateTest {
     private val tagListTemplate = cliLogService.logTemplates.tagListTemplate
 
     @Test
-    fun `tagListTemplate parses tag`() {
-        val fields = listOf("v1.0")
+    fun `tagListTemplate parses present mutable tag`() {
+        val fields = listOf("true", "v1.0", "qpvuntsm~q~", "false")
         val item = tagListTemplate.take(fields.iterator())
 
         item!!.tag shouldBe Tag("v1.0")
-        item.id shouldBe null
+        item.id shouldBe ChangeId("qpvuntsm", "q", null)
+        item.immutable shouldBe false
+    }
+
+    @Test
+    fun `tagListTemplate parses present immutable tag`() {
+        val fields = listOf("true", "v1.0", "qpvuntsm~q~", "true")
+        val item = tagListTemplate.take(fields.iterator())
+
+        item!!.tag shouldBe Tag("v1.0")
+        item.id shouldBe ChangeId("qpvuntsm", "q", null)
+        item.immutable shouldBe true
     }
 
     @Test
     fun `tagListTemplate returns null for empty name`() {
-        val fields = listOf("")
+        val fields = listOf("false", "", "", "false")
         val item = tagListTemplate.take(fields.iterator())
 
         item shouldBe null
@@ -346,26 +357,38 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses present bookmark`() {
-        val fields = listOf("true", "main", "false", "qpvuntsm~q~")
+        val fields = listOf("true", "main", "false", "qpvuntsm~q~", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark shouldBe Bookmark("main", conflict = false)
         item.id shouldBe ChangeId("qpvuntsm", "q", null)
+        item.immutable shouldBe false
+    }
+
+    @Test
+    fun `bookmarkListTemplate parses present immutable bookmark`() {
+        val fields = listOf("true", "main", "false", "qpvuntsm~q~", "true")
+        val item = bookmarkListTemplate.take(fields.iterator())
+
+        item!!.bookmark shouldBe Bookmark("main", conflict = false)
+        item.id shouldBe ChangeId("qpvuntsm", "q", null)
+        item.immutable shouldBe true
     }
 
     @Test
     fun `bookmarkListTemplate parses pending-delete bookmark`() {
-        val fields = listOf("false", "feature", "false", "")
+        val fields = listOf("false", "feature", "false", "", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.name shouldBe BookmarkName("feature")
         item.bookmark.deleted shouldBe true
         item.id shouldBe null
+        item.immutable shouldBe false
     }
 
     @Test
     fun `bookmarkListTemplate parses conflicted bookmark`() {
-        val fields = listOf("true", "main", "true", "qpvuntsm~q~")
+        val fields = listOf("true", "main", "true", "qpvuntsm~q~", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.conflict shouldBe true
