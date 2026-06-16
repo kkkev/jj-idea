@@ -31,6 +31,24 @@ in IDEA's VCS/Directory Mappings configuration. A Jujutsu root points to the sam
 - A **repository** is a Jujutsu repository - the top-level folder of a Jujutsu-controlled directory tree.
 - A repository has been **initialised** if it contains a `.jj` directory, and hence Jujutsu is tracking its content.
 
+## Performance & Scale
+
+The plugin targets large repositories (~1M files, ~500k ignored files, ~100k commits,
+~1k-change working sets, multi-root projects). The full scale envelope, refresh-path
+rules, and JVM-traversal requirements are documented in the **[Performance & Scale
+section of CLAUDE.md](CLAUDE.md#performance--scale)**.
+
+**Every PR touching file traversal, log parsing, change-provider logic, or VFS
+listener fan-out must answer this checklist question before merge:**
+
+> Does this change do work that grows with any scale dimension — total files in
+> the working copy, ignored files, commits in the log, changes in the working
+> set, or number of roots? If yes, what bounds it, and where is the scale test?
+
+If the answer is yes: (a) state the complexity in your PR description, and (b)
+ship an operation-count test following the `GitignoreScanTest.kt` pattern (see
+`src/test/kotlin/in/kkkev/jjidea/vcs/ignore/GitignoreScanTest.kt`).
+
 ## Architecture
 
 The plugin is designed with a clean separation between the VCS operations and their implementation:

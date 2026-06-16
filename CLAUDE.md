@@ -478,6 +478,73 @@ bd update <id> -p P0     # Update priority
 bd close <id>            # Close completed issue
 ```
 
+## Performance & Scale
+
+### Scale Envelope
+
+The plugin must remain responsive at:
+- ~1M files in the working tree
+- ~500k ignored files (node_modules / build-output style trees)
+- ~100k commits in the log
+- ~1k-change working sets
+- Multi-root projects — work multiplies per root
+
+### Refresh-Path Rules
+
+1. **Nothing O(repo-size) on the refresh path — only O(working-set).** Ignored-file
+   computation is decoupled from `JujutsuChangeProvider.getChanges` into the async
+   `VcsManagedFilesHolder` (see `JujutsuIgnoredFilesService`); refresh latency must
+   stay independent of ignored-tree size.
+
+2. **Prune ignored directories before descending.** At each `onEnter`, if a directory
+   is ignored, report it as a single entry and do **not** recurse into it. A child
+   cannot be re-included under an excluded parent (git semantics), so pruning is
+   correct and eliminates O(ignored-tree) visits entirely.
+
+3. **Every file/commit loop must be cancellable.** Call `progress.checkCanceled()`
+   per directory or per batch. The missing check in GitHub #35 caused a 10 s
+   shutdown hang.
+
+4. **Do not assume a colocated git repo.** Large repos are typically *not* colocated,
+   and the plugin must always work without colocation — particularly in jj workspaces.
+   JVM tree traversal done correctly (pruned + cancellable, as in
+   `GitignoreCache.collectIgnored`) is the standard path, not a fallback. Never write
+   a fast path that delegates to `git` and a broken slow path for the non-colocated
+   case.
+
+5. **Listener callbacks must be O(1) / debounced.** VFS `BulkFileListener` and
+   `ChangeListListener` callbacks must do a constant amount of work and post to a
+   debounced background task — never fan out inline per event.
+   (`repositoryStates.invalidate()` uses a 300 ms `MutableSharedFlow` debounce.)
+
+### Agent Requirement — Scale Analysis as a Deliverable
+
+Any change that adds a filesystem traversal or a per-file/per-commit loop must:
+
+**(a) State its complexity against the scale envelope above** in the implementation
+summary — e.g. "visits O(non-ignored entries), O(1) per VFS event."
+
+**(b) Ship with an operation-count test** that injects a counting collaborator and
+asserts on work performed — not wall-clock time (which is CI-flaky). Follow the
+`GitignoreScanTest.kt` pattern (`src/test/kotlin/in/kkkev/jjidea/vcs/ignore/GitignoreScanTest.kt`).
+See jj-idea-edjs.2 for the generalised pattern across hot paths.
+
+### PR Checklist Question
+
+Add this question when reviewing any change that touches file traversal, log
+parsing, change-provider logic, or VFS listener fan-out:
+
+> Does this change do work that grows with any scale dimension — total files in
+> the working copy, ignored files, commits in the log, changes in the working
+> set, or number of roots? If yes, what bounds it, and where is the scale test?
+
+### Runtime Detector
+
+A `perf:` WARN line in a user-submitted `idea.log` is a strong scale-regression
+signal — the `visited` count is the key indicator (`perf: ignore-scan took Xms
+[visited=1,843,201, ignored=12]`). See [Performance Logging](#performance-logging)
+for the log format and thresholds (`PERF_COUNT_WARN` = 50,000).
+
 ## Coding Standards
 
 ### Kotlin Style
@@ -585,6 +652,8 @@ Add entries to the `[Unreleased]` section of `CHANGELOG.md`:
 - `### Fixed` - Bug fixes
 - `### Changed` - Changes to existing functionality
 - `### Removed` - Removed features
+
+The changelog is user-facing, so avoid implementation detail.
 
 ### 5. Sync Remotes
 ```bash
