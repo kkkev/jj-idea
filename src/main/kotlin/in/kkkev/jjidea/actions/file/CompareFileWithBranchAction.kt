@@ -5,6 +5,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.jujutsuFiles
@@ -53,24 +54,32 @@ class CompareFileWithBranchAction : DumbAwareAction(
 
     fun showDiff(repo: JujutsuRepository, files: List<VirtualFile>, leftRevision: Revision) {
         runInBackground {
-            val diffManager = DiffManager.getInstance()
-
             // Locate change id in case revision is a bookmark or other expression
-            val leftChangeId = repo.getLogEntry(leftRevision).id
+            val leftChangeId = runCatching { repo.getLogEntry(leftRevision).id }.getOrNull()
+            if (leftChangeId == null) {
+                runLater {
+                    Messages.showErrorDialog(
+                        repo.project,
+                        JujutsuBundle.message("action.compare.branch.resolve.error.message", leftRevision.toString()),
+                        JujutsuBundle.message("action.compare.branch.resolve.error.title")
+                    )
+                }
+            } else {
+                val diffManager = DiffManager.getInstance()
+                val diffRequests = files.map { file ->
+                    val leftSide = repo.createDiffSideFor(file.filePath.fileAt(leftChangeId))
+                    val rightSide = repo.createDiffSideFor(file.fileAtVersion)
+                    diffRequest(
+                        JujutsuBundle.message("diff.title.compare", file.filePath.name, leftRevision.toString()),
+                        leftSide,
+                        rightSide
+                    )
+                }
 
-            val diffRequests = files.map { file ->
-                val leftSide = repo.createDiffSideFor(file.filePath.fileAt(leftChangeId))
-                val rightSide = repo.createDiffSideFor(file.fileAtVersion)
-                diffRequest(
-                    JujutsuBundle.message("diff.title.compare", file.filePath.name, leftRevision.toString()),
-                    leftSide,
-                    rightSide
-                )
-            }
-
-            runLater {
-                diffRequests.forEach {
-                    diffManager.showDiff(repo.project, it)
+                runLater {
+                    diffRequests.forEach {
+                        diffManager.showDiff(repo.project, it)
+                    }
                 }
             }
         }

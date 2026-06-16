@@ -55,8 +55,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     private val executor = repo.commandExecutor
     val logTemplates = LogTemplates()
 
-    override fun getLog(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
-        getLog(logTemplates.fullLogTemplate, revset, filePaths, limit)
+    override fun getLog(revset: Revset, filePaths: List<FilePath>, limit: Int?, quiet: Boolean) =
+        getLog(logTemplates.fullLogTemplate, revset, filePaths, limit, quiet)
 
     override fun getLogBasic(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
         getLog(logTemplates.basicLogTemplate, revset, filePaths, limit)
@@ -166,12 +166,13 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         template: LogTemplate<T>,
         revset: Revset = Expression.ALL,
         filePaths: List<FilePath> = emptyList(),
-        limit: Int? = null
+        limit: Int? = null,
+        quiet: Boolean = false
     ): Result<List<T>> {
         log.debug("Getting log for revset: $revset, files: $filePaths, limit: $limit")
         val context = "${File(repo.directory.path).name}:${limit ?: "∞"}"
         return log.measurePerf("log-load", context) { report ->
-            val result = executor.log(revset, template.spec, filePaths, limit)
+            val result = executor.log(revset, template.spec, filePaths, limit, quiet)
             if (result.isSuccess) {
                 toResult("Failed to parse") { parse(template, result.stdout) }
                     .also { r -> r.onSuccess { report.count("entries", it.size.toLong()) } }

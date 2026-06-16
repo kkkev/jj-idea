@@ -17,7 +17,8 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         revset: Revset,
         template: String?,
         filePaths: List<FilePath>,
-        limit: Int?
+        limit: Int?,
+        quiet: Boolean
     ) = toResult(
         stub.run(
             *buildList {

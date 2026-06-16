@@ -254,7 +254,8 @@ class CliExecutor(
         revset: Revset,
         template: String?,
         filePaths: List<FilePath>,
-        limit: Int?
+        limit: Int?,
+        quiet: Boolean
     ): CommandExecutor.CommandResult {
         val args = mutableListOf<Any>("log")
         if (revset !is Revset.Default) {
@@ -271,7 +272,7 @@ class CliExecutor(
             args.add(limit)
         }
         args.addAll(filePaths.map { it.relativeTo(root!!) })
-        return execute(root, args)
+        return execute(root, args, warnOnFailure = !quiet)
     }
 
     override fun annotate(file: VirtualFile, revision: Revision, template: String?): CommandExecutor.CommandResult {
@@ -553,9 +554,9 @@ class CliExecutor(
 
         log.info("Completed in ${workingDir?.path ?: "."}: jj $cmdName in ${duration}ms (exit=${output.exitCode})")
 
-        if (warnOnFailure) {
-            output.takeIf { it.exitCode != 0 }
-                ?.run { log.warn("jj $cmdName failed with exit code $exitCode:\n$stderr") }
+        output.takeIf { it.exitCode != 0 }?.run {
+            val message = "jj $cmdName failed with exit code $exitCode:\n$stderr"
+            if (warnOnFailure) log.warn(message) else log.info(message)
         }
 
         return with(output) { CommandExecutor.CommandResult(exitCode, stdout, stderr) }

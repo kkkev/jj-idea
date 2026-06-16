@@ -7,10 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The "Compare with Another Commit…" popup and the working-copy switcher now accept arbitrary revision expressions (change id, git SHA, bookmark name) that fall outside the loaded log window. Typing a query that matches nothing locally shows a "Use … as revision" fallback, which resolves in the background and upgrades to a full commit preview, including the correct mutability icon (jj-idea-p1ns).
+
 ### Changed
 - Ignored-file scanning now runs asynchronously off the modified-file refresh path. Working-copy changes appear immediately after a save regardless of ignored-tree size; the Commit toolwindow shows the built-in "updating" indicator while ignored files are computed in the background (jj-idea-2570.2).
 
 ### Fixed
+- Typing a revision that doesn't exist in the revision-choice popup or working-copy switcher no longer logs a WARN-level entry; resolution failures for a single typed revision are now logged at INFO, since this is an expected outcome rather than a plugin error.
 - Mutable/immutable icon in the working-copy switcher and revision-choice popup now correctly reflects the target commit's immutability for bookmarks and tags, even when the target is outside the loaded log window.
 - Resolving conflicts now refreshes the working copy so resolved files no longer appear conflicted in the panel; re-opening the Resolve dialog after a successful resolution no longer throws "Could not extract conflict data" (jj-idea-3cvb).
 

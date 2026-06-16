@@ -332,6 +332,11 @@ fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyLis
             append(" ")
             appendSummary(choice.description)
         }
+        is RevisionChoice.FreeForm -> grey {
+            append(icon(AllIcons.Actions::Search))
+            append(" ")
+            append(JujutsuBundle.message("dialog.revisionselector.freeform", choice.text))
+        }
     }
 }
 

@@ -88,20 +88,20 @@ class RepoLogCacheTest {
     @Test
     fun `get by change id falls back to logService on miss and stores result`() {
         val e = entry("zzz")
-        every { logService.getLog(revset = e.id) } returns Result.success(listOf(e))
+        every { logService.getLog(revset = e.id, quiet = true) } returns Result.success(listOf(e))
 
         val result = cache[e.id]
 
         result shouldBe e
         // second call should be served from cache — no extra logService calls
         cache[e.id] shouldBe e
-        verify(exactly = 1) { logService.getLog(revset = e.id) }
+        verify(exactly = 1) { logService.getLog(revset = e.id, quiet = true) }
     }
 
     @Test
     fun `get by change id throws when logService returns empty`() {
         val id = ChangeId("missing", "missing", null)
-        every { logService.getLog(revset = id) } returns Result.success(emptyList())
+        every { logService.getLog(revset = id, quiet = true) } returns Result.success(emptyList())
 
         shouldThrow<IllegalArgumentException> { cache[id] }
     }
@@ -121,7 +121,7 @@ class RepoLogCacheTest {
     fun `get throws original exception when logService returns failure`() {
         val id = ChangeId("aaa", "aaa", null)
         val cause = RuntimeException("jj not found")
-        every { logService.getLog(revset = id) } returns Result.failure(cause)
+        every { logService.getLog(revset = id, quiet = true) } returns Result.failure(cause)
 
         val thrown = shouldThrow<RuntimeException> { cache[id] }
         thrown.message shouldBe "jj not found"
@@ -153,7 +153,7 @@ class RepoLogCacheTest {
         cache.store(listOf(entry("aaa", immutable = true)))
 
         // byBookmark should no longer point at entryA; fallback hits logService, returns empty → throws
-        every { logService.getLog(revset = bm.name) } returns Result.success(emptyList())
+        every { logService.getLog(revset = bm.name, quiet = true) } returns Result.success(emptyList())
         shouldThrow<IllegalArgumentException> { cache[bm.name] }
     }
 
@@ -170,8 +170,8 @@ class RepoLogCacheTest {
             cache.clear()
 
             // After clear both fall through to logService; stub them to return empty → throws
-            every { logService.getLog(revset = mutableE.id) } returns Result.success(emptyList())
-            every { logService.getLog(revset = immutableE.id) } returns Result.success(emptyList())
+            every { logService.getLog(revset = mutableE.id, quiet = true) } returns Result.success(emptyList())
+            every { logService.getLog(revset = immutableE.id, quiet = true) } returns Result.success(emptyList())
 
             shouldThrow<IllegalArgumentException> { cache[mutableE.id] }
             shouldThrow<IllegalArgumentException> { cache[immutableE.id] }
@@ -185,7 +185,7 @@ class RepoLogCacheTest {
 
             cache.clear()
 
-            every { logService.getLog(revset = bm.name) } returns Result.success(emptyList())
+            every { logService.getLog(revset = bm.name, quiet = true) } returns Result.success(emptyList())
             shouldThrow<IllegalArgumentException> { cache[bm.name] }
         }
 
@@ -196,7 +196,7 @@ class RepoLogCacheTest {
 
             cache.clear()
 
-            every { logService.getLog(revset = e.commitId) } returns Result.success(emptyList())
+            every { logService.getLog(revset = e.commitId, quiet = true) } returns Result.success(emptyList())
             shouldThrow<IllegalArgumentException> { cache[e.commitId] }
         }
 

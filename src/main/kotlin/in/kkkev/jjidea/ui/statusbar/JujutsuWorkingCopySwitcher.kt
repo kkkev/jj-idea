@@ -73,6 +73,7 @@ object JujutsuWorkingCopySwitcher {
             val revision = when (item) {
                 is RevisionChoice.Change -> item.entry.commitId
                 is RevisionChoice.Ref -> item.item.ref
+                is RevisionChoice.FreeForm -> item.revision
             }
             runInBackground {
                 try {

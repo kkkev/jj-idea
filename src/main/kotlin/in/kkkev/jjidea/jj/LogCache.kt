@@ -105,10 +105,12 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         } ?: fetchOne(revision)
     ) { "Expression $revision does not point to a single LogEntry" }
 
-    private fun fetchOne(revision: Revision) = fetch(revision).firstOrNull()
+    // quiet=true: resolving a single revision commonly fails on purpose (e.g. a free-form revision
+    // typed by the user that may not exist), so that case is logged at INFO rather than WARN.
+    private fun fetchOne(revision: Revision) = fetch(revision, quiet = true).firstOrNull()
 
-    private fun fetch(revset: Revset, limit: Int? = null) = repo.logService.getLog(revset = revset, limit = limit)
-        .getOrThrow().also(this::store)
+    private fun fetch(revset: Revset, limit: Int? = null, quiet: Boolean = false) =
+        repo.logService.getLog(revset = revset, limit = limit, quiet = quiet).getOrThrow().also(this::store)
 
     // Fast path: if the target is already cached (e.g., from a previous loadContext call that
     // was then overwritten by loadCommits), return the full snapshot which includes both the

@@ -111,13 +111,16 @@ interface CommandExecutor {
      * @param revset Revisions to show (e.g., "@", "@-")
      * @param template Template for output (e.g., "description", "change_id")
      * @param filePaths Optional file paths to filter log (e.g., "src/main.kt")
+     * @param quiet If true, suppress the WARN-level log on failure (e.g. resolving a revision that
+     * may legitimately not exist, such as a free-form revision typed by the user)
      * @return Command result with log output
      */
     fun log(
         revset: Revset = Expression.ALL,
         template: String? = null,
         filePaths: List<FilePath> = emptyList(),
-        limit: Int? = null
+        limit: Int? = null,
+        quiet: Boolean = false
     ): CommandResult
 
     /**

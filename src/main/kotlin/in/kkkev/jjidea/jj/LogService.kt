@@ -12,12 +12,15 @@ interface LogService {
      * Get log entries with full metadata (author, committer, timestamps)
      * @param revset Revset to query (default: "all()")
      * @param filePaths Optional file paths to filter by
+     * @param quiet If true, log a failure (e.g. an unresolvable revision) at INFO rather than WARN —
+     * use when failure is an expected possibility, such as resolving a free-form user-typed revision
      * @return List of log entries with complete metadata
      */
     fun getLog(
         revset: Revset = Expression.ALL,
         filePaths: List<FilePath> = emptyList(),
-        limit: Int? = null
+        limit: Int? = null,
+        quiet: Boolean = false
     ): Result<List<LogEntry>>
 
     /**
