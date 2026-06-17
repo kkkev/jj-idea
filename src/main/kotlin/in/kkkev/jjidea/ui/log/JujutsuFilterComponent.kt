@@ -3,8 +3,10 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListPopup
+import com.intellij.openapi.util.Condition
 import com.intellij.ui.ClickListener
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
@@ -137,6 +139,13 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
     protected abstract fun doResetFilter()
 
     /**
+     * Condition used to preselect (highlight) a row when the popup opens, so a filter with an
+     * active value reopens scrolled to and highlighting that value. Returns `null` (the default)
+     * to open with no preselection.
+     */
+    protected open fun preselectCondition(): Condition<in AnAction>? = null
+
+    /**
      * Add a change listener that will be notified when the filter changes.
      */
     fun addChangeListener(listener: Runnable) {
@@ -204,7 +213,11 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         createActionGroup(),
         DataManager.getInstance().getDataContext(this),
         JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
-        false
+        false,
+        null,
+        -1,
+        preselectCondition(),
+        null
     )
 
     private fun createFocusedBorder(): Border =

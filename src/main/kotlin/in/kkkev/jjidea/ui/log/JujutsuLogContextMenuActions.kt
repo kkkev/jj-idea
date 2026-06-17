@@ -86,7 +86,7 @@ object JujutsuLogContextMenuActions {
         addSeparator()
         add(createBookmarkAction(entry))
         entry?.takeIf { it.bookmarks.isNotEmpty() }?.let { entry ->
-            addPopup("action.bookmark.submenu", JujutsuIcons.Bookmark) {
+            addPopup("action.bookmark.submenu", JujutsuIcons.BookmarkAction) {
                 entry.bookmarks.forEachIndexed { i, bookmark ->
                     if (i > 0) {
                         addSeparator()

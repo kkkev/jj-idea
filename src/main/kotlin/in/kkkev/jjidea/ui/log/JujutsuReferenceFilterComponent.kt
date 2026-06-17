@@ -5,12 +5,23 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.KeepPopupOnPerform
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Condition
+import com.intellij.ui.RowIcon
+import com.intellij.util.ui.EmptyIcon
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import `in`.kkkev.jjidea.ui.common.accented
 import javax.swing.Icon
+
+// Hoisted to avoid rebuilding on every row update.
+private val CHECK_ICON = AllIcons.Actions.Checked
+private val EMPTY_CHECK_ICON = EmptyIcon.create(CHECK_ICON.iconWidth, CHECK_ICON.iconHeight)
 
 /**
  * Filter component for references (bookmarks, tags, and @).
@@ -111,6 +122,11 @@ class JujutsuReferenceFilterComponent(
         notifyFilterChanged()
     }
 
+    override fun preselectCondition(): Condition<in AnAction>? {
+        val sel = selectedReference ?: return null
+        return Condition { it is SelectReferenceAction && it.ref == sel }
+    }
+
     private fun applyFilter() {
         val ref = selectedReference ?: run {
             tableModel.setBookmarkFilter(emptySet())
@@ -169,12 +185,32 @@ class JujutsuReferenceFilterComponent(
     }
 
     private inner class SelectReferenceAction(private val reference: String, private val type: ReferenceType) :
-        ToggleAction(reference, null, type.icon) {
-        override fun isSelected(e: AnActionEvent): Boolean = selectedReference == SelectedRef(reference, type)
+        ToggleAction(reference) {
+        val ref get() = SelectedRef(reference, type)
+
+        init {
+            // Single-select: clicking an entry should apply it and close the popup immediately,
+            // not keep it open the way multi-select toggles (e.g. JujutsuRootFilterComponent) do.
+            templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.Never
+        }
+
+        override fun isSelected(e: AnActionEvent): Boolean = selectedReference == ref
+
         override fun setSelected(e: AnActionEvent, state: Boolean) {
-            selectedReference = if (state) SelectedRef(reference, type) else null
+            selectedReference = if (state) ref else null
             expansionInFlight = false
             notifyFilterChanged()
+        }
+
+        // ToggleAction.update() nulls the icon in popups to show its own checkmark instead
+        // (ActionStepBuilder.calcRawIcons only synthesizes a checkmark when no icon is set).
+        // Overwrite it afterwards with a checkmark + type icon composed ourselves, the same way
+        // JujutsuRootFilterComponent.ToggleRootAction overwrites its icon after super.update() —
+        // this also makes the marker persist through mouse hover and keyboard navigation, unlike
+        // the popup's transient pre-selection highlight.
+        override fun update(e: AnActionEvent) {
+            super.update(e)
+            e.presentation.icon = RowIcon(if (isSelected(e)) CHECK_ICON else EMPTY_CHECK_ICON, type.icon)
         }
     }
 
@@ -184,10 +220,13 @@ class JujutsuReferenceFilterComponent(
 
     private data class References(val workingCopy: String?, val bookmarks: List<String>, val tags: List<String>)
 
+    // BookmarkAction (not the narrower inline-text Bookmark icon) is already sized for AnAction
+    // icon slots — its viewBox reserves headroom so the glyph renders centered in a true 16x16
+    // box instead of being stretched to fill it, matching JujutsuIcons.Tag and AllIcons.Vcs.Branch.
     private enum class ReferenceType(val icon: Icon) {
         WORKING_COPY(AllIcons.Vcs.Branch),
-        BOOKMARK(AllIcons.Vcs.Branch),
-        TAG(AllIcons.Nodes.Tag)
+        BOOKMARK(JujutsuIcons.BookmarkAction.accented(JujutsuColors.BOOKMARK)),
+        TAG(JujutsuIcons.Tag.accented(JujutsuColors.TAG))
     }
 
     override fun dispose() = Unit
