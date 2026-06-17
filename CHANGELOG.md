@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In multi-repository log windows, the repository color gutter is now expanded by default (showing the repo name) instead of collapsed to a thin colored strip, making per-repo colors easier to discover. Each log tab remembers your collapse/expand choice (GitHub #10).
 
 ### Fixed
+- Bookmark and tag chips in the commit details panel no longer break apart when wrapping to multiple lines — the icon could previously be separated from its label, and long hyphenated names could break mid-word; each chip now wraps as a single atomic unit.
 - Typing a revision that doesn't exist in the revision-choice popup or working-copy switcher no longer logs a WARN-level entry; resolution failures for a single typed revision are now logged at INFO, since this is an expected outcome rather than a plugin error.
 - Mutable/immutable icon in the working-copy switcher and revision-choice popup now correctly reflects the target commit's immutability for bookmarks and tags, even when the target is outside the loaded log window.
 - Resolving conflicts now refreshes the working copy so resolved files no longer appear conflicted in the panel; re-opening the Resolve dialog after a successful resolution no longer throws "Could not extract conflict data".

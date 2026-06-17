@@ -60,6 +60,26 @@ interface TextCanvas {
 
     fun append(icon: IconSpec) = control("<icon src='${icon.qualified}'/>")
 
+    /**
+     * Append [icon] (optionally preceded by [prefixIcon], e.g. a conflict marker) immediately followed by [label],
+     * with an optional trailing [suffix] in [suffixColor]. Implementations should render this as a single
+     * unbreakable unit, so a bookmark/tag chip's icon is never separated from its name, and the name never wraps
+     * mid-word, when the surrounding layout needs to wrap (jj-idea-kds1).
+     */
+    fun appendChip(
+        icon: IconSpec,
+        label: String,
+        prefixIcon: IconSpec? = null,
+        strikethrough: Boolean = false,
+        suffix: String? = null,
+        suffixColor: Color? = null
+    ) {
+        prefixIcon?.let { append(it) }
+        append(icon)
+        if (strikethrough) strikethrough { append(label) } else append(label)
+        suffix?.let { if (suffixColor != null) colored(suffixColor) { append(it) } else append(it) }
+    }
+
     fun truncate(builder: TextCanvas.() -> Unit) = builder()
 }
 
@@ -158,32 +178,31 @@ fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelativ
 fun refUri(entry: LogEntry, kind: String, name: String): URI =
     URI("jjref://${entry.repo.directory.path}?${entry.id}&kind=$kind&name=${URLEncoder.encode(name, "UTF-8")}")
 
-fun TextCanvas.append(name: BookmarkName) =
-    colored(JujutsuColors.BOOKMARK) {
-        smaller {
-            append(icon(JujutsuIcons::Bookmark))
-            append(name.name)
-        }
+fun TextCanvas.append(name: BookmarkName) = colored(JujutsuColors.BOOKMARK) {
+    smaller {
+        appendChip(icon(JujutsuIcons::Bookmark), name.name)
     }
+}
 
-private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) {
-    colored(JujutsuColors.BOOKMARK) {
-        smaller {
-            if (bookmark.conflict) append(icon(JujutsuIcons::Conflict))
-            val iconRef = if (!bookmark.isRemote || bookmark.tracked) {
-                JujutsuIcons::BookmarkTracked
-            } else {
-                JujutsuIcons::Bookmark
-            }
-            append(icon(iconRef))
-            if (bookmark.deleted) strikethrough { append(label) } else append(label)
-            if (bookmark.aheadCount > 0 || bookmark.behindCount > 0) {
-                colored(JujutsuColors.DIVERGENT) {
-                    if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
-                    if (bookmark.behindCount > 0) append("↓${bookmark.behindCount}")
-                }
-            }
+private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = colored(JujutsuColors.BOOKMARK) {
+    smaller {
+        val iconRef = if (!bookmark.isRemote || bookmark.tracked) {
+            JujutsuIcons::BookmarkTracked
+        } else {
+            JujutsuIcons::Bookmark
         }
+        val divergence = buildString {
+            if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
+            if (bookmark.behindCount > 0) append("↓${bookmark.behindCount}")
+        }
+        appendChip(
+            icon(iconRef),
+            label,
+            prefixIcon = if (bookmark.conflict) icon(JujutsuIcons::Conflict) else null,
+            strikethrough = bookmark.deleted,
+            suffix = divergence.takeIf { it.isNotEmpty() },
+            suffixColor = JujutsuColors.DIVERGENT
+        )
     }
 }
 
@@ -286,8 +305,7 @@ fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
 
 fun TextCanvas.append(tag: Tag) = colored(JujutsuColors.TAG) {
     smaller {
-        append(icon(JujutsuIcons::Tag))
-        append(tag.name)
+        appendChip(icon(JujutsuIcons::Tag), tag.name)
     }
 }
 

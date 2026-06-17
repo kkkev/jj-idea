@@ -1,9 +1,11 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.ui.ColorUtil
 import com.intellij.ui.SimpleTextAttributes
 import java.awt.Color
 import java.awt.Font
 import java.net.URI
+import java.net.URLEncoder
 
 /**
  * Create a full HTML document including wrapping `<html>` tag.
@@ -29,6 +31,39 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
     override fun append(icon: IconSpec) {
         val src = applyCurrentColor(icon).qualified
         control("<icon src='${if (style.isSmaller) "$src@$SMALLER_SCALE" else src}'/>")
+    }
+
+    /**
+     * Encode the whole chip into a single `<icon>` element's `src` attribute, resolved by [ChipIconExtension] into
+     * one atomic [ChipView]. A plain sequence of `<icon>` + text elements would let the surrounding HTML layout
+     * split the icon from its label, or the label across lines, when the row needs to wrap (jj-idea-kds1) — folding
+     * everything into a single leaf view makes that impossible.
+     */
+    override fun appendChip(
+        icon: IconSpec,
+        label: String,
+        prefixIcon: IconSpec?,
+        strikethrough: Boolean,
+        suffix: String?,
+        suffixColor: Color?
+    ) {
+        fun key(spec: IconSpec): String {
+            val src = applyCurrentColor(spec).qualified
+            return if (style.isSmaller) "$src@$SMALLER_SCALE" else src
+        }
+
+        val encodedLabel = URLEncoder.encode(label, "UTF-8")
+        val encodedSuffix = suffix?.let { URLEncoder.encode(it, "UTF-8") } ?: ""
+        val suffixColorHex = suffixColor?.let { ColorUtil.toHex(it) } ?: ""
+        val encoded = listOf(
+            key(icon),
+            prefixIcon?.let(::key) ?: "",
+            encodedLabel,
+            if (strikethrough) "1" else "0",
+            encodedSuffix,
+            suffixColorHex
+        ).joinToString(";")
+        control("<icon src='$CHIP_ICON_PREFIX$encoded'/>")
     }
 
     // TODO Optimise nested styles so that they collapse into one if they start and end at the same point

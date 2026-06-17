@@ -51,6 +51,10 @@ Use this checklist:
 - [ ] Description renders HTML formatting
 - [ ] Splitter position persists
 - [ ] Toggle details panel position (right/bottom) works
+- [ ] On a commit with several long/hyphenated bookmarks (e.g. `hotfix/issue-123`,
+      `feature/long-name-here`), narrow the panel until the bookmark line wraps — each
+      bookmark (icon + name) stays intact on one line; wrapping only occurs between
+      bookmarks, never inside a name or between its icon and text (jj-idea-kds1)
 
 ### Details Changes Panel
 

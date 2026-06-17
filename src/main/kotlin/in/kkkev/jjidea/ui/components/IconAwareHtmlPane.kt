@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
 import com.intellij.ui.scale.JBUIScale
+import com.intellij.util.ui.ExtendableHTMLViewFactory
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.invalidate
@@ -16,14 +17,28 @@ import `in`.kkkev.jjidea.ui.common.accented
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import java.awt.Component
 import java.awt.Graphics
+import java.awt.Rectangle
+import java.awt.Shape
+import java.awt.Toolkit
+import java.net.URLDecoder
 import java.util.regex.Pattern
 import javax.swing.Icon
 import javax.swing.event.HyperlinkEvent
+import javax.swing.text.AttributeSet
+import javax.swing.text.Element
+import javax.swing.text.Position
+import javax.swing.text.View
+import javax.swing.text.html.HTML
+import javax.swing.text.html.HTMLDocument
+import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.reflect.KClass
 
 private val CHANGE_ID_URL_PARSER = Pattern.compile("^jjc://([^?]+)\\?(.+)$")
 private val REF_URL_PARSER = Pattern.compile("^jjref://([^?]+)\\?([^&]+)&kind=([^&]+)&name=(.+)$")
+
+/** Marker prefix on an `<icon>` element's `src`, recognized by [ChipIconExtension], identifying a [TextCanvas.appendChip]. */
+internal const val CHIP_ICON_PREFIX = "chip:"
 
 /**
  * An HTML pane that can resolve icons from a set of icon libraries, including IDEA's icons
@@ -33,7 +48,10 @@ private val REF_URL_PARSER = Pattern.compile("^jjref://([^?]+)\\?([^&]+)&kind=([
  */
 class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     JBHtmlPaneStyleConfiguration(),
-    JBHtmlPaneConfiguration { iconResolver = { IconResolver.resolveIcon(it)?.let(::HtmlIcon) } }
+    JBHtmlPaneConfiguration {
+        iconResolver = { IconResolver.resolveIcon(it)?.let(::HtmlIcon) }
+        extensions(ChipIconExtension)
+    }
 ) {
     init {
         isOpaque = false
@@ -108,5 +126,140 @@ private class HtmlIcon(private val source: Icon) : Icon {
 
     override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
         source.paintIcon(c, g, x, y - source.iconHeight + g.fontMetrics.descent)
+    }
+}
+
+/**
+ * Corrects High-DPI "Double Scaling" like [HtmlIcon], but reports its real height. Used by [ChipView], which (unlike
+ * plain `<icon>` elements rendered by IntelliJ's built-in `JBIconView`) positions icons itself against real font
+ * metrics rather than relying on the zero-height/row-alignment trick [HtmlIcon] exists for.
+ */
+private class ScaleCorrectedIcon(private val source: Icon) : Icon {
+    override fun getIconWidth() = (source.iconWidth / JBUIScale.scale(1f)).roundToInt()
+    override fun getIconHeight() = (source.iconHeight / JBUIScale.scale(1f)).roundToInt()
+    override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) = source.paintIcon(c, g, x, y)
+}
+
+/**
+ * Resolves `<icon>` elements whose `src` starts with [CHIP_ICON_PREFIX] into a single atomic [ChipView], so that an
+ * icon is never separated from its label, nor a label split mid-word, by HTML line wrapping (jj-idea-kds1). Plain
+ * icons (no chip prefix) fall through to IntelliJ's built-in icon rendering by returning `null`.
+ */
+internal object ChipIconExtension : ExtendableHTMLViewFactory.Extension {
+    override fun invoke(element: Element, defaultView: View): View? {
+        if (element.name != "icon") return null
+        val src = element.attributes.getAttribute(HTML.Attribute.SRC) as? String ?: return null
+        if (!src.startsWith(CHIP_ICON_PREFIX)) return null
+        val spec = ChipSpec.parse(src.removePrefix(CHIP_ICON_PREFIX)) ?: return null
+        return ChipView(element, spec)
+    }
+}
+
+/** Parsed contents of a [TextCanvas.appendChip] call, encoded by `HtmlTextCanvas` into a single `src` attribute. */
+private class ChipSpec(
+    val icon: Icon,
+    val prefixIcon: Icon?,
+    val label: String,
+    val strikethrough: Boolean,
+    val suffix: String?,
+    val suffixColor: java.awt.Color?
+) {
+    companion object {
+        fun parse(encoded: String): ChipSpec? {
+            val parts = encoded.split(";")
+            if (parts.size != 6) return null
+            val icon = resolveChipIcon(parts[0]) ?: return null
+            val prefixIcon = parts[1].takeIf { it.isNotEmpty() }?.let(::resolveChipIcon)
+            val label = URLDecoder.decode(parts[2], "UTF-8")
+            val strikethrough = parts[3] == "1"
+            val suffix = parts[4].takeIf { it.isNotEmpty() }?.let { URLDecoder.decode(it, "UTF-8") }
+            val suffixColor = parts[5].takeIf { it.isNotEmpty() }?.let { ColorUtil.fromHex(it) }
+            return ChipSpec(icon, prefixIcon, label, strikethrough, suffix, suffixColor)
+        }
+
+        private fun resolveChipIcon(key: String): Icon? = IconResolver.resolveIcon(key)?.let(::ScaleCorrectedIcon)
+    }
+}
+
+/**
+ * A leaf view painting an icon (optionally preceded by a second "prefix" icon, e.g. a conflict marker), immediately
+ * followed by a text label and an optional colored suffix, as a single unbreakable unit. Unlike a plain `<icon>`
+ * followed by separate text elements, there is no view boundary between the icon and the label for the surrounding
+ * flow layout to break at (jj-idea-kds1).
+ *
+ * Font and foreground color are resolved from the element's CSS attributes (the same `colored`/`smaller` ancestor
+ * spans that would otherwise wrap separate icon/text elements), so chips still inherit ambient styling correctly.
+ */
+private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
+    private val styleSheet get() = (document as HTMLDocument).styleSheet
+    private val attr: AttributeSet by lazy { styleSheet.getViewAttributes(this) }
+    private val font by lazy { styleSheet.getFont(attr) }
+    private val foreground by lazy { styleSheet.getForeground(attr) }
+    private val fontMetrics by lazy {
+        container?.getFontMetrics(font) ?: Toolkit.getDefaultToolkit().getFontMetrics(font)
+    }
+
+    private val iconsWidth get() = (spec.prefixIcon?.iconWidth ?: 0) + spec.icon.iconWidth
+
+    override fun getPreferredSpan(axis: Int): Float {
+        val fm = fontMetrics
+        return when (axis) {
+            X_AXIS -> (iconsWidth + fm.stringWidth(spec.label) + fm.stringWidth(spec.suffix ?: "")).toFloat()
+            Y_AXIS -> max(fm.height, max(spec.icon.iconHeight, spec.prefixIcon?.iconHeight ?: 0)).toFloat()
+            else -> throw IllegalArgumentException("Invalid axis: $axis")
+        }
+    }
+
+    override fun getAlignment(axis: Int): Float =
+        if (axis == Y_AXIS) fontMetrics.ascent.toFloat() / fontMetrics.height else super.getAlignment(axis)
+
+    override fun paint(g: Graphics, allocation: Shape) {
+        val rect = allocation.bounds
+        val fm = fontMetrics
+        val baseline = rect.y + fm.ascent
+        var x = rect.x
+
+        spec.prefixIcon?.let { icon ->
+            icon.paintIcon(null, g, x, baseline - icon.iconHeight)
+            x += icon.iconWidth
+        }
+        spec.icon.paintIcon(null, g, x, baseline - spec.icon.iconHeight)
+        x += spec.icon.iconWidth
+
+        g.font = font
+        g.color = foreground
+        g.drawString(spec.label, x, baseline)
+        if (spec.strikethrough) {
+            val lineY = baseline - fm.ascent / 3
+            g.drawLine(x, lineY, x + fm.stringWidth(spec.label), lineY)
+        }
+        x += fm.stringWidth(spec.label)
+
+        spec.suffix?.let { suffix ->
+            g.color = spec.suffixColor ?: foreground
+            g.drawString(suffix, x, baseline)
+        }
+    }
+
+    override fun modelToView(pos: Int, a: Shape, b: Position.Bias): Shape {
+        val p0 = startOffset
+        val p1 = endOffset
+        if (pos in p0..p1) {
+            val r = a.bounds
+            if (pos == p1) r.x += r.width
+            r.width = 0
+            return r
+        }
+        throw javax.swing.text.BadLocationException("$pos not in range $p0,$p1", pos)
+    }
+
+    override fun viewToModel(x: Float, y: Float, a: Shape, bias: Array<Position.Bias>): Int {
+        val alloc = a as Rectangle
+        if (x < alloc.x + alloc.width / 2f) {
+            bias[0] = Position.Bias.Forward
+            return startOffset
+        }
+        bias[0] = Position.Bias.Backward
+        return endOffset
     }
 }
