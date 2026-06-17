@@ -1,6 +1,8 @@
 # Roadmap
 
-Planned features, roughly in priority order.
+## Planned Features
+
+Roughly in priority order.
 
 1. **Hunk-Level Squash & Split** — Line/hunk granularity for moving changes between commits, plus a live preview panel for the Squash Into dialog
 2. **Bookmark Management & Branches Panel** — Toolbar widget for fast switching, interactive bookmark decorations, pending-deletion visibility, distinguishing local from tracked-remote drift, and a dedicated branches panel

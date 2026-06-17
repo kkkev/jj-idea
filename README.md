@@ -78,8 +78,8 @@ See **[ROADMAP.md](ROADMAP.md)** for planned features, including hunk-level squa
 
 ## Documentation
 
-- **[Contributing](contributing.md)** — Development guidelines
-- **[Developer Guide](CLAUDE.md)** — Architecture and implementation details
+- **[Contributing](contributing.md)** — Architecture, coding standards, testing, and workflow
+- **[Agent Instructions](CLAUDE.md)** — Operating rules for AI coding agents working in this repo
 
 ## License
 

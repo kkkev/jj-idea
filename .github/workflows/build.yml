@@ -210,7 +210,7 @@ jobs:
         run: |
           DATE=$(date +%Y-%m-%d)
 
-          # Move [Unreleased] content to new version section (mirrors release.sh logic)
+          # Move [Unreleased] content to new version section
           awk -v version="$VERSION" -v date="$DATE" '
             BEGIN { in_unreleased = 0 }
 
