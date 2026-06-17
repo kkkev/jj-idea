@@ -40,7 +40,9 @@ data class LogWindowConfig(
      * Distinct from [selectedRepoPaths] which controls which repos are *loaded*;
      * this field controls which of the loaded repos are *displayed*.
      */
-    var selectedRootPaths: MutableList<String> = mutableListOf()
+    var selectedRootPaths: MutableList<String> = mutableListOf(),
+    /** Whether the multi-repo root gutter shows repo name + color (true) or just a thin colored strip (false). */
+    var rootGutterExpanded: Boolean = true
 ) {
     /**
      * Returns the subset of [allRepos] that this config selects.

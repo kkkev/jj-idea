@@ -81,9 +81,10 @@ class JujutsuLogTable(
         override fun canBeDismissedOnTimeout() = false
     }
 
-    // Root gutter state: true = expanded (shows repo name), false = collapsed (just colored strip)
-    var isRootGutterExpanded: Boolean = false
-        private set
+    // Root gutter state: true = expanded (shows repo name), false = collapsed (just colored strip).
+    // Defaults to expanded for discoverability (GitHub #10); restored/persisted per-tab via
+    // LogWindowConfig.rootGutterExpanded in UnifiedJujutsuLogPanel.
+    var isRootGutterExpanded: Boolean = true
 
     // Callback when gutter expansion changes (for column width adjustment)
     var onGutterExpansionChanged: (() -> Unit)? = null

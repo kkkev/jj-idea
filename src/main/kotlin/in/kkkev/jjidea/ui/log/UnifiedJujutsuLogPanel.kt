@@ -52,6 +52,13 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         // Load saved column widths from the per-window config
         logTable.loadColumnWidths()
 
+        // Restore + persist root gutter expansion state (per-tab, see LogWindowConfig.rootGutterExpanded)
+        logTable.isRootGutterExpanded = config.rootGutterExpanded
+        logTable.onGutterExpansionChanged = {
+            config.rootGutterExpanded = logTable.isRootGutterExpanded
+            persistConfig()
+        }
+
         // Restore search/filter options from config
         useRegex = config.useRegex
         matchCase = config.matchCase

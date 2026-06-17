@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Ignored-file scanning now runs asynchronously off the modified-file refresh path. Working-copy changes appear immediately after a save regardless of ignored-tree size; the Commit toolwindow shows the built-in "updating" indicator while ignored files are computed in the background.
+- In multi-repository log windows, the repository color gutter is now expanded by default (showing the repo name) instead of collapsed to a thin colored strip, making per-repo colors easier to discover. Each log tab remembers your collapse/expand choice (GitHub #10).
 
 ### Fixed
 - Typing a revision that doesn't exist in the revision-choice popup or working-copy switcher no longer logs a WARN-level entry; resolution failures for a single typed revision are now logged at INFO, since this is an expected outcome rather than a plugin error.

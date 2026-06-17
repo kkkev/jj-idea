@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.util.ui.JBUI
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
@@ -133,7 +132,7 @@ fun JujutsuLogTable.installRenderers() {
         when (modelIndex) {
             JujutsuLogTableModel.COLUMN_ROOT_GUTTER -> {
                 column.cellRenderer = rootGutterRenderer
-                val gutterWidth = JBUI.scale(8)
+                val gutterWidth = if (isRootGutterExpanded) gutterExpandedWidth else gutterCollapsedWidth
                 column.preferredWidth = gutterWidth
                 column.width = gutterWidth
                 column.minWidth = gutterWidth
