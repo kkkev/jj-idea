@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.10] - 2026-06-18
+
 ### Added
 - The "Compare with Another Commit…" popup and the working-copy switcher now accept arbitrary revision expressions (change id, git SHA, bookmark name) that fall outside the loaded log window. Typing a query that matches nothing locally shows a "Use … as revision" fallback, which resolves in the background and upgrades to a full commit preview, including the correct mutability icon.
 
@@ -615,7 +617,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.9...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.10...HEAD
+[0.7.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.10
 [0.7.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.9
 [0.7.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.8
 [0.7.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.7
