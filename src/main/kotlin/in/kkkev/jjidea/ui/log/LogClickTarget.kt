@@ -45,3 +45,15 @@ data class TagClick(
     override val entry: LogEntry,
     val tag: Tag
 ) : LogClickTarget
+
+/**
+ * The "+N more" overflow chip was clicked (jj-idea-w61m): [hidden] holds the bookmark/tag click
+ * targets that were collapsed out of the capped decoration display, for showing in a popup.
+ * Resolved directly in `JujutsuLogTable.clickTargetAt` (via `cappedDecorations`), not through
+ * [resolve], since the hidden list isn't recoverable from the URI alone.
+ */
+data class MoreRefsClick(
+    override val repo: JujutsuRepository,
+    override val entry: LogEntry,
+    val hidden: List<LogClickTarget>
+) : LogClickTarget

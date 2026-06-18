@@ -6,6 +6,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -20,6 +21,7 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
 import kotlinx.datetime.Instant
+import java.awt.Color
 import java.awt.Component
 import java.awt.Cursor
 import java.awt.Point
@@ -269,13 +271,18 @@ class JujutsuLogTable(
             }
         )
 
-        // Handle left-click on ref chips (bookmarks, tags) for navigation
+        // Handle left-click on ref chips (bookmarks, tags) for navigation, or the "+N more"
+        // overflow chip (jj-idea-w61m) to show the hidden refs in a popup.
         addMouseListener(
             object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
                     val target = clickTargetAt(e) ?: return
-                    project.stateModel.changeSelection.notify(ChangeKey(target.repo, target.entry.id))
+                    if (target is MoreRefsClick) {
+                        showMoreRefsPopup(e.component, e.x, e.y, target)
+                    } else {
+                        project.stateModel.changeSelection.notify(ChangeKey(target.repo, target.entry.id))
+                    }
                     e.consume()
                 }
             }
@@ -286,14 +293,15 @@ class JujutsuLogTable(
             object : PopupHandler() {
                 override fun invokePopup(comp: Component, x: Int, y: Int) {
                     val syntheticEvent = MouseEvent(this@JujutsuLogTable, 0, 0, 0, x, y, 1, false)
-                    val target = clickTargetAt(syntheticEvent)
-                    if (target != null) {
-                        val group = clickActionGroup(project, target)
-                        ActionManager.getInstance()
-                            .createActionPopupMenu(ActionPlaces.UNKNOWN, group)
-                            .component.show(comp, x, y)
-                    } else {
-                        showContextMenu(comp, x, y)
+                    when (val target = clickTargetAt(syntheticEvent)) {
+                        null -> showContextMenu(comp, x, y)
+                        is MoreRefsClick -> showMoreRefsPopup(comp, x, y, target)
+                        else -> {
+                            val group = clickActionGroup(project, target)
+                            ActionManager.getInstance()
+                                .createActionPopupMenu(ActionPlaces.UNKNOWN, group)
+                                .component.show(comp, x, y)
+                        }
                     }
                 }
             }
@@ -310,8 +318,8 @@ class JujutsuLogTable(
     }
 
     /**
-     * Return the [LogClickTarget] under [e] (a bookmark or tag chip), or null if the event
-     * is not over a clickable ref chip.
+     * Return the [LogClickTarget] under [e] (a bookmark or tag chip, or a "+N more" overflow chip —
+     * jj-idea-w61m), or null if the event is not over a clickable ref chip.
      * Handles both the Decorations column (SCC-based) and the graph+description column (fragment canvas).
      */
     private fun clickTargetAt(e: MouseEvent): LogClickTarget? {
@@ -329,7 +337,30 @@ class JujutsuLogTable(
             }
             else -> null
         } ?: return null
+        if (uri.toString().contains("&kind=overflow&")) {
+            val frc = getFontMetrics(font).fontRenderContext
+            val budget = cellRect.width * DECORATION_WIDTH_FRACTION
+            val hidden = cappedDecorations(entry, Color.BLACK, budget, font, frc).hidden
+            return MoreRefsClick(entry.repo, entry, hidden)
+        }
         return LogClickTarget.resolve(uri, entry)
+    }
+
+    /** Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref action menu. */
+    private fun showMoreRefsPopup(component: Component, x: Int, y: Int, target: MoreRefsClick) {
+        val group = DefaultActionGroup().apply {
+            target.hidden.forEach { hiddenTarget ->
+                val label = when (hiddenTarget) {
+                    is BookmarkClick -> hiddenTarget.bookmark.name.name
+                    is TagClick -> hiddenTarget.tag.name
+                    is MoreRefsClick -> return@forEach
+                }
+                add(DefaultActionGroup(label, true).apply { addAll(clickActionGroup(project, hiddenTarget)) })
+            }
+        }
+        ActionManager.getInstance()
+            .createActionPopupMenu(ActionPlaces.UNKNOWN, group)
+            .component.show(component, x, y)
     }
 
     /**

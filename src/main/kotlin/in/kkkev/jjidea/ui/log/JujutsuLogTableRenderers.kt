@@ -1,7 +1,10 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.VcsUser
+import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -53,7 +56,9 @@ fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
     }
 }
 
-/** Append right-side decorations: bookmarks, tags, and working copy indicator. */
+/** Append right-side decorations: bookmarks, tags, and working copy indicator. Uncapped — used by the
+ * row tooltip and single-revision dialogs (Split/Squash/Rebase), where there is no width constraint
+ * to collapse against. The capped, in-cell equivalent is [cappedDecorations]. */
 fun TextCanvas.appendDecorations(entry: LogEntry) {
     appendBookmarks(entry)
     if (entry.tags.isNotEmpty()) {
@@ -66,11 +71,99 @@ fun TextCanvas.appendDecorations(entry: LogEntry) {
     }
 }
 
+/** Fraction of the graph+description column width that decorations (bookmarks/tags) may occupy
+ * before the rest collapse behind a "+N more" chip (jj-idea-w61m), guaranteeing the description
+ * always keeps at least the remaining share of the cell. */
+internal const val DECORATION_WIDTH_FRACTION = 0.5
+
+/** Result of [cappedDecorations]: the canvas to render, and the refs that were collapsed away. */
+data class CappedDecorations(val canvas: FragmentRecordingCanvas, val hidden: List<LogClickTarget>)
+
+/**
+ * Build the right-side decoration canvas for [entry], capped to [maxWidth] pixels (typically
+ * [DECORATION_WIDTH_FRACTION] of the column width) so a long bookmark list can never push the
+ * description out of the cell (jj-idea-w61m).
+ *
+ * Bookmark and tag chips are kept left-to-right while they fit; any that don't fit are collapsed
+ * into a single clickable "+N more" chip (a `kind=overflow` [refUri]) whose hit target opens a
+ * popup over [CappedDecorations.hidden] — see `JujutsuLogTable.clickTargetAt`. The working-copy
+ * `@` marker is never collapsed. The full, uncapped list remains available via the row tooltip
+ * ([appendSummaryAndStatuses]/[appendDecorations]), so capping only narrows what's painted, never
+ * what's discoverable.
+ */
+fun cappedDecorations(
+    entry: LogEntry,
+    fg: Color,
+    maxWidth: Double,
+    font: Font,
+    frc: FontRenderContext
+): CappedDecorations {
+    val units = bookmarkDecorationUnits(entry) + tagDecorationUnits(entry)
+
+    fun widthOf(builder: TextCanvas.() -> Unit) =
+        FragmentRecordingCanvas().apply(builder).fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
+
+    val separatorWidth = widthOf { append(" ") }
+    val widths = units.map { widthOf(it.build) }
+
+    fun fitCount(budget: Double): Int {
+        var used = 0.0
+        for ((i, w) in widths.withIndex()) {
+            val next = used + (if (i > 0) separatorWidth else 0.0) + w
+            if (next > budget) return i
+            used = next
+        }
+        return units.size
+    }
+
+    var kept = fitCount(maxWidth)
+    if (kept < units.size) {
+        // Reserve room for the "+N more" chip (sized from this provisional hidden count), then
+        // refit — the final chip below always uses the post-refit count, so the label is accurate
+        // even if refitting changes how many chips fit.
+        val overflowWidth = widthOf { overflowChip(entry, units.size - kept) }
+        kept = fitCount(maxWidth - separatorWidth - overflowWidth)
+    }
+
+    val hiddenUnits = units.drop(kept)
+    val canvas = entryCanvas(entry, fg) {
+        units.take(kept).forEachIndexed { i, unit ->
+            if (i > 0) append(" ")
+            unit.build(this)
+        }
+        if (hiddenUnits.isNotEmpty()) {
+            if (kept > 0) append(" ")
+            overflowChip(entry, hiddenUnits.size)
+        }
+        if (entry.isWorkingCopy) {
+            if (kept > 0 || hiddenUnits.isNotEmpty()) append(" ")
+            colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
+        }
+    }
+
+    val hidden = hiddenUnits.map { unit ->
+        when (val ref = unit.ref) {
+            is Bookmark -> BookmarkClick(entry.repo, entry, ref)
+            is Tag -> TagClick(entry.repo, entry, ref)
+            else -> error("Unexpected decoration ref type: $ref")
+        }
+    }
+    return CappedDecorations(canvas, hidden)
+}
+
+/** Render the clickable "+N more" overflow chip for collapsed decorations (jj-idea-w61m). */
+private fun TextCanvas.overflowChip(entry: LogEntry, hiddenCount: Int) {
+    linked(refUri(entry, "overflow", "overflow")) {
+        grey { smaller { append(JujutsuBundle.message("log.decorations.overflow", hiddenCount)) } }
+    }
+}
+
 /**
  * Compute the ref chip hit at [localX] within the inlined decorations of the graph-description column.
  *
- * The decorations are rendered on the right side of the cell, starting at `colWidth - rightWidth`.
- * We measure fragment widths from the canvas to locate the target without Swing layout.
+ * The decorations are rendered on the right side of the cell, starting at `colWidth - rightWidth`,
+ * capped to [DECORATION_WIDTH_FRACTION] of [colWidth] (jj-idea-w61m). We measure fragment widths from
+ * the canvas to locate the target without Swing layout.
  *
  * @param entry   the log entry for the row being hit-tested
  * @param localX  x position relative to the left edge of the full cell
@@ -88,7 +181,7 @@ internal fun findInlinedRefUri(
     showDecorations: Boolean
 ): URI? {
     if (!showDecorations) return null
-    val rightCanvas = entryCanvas(entry, Color.BLACK) { appendDecorations(entry) }
+    val rightCanvas = cappedDecorations(entry, Color.BLACK, colWidth * DECORATION_WIDTH_FRACTION, font, frc).canvas
     val rightWidth = rightCanvas.fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
     val rightStart = colWidth - rightWidth
     if (localX < rightStart) return null

@@ -43,6 +43,15 @@ Use this checklist:
 - [ ] Working copy (@) indicator visible
 - [ ] Colors differentiate branches
 - [ ] Graph column auto-sizes to content
+- [ ] On a commit with ~30 bookmarks (e.g. `for i in $(seq 1 30); do jj bookmark create
+      bm-$i; done`), the log row still shows description text (not blank), and the
+      bookmarks collapse behind a grey "+N more" chip rather than overflowing the cell
+      (jj-idea-w61m)
+- [ ] Hovering that row's tooltip lists every bookmark, including the ones collapsed
+      behind "+N more" (jj-idea-w61m)
+- [ ] Left-clicking the "+N more" chip opens a popup listing the hidden bookmarks, each
+      as a sub-menu with the usual bookmark actions (Rename…, Delete, Forget, etc.); right-
+      clicking it does the same (jj-idea-w61m)
 
 ### Details Panel
 

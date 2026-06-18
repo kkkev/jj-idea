@@ -303,6 +303,36 @@ fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
     if (suffix.isNotEmpty()) append(suffix)
 }
 
+/**
+ * A single bookmark or tag chip, paired with its underlying ref. Used by `cappedDecorations`
+ * (jj-idea-w61m) to measure and selectively render decoration chips within a width budget,
+ * collapsing the rest behind a "+N more" indicator.
+ */
+internal data class DecorationUnit(val ref: Any, val build: TextCanvas.() -> Unit)
+
+/** One [DecorationUnit] per bookmark chip that [appendBookmarks] would render, in the same order. */
+internal fun bookmarkDecorationUnits(entry: LogEntry): List<DecorationUnit> {
+    val units = mutableListOf<DecorationUnit>()
+    for (group in entry.bookmarks.grouped()) {
+        group.local?.let { local ->
+            units += DecorationUnit(local) {
+                linked(refUri(entry, "bookmark", local.name.name)) { appendBookmarkChip(local, group.localName) }
+            }
+        }
+        for (remote in group.remotes) {
+            val label = if (group.local != null) "@${remote.remote}" else remote.name.name
+            units += DecorationUnit(remote) {
+                linked(refUri(entry, "bookmark", remote.name.name)) { appendBookmarkChip(remote, label) }
+            }
+        }
+    }
+    return units
+}
+
+/** One [DecorationUnit] per tag chip that [appendTags] would render, in the same order. */
+internal fun tagDecorationUnits(entry: LogEntry): List<DecorationUnit> =
+    entry.tags.map { tag -> DecorationUnit(tag) { linked(refUri(entry, "tag", tag.name)) { append(tag) } } }
+
 fun TextCanvas.append(tag: Tag) = colored(JujutsuColors.TAG) {
     smaller {
         appendChip(icon(JujutsuIcons::Tag), tag.name)

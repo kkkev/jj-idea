@@ -139,6 +139,9 @@ object JujutsuLogContextMenuActions {
                     }
                 }
                 is TagClick -> add(deleteTagAction(target.repo, target.tag))
+                // MoreRefsClick (the "+N more" overflow chip, jj-idea-w61m) is handled separately by
+                // JujutsuLogTable, which shows a popup over the hidden refs instead of this menu.
+                is MoreRefsClick -> Unit
             }
         }
 }

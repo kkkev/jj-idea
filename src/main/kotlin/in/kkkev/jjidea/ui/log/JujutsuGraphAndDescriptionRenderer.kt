@@ -146,8 +146,10 @@ class JujutsuGraphAndDescriptionRenderer(
                 if (columnManager.showDescription) appendDescriptionAndEmptyIndicator(entry)
             }
 
+            val columnWidth = table.columnModel.getColumn(column).width
             val rightCanvas = if (columnManager.showDecorations) {
-                entryCanvas(entry, fg) { appendDecorations(entry) }
+                val frc = table.getFontMetrics(table.font).fontRenderContext
+                cappedDecorations(entry, fg, columnWidth * DECORATION_WIDTH_FRACTION, table.font, frc).canvas
             } else {
                 FragmentRecordingCanvas()
             }
@@ -155,7 +157,7 @@ class JujutsuGraphAndDescriptionRenderer(
             textPanel.configure(
                 leftCanvas = leftCanvas,
                 rightCanvas = rightCanvas,
-                cellWidth = table.columnModel.getColumn(column).width - textStartX(),
+                cellWidth = columnWidth - textStartX(),
                 background = background
             )
         }
