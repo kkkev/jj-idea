@@ -79,6 +79,7 @@ class CommitGraphBuilder {
             report.count("rows", entries.size.toLong())
             val graphEntries = entries.map { GraphEntry(it.id, it.parentIds) }
             val layout = layoutCalculator.calculate(graphEntries)
+            report.count("operations", layoutCalculator.operationCount)
             layout.rows.associate { row ->
                 row.id to GraphNode(
                     lane = row.lane,

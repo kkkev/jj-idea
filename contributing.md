@@ -430,9 +430,8 @@ Any change adding a filesystem traversal or a per-file/per-commit loop must:
 summary — e.g. "visits O(non-ignored entries), O(1) per VFS event."
 
 **(b)** ship an operation-count test that injects a counting collaborator and asserts on
-work performed, not wall-clock time (CI-flaky). Follow `GitignoreScanTest.kt`
-(`src/test/kotlin/in/kkkev/jjidea/vcs/ignore/GitignoreScanTest.kt`); see jj-idea-edjs.2
-for the generalised pattern across hot paths.
+work performed, not wall-clock time (CI-flaky). See "Writing a scale test" below for the
+pattern and exemplars.
 
 Ask this question on any review touching file traversal, log parsing, change-provider
 logic, or VFS listener fan-out:
@@ -443,6 +442,37 @@ logic, or VFS listener fan-out:
 
 A `perf:` WARN line in a user-submitted `idea.log` (see Performance Logging above) is the
 runtime signal that this has regressed — the `visited` count is the key indicator.
+
+### Writing a scale test
+
+Operation-count tests are deterministic and PR-blocking (unlike wall-clock timing, which
+is CI-flaky and only ever advisory). The recipe, generalised from the ignore-scan fix
+(GitHub #35, jj-idea-2570.1):
+
+1. **Inject a counting collaborator, or return a work-count value.** Either give the hot
+   method a narrow interface seam for its expensive collaborator (e.g. a filesystem
+   walker) and feed it an in-memory fake that increments a counter per call, or — when
+   the algorithm is pure in-memory already — have it return/expose a `Long` work count
+   (e.g. an `operationCount` field) alongside its normal result.
+2. **Assert on the count, never on elapsed time.** A correct-but-quadratic regression
+   often produces *identical output* — only a work-count assertion catches it. Pick a
+   bound that a quadratic regression would clearly blow through at the chosen N (e.g.
+   `< 5*N` when N²/2 would be orders of magnitude larger).
+3. **Use synthetic in-memory structures, no real repos**, sized so the test runs in
+   <1s and lives in the default `test` task (not `platformTest`/`contractTest`).
+4. **Add output-equivalence and cancellation tests where applicable** — pin the fast
+   path's output against a brute-force baseline, and confirm a `checkCanceled` callback
+   aborts promptly rather than exhausting the input.
+
+Exemplars:
+- `vcs/ignore/GitignoreScanTest.kt` — injected fake (`TrackingNode`) + work-count return
+  (`ScanStats`) + output-equivalence + cancellation; the canonical example.
+- `jj/RepoLogCacheScaleTest.kt` — injected counting collaborator (a mockk `LogService`);
+  asserts a bulk load issues one log call (not one per entry) and that incremental
+  `store()` stays correctly ordered/deduplicated at scale.
+- `ui/log/graph/GraphLayoutScaleTest.kt` — work-count return (`LayoutCalculatorImpl
+  .operationCount`); asserts graph layout stays linear (not quadratic) for both a linear
+  chain and a wide DAG with bounded passthrough width.
 
 ## Git Workflow
 

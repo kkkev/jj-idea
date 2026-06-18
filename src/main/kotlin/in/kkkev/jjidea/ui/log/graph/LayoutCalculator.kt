@@ -16,23 +16,20 @@ private data class Passthrough<I : Any>(
     val targetParentId: I
 )
 
-/**
- * Finds the lowest non-negative integer not in [occupied].
- */
-private fun firstFreeLane(occupied: Set<Int>): Int {
-    var lane = 0
-    while (lane in occupied) lane++
-    return lane
-}
-
-/**
- * Returns [preference] if it is not in [occupied], otherwise the lowest free lane.
- */
-private fun firstFreeLanePreferring(preference: Int, occupied: Set<Int>) =
-    if (preference in occupied) firstFreeLane(occupied) else preference
-
 class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
+    /**
+     * Work-count of per-row passthrough/lane bookkeeping in the last [calculate] call. Reset at
+     * the start of each call; a single mutable field is safe because `calculate` is not
+     * reentrant/concurrent (one calculator instance lays out one graph at a time — see
+     * [CommitGraphBuilder]). Exposed for `report.count("operations", …)` and for scale tests
+     * asserting this stays linear (not quadratic) in entry count — see GraphLayoutScaleTest.
+     */
+    var operationCount: Long = 0
+        private set
+
     override fun calculate(entries: List<GraphEntry<I>>): GraphLayout<I> {
+        operationCount = 0
+
         // Pre-compute row index for each entry (needed to determine if parent is adjacent)
         val rowByChangeId = HashMap<I, Int>(entries.size * 2)
         entries.forEachIndexed { index, entry -> rowByChangeId[entry.current] = index }
@@ -47,9 +44,11 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
         // First pass: assign lanes, track children, manage passthroughs
         for ((rowIndex, entry) in entries.withIndex()) {
             // Step 2: Terminate passthroughs that end at this entry
+            operationCount += passthroughs.size
             passthroughs.removeAll { it.targetParentId == entry.current }
 
             // Step 1: Determine lane (after terminating passthroughs so lane may become available)
+            operationCount += passthroughs.size
             val currentPassthroughLanes = passthroughs.mapTo(HashSet()) { it.lane }
             val lane = laneFor(entry, currentPassthroughLanes, reservedLanes, childrenByParent)
 
@@ -63,16 +62,19 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
             }
 
             // Step 4: Create passthroughs for non-adjacent parents
+            operationCount += entry.parents.size
             val nonAdjacentParents = entry.parents.filter { parentId ->
                 val parentRow = rowByChangeId[parentId]
                 parentRow != null && parentRow > rowIndex + 1
             }
 
+            operationCount += entry.parents.size
             val hasAdjacentParent = entry.parents.any { parentId ->
                 rowByChangeId[parentId] == rowIndex + 1
             }
 
             // Track which lanes are already used (passthroughs + this entry's lane + remaining reservations)
+            operationCount += currentPassthroughLanes.size + reservedLanes.size
             val usedLanes = HashSet(currentPassthroughLanes)
             usedLanes.add(lane)
             usedLanes.addAll(reservedLanes.values)
@@ -83,6 +85,7 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
             var childLaneUsed = false
 
             for (parentId in nonAdjacentParents) {
+                operationCount += childrenByParent[parentId]?.size ?: 0
                 val parentHasOtherChildren = childrenByParent[parentId]
                     ?.any { it.id != entry.current } == true
 
@@ -153,4 +156,18 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
             firstFreeLanePreferring(children.minOf { it.lane }, currentPassthroughLanes)
         }
     }
+
+    /** Finds the lowest non-negative integer not in [occupied]. */
+    private fun firstFreeLane(occupied: Set<Int>): Int {
+        var lane = 0
+        while (lane in occupied) {
+            operationCount++
+            lane++
+        }
+        return lane
+    }
+
+    /** Returns [preference] if it is not in [occupied], otherwise the lowest free lane. */
+    private fun firstFreeLanePreferring(preference: Int, occupied: Set<Int>) =
+        if (preference in occupied) firstFreeLane(occupied) else preference
 }
