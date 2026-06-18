@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - The ignored-file scan's slow-scan watchdog now reliably fires on directories containing very many files (previously it only checked elapsed time once per directory entered, so a single huge flat directory could block past the 5s threshold without ever showing the "scan is slow" notification). The watchdog now also aborts the in-progress scan when it fires, instead of letting it run to completion (GitHub #35).
+- The log and working-copy view no longer fail to load entirely on jj backends that can't evaluate the `remote_bookmarks()` revset (e.g. some non-standard jj implementations). The plugin now falls back to loading the log without the "pushed to remote" decoration on affected repositories instead of crashing (GitHub #35).
 
 ## [0.7.10] - 2026-06-18
 

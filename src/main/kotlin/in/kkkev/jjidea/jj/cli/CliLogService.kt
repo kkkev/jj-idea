@@ -7,7 +7,9 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.vcs.getChildPath
 import kotlinx.datetime.Instant
+import org.jetbrains.annotations.TestOnly
 import java.io.File
+import java.util.concurrent.ConcurrentHashMap
 
 interface LogSpec<T> {
     val spec: String
@@ -56,10 +58,42 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     val logTemplates = LogTemplates()
 
     override fun getLog(revset: Revset, filePaths: List<FilePath>, limit: Int?, quiet: Boolean) =
-        getLog(logTemplates.fullLogTemplate, revset, filePaths, limit, quiet)
+        if (supportsPushedAncestor()) {
+            getLog(
+                logTemplates.fullLogTemplate,
+                revset,
+                filePaths,
+                limit,
+                quiet,
+                fallbackTemplate = logTemplates.fullLogTemplateWithoutPushedAncestor
+            )
+        } else {
+            getLog(logTemplates.fullLogTemplateWithoutPushedAncestor, revset, filePaths, limit, quiet)
+        }
 
     override fun getLogBasic(revset: Revset, filePaths: List<FilePath>, limit: Int?) =
-        getLog(logTemplates.basicLogTemplate, revset, filePaths, limit)
+        if (supportsPushedAncestor()) {
+            getLog(
+                logTemplates.basicLogTemplate,
+                revset,
+                filePaths,
+                limit,
+                fallbackTemplate = logTemplates.basicLogTemplateWithoutPushedAncestor
+            )
+        } else {
+            getLog(logTemplates.basicLogTemplateWithoutPushedAncestor, revset, filePaths, limit)
+        }
+
+    private fun supportsPushedAncestor() = repo.directory.path !in pushedAncestorUnsupported
+    private fun markPushedAncestorUnsupported() {
+        if (pushedAncestorUnsupported.add(repo.directory.path)) {
+            log.warn(
+                "jj backend for ${repo.directory.path} cannot evaluate the pushed-ancestor revset " +
+                    "(descendants(::remote_bookmarks())); falling back to a reduced log template " +
+                    "for the rest of this session."
+            )
+        }
+    }
 
     override fun getLogAndFileStatuses(revset: Revset, filePath: FilePath, limit: Int?) =
         getLog(logTemplates.fileStatusesFor(filePath), revset, listOf(filePath), limit)
@@ -167,15 +201,27 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         revset: Revset = Expression.ALL,
         filePaths: List<FilePath> = emptyList(),
         limit: Int? = null,
-        quiet: Boolean = false
+        quiet: Boolean = false,
+        fallbackTemplate: LogTemplate<T>? = null
     ): Result<List<T>> {
         log.debug("Getting log for revset: $revset, files: $filePaths, limit: $limit")
         val context = "${File(repo.directory.path).name}:${limit ?: "∞"}"
         return log.measurePerf("log-load", context) { report ->
+            fun parseSuccess(stdout: String, parseTemplate: LogTemplate<T>) =
+                toResult("Failed to parse") { parse(parseTemplate, stdout) }
+                    .also { r -> r.onSuccess { report.count("entries", it.size.toLong()) } }
+
             val result = executor.log(revset, template.spec, filePaths, limit, quiet)
             if (result.isSuccess) {
-                toResult("Failed to parse") { parse(template, result.stdout) }
-                    .also { r -> r.onSuccess { report.count("entries", it.size.toLong()) } }
+                parseSuccess(result.stdout, template)
+            } else if (fallbackTemplate != null && TEMPLATE_EVALUATION_FAILURE in result.stderr) {
+                markPushedAncestorUnsupported()
+                val retry = executor.log(revset, fallbackTemplate.spec, filePaths, limit, quiet)
+                if (retry.isSuccess) {
+                    parseSuccess(retry.stdout, fallbackTemplate)
+                } else {
+                    Result.failure(VcsException("Error from jj log: " + retry.stderr))
+                }
             } else {
                 // TODO Improve logging
                 Result.failure(VcsException("Error from jj log: " + result.stderr))
@@ -280,46 +326,60 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     }
 
     inner class LogTemplates : LogFields() {
-        val basicLogTemplate = logTemplate(
-            changeId,
-            commitId,
-            description,
-            bookmarks,
-            tags,
-            parents,
-            currentWorkingCopy,
-            conflict,
-            empty,
-            immutable,
-            hasPushedAncestor
-        ) {
-            LogEntry(
-                repo,
-                changeId.take(it),
-                commitId.take(it),
-                description.take(it),
-                bookmarks.take(it),
-                tags.take(it),
-                parents.take(it),
-                currentWorkingCopy.take(it),
-                conflict.take(it),
-                empty.take(it),
-                immutable = immutable.take(it),
-                hasPushedAncestor = hasPushedAncestor.take(it)
-            )
+        /**
+         * Builds the basic log template, optionally omitting [hasPushedAncestor]. That field's
+         * spec embeds the revset `descendants(::remote_bookmarks())`, which some non-standard jj
+         * backends cannot evaluate (see [CliLogService.getLog]); when omitted, [LogEntry.hasPushedAncestor]
+         * defaults to false.
+         */
+        private fun buildBasicTemplate(includePushedAncestor: Boolean): LogTemplate<LogEntry> {
+            val fields = buildList<LogSpec<*>> {
+                add(changeId)
+                add(commitId)
+                add(description)
+                add(bookmarks)
+                add(tags)
+                add(parents)
+                add(currentWorkingCopy)
+                add(conflict)
+                add(empty)
+                add(immutable)
+                if (includePushedAncestor) add(hasPushedAncestor)
+            }
+            return logTemplate(*fields.toTypedArray()) {
+                LogEntry(
+                    repo,
+                    changeId.take(it),
+                    commitId.take(it),
+                    description.take(it),
+                    bookmarks.take(it),
+                    tags.take(it),
+                    parents.take(it),
+                    currentWorkingCopy.take(it),
+                    conflict.take(it),
+                    empty.take(it),
+                    immutable = immutable.take(it),
+                    hasPushedAncestor = if (includePushedAncestor) hasPushedAncestor.take(it) else false
+                )
+            }
         }
 
-        val fullLogTemplate = logTemplate(basicLogTemplate, author, committer) {
-            val basic = basicLogTemplate.take(it)
+        private fun buildFullTemplate(basic: LogTemplate<LogEntry>) = logTemplate(basic, author, committer) {
+            val parsedBasic = basic.take(it)
             val jjAuthor = author.take(it)
             val jjCommitter = committer.take(it)
-            basic.copy(
+            parsedBasic.copy(
                 authorTimestamp = jjAuthor.timestamp,
                 committerTimestamp = jjCommitter.timestamp,
                 author = jjAuthor.user,
                 committer = jjCommitter.user
             )
         }
+
+        val basicLogTemplate = buildBasicTemplate(includePushedAncestor = true)
+        val basicLogTemplateWithoutPushedAncestor = buildBasicTemplate(includePushedAncestor = false)
+        val fullLogTemplate = buildFullTemplate(basicLogTemplate)
+        val fullLogTemplateWithoutPushedAncestor = buildFullTemplate(basicLogTemplateWithoutPushedAncestor)
 
         fun fileChangeStatusFor(filePath: FilePath) = singleField<FileChange.Status>(
             "diff.files().filter(|e| e.path().display() == '$filePath').map(|e| e.status()).join(',')"
@@ -397,6 +457,19 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
     companion object {
         private const val FIELD_SEPARATOR = "\u0000" // Null byte
+        private const val TEMPLATE_EVALUATION_FAILURE = "Failed to evaluate revset"
+
+        /**
+         * Repo paths whose jj backend cannot evaluate the pushed-ancestor revset
+         * (`descendants(::remote_bookmarks())`). This is a permanent property of the backend/executable
+         * (not the repo data or the queried revset), so once detected it's cached for the rest of the IDE
+         * session rather than re-attempted on every query. Survives [CliLogService] recreation across
+         * repository-map rebuilds; reset on IDE restart so a jj upgrade is picked up.
+         */
+        private val pushedAncestorUnsupported = ConcurrentHashMap.newKeySet<String>()
+
+        @TestOnly
+        internal fun resetBackendCapabilityCache() = pushedAncestorUnsupported.clear()
     }
 }
 

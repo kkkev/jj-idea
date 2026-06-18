@@ -361,6 +361,13 @@ Setup: have a local bookmark that has never been pushed to the remote.
 - [ ] Non-JJ repository shows appropriate message
 - [ ] Network errors during operations show user-friendly errors
 - [ ] Concurrent operations don't cause corruption
+- [ ] Backend without `remote_bookmarks()` revset support (jj-idea-2wpq, GitHub #35; can't be
+  reproduced with stock jj — requires a non-standard backend, e.g. Google-internal
+  Piper/p4base-backed jj) loads the log and working copy successfully, minus the
+  pushed-ancestor decoration (the "Open File in remote" action stays hidden) — instead of
+  failing the whole load. A one-time WARN is logged on first detection; subsequent
+  refreshes/loads for that repo don't re-probe or repeat the warning for the rest of the
+  session
 
 ### Project Tool Window
 - [ ] File in tool window has Jujutsu menu ✅

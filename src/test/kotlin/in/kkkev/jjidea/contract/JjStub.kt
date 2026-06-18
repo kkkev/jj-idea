@@ -557,6 +557,9 @@ class JjStub(override val workDir: Path) : JjBackend {
     private fun formatLogEntry(change: StubChange, template: String): String = buildString {
         val isFullTemplate = "author.name()" in template
         val isBasicTemplate = "current_working_copy" in template
+        // The pushed-ancestor field is optional: CliLogService omits it from the reduced
+        // template it falls back to when a backend can't evaluate remote_bookmarks().
+        val includesPushedAncestor = "remote_bookmarks()" in template
 
         if (!isBasicTemplate && !isFullTemplate) {
             throw StubError("Unknown log template")
@@ -577,7 +580,7 @@ class JjStub(override val workDir: Path) : JjBackend {
         field("false") // conflict
         field(if (isEmpty) "true" else "false")
         field(if (change.immutable) "true" else "false")
-        field(if (change.hasPushedAncestor) "true" else "false")
+        if (includesPushedAncestor) field(if (change.hasPushedAncestor) "true" else "false")
 
         if (isFullTemplate) {
             field(change.authorName)

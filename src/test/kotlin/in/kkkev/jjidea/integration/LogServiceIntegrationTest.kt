@@ -1,14 +1,18 @@
 package `in`.kkkev.jjidea.integration
 
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.contract.JjStub
 import `in`.kkkev.jjidea.contract.StubCommandExecutor
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.vcs.getChildPath
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.inspectors.forAtLeastOne
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -42,6 +46,7 @@ class LogServiceIntegrationTest {
 
     @BeforeEach
     fun setUp() {
+        CliLogService.resetBackendCapabilityCache()
         stub = JjStub(tempDir)
         stub.init()
         val executor = StubCommandExecutor(stub)
@@ -291,6 +296,89 @@ class LogServiceIntegrationTest {
 
             bookmarks shouldHaveSize 2
             bookmarks.map { it.bookmark.name.name }.toSet() shouldBe setOf("alpha", "beta")
+        }
+    }
+
+    /**
+     * Simulates a non-standard jj backend (e.g. a Google-internal Piper/p4base-backed jj, see
+     * GitHub issue #35 / jj-idea-2wpq) that cannot evaluate the `remote_bookmarks()` revset
+     * embedded in the pushed-ancestor field's template.
+     */
+    @Nested
+    inner class BackendCapabilityFallback {
+        private fun decoratingService(
+            failOn: (String) -> Boolean,
+            stderr: String,
+            repoPath: String
+        ): Pair<CliLogService, () -> Int> {
+            var logCallCount = 0
+            val base = StubCommandExecutor(stub)
+            val decorator = object : CommandExecutor by base {
+                override fun log(
+                    revset: Revset,
+                    template: String?,
+                    filePaths: List<FilePath>,
+                    limit: Int?,
+                    quiet: Boolean
+                ): CommandExecutor.CommandResult {
+                    logCallCount++
+                    return if (template != null && failOn(template)) {
+                        CommandExecutor.CommandResult(1, "", stderr)
+                    } else {
+                        base.log(revset, template, filePaths, limit, quiet)
+                    }
+                }
+            }
+            val repo = mockk<JujutsuRepository> {
+                every { commandExecutor } returns decorator
+                every { directory } returns virtualFile(repoPath)
+            }
+            return CliLogService(repo) to { logCallCount }
+        }
+
+        @Test
+        fun `retries with reduced template and defaults pushed-ancestor to false`() {
+            stub.describe("Hello world")
+            val (service, callCount) = decoratingService(
+                failOn = { "remote_bookmarks()" in it },
+                stderr = "Error: Failed to parse template: Failed to evaluate revset",
+                repoPath = "/broken-backend-1"
+            )
+
+            val entries = service.getLog().getOrThrow()
+            val wc = entries.first { it.isWorkingCopy }
+
+            wc.description.actual shouldBe "Hello world"
+            wc.hasPushedAncestor shouldBe false
+            callCount() shouldBe 2
+        }
+
+        @Test
+        fun `caches backend limitation so later queries skip the doomed attempt`() {
+            stub.describe("Hello world")
+            val (service, callCount) = decoratingService(
+                failOn = { "remote_bookmarks()" in it },
+                stderr = "Error: Failed to parse template: Failed to evaluate revset",
+                repoPath = "/broken-backend-2"
+            )
+
+            service.getLog().getOrThrow()
+            callCount() shouldBe 2
+
+            service.getLog().getOrThrow()
+            callCount() shouldBe 3
+        }
+
+        @Test
+        fun `does not retry on an unrelated revset error`() {
+            val (service, callCount) = decoratingService(
+                failOn = { true },
+                stderr = "Error: Revset \"bogus\" doesn't exist",
+                repoPath = "/broken-backend-3"
+            )
+
+            shouldThrow<VcsException> { service.getLog().getOrThrow() }
+            callCount() shouldBe 1
         }
     }
 }
