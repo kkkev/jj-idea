@@ -223,5 +223,47 @@ class GitignoreScanTest {
             // Must have aborted before exhausting the tree
             calls shouldBe 2
         }
+
+        @Test
+        fun `checkCanceled is throttled within a single flat directory, not just once per directory`() {
+            // Regression test for GitHub #35: a directory with many children but no
+            // subdirectories must still yield to checkCanceled periodically, not only once
+            // on entry to the (single) directory.
+            val childCount = (IGNORE_SCAN_CHECK_INTERVAL * 5).toInt()
+            val flatChildren = (1..childCount).map { TrackingNode.file("f$it.txt") }
+            val flatDir = TrackingNode.dir("root", flatChildren)
+
+            val cache = GitignoreCache(this@GitignoreScanTest.root)
+            var calls = 0
+            cache.collectIgnored(flatDir, { calls++ }) { _, _ -> }
+
+            // 1 call on directory entry + 1 per IGNORE_SCAN_CHECK_INTERVAL visited children
+            calls shouldBe (1 + childCount / IGNORE_SCAN_CHECK_INTERVAL.toInt())
+        }
+
+        @Test
+        fun `watchdog throwing partway through a flat directory aborts before visiting all children`() {
+            val childCount = (IGNORE_SCAN_CHECK_INTERVAL * 5).toInt()
+            val flatChildren = (1..childCount).map { TrackingNode.file("f$it.txt") }
+            val flatDir = TrackingNode.dir("root", flatChildren)
+
+            val cache = GitignoreCache(this@GitignoreScanTest.root)
+            var calls = 0
+            val checkCanceled: () -> Unit = {
+                calls++
+                if (calls >= 3) throw ProcessCanceledException()
+            }
+
+            var threw = false
+            val reported = mutableListOf<String>()
+            try {
+                cache.collectIgnored(flatDir, checkCanceled) { relPath, _ -> reported.add(relPath) }
+            } catch (_: ProcessCanceledException) {
+                threw = true
+            }
+            threw shouldBe true
+            // Aborted well before the directory's child list was exhausted
+            calls shouldBe 3
+        }
     }
 }

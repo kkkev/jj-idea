@@ -4,6 +4,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.ChangeListManagerImpl
@@ -160,31 +161,40 @@ class JujutsuIgnoredFilesService(private val project: Project) : Disposable {
             val cache = ignoreService.getCache(repo.directory)
             val repoRoot = File(repo.directory.path)
 
-            val newIgnored = RecursiveFilePathSet(repo.directory.isCaseSensitive)
+            var newIgnored = RecursiveFilePathSet(repo.directory.isCaseSensitive)
             if (doFullRescan) {
                 // Full scan — use the pruned walker from GitignoreCache
                 val scanStart = System.currentTimeMillis()
-                var watchdogFired = false
-                log.measurePerf("ignore-scan", repo.directory.name) { report ->
-                    val stats = cache.collectIgnored(
-                        FileScanNode(repoRoot),
-                        {
-                            if (!watchdogFired && System.currentTimeMillis() - scanStart > IGNORE_SCAN_WATCHDOG_MS) {
-                                watchdogFired = true
-                                val elapsed = System.currentTimeMillis() - scanStart
-                                log.warn(
-                                    "ignore-scan: watchdog triggered after ${elapsed}ms for ${repo.directory.name}"
-                                )
-                                JujutsuNotifications.notifyIgnoreScanSlow(project, repo, elapsed)
+                try {
+                    log.measurePerf("ignore-scan", repo.directory.name) { report ->
+                        val stats = cache.collectIgnored(
+                            FileScanNode(repoRoot),
+                            {
+                                if (System.currentTimeMillis() - scanStart > IGNORE_SCAN_WATCHDOG_MS) {
+                                    val elapsed = System.currentTimeMillis() - scanStart
+                                    log.warn(
+                                        "ignore-scan: watchdog triggered after ${elapsed}ms for " +
+                                            "${repo.directory.name}; aborting scan"
+                                    )
+                                    JujutsuNotifications.notifyIgnoreScanSlow(project, repo, elapsed)
+                                    throw ProcessCanceledException()
+                                }
+                            }
+                        ) { relPath, isDir ->
+                            if (repo.directory.path + "/" + relPath !in trackedPaths) {
+                                newIgnored.add(VcsUtil.getFilePath(File(repoRoot, relPath), isDir))
                             }
                         }
-                    ) { relPath, isDir ->
-                        if (repo.directory.path + "/" + relPath !in trackedPaths) {
-                            newIgnored.add(VcsUtil.getFilePath(File(repoRoot, relPath), isDir))
-                        }
+                        report.count("visited", stats.visited)
+                        report.count("ignored", stats.ignored)
                     }
-                    report.count("visited", stats.visited)
-                    report.count("ignored", stats.ignored)
+                } catch (e: ProcessCanceledException) {
+                    log.warn(
+                        "ignore-scan: aborted for ${repo.directory.name} after watchdog; " +
+                            "ignored-file set left empty for this scan"
+                    )
+                    // Abandon the partial walk's results rather than report an incomplete ignored-set.
+                    newIgnored = RecursiveFilePathSet(repo.directory.isCaseSensitive)
                 }
             } else {
                 // Incremental — retain entries not covered by dirty paths, re-check dirty paths

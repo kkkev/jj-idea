@@ -519,6 +519,19 @@ so adding a file to .gitignore after it's already tracked will not untrack it (s
 - [ ] Edit a tracked file (e.g. `CHANGELOG.md`) — it should remain non-gray and appear in working copy changes
 - [ ] Even if `.gitignore` contained a pattern matching `CHANGELOG.md`, a tracked file would not be grayed (not tested here — tracked files are never passed to the ignore check)
 
+#### Ignore-scan watchdog (jj-idea-la8w)
+
+The watchdog (5s) now aborts the in-progress full ignore-scan instead of merely logging — hard
+to trigger on a small repo, so this is mostly a code-level scale test
+(`GitignoreScanTest.kt`), but the disable escape hatch remains manually verifiable:
+
+- [ ] Settings / Version Control / Jujutsu → per-repo "disable ignored-file scanning" checkbox
+      still works: enable it, edit `.gitignore`, confirm the Ignored Files node stops updating
+- [ ] If you have access to a very large repo: a slow scan should show the "ignore scan slow"
+      notification once per repo per session, with "disable" and "report" actions still
+      functioning; the IDE should not hang waiting for the scan to finish after the watchdog
+      fires
+
 ### Editors for Historical Versions
 - [ ] has title including change id ✅
 - [ ] has Jujutsu menu ✅

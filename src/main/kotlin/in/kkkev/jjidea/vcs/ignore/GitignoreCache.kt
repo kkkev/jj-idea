@@ -8,6 +8,15 @@ import java.util.concurrent.ConcurrentHashMap
 data class ScanStats(val visited: Long, val ignored: Long)
 
 /**
+ * How many visited entries pass between [GitignoreCache.collectIgnored]'s extra
+ * cancellation checks within a single directory. Bounds the work done between checks to
+ * O(this) entries regardless of tree shape, so a single directory containing millions of
+ * flat (non-directory) children still yields promptly instead of only checking on directory
+ * entry/exit.
+ */
+internal const val IGNORE_SCAN_CHECK_INTERVAL = 1_000L
+
+/**
  * Per-repository cache of parsed .gitignore rules.
  *
  * Implements gitignore matching semantics without depending on JGit:
@@ -58,7 +67,10 @@ class GitignoreCache(private val repoRoot: File) {
      * entries (never descending into them). O(non-ignored entries) work.
      *
      * The [root] abstraction allows injection of in-memory trees in tests.
-     * [checkCanceled] is called once per directory entered; it should throw on cancellation.
+     * [checkCanceled] is called once per directory entered, and additionally every
+     * [IGNORE_SCAN_CHECK_INTERVAL] visited entries within a directory's child loop, so a
+     * single directory with very many children is still checked promptly; it should throw on
+     * cancellation.
      * [onIgnored] receives the repo-relative path and isDirectory for each ignored entry.
      */
     fun collectIgnored(
@@ -73,6 +85,7 @@ class GitignoreCache(private val repoRoot: File) {
             for (child in node.children()) {
                 if (child.isDirectory && (child.name == ".jj" || child.name == ".git")) continue
                 visited++
+                if (visited % IGNORE_SCAN_CHECK_INTERVAL == 0L) checkCanceled()
                 val parts = dirParts + child.name
                 if (matchesStack(stack, parts, child.isDirectory)) {
                     // Prune: report the dir itself; git semantics forbid re-including children

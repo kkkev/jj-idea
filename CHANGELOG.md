@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The ignored-file scan's slow-scan watchdog now reliably fires on directories containing very many files (previously it only checked elapsed time once per directory entered, so a single huge flat directory could block past the 5s threshold without ever showing the "scan is slow" notification). The watchdog now also aborts the in-progress scan when it fires, instead of letting it run to completion (GitHub #35).
+
 ## [0.7.10] - 2026-06-18
 
 ### Added
