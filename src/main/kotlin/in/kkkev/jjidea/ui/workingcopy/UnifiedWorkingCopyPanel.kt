@@ -86,6 +86,14 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     // Update, so an editing burst rebuilds once per window instead of per event.
     private val reloadQueue = MergingUpdateQueue("wcReload", 200, true, null, this)
 
+    // Test seams for the wc-rebuild fan-out scale guard (jj-idea-f21f): count how many
+    // times each stage of the pipeline actually runs, so a burst of events can be
+    // asserted to coalesce into <=1 rebuild instead of one per event.
+    var reloadCount = 0
+        private set
+    var rebuildCount = 0
+        private set
+
     init {
         userCollapsedPaths = loadCollapsedPaths()
 
@@ -304,8 +312,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             }.takeIf { it.isNotEmpty() }
             ?.joinToString("/")
 
-    private fun scheduleReloadChanges() =
+    fun scheduleReloadChanges() =
         reloadQueue.queue(Update.create("reload") { reloadChangesFromCache() })
+
+    /** Forces the reload queue to process pending updates synchronously (test seam). */
+    fun flushReloadQueue() = reloadQueue.flush()
 
     private fun setupVfsListener() {
         project.messageBus.connect(this).subscribe(
@@ -360,6 +371,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      * Reads from ChangeListManager cache and updates the UI.
      */
     private fun reloadChangesFromCache() {
+        reloadCount++
         runInBackground {
             val changes = ChangeListManager.getInstance(project).allChanges.toList()
 
@@ -369,8 +381,9 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         }
     }
 
-    private fun updateChangesView(changes: List<Change>) {
+    fun updateChangesView(changes: List<Change>) {
         if (changes != changesTree.changes) {
+            rebuildCount++
             log.measurePerf("wc-rebuild", project.name) { report ->
                 report.count("changes", changes.size.toLong())
                 changesTree.setChangesToDisplay(changes)
