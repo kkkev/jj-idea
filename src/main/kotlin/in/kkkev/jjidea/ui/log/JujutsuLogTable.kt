@@ -11,6 +11,8 @@ import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.ui.PopupHandler
+import com.intellij.ui.ScreenUtil
+import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
@@ -24,10 +26,12 @@ import kotlinx.datetime.Instant
 import java.awt.Color
 import java.awt.Component
 import java.awt.Cursor
+import java.awt.Dimension
 import java.awt.Point
 import java.awt.event.*
 import javax.swing.JComponent
 import javax.swing.ListSelectionModel
+import javax.swing.ScrollPaneConstants
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ListSelectionEvent
 import javax.swing.event.TableColumnModelEvent
@@ -75,8 +79,12 @@ class JujutsuLogTable(
             pane.foreground = UIUtil.getToolTipForeground()
             pane.text = text
 
+            val screen = ScreenUtil.getScreenRectangle(this@JujutsuLogTable)
+            val maxWidth = minOf(JBUI.scale(500), screen.width - JBUI.scale(40))
+            val maxHeight = screen.height - JBUI.scale(40)
+
             point = mousePos
-            tipComponent = Wrapper(pane)
+            tipComponent = Wrapper(tooltipComponent(pane, maxWidth, maxHeight))
             return true
         }
 
@@ -825,5 +833,27 @@ class JujutsuLogTableModel : AbstractTableModel() {
         entries.clear()
         filteredEntries.clear()
         fireTableDataChanged()
+    }
+}
+
+/**
+ * Bounds [pane] to [maxWidth] so its HTML reflows (e.g. bookmark chips wrap across lines)
+ * instead of laying out as one oversized line. If the resulting preferred height still
+ * exceeds [maxHeight], wraps it in a vertically scrollable pane instead of letting the
+ * tooltip get clipped by the screen (jj-idea-szn8).
+ */
+internal fun tooltipComponent(pane: JComponent, maxWidth: Int, maxHeight: Int): JComponent {
+    pane.setSize(maxWidth, Int.MAX_VALUE)
+    val pref = pane.preferredSize
+    val boundedWidth = minOf(pref.width, maxWidth)
+    pane.preferredSize = Dimension(boundedWidth, pref.height)
+
+    if (pref.height <= maxHeight) return pane
+
+    return JBScrollPane(pane).apply {
+        border = JBUI.Borders.empty()
+        horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
+        verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
+        preferredSize = Dimension(boundedWidth, maxHeight)
     }
 }

@@ -48,7 +48,9 @@ Use this checklist:
       bookmarks collapse behind a grey "+N more" chip rather than overflowing the cell
       (jj-idea-w61m)
 - [ ] Hovering that row's tooltip lists every bookmark, including the ones collapsed
-      behind "+N more" (jj-idea-w61m)
+      behind "+N more" (jj-idea-w61m), wrapping the bookmark list across multiple lines
+      and showing the full description without being clipped by the screen edge; if the
+      content is taller than the screen it scrolls instead of clipping (jj-idea-szn8)
 - [ ] Left-clicking the "+N more" chip opens a popup listing the hidden bookmarks, each
       as a sub-menu with the usual bookmark actions (Rename…, Delete, Forget, etc.); right-
       clicking it does the same (jj-idea-w61m)

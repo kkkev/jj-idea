@@ -36,8 +36,14 @@ class JujutsuBookmarkWidget(project: Project) : JujutsuFilterComponent("Bookmark
 
     override fun getCurrentText(): String {
         if (wcEntries.size != 1) return ""
-        val bookmarks = wcEntries.first().bookmarks.filter { !it.isRemote }
-        val text = bookmarks.joinToString(", ") { it.name.name }
+        val names = wcEntries.first().bookmarks.asSequence().filter { !it.isRemote }.map { it.name.name }
+        val text = buildString {
+            for (name in names) {
+                if (length >= 30) break
+                if (isNotEmpty()) append(", ")
+                append(name)
+            }
+        }
         return if (text.length > 30) text.take(29) + "…" else text
     }
 
