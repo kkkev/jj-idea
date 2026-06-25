@@ -194,6 +194,33 @@ object JujutsuNotifications {
 
     // Track repos for which a slow-scan notification has already been shown this session
     private val notifiedSlowScans: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    private val notifiedLargeIgnored: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /**
+     * Fires once per repo per session when the cached ignored-file entry count exceeds
+     * [IGNORE_REPORT_CAP].  Offers the same "disable scanning" action as the slow-scan
+     * notification so the user can silence both the scan cost and the warning.
+     */
+    fun notifyIgnoreScanLarge(project: Project, repo: JujutsuRepository, entryCount: Int) {
+        if (!notifiedLargeIgnored.add(repo.directory.path)) return
+
+        val repoName = repo.displayName
+        val notification = NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("notification.ignorescan.large.title"),
+                JujutsuBundle.message("notification.ignorescan.large.content", repoName, entryCount),
+                NotificationType.WARNING
+            )
+
+        notification.addExpiringAction("notification.ignorescan.action.disable") {
+            JujutsuSettings.getInstance(project).setDisableIgnoredFileScanning(repo, true)
+            JujutsuIgnoreService.getInstance(project).invalidate(repo)
+            VcsDirtyScopeManager.getInstance(project).markEverythingDirty()
+        }
+
+        notification.notify(project)
+    }
 
     /**
      * Show a one-time-per-session warning when the ignored-file scan exceeds the watchdog budget.

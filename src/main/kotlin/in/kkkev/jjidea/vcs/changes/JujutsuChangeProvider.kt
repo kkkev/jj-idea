@@ -9,9 +9,12 @@ import com.intellij.openapi.vcs.changes.*
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.getChildPath
+import `in`.kkkev.jjidea.vcs.ignore.IGNORE_REPORT_CAP
+import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
 /**
@@ -56,6 +59,11 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
                         }
 
                         parseStatus(result.stdout, repo, builder, conflictedPaths)
+                        reportIgnoredFiles(
+                            repo,
+                            builder,
+                            JujutsuIgnoredFilesService.getInstance(vcs.project)
+                        )
                     } catch (e: ProcessCanceledException) {
                         throw e
                     } catch (e: Exception) {
@@ -66,6 +74,32 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
     }
 
     override fun isModifiedDocumentTrackingRequired() = true
+
+    /**
+     * Reports the cached ignored-file set for [repo] via [ChangelistBuilder.processIgnoredFile].
+     *
+     * Because [JujutsuIgnoredFilesService] prunes ignored directories before descending, each
+     * entry in the cached set typically represents a whole subtree rather than a single file.
+     * Worst-case complexity is O(cached-entry-count), which is bounded by [IGNORE_REPORT_CAP]:
+     * if the set is larger, we skip reporting for this repo and fire a one-shot notification
+     * offering to disable ignore scanning.  Scale: O(min(cached entries, IGNORE_REPORT_CAP))
+     * per CLM refresh, no filesystem I/O.
+     */
+    internal fun reportIgnoredFiles(
+        repo: JujutsuRepository,
+        builder: ChangelistBuilder,
+        ignoredService: JujutsuIgnoredFilesService,
+        onCap: (Int) -> Unit = { JujutsuNotifications.notifyIgnoreScanLarge(vcs.project, repo, it) }
+    ) {
+        val entries = ignoredService.ignoredForRepo(repo).filePaths()
+        if (entries.size > IGNORE_REPORT_CAP) {
+            onCap(entries.size)
+            return
+        }
+        for (fp in entries) {
+            builder.processIgnoredFile(fp)
+        }
+    }
 
     /**
      * Parse jj status output and add changes to the builder.

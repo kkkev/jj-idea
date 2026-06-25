@@ -14,16 +14,21 @@ import com.intellij.openapi.vcs.actions.VcsContextFactory
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangelistBuilder
 import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.util.paths.RecursiveFilePathSet
 import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.ignore.IGNORE_REPORT_CAP
+import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import `in`.kkkev.jjidea.vcs.relativeTo
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class JujutsuChangeProviderTest {
@@ -591,6 +596,91 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("M foo.txt", "A bar/baz.kt", "D old.txt")
         val paths = collectTrackedAbsolutePaths(output, repo)
         paths shouldBe setOf("${directory.path}/foo.txt", "${directory.path}/bar/baz.kt", "${directory.path}/old.txt")
+    }
+
+    // ── reportIgnoredFiles scale tests ────────────────────────────────────────
+
+    @Nested
+    inner class ReportIgnoredFilesScaleTest {
+        private val ignoredService = mockk<JujutsuIgnoredFilesService>()
+
+        private fun makeIgnoredSet(count: Int): RecursiveFilePathSet {
+            val set = RecursiveFilePathSet(false)
+            repeat(count) { i ->
+                set.add(MockFilePath("/wadger/ignored_$i.txt", isDirectory = false))
+            }
+            return set
+        }
+
+        @Test
+        fun `reports all entries when count is below cap`() {
+            val count = 3
+            every { ignoredService.ignoredForRepo(repo) } returns makeIgnoredSet(count)
+            val reported = mutableListOf<FilePath>()
+            every { builder.processIgnoredFile(any()) } answers {
+                reported.add(firstArg())
+            }
+
+            var capCalled = false
+            jcp.reportIgnoredFiles(repo, builder, ignoredService, onCap = { capCalled = true })
+
+            reported.size shouldBe count
+            capCalled shouldBe false
+        }
+
+        @Test
+        fun `does not call processIgnoredFile when count exceeds cap`() {
+            val count = IGNORE_REPORT_CAP + 1
+            every { ignoredService.ignoredForRepo(repo) } returns makeIgnoredSet(count)
+            every { builder.processIgnoredFile(any()) } returns Unit
+
+            var capCount = 0
+            jcp.reportIgnoredFiles(repo, builder, ignoredService, onCap = { capCount = it })
+
+            verify(exactly = 0) { builder.processIgnoredFile(any()) }
+            capCount shouldBe count
+        }
+
+        @Test
+        fun `operation count is bounded by IGNORE_REPORT_CAP regardless of set size`() {
+            val count = IGNORE_REPORT_CAP + 100
+            every { ignoredService.ignoredForRepo(repo) } returns makeIgnoredSet(count)
+            var processIgnoredFileCalls = 0
+            every { builder.processIgnoredFile(any()) } answers {
+                processIgnoredFileCalls++
+            }
+
+            jcp.reportIgnoredFiles(repo, builder, ignoredService, onCap = {})
+
+            processIgnoredFileCalls shouldBe 0
+        }
+
+        @Test
+        fun `exactly at cap reports all entries without triggering cap`() {
+            val count = IGNORE_REPORT_CAP
+            every { ignoredService.ignoredForRepo(repo) } returns makeIgnoredSet(count)
+            val reported = mutableListOf<FilePath>()
+            every { builder.processIgnoredFile(any()) } answers {
+                reported.add(firstArg())
+            }
+
+            var capCalled = false
+            jcp.reportIgnoredFiles(repo, builder, ignoredService, onCap = { capCalled = true })
+
+            reported.size shouldBe count
+            capCalled shouldBe false
+        }
+
+        @Test
+        fun `empty set produces no calls`() {
+            every { ignoredService.ignoredForRepo(repo) } returns RecursiveFilePathSet(false)
+
+            var capCalled = false
+            jcp.reportIgnoredFiles(repo, builder, ignoredService, onCap = { capCalled = true })
+
+            verify(exactly = 0) { builder.processIgnoredFile(any()) }
+            capCalled shouldBe false
+        }
     }
 
     @Test

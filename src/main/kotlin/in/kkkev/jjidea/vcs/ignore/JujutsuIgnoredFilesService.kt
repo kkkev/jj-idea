@@ -7,10 +7,8 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.changes.ChangeListManagerImpl
-import com.intellij.openapi.vcs.changes.VcsManagedFilesHolder
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.util.paths.RecursiveFilePathSet
-import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import com.intellij.vcsUtil.VcsUtil
@@ -22,11 +20,24 @@ import `in`.kkkev.jjidea.vcs.changes.collectTrackedAbsolutePaths
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 
-/** How long before the slow-scan watchdog fires (same threshold as the former inline scan in JujutsuChangeProvider). */
+/** How long before the slow-scan watchdog fires. */
 internal const val IGNORE_SCAN_WATCHDOG_MS = 5_000L
 
 /**
- * Asynchronous engine for ignored-file scanning, backing [JujutsuVcsIgnoredFilesHolder].
+ * Maximum number of ignored-file entries reported per repo via
+ * [ChangelistBuilder.processIgnoredFile] on each CLM refresh.  Because
+ * [GitignoreCache.collectIgnored] prunes whole directories, each entry
+ * typically represents a directory subtree rather than a single file; the
+ * effective file count covered is far larger than this limit.  If the cached
+ * set for a repo exceeds this cap we skip bulk reporting for that repo (the
+ * files simply won't appear in the Ignored pane) and offer the user a one-shot
+ * notification to disable ignore scanning for that repo, mirroring the
+ * scan-watchdog mechanism.
+ */
+internal const val IGNORE_REPORT_CAP = 50_000
+
+/**
+ * Asynchronous engine for ignored-file scanning, backing [JujutsuChangeProvider].
  *
  * Decouples ignored-file computation from [JujutsuChangeProvider.getChanges] so that
  * modified-file refresh latency is independent of ignored-tree size.  Design mirrors
@@ -37,7 +48,7 @@ internal const val IGNORE_SCAN_WATCHDOG_MS = 5_000L
  * - [markDirty] / [invalidate]: safe from any thread
  * - [scan]: runs on a pooled thread via [queue]; updates coalesce by repo-path identity so
  *   no two scans for the same repo overlap — no version-counter or cancellation needed
- * - [containsFile] / [values] / [isInUpdatingMode]: lock-free reads of @Volatile fields
+ * - [ignoredForRepo] / [values] / [isInUpdatingMode]: lock-free reads of @Volatile fields
  */
 @Service(Service.Level.PROJECT)
 class JujutsuIgnoredFilesService(private val project: Project) : Disposable {
@@ -101,8 +112,9 @@ class JujutsuIgnoredFilesService(private val project: Project) : Disposable {
 
     fun isInUpdatingMode() = states.values.any { it.updating }
 
-    fun containsFile(file: FilePath, vcsRoot: VirtualFile) =
-        states[vcsRoot.path]?.ignored?.hasAncestor(file) ?: false
+    /** Per-repo cached ignored set, for reporting in [JujutsuChangeProvider]. */
+    fun ignoredForRepo(repo: JujutsuRepository): RecursiveFilePathSet =
+        states[repo.directory.path]?.ignored ?: RecursiveFilePathSet(repo.directory.isCaseSensitive)
 
     fun values(): Collection<FilePath> = states.values.flatMap { it.ignored.filePaths() }
 
@@ -115,12 +127,8 @@ class JujutsuIgnoredFilesService(private val project: Project) : Disposable {
     // Queue disposes itself via Disposer because we passed `this` as its parent.
     override fun dispose() {}
 
-    private fun publishUpdatingMode() =
-        project.messageBus.syncPublisher(VcsManagedFilesHolder.TOPIC).updatingModeChanged()
-
     private fun enqueue(state: RepoState) {
         state.updating = true
-        publishUpdatingMode() // notify before queuing so the spinner appears immediately
         queue.queue(Update.create(state.repo.directory.path) { scan(state) })
     }
 
@@ -215,8 +223,10 @@ class JujutsuIgnoredFilesService(private val project: Project) : Disposable {
             log.warn("ignore-scan: unexpected error for ${repo.directory.name}: ${e.message}", e)
         } finally {
             synchronized(state) { state.updating = state.fullRescan || state.dirtyPaths.isNotEmpty() }
-            publishUpdatingMode()
-            ChangeListManagerImpl.getInstanceImpl(project).notifyUnchangedFileStatusChanged()
+            // Mark the repo dirty so CLM re-runs getChanges against the now-fresh ignored-file cache.
+            // Without this, a CLM refresh that ran *before* this scan completed would have seen the
+            // stale cache and the ignored status of newly-created files would never appear.
+            VcsDirtyScopeManager.getInstance(project).dirDirtyRecursively(repo.directory)
         }
     }
 }

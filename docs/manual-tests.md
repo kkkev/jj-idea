@@ -550,6 +550,21 @@ to trigger on a small repo, so this is mostly a code-level scale test
       functioning; the IDE should not hang waiting for the scan to finish after the watchdog
       fires
 
+#### Large ignored-file set cap (jj-idea-cvqz)
+
+Ignored files are now reported via `ChangelistBuilder.processIgnoredFile` inside the CLM refresh
+(same cycle as change detection). The async scan still runs off the refresh thread; `getChanges`
+reads the cached set. A `IGNORE_REPORT_CAP` (50,000 entries) limits the number of
+`processIgnoredFile` calls per refresh. If the cached set exceeds the cap, a one-shot
+"Jujutsu Ignored-File List Is Very Large" notification appears with a "disable scanning" action.
+
+- [ ] Open a repo with ignored files — they appear under "Ignored Files" in Local Changes
+- [ ] Ignored files still update after editing `.gitignore` (the async rescan triggers a CLM
+      refresh, which calls `getChanges` again and picks up the updated set)
+- [ ] If you have access to a repo with >50,000 ignored top-level entries: the notification
+      fires once; "disable scanning" action disables the setting and the Ignored Files node
+      becomes empty
+
 ### Editors for Historical Versions
 - [ ] has title including change id ✅
 - [ ] has Jujutsu menu ✅
