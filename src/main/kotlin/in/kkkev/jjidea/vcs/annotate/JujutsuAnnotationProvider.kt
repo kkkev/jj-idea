@@ -3,9 +3,11 @@ package `in`.kkkev.jjidea.vcs.annotate
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.annotate.AnnotationProvider
 import com.intellij.openapi.vcs.annotate.FileAnnotation
+import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
@@ -32,6 +34,10 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
 
     override fun populateCache(file: VirtualFile) {
         if (project.isDisposed) return
+        // Skip files that have no jj history: ignored files and unversioned files both lack
+        // a parent-revision entry, so jj annotate fails with "No such path".
+        val status = ChangeListManager.getInstance(project).getStatus(file)
+        if (status == FileStatus.IGNORED || status == FileStatus.UNKNOWN) return
         try {
             cache[file] = annotate(file)
         } catch (e: ProcessCanceledException) {

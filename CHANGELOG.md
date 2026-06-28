@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- A file newly created inside an ignored directory (e.g. matching a `.gitignore` pattern) now appears under "Ignored Files" in the Changes view immediately, without requiring a second edit to `.gitignore` to trigger a refresh.
+- Opening a newly created ignored or unversioned file no longer produces a spurious warning in the IDE log.
 - The ignored-file scan's slow-scan watchdog now reliably fires on directories containing very many files (previously it only checked elapsed time once per directory entered, so a single huge flat directory could block past the 5s threshold without ever showing the "scan is slow" notification). The watchdog now also aborts the in-progress scan when it fires, instead of letting it run to completion (GitHub #35).
 - The log and working-copy view no longer fail to load entirely on jj backends that can't evaluate the `remote_bookmarks()` revset (e.g. some non-standard jj implementations). The plugin now falls back to loading the log without the "pushed to remote" decoration on affected repositories instead of crashing (GitHub #35).
 - A commit with many bookmarks no longer hides the description or silently clips part of the bookmark list in the log table. Bookmarks/tags are now capped to half the column's width, with any overflow collapsed behind a clickable "+N more" chip that opens a popup of the hidden refs.
