@@ -232,6 +232,15 @@ Open `/tmp/jj-squash-test` in the plugin IDE.
 - [ ] Clear filters (X button) resets all filters
 - [ ] Filters combine correctly (AND logic)
 
+#### Graph layout under filtering (jj-idea-7jkr)
+
+Use a repo with several concurrent branches (at least 3–4 parallel lanes in the graph).
+
+- [ ] Type a text filter that hides some rows — the graph re-draws to match the **visible** rows only: lines do not extend to hidden commits, no misaligned passthrough lines across the remaining rows
+- [ ] Clear the text filter — the graph returns to the full layout immediately (no stale passthrough lines from the filtered view)
+- [ ] Apply author, date, or root filter on a multi-branch repo — same check: graph lines align with visible rows only
+- [ ] Rapid typing (several characters quickly) converges to a single correct layout within ~250 ms (no flickering per keystroke)
+
 ### Reference Filter (bookmark/tag dropdown)
 
 Use a repo where the log limit is **smaller** than total history, with at least one bookmark and
@@ -579,3 +588,40 @@ reads the cached set. A `IGNORE_REPORT_CAP` (50,000 entries) limits the number o
 - [ ] has open in -> remote ✅
 - [ ] open in -> remote for single parent opens that parent ✅
 - [ ] open in -> remote for unpushed historical version resolves to nearest pushed ancestor ✅
+
+### Split — Hunk-level selection (jj-idea-5isf.1)
+
+Setup: create a scratch jj repo with a file that has at least two separate hunks of changes.
+
+#### Basic hunk selection (native merge picker)
+- [ ] Right-click a mutable change → **Split…** → dialog shows changed-files list on the left and a native read-only diff preview on the right
+- [ ] Click a file in the list → right panel shows a native syntax-highlighted `Before (original) ↔ After (all changes)` diff
+- [ ] Untick a file → right preview switches to `Before (original) ↔ First commit (unchanged)` with **no diff** (empty right side); re-tick → full diff returns
+- [ ] Fully-ticked files show a filled checkbox; unticked show empty; partially-picked (see below) show a **half-checked** box
+- [ ] Directory nodes containing a partial file also show a half-checked box
+
+#### Hunk picking with the native merge window
+- [ ] Click **Pick Hunks…** → IntelliJ's 3-pane merge window opens titled "Pick hunks for first commit — <filename>"
+- [ ] Resolve button reads **"Use for First Commit"** (not "Apply"); cancel button reads **"Cancel Split"**
+- [ ] After editing the result and pressing Cancel → confirmation dialog reads **"Cancel Hunk Selection?"** / **"Discard the hunks you picked for the first commit?"**
+- [ ] Accept some changes (>>) and press "Use for First Commit" → merge window closes; file shows **half-checked** in the file list; summary shows "(N partial)"; right preview shows `Before ↔ First commit` (the picked content)
+- [ ] Accepting **every** change → file remains fully checked (no half-check); summary unchanged
+- [ ] Accepting **no** changes → file becomes unchecked (excluded from first commit)
+- [ ] Cancelling the merge → file state unchanged
+- [ ] Split (linear) → first commit contains only the picked hunks; second commit has the rest
+- [ ] Log refreshes selecting the newly created change
+- [ ] (Platform) "All changes have been processed — Save changes and finish merging" balloon appears when all changes accepted — this is platform wording, expected
+
+#### Descriptions
+- [ ] Both description fields are pre-populated with the source commit's description
+- [ ] Editing the parent description field updates the first commit; editing child updates the second
+
+#### Parallel split
+- [ ] Check "Create parallel commits" → header labels switch to "First" / "Second"
+- [ ] Split → two sibling commits created (not parent/child)
+
+#### Whole-file fast path
+- [ ] With no partial hunk selection (all files fully checked or unchecked) → split completes via file-level `jj split` (no diff-editor overhead); verify via log that both commits have the expected files
+
+#### Binary / conflicted files
+- [ ] A binary file in the changed list shows no "Pick Hunks…" button (whole-file only)

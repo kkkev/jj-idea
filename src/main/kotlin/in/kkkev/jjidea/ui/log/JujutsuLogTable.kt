@@ -587,6 +587,16 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var pathsFilter: Set<String> = emptySet() // Filter by paths
     private var rootFilter: Set<JujutsuRepository> = emptySet() // Filter by repository root
 
+    /**
+     * Invoked on the EDT after [applyFilter] rebuilds [filteredEntries], except when called
+     * from [setEntries] (which is followed immediately by an explicit graph update by the
+     * caller). Used by the panel to rebuild the displayed graph for the visible subset.
+     */
+    var onFilterApplied: (() -> Unit)? = null
+
+    /** Set to true inside [setEntries] to suppress the [onFilterApplied] callback. */
+    private var suppressFilterCallback = false
+
     companion object {
         const val COLUMN_ROOT_GUTTER = 0
         const val COLUMN_GRAPH_AND_DESCRIPTION = 1
@@ -638,13 +648,24 @@ class JujutsuLogTableModel : AbstractTableModel() {
     fun getEntry(row: Int): LogEntry? = if (row in filteredEntries.indices) filteredEntries[row] else null
 
     /**
+     * Returns a snapshot of the currently-visible (filtered) entries, in their current order.
+     * Used by the panel to recompute the graph layout for the visible subset.
+     */
+    fun getFilteredEntries(): List<LogEntry> = filteredEntries.toList()
+
+    /**
      * Update the table with new log entries.
      * Called on EDT after background loading.
      */
     fun setEntries(newEntries: List<LogEntry>) {
         entries.clear()
         entries.addAll(newEntries)
-        applyFilter()
+        suppressFilterCallback = true
+        try {
+            applyFilter()
+        } finally {
+            suppressFilterCallback = false
+        }
     }
 
     /**
@@ -800,6 +821,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
             }
         )
 
+        if (!suppressFilterCallback) onFilterApplied?.invoke()
         fireTableDataChanged()
     }
 

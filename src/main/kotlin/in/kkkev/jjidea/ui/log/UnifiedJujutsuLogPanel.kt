@@ -39,6 +39,18 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     private var rootFilterComponent: JujutsuRootFilterComponent? = null
 
     /**
+     * Builds the graph layout for the visible (filtered) subset of entries.
+     * Runs on the EDT; the input list is already topo-sorted by the data loader.
+     */
+    private val graphBuilder = CommitGraphBuilder()
+
+    /**
+     * The full-set graph nodes produced by the background data loader.
+     * Reused unchanged when no filter is active (visible set == full set).
+     */
+    private var fullGraphNodes: Map<ChangeId, GraphNode> = emptyMap()
+
+    /**
      * Called by the tab manager when this window's name changes (via the configure dialog) so the
      * tab title in the Changes tool window can be updated.
      */
@@ -110,6 +122,10 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             }
         }
 
+        // Rebuild the graph layout synchronously before fireTableDataChanged() so the
+        // renderer is correct when Swing first paints the filtered rows (no intermediate flash).
+        logTable.logModel.onFilterApplied = { refreshDisplayedGraph() }
+
         log.info("UnifiedJujutsuLogPanel initialized for project: ${project.name}, window: ${config.name}")
     }
 
@@ -117,9 +133,34 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         project.stateModel.logRefresh.connect(this) { _ -> refresh() }
     }
 
+    /**
+     * Rebuilds the graph layout for the currently-visible (filtered) entries and installs it.
+     *
+     * When no filter is active the visible set equals the full set, so we reuse [fullGraphNodes]
+     * (built off-EDT by the data loader) without any extra work.
+     * When a filter is active the visible set is a topo-ordered subset, and we rebuild from it
+     * on the EDT. At the default log limit of 500 entries this is fast enough to be imperceptible.
+     */
+    private fun refreshDisplayedGraph() {
+        val model = logTable.logModel
+        val filtered = model.getFilteredEntries()
+        val graph =
+            if (filtered.size == model.getAllEntries().size) {
+                fullGraphNodes
+            } else {
+                graphBuilder.buildGraph(filtered)
+            }
+        logTable.updateGraph(graph)
+    }
+
     override fun onDataLoaded(newData: UnifiedJujutsuLogDataLoader.Data) {
+        // Store the full-set graph before setEntries() so refreshDisplayedGraph() can reuse it
+        // immediately when no filter is active.
+        fullGraphNodes = newData.graphNodes
         logTable.setEntries(newData.entries)
-        logTable.updateGraph(newData.graphNodes)
+        // Rebuild immediately (no debounce) to handle any filter that was restored from config
+        // before the first load, and to replace any graph from a previous load.
+        refreshDisplayedGraph()
         updateRootFilterVisibility()
         updateStatusBar(newData.entries.size, newData.limit)
         detailsPanel.showCommits(logTable.selectedEntries)

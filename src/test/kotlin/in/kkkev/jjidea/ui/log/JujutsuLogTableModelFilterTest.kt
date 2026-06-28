@@ -783,4 +783,100 @@ class JujutsuLogTableModelFilterTest {
             model.getEntry(1)?.id?.short shouldBe "ghi789"
         }
     }
+
+    @Nested
+    inner class `onFilterApplied callback` {
+        private var callCount = 0
+
+        @BeforeEach
+        fun wireCallback() {
+            callCount = 0
+            model.onFilterApplied = { callCount++ }
+        }
+
+        @Test
+        fun `setFilter fires callback`() {
+            model.setEntries(listOf(createEntry("aaa111", "hello")))
+            callCount = 0 // reset after setEntries (which suppresses callback)
+
+            model.setFilter("hello")
+
+            callCount shouldBe 1
+        }
+
+        @Test
+        fun `setEntries does NOT fire callback`() {
+            model.setEntries(listOf(createEntry("aaa111", "hello")))
+
+            callCount shouldBe 0
+        }
+
+        @Test
+        fun `setAuthorFilter fires callback`() {
+            model.setEntries(listOf(createEntry("aaa111")))
+            callCount = 0
+
+            model.setAuthorFilter(setOf("alice@example.com"))
+
+            callCount shouldBe 1
+        }
+
+        @Test
+        fun `setBookmarkFilter fires callback`() {
+            model.setEntries(listOf(createEntry("aaa111")))
+            callCount = 0
+
+            model.setBookmarkFilter(setOf(ChangeId("aaa111", "aaa111", null)))
+
+            callCount shouldBe 1
+        }
+
+        @Test
+        fun `setDateFilter fires callback`() {
+            model.setEntries(listOf(createEntry("aaa111")))
+            callCount = 0
+
+            model.setDateFilter(Instant.fromEpochMilliseconds(0L))
+
+            callCount shouldBe 1
+        }
+
+        @Test
+        fun `setRootFilter fires callback`() {
+            val repo = mockk<JujutsuRepository>()
+            model.setEntries(listOf(createEntry("aaa111")))
+            callCount = 0
+
+            model.setRootFilter(setOf(repo))
+
+            callCount shouldBe 1
+        }
+
+        @Test
+        fun `getFilteredEntries returns visible subset after filter`() {
+            model.setEntries(
+                listOf(
+                    createEntry("aaa111", "alpha feature"),
+                    createEntry("bbb222", "beta bug"),
+                    createEntry("ccc333", "alpha fix")
+                )
+            )
+
+            model.setFilter("alpha")
+            val filtered = model.getFilteredEntries()
+
+            filtered.map { it.id.short } shouldContainExactly listOf("aaa111", "ccc333")
+        }
+
+        @Test
+        fun `getFilteredEntries returns all entries when no filter active`() {
+            val entries = listOf(
+                createEntry("aaa111"),
+                createEntry("bbb222")
+            )
+            model.setEntries(entries)
+
+            model.getFilteredEntries().size shouldBe 2
+        }
+    }
 }
