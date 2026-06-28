@@ -5,11 +5,13 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl
+import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.DIRECTORY_GROUPING
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.REPOSITORY_GROUPING
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
+import com.intellij.util.ui.ThreeStateCheckBox
 import `in`.kkkev.jjidea.actions.filechange.fileChangeActionGroup
 import javax.swing.tree.DefaultTreeModel
 
@@ -25,6 +27,34 @@ class JujutsuChangesTree(project: Project, showCheckboxes: Boolean = false) :
      * [in.kkkev.jjidea.actions.JujutsuDataKeys.LOG_ENTRY].
      */
     var additionalDataProvider: ((DataSink) -> Unit)? = null
+
+    /**
+     * Changes that should be shown as **partially** included (half-checked).
+     *
+     * A change in this set is still counted as included in the inclusion model (checked),
+     * but the checkbox renders as [ThreeStateCheckBox.State.DONT_CARE] to signal that only
+     * a subset of its hunks goes into the first commit. Parent/directory nodes that contain
+     * at least one partial descendant also show DONT_CARE.
+     *
+     * Setting this property triggers a repaint. Clearing it (empty set) restores the
+     * standard binary SELECTED/NOT_SELECTED rendering from the inclusion model.
+     */
+    var partialChanges: Set<Change> = emptySet()
+        set(value) {
+            field = value
+            repaint()
+        }
+
+    override fun getNodeStatus(node: ChangesBrowserNode<*>): ThreeStateCheckBox.State {
+        // Note: partialChanges may be null during superclass construction (called before Kotlin
+        // property initialization completes), so we capture it and guard explicitly.
+        val partial = partialChanges
+        @Suppress("SENSELESS_COMPARISON")
+        if (partial != null && partial.isNotEmpty() && node.traverseObjectsUnder().any { it in partial }) {
+            return ThreeStateCheckBox.State.DONT_CARE
+        }
+        return super.getNodeStatus(node)
+    }
 
     init {
         // Use KEEP_NON_EMPTY strategy: preserves user's manual expansion/collapse actions

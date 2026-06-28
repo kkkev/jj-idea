@@ -122,6 +122,34 @@ internal fun splitArgs(
     addAll(filePaths)
 }
 
+/**
+ * Build the full argument list for `jj split --tool <tool>` (interactive diff-editor split).
+ *
+ * [configArgs] are `NAME=VALUE` strings emitted as `--config NAME=VALUE` **before** the
+ * subcommand, since `--config` is a jj global option that must precede the subcommand.
+ * When [tool] is set, `--tool <tool>` is added (which implies `--interactive`), and no
+ * filesets are passed — the tool drives selection over the whole diff.
+ */
+internal fun splitInteractiveArgs(
+    revision: Revision,
+    description: Description? = null,
+    parallel: Boolean = false,
+    configArgs: List<String> = emptyList(),
+    tool: String
+): List<String> = buildList {
+    // Global --config flags before the subcommand.
+    for (kv in configArgs) {
+        add("--config")
+        add(kv)
+    }
+    add("split")
+    add("-r")
+    add(revision.toString())
+    if (description != null) add("--message=${description.actual}")
+    if (parallel) add("--parallel")
+    add("--tool=$tool")
+}
+
 /** Build the argument list for `jj git clone`. */
 internal fun gitCloneArgs(source: String, destination: String, colocate: Boolean): List<String> = buildList {
     add("git")
@@ -385,6 +413,14 @@ class CliExecutor(
         description: Description?,
         parallel: Boolean
     ) = execute(root, splitArgs(revision, filePaths.map { it.relativeTo(root!!) }, description, parallel))
+
+    override fun splitInteractive(
+        revision: Revision,
+        description: Description?,
+        parallel: Boolean,
+        configArgs: List<String>,
+        tool: String
+    ) = execute(root, splitInteractiveArgs(revision, description, parallel, configArgs, tool))
 
     override fun gitFetch(remote: Remote?, allRemotes: Boolean) =
         execute(root, gitFetchArgs(remote, allRemotes), timeout = networkTimeout)

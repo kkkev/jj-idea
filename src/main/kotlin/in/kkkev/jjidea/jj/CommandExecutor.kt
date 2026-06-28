@@ -284,6 +284,28 @@ interface CommandExecutor {
     ): CommandResult
 
     /**
+     * Split a change interactively using a diff editor tool.
+     *
+     * Uses `jj split --tool <tool>` (implies `--interactive`), driven non-interactively by
+     * the IDE's diff-edit helper. The [configArgs] list contains `NAME=VALUE` strings that are
+     * prefixed with `--config` and prepended to the command (global jj options).
+     *
+     * @param revision The revision to split
+     * @param description Description for the first commit (passed as `-m`; null = keep original)
+     * @param parallel Create parallel (sibling) commits instead of parent/child
+     * @param configArgs Extra `--config NAME=VALUE` entries (prepended before the subcommand)
+     * @param tool The diff-editor tool name registered via [configArgs]
+     * @return Command result
+     */
+    fun splitInteractive(
+        revision: Revision = WorkingCopy,
+        description: Description? = null,
+        parallel: Boolean = false,
+        configArgs: List<String> = emptyList(),
+        tool: String
+    ): CommandResult
+
+    /**
      * List Git remotes.
      * @return Command result with remote names (one per line)
      */

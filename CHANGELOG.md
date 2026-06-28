@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.7.11] - 2026-06-28
 
 ### Fixed
+- Splitting a change with hunk-level selection now correctly includes all ticked files, not just files whose hunks were manually previewed in the split dialog. Files that were ticked but never clicked had their full content silently dropped from the first commit. Files with partial hunk selections are counted in both commit totals in the split summary, since they contribute changes to both commits.
+- The hunk picker window now labels its target commit consistently with the split dialog: "Parent" in normal mode and "Second" in parallel mode, instead of always saying "First Commit". The file count summary at the bottom of the split dialog uses the same labels.
 - A file newly created inside an ignored directory (e.g. matching a `.gitignore` pattern) now appears under "Ignored Files" in the Changes view immediately, without requiring a second edit to `.gitignore` to trigger a refresh.
 - Opening a newly created ignored or unversioned file no longer produces a spurious warning in the IDE log.
 - The ignored-file scan's slow-scan watchdog now reliably fires on directories containing very many files (previously it only checked elapsed time once per directory entered, so a single huge flat directory could block past the 5s threshold without ever showing the "scan is slow" notification). The watchdog now also aborts the in-progress scan when it fires, instead of letting it run to completion (GitHub #35).

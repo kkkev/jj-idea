@@ -61,6 +61,14 @@ class FileSelectionPanel(project: Project) : JPanel(BorderLayout()) {
         changesTree.setInclusionListener(listener)
     }
 
+    /**
+     * Mark [changes] as partially included so the tree renders them with a half-checked box.
+     * Pass an empty set to clear all partial marks.
+     */
+    fun setPartialChanges(changes: Set<Change>) {
+        changesTree.partialChanges = changes
+    }
+
     private fun createToolbar() = ActionManager.getInstance().createActionToolbar(
         ActionPlaces.CHANGES_VIEW_TOOLBAR,
         DefaultActionGroup().apply {
