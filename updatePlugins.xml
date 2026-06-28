@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.10/jj-idea-0.7.10.zip" version="0.7.10">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.11/jj-idea-0.7.11.zip" version="0.7.11">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,21 +23,16 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.10</h3>
+      <h3>0.7.11</h3>
       
-<h4>Added</h4>
-<li>The "Compare with Another Commit…" popup and the working-copy switcher now accept arbitrary revision expressions (change id, git SHA, bookmark name) that fall outside the loaded log window. Typing a query that matches nothing locally shows a "Use … as revision" fallback, which resolves in the background and upgrades to a full commit preview, including the correct mutability icon.</li>
-
-<h4>Changed</h4>
-<li>Ignored-file scanning now runs asynchronously off the modified-file refresh path. Working-copy changes appear immediately after a save regardless of ignored-tree size; the Commit toolwindow shows the built-in "updating" indicator while ignored files are computed in the background.</li>
-<li>In multi-repository log windows, the repository color gutter is now expanded by default (showing the repo name) instead of collapsed to a thin colored strip, making per-repo colors easier to discover. Each log tab remembers your collapse/expand choice (GitHub #10).</li>
-
 <h4>Fixed</h4>
-<li>Bookmark and tag chips in the commit details panel no longer break apart when wrapping to multiple lines — the icon could previously be separated from its label, and long hyphenated names could break mid-word; each chip now wraps as a single atomic unit.</li>
-<li>Typing a revision that doesn't exist in the revision-choice popup or working-copy switcher no longer logs a WARN-level entry; resolution failures for a single typed revision are now logged at INFO, since this is an expected outcome rather than a plugin error.</li>
-<li>Mutable/immutable icon in the working-copy switcher and revision-choice popup now correctly reflects the target commit's immutability for bookmarks and tags, even when the target is outside the loaded log window.</li>
-<li>Resolving conflicts now refreshes the working copy so resolved files no longer appear conflicted in the panel; re-opening the Resolve dialog after a successful resolution no longer throws "Could not extract conflict data".</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.10">full release notes</a> for details.</p>
+<li>A file newly created inside an ignored directory (e.g. matching a `.gitignore` pattern) now appears under "Ignored Files" in the Changes view immediately, without requiring a second edit to `.gitignore` to trigger a refresh.</li>
+<li>Opening a newly created ignored or unversioned file no longer produces a spurious warning in the IDE log.</li>
+<li>The ignored-file scan's slow-scan watchdog now reliably fires on directories containing very many files (previously it only checked elapsed time once per directory entered, so a single huge flat directory could block past the 5s threshold without ever showing the "scan is slow" notification). The watchdog now also aborts the in-progress scan when it fires, instead of letting it run to completion (GitHub #35).</li>
+<li>The log and working-copy view no longer fail to load entirely on jj backends that can't evaluate the `remote_bookmarks()` revset (e.g. some non-standard jj implementations). The plugin now falls back to loading the log without the "pushed to remote" decoration on affected repositories instead of crashing (GitHub #35).</li>
+<li>A commit with many bookmarks no longer hides the description or silently clips part of the bookmark list in the log table. Bookmarks/tags are now capped to half the column's width, with any overflow collapsed behind a clickable "+N more" chip that opens a popup of the hidden refs.</li>
+<li>The log row hover tooltip no longer gets clipped by the screen for commits with many bookmarks. It now reflows the bookmark list across multiple lines and scrolls if the content is taller than the screen, instead of cutting off the description and/or bookmarks.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.11">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

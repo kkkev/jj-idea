@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.11] - 2026-06-28
+
 ### Fixed
 - A file newly created inside an ignored directory (e.g. matching a `.gitignore` pattern) now appears under "Ignored Files" in the Changes view immediately, without requiring a second edit to `.gitignore` to trigger a refresh.
 - Opening a newly created ignored or unversioned file no longer produces a spurious warning in the IDE log.
@@ -625,7 +627,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.10...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.11...HEAD
+[0.7.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.11
 [0.7.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.10
 [0.7.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.9
 [0.7.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.8
