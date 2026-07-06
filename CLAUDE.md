@@ -25,6 +25,7 @@ rules that supplement it.
   [docs/manual-tests.md](docs/manual-tests.md) if it adds or changes a manual-testable
   surface.
 - Follow contributing.md's End of Task Checklist before declaring work done.
-- **When the user says "finish"**, run in order: `./gradlew check` → `jj describe` (write a
-  commit message for the working-copy change) → `bd export -o .beads/issues.jsonl` →
+- **When the user says "finish"**, run in order: `./gradlew check` → update `CHANGELOG.md`
+  (add a user-facing entry under `[Unreleased]`) → `jj describe` (write a commit message
+  for the working-copy change) → `bd export -o .beads/issues.jsonl` →
   `jj bookmark set master` → then stop and ask for permission before any `jj git push`.
