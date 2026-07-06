@@ -6,7 +6,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.actions.fileList
+import `in`.kkkev.jjidea.actions.filesFor
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.util.runInBackground
@@ -21,10 +22,12 @@ class ShowDiffInNewTabAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val changes = e.changes
-        val files = e.files
-        val logEntry = if (changes.isEmpty() && files.isEmpty()) e.logEntry else null
+        val changes = e.changes // EDT capture — cheap (data key access only)
+        val fileList = e.fileList // EDT capture — cheap (data key access only)
+        val logEntry = if (changes.isEmpty() && fileList.isNullOrEmpty()) e.logEntry else null
         runInBackground {
+            // filesFor may run `jj log` when resolving from changes — must stay off the EDT
+            val files = project.filesFor(fileList, changes)
             if (logEntry != null) {
                 val fileChanges = logEntry.repo.logService.getFileChanges(logEntry).getOrElse { emptyList() }
                 val requests = buildDiffRequests(project, fileChanges, emptyList())

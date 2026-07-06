@@ -75,7 +75,7 @@ Use this checklist:
 - [ ] Clicking a different file while the diff tab is open swaps its content; tab count stays at 1
 - [ ] Escape inside the diff tab closes it
 - [ ] Cmd/Ctrl+D opens the same diff preview tab (routes through preview when available)
-- [ ] F4 still opens the file in a regular editor tab
+- [ ] F4 still opens the file in a regular editor tab (no "Synchronous execution on EDT" error in IDE log)
 - [ ] Menu has "Compare with Another Commit" ❌ jj-idea-7d9p
 - [ ] Menu has "Compare Before with Another Commit" ❌ jj-idea-lo7u
 - [ ] open file for historical opens correct version ✅
@@ -346,7 +346,7 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Single click swaps diff content if diff tab is already open
 - [ ] Escape inside the diff tab closes it
 - [ ] Cmd/Ctrl+D opens the same diff preview tab
-- [ ] F4 still opens the file in a regular editor tab
+- [ ] F4 still opens the file in a regular editor tab (no "Synchronous execution on EDT" error in IDE log)
 - [ ] Right-click shows context menu with file actions
 - [ ] Open shows working copy as editable ✅
 - [ ] Menu has "Compare with Another Commit" ❌ jj-idea-7d9p

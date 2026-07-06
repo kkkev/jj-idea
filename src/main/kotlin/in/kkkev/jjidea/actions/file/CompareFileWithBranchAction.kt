@@ -8,7 +8,10 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.jujutsuFiles
+import `in`.kkkev.jjidea.actions.changes
+import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.fileList
+import `in`.kkkev.jjidea.actions.jujutsuFilesFor
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -35,8 +38,12 @@ class CompareFileWithBranchAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val files = e.jujutsuFiles
+        val changes = e.changes // EDT capture — cheap (data key access only)
+        val fileList = e.fileList // EDT capture — cheap (data key access only)
+        val focusedFile = e.file // EDT capture — cheap (data key access only)
         runInBackground {
+            // jujutsuFilesFor may run `jj log` when resolving from changes — must stay off the EDT
+            val files = project.jujutsuFilesFor(fileList, changes, focusedFile)
             val repo = files.singleJujutsuRepository(project) ?: return@runInBackground
             RevisionSelectorPopup.show(
                 "action.compare.branch.popup.title",

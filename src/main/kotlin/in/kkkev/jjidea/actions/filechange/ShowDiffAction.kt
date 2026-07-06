@@ -9,7 +9,8 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
-import `in`.kkkev.jjidea.actions.files
+import `in`.kkkev.jjidea.actions.fileList
+import `in`.kkkev.jjidea.actions.filesFor
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.util.runInBackground
@@ -36,9 +37,11 @@ class ShowDiffAction :
         val preview = e.getData(DiffDataKeys.EDITOR_TAB_DIFF_PREVIEW)
         if (preview != null && preview.performDiffAction()) return
 
-        val changes = e.changes
-        val files = e.files
+        val changes = e.changes // EDT capture — cheap (data key access only)
+        val fileList = e.fileList // EDT capture — cheap (data key access only)
         runInBackground {
+            // filesFor may run `jj log` when resolving from changes — must stay off the EDT
+            val files = project.filesFor(fileList, changes)
             val requests = buildDiffRequests(project, changes, files)
             if (requests.isNotEmpty()) {
                 val diffManager = DiffManager.getInstance()
