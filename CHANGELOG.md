@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- A **Sponsor this plugin** link now appears at the bottom of **Settings → Version Control → Jujutsu**, opening the GitHub Sponsors page for the maintainer.
+- GitHub Sponsors button added to the repository (via `.github/FUNDING.yml`).
+
 ### Fixed
 - Opening a file with F4 from the commit details or working-copy changes panel no longer logs a "Synchronous execution on EDT" error. The same fix covers Show Diff, Show Diff in New Tab, and Compare File with Branch when invoked from a changes selection.
 - Splitting a change with hunk-level selection now correctly includes all ticked files, not just files whose hunks were manually previewed in the split dialog. Files that were ticked but never clicked had their full content silently dropped from the first commit. Files with partial hunk selections are counted in both commit totals in the split summary, since they contribute changes to both commits.
 - The hunk picker window now labels its target commit consistently with the split dialog: "Parent" in normal mode and "Second" in parallel mode, instead of always saying "First Commit". The file count summary at the bottom of the split dialog uses the same labels.
 - Filtering the commit log (by text, author, date, reference, or root) no longer leaves the graph lines misaligned or pointing at hidden commits. The graph layout is now recomputed from the visible subset whenever the filter changes, and the renderer is updated before Swing repaints so no intermediate misaligned state is shown.
+- Resolving a conflict now updates the Working Copy panel automatically — previously the file kept showing as conflicted even after clicking Refresh, and trying to resolve it again would throw an error.
 
 ## [0.7.11] - 2026-06-28
 

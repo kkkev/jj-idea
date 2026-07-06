@@ -81,6 +81,13 @@ See **[ROADMAP.md](ROADMAP.md)** for planned features, including hunk-level squa
 - **[Contributing](contributing.md)** — Architecture, coding standards, testing, and workflow
 - **[Agent Instructions](CLAUDE.md)** — Operating rules for AI coding agents working in this repo
 
+## Support
+
+This plugin is free and maintained in my spare time, with a lot of the work done using AI
+coding tools. If it saves you time, you can [sponsor me on GitHub](https://github.com/sponsors/kkkev)
+to help fund those tools and continued development — entirely optional. Feedback and issues
+are just as welcome.
+
 ## License
 
 [Apache License 2.0](LICENSE)

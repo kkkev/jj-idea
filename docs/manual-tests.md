@@ -626,3 +626,9 @@ Setup: create a scratch jj repo with a file that has at least two separate hunks
 
 #### Binary / conflicted files
 - [ ] A binary file in the changed list shows no "Pick Hunks…" button (whole-file only)
+
+### Settings — Support section
+
+- [ ] Open **Settings → Version Control → Jujutsu**
+- [ ] A **Support** group appears at the bottom of the panel with a "Sponsor this plugin on GitHub..." link
+- [ ] Clicking the link opens `https://github.com/sponsors/kkkev` in the default browser

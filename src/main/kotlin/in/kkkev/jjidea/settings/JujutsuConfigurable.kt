@@ -350,6 +350,14 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             }
         }
 
+        group(JujutsuBundle.message("settings.group.support")) {
+            row {
+                link(JujutsuBundle.message("settings.support.link")) {
+                    BrowserUtil.browse(SPONSORS_URL)
+                }
+            }
+        }
+
         // Load global identity values asynchronously
         loadGlobalIdentity()
     }
@@ -634,6 +642,10 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = clear()
         override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = clear()
         override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = clear()
+    }
+
+    companion object {
+        private const val SPONSORS_URL = "https://github.com/sponsors/kkkev"
     }
 
     /** Creates a read-only text field with monospace font for displaying commands. */
