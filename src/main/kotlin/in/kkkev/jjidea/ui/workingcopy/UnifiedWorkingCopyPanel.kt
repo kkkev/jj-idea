@@ -382,7 +382,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     fun updateChangesView(changes: List<Change>) {
-        if (changes != changesTree.changes) {
+        if (!sameChangesAndStatuses(changes, changesTree.changes)) {
             rebuildCount++
             log.measurePerf("wc-rebuild", project.name) { report ->
                 report.count("changes", changes.size.toLong())
@@ -401,6 +401,17 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             }
         }
     }
+
+    /**
+     * [Change.equals] compares only before/after [com.intellij.openapi.vcs.FilePath]s and ignores
+     * [Change.getFileStatus]. So a file that transitions e.g. MERGED_WITH_CONFLICTS -> MODIFIED
+     * (same paths, resolved conflict) would be treated as unchanged by a plain list comparison,
+     * leaving the tree rendering the stale conflict decoration even after Refresh (jj-idea-3cvb).
+     * This also compares each pair's [com.intellij.openapi.vcs.FileStatus] so such
+     * transitions force a rebuild.
+     */
+    private fun sameChangesAndStatuses(a: List<Change>, b: List<Change>): Boolean =
+        a.size == b.size && a.indices.all { i -> a[i] == b[i] && a[i].fileStatus == b[i].fileStatus }
 
     private fun reapplyUserCollapses() {
         log.info("Reapplying user collapses (${userCollapsedPaths.size} paths)")

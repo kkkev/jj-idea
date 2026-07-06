@@ -482,12 +482,13 @@ Open `/tmp/jj-conflict-test` as a project in the plugin IDE (`./gradlew runIde`)
 
 - [ ] Edit the center pane to a desired resolution and click Apply / Save
 - [ ] After closing the dialog, `file.txt` content on disk reflects the resolution (no conflict markers)
-- [ ] `file.txt` disappears from the Working Copy panel's conflict list (status updates on next refresh)
+- [ ] `file.txt` disappears from the Working Copy panel's conflict list **automatically**, without pressing Refresh (jj-idea-3cvb: a stale conflict decoration used to survive even a manual Refresh)
+- [ ] Right-clicking `file.txt` again (now resolved): "Resolve Conflicts…" is **not visible**, and if triggered anyway does not throw
 
 #### Accept Yours / Accept Theirs (bulk)
 
 - [ ] In the multi-file merge dialog, selecting `file.txt` and clicking **Accept Yours**: file on disk contains "ours" content with no conflict markers
-- [ ] Status refreshes: `file.txt` leaves conflicted state
+- [ ] `file.txt` leaves conflicted state automatically, without pressing Refresh
 - [ ] **Accept Theirs** analogously writes "theirs" content
 
 #### Log details pane (commit selected in log table)

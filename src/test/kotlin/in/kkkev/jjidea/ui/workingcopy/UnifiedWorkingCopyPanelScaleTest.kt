@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.workingcopy
 
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.SimpleContentRevision
@@ -72,14 +73,41 @@ class UnifiedWorkingCopyPanelScaleTest {
         }
     }
 
+    /**
+     * Regression test for jj-idea-3cvb: resolving a conflict re-reports the same file
+     * (same before/after paths) with a different [FileStatus] (MERGED_WITH_CONFLICTS ->
+     * MODIFIED). [Change.equals] ignores [FileStatus], so a plain list-equality guard
+     * would treat this as "unchanged" and skip the rebuild, leaving the tree showing the
+     * file as still conflicted even after Refresh.
+     */
+    @Test
+    fun `status-only change on the same file forces a rebuild`() {
+        val panel = UnifiedWorkingCopyPanel(project.get())
+        try {
+            val conflicted = change("src/Main.kt", FileStatus.MERGED_WITH_CONFLICTS)
+            val resolved = change("src/Main.kt", FileStatus.MODIFIED)
+
+            panel.updateChangesView(listOf(conflicted))
+            pumpEdt()
+            panel.rebuildCount shouldBe 1
+
+            // Same paths, different FileStatus -> must still rebuild, not early-out.
+            panel.updateChangesView(listOf(resolved))
+            pumpEdt()
+            panel.rebuildCount shouldBe 2
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
     // The counters under test increment synchronously when the queue/update runs; this
     // only drains any invokeLater hops already posted to the EDT, so a couple of passes
     // suffice (cf. FileSelectionPanelTest.waitForRefresh, which polls for an async signal
     // that doesn't exist here).
     private fun pumpEdt() = repeat(3) { UIUtil.dispatchAllInvocationEvents() }
 
-    private fun change(path: String): Change {
+    private fun change(path: String, status: FileStatus? = null): Change {
         val filePath = LocalFilePath(path, false)
-        return Change(null, SimpleContentRevision("", filePath, "1"))
+        return Change(null, SimpleContentRevision("", filePath, "1"), status)
     }
 }
