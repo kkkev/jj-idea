@@ -13,7 +13,7 @@ import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.filterInJujutsuProject
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import `in`.kkkev.jjidea.vcs.possibleLogEntryFor
@@ -62,8 +62,8 @@ fun Project.jujutsuFilesFor(
     changes: List<FileChange>,
     focusedFile: VirtualFile?
 ): List<VirtualFile> =
-    filesFor(fileList, changes).filterInJujutsuProject(this)
-        .ifEmpty { listOfNotNull(focusedFile).filterInJujutsuProject(this) }
+    filesFor(fileList, changes).filterInJujutsuRepo(this)
+        .ifEmpty { listOfNotNull(focusedFile).filterInJujutsuRepo(this) }
 
 val AnActionEvent.filePaths: List<FilePath>
     get() = this.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()?.map { it.filePath }

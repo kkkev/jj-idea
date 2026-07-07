@@ -12,6 +12,7 @@ import `in`.kkkev.jjidea.actions.change.resolveSelectedAvailability
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
 class ResolveSelectedConflictsAction : DumbAwareAction(
@@ -49,13 +50,14 @@ class ResolveSelectedConflictsAction : DumbAwareAction(
         val fromChanges = e.changes.filter { it.isConflicted }.mapNotNull { it.filePath.virtualFile }
         if (fromChanges.isNotEmpty()) return fromChanges
 
-        val changeListManager = e.project?.let { ChangeListManager.getInstance(it) } ?: return emptyList()
+        val project = e.project ?: return emptyList()
+        val changeListManager = ChangeListManager.getInstance(project)
         return (
             if (e.logEntry?.isWorkingCopy == true) {
                 // Working copy log entry with inherited conflicts: the entry's own changes tree is empty
                 // because jj diff --summary shows 0 changes, but conflicts propagated from the parent are
                 // still materialised on disk and tracked by ChangeListManager.
-                changeListManager.allChanges
+                changeListManager.allChanges.filterInJujutsuRepo(project)
             } else {
                 // Editor / project view: fall back to the single focused file
                 listOfNotNull(e.file?.let { file -> changeListManager.getChange(file) })

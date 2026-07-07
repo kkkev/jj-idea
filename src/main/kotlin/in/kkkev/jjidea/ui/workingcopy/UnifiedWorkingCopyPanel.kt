@@ -36,6 +36,7 @@ import `in`.kkkev.jjidea.ui.services.showVcsMappingsSettings
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import javax.swing.Box
@@ -373,7 +374,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     private fun reloadChangesFromCache() {
         reloadCount++
         runInBackground {
-            val changes = ChangeListManager.getInstance(project).allChanges.toList()
+            val changes = ChangeListManager.getInstance(project).allChanges.filterInJujutsuRepo(project)
 
             runLater {
                 updateChangesView(changes)

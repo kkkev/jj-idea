@@ -363,6 +363,10 @@ Verify these keyboard shortcuts work in the log view:
 - [ ] Menu has Open in -> remote ✅
 - [ ] Open in -> remote for single parent opens that parent (resolves to pushed ancestor)
 - [ ] Open in -> remote hidden when no pushed ancestor exists
+- [ ] jj-idea-t0zo: in a repository that is colocated with Git (mapped to both Jujutsu and
+  Git4Idea), the Working Copy panel's changed-files tree shows only jj's changes — no
+  Git-only changes appear. Also verify "Resolve Conflicts…" (both the toolbar/menu action
+  and the per-file context menu action) only offers jj-tracked conflicted files
 
 ### Git Push Dialog
 

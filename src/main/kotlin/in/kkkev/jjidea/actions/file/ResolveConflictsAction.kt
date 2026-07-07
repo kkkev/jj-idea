@@ -7,6 +7,7 @@ import com.intellij.openapi.vcs.AbstractVcsHelper
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
 class ResolveConflictsAction : DumbAwareAction(
@@ -20,6 +21,7 @@ class ResolveConflictsAction : DumbAwareAction(
 
         val conflictedFiles = ChangeListManager.getInstance(project)
             .allChanges
+            .filterInJujutsuRepo(project)
             .filter { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
             .mapNotNull { it.virtualFile }
 
@@ -36,6 +38,7 @@ class ResolveConflictsAction : DumbAwareAction(
         }
         e.presentation.isEnabledAndVisible = ChangeListManager.getInstance(project)
             .allChanges
+            .filterInJujutsuRepo(project)
             .any { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
     }
 

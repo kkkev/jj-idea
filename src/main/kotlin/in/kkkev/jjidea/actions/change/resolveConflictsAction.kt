@@ -10,6 +10,7 @@ import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
 // Read live rather than capturing once at construction time: a stale snapshot could hand
@@ -19,6 +20,7 @@ import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 private fun conflictedFiles(project: Project, entry: LogEntry?): List<VirtualFile> =
     if (entry?.isWorkingCopy == true) {
         ChangeListManager.getInstance(project).allChanges
+            .filterInJujutsuRepo(project)
             .filter { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
             .mapNotNull { it.virtualFile }
     } else {

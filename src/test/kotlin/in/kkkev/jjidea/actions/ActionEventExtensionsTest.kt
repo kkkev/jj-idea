@@ -6,7 +6,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.FileChange
-import `in`.kkkev.jjidea.vcs.filterInJujutsuProject
+import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.possibleVirtualFileFor
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -116,10 +116,10 @@ class ActionEventExtensionsTest {
     @Nested
     inner class `jujutsuFilesFor` {
         @Test
-        fun `returns files that pass filterInJujutsuProject`() {
+        fun `returns files that pass filterInJujutsuRepo`() {
             val vf = virtualFile("Main.kt")
-            // filterInJujutsuProject is a List<VirtualFile> extension — mock it as a static
-            every { listOf(vf).filterInJujutsuProject(project) } returns listOf(vf)
+            // filterInJujutsuRepo is a List<VirtualFile> extension — mock it as a static
+            every { listOf(vf).filterInJujutsuRepo(project) } returns listOf(vf)
 
             val result = project.jujutsuFilesFor(listOf(vf), emptyList(), null)
             result shouldBe listOf(vf)
@@ -131,9 +131,9 @@ class ActionEventExtensionsTest {
             val focused = virtualFile("Focused.kt")
 
             // primary list resolves to something outside a jj root
-            every { listOf(vfArray).filterInJujutsuProject(project) } returns emptyList()
+            every { listOf(vfArray).filterInJujutsuRepo(project) } returns emptyList()
             // fallback list is accepted
-            every { listOf(focused).filterInJujutsuProject(project) } returns listOf(focused)
+            every { listOf(focused).filterInJujutsuRepo(project) } returns listOf(focused)
 
             val result = project.jujutsuFilesFor(listOf(vfArray), emptyList(), focused)
             result shouldBe listOf(focused)
@@ -142,8 +142,8 @@ class ActionEventExtensionsTest {
         @Test
         fun `returns empty list when both primary and fallback resolve to nothing`() {
             val vf = virtualFile("NotInJj.kt")
-            every { listOf(vf).filterInJujutsuProject(project) } returns emptyList()
-            every { emptyList<VirtualFile>().filterInJujutsuProject(project) } returns emptyList()
+            every { listOf(vf).filterInJujutsuRepo(project) } returns emptyList()
+            every { emptyList<VirtualFile>().filterInJujutsuRepo(project) } returns emptyList()
 
             val result = project.jujutsuFilesFor(listOf(vf), emptyList(), null)
             result shouldBe emptyList()

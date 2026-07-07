@@ -51,8 +51,18 @@ fun Project.possibleJujutsuRepositoryFor(filePath: FilePath) =
 fun Project.jujutsuRepositoryFor(filePath: FilePath) = possibleJujutsuRepositoryFor(filePath)
     ?: throw VcsException(JujutsuBundle.message("vcs.error.no.root", filePath))
 
-fun List<VirtualFile>.filterInJujutsuProject(project: Project) = filter {
+fun List<VirtualFile>.filterInJujutsuRepo(project: Project) = filter {
     project.possibleJujutsuRepositoryFor(it) != null
+}
+
+/**
+ * Keeps only changes owned by an initialised Jujutsu repository, dropping changes from
+ * other VCSes (e.g. Git4Idea) mapped into the same project. [ChangeListManager.allChanges]
+ * is a project-wide, VCS-agnostic aggregate, so any read of it that's meant to represent
+ * "jj's changes" must be scoped with this filter (jj-idea-t0zo).
+ */
+fun Iterable<Change>.filterInJujutsuRepo(project: Project): List<Change> = filter {
+    project.possibleJujutsuRepositoryFor(it.filePath) != null
 }
 
 fun List<VirtualFile>.singleJujutsuRepository(project: Project) =
