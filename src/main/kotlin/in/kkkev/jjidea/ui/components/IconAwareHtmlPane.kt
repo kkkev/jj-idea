@@ -7,6 +7,7 @@ import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
 import com.intellij.ui.scale.JBUIScale
+import com.intellij.util.io.URLUtil
 import com.intellij.util.ui.ExtendableHTMLViewFactory
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -60,14 +61,16 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                 val url = e.description ?: return@addHyperlinkListener
                 with(CHANGE_ID_URL_PARSER.matcher(url)) {
                     if (matches()) {
-                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(group(1), true))
+                        val path = URLUtil.unescapePercentSequences(group(1))
+                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
                             .invalidate(ChangeId(group(2)))
                         return@addHyperlinkListener
                     }
                 }
                 with(REF_URL_PARSER.matcher(url)) {
                     if (matches()) {
-                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(group(1), true))
+                        val path = URLUtil.unescapePercentSequences(group(1))
+                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
                             .invalidate(ChangeId(group(2)))
                     }
                 }

@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.components
 import com.intellij.icons.AllIcons
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
+import com.intellij.util.io.URLUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.JujutsuMessage
@@ -141,7 +142,7 @@ fun TextCanvas.append(changeId: ChangeId) {
 }
 
 fun TextCanvas.append(changeKey: ChangeKey) {
-    linked(URI("jjc://${changeKey.repo.directory.path}?${changeKey.revision}")) {
+    linked(URI("jjc://${URLUtil.encodePath(changeKey.repo.directory.path)}?${changeKey.revision}")) {
         with(changeKey.revision) {
             when (this) {
                 is ChangeId -> append(this)
@@ -176,7 +177,10 @@ fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelativ
 
 /** Canonical `jjref://` URI identifying a specific clickable ref (bookmark or tag) on a log entry. */
 fun refUri(entry: LogEntry, kind: String, name: String): URI =
-    URI("jjref://${entry.repo.directory.path}?${entry.id}&kind=$kind&name=${URLEncoder.encode(name, "UTF-8")}")
+    URI(
+        "jjref://${URLUtil.encodePath(entry.repo.directory.path)}?${entry.id}" +
+            "&kind=$kind&name=${URLEncoder.encode(name, "UTF-8")}"
+    )
 
 fun TextCanvas.append(name: BookmarkName) = colored(JujutsuColors.BOOKMARK) {
     smaller {
