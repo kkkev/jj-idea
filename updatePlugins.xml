@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.12/jj-idea-0.7.12.zip" version="0.7.12">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.13/jj-idea-0.7.13.zip" version="0.7.13">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,17 +23,12 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.12</h3>
+      <h3>0.7.13</h3>
       
-<h4>Added</h4>
-<li>Splitting allows selection of specific hunks within files.</li>
-<li>You can now support me to keep working on this plugin! See the *Sponsor this plugin** link at the bottom of **Settings → Version Control → Jujutsu**.</li>
-
 <h4>Fixed</h4>
-<li>Opening a file with F4 from the commit details or working-copy changes panel no longer logs a "Synchronous execution on EDT" error. The same fix covers Show Diff, Show Diff in New Tab, and Compare File with Branch when invoked from a changes selection.</li>
-<li>Filtering the commit log (by text, author, date, reference, or root) no longer leaves the graph lines misaligned or pointing at hidden commits. The graph layout is now recomputed from the visible subset whenever the filter changes, and the renderer is updated before Swing repaints so no intermediate misaligned state is shown.</li>
-<li>Resolving a conflict now updates the Working Copy panel automatically — previously the file kept showing as conflicted even after clicking Refresh, and trying to resolve it again would throw an error.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.12">full release notes</a> for details.</p>
+<li>"Resolve Conflicts…" now appears (though disabled, with a hint to edit the change first) for a conflicted commit that isn't the working copy — including a commit that only inherits its conflict from an ancestor merge. Previously the option was hidden entirely, so there was no way to discover that the change could be resolved.</li>
+<li>The Working Copy tool window, and the "Resolve Conflicts…" actions, no longer show changes from Git in a repository that uses both Jujutsu and Git.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.13">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

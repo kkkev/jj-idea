@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.13] - 2026-07-07
+
 ### Fixed
 - "Resolve Conflicts…" now appears (though disabled, with a hint to edit the change first) for a conflicted commit that isn't the working copy — including a commit that only inherits its conflict from an ancestor merge. Previously the option was hidden entirely, so there was no way to discover that the change could be resolved.
 - The Working Copy tool window, and the "Resolve Conflicts…" actions, no longer show changes from Git in a repository that uses both Jujutsu and Git.
@@ -642,7 +644,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.12...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.13...HEAD
+[0.7.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.13
 [0.7.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.12
 [0.7.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.11
 [0.7.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.10
