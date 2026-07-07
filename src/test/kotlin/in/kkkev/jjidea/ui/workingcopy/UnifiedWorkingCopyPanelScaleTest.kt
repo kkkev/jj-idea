@@ -9,7 +9,9 @@ import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
@@ -29,6 +31,13 @@ import org.junit.jupiter.api.Test
 @RunInEdt
 class UnifiedWorkingCopyPanelScaleTest {
     private val project = projectFixture()
+
+    // Constructing UnifiedWorkingCopyPanel touches project.stateModel, whose init fires
+    // fire-and-forget pooled-thread loaders that capture this fixture's project (see
+    // PlatformTestSupport.drainBackgroundLoads); drain them before projectFixture disposes the
+    // project, to avoid a flaky LeakHunter retained-Project report (jj-idea-q49j).
+    @AfterEach
+    fun drainStateModelLoads() = drainBackgroundLoads()
 
     @Test
     fun `burst of scheduled reloads coalesces into a single reload`() {
