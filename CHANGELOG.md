@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.12] - 2026-07-07
+
 ### Added
 - Splitting allows selection of specific hunks within files.
 - You can now support me to keep working on this plugin! See the *Sponsor this plugin** link at the bottom of **Settings → Version Control → Jujutsu**.
@@ -636,7 +638,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.11...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.12...HEAD
+[0.7.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.12
 [0.7.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.11
 [0.7.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.10
 [0.7.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.9
