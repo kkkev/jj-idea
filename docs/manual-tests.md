@@ -47,6 +47,14 @@ Use this checklist:
       bm-$i; done`), the log row still shows description text (not blank), and the
       bookmarks collapse behind a grey "+N more" chip rather than overflowing the cell
       (jj-idea-w61m)
+- [ ] Stress-test repo, many concurrent branches (`jj-idea-1ojh`, `jj-idea-5i6i`): open
+      `jj-stress-test` (1084 commits, ~26 concurrent heads incl. a ~200-commit
+      `deep-branch` and an `octopus-merge`); set Settings → Version Control → Jujutsu →
+      Log Limit to 200 so several branches fall out of view; apply an author or date
+      filter to shrink the visible set further; confirm tree lines never cross over
+      unrelated commits or share a lane (dropped edges to filtered-out ancestors are
+      expected and tracked separately as `jj-idea-hlu3`, not a bug here); clear the
+      filter and confirm the graph restores immediately without a manual Refresh
 - [ ] Hovering that row's tooltip lists every bookmark, including the ones collapsed
       behind "+N more" (jj-idea-w61m), wrapping the bookmark list across multiple lines
       and showing the full description without being clipped by the screen edge; if the
