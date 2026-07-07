@@ -32,8 +32,18 @@ fun resolveConflictsAction(project: Project, entry: LogEntry?): DumbAwareAction 
         null
     ) {
         override fun update(e: AnActionEvent) {
-            e.presentation.isEnabled = conflictedFiles(project, entry).isNotEmpty()
-            e.presentation.isVisible = entry?.isWorkingCopy == true
+            val isWorkingCopy = entry?.isWorkingCopy == true
+            val availability = resolveAvailability(
+                isWorkingCopy = isWorkingCopy,
+                hasConflict = entry?.hasConflict == true,
+                workingCopyConflictCount = if (isWorkingCopy) conflictedFiles(project, entry).size else 0
+            )
+            e.presentation.isVisible = availability.visible
+            e.presentation.isEnabled = availability.enabled
+            if (availability.needsEditHint) {
+                e.presentation.text = JujutsuBundle.message("action.resolve.conflicts.needsEdit")
+                e.presentation.description = JujutsuBundle.message("action.resolve.conflicts.needsEdit.description")
+            }
         }
 
         override fun actionPerformed(e: AnActionEvent) {

@@ -504,15 +504,24 @@ Open `/tmp/jj-conflict-test` as a project in the plugin IDE (`./gradlew runIde`)
 Use the same conflict setup above. The test repo has a conflicted commit that is **not** the working copy (e.g., run `jj new` to create an empty working copy on top of the conflicted change).
 
 - [ ] Selecting the **conflicted historical commit** in the log: conflicted file appears in the details panel with red (MERGED_WITH_CONFLICTS) status
-- [ ] Selecting the **conflicted historical commit**: "Resolve Conflicts…" is **not visible** in the details panel context menu (only working copy conflicts are resolvable)
-- [ ] Selecting the **working copy commit** (empty, inherits conflict): "Resolve Conflicts…" **is visible** in the details panel context menu and opens the merge dialog for the inherited conflicted files
+- [ ] Selecting the **conflicted historical commit**: "Resolve Conflicts… (edit this change first)" is **visible but disabled** in the details panel context menu (jj-idea-sm1s: resolution requires this commit to become the working copy first)
+- [ ] Selecting the **working copy commit** (empty, inherits conflict): "Resolve Conflicts…" **is visible and enabled** in the details panel context menu and opens the merge dialog for the inherited conflicted files
 
 #### Log row context menu
 
-- [ ] Right-clicking the **working copy entry** when conflicts exist: "Resolve Conflicts…" appears in the context menu
+- [ ] Right-clicking the **working copy entry** when conflicts exist: "Resolve Conflicts…" appears in the context menu, enabled
 - [ ] Right-clicking the **working copy entry** when no conflicts exist: "Resolve Conflicts…" is **not visible** (hidden, not just disabled)
-- [ ] Right-clicking a **non-working-copy entry** (even one with conflicts): "Resolve Conflicts…" is **not visible**
+- [ ] Right-clicking a **non-conflicted, non-working-copy entry**: "Resolve Conflicts…" is **not visible**
+- [ ] Right-clicking a **conflicted, non-working-copy entry** (jj-idea-sm1s — e.g. a merge commit, or a child that only *inherits* the conflict): "Resolve Conflicts… (edit this change first)" is **visible but disabled**, with a tooltip/description prompting the user to `jj edit` the change first
 - [ ] Invoking "Resolve Conflicts…" from the log row context menu opens the merge dialog with all conflicted files
+
+#### Inherited conflicts (jj-idea-sm1s)
+
+Extend the setup above: with the working copy on the conflicted commit, run `jj new` to create an empty child (the child now inherits the parent's unresolved conflict).
+
+- [ ] Selecting the **conflicted merge/parent commit** in the log: "Resolve Conflicts… (edit this change first)" is visible but disabled (it is no longer the working copy)
+- [ ] Selecting the **child commit** (working copy, inherits the conflict, empty diff of its own): "Resolve Conflicts…" is visible and **enabled**, and resolves the inherited conflict correctly
+- [ ] `jj edit` back onto the conflicted parent commit: it becomes the working copy and "Resolve Conflicts…" becomes enabled for it; the previously-child commit (now not the working copy) shows the disabled hint instead
 
 #### Multi-repo scoping
 

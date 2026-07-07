@@ -8,6 +8,7 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.change.resolveSelectedAvailability
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntry
@@ -29,8 +30,16 @@ class ResolveSelectedConflictsAction : DumbAwareAction(
     override fun update(e: AnActionEvent) {
         val hasConflicts = e.project?.possibleJujutsuVcs != null && conflictedFilesFromContext(e).isNotEmpty()
         val logEntry = e.logEntry
-        // In the log details pane, only enable resolution for the working copy entry
-        e.presentation.isEnabledAndVisible = hasConflicts && (logEntry == null || logEntry.isWorkingCopy)
+        val availability = resolveSelectedAvailability(
+            hasContextConflicts = hasConflicts,
+            isWorkingCopyContext = logEntry == null || logEntry.isWorkingCopy
+        )
+        e.presentation.isVisible = availability.visible
+        e.presentation.isEnabled = availability.enabled
+        if (availability.needsEditHint) {
+            e.presentation.text = JujutsuBundle.message("action.resolve.conflicts.needsEdit")
+            e.presentation.description = JujutsuBundle.message("action.resolve.conflicts.needsEdit.description")
+        }
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT

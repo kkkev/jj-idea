@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- "Resolve Conflicts…" now appears (though disabled, with a hint to edit the change first) for a conflicted commit that isn't the working copy — including a commit that only inherits its conflict from an ancestor merge. Previously the option was hidden entirely, so there was no way to discover that the change could be resolved.
+
 ## [0.7.12] - 2026-07-07
 
 ### Added
