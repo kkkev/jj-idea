@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.vcs.contentLocator
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
+import java.util.concurrent.CancellationException
 
 /**
  * Provides file annotations (blame) for Jujutsu files
@@ -94,7 +95,7 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
 
     override fun isAnnotationValid(rev: VcsFileRevision) = true
 
-    private fun annotateInternal(
+    internal fun annotateInternal(
         file: VirtualFile,
         revision: Revision,
         repo: JujutsuRepository
@@ -117,6 +118,14 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
             workingCopyChangeId = repo.workingCopy.id
         )
     } catch (e: VcsException) {
+        throw e
+    } catch (e: ProcessCanceledException) {
+        throw e
+    } catch (e: CancellationException) {
+        // ContainerDisposedException (raised when the working copy / state model is queried while the
+        // project is being disposed on window close) is a CancellationException, not a
+        // ProcessCanceledException. Rethrow control-flow exceptions rather than logging them —
+        // Logger.error() rethrows them anyway and reports a spurious error in the process.
         throw e
     } catch (e: Exception) {
         log.error("Error during annotation", e)
