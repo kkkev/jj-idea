@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The plugin no longer bundles its own copy of the Kotlin standard library, reducing plugin size since the IDE already provides it.
+
 ## [0.7.13] - 2026-07-07
 
 ### Fixed
