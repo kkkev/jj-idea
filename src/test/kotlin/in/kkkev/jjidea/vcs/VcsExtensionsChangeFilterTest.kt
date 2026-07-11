@@ -4,7 +4,10 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.changes.CurrentContentRevision
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -12,6 +15,7 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /**
@@ -76,5 +80,56 @@ class VcsExtensionsChangeFilterTest {
     @Test
     fun `empty input yields empty output`() {
         emptyList<Change>().filterInJujutsuRepo(project) shouldBe emptyList()
+    }
+
+    // ── isJujutsuChange ───────────────────────────────────────────────────────
+    // Regression coverage for GitHub #50 / jj-idea-mdi4: AnActionEvent.changes must drop
+    // foreign-VCS changes (e.g. Git4Idea, or an unrelated VCS backend such as Piper) instead
+    // of throwing when FileChange.from -> .locator can't interpret their revision number.
+
+    @Nested
+    inner class `isJujutsuChange` {
+        private fun jujutsuRevision(path: String): ContentRevision = mockk {
+            every { file } returns LocalFilePath(path, false)
+            every { revisionNumber } returns ChangeIdRevisionNumber(ChangeId("abc123abc123", "abc1"))
+        }
+
+        private fun foreignRevision(path: String): ContentRevision = mockk {
+            every { file } returns LocalFilePath(path, false)
+            every { revisionNumber } returns mockk() // not a JujutsuRevisionNumber
+        }
+
+        private fun workingCopyRevision(path: String): ContentRevision =
+            CurrentContentRevision(LocalFilePath(path, false))
+
+        @Test
+        fun `true when after revision is a Jujutsu revision`() {
+            Change(null, jujutsuRevision("a.kt")).isJujutsuChange shouldBe true
+        }
+
+        @Test
+        fun `true when after revision is the current (working copy) content revision`() {
+            Change(null, workingCopyRevision("a.kt")).isJujutsuChange shouldBe true
+        }
+
+        @Test
+        fun `false when after revision is a foreign VCS revision`() {
+            Change(null, foreignRevision("a.kt")).isJujutsuChange shouldBe false
+        }
+
+        @Test
+        fun `false when before revision is a foreign VCS revision (delete)`() {
+            Change(foreignRevision("a.kt"), null).isJujutsuChange shouldBe false
+        }
+
+        @Test
+        fun `false when either side is foreign, even if the other is Jujutsu (rename across VCS boundary)`() {
+            Change(foreignRevision("old.kt"), jujutsuRevision("new.kt")).isJujutsuChange shouldBe false
+        }
+
+        @Test
+        fun `true when both before and after are Jujutsu revisions`() {
+            Change(jujutsuRevision("old.kt"), jujutsuRevision("new.kt")).isJujutsuChange shouldBe true
+        }
     }
 }

@@ -112,3 +112,23 @@ val ContentRevision.locator: ContentLocator
             else -> throw VcsException("Not a Jujutsu revision: $this")
         }
     }
+
+/**
+ * True when [locator] can interpret this revision without throwing: either its revision
+ * number is a [JujutsuRevisionNumber], or it's the platform's [CurrentContentRevision]
+ * (mapped to the working copy). A foreign-VCS revision (e.g. Git4Idea in a colocated repo,
+ * or an unrelated VCS backend such as Piper) is neither.
+ */
+val ContentRevision.isJujutsuRevision: Boolean
+    get() = revisionNumber is JujutsuRevisionNumber || this is CurrentContentRevision
+
+/**
+ * True when every present revision (before/after) of this change is interpretable as a
+ * Jujutsu change — see [ContentRevision.isJujutsuRevision]. Use to filter a VCS-agnostic
+ * change selection (e.g. [com.intellij.openapi.vcs.VcsDataKeys.SELECTED_CHANGES], which
+ * aggregates every registered VCS) before handing it to [in.kkkev.jjidea.jj.FileChange.from],
+ * which otherwise throws `Not a Jujutsu revision` on a foreign change (GitHub #50 /
+ * jj-idea-mdi4).
+ */
+val Change.isJujutsuChange: Boolean
+    get() = listOfNotNull(beforeRevision, afterRevision).all { it.isJujutsuRevision }

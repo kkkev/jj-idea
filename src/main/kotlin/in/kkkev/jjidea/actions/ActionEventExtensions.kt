@@ -15,6 +15,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
+import `in`.kkkev.jjidea.vcs.isJujutsuChange
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import `in`.kkkev.jjidea.vcs.possibleLogEntryFor
 import `in`.kkkev.jjidea.vcs.possibleVirtualFileFor
@@ -76,12 +77,19 @@ val AnActionEvent.restorePaths: List<FilePath>
 
 val AnActionEvent.editor: Editor? get() = this.getData(CommonDataKeys.EDITOR)
 
+/**
+ * Selected changes as jj-domain [FileChange]s. The IDE's change selection is a
+ * VCS-agnostic aggregate, so changes owned by another VCS (Git4Idea in a colocated repo,
+ * or a foreign backend such as Piper) can appear here. Those are dropped via
+ * [isJujutsuChange] before conversion, because [FileChange.from] can only interpret jj
+ * revisions and throws `Not a Jujutsu revision` on anything else (GitHub #50 / jj-idea-mdi4).
+ */
 val AnActionEvent.changes: List<FileChange>
     get() = (
         (this.getData(VcsDataKeys.SELECTED_CHANGES) ?: this.getData(VcsDataKeys.CHANGES))
             ?.toList()
             ?: emptyList()
-    ).map { FileChange.from(it) }
+    ).filter { it.isJujutsuChange }.map { FileChange.from(it) }
 
 val AnActionEvent.fileRevision get() = this.getData(VcsDataKeys.VCS_FILE_REVISION) as? JujutsuFileRevision
 

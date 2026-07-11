@@ -1,11 +1,17 @@
 package `in`.kkkev.jjidea.actions
 
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.LocalFilePath
+import com.intellij.openapi.vcs.VcsDataKeys
+import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.FileChange
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.possibleVirtualFileFor
 import io.kotest.matchers.shouldBe
@@ -147,6 +153,63 @@ class ActionEventExtensionsTest {
 
             val result = project.jujutsuFilesFor(listOf(vf), emptyList(), null)
             result shouldBe emptyList()
+        }
+    }
+
+    // ── AnActionEvent.changes ────────────────────────────────────────────────
+    // Regression coverage for GitHub #50 / jj-idea-mdi4: a foreign-VCS change (e.g. Git4Idea
+    // in a colocated repo, or an unrelated VCS backend such as Piper) selected alongside jj
+    // changes must be dropped, not converted — converting it throws `Not a Jujutsu revision`.
+
+    @Nested
+    inner class `changes` {
+        private val event = mockk<AnActionEvent>()
+
+        private fun jujutsuChange(path: String): Change {
+            val revision = mockk<ContentRevision> {
+                every { file } returns LocalFilePath(path, false)
+                every { revisionNumber } returns ChangeIdRevisionNumber(ChangeId("abc123abc123", "abc1"))
+            }
+            return Change(null, revision)
+        }
+
+        private fun workingCopyChange(path: String) =
+            Change(null, CurrentContentRevision(LocalFilePath(path, false)))
+
+        private fun foreignChange(path: String): Change {
+            val revision = mockk<ContentRevision> {
+                every { file } returns LocalFilePath(path, false)
+                every { revisionNumber } returns mockk() // not a JujutsuRevisionNumber
+            }
+            return Change(null, revision)
+        }
+
+        @Test
+        fun `converts a Jujutsu change without throwing`() {
+            every { event.getData(VcsDataKeys.SELECTED_CHANGES) } returns arrayOf(jujutsuChange("a.kt"))
+            every { event.getData(VcsDataKeys.CHANGES) } returns null
+
+            event.changes.map { it.filePath.name } shouldBe listOf("a.kt")
+        }
+
+        @Test
+        fun `drops a foreign-VCS change instead of throwing`() {
+            every { event.getData(VcsDataKeys.SELECTED_CHANGES) } returns arrayOf(foreignChange("Piper.kt"))
+            every { event.getData(VcsDataKeys.CHANGES) } returns null
+
+            event.changes shouldBe emptyList()
+        }
+
+        @Test
+        fun `keeps Jujutsu and working-copy changes while dropping a foreign-VCS change in the same selection`() {
+            every { event.getData(VcsDataKeys.SELECTED_CHANGES) } returns arrayOf(
+                jujutsuChange("a.kt"),
+                foreignChange("Piper.kt"),
+                workingCopyChange("b.kt")
+            )
+            every { event.getData(VcsDataKeys.CHANGES) } returns null
+
+            event.changes.map { it.filePath.name } shouldBe listOf("a.kt", "b.kt")
         }
     }
 }

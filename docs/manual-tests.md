@@ -367,6 +367,11 @@ Verify these keyboard shortcuts work in the log view:
   Git4Idea), the Working Copy panel's changed-files tree shows only jj's changes — no
   Git-only changes appear. Also verify "Resolve Conflicts…" (both the toolbar/menu action
   and the per-file context menu action) only offers jj-tracked conflicted files
+- [ ] jj-idea-mdi4: in a repository mapped to a non-jj VCS (e.g. Git4Idea, colocated or
+  otherwise), select a change belonging to that other VCS in the Changes view and press F4
+  / open the context menu — no `VcsException: Not a Jujutsu revision` appears in the IDE
+  log, and jj's file-change actions (Open, Compare, Restore, etc.) simply don't offer that
+  change
 
 ### Git Push Dialog
 
