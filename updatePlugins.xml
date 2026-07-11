@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.13/jj-idea-0.7.13.zip" version="0.7.13">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.14/jj-idea-0.7.14.zip" version="0.7.14">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,12 +23,13 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.13</h3>
+      <h3>0.7.14</h3>
       
 <h4>Fixed</h4>
-<li>"Resolve Conflicts…" now appears (though disabled, with a hint to edit the change first) for a conflicted commit that isn't the working copy — including a commit that only inherits its conflict from an ancestor merge. Previously the option was hidden entirely, so there was no way to discover that the change could be resolved.</li>
-<li>The Working Copy tool window, and the "Resolve Conflicts…" actions, no longer show changes from Git in a repository that uses both Jujutsu and Git.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.13">full release notes</a> for details.</p>
+<li>The plugin no longer bundles its own copy of the Kotlin standard library, reducing plugin size since the IDE already provides it. ([#41](https://github.com/kkkev/jj-idea/issues/41))</li>
+<li>Annotate (blame) no longer logs a spurious error when the project window is closed while an annotation is loading. ([#45](https://github.com/kkkev/jj-idea/issues/45))</li>
+<li>File-change actions (Open, Compare, Restore, etc.) no longer throw an error when a change from another VCS (e.g. Git in a colocated repository, or an unrelated VCS backend) is selected alongside or instead of a Jujutsu change. ([#50](https://github.com/kkkev/jj-idea/issues/50))</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.14">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

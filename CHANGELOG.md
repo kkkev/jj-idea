@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.14] - 2026-07-11
+
 ### Fixed
 - The plugin no longer bundles its own copy of the Kotlin standard library, reducing plugin size since the IDE already provides it. ([#41](https://github.com/kkkev/jj-idea/issues/41))
 - Annotate (blame) no longer logs a spurious error when the project window is closed while an annotation is loading. ([#45](https://github.com/kkkev/jj-idea/issues/45))
@@ -649,7 +651,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.13...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.14...HEAD
+[0.7.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.14
 [0.7.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.13
 [0.7.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.12
 [0.7.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.11
