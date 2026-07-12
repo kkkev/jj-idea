@@ -394,4 +394,17 @@ class LogTemplateTest {
         item!!.bookmark.conflict shouldBe true
         item.id shouldBe ChangeId("qpvuntsm", "q", null)
     }
+
+    @Test
+    fun `bookmarkListTemplate parses remote-only untracked bookmark`() {
+        // name arrives pre-formatted as "name@remote" by nameWithRemote(), as jj's `--all-remotes`
+        // output does for a bookmark with no local counterpart.
+        val fields = listOf("true", "feature@origin", "false", "qpvuntsm~q~", "false")
+        val item = bookmarkListTemplate.take(fields.iterator())
+
+        item!!.bookmark.name shouldBe BookmarkName("feature@origin")
+        item.bookmark.isRemote shouldBe true
+        item.bookmark.deleted shouldBe false
+        item.id shouldBe ChangeId("qpvuntsm", "q", null)
+    }
 }

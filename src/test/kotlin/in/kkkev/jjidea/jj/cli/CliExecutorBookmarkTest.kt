@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj.cli
 
 import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.Remote
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
@@ -65,6 +66,19 @@ class CliExecutorBookmarkTest {
         fun `untrack remote bookmark`() {
             bookmarkUntrackArgs(BookmarkName("main@origin")) shouldBe
                 listOf("bookmark", "untrack", "main", "--remote", "origin")
+        }
+    }
+
+    @Nested
+    inner class `bookmark list` {
+        @Test
+        fun `list defaults to all remotes, including untracked`() {
+            bookmarkListArgs() shouldBe listOf("bookmark", "list", "--all-remotes")
+        }
+
+        @Test
+        fun `list scoped to a specific remote omits all-remotes`() {
+            bookmarkListArgs(remote = Remote("origin")) shouldBe listOf("bookmark", "list", "--remote", "origin")
         }
     }
 

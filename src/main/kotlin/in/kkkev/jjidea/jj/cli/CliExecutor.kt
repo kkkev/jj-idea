@@ -30,6 +30,36 @@ internal fun bookmarkTrackArgs(name: BookmarkName) =
 internal fun bookmarkUntrackArgs(name: BookmarkName) =
     listOf("bookmark", "untrack", name.localName, "--remote", name.remote)
 
+/**
+ * Build the argument list for `jj bookmark list`. Always includes untracked remote-only
+ * bookmarks (`--all-remotes`) unless [remote] scopes the listing to one specific remote — `jj`
+ * rejects passing both flags together.
+ */
+internal fun bookmarkListArgs(
+    template: String? = null,
+    remote: Remote? = null,
+    tracked: Boolean = false,
+    revision: Revision? = null
+): List<String> = buildList {
+    add("bookmark")
+    add("list")
+    if (tracked) add("--tracked")
+    if (remote != null) {
+        add("--remote")
+        add(remote.name)
+    } else {
+        add("--all-remotes")
+    }
+    if (revision != null) {
+        add("-r")
+        add("::$revision")
+    }
+    if (template != null) {
+        add("-T")
+        add(template)
+    }
+}
+
 internal fun bookmarkSetArgs(name: BookmarkName, revision: Revision = WorkingCopy, allowBackwards: Boolean = false) =
     buildList {
         addAll(listOf("bookmark", "set", name.toString(), "-r", revision.toString()))
@@ -337,23 +367,7 @@ class CliExecutor(
         remote: Remote?,
         tracked: Boolean,
         revision: Revision?
-    ): CommandExecutor.CommandResult {
-        val args = mutableListOf("bookmark", "list")
-        if (tracked) args.add("--tracked")
-        if (remote != null) {
-            args.add("--remote")
-            args.add(remote.name)
-        }
-        if (revision != null) {
-            args.add("-r")
-            args.add("::$revision")
-        }
-        if (template != null) {
-            args.add("-T")
-            args.add(template)
-        }
-        return execute(root, args)
-    }
+    ) = execute(root, bookmarkListArgs(template, remote, tracked, revision))
 
     override fun bookmarkCreate(name: BookmarkName, revision: Revision) =
         execute(root, bookmarkCreateArgs(name, revision))

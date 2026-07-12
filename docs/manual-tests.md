@@ -268,6 +268,19 @@ and the `release-*` bookmarks/tags sit deep in history, and `main`'s ancestry is
 - [ ] Dropdown lists **all** local bookmarks (with the gold bookmark icon, narrower than the tag icon), not only those on loaded log rows
 - [ ] Dropdown lists **all** tags (with the green tag icon), including tags beyond the log limit
 - [ ] Bookmark and tag icons are visibly distinct from each other and from the "@" working-copy icon, and colored to match the bookmark/tag colors used in the log table
+
+#### Remote-only bookmarks (jj-idea-iadu)
+
+Clone a repo and leave at least one remote bookmark **untracked** (e.g. `jj git clone`, then
+push a bookmark from another clone without running `jj bookmark track` in this one —
+`jj bookmark list --all-remotes` in the terminal should show it as untracked).
+
+- [ ] Dropdown lists the untracked remote bookmark as `name@remote`, with an icon visibly
+      distinct from local bookmarks (plain vs. filled bookmark icon)
+- [ ] A local bookmark whose remote is synced (tracked, same target) appears only **once**, as
+      the plain local name — no duplicate `name@remote` row
+- [ ] Selecting the remote-only bookmark filters the log to that commit and its ancestors,
+      expanding the log window first if the target is outside the current limit
 - [ ] The currently-selected reference shows a checkmark next to its icon; no other row does
 - [ ] Hovering over rows or moving the keyboard selection up/down does **not** move the checkmark — it stays on the actually-selected reference
 - [ ] Creating/deleting a bookmark or tag in the terminal updates the dropdown after the auto-refresh (~300 ms) — without clicking Refresh or saving a file (external jj ops are detected via the op-heads watch)

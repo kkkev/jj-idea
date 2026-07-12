@@ -24,6 +24,22 @@ private val CHECK_ICON = AllIcons.Actions.Checked
 private val EMPTY_CHECK_ICON = EmptyIcon.create(CHECK_ICON.iconWidth, CHECK_ICON.iconHeight)
 
 /**
+ * Reduces a flat, possibly cross-repo list of bookmarks to the set of names selectable in the
+ * References filter, mapped to whether each is remote-only (no local counterpart). Deleted
+ * bookmarks are excluded. Bookmarks are grouped by [BookmarkGroup.localName] first so a remote
+ * that is merely synced with its local counterpart (e.g. `main` + `main@origin` pointing at the
+ * same target) collapses into a single `main` entry instead of showing twice.
+ */
+internal fun selectableBookmarkNames(bookmarks: List<Bookmark>): Map<String, Boolean> =
+    bookmarks.filterNot { it.deleted }.grouped().flatMap { group ->
+        if (group.local != null) {
+            listOf(group.localName to false)
+        } else {
+            group.remotes.map { it.name.name to true }
+        }
+    }.toMap()
+
+/**
  * Filter component for references (bookmarks, tags, and @).
  * When a reference is selected, includes all parent commits of that reference.
  * Out-of-limit references trigger a context-window expansion (same as navigate-to-out-of-limit).
@@ -40,7 +56,9 @@ class JujutsuReferenceFilterComponent(
 
     private var selectedReference: SelectedRef? = null
 
-    private var allBookmarkNames: Set<String> = emptySet()
+    // Bookmark ref name -> BOOKMARK (local) or REMOTE_BOOKMARK (remote-only, no local counterpart).
+    // Synced tracked-remote counterparts of a local bookmark are collapsed into the local entry.
+    private var bookmarkRefs: Map<String, ReferenceType> = emptyMap()
     private var allTagNames: Set<String> = emptySet()
 
     // Prevents re-triggering loadExpanding while one is already in flight.
@@ -58,7 +76,10 @@ class JujutsuReferenceFilterComponent(
     }
 
     private fun updateFromReferences(references: Map<JujutsuRepository, RepositoryReferences>) {
-        allBookmarkNames = references.values.flatMap { it.bookmarks }.map { it.bookmark.name.name }.toSet()
+        val bookmarks = references.values.flatMap { it.bookmarks }.map { it.bookmark }
+        bookmarkRefs = selectableBookmarkNames(bookmarks).mapValues { (_, remoteOnly) ->
+            if (remoteOnly) ReferenceType.REMOTE_BOOKMARK else ReferenceType.BOOKMARK
+        }
         allTagNames = references.values.flatMap { it.tags }.map { it.tag.name }.toSet()
         repaint()
     }
@@ -89,7 +110,7 @@ class JujutsuReferenceFilterComponent(
         val type = when {
             name == "@" -> ReferenceType.WORKING_COPY
             name in allTagNames -> ReferenceType.TAG
-            else -> ReferenceType.BOOKMARK
+            else -> bookmarkRefs[name] ?: ReferenceType.BOOKMARK
         }
         selectedReference = SelectedRef(name, type)
         // Refresh the button icon and label without calling notifyFilterChanged(), because at init
@@ -105,7 +126,7 @@ class JujutsuReferenceFilterComponent(
         if (references.workingCopy != null) {
             group.add(SelectReferenceAction(WorkingCopy.REF, ReferenceType.WORKING_COPY))
         }
-        references.bookmarks.forEach { group.add(SelectReferenceAction(it, ReferenceType.BOOKMARK)) }
+        references.bookmarks.forEach { (name, type) -> group.add(SelectReferenceAction(name, type)) }
         references.tags.forEach { group.add(SelectReferenceAction(it, ReferenceType.TAG)) }
 
         if (selectedReference != null) {
@@ -154,7 +175,7 @@ class JujutsuReferenceFilterComponent(
         allEntries.forEach { if (it.isWorkingCopy) workingCopy = WorkingCopy.REF }
         return References(
             workingCopy = workingCopy,
-            bookmarks = allBookmarkNames.sorted(),
+            bookmarks = bookmarkRefs.entries.sortedBy { it.key }.map { it.key to it.value },
             tags = allTagNames.sorted()
         )
     }
@@ -167,7 +188,8 @@ class JujutsuReferenceFilterComponent(
         val referencedEntry = allEntries.find { entry ->
             when (ref.type) {
                 ReferenceType.WORKING_COPY -> entry.isWorkingCopy
-                ReferenceType.BOOKMARK -> entry.bookmarks.any { it.name.name == ref.name }
+                ReferenceType.BOOKMARK, ReferenceType.REMOTE_BOOKMARK ->
+                    entry.bookmarks.any { it.name.name == ref.name }
                 ReferenceType.TAG -> entry.tags.any { it.name == ref.name }
             }
         } ?: return null
@@ -218,14 +240,22 @@ class JujutsuReferenceFilterComponent(
         override fun actionPerformed(e: AnActionEvent) = doResetFilter()
     }
 
-    private data class References(val workingCopy: String?, val bookmarks: List<String>, val tags: List<String>)
+    private data class References(
+        val workingCopy: String?,
+        val bookmarks: List<Pair<String, ReferenceType>>,
+        val tags: List<String>
+    )
 
     // BookmarkAction (not the narrower inline-text Bookmark icon) is already sized for AnAction
     // icon slots — its viewBox reserves headroom so the glyph renders centered in a true 16x16
     // box instead of being stretched to fill it, matching JujutsuIcons.Tag and AllIcons.Vcs.Branch.
+    // REMOTE_BOOKMARK uses the plain (untracked-style) icon vs. BOOKMARK's filled icon, mirroring
+    // the tracked/untracked distinction TextCanvas.appendBookmarkChip draws in the log itself —
+    // the "@remote" suffix in the label spells it out further.
     private enum class ReferenceType(val icon: Icon) {
         WORKING_COPY(AllIcons.Vcs.Branch),
-        BOOKMARK(JujutsuIcons.BookmarkAction.accented(JujutsuColors.BOOKMARK)),
+        BOOKMARK(JujutsuIcons.BookmarkTrackedAction.accented(JujutsuColors.BOOKMARK)),
+        REMOTE_BOOKMARK(JujutsuIcons.BookmarkAction.accented(JujutsuColors.BOOKMARK)),
         TAG(JujutsuIcons.Tag.accented(JujutsuColors.TAG))
     }
 

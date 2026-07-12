@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.contract
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.jj.cli.bookmarkListArgs
 
 /**
  * Adapts [JjStub] to the [CommandExecutor] interface for integration tests.
@@ -66,26 +67,13 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         )
     )
 
-    override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean, revision: Revision?) = toResult(
-        stub.run(
-            *buildList {
-                add("bookmark")
-                add("list")
-                if (tracked) add("--tracked")
-                if (remote != null) {
-                    add("--remote")
-                    add(remote.name)
-                }
-                if (revision != null) {
-                    add("-r")
-                    add("::$revision")
-                }
-                if (template != null) {
-                    add("-T")
-                    add(template)
-                }
-            }.toTypedArray()
-        )
+    override fun bookmarkList(
+        template: String?,
+        remote: Remote?,
+        tracked: Boolean,
+        revision: Revision?
+    ) = toResult(
+        stub.run(*bookmarkListArgs(template, remote, tracked, revision).toTypedArray())
     )
 
     override fun tagList(template: String?) = toResult(
