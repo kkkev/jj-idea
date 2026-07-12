@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.contract
 
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldMatch
@@ -72,6 +73,22 @@ abstract class DiffSummaryContractTest {
         result.stdout.trim().lines().forEach { line ->
             line shouldMatch Regex("[MADR] .+")
         }
+    }
+
+    @Test
+    fun `diff summary between two revisions shows changes across both`() {
+        jj.createFile("file.txt", "original")
+        jj.newChange()
+        jj.createFile("file.txt", "modified")
+        jj.createFile("added.txt", "new")
+
+        val result = jj.run("diff", "--summary", "--from", "@-", "--to", "@")
+        result.isSuccess shouldBe true
+
+        val lines = parseDiffLines(result.stdout)
+        lines shouldHaveSize 2
+        lines shouldContain DiffLine('M', "file.txt")
+        lines shouldContain DiffLine('A', "added.txt")
     }
 
     @Test

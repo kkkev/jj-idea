@@ -272,6 +272,49 @@ class LogServiceIntegrationTest {
     }
 
     @Nested
+    inner class GetFileChangesBetween {
+        @Test
+        fun `added file`() {
+            stub.createFile("existing.txt", "original")
+            stub.newChange()
+            stub.createFile("new.txt", "hello")
+
+            val parent = workingCopy.parentIds.first()
+            val changes = logService.getFileChangesBetween(parent, WorkingCopy).getOrThrow()
+
+            changes shouldHaveSize 1
+            changes[0].after?.filePath?.path shouldBe "new.txt"
+            changes[0].status shouldBe FileChange.Status.ADDED
+        }
+
+        @Test
+        fun `modified file`() {
+            stub.createFile("file.txt", "original")
+            stub.newChange()
+            stub.createFile("file.txt", "modified")
+
+            val parent = workingCopy.parentIds.first()
+            val changes = logService.getFileChangesBetween(parent, WorkingCopy).getOrThrow()
+
+            changes shouldHaveSize 1
+            changes[0].before?.filePath?.path shouldBe "file.txt"
+            changes[0].after?.filePath?.path shouldBe "file.txt"
+            changes[0].status shouldBe FileChange.Status.MODIFIED
+        }
+
+        @Test
+        fun `no changes returns empty list`() {
+            stub.createFile("file.txt", "content")
+            stub.newChange()
+
+            val parent = workingCopy.parentIds.first()
+            val changes = logService.getFileChangesBetween(parent, WorkingCopy).getOrThrow()
+
+            changes shouldHaveSize 0
+        }
+    }
+
+    @Nested
     inner class GetBookmarks {
         @Test
         fun `single bookmark`() {

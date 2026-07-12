@@ -51,6 +51,14 @@ interface LogService {
     fun getFileChanges(logEntry: LogEntry, filePath: FilePath? = null): Result<List<FileChange>>
 
     /**
+     * Get file changes between two arbitrary content locators (e.g. a commit and the working copy).
+     * @param from Content locator for the "before" side
+     * @param to Content locator for the "after" side
+     * @return List of file changes
+     */
+    fun getFileChangesBetween(from: ContentLocator, to: ContentLocator): Result<List<FileChange>>
+
+    /**
      * Get all bookmarks in the repository
      * @return List of bookmarks with their associated change IDs
      */

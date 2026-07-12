@@ -99,6 +99,37 @@ class JujutsuLogContextMenuActionsTest {
     }
 
     @Nested
+    inner class `Compare with working copy action availability` {
+        @Test
+        fun `working copy entry filtered out`() {
+            val entry = createEntry("abc123", isWorkingCopy = true)
+
+            val compareTarget = entry.takeIf { !it.isWorkingCopy }
+
+            compareTarget.shouldBeNull()
+        }
+
+        @Test
+        fun `non-working-copy entry passes through`() {
+            val entry = createEntry("abc123", isWorkingCopy = false)
+
+            val compareTarget = entry.takeIf { !it.isWorkingCopy }
+
+            compareTarget.shouldNotBeNull()
+            compareTarget.id.full shouldBe "abc123"
+        }
+
+        @Test
+        fun `immutable entry still passes through`() {
+            val entry = createEntry("abc123", isWorkingCopy = false, immutable = true)
+
+            val compareTarget = entry.takeIf { !it.isWorkingCopy }
+
+            compareTarget.shouldNotBeNull()
+        }
+    }
+
+    @Nested
     inner class `Edit action availability` {
         @Test
         fun `working copy entry filtered out`() {

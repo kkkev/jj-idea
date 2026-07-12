@@ -12,6 +12,7 @@ import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkToChangeAction
 import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
+import `in`.kkkev.jjidea.actions.change.compareWithWorkingCopyAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
 import `in`.kkkev.jjidea.actions.change.copyIdAction
 import `in`.kkkev.jjidea.actions.change.describeAction
@@ -48,9 +49,11 @@ object JujutsuLogContextMenuActions {
         entries: List<LogEntry>
     ): DefaultActionGroup = DefaultActionGroup().apply {
         ActionManager.getInstance().getAction("Jujutsu.ShowChangesDiff")?.let { add(it) }
-        addSeparator()
 
         val entry = entries.singleOrNull()
+        add(compareWithWorkingCopyAction(project, entry?.takeIf { !it.isWorkingCopy }))
+        addSeparator()
+
         entry?.run { add(copyIdAction(id)) }
         add(copyDescriptionAction(entry?.description?.actual))
         addSeparator()

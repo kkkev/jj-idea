@@ -235,6 +235,11 @@ class CliExecutor(
         listOfNotNull("diff", "--summary", "-r", revision, filePath?.relativeTo(root!!))
     )
 
+    override fun diffSummaryBetween(from: ContentLocator, to: ContentLocator, filePath: FilePath?) = execute(
+        root,
+        listOfNotNull("diff", "--summary", "--from", from, "--to", to, filePath?.relativeTo(root!!))
+    )
+
     override fun show(filePath: FilePath, revision: Revision) =
         execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root!!)))
 

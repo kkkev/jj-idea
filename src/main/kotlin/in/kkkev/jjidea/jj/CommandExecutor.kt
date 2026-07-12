@@ -49,6 +49,14 @@ interface CommandExecutor {
     fun diffSummary(revision: Revision, filePath: FilePath? = null): CommandResult
 
     /**
+     * Get summary of changes between two revisions/locators (`jj diff --summary --from --to`).
+     * @param from Content locator for the "before" side (e.g. a commit)
+     * @param to Content locator for the "after" side (e.g. the working copy)
+     * @return Summary of file changes
+     */
+    fun diffSummaryBetween(from: ContentLocator, to: ContentLocator, filePath: FilePath? = null): CommandResult
+
+    /**
      * Get the content of a file at a specific revision
      * @param filePath Path relative to root
      * @param revision Revision (e.g., "@", "@-", commit hash)

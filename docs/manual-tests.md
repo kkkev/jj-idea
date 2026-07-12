@@ -100,6 +100,16 @@ Use this checklist:
 - [ ] **Describe** action opens dialog and updates description
 - [ ] **Abandon** action removes change after confirmation
 
+#### Compare with Working Copy (jj-idea-a6cz)
+
+- [ ] Right-clicking a non-working-copy commit shows **Compare with Working Copy**
+- [ ] Right-clicking the working-copy entry: **Compare with Working Copy** is **not visible**
+- [ ] Invoking it on a commit with differences from `@` opens a single editor tab listing every changed file (added/modified/deleted/renamed all included)
+- [ ] The right (working-copy) side of the diff is editable, and edits are written through to the real file on disk
+- [ ] The left (commit) side is read-only
+- [ ] Next/Previous Difference navigates across all files in the tab
+- [ ] Invoking it on a commit identical to `@` shows a "No Differences" notification instead of an empty tab
+
 ### Squash Into...
 
 #### Test setup

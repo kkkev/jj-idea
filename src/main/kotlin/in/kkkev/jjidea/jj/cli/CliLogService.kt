@@ -147,13 +147,29 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         }
     }
 
+    override fun getFileChangesBetween(from: ContentLocator, to: ContentLocator): Result<List<FileChange>> {
+        log.debug("Getting file changes between: $from and $to")
+
+        val result = executor.diffSummaryBetween(from, to)
+
+        return if (result.isSuccess) {
+            toResult("Failed to parse file changes") {
+                parseFileChanges(result.stdout, afterContentLocator = to, beforeContentLocator = from).also {
+                    log.debug("Parsed ${it.size} file changes")
+                }
+            }
+        } else {
+            Result.failure(Exception("Diff summary command failed: ${result.stderr}"))
+        }
+    }
+
     /**
      * Parse diff summary output.
      * Format: "M path/to/file" or "A path/to/file" or "D path/to/file" or "R prefix{old => new}suffix"
      */
     private fun parseFileChanges(
         output: String,
-        afterChangeId: ChangeId,
+        afterContentLocator: ContentLocator,
         beforeContentLocator: ContentLocator
     ): List<FileChange> {
         val trimmed = output.trim()
@@ -170,8 +186,11 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             val filePath = repo.directory.getChildPath(changeFileSpec)
 
             when (statusChar) {
-                'M' -> FileChange.Modified(filePath.fileAt(beforeContentLocator), filePath.fileAt(afterChangeId))
-                'A' -> FileChange.Added(filePath.fileAt(afterChangeId))
+                'M' -> FileChange.Modified(
+                    filePath.fileAt(beforeContentLocator),
+                    filePath.fileAt(afterContentLocator)
+                )
+                'A' -> FileChange.Added(filePath.fileAt(afterContentLocator))
                 'D' -> FileChange.Deleted(filePath.fileAt(beforeContentLocator))
                 'R', 'C' -> {
                     val (oldPath, newPath) = parseRenameSpec(changeFileSpec)
@@ -184,7 +203,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
                     FileChange.Renamed(
                         repo.directory.getChildPath(oldPath).fileAt(beforeContentLocator),
-                        repo.directory.getChildPath(newPath).fileAt(afterChangeId)
+                        repo.directory.getChildPath(newPath).fileAt(afterContentLocator)
                     )
                 }
 

@@ -52,6 +52,20 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         )
     )
 
+    override fun diffSummaryBetween(from: ContentLocator, to: ContentLocator, filePath: FilePath?) = toResult(
+        stub.run(
+            *listOfNotNull(
+                "diff",
+                "--summary",
+                "--from",
+                from.toString(),
+                "--to",
+                to.toString(),
+                filePath?.path
+            ).toTypedArray()
+        )
+    )
+
     override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean, revision: Revision?) = toResult(
         stub.run(
             *buildList {

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- "Compare with Working Copy" in the log's right-click menu diffs every file that differs between the selected commit and your working copy, in one editor tab with the working-copy side editable — handy for reviewing everything since a target commit and editing it directly for a final `jj absorb`. ([#40](https://github.com/kkkev/jj-idea/issues/40))
+
 ## [0.7.14] - 2026-07-11
 
 ### Fixed
