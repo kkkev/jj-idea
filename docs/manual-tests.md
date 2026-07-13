@@ -25,6 +25,12 @@ Use this checklist:
 - [ ] Home/End key navigation
 - [ ] Selection persists after filtering (if entry still visible)
 - [ ] Selection clears when filtered entry is hidden
+- [ ] On a narrow window with horizontal scroll active (scrolled right so later columns are
+      visible), selecting a commit (click, arrow keys, ref-chip click, a details-panel parent
+      link click, or a log refresh) does not reset horizontal scroll position (jj-idea-f27g)
+- [ ] Clicking a parent/change-id link in the commit details panel (or working copy panel)
+      selects that commit in the log and it stays selected (no flicker/deselect); if the
+      linked commit is beyond the log limit, the log expands to include it (jj-idea-f27g)
 
 ### Column Management
 

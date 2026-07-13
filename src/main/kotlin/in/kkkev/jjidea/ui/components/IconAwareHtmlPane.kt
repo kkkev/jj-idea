@@ -11,7 +11,8 @@ import com.intellij.util.io.URLUtil
 import com.intellij.util.ui.ExtendableHTMLViewFactory
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.common.accented
@@ -62,16 +63,16 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                 with(CHANGE_ID_URL_PARSER.matcher(url)) {
                     if (matches()) {
                         val path = URLUtil.unescapePercentSequences(group(1))
-                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
-                            .invalidate(ChangeId(group(2)))
+                        val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
+                        project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
                         return@addHyperlinkListener
                     }
                 }
                 with(REF_URL_PARSER.matcher(url)) {
                     if (matches()) {
                         val path = URLUtil.unescapePercentSequences(group(1))
-                        project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
-                            .invalidate(ChangeId(group(2)))
+                        val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
+                        project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
                     }
                 }
             }

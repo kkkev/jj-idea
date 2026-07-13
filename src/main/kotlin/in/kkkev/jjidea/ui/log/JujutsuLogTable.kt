@@ -28,6 +28,7 @@ import java.awt.Component
 import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.Point
+import java.awt.Rectangle
 import java.awt.event.*
 import javax.swing.JComponent
 import javax.swing.ListSelectionModel
@@ -423,6 +424,20 @@ class JujutsuLogTable(
     }
 
     /**
+     * Keep horizontal scroll position stable when the selection changes via mouse click or
+     * keyboard navigation. The base [javax.swing.JTable.changeSelection] scrolls the clicked/
+     * navigated cell fully into view, which snaps the viewport back to the left edge for the wide
+     * graph+description column (view column 0, x≈0). Re-assert the prior horizontal offset while
+     * keeping the vertical scroll `super` already performed.
+     */
+    override fun changeSelection(rowIndex: Int, columnIndex: Int, toggle: Boolean, extend: Boolean) {
+        val restoreX = visibleRect.x
+        super.changeSelection(rowIndex, columnIndex, toggle, extend)
+        val v = visibleRect
+        if (v.x != restoreX) scrollRectToVisible(Rectangle(restoreX, v.y, v.width, v.height))
+    }
+
+    /**
      * Select an entry in the table by repo and revision, scrolling it into view.
      * Matches by repo to ensure correct selection in multi-root.
      *
@@ -448,7 +463,7 @@ class JujutsuLogTable(
         } ?: return false
 
         setRowSelectionInterval(rowIndex, rowIndex)
-        scrollRectToVisible(getCellRect(rowIndex, 0, true))
+        scrollRectToVisible(rowRectPreservingHorizontalScroll(getCellRect(rowIndex, 0, true), visibleRect))
         log.info("Selected entry at row $rowIndex ($repo:$revision)")
         return true
     }
@@ -562,6 +577,14 @@ class JujutsuLogTable(
     override fun dispose() {
     }
 }
+
+/**
+ * Returns [rowRect] adjusted to keep the current horizontal viewport ([currentVisible]), so
+ * scrolling a selected row into view only moves vertically and does not reset the user's
+ * horizontal scroll position.
+ */
+internal fun rowRectPreservingHorizontalScroll(rowRect: Rectangle, currentVisible: Rectangle): Rectangle =
+    Rectangle(currentVisible.x, rowRect.y, currentVisible.width, rowRect.height)
 
 /**
  * Table model for Jujutsu commit log.

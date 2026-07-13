@@ -10,6 +10,7 @@ import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
+import java.awt.Rectangle
 
 /**
  * Tests for column functionality in JujutsuLogTable.
@@ -211,6 +212,26 @@ class JujutsuLogTableColumnTest {
 
         val value = model.getValueAt(0, JujutsuLogTableModel.COLUMN_DATE)
         value shouldBe null
+    }
+
+    @Test
+    fun `rowRectPreservingHorizontalScroll keeps horizontal viewport when scrolled right`() {
+        val currentVisible = Rectangle(300, 0, 200, 400)
+        val rowRect = Rectangle(0, 180, 120, 20)
+
+        val result = rowRectPreservingHorizontalScroll(rowRect, currentVisible)
+
+        result shouldBe Rectangle(300, 180, 200, 20)
+    }
+
+    @Test
+    fun `rowRectPreservingHorizontalScroll is a no-op when not scrolled horizontally`() {
+        val currentVisible = Rectangle(0, 0, 200, 400)
+        val rowRect = Rectangle(0, 180, 120, 20)
+
+        val result = rowRectPreservingHorizontalScroll(rowRect, currentVisible)
+
+        result shouldBe Rectangle(0, 180, 200, 20)
     }
 
     // Helper function to create test log entries
