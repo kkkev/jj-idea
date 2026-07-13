@@ -630,6 +630,67 @@ reads the cached set. A `IGNORE_REPORT_CAP` (50,000 entries) limits the number o
       fires once; "disable scanning" action disables the setting and the Ignored Files node
       becomes empty
 
+#### Tracked toggle (jj-idea-i9ol, GitHub #42)
+
+Right-click on selected files in Project view, editor, Working Copy panel, or a Commit view → a
+single **Tracked** checkbox item (wrapping `jj file track --include-ignored` / `jj file untrack`)
+appears when at least one selected file matches an ignore rule. Checked means jj currently tracks
+the file; unchecked means it doesn't; clicking flips it. Unlike an earlier build of this feature,
+there's no separate Track/Untrack pair and no text hint about which one might fail — tracked
+status is always determined reliably via `jj file list` (see
+`docs/jj-track-untrack-model.md`), never guessed. The item is hidden entirely on ordinary,
+non-ignored files (there's nothing meaningful to toggle there), on **any selection containing a
+folder** (no tri-state checkbox exists in IntelliJ's menu system, and folders are out of scope for
+this feature — see jj-idea-i9ol's design notes), and in the Commit details panel (historical,
+non-working-copy context — tracking only applies to the working copy).
+
+Tracked status is resolved via a small async cache (`JujutsuTrackedFilesService`) rather than a
+direct query, since `update()`/`isSelected()` run under a read action even on background threads
+and IntelliJ forbids blocking subprocess calls there. **The first time you right-click a
+previously-unseen file *without clicking the checkbox*, it may briefly show unchecked (a safe
+default) while the cache populates in the background (~300ms)** — right-clicking (or looking)
+again shortly after should show the accurate state. This is expected, not a bug. Once you actually
+**click** the checkbox, its state is written immediately and is authoritative from that point on —
+no such delay applies to a click.
+
+- [ ] Add a pattern to `.gitignore`, create a matching file that was never tracked. Right-click it
+      in Project view, Working Copy panel, and a Commit view → **Tracked** checkbox appears,
+      unchecked
+- [ ] Check it → the checkbox flips to **checked immediately and stays checked** (right-click the
+      same file again right after — still checked; this is the regression check for an earlier
+      build where the checkbox could silently revert because `isSelected()` re-read a
+      not-yet-updated cache). A brief progress indicator appears in the status bar while the
+      command runs, and a notification balloon confirms completion ("Track — 'foo.txt'"). The file
+      now actually appears in the working copy / `jj file list` (regression check: an even earlier
+      build's Track action silently no-op'd on ignored files because it was missing
+      `--include-ignored`); log refreshes
+- [ ] Uncheck it → checkbox flips to unchecked immediately; notification balloon reads
+      "Untrack — 'foo.txt'"; file becomes untracked again
+- [ ] Multi-select one already-tracked-and-ignored file plus one untracked-and-ignored file →
+      checkbox shows **unchecked** (mixed selection reads as "something left to track"); checking
+      it tracks only the untracked one (notification summarizes the count, e.g. "Track — 1 file"),
+      leaving the already-tracked one alone
+- [ ] Untrack (uncheck) a file, then immediately try unchecking an already-untracked one in the
+      same multi-select → the notification balloon's message includes jj's own
+      `Warning: No matching entries for paths: ...` text for the no-op member (regression check:
+      an earlier build silently swallowed this warning entirely)
+- [ ] Force a failure — e.g. manually remove a file from `.gitignore` so it's no longer ignored,
+      then try unchecking it anyway → a **non-blocking error notification** balloon appears (not a
+      modal dialog) showing jj's "not ignored" message, and the checkbox **reverts** to its true
+      (checked) state rather than staying on the failed change
+- [ ] Right-click a normal, non-ignored, tracked file (anywhere: Project view, editor, Working
+      Copy panel, Commit view) → **no Tracked checkbox appears at all**
+- [ ] Right-click a file in the **Commit details panel** (historical, non-working-copy context)
+      → no Tracked checkbox appears, even on an ignored file
+- [ ] Right-click a **directory** that itself matches an ignore rule (e.g. `build/`) → no Tracked
+      checkbox appears, in Project view and Working Copy panel alike. Also check a mixed selection
+      (one file + one directory) → checkbox likewise hidden (regression check: an earlier build
+      would have shown a permanently-inert checkbox for a directory selection)
+- [ ] Right-click an ignored file you've never interacted with before → confirm no
+      `Synchronous execution under ReadAction` (or similar) error appears in the IDE log
+      (Help → Show Log) — this was a real crash in an earlier build, caused by querying
+      `jj file list` directly inside the checkbox's `update()`/`isSelected()`
+
 ### Editors for Historical Versions
 - [ ] has title including change id ✅
 - [ ] has Jujutsu menu ✅

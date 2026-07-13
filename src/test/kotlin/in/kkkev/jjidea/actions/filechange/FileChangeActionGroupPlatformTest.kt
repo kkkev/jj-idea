@@ -32,7 +32,8 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
             "Jujutsu.SquashFiles",
-            "Jujutsu.SplitFiles"
+            "Jujutsu.SplitFiles",
+            "Jujutsu.TrackedToggle"
         )
         val missing = expected.filter { actionManager.getAction(it) == null }
         missing shouldBe emptyList()
@@ -52,7 +53,8 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
             "Jujutsu.SquashFiles",
-            "Jujutsu.SplitFiles"
+            "Jujutsu.SplitFiles",
+            "Jujutsu.TrackedToggle"
         )
     }
 
@@ -87,11 +89,19 @@ class FileChangeActionGroupPlatformTest {
     }
 
     @Test
-    fun `SquashFiles and SplitFiles appear in the last block`() {
+    fun `SquashFiles and SplitFiles appear in the second-to-last block`() {
         val group = fileChangeActionGroup()
         val children = group.getChildren(null).toList()
         val blocks = splitBySeparators(children)
-        blocks.last().actionIds() shouldContainAll listOf("Jujutsu.SquashFiles", "Jujutsu.SplitFiles")
+        blocks[blocks.size - 2].actionIds() shouldContainAll listOf("Jujutsu.SquashFiles", "Jujutsu.SplitFiles")
+    }
+
+    @Test
+    fun `TrackedToggle appears in the last block`() {
+        val group = fileChangeActionGroup()
+        val children = group.getChildren(null).toList()
+        val blocks = splitBySeparators(children)
+        blocks.last().actionIds() shouldContainAll listOf("Jujutsu.TrackedToggle")
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

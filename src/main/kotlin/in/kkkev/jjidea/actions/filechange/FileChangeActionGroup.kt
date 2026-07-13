@@ -18,6 +18,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * - Restore (Jujutsu.RestoreFile) - visible in working copy context
  * - Restore to This (Jujutsu.RestoreToChange) - visible in historical context
  * - Resolve Conflicts (Jujutsu.ResolveSelectedConflicts) - visible when selection contains conflicted files
+ * - Tracked toggle (Jujutsu.TrackedToggle) - visible in working copy context on predicted-ignored files
  *
  * Actions self-filter their visibility based on the data context
  * (specifically [in.kkkev.jjidea.actions.JujutsuDataKeys.LOG_ENTRY]).
@@ -52,6 +53,11 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     actionManager.getAction("Jujutsu.SquashFiles")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.SquashIntoFiles")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.SplitFiles")?.let { group.add(it) }
+
+    group.addSeparator()
+
+    // Tracked toggle — self-filters (hidden outside working-copy context / when not predicted-ignored)
+    actionManager.getAction("Jujutsu.TrackedToggle")?.let { group.add(it) }
 
     return group
 }

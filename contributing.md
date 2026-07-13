@@ -93,6 +93,22 @@ keymap-bound and `mouseClicked` only handles link clicks — so jj-idea-th9h rou
 double-click through the same keymap-bound action as Enter (default: Show Diff) rather
 than adding a bespoke "double-click behaviour" setting.
 
+**Action-availability hints go in the text, not the icon (tenet)** — When an action
+might not succeed for a reason the plugin can only *predict* (not guarantee), never
+hide, disable, or re-icon it based on that prediction alone — jj (or whatever the
+plugin fronts) is the actual authority, and a wrong prediction that blocks the action is
+a silent dead end. Instead, append a short parenthetical to the action's **text** (and
+update its tooltip), leaving the icon and enabled/visible state untouched:
+`"Untrack (may not be ignored)"`. This keeps the action discoverable, mirrors how the
+platform's own disabled-but-hinted actions read, and avoids the "this looks broken"
+alarm a warning icon creates for what's usually a correct guess.
+
+*Example:* jj-idea-i9ol's "Untrack" action can't fully verify jj's own ignore-status
+without asking jj itself, so an uncertain prediction changes its text to `"Untrack (may
+not be ignored)"` rather than swapping to a warning icon or hiding/disabling the item —
+mirroring the existing `action.resolve.conflicts.needsEdit` pattern (`"Resolve
+Conflicts…"` → `"Resolve Conflicts… (edit this change first)"`).
+
 **1. Log parsing with null-byte separator** — `jj log` templates use `\0` as the field
 separator (descriptions can contain newlines/special chars) and `++` concatenation, not
 `separate()` (which skips empty values and would misalign fields). **See**:

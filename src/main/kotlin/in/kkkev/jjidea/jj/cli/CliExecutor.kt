@@ -74,6 +74,25 @@ internal fun tagSetArgs(tag: Tag, revision: Revision = WorkingCopy, allowMove: B
 
 internal fun tagDeleteArgs(tag: Tag) = listOf("tag", "delete", tag.name)
 
+/**
+ * Build the argument list for `jj file track`. [paths] must already be relative to the repo root.
+ *
+ * `--include-ignored` is required to actually force-track a path matching `.gitignore` - without
+ * it, `jj file track` silently no-ops on ignored paths (verified against jj 0.37.0). It's harmless
+ * to always pass: confirmed no-op-but-successful on already-tracked, non-ignored, and even
+ * nonexistent paths.
+ */
+internal fun fileTrackArgs(paths: List<String>) = listOf("file", "track", "--include-ignored") + paths
+
+/** Build the argument list for `jj file untrack`. [paths] must already be relative to the repo root. */
+internal fun fileUntrackArgs(paths: List<String>) = listOf("file", "untrack") + paths
+
+/**
+ * Build the argument list for `jj file list`. [paths] must already be relative to the repo root.
+ * The only fully reliable way to determine tracked status - see docs/jj-track-untrack-model.md.
+ */
+internal fun fileListArgs(paths: List<String>) = listOf("file", "list") + paths
+
 /** Build the argument list for `jj git fetch`. */
 internal fun gitFetchArgs(remote: Remote? = null, allRemotes: Boolean = false): List<String> = buildList {
     add("git")
@@ -394,6 +413,15 @@ class CliExecutor(
 
     override fun restore(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root!!) })
+
+    override fun fileTrack(filePaths: List<FilePath>): CommandExecutor.CommandResult =
+        execute(root, fileTrackArgs(filePaths.map { it.relativeTo(root!!) }))
+
+    override fun fileUntrack(filePaths: List<FilePath>): CommandExecutor.CommandResult =
+        execute(root, fileUntrackArgs(filePaths.map { it.relativeTo(root!!) }))
+
+    override fun fileList(filePaths: List<FilePath>): CommandExecutor.CommandResult =
+        execute(root, fileListArgs(filePaths.map { it.relativeTo(root!!) }))
 
     override fun rebase(
         revisions: List<Revision>,

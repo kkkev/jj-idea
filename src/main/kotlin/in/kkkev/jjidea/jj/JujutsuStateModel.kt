@@ -27,6 +27,7 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
+import `in`.kkkev.jjidea.vcs.ignore.JujutsuTrackedFilesService
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
@@ -280,11 +281,15 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                         dirtyScopeManager.filesDirty(dirtyFiles, null)
                         // Also forward to the async ignored-files holder so it can do an incremental re-check
                         val ignoredFilesService = JujutsuIgnoredFilesService.getInstance(project)
+                        val trackedFilesService = JujutsuTrackedFilesService.getInstance(project)
                         dirtyFiles
                             .groupBy { file -> repos.firstOrNull { VfsUtil.isAncestor(it.directory, file, false) } }
                             .forEach { (repo, files) ->
                                 if (repo != null) {
-                                    ignoredFilesService.markDirty(repo, files.map { VcsUtil.getFilePath(it) })
+                                    val filePaths = files.map { VcsUtil.getFilePath(it) }
+                                    ignoredFilesService.markDirty(repo, filePaths)
+                                    // An edited/created/deleted file's tracked status can change too.
+                                    trackedFilesService.invalidatePaths(repo, filePaths)
                                 }
                             }
                     }
@@ -385,7 +390,11 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             logRefresh.notify(Unit)
             // Trigger a full ignored-file scan for each newly discovered repo
             val ignoredFilesService = JujutsuIgnoredFilesService.getInstance(project)
-            new.values.forEach { repo -> ignoredFilesService.invalidate(repo) }
+            val trackedFilesService = JujutsuTrackedFilesService.getInstance(project)
+            new.values.forEach { repo ->
+                ignoredFilesService.invalidate(repo)
+                trackedFilesService.invalidate(repo)
+            }
         }
 
         // When repository states change (VCS operations completed), mark directories dirty

@@ -202,6 +202,26 @@ interface CommandExecutor {
      */
     fun restore(filePaths: List<FilePath>, revision: Revision): CommandResult
 
+    /**
+     * Force-include the specified files even if they match `.gitignore` (`jj file track`).
+     */
+    fun fileTrack(filePaths: List<FilePath>): CommandResult
+
+    /**
+     * Stop tracking the specified files (`jj file untrack`). Only succeeds for files jj
+     * considers ignored.
+     */
+    fun fileUntrack(filePaths: List<FilePath>): CommandResult
+
+    /**
+     * Lists which of the given paths jj currently tracks (`jj file list <paths>...`). A path
+     * missing from stdout is untracked - jj can't distinguish "untracked because ignored" from
+     * "untracked for any other reason" here, so this only answers the tracked/untracked question,
+     * not why. This is the only fully reliable way to determine tracked status; see
+     * docs/jj-track-untrack-model.md.
+     */
+    fun fileList(filePaths: List<FilePath>): CommandResult
+
     /** Lists all conflicted file paths in the given revision (infrastructure for the future Conflicts tool window). */
     fun resolveList(revision: Revision = WorkingCopy): CommandResult
 
@@ -384,15 +404,30 @@ interface CommandExecutor {
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,
         val onSuccess: (String) -> Unit = {},
+        val onSuccessResult: CommandResult.() -> Unit = {},
         val onFailure: CommandResult.() -> Unit = {}
     ) {
         fun onSuccess(callback: (String) -> Unit) = copy(onSuccess = callback)
+
+        /**
+         * Like [onSuccess], but receives the full [CommandResult] (including [CommandResult.stderr])
+         * instead of just stdout. Some jj subcommands print a non-fatal warning to stderr on an
+         * otherwise-successful (exit 0) run - e.g. `jj file untrack` on a path that's already
+         * untracked - which plain [onSuccess] can't see. Prefer this when a caller needs to surface
+         * such warnings; both callbacks run on success, so most callers only need one or the other.
+         */
+        fun onSuccessResult(callback: CommandResult.() -> Unit) = copy(onSuccessResult = callback)
 
         fun onFailure(callback: CommandResult.() -> Unit) = copy(onFailure = callback)
 
         private fun handleResult(result: CommandResult) {
             runLater {
-                if (result.isSuccess) onSuccess(result.stdout) else onFailure(result)
+                if (result.isSuccess) {
+                    onSuccess(result.stdout)
+                    result.onSuccessResult()
+                } else {
+                    onFailure(result)
+                }
             }
         }
 

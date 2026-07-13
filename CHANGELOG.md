@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - "Compare with Working Copy" in the log's right-click menu diffs every file that differs between the selected commit and your working copy, in one editor tab with the working-copy side editable — handy for reviewing everything since a target commit and editing it directly for a final `jj absorb`. ([#40](https://github.com/kkkev/jj-idea/issues/40))
 - The References/Bookmarks selector above the log now also lists bookmarks that exist only on a remote and aren't tracked locally, shown as `name@remote` with a distinct icon, so you can start work off a remote branch without tracking it first. ([#47](https://github.com/kkkev/jj-idea/issues/47))
+- New "Tracked" checkbox in the right-click menu for selected files (Project view, editor, Working Copy panel, Commit view) that match a `.gitignore` rule lets you force-include or stop tracking them, without touching `.gitignore` by hand. The checkbox updates instantly, and a notification confirms what happened (or explains why it didn't). ([#42](https://github.com/kkkev/jj-idea/issues/42))
 
 ### Fixed
 - Selecting a commit in the log no longer resets the table's horizontal scroll position. ([#51](https://github.com/kkkev/jj-idea/issues/51))

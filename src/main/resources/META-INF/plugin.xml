@@ -170,6 +170,9 @@
     <group id="Jujutsu.OpenFileInRemote"
            class="in.kkkev.jjidea.actions.filechange.OpenFileInRemoteGroup"/>
 
+    <!-- Tracked toggle (jj file track / jj file untrack) -->
+    <action id="Jujutsu.TrackedToggle" class="in.kkkev.jjidea.actions.file.TrackedToggleAction"/>
+
     <!-- Jujutsu action group in editor context menu -->
     <group id="Jujutsu.EditorGroup" text="Jujutsu" class="in.kkkev.jjidea.actions.file.JujutsuEditorActionGroup"
            popup="true">
@@ -193,6 +196,8 @@
       <reference ref="Jujutsu.SquashFiles"/>
       <reference ref="Jujutsu.SquashIntoFiles"/>
       <reference ref="Jujutsu.SplitFiles"/>
+      <separator/>
+      <reference ref="Jujutsu.TrackedToggle"/>
       <add-to-group group-id="EditorLangPopupMenu" anchor="after" relative-to-action="VersionControlsGroup"/>
       <add-to-group group-id="ProjectViewPopupMenu" anchor="after" relative-to-action="VersionControlsGroup"/>
       <add-to-group group-id="Diff.EditorPopupMenu" anchor="last"/>
