@@ -80,6 +80,19 @@ swap. **See**: `jj/CommandExecutor.kt`, `jj/cli/CliExecutor.kt`
 
 ### Key Design Decisions
 
+**UX-priority tenet (tie-breaker)** — When a look-and-feel or behaviour decision has no
+clear answer, resolve it in this order: **(1) IntelliJ-native** conventions — match what
+the IDE and its built-in VCS log already do; **(2) jj-native** semantics — match jj's
+model and terminology; **(3) other-VCS or bespoke** conventions — only when neither
+above applies. Prefer reusing/rebinding existing IntelliJ mechanisms (keymap actions,
+standard data keys) over inventing plugin-specific settings.
+
+*Example:* GitHub #51 asked for double-click-to-checkout in the log. IntelliJ's own
+`VcsLogGraphTable` has no double-click-to-checkout/diff — commit actions are
+keymap-bound and `mouseClicked` only handles link clicks — so jj-idea-th9h routes
+double-click through the same keymap-bound action as Enter (default: Show Diff) rather
+than adding a bespoke "double-click behaviour" setting.
+
 **1. Log parsing with null-byte separator** — `jj log` templates use `\0` as the field
 separator (descriptions can contain newlines/special chars) and `++` concatenation, not
 `separate()` (which skips empty values and would misalign fields). **See**:
