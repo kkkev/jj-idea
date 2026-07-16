@@ -133,6 +133,9 @@
       <keyboard-shortcut first-keystroke="meta shift N" keymap="Mac OS X 10.5+"/>
     </action>
 
+    <!-- "Edit": moves the working copy to the selected change. Used by the log toolbar and context menu. -->
+    <action id="Jujutsu.EditChange" class="in.kkkev.jjidea.actions.change.EditChangeAction"/>
+
     <!-- Open custom Jujutsu log tab -->
     <action id="Jujutsu.OpenLogTab"
             class="in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction">

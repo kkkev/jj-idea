@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -170,6 +171,15 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             rootFilterComponent?.setSelectedRoots(config.selectedRootPaths.toSet())
         }
     }
+
+    /**
+     * One-click New/Edit buttons ahead of Refresh, for the common change-creation/editing
+     * operations (GitHub #51 point 8 / VisualJJ parity). File history doesn't override this.
+     */
+    override fun primaryActions() = listOfNotNull(
+        ActionManager.getInstance().getAction("Jujutsu.NewChange"),
+        ActionManager.getInstance().getAction("Jujutsu.EditChange")
+    )
 
     /**
      * Persists all UI state into [config] and calls [JujutsuSettings.upsertLogWindow].

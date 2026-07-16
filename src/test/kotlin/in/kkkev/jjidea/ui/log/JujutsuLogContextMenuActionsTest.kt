@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import `in`.kkkev.jjidea.actions.change.editableEntry
 import `in`.kkkev.jjidea.actions.change.squashableEntry
 import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.nulls.shouldBeNull
@@ -19,7 +20,7 @@ import org.junit.jupiter.api.Test
  * what data gets passed to the action factories.
  *
  * The logic tested here corresponds to the filtering in createActionGroup:
- * - `entry?.takeIf { !it.isWorkingCopy && !it.immutable }` for edit
+ * - [in.kkkev.jjidea.actions.change.editableEntry] for edit
  * - `entry?.takeUnless { it.immutable }` for describe
  * - `entry?.takeIf { !it.immutable }` for abandon
  * - `entries.map { it.repo }.toSet().singleOrNull()` for new change
@@ -135,37 +136,36 @@ class JujutsuLogContextMenuActionsTest {
         fun `working copy entry filtered out`() {
             val entry = createEntry("abc123", isWorkingCopy = true)
 
-            val editTarget = entry.takeIf { !it.isWorkingCopy && !it.immutable }
-
-            editTarget.shouldBeNull()
+            editableEntry(entry).shouldBeNull()
         }
 
         @Test
         fun `immutable entry filtered out`() {
             val entry = createEntry("abc123", immutable = true)
 
-            val editTarget = entry.takeIf { !it.isWorkingCopy && !it.immutable }
-
-            editTarget.shouldBeNull()
+            editableEntry(entry).shouldBeNull()
         }
 
         @Test
         fun `working copy and immutable entry filtered out`() {
             val entry = createEntry("abc123", isWorkingCopy = true, immutable = true)
 
-            val editTarget = entry.takeIf { !it.isWorkingCopy && !it.immutable }
-
-            editTarget.shouldBeNull()
+            editableEntry(entry).shouldBeNull()
         }
 
         @Test
         fun `mutable non-working-copy entry passes through`() {
             val entry = createEntry("abc123", isWorkingCopy = false, immutable = false)
 
-            val editTarget = entry.takeIf { !it.isWorkingCopy && !it.immutable }
+            val editTarget = editableEntry(entry)
 
             editTarget.shouldNotBeNull()
             editTarget.id.full shouldBe "abc123"
+        }
+
+        @Test
+        fun `null entry filtered out`() {
+            editableEntry(null).shouldBeNull()
         }
     }
 

@@ -16,7 +16,6 @@ import `in`.kkkev.jjidea.actions.change.compareWithWorkingCopyAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
 import `in`.kkkev.jjidea.actions.change.copyIdAction
 import `in`.kkkev.jjidea.actions.change.describeAction
-import `in`.kkkev.jjidea.actions.change.editChangeAction
 import `in`.kkkev.jjidea.actions.change.newChangeFromAction
 import `in`.kkkev.jjidea.actions.change.rebaseAction
 import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
@@ -67,7 +66,7 @@ object JujutsuLogContextMenuActions {
         add(newChangeFromAction(project, uniqueRepo, entries.map { it.id }))
 
         // Offer "Edit" for non-working-copy, non-immutable changes
-        add(editChangeAction(project, entry?.takeIf { !it.isWorkingCopy && !it.immutable }))
+        ActionManager.getInstance().getAction("Jujutsu.EditChange")?.let { add(it) }
 
         // Offer "Describe" for mutable changes
         add(describeAction(project, entry?.takeUnless { it.immutable }))

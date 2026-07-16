@@ -270,6 +270,14 @@ Open `/tmp/jj-squash-test` in the plugin IDE.
 - [ ] Clear filters (X button) resets all filters
 - [ ] Filters combine correctly (AND logic)
 
+#### New/Edit toolbar buttons (jj-idea-e53e)
+
+- [ ] **New** and **Edit** icon buttons appear at the left of the main log toolbar, before Refresh, each with a tooltip
+- [ ] Selecting a mutable non-working-copy change and clicking **Edit** moves the working copy to it (it becomes `@`) and the log reselects it
+- [ ] Selecting the working-copy change or an immutable commit disables **Edit**
+- [ ] Clicking **New** with a change selected creates a new empty change on top of the selection and it becomes `@`; with no selection it stacks on the working copy
+- [ ] Open a file's history (right-click a file > Show History) — confirm its toolbar shows only Refresh/search, with no New/Edit buttons
+
 #### Graph layout under filtering (jj-idea-7jkr)
 
 Use a repo with several concurrent branches (at least 3–4 parallel lanes in the graph).

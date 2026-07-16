@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New "Tracked" checkbox in the right-click menu for selected files (Project view, editor, Working Copy panel, Commit view) that match a `.gitignore` rule lets you force-include or stop tracking them, without touching `.gitignore` by hand. The checkbox updates instantly, and a notification confirms what happened (or explains why it didn't). ([#42](https://github.com/kkkev/jj-idea/issues/42))
 - The commit details panel now shows the author's (and committer's, when different) email address alongside their name, as a clickable mail link, with the date/time kept together on one line when it wraps. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - New "New Change" quick action creates a change without prompting for a description upfront (the common case, since you'll usually squash it in later). It's the primary option in the log's right-click menu (the old dialog-based flow is kept as "New Change with Description..."), and is bound to Cmd/Ctrl+Shift+N while the log is focused. ([#51](https://github.com/kkkev/jj-idea/issues/51))
+- New and Edit buttons in the log toolbar act on the selected change with one click, without opening the right-click menu. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 
 ### Fixed
 - Selecting a commit in the log no longer resets the table's horizontal scroll position. ([#51](https://github.com/kkkev/jj-idea/issues/51))

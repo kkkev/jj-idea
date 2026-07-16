@@ -17,6 +17,7 @@ import com.intellij.ui.components.SearchFieldWithExtension
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.ui.log.*
 import java.awt.BorderLayout
 import javax.swing.Box
@@ -234,15 +235,27 @@ abstract class CommitTablePanel<D>(
         // Note: Paths filter is omitted in unified mode as it requires a single root
     }
 
-    private fun createActionGroup() = BackgroundActionGroup(
-        RefreshAction(),
-        Separator.create(),
-        ActionManager.getInstance().getAction("Jujutsu.GitFetch"),
-        ActionManager.getInstance().getAction("Jujutsu.GitPush"),
-        Separator.create(),
-        ColumnsAction(),
-        DetailsPositionAction()
-    )
+    /**
+     * Extra actions shown at the left of the toolbar, ahead of Refresh. Empty by default;
+     * subclasses override to add surface-specific one-click actions (e.g. New/Edit in the
+     * main log toolbar). Not shown in the file history toolbar.
+     */
+    protected open fun primaryActions(): List<AnAction> = emptyList()
+
+    private fun createActionGroup(): BackgroundActionGroup {
+        val primary = primaryActions()
+        return BackgroundActionGroup(
+            *primary.toTypedArray(),
+            *(if (primary.isEmpty()) emptyArray() else arrayOf(Separator.create())),
+            RefreshAction(),
+            Separator.create(),
+            ActionManager.getInstance().getAction("Jujutsu.GitFetch"),
+            ActionManager.getInstance().getAction("Jujutsu.GitPush"),
+            Separator.create(),
+            ColumnsAction(),
+            DetailsPositionAction()
+        )
+    }
 
     /**
      * Hook called whenever any persisted UI state changes (column visibility, details position,
@@ -364,6 +377,11 @@ abstract class CommitTablePanel<D>(
 
     override fun uiDataSnapshot(sink: DataSink) {
         sink[DiffDataKeys.EDITOR_TAB_DIFF_PREVIEW] = detailsPanel.diffPreview
+        // The toolbar's targetComponent is this panel, not logTable, and DataManager only
+        // walks up from a target component - so log-selection keys must be forwarded here for
+        // toolbar actions (e.g. New/Edit) to see the current selection.
+        logTable.selectedEntry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+        logTable.selectedEntries.takeIf { it.isNotEmpty() }?.let { sink[JujutsuDataKeys.LOG_ENTRIES] = it }
     }
 
     abstract fun onDataLoaded(newData: D)
