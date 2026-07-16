@@ -51,13 +51,27 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
             val src = applyCurrentColor(spec).qualified
             return if (style.isSmaller) "$src@$SMALLER_SCALE" else src
         }
+        appendChipHtml(key(icon), prefixIcon?.let(::key) ?: "", label, strikethrough, suffix, suffixColor)
+    }
 
+    /** Same atomic-leaf mechanism as [appendChip], but with no icon — just a plain unbreakable text run. */
+    override fun appendUnbreakable(text: String) =
+        appendChipHtml("", "", text, strikethrough = false, suffix = null, suffixColor = null)
+
+    private fun appendChipHtml(
+        iconKey: String,
+        prefixIconKey: String,
+        label: String,
+        strikethrough: Boolean,
+        suffix: String?,
+        suffixColor: Color?
+    ) {
         val encodedLabel = URLEncoder.encode(label, "UTF-8")
         val encodedSuffix = suffix?.let { URLEncoder.encode(it, "UTF-8") } ?: ""
         val suffixColorHex = suffixColor?.let { ColorUtil.toHex(it) } ?: ""
         val encoded = listOf(
-            key(icon),
-            prefixIcon?.let(::key) ?: "",
+            iconKey,
+            prefixIconKey,
             encodedLabel,
             if (strikethrough) "1" else "0",
             encodedSuffix,

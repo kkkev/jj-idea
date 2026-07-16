@@ -82,6 +82,12 @@ interface TextCanvas {
     }
 
     fun truncate(builder: TextCanvas.() -> Unit) = builder()
+
+    /**
+     * Append [text] as a single unbreakable unit — the surrounding layout may still wrap before or after it, but
+     * never split it mid-word. Use for short strings (e.g. a date/time) that read badly if broken across lines.
+     */
+    fun appendUnbreakable(text: String) = append(text)
 }
 
 abstract class StyledTextCanvas : TextCanvas {
@@ -172,6 +178,19 @@ fun TextCanvas.appendSummary(description: Description) = truncate {
 fun TextCanvas.append(user: VcsUser) = user.email.takeIf { it.isNotEmpty() }
     ?.let { email -> linked(URI("mailto", email, null)) { append(user.name) } }
     ?: append(user.name)
+
+/**
+ * Renders a user as `Name <email>` for detailed views, as a single unbreakable mailto-linked unit — the surrounding
+ * layout can wrap before or after it, but the name and email never split from each other or internally.
+ */
+fun TextCanvas.appendWithEmail(user: VcsUser) {
+    val email = user.email.takeIf { it.isNotEmpty() }
+    if (email != null) {
+        linked(URI("mailto", email, null)) { appendUnbreakable("${user.name} <$email>") }
+    } else {
+        append(user.name)
+    }
+}
 
 fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelative(instant))
 

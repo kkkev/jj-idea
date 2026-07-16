@@ -73,6 +73,11 @@ Use this checklist:
 
 - [ ] Details panel shows on row selection
 - [ ] Metadata displays correctly (author, date, change ID)
+- [ ] Author line shows `Name <email>` as a single clickable mailto link; when the committer
+      differs from the author, a "committed by Name <email>" line also appears with its own mailto link
+- [ ] Narrow the details panel (or use a commit with a long name/email, e.g. a bot commit) so the
+      author/committer line must wrap: `Name <email>` and `· date, time` each wrap as a whole (never
+      splitting mid-email or mid-date), with a visible gap between them, never touching
 - [ ] Description renders HTML formatting
 - [ ] Splitter position persists
 - [ ] Toggle details panel position (right/bottom) works

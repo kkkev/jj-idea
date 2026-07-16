@@ -10,9 +10,11 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
@@ -128,5 +130,42 @@ class HtmlTextCanvasTest {
         href shouldContain "%20"
         val encodedPath = href.removePrefix("jjref://").substringBefore("?")
         URLUtil.unescapePercentSequences(encodedPath) shouldBe spacedPath
+    }
+
+    /** Regression tests for jj-idea-c6f5 / GitHub #51: the commit details panel shows the user's email. */
+    @Test
+    fun `appendWithEmail renders name and email as a single clickable unbreakable chip`() {
+        val html = htmlString { appendWithEmail(VcsUserImpl("Alice", "alice@example.com")) }
+
+        html shouldContain "mailto:alice@example.com"
+        val iconTags = ICON_TAG.findAll(html).toList()
+        iconTags shouldHaveSize 1
+        iconTags[0].value shouldContain CHIP_ICON_PREFIX
+        iconTags[0].value shouldContain URLEncoder.encode("Alice <alice@example.com>", "UTF-8")
+    }
+
+    @Test
+    fun `appendWithEmail falls back to the plain name when email is missing`() {
+        val html = htmlString { appendWithEmail(VcsUserImpl("John", "")) }
+
+        html shouldContain "John"
+        html shouldNotContain "mailto:"
+        html shouldNotContain "<>"
+    }
+
+    /**
+     * Regression test for jj-idea-c6f5: a `white-space: nowrap` CSS span does not stop Swing's HTMLEditorKit from
+     * force-breaking text mid-word when it doesn't fit the line. [TextCanvas.appendUnbreakable] must instead render
+     * as a single atomic leaf (the same [ChipIconExtension] mechanism as [TextCanvas.appendChip], jj-idea-kds1) with
+     * no separate breakable text run for the surrounding layout to split.
+     */
+    @Test
+    fun `appendUnbreakable renders as a single atomic icon element with no icon`() {
+        val html = htmlString { appendUnbreakable("· 12/07/2026, 04:07") }
+
+        val iconTags = ICON_TAG.findAll(html).toList()
+        iconTags shouldHaveSize 1
+        iconTags[0].value shouldContain CHIP_ICON_PREFIX
+        iconTags[0].value shouldContain URLEncoder.encode("· 12/07/2026, 04:07", "UTF-8")
     }
 }

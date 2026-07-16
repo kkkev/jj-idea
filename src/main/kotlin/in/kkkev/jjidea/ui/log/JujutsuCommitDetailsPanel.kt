@@ -229,18 +229,18 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
                     append(entry.description)
                 }
                 control("<p style='margin: 4px 0;'>", "</p>") {
-                    entry.author?.let { append(it) } ?: append("Unknown")
+                    entry.author?.let { appendWithEmail(it) } ?: append("Unknown")
                     entry.authorTimestamp?.also {
-                        append(" \u00b7 ")
-                        append(DateTimeFormatter.formatAbsolute(it))
+                        control(" ")
+                        appendUnbreakable("\u00b7 ${DateTimeFormatter.formatAbsolute(it)}")
                     }
                     val committer = entry.committer
                     if (committer != null && committer != entry.author) {
                         append("\ncommitted by ")
-                        append(committer)
+                        appendWithEmail(committer)
                         entry.committerTimestamp?.also {
-                            append(" \u00b7 ")
-                            append(DateTimeFormatter.formatAbsolute(it))
+                            control(" ")
+                            appendUnbreakable("\u00b7 ${DateTimeFormatter.formatAbsolute(it)}")
                         }
                     }
                 }

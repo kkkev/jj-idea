@@ -159,9 +159,12 @@ internal object ChipIconExtension : ExtendableHTMLViewFactory.Extension {
     }
 }
 
-/** Parsed contents of a [TextCanvas.appendChip] call, encoded by `HtmlTextCanvas` into a single `src` attribute. */
+/**
+ * Parsed contents of a [TextCanvas.appendChip] (or [TextCanvas.appendUnbreakable]) call, encoded by `HtmlTextCanvas`
+ * into a single `src` attribute. [icon] is null for a plain unbreakable text label with no icon.
+ */
 private class ChipSpec(
-    val icon: Icon,
+    val icon: Icon?,
     val prefixIcon: Icon?,
     val label: String,
     val strikethrough: Boolean,
@@ -172,7 +175,7 @@ private class ChipSpec(
         fun parse(encoded: String): ChipSpec? {
             val parts = encoded.split(";")
             if (parts.size != 6) return null
-            val icon = resolveChipIcon(parts[0]) ?: return null
+            val icon = parts[0].takeIf { it.isNotEmpty() }?.let { resolveChipIcon(it) ?: return null }
             val prefixIcon = parts[1].takeIf { it.isNotEmpty() }?.let(::resolveChipIcon)
             val label = URLDecoder.decode(parts[2], "UTF-8")
             val strikethrough = parts[3] == "1"
@@ -186,10 +189,11 @@ private class ChipSpec(
 }
 
 /**
- * A leaf view painting an icon (optionally preceded by a second "prefix" icon, e.g. a conflict marker), immediately
- * followed by a text label and an optional colored suffix, as a single unbreakable unit. Unlike a plain `<icon>`
- * followed by separate text elements, there is no view boundary between the icon and the label for the surrounding
- * flow layout to break at (jj-idea-kds1).
+ * A leaf view painting an optional icon (itself optionally preceded by a second "prefix" icon, e.g. a conflict
+ * marker), immediately followed by a text label and an optional colored suffix, as a single unbreakable unit. Unlike
+ * a plain `<icon>` followed by separate text elements, there is no view boundary between the icon and the label for
+ * the surrounding flow layout to break at (jj-idea-kds1). With no icon at all, this is a plain unbreakable text run
+ * (used by [TextCanvas.appendUnbreakable] for short strings, like a date/time, that must never split mid-word).
  *
  * Font and foreground color are resolved from the element's CSS attributes (the same `colored`/`smaller` ancestor
  * spans that would otherwise wrap separate icon/text elements), so chips still inherit ambient styling correctly.
@@ -203,13 +207,13 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         container?.getFontMetrics(font) ?: Toolkit.getDefaultToolkit().getFontMetrics(font)
     }
 
-    private val iconsWidth get() = (spec.prefixIcon?.iconWidth ?: 0) + spec.icon.iconWidth
+    private val iconsWidth get() = (spec.prefixIcon?.iconWidth ?: 0) + (spec.icon?.iconWidth ?: 0)
 
     override fun getPreferredSpan(axis: Int): Float {
         val fm = fontMetrics
         return when (axis) {
             X_AXIS -> (iconsWidth + fm.stringWidth(spec.label) + fm.stringWidth(spec.suffix ?: "")).toFloat()
-            Y_AXIS -> max(fm.height, max(spec.icon.iconHeight, spec.prefixIcon?.iconHeight ?: 0)).toFloat()
+            Y_AXIS -> max(fm.height, max(spec.icon?.iconHeight ?: 0, spec.prefixIcon?.iconHeight ?: 0)).toFloat()
             else -> throw IllegalArgumentException("Invalid axis: $axis")
         }
     }
@@ -227,8 +231,10 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
             icon.paintIcon(null, g, x, baseline - icon.iconHeight)
             x += icon.iconWidth
         }
-        spec.icon.paintIcon(null, g, x, baseline - spec.icon.iconHeight)
-        x += spec.icon.iconWidth
+        spec.icon?.let { icon ->
+            icon.paintIcon(null, g, x, baseline - icon.iconHeight)
+            x += icon.iconWidth
+        }
 
         g.font = font
         g.color = foreground
