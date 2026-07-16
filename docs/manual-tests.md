@@ -106,10 +106,19 @@ Use this checklist:
 - [ ] Right-click opens context menu
 - [ ] **Copy Change ID** works and copies to clipboard
 - [ ] **Copy Description** works and copies to clipboard
-- [ ] **New Change From This** creates new change and refreshes
+- [ ] **New Change From This** (primary, no dialog) creates new change directly and refreshes
+- [ ] **New Change with Description...** (secondary) opens the description dialog and creates the change
 - [ ] **Edit** action changes working copy
 - [ ] **Describe** action opens dialog and updates description
 - [ ] **Abandon** action removes change after confirmation
+
+#### New Change quick action (jj-idea-byfa)
+
+- [ ] With the log focused and a commit selected, pressing Cmd/Ctrl+Shift+N creates a new change on top of it, with no dialog, and the log reselects the new change
+- [ ] With the log focused and nothing selected but the default working-copy (@) selection, Cmd/Ctrl+Shift+N creates a new change on top of @
+- [ ] With the **editor** focused (not the log), Cmd/Ctrl+Shift+N still triggers the IDE's normal Go to File / New Scratch File action - it is not intercepted
+- [ ] Multi-selecting two commits (same repo) and choosing **New Change From These** (or the shortcut) creates a merge change with both as parents
+- [ ] Multi-selecting commits across two repos in a multi-root project: **New Change From This/These** is disabled/hidden (no arbitrary repo is picked)
 
 #### Compare with Working Copy (jj-idea-a6cz)
 

@@ -572,6 +572,7 @@ class JujutsuLogTable(
 
     override fun uiDataSnapshot(sink: DataSink) {
         selectedEntry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+        selectedEntries.takeIf { it.isNotEmpty() }?.let { sink[JujutsuDataKeys.LOG_ENTRIES] = it }
     }
 
     override fun dispose() {

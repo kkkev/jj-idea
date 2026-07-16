@@ -24,6 +24,9 @@ val AnActionEvent.file: VirtualFile? get() = this.getData(CommonDataKeys.VIRTUAL
 
 val AnActionEvent.logEntry: LogEntry? get() = this.getData(JujutsuDataKeys.LOG_ENTRY)
 
+/** The full multi-select log table selection, or empty if none (e.g. focus is outside the log table). */
+val AnActionEvent.logEntries: List<LogEntry> get() = this.getData(JujutsuDataKeys.LOG_ENTRIES) ?: emptyList()
+
 /** Gets the log entry from the DataSink, falling back to the file's user data. Use in actions that need to work in both changes tree and editor contexts. */
 val AnActionEvent.logEntryForFile: LogEntry?
     get() = logEntry ?: project?.let { p -> file?.let(p::possibleLogEntryFor) }

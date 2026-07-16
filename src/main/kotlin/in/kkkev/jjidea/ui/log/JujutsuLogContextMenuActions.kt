@@ -58,9 +58,12 @@ object JujutsuLogContextMenuActions {
         add(copyDescriptionAction(entry?.description?.actual))
         addSeparator()
 
-        // Offer "New Change From This/These" if all entries are in the same root
+        // Offer "New Change From This/These" if all entries are in the same root.
+        // The quick (no-dialog) action is primary and shows the default keybinding; the
+        // dialog-based variant is offered as a secondary "with description" option.
         val uniqueRepo = entries.map { it.repo }.toSet().singleOrNull()
 
+        ActionManager.getInstance().getAction("Jujutsu.NewChange")?.let { add(it) }
         add(newChangeFromAction(project, uniqueRepo, entries.map { it.id }))
 
         // Offer "Edit" for non-working-copy, non-immutable changes

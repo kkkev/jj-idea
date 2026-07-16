@@ -20,6 +20,15 @@ object JujutsuDataKeys {
     val LOG_ENTRY: DataKey<LogEntry> = DataKey.create("Jujutsu.LogEntry")
 
     /**
+     * The full log table selection for the current context (multi-select aware).
+     * Present in the custom log table alongside [LOG_ENTRY] (which is only set for a
+     * single-row selection). Actions that support acting on multiple selected changes
+     * (e.g. creating a merge change) should prefer this over [LOG_ENTRY].
+     */
+    @JvmField
+    val LOG_ENTRIES: DataKey<List<LogEntry>> = DataKey.create("Jujutsu.LogEntries")
+
+    /**
      * VirtualFile user-data: log entry pinned to a historical version opened by OpenRepositoryVersionAction.
      * Use [Project.possibleLogEntryFor] as the single access point rather than reading this key directly.
      */

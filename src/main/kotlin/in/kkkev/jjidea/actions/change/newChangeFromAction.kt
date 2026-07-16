@@ -10,8 +10,11 @@ import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
 /**
- * Create new change from the selected commit.
+ * Create new change from the selected commit, prompting for a description first.
  * Uses `jj new <change-id>` to create a new working copy based on this commit.
+ *
+ * Secondary to [in.kkkev.jjidea.actions.change.NewChangeAction] (the quick, no-dialog default)
+ * for users who want to type the description up front rather than squashing it in later.
  */
 fun newChangeFromAction(project: Project, repo: JujutsuRepository?, parentRevisions: List<Revision>) =
     nullAndDumbAwareAction(

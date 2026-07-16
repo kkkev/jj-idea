@@ -126,6 +126,13 @@
       <keyboard-shortcut first-keystroke="meta K" keymap="Mac OS X 10.5+"/>
     </action>
 
+    <!-- Quick "New Change" (no description dialog): creates an unnamed change directly. -->
+    <action id="Jujutsu.NewChange" class="in.kkkev.jjidea.actions.change.NewChangeAction">
+      <keyboard-shortcut first-keystroke="control shift N" keymap="$default"/>
+      <keyboard-shortcut first-keystroke="meta shift N" keymap="Mac OS X"/>
+      <keyboard-shortcut first-keystroke="meta shift N" keymap="Mac OS X 10.5+"/>
+    </action>
+
     <!-- Open custom Jujutsu log tab -->
     <action id="Jujutsu.OpenLogTab"
             class="in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction">

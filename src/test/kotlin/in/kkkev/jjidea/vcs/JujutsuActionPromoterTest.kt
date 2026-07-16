@@ -19,12 +19,18 @@ class JujutsuActionPromoterTest {
     private val showDiffAction = mockk<AnAction>(relaxed = true)
     private val compareAction = mockk<AnAction>(relaxed = true)
     private val duplicateAction = mockk<AnAction>(relaxed = true)
+    private val newChangeAction = mockk<AnAction>(relaxed = true)
+    private val gotoFileAction = mockk<AnAction>(relaxed = true)
+    private val newScratchFileAction = mockk<AnAction>(relaxed = true)
 
     private val promoter = JujutsuActionPromoter { action ->
         when (action) {
             showDiffAction -> "Jujutsu.ShowChangesDiff"
             compareAction -> "Compare.SameVersion"
             duplicateAction -> "EditorDuplicate"
+            newChangeAction -> "Jujutsu.NewChange"
+            gotoFileAction -> "GotoFile"
+            newScratchFileAction -> "NewScratchFile"
             else -> null
         }
     }
@@ -37,6 +43,7 @@ class JujutsuActionPromoterTest {
         every { context.getData(VcsDataKeys.SELECTED_CHANGES) } returns null
         every { context.getData(VcsDataKeys.CHANGES) } returns null
         every { context.getData(JujutsuDataKeys.LOG_ENTRY) } returns null
+        every { context.getData(JujutsuDataKeys.LOG_ENTRIES) } returns null
     }
 
     @Test
@@ -95,5 +102,71 @@ class JujutsuActionPromoterTest {
         val actions = listOf(duplicateAction, compareAction, showDiffAction)
         val result = promoter.promote(actions, context)
         result shouldBe listOf(showDiffAction, duplicateAction, compareAction)
+    }
+
+    @Test
+    fun `returns list unchanged when NewChange not in list`() {
+        val actions = listOf(gotoFileAction, newScratchFileAction)
+        promoter.promote(actions, context) shouldBe actions
+    }
+
+    @Test
+    fun `returns list unchanged when no builtin new-file action present`() {
+        val actions = listOf(duplicateAction, newChangeAction)
+        promoter.promote(actions, context) shouldBe actions
+    }
+
+    @Test
+    fun `returns list unchanged when context has no log data`() {
+        val actions = listOf(gotoFileAction, newScratchFileAction, newChangeAction)
+        promoter.promote(actions, context) shouldBe actions
+    }
+
+    @Test
+    fun `promotes NewChange over GotoFile when LOG_ENTRIES in context`() {
+        val repo = mockk<JujutsuRepository>(relaxed = true)
+        val entry = LogEntry(
+            repo = repo,
+            id = ChangeId("abc123abc123", "abc1"),
+            commitId = CommitId("abc0000000000000000000000000000000000000000"),
+            underlyingDescription = "Test",
+            isWorkingCopy = false
+        )
+        every { context.getData(JujutsuDataKeys.LOG_ENTRIES) } returns listOf(entry)
+        val actions = listOf(gotoFileAction, newScratchFileAction, newChangeAction)
+        val result = promoter.promote(actions, context)
+        result.first() shouldBe newChangeAction
+    }
+
+    @Test
+    fun `promotes NewChange over NewScratchFile when LOG_ENTRY in context`() {
+        val repo = mockk<JujutsuRepository>(relaxed = true)
+        val entry = LogEntry(
+            repo = repo,
+            id = ChangeId("abc123abc123", "abc1"),
+            commitId = CommitId("abc0000000000000000000000000000000000000000"),
+            underlyingDescription = "Test",
+            isWorkingCopy = false
+        )
+        every { context.getData(JujutsuDataKeys.LOG_ENTRY) } returns entry
+        val actions = listOf(newScratchFileAction, newChangeAction)
+        val result = promoter.promote(actions, context)
+        result.first() shouldBe newChangeAction
+    }
+
+    @Test
+    fun `promotes both ShowChangesDiff and NewChange independently when both contexts present`() {
+        val repo = mockk<JujutsuRepository>(relaxed = true)
+        val entry = LogEntry(
+            repo = repo,
+            id = ChangeId("abc123abc123", "abc1"),
+            commitId = CommitId("abc0000000000000000000000000000000000000000"),
+            underlyingDescription = "Test",
+            isWorkingCopy = false
+        )
+        every { context.getData(JujutsuDataKeys.LOG_ENTRY) } returns entry
+        val actions = listOf(duplicateAction, compareAction, gotoFileAction, showDiffAction, newChangeAction)
+        val result = promoter.promote(actions, context)
+        result.take(2).toSet() shouldBe setOf(showDiffAction, newChangeAction)
     }
 }
