@@ -10,8 +10,6 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.LogWindowConfig
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
-import javax.swing.Box
-import javax.swing.JPanel
 
 /**
  * Unified panel for Jujutsu commit log UI that shows commits from all (or a selected subset of) repositories.
@@ -220,7 +218,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         }
     }
 
-    override fun createOtherFilterComponents(filterPanel: JPanel) {
+    override fun createOtherFilterComponents(): List<JujutsuFilterComponent> {
         // Root filter (only shown when multiple roots)
         rootFilterComponent = JujutsuRootFilterComponent(logTable.logModel).apply {
             initUi()
@@ -233,14 +231,12 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
                 persistConfig()
             }
         }
-        filterPanel.add(rootFilterComponent)
-        filterPanel.add(Box.createHorizontalStrut(5))
 
         // Bookmark widget
         val widget = JujutsuBookmarkWidget(project)
         Disposer.register(this, widget)
-        filterPanel.add(widget)
-        filterPanel.add(Box.createHorizontalStrut(5))
+
+        return listOfNotNull(rootFilterComponent, widget)
     }
 
     override fun updateTableStuff() {

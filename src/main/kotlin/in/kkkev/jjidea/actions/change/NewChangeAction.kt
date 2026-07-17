@@ -54,7 +54,7 @@ class NewChangeAction : DumbAwareAction(
 ) {
     override fun update(e: AnActionEvent) {
         val target = resolveNewChangeTarget(e.logEntries)
-        e.presentation.isEnabledAndVisible = target != null
+        e.presentation.isEnabled = target != null
         e.presentation.text = when (e.logEntries.size) {
             0, 1 -> JujutsuBundle.message("action.newchange.from.singular")
             else -> JujutsuBundle.message("action.newchange.from.plural")

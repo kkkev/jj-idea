@@ -276,7 +276,27 @@ Open `/tmp/jj-squash-test` in the plugin IDE.
 - [ ] Selecting a mutable non-working-copy change and clicking **Edit** moves the working copy to it (it becomes `@`) and the log reselects it
 - [ ] Selecting the working-copy change or an immutable commit disables **Edit**
 - [ ] Clicking **New** with a change selected creates a new empty change on top of the selection and it becomes `@`; with no selection it stacks on the working copy
+- [ ] Clearing the log selection entirely (e.g. Ctrl/Cmd-click the selected row to deselect) disables **New** (greyed out) rather than removing it from the toolbar — it stays in place, matching **Edit**'s behavior
 - [ ] Open a file's history (right-click a file > Show History) — confirm its toolbar shows only Refresh/search, with no New/Edit buttons
+
+#### Narrow-width toolbar (jj-idea-kxx4)
+
+- [ ] Shrink the log tool window / splitter narrower and narrower — New, Edit, Refresh,
+  Fetch, **Push**, Columns, and Details-position buttons all stay visible and clickable at
+  every width; they are never pushed off-screen
+- [ ] As the window narrows, the search field shrinks down to a minimum width and stops
+  (it does not keep shrinking to zero or overlap the buttons)
+- [ ] As the window narrows further, filter chips (Reference, Author, Date, Root) start
+  disappearing from the toolbar one at a time and a "»" overflow chevron appears in their
+  place; clicking the chevron opens a popup listing all filters, including the ones that
+  no longer fit — from there they're fully usable (clicking one opens its dropdown)
+- [ ] With no filters applied, narrowing hides filters in trailing (rightmost) order first
+- [ ] Apply a value to a filter that would otherwise be hidden first (e.g. select a bookmark
+  in the Reference filter, then narrow) — the applied filter stays visible and unapplied
+  filters are hidden ahead of it, even though the applied filter isn't the leftmost one;
+  whatever remains visible keeps its original left-to-right order (nothing reorders/jumps)
+- [ ] Widen the window back out — hidden filters reappear and the chevron disappears once
+  everything fits again
 
 #### Graph layout under filtering (jj-idea-7jkr)
 

@@ -129,6 +129,12 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
     protected abstract fun isValueSelected(): Boolean
 
     /**
+     * Whether this filter currently has an applied value. Used to prioritize which filters stay
+     * visible under width pressure — see `FilterPriorityLayoutStrategy`.
+     */
+    val isActive: Boolean get() = isValueSelected()
+
+    /**
      * Create the action group for the popup menu.
      */
     protected abstract fun createActionGroup(): ActionGroup
@@ -144,6 +150,14 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
      * to open with no preselection.
      */
     protected open fun preselectCondition(): Condition<in AnAction>? = null
+
+    /**
+     * Opens this filter's selection popup. Used when this component is invoked as a toolbar
+     * action, including from the "»" overflow popup once it no longer fits the toolbar width.
+     */
+    fun openPopup() {
+        if (isEnabled) showPopup()
+    }
 
     /**
      * Add a change listener that will be notified when the filter changes.

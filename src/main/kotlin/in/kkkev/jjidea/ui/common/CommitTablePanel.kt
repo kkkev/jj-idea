@@ -4,6 +4,7 @@ import com.intellij.diff.tools.util.DiffDataKeys
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
@@ -20,9 +21,11 @@ import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.ui.log.*
 import java.awt.BorderLayout
+import java.awt.Dimension
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.Icon
+import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
@@ -160,7 +163,12 @@ abstract class CommitTablePanel<D>(
         )
         toolbar.targetComponent = searchTextField.textEditor
 
-        return SearchFieldWithExtension(toolbar.component, searchTextField)
+        return SearchFieldWithExtension(toolbar.component, searchTextField).apply {
+            // Allow the search field to shrink under width pressure, but not below a
+            // sensible floor (matches IntelliJ's own VCS Log text filter field), so it
+            // degrades gracefully instead of forcing the action toolbar off-screen.
+            minimumSize = Dimension(JBUI.scale(150), preferredSize.height)
+        }
     }
 
     /**
@@ -194,19 +202,25 @@ abstract class CommitTablePanel<D>(
         )
         toolbar.targetComponent = this@CommitTablePanel
 
-        add(leftPanel, BorderLayout.WEST)
+        // Filters go in CENTER (not WEST) so the action toolbar in EAST always claims its
+        // full preferred width first; the filter cluster absorbs whatever width remains and
+        // shrinks/clips under pressure instead of pushing New/Edit/Fetch/Push off-screen.
+        add(leftPanel, BorderLayout.CENTER)
         add(toolbar.component, BorderLayout.EAST)
     }
 
-    open fun createOtherFilterComponents(filterPanel: JPanel) {}
+    open fun createOtherFilterComponents(): List<JujutsuFilterComponent> = emptyList()
 
     /**
-     * Create the filter components panel (Root, Reference, Author, Date, Paths).
+     * Create the filter action toolbar (Root, Reference, Author, Date, Paths). Backed by an
+     * [ActionToolbar] using [FilterPriorityLayoutStrategy] so filters that no longer fit the
+     * available width collapse into the standard "»" overflow popup — hiding unapplied filters
+     * before applied ones, without reordering whatever stays visible — rather than being pushed
+     * off-screen and becoming completely unreachable.
      */
-    private fun createFilterComponents() = JPanel().apply {
-        layout = BoxLayout(this, BoxLayout.X_AXIS)
-
-        createOtherFilterComponents(this)
+    private fun createFilterComponents(): JComponent {
+        val filters = mutableListOf<JujutsuFilterComponent>()
+        filters += createOtherFilterComponents()
 
         // Reference filter (bookmarks, tags, @)
         referenceFilterComponent =
@@ -215,24 +229,52 @@ abstract class CommitTablePanel<D>(
                 initialize()
             }
         Disposer.register(this@CommitTablePanel, referenceFilterComponent)
-        add(referenceFilterComponent)
-        add(Box.createHorizontalStrut(5))
+        filters += referenceFilterComponent
 
         // Author filter
         authorFilterComponent = JujutsuAuthorFilterComponent(logTable.logModel).apply {
             initUi()
             initialize()
         }
-        add(authorFilterComponent)
-        add(Box.createHorizontalStrut(5))
+        filters += authorFilterComponent
 
         // Date filter
         dateFilterComponent = JujutsuDateFilterComponent(logTable.logModel).apply {
             initUi()
             initialize()
         }
-        add(dateFilterComponent)
+        filters += dateFilterComponent
         // Note: Paths filter is omitted in unified mode as it requires a single root
+
+        val group = BackgroundActionGroup(*filters.map { FilterComponentAction(it) }.toTypedArray())
+        val toolbar = ActionManager.getInstance().createActionToolbar("JujutsuLogFilters", group, true).apply {
+            targetComponent = this@CommitTablePanel
+            layoutStrategy = FilterPriorityLayoutStrategy
+        }
+        return toolbar.component
+    }
+
+    /**
+     * Wraps a [JujutsuFilterComponent] as a toolbar action so it can participate in
+     * [FilterPriorityLayoutStrategy] overflow: clicking it (whether shown inline or selected from
+     * the "»" popup once collapsed) opens the filter's own selection popup.
+     */
+    private class FilterComponentAction(private val component: JujutsuFilterComponent) :
+        AnAction(),
+        CustomComponentAction {
+        override fun createCustomComponent(presentation: Presentation, place: String): JComponent = component
+
+        override fun updateCustomComponent(component: JComponent, presentation: Presentation) {
+            component.isEnabled = presentation.isEnabled
+        }
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabledAndVisible = component.isVisible
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            component.openPopup()
+        }
     }
 
     /**

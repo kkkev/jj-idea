@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Selecting a commit in the log no longer resets the table's horizontal scroll position. ([#51](https://github.com/kkkev/jj-idea/issues/51))
+- On a narrow log window, the filters no longer crowd out the New/Edit/Refresh/Fetch/Push/Columns buttons. Filters that don't fit collapse into a "»" menu instead, with any filter you've actually applied kept visible longer than ones you haven't. ([#51](https://github.com/kkkev/jj-idea/issues/51))
+- The New button in the log toolbar now greys out instead of disappearing when there's no selection, matching how the Edit button already behaved.
 
 ## [0.7.14] - 2026-07-11
 
