@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.14/jj-idea-0.7.14.zip" version="0.7.14">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.15/jj-idea-0.7.15.zip" version="0.7.15">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,13 +23,22 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.14</h3>
+      <h3>0.7.15</h3>
       
+<h4>Added</h4>
+<li>"Compare with Working Copy" in the log's right-click menu diffs every file that differs between the selected commit and your working copy, in one editor tab with the working-copy side editable — handy for reviewing everything since a target commit and editing it directly for a final `jj absorb`. ([#40](https://github.com/kkkev/jj-idea/issues/40))</li>
+<li>The References/Bookmarks selector above the log now also lists bookmarks that exist only on a remote and aren't tracked locally, shown as `name@remote` with a distinct icon, so you can start work off a remote branch without tracking it first. ([#47](https://github.com/kkkev/jj-idea/issues/47))</li>
+<li>New "Tracked" checkbox in the right-click menu for selected files (Project view, editor, Working Copy panel, Commit view) that match a `.gitignore` rule lets you force-include or stop tracking them, without touching `.gitignore` by hand. The checkbox updates instantly, and a notification confirms what happened (or explains why it didn't). ([#42](https://github.com/kkkev/jj-idea/issues/42))</li>
+<li>The commit details panel now shows the author's (and committer's, when different) email address alongside their name, as a clickable mail link, with the date/time kept together on one line when it wraps. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>New "New Change" quick action creates a change without prompting for a description upfront (the common case, since you'll usually squash it in later). It's the primary option in the log's right-click menu (the old dialog-based flow is kept as "New Change with Description..."), and is bound to Cmd/Ctrl+Shift+N while the log is focused. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>New and Edit buttons in the log toolbar act on the selected change with one click, without opening the right-click menu. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>New "Fit Columns to Window Width" option (Columns menu) shrinks the description and other columns as the log window narrows so horizontal scrolling is rarely needed, e.g. on a laptop screen or with the details pane docked beside the log. On by default for tabs you haven't customized; tabs where you've already resized a column keep your exact layout and scrolling as before. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+
 <h4>Fixed</h4>
-<li>The plugin no longer bundles its own copy of the Kotlin standard library, reducing plugin size since the IDE already provides it. ([#41](https://github.com/kkkev/jj-idea/issues/41))</li>
-<li>Annotate (blame) no longer logs a spurious error when the project window is closed while an annotation is loading. ([#45](https://github.com/kkkev/jj-idea/issues/45))</li>
-<li>File-change actions (Open, Compare, Restore, etc.) no longer throw an error when a change from another VCS (e.g. Git in a colocated repository, or an unrelated VCS backend) is selected alongside or instead of a Jujutsu change. ([#50](https://github.com/kkkev/jj-idea/issues/50))</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.14">full release notes</a> for details.</p>
+<li>Selecting a commit in the log no longer resets the table's horizontal scroll position. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>On a narrow log window, the filters no longer crowd out the New/Edit/Refresh/Fetch/Push/Columns buttons. Filters that don't fit collapse into a "»" menu instead, with any filter you've actually applied kept visible longer than ones you haven't. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>The New button in the log toolbar now greys out instead of disappearing when there's no selection, matching how the Edit button already behaved.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.15">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

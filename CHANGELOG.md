@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.15] - 2026-07-18
+
 ### Added
 - "Compare with Working Copy" in the log's right-click menu diffs every file that differs between the selected commit and your working copy, in one editor tab with the working-copy side editable — handy for reviewing everything since a target commit and editing it directly for a final `jj absorb`. ([#40](https://github.com/kkkev/jj-idea/issues/40))
 - The References/Bookmarks selector above the log now also lists bookmarks that exist only on a remote and aren't tracked locally, shown as `name@remote` with a distinct icon, so you can start work off a remote branch without tracking it first. ([#47](https://github.com/kkkev/jj-idea/issues/47))
@@ -665,7 +667,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.14...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.15...HEAD
+[0.7.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.15
 [0.7.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.14
 [0.7.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.13
 [0.7.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.12
