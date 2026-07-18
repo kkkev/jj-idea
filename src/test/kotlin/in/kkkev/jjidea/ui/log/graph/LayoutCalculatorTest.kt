@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log.graph
 
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
+import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -173,7 +174,7 @@ class LayoutCalculatorTest {
         val layout = calculator.calculate(entries)
 
         layout.rows[0].lane shouldBe 0
-        layout.rows[0].parentLanes shouldContainExactlyInAnyOrder listOf(0, 1)
+        layout.rows[0].parentLanes shouldBe listOf(0, 1) // order matters: B (first) left, C right
         layout.rows[1].lane shouldBe 0 // B can use lane 0 (passthrough to C is at lane 1)
         layout.rows[2].lane shouldBe 1 // C at lane 1 (reserved by pure merge passthrough)
     }
@@ -502,5 +503,85 @@ class LayoutCalculatorTest {
         layout.rows[1].lane shouldBe 2 // S blocked by passthroughs at 0 and 1
         layout.rows[2].lane shouldBe 0 // P1 - first parent keeps child's lane
         layout.rows[3].lane shouldBe 1 // P2 - second parent gets new lane
+    }
+
+    // 15. Merge with adjacent SECOND parent, non-adjacent FIRST parent
+    //
+    // Regression test for jj-idea-fdux / GitHub #51.2: the first parent (mainline) must
+    // keep the child's lane even when a later parent happens to be adjacent. Previously,
+    // any adjacent parent (not just the first) disqualified the "use child's lane" branch,
+    // causing the adjacent second parent to steal lane 0 and render the merge with the
+    // first parent (trunk) on the right and swapped edge colours.
+    //
+    // Structure:
+    //   M → P1, P2  (merge; P1 first/non-adjacent, P2 second/adjacent)
+    //   P2          (adjacent - row 1)
+    //   P1          (non-adjacent - row 2)
+    @Test
+    fun `merge with adjacent second parent - first parent still keeps child lane`() {
+        val m = "M"
+        val p1 = "P1"
+        val p2 = "P2"
+
+        val entries = listOf(
+            GraphEntry(m, listOf(p1, p2)), // Row 0: merge
+            GraphEntry(p2, emptyList()), // Row 1: second parent adjacent
+            GraphEntry(p1, emptyList()) // Row 2: first parent non-adjacent
+        )
+        val layout = calculator.calculate(entries)
+
+        layout.rows[0].lane shouldBe 0
+        layout.rows[0].parentLanes shouldBe listOf(0, 1) // order matters: P1 (first) left, P2 right
+        layout.rows[0].passthroughLanes[p1] shouldBe 0 // first parent keeps child's lane
+        layout.rows[1].lane shouldBe 1 // P2 pushed off lane 0 (blocked by M->P1 passthrough)
+        layout.rows[2].lane shouldBe 0 // P1 keeps child's lane
+    }
+
+    // 16. Octopus merge (4 parents) where a NON-FIRST parent (P2) is adjacent
+    //
+    // Regression test for jj-idea-fdux / GitHub #51.2 follow-up: with 3+ parents, an
+    // adjacent parent that ISN'T first must still land in its correct left-to-right
+    // slot among its siblings — not wherever its own row's default lane placement
+    // happens to find free. Every non-first Pure Merge parent (adjacent or not) now
+    // gets an explicit, order-increasing lane reservation.
+    //
+    // Structure:
+    //   M → P1, P2, P3, P4  (octopus merge; only P2 is adjacent)
+    //   P2                  (row 1 - adjacent)
+    //   P1                  (row 2 - non-adjacent)
+    //   P3                  (row 3 - non-adjacent)
+    //   P4                  (row 4 - non-adjacent)
+    @Test
+    fun `octopus merge with non-first adjacent parent - all parents in order`() {
+        val m = "M"
+        val p1 = "P1"
+        val p2 = "P2"
+        val p3 = "P3"
+        val p4 = "P4"
+
+        val entries = listOf(
+            GraphEntry(m, listOf(p1, p2, p3, p4)), // Row 0: octopus merge
+            GraphEntry(p2, emptyList()), // Row 1: second parent, adjacent
+            GraphEntry(p1, emptyList()), // Row 2: first parent, non-adjacent
+            GraphEntry(p3, emptyList()), // Row 3: third parent, non-adjacent
+            GraphEntry(p4, emptyList()) // Row 4: fourth parent, non-adjacent
+        )
+        val layout = calculator.calculate(entries)
+
+        layout.rows[0].lane shouldBe 0
+        // ORDER matters: lanes strictly increase left-to-right matching parentIds order,
+        // even though P2 (index 1) is the adjacent one, not P1 or a trailing parent.
+        layout.rows[0].parentLanes shouldBe listOf(0, 1, 2, 3)
+        layout.rows[0].passthroughLanes[p1] shouldBe 0 // first parent keeps child's lane
+        layout.rows[0].passthroughLanes[p3] shouldBe 2
+        layout.rows[0].passthroughLanes[p4] shouldBe 3
+        // P2 has no passthrough entry (adjacent - no line spans multiple rows) but is
+        // still pinned to lane 1 via an explicit reservation.
+        layout.rows[0].passthroughLanes shouldNotContainKey p2
+
+        layout.rows[1].lane shouldBe 1 // P2 pinned to its reserved lane, not pushed further right
+        layout.rows[2].lane shouldBe 0 // P1 keeps child's lane
+        layout.rows[3].lane shouldBe 2 // P3
+        layout.rows[4].lane shouldBe 3 // P4
     }
 }

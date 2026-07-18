@@ -286,8 +286,8 @@ class JujutsuGraphAndDescriptionRenderer(
 
             val childHasMultipleParents = node.parentLanes.size > 1
 
-            for ((parentIndex, parentId) in currentEntry.parentIds.withIndex()) {
-                val parentLane = node.parentLanes.getOrNull(parentIndex) ?: continue
+            for (parentId in currentEntry.parentIds) {
+                val parentLane = graphNodes[parentId]?.lane ?: continue
 
                 val passThroughLane = node.passthroughLanes[parentId]
                 val targetLane = passThroughLane

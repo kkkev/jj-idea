@@ -104,18 +104,45 @@ For each row, processed top to bottom:
 - For each parent of this entry:
   - Add `{childId: this entry's ID, childLane: this entry's lane}` to `childrenByParent[parentId]`
 
-#### Step 4: Create passthroughs for parents not in the next row
+#### Step 4: Classify each parent and create passthroughs for the non-adjacent ones
 
-- For each parent of this entry that is not in the immediately next row:
+- Walk **all** of this entry's parents present in the loaded rows, **in parent order**
+  (first parent first). A parent absent from the loaded rows (filtered/off-screen) is
+  skipped entirely — no lane, passthrough, or reservation is created for it, since its
+  row will never be processed to terminate/consume one.
   - Classify the connection:
-    - **If this entry has only 1 parent**: Simple/Fork → passthrough uses child's lane
+    - **If this entry has only 1 parent**: Simple/Fork → uses child's lane
     - **If this entry has multiple parents**:
       - Check if the parent already has other children (from earlier rows)
-      - **If parent has other children**: Fork+Merge → passthrough uses child's lane
-      - **If parent has no other children**: Pure Merge → passthrough uses a NEW lane (reserve it for the parent)
-  - Create a passthrough with:
-    - `lane`: determined by classification above
+      - **If parent has other children**: Fork+Merge → uses child's lane
+      - **If parent has no other children**: Pure Merge:
+        - **If the child's lane hasn't been claimed by an earlier parent yet**: this
+          parent uses the child's lane. Because parents are processed in list order, this
+          is always the first (visible) parent — the mainline stays in the child's lane
+          even when it isn't in the very next row.
+        - **Otherwise** (a later Pure Merge parent, once the child's lane is already
+          claimed): allocate a **NEW** lane and reserve it for that parent, regardless of
+          whether the parent happens to be adjacent or not. The reservation pins the
+          parent's own row to that lane (reservations are checked first in lane
+          assignment), so its final position still matches its place in the parent list.
+  - If the parent is **not** in the immediately next row, create a passthrough with:
+    - `lane`: the lane determined by classification above
     - `targetParentId`: the parent's change ID
+  - If the parent **is** in the immediately next row, no passthrough is needed — but a
+    NEW-lane reservation (above) is still created when applicable, so an adjacent
+    non-first parent doesn't fall through to whatever lane its own row's default
+    placement finds free.
+
+  **Why every non-first Pure Merge parent needs an explicit reservation:** `jj`/git treat
+  parent order as meaningful (first parent = mainline). Only one parent per row can ever
+  be literally adjacent (occupy the very next row) — but with 3+ parents (an octopus
+  merge), that adjacent parent need not be the first one. Without an explicit reservation,
+  an adjacent non-first parent's lane is decided later, by its own row's generic
+  "lowest free lane" placement — which has no notion of where it belongs among its
+  siblings, and can land it to the right of parents that appear later in the list.
+  Reserving a lane for every non-first Pure Merge parent up front — whether adjacent or
+  not — keeps all parents in strict left-to-right order matching `parentIds`, with edge
+  colours (lane-derived) following suit.
 
 #### Step 5: Pass active passthroughs to the next row
 

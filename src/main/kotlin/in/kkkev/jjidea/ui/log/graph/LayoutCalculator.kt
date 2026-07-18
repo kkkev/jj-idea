@@ -61,19 +61,12 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                     .add(ChildInfo(entry.current, lane))
             }
 
-            // Step 4: Create passthroughs for non-adjacent parents
-            operationCount += entry.parents.size
-            val nonAdjacentParents = entry.parents.filter { parentId ->
-                val parentRow = rowByChangeId[parentId]
-                parentRow != null && parentRow > rowIndex + 1
-            }
-
-            operationCount += entry.parents.size
-            val hasAdjacentParent = entry.parents.any { parentId ->
-                rowByChangeId[parentId] == rowIndex + 1
-            }
-
-            // Track which lanes are already used (passthroughs + this entry's lane + remaining reservations)
+            // Step 4: Classify each parent and, for non-adjacent ones, create a passthrough.
+            // Walk ALL parents (not just non-adjacent ones) in order: a Pure Merge parent
+            // other than the first must get an explicit, order-increasing lane reservation
+            // even when it happens to be adjacent — otherwise its own row's natural
+            // "lowest free lane" placement can land it anywhere, out of sequence with its
+            // non-adjacent siblings (see LOG_GRAPH_ALGORITHM.md).
             operationCount += currentPassthroughLanes.size + reservedLanes.size
             val usedLanes = HashSet(currentPassthroughLanes)
             usedLanes.add(lane)
@@ -82,9 +75,23 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
             val newPassthroughs = mutableSetOf<Passthrough<I>>()
 
             val childHasMultipleParents = entry.parents.size > 1
+            // Tracks whether some parent has already claimed the child's lane. Iteration is
+            // in parents-list order, so the first eligible (Simple/Fork/Fork+Merge, or the
+            // first Pure Merge parent) parent to reach a branch below wins — for a normal
+            // merge that's parents[0], preserving the "mainline stays put" convention; if
+            // parents[0] is filtered out of the loaded entries (see the continue below), the
+            // first still-visible parent takes over the role, which is the sensible default.
             var childLaneUsed = false
 
-            for (parentId in nonAdjacentParents) {
+            operationCount += entry.parents.size
+            for (parentId in entry.parents) {
+                // Parents not present in the loaded entry set (filtered/off-screen) get no
+                // lane/passthrough bookkeeping at all — a passthrough or reservation for
+                // them would never be terminated/consumed (their row never gets processed),
+                // leaking a lane for the rest of the graph.
+                val parentRow = rowByChangeId[parentId] ?: continue
+                val isAdjacent = parentRow == rowIndex + 1
+
                 operationCount += childrenByParent[parentId]?.size ?: 0
                 val parentHasOtherChildren = childrenByParent[parentId]
                     ?.any { it.id != entry.current } == true
@@ -93,25 +100,29 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 // - Not a merge (child has 1 parent): use child's lane (simple/fork)
                 // - Fork+Merge (merge + parent has other children): use child's lane
                 // - Pure Merge (merge + parent has no other children):
-                //     - If there are adjacent parents: use NEW lane (avoid blocking adjacent parent)
-                //     - If NO adjacent parents AND child's lane not yet used: first uses child's lane
-                //     - Otherwise: use NEW lane
-                val passLane = if (!childHasMultipleParents || parentHasOtherChildren) {
+                //     - First (visible) parent, lane still free: keep child's lane
+                //       (mainline stays put)
+                //     - Otherwise (any later parent, adjacent or not): allocate a NEW lane,
+                //       in parent order, so siblings render left-to-right matching parentIds
+                if (!childHasMultipleParents || parentHasOtherChildren) {
                     // Simple, Fork, or Fork+Merge: use child's lane
                     childLaneUsed = true
-                    lane
-                } else if (!hasAdjacentParent && !childLaneUsed) {
-                    // Pure Merge with no adjacent parents and child's lane free: use child's lane
+                    if (!isAdjacent) newPassthroughs.add(Passthrough(lane = lane, targetParentId = parentId))
+                } else if (!childLaneUsed) {
+                    // First pure-merge parent, lane still free: keep child's lane. If
+                    // adjacent, its own row naturally picks up the (still-unclaimed) child's
+                    // lane next — no reservation/passthrough needed here.
                     childLaneUsed = true
-                    lane
+                    if (!isAdjacent) newPassthroughs.add(Passthrough(lane = lane, targetParentId = parentId))
                 } else {
-                    // Pure Merge: allocate new lane, reserve it for parent
+                    // Pure Merge, not the first (visible) parent: allocate a new lane and
+                    // reserve it, so its own row-lane-assignment is pinned here regardless
+                    // of adjacency.
                     val newLane = firstFreeLane(usedLanes)
                     usedLanes.add(newLane)
                     reservedLanes[parentId] = newLane
-                    newLane
+                    if (!isAdjacent) newPassthroughs.add(Passthrough(lane = newLane, targetParentId = parentId))
                 }
-                newPassthroughs.add(Passthrough(lane = passLane, targetParentId = parentId))
             }
 
             lanes[entry.current] = lane
