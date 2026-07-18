@@ -41,6 +41,25 @@ Use this checklist:
 - [ ] Column widths persist across IDE restarts
 - [ ] Column visibility persists across IDE restarts
 
+#### Responsive column sizing (jj-idea-lzq7)
+
+- [ ] Open a fresh log tab (or one where you've never dragged a column). The Columns menu's
+      "Fit Columns to Window Width" is checked by default. Drag the tool window narrow: the
+      description column shrinks and no horizontal scrollbar appears until the window is very
+      narrow; author/date visibly narrow (and ellipsize) before any scrollbar appears
+- [ ] With that tab still narrow, dock the commit-details pane to the right (Details position):
+      the table re-fits to the remaining width with no scrollbar; widen the window back out and
+      the columns grow back
+- [ ] In a tab with a column you dragged before this change shipped (or drag one now, then
+      reopen the tab), "Fit Columns to Window Width" defaults to unchecked and the layout/
+      scrollbar behavior is exactly as before
+- [ ] Toggle "Fit Columns to Window Width" off and on in the Columns menu; behavior switches
+      between responsive and manual immediately, and the choice persists across closing and
+      reopening the tab
+- [ ] With fit-to-width on, manually widen the author column via drag, then narrow the window:
+      the chosen author width is remembered (the column returns to it on widen) and persists
+      across reopening the tab
+
 ### Graph Rendering
 
 - [ ] Graph lines render correctly for linear history

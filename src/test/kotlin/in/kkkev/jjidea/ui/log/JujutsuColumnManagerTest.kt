@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import `in`.kkkev.jjidea.settings.LogWindowConfig
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
@@ -123,5 +124,63 @@ class JujutsuColumnManagerTest {
         manager.showChangeId shouldBe true
         manager.showDescription shouldBe true
         manager.showDecorations shouldBe true
+    }
+
+    // jj-idea-lzq7: fitColumnsToWidth smart-default migration.
+    // A never-resolved config with no persisted column widths (fresh tab, or an existing tab
+    // where the user never dragged a column) defaults to responsive sizing.
+
+    @Test
+    fun `loadFrom defaults fitColumnsToWidth on for an unresolved config with no saved widths`() {
+        val manager = JujutsuColumnManager()
+        val config = LogWindowConfig()
+
+        manager.loadFrom(config)
+
+        manager.fitColumnsToWidth shouldBe true
+        config.fitColumnsToWidth shouldBe true
+        config.fitColumnsToWidthResolved shouldBe true
+    }
+
+    @Test
+    fun `loadFrom defaults fitColumnsToWidth off for an unresolved config with saved widths`() {
+        val manager = JujutsuColumnManager()
+        val config = LogWindowConfig().apply {
+            columnWidths[JujutsuLogTableModel.KEY_AUTHOR] = 150
+        }
+
+        manager.loadFrom(config)
+
+        manager.fitColumnsToWidth shouldBe false
+        config.fitColumnsToWidth shouldBe false
+        config.fitColumnsToWidthResolved shouldBe true
+    }
+
+    @Test
+    fun `loadFrom does not re-derive the default once resolved`() {
+        val manager = JujutsuColumnManager()
+        // Already resolved to "on" even though widths are present - a later column drag by a
+        // user in responsive mode must not silently flip the mode back off.
+        val config = LogWindowConfig().apply {
+            columnWidths[JujutsuLogTableModel.KEY_AUTHOR] = 150
+            fitColumnsToWidth = true
+            fitColumnsToWidthResolved = true
+        }
+
+        manager.loadFrom(config)
+
+        manager.fitColumnsToWidth shouldBe true
+        config.fitColumnsToWidth shouldBe true
+    }
+
+    @Test
+    fun `saveTo persists fitColumnsToWidth and marks it resolved`() {
+        val manager = JujutsuColumnManager().apply { fitColumnsToWidth = false }
+        val config = LogWindowConfig()
+
+        manager.saveTo(config)
+
+        config.fitColumnsToWidth shouldBe false
+        config.fitColumnsToWidthResolved shouldBe true
     }
 }

@@ -24,6 +24,13 @@ data class LogWindowConfig(
     var showDecorations: Boolean = true,
     // Column widths (keyed by JujutsuLogTableModel.KEY_* constants)
     var columnWidths: MutableMap<String, Int> = mutableMapOf(),
+    // Whether the graph+description column flexes to fill the window width, squeezing
+    // author/committer/date before falling back to horizontal scroll (jj-idea-lzq7).
+    var fitColumnsToWidth: Boolean = true,
+    // One-time migration marker: false until the smart default for fitColumnsToWidth has
+    // been resolved (see JujutsuColumnManager.loadFrom). Prevents a later column drag from
+    // silently re-deriving (and flipping) the mode.
+    var fitColumnsToWidthResolved: Boolean = false,
     // Filter / search state
     var searchText: String = "",
     var useRegex: Boolean = false,

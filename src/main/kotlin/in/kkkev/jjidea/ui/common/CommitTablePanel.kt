@@ -443,6 +443,27 @@ abstract class CommitTablePanel<D>(
         }
     }
 
+    /**
+     * Toggle for "Fit columns to window width" (jj-idea-lzq7): flexes the graph+description
+     * column and squeezes the fixed columns to avoid horizontal scroll, vs. honoring each
+     * column's exact persisted width (today's manual-scroll behavior). Unlike [ToggleColumnAction]
+     * this doesn't rebuild the column model - it only needs to re-run the width policy.
+     */
+    private inner class FitColumnsToWidthAction :
+        ToggleAction(
+            JujutsuBundle.message("log.column.toggle.fitwidth"),
+            JujutsuBundle.message("log.column.toggle.fitwidth.tooltip"),
+            null
+        ) {
+        override fun isSelected(e: AnActionEvent) = columnManager.fitColumnsToWidth
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            columnManager.fitColumnsToWidth = state
+            logTable.applyColumnWidthPolicy()
+            onConfigChanged()
+        }
+    }
+
     fun createColumnsActionGroup() = DefaultActionGroup().apply {
         addAction(ToggleColumnAction("status", JujutsuColumnManager::showStatus))
         addAction(ToggleColumnAction("changeid", JujutsuColumnManager::showChangeId))
@@ -452,6 +473,8 @@ abstract class CommitTablePanel<D>(
         addAction(ToggleColumnAction("author", JujutsuColumnManager::showAuthorColumn))
         addAction(ToggleColumnAction("committer", JujutsuColumnManager::showCommitterColumn))
         addAction(ToggleColumnAction("date", JujutsuColumnManager::showDateColumn))
+        addSeparator()
+        addAction(FitColumnsToWidthAction())
     }
 
     /**

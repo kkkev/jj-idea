@@ -234,6 +234,66 @@ class JujutsuLogTableColumnTest {
         result shouldBe Rectangle(0, 180, 200, 20)
     }
 
+    // jj-idea-lzq7: responsive column sizing. fixed columns below model author(100)/committer(100)/date(120).
+
+    @Test
+    fun `fitColumnWidths gives all leftover space to description on a wide viewport`() {
+        val fixed = listOf(FixedColumn(desired = 100, min = 55), FixedColumn(desired = 120, min = 60))
+
+        val layout = fitColumnWidths(available = 1000, descMin = 180, fixed = fixed)
+
+        layout.desc shouldBe 1000 - 100 - 120
+        layout.fixed shouldBe listOf(100, 120)
+    }
+
+    @Test
+    fun `fitColumnWidths gives description exactly its floor when space is an exact fit`() {
+        val fixed = listOf(FixedColumn(desired = 100, min = 55), FixedColumn(desired = 120, min = 60))
+
+        val layout = fitColumnWidths(available = 180 + 100 + 120, descMin = 180, fixed = fixed)
+
+        layout.desc shouldBe 180
+        layout.fixed shouldBe listOf(100, 120)
+    }
+
+    @Test
+    fun `fitColumnWidths shrinks fixed columns proportionally toward their minimums when narrow`() {
+        // descMin=180, fixed desired 100+120=220, total desired = 400. Available = 350, so
+        // fixed columns must give back 50px total; author has 45 shrinkable (100-55), date has
+        // 60 shrinkable (120-60), total shrinkable = 105 - both have room, so both shrink.
+        val fixed = listOf(FixedColumn(desired = 100, min = 55), FixedColumn(desired = 120, min = 60))
+
+        val layout = fitColumnWidths(available = 350, descMin = 180, fixed = fixed)
+
+        layout.desc shouldBe 180
+        // author: 100 - 50*45/105 = 100 - 21 = 79 (integer division truncates); date: 120 - 50*60/105 = 120 - 28 = 92
+        layout.fixed shouldBe listOf(79, 92)
+        // Total lands within a few px of available - integer-division truncation on each fixed
+        // column's share means the reclaimed total can undershoot the exact shortfall slightly.
+        (layout.desc + layout.fixed.sum()) shouldBe 351
+    }
+
+    @Test
+    fun `fitColumnWidths floors everything and allows overflow when even minimums do not fit`() {
+        val fixed = listOf(FixedColumn(desired = 100, min = 55), FixedColumn(desired = 120, min = 60))
+
+        // Available is less than descMin + sum(min) = 180 + 55 + 60 = 295: no room left to shrink.
+        val layout = fitColumnWidths(available = 200, descMin = 180, fixed = fixed)
+
+        layout.desc shouldBe 180
+        layout.fixed shouldBe listOf(55, 60)
+        // Total exceeds available - this is the accepted horizontal-scroll fallback.
+        (layout.desc + layout.fixed.sum()) shouldBe 295
+    }
+
+    @Test
+    fun `fitColumnWidths with no fixed columns gives everything to description`() {
+        val layout = fitColumnWidths(available = 500, descMin = 180, fixed = emptyList())
+
+        layout.desc shouldBe 500
+        layout.fixed shouldBe emptyList()
+    }
+
     // Helper function to create test log entries
     private fun createTestEntry(
         changeId: String,

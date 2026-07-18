@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.util.ui.JBUI
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
@@ -207,6 +208,17 @@ private val DEFAULT_COLUMN_WIDTHS = mapOf(
 )
 
 /**
+ * Minimum widths used both as hard [javax.swing.table.TableColumn] floors and as the shrink
+ * targets for [fitColumnWidths] when "Fit columns to window width" is on (jj-idea-lzq7). Lower
+ * than the historical minimums (80/80/70) so the fixed columns can collapse further - down to an
+ * ellipsized name/date - before a horizontal scrollbar becomes necessary.
+ */
+private val DESC_MIN_WIDTH = JBUI.scale(180)
+private val AUTHOR_MIN_WIDTH = JBUI.scale(55)
+private val COMMITTER_MIN_WIDTH = JBUI.scale(55)
+private val DATE_MIN_WIDTH = JBUI.scale(60)
+
+/**
  * Install all custom renderers on the given table.
  * Note: Combined graph+description renderer is installed separately when graph data is loaded.
  * Only installs renderers for columns that are actually present in the column model.
@@ -235,26 +247,31 @@ fun JujutsuLogTable.installRenderers() {
                 column.cellRenderer = JujutsuGraphAndDescriptionRenderer(graphNodes, columnManager)
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
+                column.minWidth = DESC_MIN_WIDTH
                 column.maxWidth = Int.MAX_VALUE
             }
             JujutsuLogTableModel.COLUMN_AUTHOR -> {
                 column.cellRenderer = authorRenderer
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
-                column.minWidth = 80
+                column.minWidth = AUTHOR_MIN_WIDTH
             }
             JujutsuLogTableModel.COLUMN_COMMITTER -> {
                 column.cellRenderer = committerRenderer
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
-                column.minWidth = 80
+                column.minWidth = COMMITTER_MIN_WIDTH
             }
             JujutsuLogTableModel.COLUMN_DATE -> {
                 column.cellRenderer = dateRenderer
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
-                column.minWidth = 70
+                column.minWidth = DATE_MIN_WIDTH
             }
         }
     }
+    // Columns just got (re)installed at their default/desired widths - re-fit against the
+    // current viewport (e.g. after a column-visibility toggle) rather than waiting for the
+    // next resize event.
+    applyColumnWidthPolicy()
 }

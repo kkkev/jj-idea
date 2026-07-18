@@ -31,6 +31,7 @@ import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.*
 import javax.swing.JComponent
+import javax.swing.JViewport
 import javax.swing.ListSelectionModel
 import javax.swing.ScrollPaneConstants
 import javax.swing.event.ChangeEvent
@@ -266,8 +267,17 @@ class JujutsuLogTable(
                     // for programmatic changes (installRenderers, loadColumnWidths, etc.).
                     // Saving during init would clobber user-saved widths with defaults before
                     // they can be restored. Same idiom as VcsLogGraphTable.MyTableColumnModel.
-                    if (tableHeader.resizingColumn == null) return
+                    val resizing = tableHeader.resizingColumn ?: return
+                    // The user's dragged size becomes the new desired width (preferredWidth),
+                    // distinct from the possibly-squeezed displayed width (see applyColumnWidthPolicy).
+                    resizing.preferredWidth = resizing.width
                     saveColumnWidths()
+                    // Rebalance the flex description column against the newly-desired fixed width.
+                    val resizedFixedColumn =
+                        resizing.modelIndex != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION
+                    if (columnManager.fitColumnsToWidth && resizedFixedColumn) {
+                        applyColumnWidthPolicy()
+                    }
                 }
 
                 override fun columnAdded(e: TableColumnModelEvent) {}
@@ -316,14 +326,40 @@ class JujutsuLogTable(
             }
         )
 
-        // Add component resize listener for dynamic column width adjustment
+        // Add component resize listener for dynamic column width adjustment. Backup for
+        // viewportResizeListener below - the table itself only resizes when its own preferred
+        // width changes (e.g. gutter toggle), since AUTO_RESIZE_OFF means the table doesn't
+        // track the viewport's width.
         addComponentListener(
             object : ComponentAdapter() {
                 override fun componentResized(e: ComponentEvent?) {
-                    adjustDescriptionColumnWidth()
+                    applyColumnWidthPolicy()
                 }
             }
         )
+    }
+
+    /**
+     * Listens for the enclosing [JViewport] resizing (e.g. the tool window narrowing, or the
+     * details pane docking beside the table). With `autoResizeMode = AUTO_RESIZE_OFF` the table
+     * itself never shrinks below the sum of its column widths, so `componentResized` on the table
+     * never fires for this - only the viewport observes the actual available width.
+     */
+    private val viewportResizeListener = object : ComponentAdapter() {
+        override fun componentResized(e: ComponentEvent?) {
+            applyColumnWidthPolicy()
+        }
+    }
+
+    override fun addNotify() {
+        super.addNotify()
+        (parent as? JViewport)?.addComponentListener(viewportResizeListener)
+        applyColumnWidthPolicy()
+    }
+
+    override fun removeNotify() {
+        (parent as? JViewport)?.removeComponentListener(viewportResizeListener)
+        super.removeNotify()
     }
 
     /**
@@ -507,6 +543,10 @@ class JujutsuLogTable(
     /**
      * Save current column widths.
      *
+     * Saves [TableColumn.getPreferredWidth], the user's *desired* size, not
+     * [TableColumn.getWidth] which may be transiently squeezed by [applyColumnWidthPolicy] on a
+     * narrow window - so a saved width always reflects what the user actually chose (jj-idea-lzq7).
+     *
      * If [columnWidthsStorage] is set, writes there and calls [onColumnWidthsSaved].
      * Otherwise falls back to the global [JujutsuSettings.state.columnWidths].
      */
@@ -515,7 +555,7 @@ class JujutsuLogTable(
         if (storage != null) {
             for (i in 0 until columnModel.columnCount) {
                 val column = columnModel.getColumn(i)
-                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> storage[key] = column.width }
+                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> storage[key] = column.preferredWidth }
             }
             onColumnWidthsSaved?.invoke()
         } else {
@@ -523,7 +563,7 @@ class JujutsuLogTable(
             val widths = settings.state.columnWidths.toMutableMap()
             for (i in 0 until columnModel.columnCount) {
                 val column = columnModel.getColumn(i)
-                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> widths[key] = column.width }
+                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> widths[key] = column.preferredWidth }
             }
             settings.state.columnWidths = widths
         }
@@ -537,37 +577,83 @@ class JujutsuLogTable(
      */
     fun loadColumnWidths() {
         val savedWidths = columnWidthsStorage ?: JujutsuSettings.getInstance(project).state.columnWidths
-        if (savedWidths.isEmpty()) return
-        for (i in 0 until columnModel.columnCount) {
-            val column = columnModel.getColumn(i)
-            val key = JujutsuLogTableModel.columnKey(column.modelIndex) ?: continue
-            val savedWidth = savedWidths[key]
-            if (savedWidth != null && savedWidth > 0) {
-                column.preferredWidth = savedWidth
-                column.width = savedWidth
+        if (savedWidths.isNotEmpty()) {
+            for (i in 0 until columnModel.columnCount) {
+                val column = columnModel.getColumn(i)
+                val key = JujutsuLogTableModel.columnKey(column.modelIndex) ?: continue
+                val savedWidth = savedWidths[key]
+                if (savedWidth != null && savedWidth > 0) {
+                    column.preferredWidth = savedWidth
+                    column.width = savedWidth
+                }
             }
+        }
+        // Re-fit against the restored desired widths in case this runs before the first
+        // viewport resize event (e.g. tab restore, column-visibility change).
+        applyColumnWidthPolicy()
+    }
+
+    // Reentrancy guard: applying computed widths mutates the column model, which can re-fire
+    // the resize listeners that call back into this method.
+    private var adjustingColumnWidths = false
+
+    /**
+     * Apply the current column-width policy: fit columns to the viewport (shrinking the
+     * description, then the fixed columns) when [JujutsuColumnManager.fitColumnsToWidth] is on,
+     * or restore each column to its desired ([TableColumn.getPreferredWidth]) size when off.
+     * Runs on viewport/table resize, column-visibility changes, and width restore.
+     */
+    fun applyColumnWidthPolicy() {
+        if (adjustingColumnWidths || columnModel.columnCount == 0) return
+        adjustingColumnWidths = true
+        try {
+            if (columnManager.fitColumnsToWidth) fitColumnsToViewport() else restoreDesiredColumnWidths()
+        } finally {
+            adjustingColumnWidths = false
         }
     }
 
-    /**
-     * Dynamically adjust description column to fill available width.
-     * Runs on component resize.
-     */
-    private fun adjustDescriptionColumnWidth() {
-        if (columnModel.columnCount == 0) return
-        val descColumn = (0 until columnModel.columnCount)
-            .map { columnModel.getColumn(it) }
-            .firstOrNull { it.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
-            ?: return
-        val otherColumnsWidth = (0 until columnModel.columnCount)
-            .map { columnModel.getColumn(it) }
-            .filter { it != descColumn }
-            .sumOf { it.width }
-        val availableWidth = width - otherColumnsWidth
-        if (availableWidth > descColumn.minWidth) {
-            descColumn.preferredWidth = availableWidth
-            descColumn.width = availableWidth
+    /** OFF mode: show every column at its desired width (today's manual-scroll behavior). */
+    private fun restoreDesiredColumnWidths() {
+        for (i in 0 until columnModel.columnCount) {
+            val column = columnModel.getColumn(i)
+            column.width = column.preferredWidth
         }
+        resizeAndRepaint()
+    }
+
+    /**
+     * ON mode: the graph+description column fills the leftover viewport width (shrinking the
+     * fixed columns toward their minimums first, per [fitColumnWidths]) instead of the table
+     * overflowing into a horizontal scrollbar. With `autoResizeMode = AUTO_RESIZE_OFF` the table
+     * always sizes itself to the sum of its column widths, never to the viewport, so the viewport
+     * (not `width`) is the source of truth for available space.
+     */
+    private fun fitColumnsToViewport() {
+        val viewportWidth = (parent as? JViewport)?.width ?: width
+        if (viewportWidth <= 0) return
+
+        val columns = (0 until columnModel.columnCount).map { columnModel.getColumn(it) }
+        val descColumn = columns.firstOrNull { it.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
+            ?: return
+        val pinnedWidth = columns
+            .filter { it.modelIndex == JujutsuLogTableModel.COLUMN_ROOT_GUTTER }
+            .sumOf { it.width }
+        val fixedColumns = columns.filter {
+            it != descColumn && it.modelIndex != JujutsuLogTableModel.COLUMN_ROOT_GUTTER
+        }
+
+        val layout = fitColumnWidths(
+            available = viewportWidth - pinnedWidth,
+            descMin = descColumn.minWidth,
+            fixed = fixedColumns.map { FixedColumn(desired = it.preferredWidth, min = it.minWidth) }
+        )
+        // Also update preferredWidth so a subsequent save (or a switch to manual mode) captures
+        // the fitted size rather than a stale default.
+        descColumn.preferredWidth = layout.desc
+        descColumn.width = layout.desc
+        fixedColumns.zip(layout.fixed).forEach { (column, w) -> column.width = w }
+        resizeAndRepaint()
     }
 
     override fun uiDataSnapshot(sink: DataSink) {
@@ -586,6 +672,36 @@ class JujutsuLogTable(
  */
 internal fun rowRectPreservingHorizontalScroll(rowRect: Rectangle, currentVisible: Rectangle): Rectangle =
     Rectangle(currentVisible.x, rowRect.y, currentVisible.width, rowRect.height)
+
+/** A shrinkable fixed-width column (author/committer/date) as input to [fitColumnWidths]. */
+internal data class FixedColumn(val desired: Int, val min: Int)
+
+/** Computed widths from [fitColumnWidths]: the flex graph+description column and each fixed column, in order. */
+internal data class ColumnLayout(val desc: Int, val fixed: List<Int>)
+
+/**
+ * Distribute [available] px (viewport width minus any pinned columns, e.g. the root gutter)
+ * across the flex graph+description column and [fixed] columns (author/committer/date).
+ *
+ * The description column fills whatever is left over after the fixed columns take their
+ * [FixedColumn.desired] width, but never drops below [descMin]. When it would, the fixed columns
+ * give back space by shrinking proportionally from their desired width toward their
+ * [FixedColumn.min] (each column's share of the shortfall is proportional to its own shrinkable
+ * range, so a column with more room to give gives more). Only when every fixed column is already
+ * at its minimum and the description is still at its floor does the total exceed [available] -
+ * horizontal scroll is the last-resort fallback in that case (jj-idea-lzq7).
+ */
+internal fun fitColumnWidths(available: Int, descMin: Int, fixed: List<FixedColumn>): ColumnLayout {
+    val descFill = available - fixed.sumOf { it.desired }
+    if (descFill >= descMin) return ColumnLayout(descFill, fixed.map { it.desired })
+
+    val shortfall = descMin - descFill
+    val shrinkable = fixed.sumOf { it.desired - it.min }
+    if (shrinkable <= 0) return ColumnLayout(descMin, fixed.map { it.min })
+
+    val reclaim = minOf(shortfall, shrinkable)
+    return ColumnLayout(descMin, fixed.map { it.desired - reclaim * (it.desired - it.min) / shrinkable })
+}
 
 /**
  * Table model for Jujutsu commit log.

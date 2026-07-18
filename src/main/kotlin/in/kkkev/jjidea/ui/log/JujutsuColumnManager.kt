@@ -11,6 +11,10 @@ class JujutsuColumnManager {
     var showDescription: Boolean = true
     var showDecorations: Boolean = true
 
+    // Whether the graph+description column flexes to fill the window width, squeezing
+    // author/committer/date before falling back to horizontal scroll (jj-idea-lzq7).
+    var fitColumnsToWidth: Boolean = true
+
     fun getVisibleColumns(): List<Int> = buildList {
         if (showRootGutterColumn) add(JujutsuLogTableModel.COLUMN_ROOT_GUTTER)
         add(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
@@ -37,6 +41,17 @@ class JujutsuColumnManager {
         showChangeId = config.showChangeId
         showDescription = config.showDescription
         showDecorations = config.showDecorations
+
+        if (!config.fitColumnsToWidthResolved) {
+            // First load after upgrade / first run for this tab: a non-empty columnWidths map
+            // means the user has explicitly dragged a column (saveColumnWidths only writes on
+            // user resize - see JujutsuLogTable.columnMarginChanged), so preserve their manual
+            // layout by leaving fit-to-width off; otherwise default to responsive (jj-idea-lzq7).
+            // Resolved once and frozen so a later drag can't silently flip the mode back off.
+            config.fitColumnsToWidth = config.columnWidths.isEmpty()
+            config.fitColumnsToWidthResolved = true
+        }
+        fitColumnsToWidth = config.fitColumnsToWidth
     }
 
     /** Persist current visibility state into [config]. Does not include [showRootGutterColumn] (dynamic). */
@@ -48,6 +63,8 @@ class JujutsuColumnManager {
         config.showChangeId = showChangeId
         config.showDescription = showDescription
         config.showDecorations = showDecorations
+        config.fitColumnsToWidth = fitColumnsToWidth
+        config.fitColumnsToWidthResolved = true
     }
 
     companion object {

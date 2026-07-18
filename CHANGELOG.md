@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The commit details panel now shows the author's (and committer's, when different) email address alongside their name, as a clickable mail link, with the date/time kept together on one line when it wraps. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - New "New Change" quick action creates a change without prompting for a description upfront (the common case, since you'll usually squash it in later). It's the primary option in the log's right-click menu (the old dialog-based flow is kept as "New Change with Description..."), and is bound to Cmd/Ctrl+Shift+N while the log is focused. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - New and Edit buttons in the log toolbar act on the selected change with one click, without opening the right-click menu. ([#51](https://github.com/kkkev/jj-idea/issues/51))
+- New "Fit Columns to Window Width" option (Columns menu) shrinks the description and other columns as the log window narrows so horizontal scrolling is rarely needed, e.g. on a laptop screen or with the details pane docked beside the log. On by default for tabs you haven't customized; tabs where you've already resized a column keep your exact layout and scrolling as before. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 
 ### Fixed
 - Selecting a commit in the log no longer resets the table's horizontal scroll position. ([#51](https://github.com/kkkev/jj-idea/issues/51))
