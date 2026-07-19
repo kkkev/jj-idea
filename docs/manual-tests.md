@@ -32,6 +32,17 @@ Use this checklist:
       selects that commit in the log and it stays selected (no flicker/deselect); if the
       linked commit is beyond the log limit, the log expands to include it (jj-idea-f27g)
 
+#### Double-click / Enter on a log row (jj-idea-th9h)
+
+- [ ] Select a commit row and press Enter → that commit's diff opens (Show Diff)
+- [ ] Double-click a commit row (not on a bookmark/tag chip or the root gutter) → the same
+      diff opens
+- [ ] Double-click a bookmark or tag chip → navigates to that ref (no diff opens)
+- [ ] Double-click the "+N more" overflow chip → shows the hidden-refs popup (no diff opens)
+- [ ] Double-click the root gutter column (multi-repo view) → toggles expansion (no diff opens)
+- [ ] In Settings → Keymap, rebind "Show Diff" off Enter onto a different jj action (or clear
+      it) → both Enter and double-click on a log row now follow the new binding
+
 ### Column Management
 
 - [ ] Column visibility toggle via column header context menu

@@ -1,17 +1,13 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.ide.DataManager
 import com.intellij.ide.IdeTooltip
 import com.intellij.ide.IdeTooltipManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.ActionUiKind
-import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.UiDataProvider
-import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
@@ -449,25 +445,32 @@ class JujutsuLogTable(
 
     /**
      * Run the first enabled action bound to the Enter keystroke in the active keymap (default:
-     * Show Diff, `Jujutsu.ShowChangesDiff`), using this table's data context so the action sees
-     * the current selection. Backs the double-click handler above — jj-idea-th9h.
+     * Show Diff, `Jujutsu.ShowChangesDiff`), using this table as the context component so the
+     * action sees the current selection. Backs the double-click handler above — jj-idea-th9h.
      *
-     * Returns whether an action was found and run, so callers (e.g. [DoubleClickListener]) can
-     * report whether the click was consumed.
+     * Uses [ActionManager.tryToExecute] — the same entry point the real Enter keypress goes
+     * through — rather than hand-building an [com.intellij.openapi.actionSystem.AnActionEvent],
+     * so update() (including background-thread update actions like Show Diff) and enablement
+     * checks run exactly as they would for a real keystroke. Tries the next Enter-bound action
+     * (if any) when one is disabled, since [ActionManager.tryToExecute] only checks the single
+     * action it's given.
      */
-    private fun invokeEnterBoundAction(): Boolean {
-        val enter = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)
-        val actionManager = ActionManager.getInstance()
-        val context = DataManager.getInstance().getDataContext(this)
-        for (actionId in KeymapManager.getInstance().activeKeymap.getActionIds(enter)) {
-            val action = actionManager.getAction(actionId) ?: continue
-            val event = AnActionEvent.createEvent(action, context, null, ActionPlaces.UNKNOWN, ActionUiKind.NONE, null)
-            if (ActionUtil.lastUpdateAndCheckDumb(action, event, false)) {
-                ActionUtil.performActionDumbAwareWithCallbacks(action, event)
-                return true
-            }
+    private fun invokeEnterBoundAction(actionIds: List<String> = enterBoundActionIds()): Boolean {
+        val actionId = actionIds.firstOrNull() ?: return false
+        val action = ActionManager.getInstance().getAction(actionId)
+        if (action == null) {
+            return invokeEnterBoundAction(actionIds.drop(1))
         }
-        return false
+        val keyEvent = KeyEvent(this, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0, KeyEvent.VK_ENTER, '\r')
+        ActionManager.getInstance()
+            .tryToExecute(action, keyEvent, this, ActionPlaces.KEYBOARD_SHORTCUT, true)
+            .doWhenRejected(Runnable { invokeEnterBoundAction(actionIds.drop(1)) })
+        return true
+    }
+
+    private fun enterBoundActionIds(): List<String> {
+        val enter = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)
+        return KeymapManager.getInstance().activeKeymap.getActionIds(enter).toList()
     }
 
     /**
