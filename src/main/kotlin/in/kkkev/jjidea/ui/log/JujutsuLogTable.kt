@@ -1,15 +1,21 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.ide.DataManager
 import com.intellij.ide.IdeTooltip
 import com.intellij.ide.IdeTooltipManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.UiDataProvider
+import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
+import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScreenUtil
 import com.intellij.ui.components.JBScrollPane
@@ -32,6 +38,7 @@ import java.awt.Rectangle
 import java.awt.event.*
 import javax.swing.JComponent
 import javax.swing.JViewport
+import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
 import javax.swing.ScrollPaneConstants
 import javax.swing.event.ChangeEvent
@@ -307,6 +314,27 @@ class JujutsuLogTable(
             }
         )
 
+        // Route double-click through whichever action is bound to Enter (default: Show Diff,
+        // jj-idea-th9h). Mirrors IntelliJ's own EditorTabPreview pattern: Enter and double-click
+        // invoke the same action rather than a bespoke double-click setting, so rebinding Enter
+        // in Keymap settings changes double-click behaviour too. Ref chips and the root gutter
+        // keep their existing single-click behaviour instead of triggering the Enter action.
+        object : DoubleClickListener() {
+            override fun onDoubleClick(e: MouseEvent): Boolean {
+                if (clickTargetAt(e) != null) return false
+                val viewColumn = columnAtPoint(e.point)
+                if (viewColumn >= 0 &&
+                    convertColumnIndexToModel(viewColumn) == JujutsuLogTableModel.COLUMN_ROOT_GUTTER
+                ) {
+                    return false
+                }
+                val row = rowAtPoint(e.point)
+                if (row < 0) return false
+                if (!isRowSelected(row)) setRowSelectionInterval(row, row)
+                return invokeEnterBoundAction()
+            }
+        }.installOn(this)
+
         // Add context menu support (checks ref chips before falling through to row menu)
         addMouseListener(
             object : PopupHandler() {
@@ -417,6 +445,29 @@ class JujutsuLogTable(
         val popupMenu = ActionManager.getInstance().createActionPopupMenu("Jujutsu.LogTable", actionGroup)
         popupMenu.setTargetComponent(this)
         popupMenu.component.show(component, x, y)
+    }
+
+    /**
+     * Run the first enabled action bound to the Enter keystroke in the active keymap (default:
+     * Show Diff, `Jujutsu.ShowChangesDiff`), using this table's data context so the action sees
+     * the current selection. Backs the double-click handler above — jj-idea-th9h.
+     *
+     * Returns whether an action was found and run, so callers (e.g. [DoubleClickListener]) can
+     * report whether the click was consumed.
+     */
+    private fun invokeEnterBoundAction(): Boolean {
+        val enter = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)
+        val actionManager = ActionManager.getInstance()
+        val context = DataManager.getInstance().getDataContext(this)
+        for (actionId in KeymapManager.getInstance().activeKeymap.getActionIds(enter)) {
+            val action = actionManager.getAction(actionId) ?: continue
+            val event = AnActionEvent.createEvent(action, context, null, ActionPlaces.UNKNOWN, ActionUiKind.NONE, null)
+            if (ActionUtil.lastUpdateAndCheckDumb(action, event, false)) {
+                ActionUtil.performActionDumbAwareWithCallbacks(action, event)
+                return true
+            }
+        }
+        return false
     }
 
     /**

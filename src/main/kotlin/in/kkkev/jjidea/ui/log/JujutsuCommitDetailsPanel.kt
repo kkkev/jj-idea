@@ -11,6 +11,7 @@ import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
@@ -42,7 +43,7 @@ import javax.swing.JPanel
  * Note: This panel works with entries from any repository. The repository context
  * is obtained from the `LogEntry.repo` field when needed.
  */
-class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disposable, UiDataProvider {
+class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val log = Logger.getInstance(javaClass)
 
     private val metadataPanel = JPanel(BorderLayout())
@@ -226,7 +227,7 @@ class JujutsuCommitDetailsPanel(project: Project) : JPanel(BorderLayout()), Disp
                 appendSummaryAndStatuses(entry)
                 appendParents(entry)
                 control("<pre style='white-space: pre-wrap;'>", "</pre>") {
-                    append(entry.description)
+                    append(entry.description, IssueNavigationConfiguration.getInstance(project))
                 }
                 control("<p style='margin: 4px 0;'>", "</p>") {
                     entry.author?.let { appendWithEmail(it) } ?: append("Unknown")

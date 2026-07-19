@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.io.URLUtil
@@ -159,20 +160,50 @@ fun TextCanvas.append(changeKey: ChangeKey) {
     }
 }
 
-fun TextCanvas.append(description: Description) {
+/**
+ * Append [description], optionally linkifying issue-tracker references (e.g. `JIRA-123`) and bare URLs found by
+ * [issueLinks] (an [IssueNavigationConfiguration], resolved from a `Project`) as clickable links (jj-idea-10fo).
+ * When [issueLinks] is null (the default), or finds no matches, this renders exactly as before.
+ */
+fun TextCanvas.append(description: Description, issueLinks: IssueNavigationConfiguration? = null) {
     if (description.empty) {
         grey { italic { append(description.display) } }
     } else {
-        append(description.display)
+        appendLinkified(description.display, issueLinks)
     }
 }
 
-fun TextCanvas.appendSummary(description: Description) = truncate {
+/** As [append], but only the first line of [description], for summary contexts. */
+fun TextCanvas.appendSummary(description: Description, issueLinks: IssueNavigationConfiguration? = null) = truncate {
     if (description.empty) {
         grey { italic { append(description.summary) } }
     } else {
-        append(description.summary)
+        appendLinkified(description.summary, issueLinks)
     }
+}
+
+/**
+ * Split [text] into plain runs and issue-tracker/URL link runs found by [config], appending each accordingly.
+ * Links are emitted via [TextCanvas.linked] (rather than raw HTML), so they carry over into any backend — including
+ * [FragmentRecordingCanvas], where the URI becomes a [FragmentRecordingCanvas.Fragment.linkTarget] usable for
+ * hit-testing (jj-idea-iesq) — not just the HTML details pane.
+ */
+private fun TextCanvas.appendLinkified(text: String, config: IssueNavigationConfiguration?) {
+    val matches = config?.findIssueLinks(text).orEmpty()
+    if (matches.isEmpty()) {
+        append(text)
+        return
+    }
+    IssueNavigationConfiguration.processTextWithLinks(
+        text,
+        matches,
+        { plain -> append(plain) },
+        { linkText, target ->
+            runCatching { URI(target) }.getOrNull()
+                ?.let { uri -> linked(uri) { append(linkText) } }
+                ?: append(linkText)
+        }
+    )
 }
 
 fun TextCanvas.append(user: VcsUser) = user.email.takeIf { it.isNotEmpty() }

@@ -105,6 +105,17 @@ Use this checklist:
       bookmark (icon + name) stays intact on one line; wrapping only occurs between
       bookmarks, never inside a name or between its icon and text (jj-idea-kds1)
 
+#### Issue-tracker links in descriptions (jj-idea-10fo)
+
+- [ ] In Settings → Version Control → Issue Navigation, add a pattern (e.g. issue regexp
+      `[A-Z]+-\d+`, link `https://example.com/browse/$0`); Apply
+- [ ] Select a commit whose description contains a matching reference (e.g. `Fixes JIRA-123`) —
+      the reference renders underlined/link-styled in the details panel
+- [ ] Clicking the reference opens the URL in your default browser
+- [ ] A bare `https://…` URL in a description is also clickable and opens correctly
+- [ ] A commit description with no matching reference renders unchanged (plain text, no link)
+- [ ] With no Issue Navigation patterns configured, descriptions render exactly as before
+
 ### Details Changes Panel
 
 - [ ] File change tree shows correct files

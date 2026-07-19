@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.project.Project
+import com.intellij.ui.BrowserHyperlinkListener
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
@@ -59,22 +60,28 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
         isOpaque = false
         addHyperlinkListener { e ->
             if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
-                val url = e.description ?: return@addHyperlinkListener
-                with(CHANGE_ID_URL_PARSER.matcher(url)) {
-                    if (matches()) {
-                        val path = URLUtil.unescapePercentSequences(group(1))
-                        val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
-                        project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
-                        return@addHyperlinkListener
+                val url = e.description
+                if (url != null) {
+                    with(CHANGE_ID_URL_PARSER.matcher(url)) {
+                        if (matches()) {
+                            val path = URLUtil.unescapePercentSequences(group(1))
+                            val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
+                            project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
+                            return@addHyperlinkListener
+                        }
+                    }
+                    with(REF_URL_PARSER.matcher(url)) {
+                        if (matches()) {
+                            val path = URLUtil.unescapePercentSequences(group(1))
+                            val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
+                            project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
+                            return@addHyperlinkListener
+                        }
                     }
                 }
-                with(REF_URL_PARSER.matcher(url)) {
-                    if (matches()) {
-                        val path = URLUtil.unescapePercentSequences(group(1))
-                        val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
-                        project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
-                    }
-                }
+                // Not one of our internal jjc:/jjref: schemes (e.g. an issue-tracker link, jj-idea-10fo, or a
+                // mailto: author link) — hand off to the platform's standard browser/mail handler.
+                BrowserHyperlinkListener.INSTANCE.hyperlinkUpdate(e)
             }
         }
     }
