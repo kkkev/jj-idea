@@ -23,8 +23,12 @@ Use this checklist:
 - [ ] Arrow key navigation (Up/Down)
 - [ ] Page Up/Page Down navigation
 - [ ] Home/End key navigation
-- [ ] Selection persists after filtering (if entry still visible)
-- [ ] Selection clears when filtered entry is hidden
+- [ ] Selection persists after filtering (if entry still visible): select a commit, then clear or
+      change each of the reference/bookmark, author, date, text, and root filters in turn while the
+      commit stays visible throughout — the selection (and the details panel content) never
+      flickers to empty and stays on the same commit each time (jj-idea-yje9)
+- [ ] Selection clears when filtered entry is hidden: select a commit, then apply a filter that
+      excludes it — the selection clears and the details panel shows its empty state (jj-idea-yje9)
 - [ ] On a narrow window with horizontal scroll active (scrolled right so later columns are
       visible), selecting a commit (click, arrow keys, ref-chip click, a details-panel parent
       link click, or a log refresh) does not reset horizontal scroll position (jj-idea-f27g)

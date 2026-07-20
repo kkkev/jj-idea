@@ -171,6 +171,9 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
      * and the changes tree shows the union of all selected commits' changes.
      */
     fun showCommits(entries: List<LogEntry>) {
+        // Selection-preservation (jj-idea-yje9) can re-fire this with an unchanged selection;
+        // skip the HTML rebuild and background change-load when nothing actually changed.
+        if (entries == currentEntries) return
         currentEntries = entries
 
         if (entries.isEmpty()) {

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - The log graph now draws a merge commit's parents in the same left-to-right order as `jj log`, with matching line colors. Previously the parents could appear swapped (e.g. the trunk parent on the right) when a non-mainline parent happened to sit in the row directly below the merge. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - The commit log no longer shows a status icon on ordinary (mutable) revisions; only immutable revisions are marked, removing visual noise from the common case. ([#51](https://github.com/kkkev/jj-idea/issues/51))
+- Changing a log filter (reference/bookmark, author, date, text, or root) no longer deselects the current commit, or silently selects a different one, as long as it's still visible in the filtered list.
 
 ## [0.7.15] - 2026-07-18
 

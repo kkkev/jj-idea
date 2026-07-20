@@ -361,6 +361,24 @@ class JujutsuLogTable(
                 }
             }
         )
+
+        // Preserve the current selection across filter changes when the selected entry stays
+        // visible (jj-idea-yje9). rebuild() (fireTableDataChanged()) leaves the JTable selection
+        // tracking a raw row index rather than the entry that was there before, so without this a
+        // filter tweak (author/date/reference/text/root/paths) can silently point the selection at
+        // the wrong row - or, if the old index is no longer valid, drop it - even though the
+        // originally-selected commit is still visible in the filtered list.
+        //
+        // Any selection churn this causes (clear, then reselect-by-identity) is absorbed by
+        // CommitTablePanel's deferred, dedup'd selection listener rather than being fought here -
+        // see the comment on the listener in CommitTablePanel.kt.
+        logModel.withSelectionPreserved = { rebuild ->
+            val key = selectedEntry?.let { ChangeKey(it.repo, it.id) }
+            rebuild()
+            if (key != null && !selectEntry(key.repo, key.revision)) {
+                clearSelection()
+            }
+        }
     }
 
     /**
@@ -791,6 +809,17 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /** Set to true inside [setEntries] to suppress the [onFilterApplied] callback. */
     private var suppressFilterCallback = false
 
+    /**
+     * Installed by the view so filter-driven rebuilds preserve the current selection when the
+     * selected entry stays visible (jj-idea-yje9). [applyFilter] calls this around the whole
+     * [rebuildFilteredEntries] (not just the final [fireTableDataChanged]) so the callback can read
+     * the *pre-filter* selection before [filteredEntries] is mutated - reading it after the swap
+     * would pick up whichever entry lands at the old row index in the new filtered list, not the
+     * entry that was actually selected. Not used during [setEntries] (see [suppressFilterCallback]),
+     * which is followed by the view's own richer selection/expansion-aware preservation.
+     */
+    var withSelectionPreserved: ((rebuild: () -> Unit) -> Unit)? = null
+
     companion object {
         const val COLUMN_ROOT_GUTTER = 0
         const val COLUMN_GRAPH_AND_DESCRIPTION = 1
@@ -944,8 +973,25 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
     /**
      * Apply the current filter to the entries.
+     *
+     * The actual recompute-and-swap is deferred into [rebuildFilteredEntries] so that
+     * [withSelectionPreserved], when installed, gets a chance to read the *pre-filter* selection
+     * (via the view's `selectedEntry`, which reads [filteredEntries]) before [filteredEntries] is
+     * mutated - see jj-idea-yje9. Capturing the selection after the swap would read whatever entry
+     * ended up at the old row index in the *new* filtered list, not the entry that was actually
+     * selected.
      */
     private fun applyFilter() {
+        val preserve = withSelectionPreserved
+        if (suppressFilterCallback || preserve == null) {
+            rebuildFilteredEntries()
+        } else {
+            preserve { rebuildFilteredEntries() }
+        }
+    }
+
+    /** Recomputes [filteredEntries] from the current filter state and fires the table update. */
+    private fun rebuildFilteredEntries() {
         filteredEntries.clear()
 
         val matcher = LogFilterMatcher.create(filterText, useRegex, matchCase, matchWholeWords)

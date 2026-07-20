@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.ui.log.*
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.Box
@@ -129,9 +130,17 @@ abstract class CommitTablePanel<D>(
 
         add(splitter, BorderLayout.CENTER)
 
-        // Wire table selection to details panel
+        // Wire table selection to details panel. Deferred via runLater (rather than reading
+        // logTable.selectedEntries synchronously in the listener) so that a filter change which
+        // clears and re-selects the current row (jj-idea-yje9, see
+        // JujutsuLogTableModel.withSelectionPreserved) coalesces into a single update: any
+        // intermediate selection-changed events this produces are all deferred to the same EDT
+        // tick, and by the time the first deferred callback runs, the synchronous
+        // clear-then-reselect has already finished - so every deferred callback reads the same
+        // final selection. Combined with showCommits()'s no-op-on-unchanged-selection guard, this
+        // means the details panel never flashes empty or reloads the same commit's diff twice.
         logTable.selectionModel.addListSelectionListener { e ->
-            if (!e.valueIsAdjusting) detailsPanel.showCommits(logTable.selectedEntries)
+            if (!e.valueIsAdjusting) runLater { detailsPanel.showCommits(logTable.selectedEntries) }
         }
 
         dataLoader.load()
