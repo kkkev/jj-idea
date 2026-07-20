@@ -6,6 +6,7 @@ import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsListener
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.log.topologicalSort
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -109,8 +110,14 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     // typed by the user that may not exist), so that case is logged at INFO rather than WARN.
     private fun fetchOne(revision: Revision) = fetch(revision, quiet = true).firstOrNull()
 
+    // Sorted so children always precede parents (newest first), matching what
+    // UnifiedJujutsuLogDataLoader.loadCommits() stores after a main-log-window load - callers
+    // of logCache.all/get/loadContext must see the same order regardless of whether the cache
+    // was already warmed by the log window or is being cold-fetched here. CommitGraphBuilder
+    // also requires this order to lay out connector lines correctly.
     private fun fetch(revset: Revset, limit: Int? = null, quiet: Boolean = false) =
-        repo.logService.getLog(revset = revset, limit = limit, quiet = quiet).getOrThrow().also(this::store)
+        topologicalSort(repo.logService.getLog(revset = revset, limit = limit, quiet = quiet).getOrThrow())
+            .also(this::store)
 
     // Fast path: if the target is already cached (e.g., from a previous loadContext call that
     // was then overwritten by loadCommits), return the full snapshot which includes both the

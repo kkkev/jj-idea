@@ -176,19 +176,28 @@ internal fun enrichWithDeletedBookmarks(entry: LogEntry, deletedNames: Set<Strin
 internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
     if (entries.isEmpty()) return emptyList()
 
+    // Key by (repo, changeId), not changeId alone: jj's root commit has the identical
+    // change ID ("zzzz...z") in every repository since it's synthetic rather than
+    // content-derived, so a bare ChangeId key would conflate different repos' root commits
+    // (and in principle any other colliding ID) when entries from multiple repos are merged
+    // here, corrupting the child-count computation below for whichever repo loses the
+    // collision.
+    fun keyOf(entry: LogEntry) = ChangeKey(entry.repo, entry.id)
+
     // Build lookup maps
-    val entryById = entries.associateBy { it.id }
-    val entryIds = entryById.keys
+    val entryByKey = entries.associateBy(::keyOf)
+    val entryKeys = entryByKey.keys
 
     // Count children for each entry (only counting children that are in our set)
-    val childCount = mutableMapOf<ChangeId, Int>()
+    val childCount = mutableMapOf<ChangeKey, Int>()
     for (entry in entries) {
-        childCount[entry.id] = 0
+        childCount[keyOf(entry)] = 0
     }
     for (entry in entries) {
         for (parentId in entry.parentIds) {
-            if (parentId in entryIds) {
-                childCount[parentId] = childCount.getValue(parentId) + 1
+            val parentKey = ChangeKey(entry.repo, parentId)
+            if (parentKey in entryKeys) {
+                childCount[parentKey] = childCount.getValue(parentKey) + 1
             }
         }
     }
@@ -198,7 +207,7 @@ internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
 
     // Start with entries that have no children in the set
     for (entry in entries) {
-        if (childCount[entry.id] == 0) {
+        if (childCount[keyOf(entry)] == 0) {
             ready.add(entry)
         }
     }
@@ -211,11 +220,12 @@ internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
 
         // Decrement child count for each parent
         for (parentId in entry.parentIds) {
-            if (parentId in entryIds) {
-                val newCount = childCount.getValue(parentId) - 1
-                childCount[parentId] = newCount
+            val parentKey = ChangeKey(entry.repo, parentId)
+            if (parentKey in entryKeys) {
+                val newCount = childCount.getValue(parentKey) - 1
+                childCount[parentKey] = newCount
                 if (newCount == 0) {
-                    ready.add(entryById.getValue(parentId))
+                    ready.add(entryByKey.getValue(parentKey))
                 }
             }
         }

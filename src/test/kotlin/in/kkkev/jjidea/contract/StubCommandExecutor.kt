@@ -143,6 +143,12 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun edit(revision: Revision): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
+    override fun duplicate(
+        revisions: List<Revision>,
+        destinations: List<Revision>,
+        destinationMode: RebaseDestinationMode
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
     override fun bookmarkCreate(
         name: BookmarkName,
         revision: Revision

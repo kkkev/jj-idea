@@ -232,6 +232,19 @@ internal fun squashIntoArgs(
 }
 
 /** Build the argument list for `jj rebase`. */
+internal fun duplicateArgs(
+    revisions: List<Revision>,
+    destinations: List<Revision> = emptyList(),
+    destinationMode: RebaseDestinationMode = RebaseDestinationMode.ONTO
+): List<String> = buildList {
+    add("duplicate")
+    revisions.forEach { add(it.toString()) }
+    destinations.forEach {
+        add(destinationMode.flag)
+        add(it.toString())
+    }
+}
+
 internal fun rebaseArgs(
     revisions: List<Revision>,
     destinations: List<Revision>,
@@ -331,6 +344,12 @@ class CliExecutor(
         execute(root, listOf("abandon", "-r", revision))
 
     override fun edit(revision: Revision): CommandExecutor.CommandResult = execute(root, listOf("edit", revision))
+
+    override fun duplicate(
+        revisions: List<Revision>,
+        destinations: List<Revision>,
+        destinationMode: RebaseDestinationMode
+    ) = execute(root, duplicateArgs(revisions, destinations, destinationMode))
 
     override fun log(
         revset: Revset,

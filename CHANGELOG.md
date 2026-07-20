@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The commit details panel now renders issue-tracker references (e.g. `JIRA-123`) and plain URLs in commit descriptions as clickable links, using your IDE's Version Control → Issue Navigation settings. Clicking one opens it in your browser. ([#15](https://github.com/kkkev/jj-idea/issues/15))
 - Double-clicking a commit in the log now shows its diff, and pressing Enter does the same — both are rebindable to a different action in Settings → Keymap. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - The log search field now matches a commit's Git hash (full or abbreviated), not just its change ID, description, or author. ([#44](https://github.com/kkkev/jj-idea/issues/44))
+- New "Duplicate Change" and "Duplicate Onto..." actions in the log's right-click menu create an identical copy of the selected change(s), either in place or onto a chosen destination — works on immutable changes too. The "Duplicate Onto..." dialog hides destinations and disables placements that would fail because they'd need to rewrite an immutable commit. ([#33](https://github.com/kkkev/jj-idea/issues/33))
 
 ### Fixed
 - The log graph now draws a merge commit's parents in the same left-to-right order as `jj log`, with matching line colors. Previously the parents could appear swapped (e.g. the trunk parent on the right) when a non-mainline parent happened to sit in the row directly below the merge. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - The commit log no longer shows a status icon on ordinary (mutable) revisions; only immutable revisions are marked, removing visual noise from the common case. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - Changing a log filter (reference/bookmark, author, date, text, or root) no longer deselects the current commit, or silently selects a different one, as long as it's still visible in the filtered list.
+- Commit pickers in dialogs (Rebase, Squash Into..., Duplicate Onto..., Move Bookmark) now always show commits in the same order as the main log, instead of sometimes showing an unrelated order (e.g. an immutable root commit before the changes on top of it). This could happen the first time a dialog was opened for a repo, and — in multi-repo projects — could affect any repo unpredictably, because different repos' root commits share the same underlying jj change ID and were getting conflated when merging repos' logs.
 
 ## [0.7.15] - 2026-07-18
 

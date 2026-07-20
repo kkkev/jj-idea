@@ -16,6 +16,8 @@ import `in`.kkkev.jjidea.actions.change.compareWithWorkingCopyAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
 import `in`.kkkev.jjidea.actions.change.copyIdAction
 import `in`.kkkev.jjidea.actions.change.describeAction
+import `in`.kkkev.jjidea.actions.change.duplicateChangeAction
+import `in`.kkkev.jjidea.actions.change.duplicateOntoAction
 import `in`.kkkev.jjidea.actions.change.newChangeFromAction
 import `in`.kkkev.jjidea.actions.change.rebaseAction
 import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
@@ -82,6 +84,11 @@ object JujutsuLogContextMenuActions {
         val mutableEntries = entries.filter { !it.immutable }
         val rebaseRepo = uniqueRepo?.takeIf { mutableEntries.isNotEmpty() }
         add(rebaseAction(project, rebaseRepo, mutableEntries))
+
+        // Duplicate works on any change, including immutable ones
+        add(duplicateChangeAction(project, uniqueRepo, entries))
+        add(duplicateOntoAction(project, uniqueRepo, entries))
+
         add(squashAction(project, squashableEntry(entry)))
         val squashIntoSrcs = squashIntoSources(entries)
         add(squashIntoAction(project, uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() }, squashIntoSrcs))

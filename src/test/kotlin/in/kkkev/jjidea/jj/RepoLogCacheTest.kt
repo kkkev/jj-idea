@@ -46,13 +46,15 @@ class RepoLogCacheTest {
         id: String,
         commitId: String = "commit-$id",
         bookmarks: List<Bookmark> = emptyList(),
-        immutable: Boolean = false
+        immutable: Boolean = false,
+        parentIds: List<String> = emptyList()
     ) = LogEntry(
         repo = repo,
         id = ChangeId(id, id, null),
         commitId = CommitId(commitId),
         underlyingDescription = "desc $id",
         bookmarks = bookmarks,
+        parentIdentifiers = parentIds.map { LogEntry.Identifiers(ChangeId(it, it, null), CommitId("commit-$it")) },
         immutable = immutable
     )
 
@@ -214,6 +216,24 @@ class RepoLogCacheTest {
     }
 
     // ─── ordering / deduplication ─────────────────────────────────────────────
+
+    @Test
+    fun `all topologically sorts a cold fetch, children before parents, even if jj log emitted parent first`() {
+        // Root/immutable commit intentionally listed FIRST, as if jj log CLI output (or the
+        // configured revset) didn't already put children first - all() must not trust that
+        // order as-is, since UnifiedJujutsuLogDataLoader's warm-cache path always re-sorts
+        // before storing, and every consumer of logCache.all (RebaseDialog, DuplicateDialog,
+        // etc.) relies on the same "children before parents" guarantee for both display order
+        // and CommitGraphBuilder's layout.
+        val root = entry("root", immutable = true)
+        val child = entry("child", parentIds = listOf("root"))
+        stubSettings()
+        every { logService.getLog(revset = Revset.Default, limit = 100) } returns Result.success(listOf(root, child))
+
+        val result = cache.all
+
+        result shouldBe listOf(child, root)
+    }
 
     @Test
     fun `store deduplicates orderedIds when same entry is re-stored`() {

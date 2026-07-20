@@ -115,6 +115,21 @@ interface CommandExecutor {
     fun edit(revision: Revision): CommandResult
 
     /**
+     * Duplicate one or more changes (identical copies with new change IDs).
+     * @param revisions The revisions to duplicate
+     * @param destinations Optional destination revisions; if empty, each copy is placed
+     * in the same location as its original
+     * @param destinationMode How to place the copies relative to [destinations] (onto,
+     * insert-after, insert-before)
+     * @return Command result
+     */
+    fun duplicate(
+        revisions: List<Revision>,
+        destinations: List<Revision> = emptyList(),
+        destinationMode: RebaseDestinationMode = RebaseDestinationMode.ONTO
+    ): CommandResult
+
+    /**
      * Get the log for specific revset
      * @param revset Revisions to show (e.g., "@", "@-")
      * @param template Template for output (e.g., "description", "change_id")

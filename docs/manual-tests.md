@@ -156,6 +156,42 @@ Use this checklist:
 - [ ] **Edit** action changes working copy
 - [ ] **Describe** action opens dialog and updates description
 - [ ] **Abandon** action removes change after confirmation
+- [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
+- [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
+
+#### Duplicate Change (jj-idea-vu35)
+
+- [ ] Right-clicking an **immutable** change still offers both Duplicate actions (unlike Abandon/Describe/Edit)
+- [ ] Multi-selecting several changes (same repo) and choosing **Duplicate Change** creates an identical copy of each, in place
+- [ ] Multi-selecting commits across two repos in a multi-root project: both Duplicate actions are disabled/hidden
+- [ ] **Duplicate Onto...**: choosing "Onto (-d)" places the copy as a child of the destination
+- [ ] **Duplicate Onto...**: choosing "Insert after (-A)" / "Insert before (-B)" places the copy relative to the destination accordingly
+- [ ] **Duplicate Onto...** with no destination selected shows a validation error and does not close the dialog
+
+#### Duplicate Onto... immutability guard (jj-idea-70e6)
+
+In a repo with an immutable trunk (e.g. `main` tracked as immutable, with mutable commits on top):
+
+- [ ] Selecting an immutable **head** (no children) as destination: "Insert after" stays enabled; "Insert before" greys out
+- [ ] Selecting an immutable **non-head** commit (has a child) as destination: both "Insert after" and "Insert before" grey out; only "Onto" is selectable
+- [ ] With "Insert before" already selected, immutable commits don't appear in the destination picker at all
+- [ ] With "Insert after" already selected, only immutable commits that have an immutable child are hidden from the picker; an immutable head remains selectable
+- [ ] Switching placement back to "Onto" makes every commit (including immutable ones) reappear in the picker
+- [ ] A permitted "Insert after" on an immutable head actually succeeds when you click Duplicate
+- [ ] Normal "Onto" duplicates and the quick in-place **Duplicate Change** action are unaffected by the guard
+
+#### Dialog commit-picker ordering (jj-idea-6fxz, jj-idea-45id)
+
+Restart the IDE (or open a repo the log tool window hasn't loaded yet) so `logCache` starts cold for it, then — **without** opening the main log tab for that repo first — open a dialog with a commit picker (Rebase, Squash Into..., Duplicate Onto..., Move Bookmark to Change):
+
+- [ ] The picker's commit order matches what the main log window shows (newest first, root/oldest last) — not reversed or arbitrary
+- [ ] The graph connector lines in the picker render correctly (no crossed/backwards lines), consistent with a cold-cache fetch
+- [ ] Opening the main log tab afterwards shows the same order as the dialog did
+
+In a **multi-repo** project (multiple `.jj` roots open together):
+
+- [ ] Open the main log tab (loads and merges all repos), then open a commit picker for each repo in turn — every repo shows its own commits newest-first, root last; none show the root (or any commit) out of place
+- [ ] Repeat across a few IDE restarts — the correct ordering should hold consistently for every repo, not just some of them
 
 #### New Change quick action (jj-idea-byfa)
 

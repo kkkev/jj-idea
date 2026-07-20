@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import `in`.kkkev.jjidea.jj.*
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -17,6 +18,7 @@ import org.junit.jupiter.api.Test
  */
 class TopologicalSortTest {
     private lateinit var repo: JujutsuRepository
+    private lateinit var repo2: JujutsuRepository
 
     @BeforeEach
     fun setup() {
@@ -24,14 +26,19 @@ class TopologicalSortTest {
             every { commandExecutor } returns mockk()
             every { displayName } returns "test-repo"
         }
+        repo2 = mockk<JujutsuRepository> {
+            every { commandExecutor } returns mockk()
+            every { displayName } returns "test-repo-2"
+        }
     }
 
     private fun createEntry(
         changeId: String,
         parentIds: List<String> = emptyList(),
-        timestamp: Long = 0L
+        timestamp: Long = 0L,
+        entryRepo: JujutsuRepository = repo
     ) = LogEntry(
-        repo = repo,
+        repo = entryRepo,
         id = ChangeId(changeId, changeId.take(2), null),
         commitId = CommitId("0".repeat(40)),
         underlyingDescription = "Commit $changeId",
@@ -145,6 +152,42 @@ class TopologicalSortTest {
             val result = topologicalSort(listOf(child))
 
             result.map { it.id.full } shouldBe listOf("C")
+        }
+    }
+
+    @Nested
+    inner class `Multi-repo id collisions` {
+        @Test
+        fun `two repos' root commits sharing the same change id are kept independent`() {
+            // jj's root commit has the identical change id ("zzzz...z") in every repo, since
+            // it's synthetic rather than content-derived. Both repos here reuse "root" as a
+            // stand-in for that collision. A bare-ChangeId key would conflate the two roots
+            // and could corrupt the child-count computation for one repo depending on
+            // flatten/map-iteration order.
+            val rootA = createEntry("root", entryRepo = repo)
+            val childA = createEntry("childA", parentIds = listOf("root"), entryRepo = repo)
+            val rootB = createEntry("root", entryRepo = repo2)
+            val childB = createEntry("childB", parentIds = listOf("root"), entryRepo = repo2)
+
+            val result = topologicalSort(listOf(rootA, childA, rootB, childB))
+
+            // Each repo's child must precede that repo's own root - never the other way
+            // round for either repo, regardless of map ordering.
+            result.indexOf(childA) shouldBeLessThan result.indexOf(rootA)
+            result.indexOf(childB) shouldBeLessThan result.indexOf(rootB)
+        }
+
+        @Test
+        fun `a child's parent id is only resolved within its own repo`() {
+            // repoB has an entry sharing an id with repoA's root, but repoA's child must not
+            // treat repoB's same-id entry as satisfying its own parent link.
+            val rootA = createEntry("shared", entryRepo = repo)
+            val childA = createEntry("childA", parentIds = listOf("shared"), entryRepo = repo)
+            val unrelatedB = createEntry("shared", parentIds = emptyList(), entryRepo = repo2)
+
+            val result = topologicalSort(listOf(unrelatedB, rootA, childA))
+
+            result.indexOf(childA) shouldBeLessThan result.indexOf(rootA)
         }
     }
 
