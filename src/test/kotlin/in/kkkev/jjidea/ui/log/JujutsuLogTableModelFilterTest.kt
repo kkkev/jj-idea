@@ -38,11 +38,12 @@ class JujutsuLogTableModelFilterTest {
         description: String = "Test commit",
         author: VcsUser? = alice,
         timestamp: Instant? = Instant.fromEpochMilliseconds(1000000000L),
-        bookmarks: List<Bookmark> = emptyList()
+        bookmarks: List<Bookmark> = emptyList(),
+        commitId: String = "0000000000000000000000000000000000000000"
     ) = LogEntry(
         repo = mockk<JujutsuRepository>(),
         id = ChangeId(changeId, changeId, null),
-        commitId = CommitId("0000000000000000000000000000000000000000"),
+        commitId = CommitId(commitId),
         underlyingDescription = description,
         bookmarks = bookmarks,
         parentIdentifiers = emptyList(),
@@ -208,6 +209,93 @@ class JujutsuLogTableModelFilterTest {
             model.setFilter("   ")
 
             model.rowCount shouldBe 2
+        }
+
+        @Test
+        fun `filter by full git commit hash matches`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First", commitId = "1111111111111111111111111111111111111111"),
+                    createEntry("def456", "Second", commitId = "2222222222222222222222222222222222222222")
+                )
+            )
+
+            model.setFilter("2222222222222222222222222222222222222222")
+
+            model.rowCount shouldBe 1
+            model.getEntry(0)?.id?.short shouldBe "def456"
+        }
+
+        @Test
+        fun `filter by abbreviated git commit hash matches`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First", commitId = "1111111111111111111111111111111111111111"),
+                    createEntry("def456", "Second", commitId = "8640b2e26aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                )
+            )
+
+            model.setFilter("8640b2e2")
+
+            model.rowCount shouldBe 1
+            model.getEntry(0)?.id?.short shouldBe "def456"
+        }
+
+        @Test
+        fun `filter by git commit hash is case insensitive by default`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First", commitId = "8640b2e26aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                )
+            )
+
+            model.setFilter("8640B2E2")
+
+            model.rowCount shouldBe 1
+        }
+
+        @Test
+        fun `filter by git commit hash not in loaded entries matches nothing`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First", commitId = "1111111111111111111111111111111111111111")
+                )
+            )
+
+            // This hash exists in the repo but was never loaded into the log window -
+            // the in-memory text filter can't find it (tracked follow-up: whole-repo search on Enter).
+            model.setFilter("ffffffffffffffffffffffffffffffffffffffff")
+
+            model.rowCount shouldBe 0
+        }
+
+        @Test
+        fun `filter does not match change id substring that is not a prefix`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First"),
+                    createEntry("def456", "Second")
+                )
+            )
+
+            // "c123" occurs inside "abc123" but is not a prefix - should not match.
+            model.setFilter("c123")
+
+            model.rowCount shouldBe 0
+        }
+
+        @Test
+        fun `filter does not match git commit hash substring that is not a prefix`() {
+            model.setEntries(
+                listOf(
+                    createEntry("abc123", "First", commitId = "8640b2e26aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+                )
+            )
+
+            // "b2e2" occurs inside the hash but is not a prefix - should not match.
+            model.setFilter("b2e2")
+
+            model.rowCount shouldBe 0
         }
     }
 

@@ -948,41 +948,13 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private fun applyFilter() {
         filteredEntries.clear()
 
-        // Build text matcher if text filter is active
-        val textMatcher: ((String) -> Boolean)? = if (filterText.isNotBlank()) {
-            if (useRegex) {
-                // Regex mode
-                try {
-                    val pattern =
-                        if (matchCase) {
-                            filterText.toRegex()
-                        } else {
-                            filterText.toRegex(RegexOption.IGNORE_CASE)
-                        }
-                    { text: String -> pattern.containsMatchIn(text) }
-                } catch (_: Exception) {
-                    // Invalid regex - fall back to literal search
-                    createLiteralMatcher(filterText, matchCase, matchWholeWords)
-                }
-            } else {
-                // Literal search
-                createLiteralMatcher(filterText, matchCase, matchWholeWords)
-            }
-        } else {
-            null
-        }
+        val matcher = LogFilterMatcher.create(filterText, useRegex, matchCase, matchWholeWords)
 
         // Filter entries by all active filters
         filteredEntries.addAll(
             entries.filter { entry ->
                 // Text filter (if active)
-                val matchesText = textMatcher?.let { matcher ->
-                    matcher(entry.description.summary) ||
-                        matcher(entry.id.short) ||
-                        matcher(entry.id.full) ||
-                        entry.author?.name?.let(matcher) == true ||
-                        entry.author?.email?.let(matcher) == true
-                } ?: true
+                val matchesText = matcher?.matches(entry) ?: true
 
                 // Author filter (if active)
                 val matchesAuthor = if (authorFilter.isNotEmpty()) {
@@ -1017,29 +989,6 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
         if (!suppressFilterCallback) onFilterApplied?.invoke()
         fireTableDataChanged()
-    }
-
-    /**
-     * Create a literal string matcher with case sensitivity and whole word options.
-     */
-    private fun createLiteralMatcher(filter: String, caseSensitive: Boolean, wholeWords: Boolean): (String) -> Boolean {
-        if (wholeWords) {
-            // Match whole words only
-            val pattern = if (caseSensitive) {
-                "\\b${Regex.escape(filter)}\\b".toRegex()
-            } else {
-                "\\b${Regex.escape(filter)}\\b".toRegex(RegexOption.IGNORE_CASE)
-            }
-            return { text: String -> pattern.containsMatchIn(text) }
-        }
-
-        // Simple substring match
-        if (caseSensitive) {
-            return { text: String -> text.contains(filter) }
-        }
-
-        val lowerFilter = filter.lowercase()
-        return { text: String -> text.lowercase().contains(lowerFilter) }
     }
 
     /**

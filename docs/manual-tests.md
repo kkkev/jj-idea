@@ -311,6 +311,17 @@ Open `/tmp/jj-squash-test` in the plugin IDE.
 - [ ] Clear filters (X button) resets all filters
 - [ ] Filters combine correctly (AND logic)
 
+#### Search by Git commit hash (jj-idea-odzo)
+
+- [ ] Copy a full 40-character Git commit hash of a commit currently visible in the log
+      (e.g. `jj log -T commit_id`) and paste it into the search field — the row filters
+      in and is the only result
+- [ ] Paste just an abbreviated prefix of that hash — it still matches
+- [ ] Paste the hash in a different case (e.g. uppercase) — it still matches (case-insensitive
+      by default)
+- [ ] Paste a hash for a commit that isn't currently loaded in the log window — no results
+      (searching outside the loaded window is not yet supported)
+
 #### New/Edit toolbar buttons (jj-idea-e53e)
 
 - [ ] **New** and **Edit** icon buttons appear at the left of the main log toolbar, before Refresh, each with a tooltip
