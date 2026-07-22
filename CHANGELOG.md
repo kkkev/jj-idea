@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Pushing a new or untracked bookmark no longer fails on jj 0.42 and later with "unexpected argument '--allow-new'". You're now asked to confirm before the new bookmark is created on the remote, same as before. ([#53](https://github.com/kkkev/jj-idea/issues/53))
 - Pushing with the default "tracking bookmarks" scope no longer silently skips a brand-new bookmark with no feedback — you're now asked to confirm creating it on the remote, same as when pushing a specific bookmark.
+- Background operations (e.g. Git push/fetch) that hit an unexpected internal error now report it instead of appearing to do nothing.
 - The log graph now draws a merge commit's parents in the same left-to-right order as `jj log`, with matching line colors. Previously the parents could appear swapped (e.g. the trunk parent on the right) when a non-mainline parent happened to sit in the row directly below the merge. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - The commit log no longer shows a status icon on ordinary (mutable) revisions; only immutable revisions are marked, removing visual noise from the common case. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - Changing a log filter (reference/bookmark, author, date, text, or root) no longer deselects the current commit, or silently selects a different one, as long as it's still visible in the filtered list.
