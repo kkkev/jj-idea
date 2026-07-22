@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.15/jj-idea-0.7.15.zip" version="0.7.15">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.16/jj-idea-0.7.16.zip" version="0.7.16">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,22 +23,23 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.15</h3>
+      <h3>0.7.16</h3>
       
 <h4>Added</h4>
-<li>"Compare with Working Copy" in the log's right-click menu diffs every file that differs between the selected commit and your working copy, in one editor tab with the working-copy side editable — handy for reviewing everything since a target commit and editing it directly for a final `jj absorb`. ([#40](https://github.com/kkkev/jj-idea/issues/40))</li>
-<li>The References/Bookmarks selector above the log now also lists bookmarks that exist only on a remote and aren't tracked locally, shown as `name@remote` with a distinct icon, so you can start work off a remote branch without tracking it first. ([#47](https://github.com/kkkev/jj-idea/issues/47))</li>
-<li>New "Tracked" checkbox in the right-click menu for selected files (Project view, editor, Working Copy panel, Commit view) that match a `.gitignore` rule lets you force-include or stop tracking them, without touching `.gitignore` by hand. The checkbox updates instantly, and a notification confirms what happened (or explains why it didn't). ([#42](https://github.com/kkkev/jj-idea/issues/42))</li>
-<li>The commit details panel now shows the author's (and committer's, when different) email address alongside their name, as a clickable mail link, with the date/time kept together on one line when it wraps. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>New "New Change" quick action creates a change without prompting for a description upfront (the common case, since you'll usually squash it in later). It's the primary option in the log's right-click menu (the old dialog-based flow is kept as "New Change with Description..."), and is bound to Cmd/Ctrl+Shift+N while the log is focused. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>New and Edit buttons in the log toolbar act on the selected change with one click, without opening the right-click menu. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>New "Fit Columns to Window Width" option (Columns menu) shrinks the description and other columns as the log window narrows so horizontal scrolling is rarely needed, e.g. on a laptop screen or with the details pane docked beside the log. On by default for tabs you haven't customized; tabs where you've already resized a column keep your exact layout and scrolling as before. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>The commit details panel now renders issue-tracker references (e.g. `JIRA-123`) and plain URLs in commit descriptions as clickable links, using your IDE's Version Control → Issue Navigation settings. Clicking one opens it in your browser. ([#15](https://github.com/kkkev/jj-idea/issues/15))</li>
+<li>Double-clicking a commit in the log now shows its diff, and pressing Enter does the same — both are rebindable to a different action in Settings → Keymap. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>The log search field now matches a commit's Git hash (full or abbreviated), not just its change ID, description, or author. ([#44](https://github.com/kkkev/jj-idea/issues/44))</li>
+<li>New "Duplicate Change" and "Duplicate Onto..." actions in the log's right-click menu create an identical copy of the selected change(s), either in place or onto a chosen destination — works on immutable changes too. The "Duplicate Onto..." dialog hides destinations and disables placements that would fail because they'd need to rewrite an immutable commit. ([#33](https://github.com/kkkev/jj-idea/issues/33))</li>
 
 <h4>Fixed</h4>
-<li>Selecting a commit in the log no longer resets the table's horizontal scroll position. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>On a narrow log window, the filters no longer crowd out the New/Edit/Refresh/Fetch/Push/Columns buttons. Filters that don't fit collapse into a "»" menu instead, with any filter you've actually applied kept visible longer than ones you haven't. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>The New button in the log toolbar now greys out instead of disappearing when there's no selection, matching how the Edit button already behaved.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.15">full release notes</a> for details.</p>
+<li>Pushing a new or untracked bookmark no longer fails on jj 0.42 and later with "unexpected argument '--allow-new'". You're now asked to confirm before the new bookmark is created on the remote, same as before. ([#53](https://github.com/kkkev/jj-idea/issues/53))</li>
+<li>Pushing with the default "tracking bookmarks" scope no longer silently skips a brand-new bookmark with no feedback — you're now asked to confirm creating it on the remote, same as when pushing a specific bookmark.</li>
+<li>Background operations (e.g. Git push/fetch) that hit an unexpected internal error now report it instead of appearing to do nothing.</li>
+<li>The log graph now draws a merge commit's parents in the same left-to-right order as `jj log`, with matching line colors. Previously the parents could appear swapped (e.g. the trunk parent on the right) when a non-mainline parent happened to sit in the row directly below the merge. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>The commit log no longer shows a status icon on ordinary (mutable) revisions; only immutable revisions are marked, removing visual noise from the common case. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>Changing a log filter (reference/bookmark, author, date, text, or root) no longer deselects the current commit, or silently selects a different one, as long as it's still visible in the filtered list.</li>
+<li>Commit pickers in dialogs (Rebase, Squash Into..., Duplicate Onto..., Move Bookmark) now always show commits in the same order as the main log, instead of sometimes showing an unrelated order (e.g. an immutable root commit before the changes on top of it). This could happen the first time a dialog was opened for a repo, and — in multi-repo projects — could affect any repo unpredictably, because different repos' root commits share the same underlying jj change ID and were getting conflated when merging repos' logs.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.16">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

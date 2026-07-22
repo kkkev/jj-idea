@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.16] - 2026-07-22
+
 ### Added
 - The commit details panel now renders issue-tracker references (e.g. `JIRA-123`) and plain URLs in commit descriptions as clickable links, using your IDE's Version Control → Issue Navigation settings. Clicking one opens it in your browser. ([#15](https://github.com/kkkev/jj-idea/issues/15))
 - Double-clicking a commit in the log now shows its diff, and pressing Enter does the same — both are rebindable to a different action in Settings → Keymap. ([#51](https://github.com/kkkev/jj-idea/issues/51))
@@ -682,7 +684,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.15...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.16...HEAD
+[0.7.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.16
 [0.7.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.15
 [0.7.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.14
 [0.7.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.13
