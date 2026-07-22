@@ -24,8 +24,9 @@ internal fun bookmarkForgetArgs(name: BookmarkName) = listOf("bookmark", "forget
 internal fun bookmarkRenameArgs(oldName: BookmarkName, newName: BookmarkName) =
     listOf("bookmark", "rename", oldName, newName).map(Any::toString)
 
-internal fun bookmarkTrackArgs(name: BookmarkName) =
-    listOf("bookmark", "track", name.localName, "--remote", name.remote)
+/** Builds `jj bookmark track NAME... --remote REMOTE`. All [names] must share the same remote. */
+internal fun bookmarkTrackArgs(names: List<BookmarkName>) =
+    listOf("bookmark", "track") + names.map { it.localName } + listOf("--remote", names.first().remote)
 
 internal fun bookmarkUntrackArgs(name: BookmarkName) =
     listOf("bookmark", "untrack", name.localName, "--remote", name.remote)
@@ -110,7 +111,6 @@ internal fun gitPushArgs(
     remote: Remote? = null,
     bookmark: Bookmark? = null,
     allBookmarks: Boolean = false,
-    allowNew: Boolean = false,
     revision: Revision? = null,
     dryRun: Boolean = false
 ): List<String> = buildList {
@@ -126,7 +126,6 @@ internal fun gitPushArgs(
         add("--bookmark")
         add(bookmark.name.name)
     }
-    if (allowNew) add("--allow-new")
     if (revision != null && bookmark == null && !allBookmarks) {
         add("-r")
         add(revision.toString())
@@ -420,7 +419,7 @@ class CliExecutor(
     override fun bookmarkSet(name: BookmarkName, revision: Revision, allowBackwards: Boolean) =
         execute(root, bookmarkSetArgs(name, revision, allowBackwards))
 
-    override fun bookmarkTrack(name: BookmarkName) = execute(root, bookmarkTrackArgs(name))
+    override fun bookmarkTrack(names: List<BookmarkName>) = execute(root, bookmarkTrackArgs(names))
 
     override fun bookmarkUntrack(name: BookmarkName) = execute(root, bookmarkUntrackArgs(name))
 
@@ -495,10 +494,9 @@ class CliExecutor(
         remote: Remote?,
         bookmark: Bookmark?,
         allBookmarks: Boolean,
-        allowNew: Boolean,
         revision: Revision?,
         dryRun: Boolean
-    ) = execute(root, gitPushArgs(remote, bookmark, allBookmarks, allowNew, revision, dryRun), timeout = networkTimeout)
+    ) = execute(root, gitPushArgs(remote, bookmark, allBookmarks, revision, dryRun), timeout = networkTimeout)
 
     override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
 

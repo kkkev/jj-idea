@@ -55,8 +55,14 @@ class CliExecutorBookmarkTest {
     inner class `bookmark track` {
         @Test
         fun `track remote bookmark`() {
-            bookmarkTrackArgs(BookmarkName("main@origin")) shouldBe
+            bookmarkTrackArgs(listOf(BookmarkName("main@origin"))) shouldBe
                 listOf("bookmark", "track", "main", "--remote", "origin")
+        }
+
+        @Test
+        fun `track multiple remote bookmarks in one command`() {
+            bookmarkTrackArgs(listOf(BookmarkName("main@origin"), BookmarkName("feature@origin"))) shouldBe
+                listOf("bookmark", "track", "main", "feature", "--remote", "origin")
         }
     }
 

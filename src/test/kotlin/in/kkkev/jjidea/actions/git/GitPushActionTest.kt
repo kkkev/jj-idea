@@ -1,32 +1,60 @@
 package `in`.kkkev.jjidea.actions.git
 
-import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.BookmarkName
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class GitPushActionTest {
     @Nested
-    inner class `resolveAllowNew` {
+    inner class `parseRefusedNewBookmarks` {
         @Test
-        fun `default scope without confirmation does not allow new`() =
-            resolveAllowNew(forceAllowNew = false, bookmark = null) shouldBe false
+        fun `returns empty list when nothing was refused`() {
+            val stderr =
+                """
+                Changes to push to origin:
+                  Move forward bookmark main from abc1234 to def5678
+                """.trimIndent()
+            parseRefusedNewBookmarks(stderr) shouldBe emptyList()
+        }
 
         @Test
-        fun `default scope with user confirmation allows new`() =
-            resolveAllowNew(forceAllowNew = true, bookmark = null) shouldBe true
+        fun `detects a specific-bookmark refusal (Error, exit 1)`() {
+            val stderr =
+                """
+                Error: Refusing to create new remote bookmark feature@origin
+                Hint: Run `jj bookmark track feature --remote=origin` and try again.
+                """.trimIndent()
+            parseRefusedNewBookmarks(stderr) shouldBe listOf(BookmarkName("feature@origin"))
+        }
 
         @Test
-        fun `specific untracked bookmark allows new`() =
-            resolveAllowNew(forceAllowNew = false, bookmark = Bookmark("feature", tracked = false)) shouldBe true
+        fun `detects a default-scope refusal (Warning, exit 0)`() {
+            val stderr =
+                """
+                Warning: Refusing to create new remote bookmark feature@origin
+                Hint: Run `jj bookmark track feature --remote=origin` and try again.
+                Nothing changed.
+                """.trimIndent()
+            parseRefusedNewBookmarks(stderr) shouldBe listOf(BookmarkName("feature@origin"))
+        }
 
         @Test
-        fun `specific tracked bookmark does not allow new`() =
-            resolveAllowNew(forceAllowNew = false, bookmark = Bookmark("main", tracked = true)) shouldBe false
+        fun `detects multiple refused bookmarks`() {
+            val stderr =
+                """
+                Warning: Refusing to create new remote bookmark feature-a@origin
+                Warning: Refusing to create new remote bookmark feature-b@origin
+                Nothing changed.
+                """.trimIndent()
+            parseRefusedNewBookmarks(stderr) shouldBe
+                listOf(BookmarkName("feature-a@origin"), BookmarkName("feature-b@origin"))
+        }
 
         @Test
-        fun `force plus tracked bookmark still allows new`() =
-            resolveAllowNew(forceAllowNew = true, bookmark = Bookmark("main", tracked = true)) shouldBe true
+        fun `returns empty list for empty output`() {
+            parseRefusedNewBookmarks("") shouldBe emptyList()
+        }
     }
 
     @Nested

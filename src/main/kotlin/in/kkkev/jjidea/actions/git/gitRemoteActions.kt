@@ -7,7 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
-import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.invalidate
@@ -103,33 +103,37 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?, revision: Revision
     }
 
 /**
- * Runs a dry-run push to detect non-fast-forward bookmark moves, then shows a confirmation
- * dialog if needed before performing the actual push. Called on EDT.
+ * Runs a dry-run push to detect new remote bookmarks and non-fast-forward bookmark moves, then
+ * shows a confirmation dialog if needed before performing the actual push. Called on EDT.
  *
+ * - New/untracked bookmarks: jj refuses to create them on the remote without being tracked first
+ *   (as an `Error` when a specific bookmark is targeted, or a `Warning` with the bookmark silently
+ *   skipped for the default/tracking-bookmarks scope) → warn, then track and retry on confirmation.
  * - Tracked bookmarks moved backwards or sideways: jj reports direction in dry-run stderr → warn.
- * - Untracked bookmarks: jj has no old position, refuses dry-run → warn that direction is unknown.
- * - Forward or new bookmarks: proceed silently.
+ * - Forward-moving or `--all` (which creates new remote bookmarks unconditionally): proceed silently.
  */
 fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Revision? = null) {
     runInBackground {
-        val bm = spec.bookmark
         val dryRun = spec.repo.commandExecutor.gitPush(
             remote = spec.remote,
-            bookmark = bm,
+            bookmark = spec.bookmark,
             allBookmarks = spec.allBookmarks,
-            allowNew = false,
             revision = revision,
             dryRun = true
         )
 
-        if (!dryRun.isSuccess) {
-            if (dryRun.stderr.contains("Refusing to create new remote bookmark")) {
-                runLater {
-                    if (confirmUntrackedPush(project)) performPush(spec, project, revision, allowNew = true)
+        val newBookmarks = parseRefusedNewBookmarks(dryRun.stderr)
+        if (newBookmarks.isNotEmpty()) {
+            runLater {
+                if (confirmUntrackedPush(project, newBookmarks.map { it.localName })) {
+                    trackAndPush(spec, project, revision, newBookmarks)
                 }
-            } else {
-                runLater { dryRun.tellUser(project, "action.git.push.error") }
             }
+            return@runInBackground
+        }
+
+        if (!dryRun.isSuccess) {
+            runLater { dryRun.tellUser(project, "action.git.push.error") }
             return@runInBackground
         }
 
@@ -146,25 +150,29 @@ fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Re
     }
 }
 
-internal fun resolveAllowNew(forceAllowNew: Boolean, bookmark: Bookmark?) =
-    forceAllowNew || (bookmark != null && !bookmark.tracked)
-
-private fun performPush(
+/**
+ * Tracks the new remote bookmarks in a single command (they all share the same remote, since
+ * they came from one push's dry-run), then performs the push. Called off EDT.
+ */
+private fun trackAndPush(
     spec: GitPushDialog.GitPushSpec,
     project: Project,
     revision: Revision?,
-    allowNew: Boolean = false
+    newBookmarks: List<BookmarkName>
 ) {
-    spec.repo.commandExecutor
-        .createCommand {
-            gitPush(
-                spec.remote,
-                spec.bookmark,
-                spec.allBookmarks,
-                allowNew = resolveAllowNew(allowNew, spec.bookmark),
-                revision = revision
-            )
+    runInBackground {
+        val result = spec.repo.commandExecutor.bookmarkTrack(newBookmarks)
+        if (!result.isSuccess) {
+            runLater { result.tellUser(project, "action.git.push.error") }
+            return@runInBackground
         }
+        performPush(spec, project, revision)
+    }
+}
+
+private fun performPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Revision?) {
+    spec.repo.commandExecutor
+        .createCommand { gitPush(spec.remote, spec.bookmark, spec.allBookmarks, revision = revision) }
         .onSuccess { stdout ->
             spec.repo.invalidate()
             log.info("Pushed for ${spec.repo.displayName}")
@@ -178,6 +186,17 @@ private fun performPush(
         .onFailure { tellUser(project, "action.git.push.error") }
         .executeWithProgress(project, JujutsuBundle.message("progress.git.push"))
 }
+
+// jj outputs "Error: Refusing to create new remote bookmark X@Y" (specific bookmark, exit 1) or
+// "Warning: Refusing to create new remote bookmark X@Y" (default scope, exit 0, bookmark silently
+// skipped) when a bookmark doesn't yet exist on the remote and isn't tracked.
+private val REFUSING_NEW_BOOKMARK_MARKER = Regex("""Refusing to create new remote bookmark (\S+)""")
+
+/** Parses dry-run stderr for bookmarks jj refused to push because they aren't tracked yet. */
+internal fun parseRefusedNewBookmarks(stderr: String): List<BookmarkName> =
+    stderr.lines()
+        .mapNotNull { REFUSING_NEW_BOOKMARK_MARKER.find(it)?.groupValues?.get(1) }
+        .map { BookmarkName(it) }
 
 // jj outputs "Move sideways bookmark X from Y to Z" or "Move backward bookmark X from Y to Z"
 // for non-fast-forward pushes. Both require a force-push and must be confirmed.
@@ -203,15 +222,17 @@ internal fun parseDeletedBookmarks(stderr: String): List<String> =
                 ?.takeIf { it.isNotEmpty() }
         }
 
-private fun confirmUntrackedPush(project: Project) =
-    Messages.showYesNoDialog(
+private fun confirmUntrackedPush(project: Project, bookmarkNames: List<String>): Boolean {
+    val list = bookmarkNames.joinToString("\n") { "  • $it" }
+    return Messages.showYesNoDialog(
         project,
-        JujutsuBundle.message("action.git.push.untracked.message"),
+        JujutsuBundle.message("action.git.push.untracked.message", list),
         JujutsuBundle.message("action.git.push.sideways.title"),
         JujutsuBundle.message("action.git.push.sideways.push"),
         JujutsuBundle.message("action.git.push.sideways.cancel"),
         Messages.getWarningIcon()
     ) == Messages.YES
+}
 
 private fun confirmPush(project: Project, forcePushBookmarks: List<String>, deletedBookmarks: List<String>): Boolean {
     val parts = buildList {

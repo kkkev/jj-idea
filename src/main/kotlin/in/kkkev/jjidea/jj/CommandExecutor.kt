@@ -192,7 +192,8 @@ interface CommandExecutor {
 
     fun bookmarkForget(name: BookmarkName): CommandResult
 
-    fun bookmarkTrack(name: BookmarkName): CommandResult
+    /** Tracks one or more remote bookmarks in a single command; all must share the same remote. */
+    fun bookmarkTrack(names: List<BookmarkName>): CommandResult
 
     fun bookmarkUntrack(name: BookmarkName): CommandResult
 
@@ -274,7 +275,6 @@ interface CommandExecutor {
         remote: Remote? = null,
         bookmark: Bookmark? = null,
         allBookmarks: Boolean = false,
-        allowNew: Boolean = false,
         revision: Revision? = null,
         dryRun: Boolean = false
     ): CommandResult

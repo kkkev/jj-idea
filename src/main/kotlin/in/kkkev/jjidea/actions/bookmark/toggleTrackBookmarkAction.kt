@@ -16,7 +16,7 @@ fun toggleTrackBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark) =
         }
     } else {
         nullAndDumbAwareAction(bookmark, "action.bookmark.track", JujutsuIcons.BookmarkTrackedAction) {
-            repo.commandExecutor.createCommand { bookmarkTrack(target.name) }
+            repo.commandExecutor.createCommand { bookmarkTrack(listOf(target.name)) }
                 .onSuccess { repo.invalidate() }
                 .onFailure { tellUser(repo.project, "action.bookmark.track.error") }
                 .executeAsync()

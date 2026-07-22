@@ -541,10 +541,23 @@ Verify these keyboard shortcuts work in the log view:
 Setup: have a local bookmark that has never been pushed to the remote.
 
 - [ ] Open push dialog (VCS menu → Push) → "Tracking bookmarks (default)" selected → OK → push completes (shows success notification)
-- [ ] Open push dialog → "Tracking bookmarks (default)" → if new bookmark exists, confirmation dialog appears asking whether to create remote bookmark → confirm → push succeeds with `--allow-new`
-- [ ] Open push dialog → "Specific bookmark" → select an untracked bookmark → OK → push succeeds with `--allow-new`
+- [ ] Open push dialog → "Tracking bookmarks (default)" → if new bookmark exists, confirmation dialog appears asking whether to create remote bookmark → confirm → push succeeds
+- [ ] Open push dialog → "Specific bookmark" → select an untracked bookmark → OK → push succeeds
 - [ ] Open push dialog → "All bookmarks" → OK → pushes all bookmarks
 - [ ] Cancel push dialog → no push occurs
+
+#### New/untracked bookmark push (jj-idea-dt2k, GitHub #53)
+
+The plugin no longer uses `jj git push --allow-new` (removed in jj 0.42.0); it tracks the
+bookmark against the remote first, then pushes without any special flag. Verify on **both**
+jj < 0.42 (e.g. 0.37–0.41) and jj ≥ 0.42 (e.g. 0.43) — this was the #53 regression, previously
+failing on 0.42+ with `error: unexpected argument '--allow-new'`:
+- [ ] "Tracking bookmarks (default)" scope with a brand-new untracked bookmark at the working
+  copy → confirmation dialog lists the bookmark → confirm → push succeeds and the bookmark is
+  now tracked (`jj bookmark list` shows `@origin`)
+- [ ] "Specific bookmark" scope, selecting an untracked bookmark → same confirmation → confirm →
+  push succeeds
+- [ ] Cancel either confirmation dialog → no push occurs, bookmark remains untracked
 
 ### Settings (Version Control > Jujutsu)
 

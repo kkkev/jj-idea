@@ -75,11 +75,6 @@ class CliExecutorGitRemoteTest {
         }
 
         @Test
-        fun `push with allow-new includes --allow-new flag`() {
-            gitPushArgs(allowNew = true) shouldBe listOf("git", "push", "--allow-new")
-        }
-
-        @Test
         fun `push with revision adds -r flag in default scope`() {
             val revision = ChangeId("abc123", "abc")
             gitPushArgs(revision = revision) shouldBe listOf("git", "push", "-r", "abc123")

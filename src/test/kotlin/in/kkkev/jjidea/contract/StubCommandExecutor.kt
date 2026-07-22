@@ -171,7 +171,7 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         allowBackwards: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
-    override fun bookmarkTrack(name: BookmarkName): CommandExecutor.CommandResult =
+    override fun bookmarkTrack(names: List<BookmarkName>): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
     override fun bookmarkUntrack(name: BookmarkName): CommandExecutor.CommandResult =
@@ -222,7 +222,6 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         remote: Remote?,
         bookmark: Bookmark?,
         allBookmarks: Boolean,
-        allowNew: Boolean,
         revision: Revision?,
         dryRun: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")

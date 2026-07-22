@@ -155,6 +155,7 @@ tasks.test {
     useJUnitPlatform {
         excludeTags("platform", "contract")
     }
+    maxHeapSize = "1g"
     testClassesDirs = sourceSets["test"].output.classesDirs
 
     classpath = configurations["testCompileClasspath"] +
