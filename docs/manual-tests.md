@@ -609,6 +609,11 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 - [ ] Jujutsu menu has "Compare with Another Commit" ✅
 - [ ] Jujutsu menu has "Annotate" ✅
 - [ ] Annotate fetches annotations for the correct revision ✅
+- [ ] "Annotate Previous Revision" on a line owned by a single-parent commit re-annotates at that commit's parent
+- [ ] "Annotate Previous Revision" on a line owned by a merge commit is unavailable/no-op (no incorrect ancestor shown)
+- [ ] Annotate on a file whose working copy is a merge commit succeeds (no "resolved to more than one revision" error)
+- [ ] Annotate on a merge commit with a resolved conflict shows no "line count" warning, and correctly attributes lines inherited from each parent plus the conflict-resolution line(s) to the merge commit itself
+- [ ] Annotate on a merge commit where the file exists in only some parents (e.g. a criss-cross merge) succeeds (no "No such path" error), attributing blame from whichever parents have the file
 - [ ] if file has changed, Jujutsu menu has compare before with another commit ❌ jj-idea-lo7u
 - [ ] diff for unchanged file shows no changes (before view has same content, shows content as identical) ✅
 - [ ] diff for modified file and single parent shows before from @-, current from @ ✅

@@ -17,19 +17,23 @@ import kotlinx.datetime.Instant
  */
 object AnnotationParser {
     private const val FIELD_SEPARATOR = "\u0000" // Null byte
-    private const val FIELDS_PER_LINE = 10
+    private const val PARENT_SEPARATOR = ","
+    private const val FIELDS_PER_LINE = 11
 
     /**
      * Template to use with `jj file annotate -T`
-     * Outputs 8 fields per line separated by null bytes:
-     * 1. full commit hash
-     * 2. short commit hash
-     * 3. commit hash (duplicate for compatibility)
-     * 4. author name
-     * 5. author email
-     * 6. description first line
-     * 7. is commit the working copy?
-     * 8. line content
+     * Outputs fields per line separated by null bytes:
+     * 1. full change id
+     * 2. short change id
+     * 3. divergence offset
+     * 4. full commit hash
+     * 5. short commit hash
+     * 6. author name
+     * 7. author email
+     * 8. author timestamp
+     * 9. description first line
+     * 10. comma-separated parent change ids
+     * 11. line content
      *
      * Note: In annotate context, use `commit` instead of `commit_id`
      */
@@ -44,6 +48,7 @@ object AnnotationParser {
         commit.author().email() ++ "\0" ++
         commit.author().timestamp().utc().format("%s") ++ "\0" ++
         commit.description() ++ "\0" ++
+        commit.parents().map(|c| c.change_id()).join(",") ++ "\0" ++
         content ++ "\0"
         """.trimIndent().replace("\n", "")
 
@@ -70,7 +75,8 @@ object AnnotationParser {
 
     /**
      * Parse a single annotation line from chunked fields
-     * @param chunk Array of 7 fields: [fullChangeId, shortChangeId, commitId, authorName, authorEmail, descFirstLine, lineContent]
+     * @param chunk Array of 11 fields: [fullChangeId, shortChangeId, changeOffset, fullCommitId, shortCommitId,
+     *   authorName, authorEmail, authorTimestamp, description, parentIds, lineContent]
      * @param lineNumber Line number (1-indexed)
      * @return Parsed annotation line
      */
@@ -88,7 +94,8 @@ object AnnotationParser {
         val authorEmail = chunk[6]
         val authorTimestamp = chunk[7].toLongOrNull()?.let(Instant::fromEpochSeconds)
         val description = Description(chunk[8])
-        val lineContent = chunk[9]
+        val parentIds = chunk[9].split(PARENT_SEPARATOR).filter { it.isNotEmpty() }.map { ChangeId(it) }
+        val lineContent = chunk[10]
 
         return AnnotationLine(
             id = ChangeId(fullChangeId, shortChangeId, changeOffset),
@@ -96,6 +103,7 @@ object AnnotationParser {
             author = VcsUserImpl(authorName, authorEmail),
             authorTimestamp = authorTimestamp,
             description = description,
+            parentIds = parentIds,
             lineContent = lineContent,
             lineNumber = lineNumber
         )

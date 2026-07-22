@@ -80,9 +80,9 @@ abstract class AnnotateContractTest {
         val fields = result.stdout.trim().split("\u0000")
         val records = fields.chunked(FIELDS_PER_LINE).filter { it.size == FIELDS_PER_LINE }
 
-        records[0][9] shouldBe "first\n"
-        records[1][9] shouldBe "second\n"
-        records[2][9] shouldBe "third\n"
+        records[0][10] shouldBe "first\n"
+        records[1][10] shouldBe "second\n"
+        records[2][10] shouldBe "third\n"
     }
 
     @Test
@@ -120,6 +120,6 @@ abstract class AnnotateContractTest {
     }
 
     companion object {
-        private const val FIELDS_PER_LINE = 10
+        private const val FIELDS_PER_LINE = 11
     }
 }

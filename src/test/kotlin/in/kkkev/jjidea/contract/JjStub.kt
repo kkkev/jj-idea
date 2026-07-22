@@ -413,6 +413,10 @@ class JjStub(override val workDir: Path) : JjBackend {
                 field(change.authorEmail)
                 field(change.timestamp.toString())
                 field(desc)
+                val parentChangeIds = change.parentIds.mapNotNull { pid ->
+                    changes.firstOrNull { it.commitId == pid }?.changeId
+                }
+                field(parentChangeIds.joinToString(","))
                 field(line + "\n")
             }
         }

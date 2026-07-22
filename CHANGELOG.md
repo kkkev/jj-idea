@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- "Annotate Previous Revision" now re-annotates at the correct parent commit instead of an arbitrary one. On a line introduced by a merge commit, where there's no single correct "previous" revision, the action is unavailable rather than guessing wrong.
+- Annotating a file whose working copy (or an ancestor) is a merge commit no longer fails with "Revset `@-` resolved to more than one revision".
+- Annotating a resolved merge conflict no longer shows a spurious "number of lines annotated is not equal to number of lines in the file" warning. Blame now correctly attributes each line to whichever original commit introduced it, with conflict-resolution lines attributed to the merge itself.
+- Annotating a merge no longer fails with "No such path" when the file exists in only some of the merge's parents (e.g. a criss-cross merge where a file was added on only one side). Blame is now assembled from whichever parents actually have the file.
+
 ## [0.7.16] - 2026-07-22
 
 ### Added

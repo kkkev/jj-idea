@@ -14,6 +14,7 @@ data class AnnotationLine(
     override val author: VcsUser,
     override val authorTimestamp: Instant?,
     override val description: Description,
+    val parentIds: List<ChangeId> = emptyList(),
     val lineContent: String,
     val lineNumber: Int
 ) : ChangeDetail {

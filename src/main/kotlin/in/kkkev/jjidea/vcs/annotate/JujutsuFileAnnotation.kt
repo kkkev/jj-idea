@@ -68,6 +68,7 @@ class JujutsuFileAnnotation(
 
     override fun getRevisions(): List<VcsFileRevision> = annotationLines
         .distinctBy { it.id }
+        .sortedByDescending { it.authorTimestamp }
         .map { AnnotationFileRevision(it, file, repo) }
 
     override fun getAuthorsMappingProvider() = AuthorsMappingProvider {
@@ -81,6 +82,22 @@ class JujutsuFileAnnotation(
             .distinctBy { it.id }
             .sortedByDescending { it.authorTimestamp }
             .map { listOf(ChangeIdRevisionNumber(it.id) as VcsRevisionNumber) }
+    }
+
+    /**
+     * "Previous" is the ancestrally correct parent of the line's own change, not merely the
+     * next entry in some ordering (the platform default, which the line-order/timestamp-order
+     * of [getRevisions] cannot support correctly). A merge commit has multiple parents with no
+     * single correct "previous", so those lines decline (return null) rather than guess.
+     */
+    override fun getPreviousFileRevisionProvider() = object : PreviousFileRevisionProvider {
+        override fun getPreviousRevision(lineNumber: Int): VcsFileRevision? {
+            val parentIds = getAnnotationLine(lineNumber)?.parentIds ?: return null
+            return parentIds.singleOrNull()?.let { ParentFileRevision(it, file, repo) }
+        }
+
+        override fun getLastRevision(): VcsFileRevision? =
+            workingCopyChangeId?.let { ParentFileRevision(it, file, repo) } ?: getRevisions().firstOrNull()
     }
 
     /**
@@ -187,6 +204,41 @@ private class AnnotationFileRevision(
         val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, line.id) }
         val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
         if (!result.isSuccess) throw VcsException("Failed to load content at ${line.id}: ${result.stderr}")
+        return result.stdout.toByteArray()
+    }
+
+    @Throws(VcsException::class)
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun getContent(): ByteArray = loadContent()
+}
+
+/**
+ * A revision known only by its [ChangeId] (e.g. a parent change with no annotation metadata
+ * of its own). Used as the "previous revision" target for re-annotation.
+ */
+private class ParentFileRevision(
+    private val changeId: ChangeId,
+    private val virtualFile: VirtualFile,
+    private val repo: JujutsuRepository
+) : VcsFileRevisionEx() {
+    override fun getRevisionNumber(): VcsRevisionNumber = ChangeIdRevisionNumber(changeId)
+    override fun getRevisionDate(): Date? = null
+    override fun getAuthorDate(): Date? = null
+    override fun getAuthor(): String? = null
+    override fun getAuthorEmail(): String? = null
+    override fun getCommitMessage(): String? = null
+    override fun getBranchName(): String? = null
+    override fun getCommitterName(): String? = null
+    override fun getCommitterEmail(): String? = null
+    override fun getChangedRepositoryPath() = null
+    override fun getPath() = VcsUtil.getFilePath(virtualFile)
+    override fun isDeleted() = false
+
+    @Throws(VcsException::class)
+    override fun loadContent(): ByteArray {
+        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, changeId) }
+        val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
+        if (!result.isSuccess) throw VcsException("Failed to load content at $changeId: ${result.stderr}")
         return result.stdout.toByteArray()
     }
 

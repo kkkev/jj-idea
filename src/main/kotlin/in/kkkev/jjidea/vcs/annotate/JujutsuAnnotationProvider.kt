@@ -11,11 +11,15 @@ import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
+import `in`.kkkev.jjidea.jj.AnnotationLine
+import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
+import `in`.kkkev.jjidea.jj.reconstructMergeParentContent
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.contentLocator
@@ -70,18 +74,97 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
         val before = change?.before ?: FileAtVersion(file.filePath, repo.workingCopy.parentContentLocator)
         val beforeFile = repo.getVirtualFile(before)
             ?: throw VcsException("Cannot find virtual file for $before")
-        val beforeRevision = (before.contentLocator as? Revision)
-            ?: ((contentLocator as? Revision) ?: WorkingCopy).parent
 
-        // For the purpose of annotating, pick an arbitrary parent (the first one)
-        // TODO What happens if the file has merged from multiple parents?
         // TODO Or for a rename, the filename would have changed
         // If we get this information from a change... that's great... but we can annotate files too
         // In that case, we need to find the change object from a working copy virtual file
-        // MergeParentOf will need its own special handling - which will be complex. We would probably need to
-        // annotate all of the parents, then compare these to the merge parent (reverse diff), copying annotations
-        // across for all lines that match.
+        (before.contentLocator as? MergeParentOf)?.let { mergeParentOf ->
+            annotateMerge(beforeFile, mergeParentOf, repo)?.let { return it }
+        }
+
+        val beforeRevision = beforeRevisionFor(before.contentLocator, contentLocator, repo)
         return annotateInternal(beforeFile, beforeRevision, repo)
+    }
+
+    /**
+     * Annotates a merge commit's auto-merged parent tree by annotating each real parent and
+     * reconciling their blame via [MergeAnnotationReconciler], so the resulting line count
+     * matches the actual resolved file (only genuine conflict-resolution edits show as
+     * unattributed, rather than the whole file diverging from one arbitrary parent).
+     *
+     * A parent that doesn't have the file at all (e.g. it was added on only one side of a
+     * criss-cross merge) is skipped rather than aborting the whole reconciliation — jj correctly
+     * reports "No such path" for that parent, but the *other* parent(s) can still supply blame.
+     *
+     * Returns null if reconstructing the merge tree fails, or if *no* parent could be annotated,
+     * so the caller can fall back to [beforeRevisionFor]'s arbitrary-first-parent behavior rather
+     * than failing outright.
+     */
+    internal fun annotateMerge(
+        file: VirtualFile,
+        mergeParentOf: MergeParentOf,
+        repo: JujutsuRepository
+    ): FileAnnotation? {
+        val childRevision = mergeParentOf.childRevision
+        return try {
+            val mergeCommit = repo.getLogEntry(childRevision)
+            val mergeContent = repo.reconstructMergeParentContent(childRevision, file.filePath)
+            val parentAnnotations = mergeCommit.parentIds.mapNotNull { parentId ->
+                annotationLinesOrNull(file, parentId, repo, childRevision)
+            }
+            if (parentAnnotations.isEmpty()) {
+                log.warn("No parent of merge $childRevision could be annotated for $file, falling back to first parent")
+                return null
+            }
+            val annotationLines = MergeAnnotationReconciler.reconcile(mergeContent, mergeCommit, parentAnnotations)
+
+            JujutsuFileAnnotation(
+                project = project,
+                repo = repo,
+                file = file,
+                annotationLines = annotationLines,
+                vcsKey = vcs.keyInstanceMethod,
+                workingCopyChangeId = repo.workingCopy.id
+            )
+        } catch (e: ProcessCanceledException) {
+            throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            log.warn("Failed to reconcile merge annotation for $childRevision, falling back to first parent", e)
+            null
+        }
+    }
+
+    /** [getAnnotationLines], but null (rather than throwing) if this specific parent lacks the file. */
+    private fun annotationLinesOrNull(
+        file: VirtualFile,
+        parentId: Revision,
+        repo: JujutsuRepository,
+        childRevision: Revision
+    ): List<AnnotationLine>? = try {
+        getAnnotationLines(file, parentId, repo)
+    } catch (e: VcsException) {
+        log.warn("Failed to annotate parent $parentId of merge $childRevision, treating as absent in that parent", e)
+        null
+    }
+
+    /**
+     * `jj file annotate` requires a single revision, but a merge commit's "before" is
+     * [MergeParentOf] — a synthetic reconstruction of the auto-merged tree, not a real revision
+     * jj can annotate against. Used as a fallback (arbitrary first parent) when
+     * [annotateMerge] can't reconcile a full multi-parent annotation.
+     */
+    internal fun beforeRevisionFor(
+        beforeLocator: ContentLocator,
+        contentLocator: ContentLocator,
+        repo: JujutsuRepository
+    ): Revision {
+        (beforeLocator as? Revision)?.let { return it }
+        (beforeLocator as? MergeParentOf)?.let { mergeParent ->
+            repo.getLogEntry(mergeParent.childRevision).parentIds.firstOrNull()?.let { return it }
+        }
+        return ((contentLocator as? Revision) ?: WorkingCopy).parent
     }
 
     /** Annotate a file at a specific revision (used for "Annotate This/Previous Revision"). */
@@ -95,19 +178,26 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
 
     override fun isAnnotationValid(rev: VcsFileRevision) = true
 
+    /** Runs `jj file annotate` for a single revision and parses the result. */
+    private fun getAnnotationLines(
+        file: VirtualFile,
+        revision: Revision,
+        repo: JujutsuRepository
+    ): List<AnnotationLine> {
+        val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
+        if (!result.isSuccess) {
+            log.warn("Failed to annotate file: ${result.stderr}")
+            throw VcsException("Failed to annotate file: ${result.stderr}")
+        }
+        return AnnotationParser.parse(result.stdout)
+    }
+
     internal fun annotateInternal(
         file: VirtualFile,
         revision: Revision,
         repo: JujutsuRepository
     ): FileAnnotation = try {
-        val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
-
-        if (!result.isSuccess) {
-            log.warn("Failed to annotate file: ${result.stderr}")
-            throw VcsException("Failed to annotate file: ${result.stderr}")
-        }
-
-        val annotationLines = AnnotationParser.parse(result.stdout)
+        val annotationLines = getAnnotationLines(file, revision, repo)
 
         JujutsuFileAnnotation(
             project = project,

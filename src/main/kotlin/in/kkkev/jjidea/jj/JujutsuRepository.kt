@@ -163,21 +163,7 @@ data class JujutsuRepositoryImpl(
         private val filePath: FilePath,
         private val mergeParentOf: MergeParentOf
     ) : ContentRevision {
-        /**
-         * Reconstructs the auto-merged parent tree content by
-         * reverse-applying `jj diff --git -r <childRevision> -- <file>` to the file's content at
-         * [MergeParentOf.childRevision]. This is necessary because `jj file show -r <firstParent>`
-         * only returns the first parent's content, not the merge parent tree jj diffs against.
-         */
-        override fun getContent(): String {
-            val childRevision = mergeParentOf.childRevision
-            val afterContent = commandExecutor.show(filePath, childRevision).let {
-                if (it.isSuccess) it.stdout else ""
-            }
-            val diffResult = commandExecutor.diffGitFile(childRevision, filePath)
-            if (!diffResult.isSuccess || diffResult.stdout.isBlank()) return afterContent
-            return GitDiffReverseApplier.reverseApply(afterContent, diffResult.stdout) ?: afterContent
-        }
+        override fun getContent() = reconstructMergeParentContent(mergeParentOf.childRevision, filePath)
 
         override fun getFile() = filePath
 
@@ -240,6 +226,21 @@ data class JujutsuRepositoryImpl(
         override fun getContent() = null
         override fun getRevisionNumber() = dummyRevisionNumber(ContentLocator.Empty.title)
     }
+}
+
+/**
+ * Reconstructs the auto-merged parent tree content for [childRevision]'s [filePath] by
+ * reverse-applying `jj diff --git -r <childRevision> -- <file>` to the file's content at
+ * [childRevision]. This is necessary because `jj file show -r <firstParent>` only returns the
+ * first parent's content, not the merge parent tree jj diffs against.
+ */
+fun JujutsuRepository.reconstructMergeParentContent(childRevision: Revision, filePath: FilePath): String {
+    val afterContent = commandExecutor.show(filePath, childRevision).let {
+        if (it.isSuccess) it.stdout else ""
+    }
+    val diffResult = commandExecutor.diffGitFile(childRevision, filePath)
+    if (!diffResult.isSuccess || diffResult.stdout.isBlank()) return afterContent
+    return GitDiffReverseApplier.reverseApply(afterContent, diffResult.stdout) ?: afterContent
 }
 
 private fun dummyRevisionNumber(title: String) = object : VcsRevisionNumber {

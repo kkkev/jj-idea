@@ -5,11 +5,16 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.testFramework.LoggedErrorProcessor
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.MergeParentOf
+import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
@@ -62,5 +67,31 @@ class JujutsuAnnotationProviderTest {
                 provider.annotateInternal(file, WorkingCopy, repo)
             }
         }
+    }
+
+    // Regression test for jj-idea reported crash: annotating a merge commit (working copy or
+    // historical) must not pass the literal "@-" revset to `jj file annotate`, since for a merge
+    // that resolves to multiple revisions and jj fails with "resolved to more than one revision".
+    @Test
+    fun `beforeRevisionFor falls back to first parent for a merge commit`() {
+        val child: Revision = ChangeId("child1", "child1")
+        val parent1 = ChangeId("parent1", "parent1")
+        val parent2 = ChangeId("parent2", "parent2")
+        val logEntry = mockk<LogEntry>()
+        every { logEntry.parentIds } returns listOf(parent1, parent2)
+        every { repo.getLogEntry(child) } returns logEntry
+
+        val result = provider.beforeRevisionFor(MergeParentOf(child), WorkingCopy, repo)
+
+        result shouldBe parent1
+    }
+
+    @Test
+    fun `beforeRevisionFor uses the before revision directly when it is a real revision`() {
+        val parent = ChangeId("parent1", "parent1")
+
+        val result = provider.beforeRevisionFor(parent, WorkingCopy, repo)
+
+        result shouldBe parent
     }
 }
