@@ -266,4 +266,81 @@ class GitignoreScanTest {
             calls shouldBe 3
         }
     }
+
+    // ─── Zero ignore files (jj-idea-b6xo) ──────────────────────────────────────
+
+    @Nested
+    inner class `watchdog fires with zero ignore files (jj-idea-b6xo)` {
+        // Regression for jj-idea-b6xo / GitHub #35: with NO ignore files present anywhere in
+        // the repo, the scan prunes nothing and visits every entry, so checkCanceled (which
+        // carries the 5s watchdog in JujutsuIgnoredFilesService) must still be invoked during
+        // traversal — it must NOT be gated on an ignored entry ever being reported via
+        // onIgnored. Note: no rootGitignore()/subGitignore() call in this nested class —
+        // GitignoreCache sees no .gitignore anywhere, exactly the reported scenario.
+
+        @Test
+        fun `checkCanceled fires per directory even though nothing is ignored`() {
+            // Deep chain root -> a -> b -> c, each a plain directory with no ignore rules.
+            val deepTree = TrackingNode.dir(
+                "root",
+                listOf(
+                    TrackingNode.dir(
+                        "a",
+                        listOf(TrackingNode.dir("b", listOf(TrackingNode.dir("c", listOf(TrackingNode.file("f.txt"))))))
+                    )
+                )
+            )
+
+            val cache = GitignoreCache(this@GitignoreScanTest.root)
+            var calls = 0
+            val reported = mutableListOf<String>()
+            cache.collectIgnored(deepTree, { calls++ }) { relPath, _ -> reported.add(relPath) }
+
+            // One checkCanceled call per directory entered: root, a, b, c = 4.
+            calls shouldBe 4
+            reported shouldBe emptyList()
+        }
+
+        @Test
+        fun `checkCanceled is throttled inside a huge flat dir with no ignore files`() {
+            val childCount = (IGNORE_SCAN_CHECK_INTERVAL * 5).toInt()
+            val flatChildren = (1..childCount).map { TrackingNode.file("f$it.txt") }
+            val flatDir = TrackingNode.dir("root", flatChildren)
+
+            val cache = GitignoreCache(this@GitignoreScanTest.root)
+            var calls = 0
+            val reported = mutableListOf<String>()
+            cache.collectIgnored(flatDir, { calls++ }) { relPath, _ -> reported.add(relPath) }
+
+            // 1 call on directory entry + 1 per IGNORE_SCAN_CHECK_INTERVAL visited children.
+            calls shouldBe (1 + childCount / IGNORE_SCAN_CHECK_INTERVAL.toInt())
+            reported shouldBe emptyList()
+        }
+
+        @Test
+        fun `watchdog abort stops the walk when there are no ignore files`() {
+            val childCount = (IGNORE_SCAN_CHECK_INTERVAL * 5).toInt()
+            val flatChildren = (1..childCount).map { TrackingNode.file("f$it.txt") }
+            val flatDir = TrackingNode.dir("root", flatChildren)
+
+            val cache = GitignoreCache(this@GitignoreScanTest.root)
+            var calls = 0
+            val checkCanceled: () -> Unit = {
+                calls++
+                if (calls >= 3) throw ProcessCanceledException()
+            }
+
+            var threw = false
+            val reported = mutableListOf<String>()
+            try {
+                cache.collectIgnored(flatDir, checkCanceled) { relPath, _ -> reported.add(relPath) }
+            } catch (_: ProcessCanceledException) {
+                threw = true
+            }
+            threw shouldBe true
+            // Aborted well before the directory's child list was exhausted.
+            calls shouldBe 3
+            reported shouldBe emptyList()
+        }
+    }
 }
