@@ -13,7 +13,7 @@ class RebaseModeTest {
 
     @Test
     fun `destination mode flags`() {
-        RebaseDestinationMode.ONTO.flag shouldBe "-d"
+        RebaseDestinationMode.ONTO.flag shouldBe "--onto"
         RebaseDestinationMode.INSERT_AFTER.flag shouldBe "-A"
         RebaseDestinationMode.INSERT_BEFORE.flag shouldBe "-B"
     }

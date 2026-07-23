@@ -15,35 +15,35 @@ class CliExecutorRebaseTest {
     @Nested
     inner class `single revision single destination` {
         @Test
-        fun `rebase -r revision -d destination`() {
+        fun `rebase -r revision --onto destination`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main"))
             )
 
-            result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "main")
+            result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main")
         }
 
         @Test
-        fun `rebase -s revision -d destination`() {
+        fun `rebase -s revision --onto destination`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main")),
                 RebaseSourceMode.SOURCE
             )
 
-            result shouldBe listOf("rebase", "-s", "abc123def456", "-d", "main")
+            result shouldBe listOf("rebase", "-s", "abc123def456", "--onto", "main")
         }
 
         @Test
-        fun `rebase -b revision -d destination`() {
+        fun `rebase -b revision --onto destination`() {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main")),
                 RebaseSourceMode.BRANCH
             )
 
-            result shouldBe listOf("rebase", "-b", "abc123def456", "-d", "main")
+            result shouldBe listOf("rebase", "-b", "abc123def456", "--onto", "main")
         }
     }
 
@@ -87,7 +87,7 @@ class CliExecutorRebaseTest {
                 listOf(BookmarkName("main"))
             )
 
-            result shouldBe listOf("rebase", "-r", "abc123def456", "-r", "fed987cba654", "-d", "main")
+            result shouldBe listOf("rebase", "-r", "abc123def456", "-r", "fed987cba654", "--onto", "main")
         }
 
         @Test
@@ -101,7 +101,7 @@ class CliExecutorRebaseTest {
                 RebaseSourceMode.SOURCE
             )
 
-            result shouldBe listOf("rebase", "-s", "abc123def456", "-s", "fed987cba654", "-d", "main")
+            result shouldBe listOf("rebase", "-s", "abc123def456", "-s", "fed987cba654", "--onto", "main")
         }
     }
 
@@ -114,7 +114,7 @@ class CliExecutorRebaseTest {
                 listOf(BookmarkName("main"), BookmarkName("feature"))
             )
 
-            result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "main", "-d", "feature")
+            result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main", "--onto", "feature")
         }
 
         @Test
@@ -142,7 +142,7 @@ class CliExecutorRebaseTest {
                 RebaseSourceMode.BRANCH
             )
 
-            result shouldBe listOf("rebase", "-b", "@", "-d", "main")
+            result shouldBe listOf("rebase", "-b", "@", "--onto", "main")
         }
 
         @Test
@@ -152,7 +152,7 @@ class CliExecutorRebaseTest {
                 listOf(ChangeId("fed987cba654", "fed987cb", null))
             )
 
-            result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "fed987cba654")
+            result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "fed987cba654")
         }
 
         @Test
@@ -162,7 +162,7 @@ class CliExecutorRebaseTest {
                 listOf(RevisionExpression("main@origin"))
             )
 
-            result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "main@origin")
+            result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main@origin")
         }
     }
 
@@ -175,7 +175,7 @@ class CliExecutorRebaseTest {
                 listOf(BookmarkName("main"))
             )
 
-            result shouldBe listOf("rebase", "-r", "abc123def456", "-d", "main")
+            result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main")
         }
     }
 }

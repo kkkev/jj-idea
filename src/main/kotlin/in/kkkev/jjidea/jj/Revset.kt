@@ -173,7 +173,7 @@ enum class RebaseSourceMode(val flag: String) {
 /** Where to place rebased revisions. */
 enum class RebaseDestinationMode(val flag: String) {
     /** Standard rebase: become children of the destination. */
-    ONTO("-d"),
+    ONTO("--onto"),
 
     /** Insert after the destination, before its current children. */
     INSERT_AFTER("-A"),

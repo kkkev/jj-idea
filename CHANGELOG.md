@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Rebase and duplicate now use jj's `--onto` flag instead of the deprecated `-d`/`--destination`, ahead of its removal in a future jj release.
+
 ### Fixed
 - "Annotate Previous Revision" now re-annotates at the correct parent commit instead of an arbitrary one. On a line introduced by a merge commit, where there's no single correct "previous" revision, the action is unavailable rather than guessing wrong.
 - Annotating a file whose working copy (or an ancestor) is a merge commit no longer fails with "Revset `@-` resolved to more than one revision".

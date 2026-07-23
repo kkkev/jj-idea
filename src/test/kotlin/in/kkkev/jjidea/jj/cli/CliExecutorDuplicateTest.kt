@@ -44,10 +44,10 @@ class CliExecutorDuplicateTest {
     @Nested
     inner class `with destination` {
         @Test
-        fun `onto uses -d flag`() {
+        fun `onto uses --onto flag`() {
             val result = duplicateArgs(listOf(revision), listOf(BookmarkName("main")))
 
-            result shouldBe listOf("duplicate", "abc123def456", "-d", "main")
+            result shouldBe listOf("duplicate", "abc123def456", "--onto", "main")
         }
 
         @Test
@@ -79,7 +79,7 @@ class CliExecutorDuplicateTest {
                 listOf(BookmarkName("main"), BookmarkName("feature"))
             )
 
-            result shouldBe listOf("duplicate", "abc123def456", "-d", "main", "-d", "feature")
+            result shouldBe listOf("duplicate", "abc123def456", "--onto", "main", "--onto", "feature")
         }
 
         @Test
@@ -92,7 +92,7 @@ class CliExecutorDuplicateTest {
                 listOf(BookmarkName("main"))
             )
 
-            result shouldBe listOf("duplicate", "aaa111bbb222", "bbb222ccc333", "-d", "main")
+            result shouldBe listOf("duplicate", "aaa111bbb222", "bbb222ccc333", "--onto", "main")
         }
     }
 }
