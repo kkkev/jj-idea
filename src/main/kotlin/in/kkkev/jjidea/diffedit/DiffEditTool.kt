@@ -94,38 +94,61 @@ object DiffEditTool {
     /**
      * Find the classpath needed to run [HunkApplyMain] in a fresh JVM.
      *
-     * Under the IntelliJ platform, classes are loaded by a `PluginClassLoader`, which extends
-     * [UrlClassLoader]. That classloader's [UrlClassLoader.getFiles] method returns the list
-     * of jar `Path` objects that make up this plugin's runtime classpath — typically the
-     * plugin jar plus bundled dependencies such as `kotlin-stdlib`. These are joined with
-     * [java.io.File.pathSeparator] to form the `-cp` argument.
+     * [HunkApplyMain] needs two things on its `-cp`: this plugin's own compiled classes, and
+     * `kotlin-stdlib` (this project doesn't bundle its own copy — `kotlin.stdlib.default.dependency
+     * =false` in `gradle.properties` — so it's whatever the target IDE supplies at runtime,
+     * and *where* that lives is not something we can hardcode: it varies by IDE build and isn't
+     * necessarily a plain jar under this plugin's own `lib/`).
      *
-     * Note: `codeSource.location` **cannot** be used here. `PluginClassLoader` defines classes
-     * with a null `ProtectionDomain` (`UrlClassLoader.consumeClassData` passes `null` as the
-     * domain argument), so `codeSource` is always null for plugin classes. This is structural,
-     * not incidental.
+     * Strategy: introspect the classloader that actually resolves each needed class, at the
+     * point we need it — this works regardless of *how* the platform wires kotlin-stdlib to
+     * plugins, because we're asking the live, already-working resolution mechanism directly
+     * rather than assuming a directory layout:
+     * - [DiffEditTool]'s own classloader files (this plugin's own classes).
+     * - `kotlin.jvm.internal.Intrinsics`'s own classloader files (kotlin-stdlib — same
+     *   classloader as above in some IDE builds, a separate one in others).
      *
-     * Falls back to `java.class.path` for non-plugin classloaders (e.g. the Gradle/JUnit
-     * classloader in unit tests, where the helper is never actually launched).
+     * Regression: a previous version only checked [DiffEditTool]'s own classloader. Under a
+     * real installed plugin, that classloader's `getFiles()` didn't include `kotlin-stdlib`,
+     * so the subprocess launched without it and failed with
+     * `NoClassDefFoundError: kotlin/jvm/internal/Intrinsics`.
+     *
+     * Falls back to `java.class.path` if neither classloader yields anything (e.g. the
+     * Gradle/JUnit classloader in unit tests, where the helper is never actually launched).
+     *
+     * Note: `codeSource.location` **cannot** be used as the primary signal. `PluginClassLoader`
+     * defines classes with a null `ProtectionDomain` (`UrlClassLoader.consumeClassData` passes
+     * `null` as the domain argument), so `codeSource` is null for plugin-defined classes. This
+     * is structural, not incidental — `UrlClassLoader.getFiles()` is the reliable source.
      */
     internal fun discoverClasspath(): String {
-        val loader = DiffEditTool::class.java.classLoader
-        // PluginClassLoader extends UrlClassLoader; getFiles() returns the plugin's own
-        // classpath jars (plugin jar + bundled kotlin-stdlib etc.) as native Path objects.
-        // No URL parsing — OS-independent, no %20/!/drive-letter hazards.
-        if (loader is UrlClassLoader) {
-            val files = loader.files
-            if (files.isNotEmpty()) {
-                return files.joinToString(java.io.File.pathSeparator) { it.toAbsolutePath().toString() }
-            }
+        val entries = LinkedHashSet<String>()
+        entries += classloaderFiles(DiffEditTool::class.java)
+        entries += classloaderFiles(Class.forName("kotlin.jvm.internal.Intrinsics"))
+
+        if (entries.isNotEmpty()) {
+            return entries.joinToString(java.io.File.pathSeparator)
         }
-        // Fallback: non-plugin classloader (unit tests). The helper is never launched here
-        // so any non-empty classpath is sufficient to pass the args-sanity tests.
+
         log.warn(
-            "discoverClasspath: classloader is not a UrlClassLoader " +
-                "(${loader?.javaClass?.name}); falling back to java.class.path"
+            "discoverClasspath: no classpath entries resolved from either classloader; " +
+                "falling back to java.class.path"
         )
         return System.getProperty("java.class.path").orEmpty()
+    }
+
+    /**
+     * The jar/directory `Path`s [clazz]'s own classloader was constructed with, or empty if
+     * that classloader isn't a [UrlClassLoader] (e.g. a non-plugin test classloader).
+     * No URL parsing — OS-independent, no %20/!/drive-letter hazards.
+     */
+    private fun classloaderFiles(clazz: Class<*>): List<String> {
+        val loader = clazz.classLoader
+        return if (loader is UrlClassLoader) {
+            loader.files.map { it.toAbsolutePath().toString() }
+        } else {
+            emptyList()
+        }
     }
 
     /** Encode a list of strings as a TOML inline array (e.g. `["a","b","c"]`). */
