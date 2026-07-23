@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
+import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -84,25 +85,57 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `all files included by default in file selection`() {
+    fun `no files ticked by default in file selection`() {
         val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
         val source = createEntry("src1", description = "desc")
         val dialog = SplitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
-        dialog.fileSelection.includedChanges.size shouldBe 2
+        dialog.fileSelection.includedChanges.size shouldBe 0
         disposeDialog(dialog)
     }
 
     @Test
-    fun `validation fails when all files included (nothing to split off)`() {
+    fun `validation fails when nothing ticked (nothing to split off)`() {
         val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
         val source = createEntry("src1", description = "desc")
         val dialog = SplitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
-        // All included and no overrides — validation should fail (nothing in second commit)
+        // Nothing ticked and no overrides — validation should fail (child would be empty)
         dialog.doValidateForTest() shouldNotBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `validation fails when all files ticked (nothing left for parent)`() {
+        val main = change("src/Main.kt")
+        val utils = change("src/Utils.kt")
+        val changes = listOf(main, utils)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.fileSelection.changesTree.setIncludedChanges(changes)
+        UIUtil.dispatchAllInvocationEvents()
+
+        dialog.doValidateForTest() shouldNotBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `validation passes with a mixed selection`() {
+        val main = change("src/Main.kt")
+        val utils = change("src/Utils.kt")
+        val changes = listOf(main, utils)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.fileSelection.changesTree.setIncludedChanges(listOf(main))
+        UIUtil.dispatchAllInvocationEvents()
+
+        dialog.doValidateForTest() shouldBe null
         disposeDialog(dialog)
     }
 
@@ -135,9 +168,8 @@ class SplitDialogTest {
         val dialog = SplitDialog(project.get(), source, changes)
         waitForRefresh(dialog.fileSelection)
 
-        // Uncheck Logger so it goes to second commit (file-level, no overrides).
-        val withoutLogger = listOf(authChange)
-        dialog.fileSelection.changesTree.setIncludedChanges(withoutLogger)
+        // Tick Logger so it moves to the child (file-level, no overrides).
+        dialog.fileSelection.changesTree.setIncludedChanges(listOf(loggerChange))
         UIUtil.dispatchAllInvocationEvents()
 
         dialog.performOKForTest()
@@ -145,7 +177,7 @@ class SplitDialogTest {
 
         result shouldNotBe null
         result!!.hunkSelection shouldBe null // no overrides → fast path
-        result.filePaths.size shouldBe 1 // Auth.kt in first commit
+        result.filePaths shouldBe listOf(authChange.filePath) // Auth.kt stays in the parent
         result.description shouldBe Description("initial desc")
         result.childDescription shouldBe null // unchanged
         result.parallel shouldBe false
@@ -153,28 +185,36 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `computePreviewRight excluded returns base content with unchanged title`() {
+    fun `preSelectedFiles from right-click land in the child, not the parent`() {
+        val authChange = change("src/Auth.kt")
+        val loggerChange = change("src/Logger.kt")
+        val changes = listOf(authChange, loggerChange)
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, emptyList())
+        val authPath = LocalFilePath("src/Auth.kt", false)
 
-        val (content, title) = dialog.computePreviewRight(
-            isIncluded = false,
-            override = null,
-            baseContent = "before\n",
-            afterContent = "after\n"
-        )
-        content shouldBe "before\n"
-        title shouldContain "unchanged"
+        // Simulate right-clicking Auth.kt and choosing "Split into New Child".
+        val dialog = SplitDialog(project.get(), source, changes, preSelectedFiles = setOf(authPath))
+        waitForRefresh(dialog.fileSelection)
+
+        // The right-clicked file must start TICKED (moving to the child); the other file
+        // stays unticked (remains in the parent).
+        dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
+
+        dialog.performOKForTest()
+        val result = dialog.result
+        result shouldNotBe null
+        // filePaths are the files that stay in the parent (`jj split` keeps them there).
+        result!!.filePaths shouldBe listOf(loggerChange.filePath)
         disposeDialog(dialog)
     }
 
     @Test
-    fun `computePreviewRight fully included returns after content`() {
+    fun `computePreviewLeftContent unticked returns after content (nothing moves)`() {
         val source = createEntry("src1", description = "desc")
         val dialog = SplitDialog(project.get(), source, emptyList())
 
-        val (content, _) = dialog.computePreviewRight(
-            isIncluded = true,
+        val content = dialog.computePreviewLeftContent(
+            isIncludedInChild = false,
             override = null,
             baseContent = "before\n",
             afterContent = "after\n"
@@ -184,18 +224,105 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `computePreviewRight partial override returns override content`() {
+    fun `computePreviewLeftContent fully ticked returns base content`() {
         val source = createEntry("src1", description = "desc")
         val dialog = SplitDialog(project.get(), source, emptyList())
 
-        val (content, title) = dialog.computePreviewRight(
-            isIncluded = true,
+        val content = dialog.computePreviewLeftContent(
+            isIncludedInChild = true,
+            override = null,
+            baseContent = "before\n",
+            afterContent = "after\n"
+        )
+        content shouldBe "before\n"
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `computePreviewLeftContent partial override wins regardless of tick`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList())
+
+        val content = dialog.computePreviewLeftContent(
+            isIncludedInChild = true,
             override = "partial\n",
             baseContent = "before\n",
             afterContent = "after\n"
         )
         content shouldBe "partial\n"
-        title shouldContain "Parent"
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `describeSplitState labels unticked state as parent all changes, child no changes`() {
+        val (parentTitle, childTitle) = describeSplitState(
+            content = "after\n",
+            baseContent = "before\n",
+            afterContent = "after\n",
+            parentLabel = "Parent",
+            childLabel = "Child"
+        )
+        parentTitle shouldContain "all changes"
+        childTitle shouldContain "no changes"
+    }
+
+    @Test
+    fun `describeSplitState labels fully-ticked state as parent unchanged, child all changes`() {
+        val (parentTitle, childTitle) = describeSplitState(
+            content = "before\n",
+            baseContent = "before\n",
+            afterContent = "after\n",
+            parentLabel = "Parent",
+            childLabel = "Child"
+        )
+        parentTitle shouldContain "unchanged"
+        childTitle shouldContain "all changes"
+    }
+
+    @Test
+    fun `describeSplitState labels partial content as partial on both sides`() {
+        val (parentTitle, childTitle) = describeSplitState(
+            content = "partial\n",
+            baseContent = "before\n",
+            afterContent = "after\n",
+            parentLabel = "Parent",
+            childLabel = "Child"
+        )
+        parentTitle shouldContain "partial"
+        childTitle shouldContain "partial"
+    }
+
+    @Test
+    fun `applyPickedContent for a genuine partial does not force-tick a previously unticked file`() {
+        val authChange = change("src/Auth.kt")
+        val changes = listOf(authChange)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes)
+        waitForRefresh(dialog.fileSelection)
+
+        val fp = LocalFilePath("src/Auth.kt", false)
+        // Auth.kt starts unticked (nothing selected by default). Apply a genuinely-partial
+        // result directly, exactly as onPickHunks would after a real partial pick.
+        dialog.applyPickedContent(fp, "partial\n", baseContent = "before\n", afterContent = "after\n")
+
+        // Regression: this used to force-tick the file (ensureFileIncluded), making a
+        // half-picked file look fully committed to the child.
+        dialog.fileSelection.includedChanges shouldBe emptyList()
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `applyPickedContent for a fully-picked result ticks the file`() {
+        val authChange = change("src/Auth.kt")
+        val changes = listOf(authChange)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes)
+        waitForRefresh(dialog.fileSelection)
+
+        val fp = LocalFilePath("src/Auth.kt", false)
+        dialog.applyPickedContent(fp, "before\n", baseContent = "before\n", afterContent = "after\n")
+
+        dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
         disposeDialog(dialog)
     }
 

@@ -858,39 +858,64 @@ no such delay applies to a click.
 - [ ] open in -> remote for single parent opens that parent ✅
 - [ ] open in -> remote for unpushed historical version resolves to nearest pushed ancestor ✅
 
-### Split — Hunk-level selection (jj-idea-5isf.1)
+### Split — Hunk-level selection (jj-idea-5isf.1, jj-idea-twis, jj-idea-5bx9)
 
-Setup: create a scratch jj repo with a file that has at least two separate hunks of changes.
+Setup: create a scratch jj repo with a file that has at least **two separate** hunks of changes
+(so partial selection is meaningful).
 
-#### Basic hunk selection (native merge picker)
-- [ ] Right-click a mutable change → **Split…** → dialog shows changed-files list on the left and a native read-only diff preview on the right
-- [ ] Click a file in the list → right panel shows a native syntax-highlighted `Before (original) ↔ After (all changes)` diff
-- [ ] Untick a file → right preview switches to `Before (original) ↔ First commit (unchanged)` with **no diff** (empty right side); re-tick → full diff returns
+Model: **ticking a file moves it to the new child commit**; unticked files stay in the
+parent. Nothing is ticked by default. "Pick Hunks…" opens a 3-way merge widget with **fixed,
+never-flipping roles**: Left = "Before" (the file's state before any of this change), Right =
+the child commit's label (always the source's full content — a structural invariant of
+`jj split`, not a bug), Middle = editable "Parent" (seeded from any existing partial pick, or a
+tick-derived default). Accepting a hunk from the **left** removes it from Parent (sends it to
+the child); accepting from the **right** adds it to Parent (pulls it from the child) — both are
+always available for the same hunk, so a pick can be reversed by accepting the opposite side,
+as many times as needed before closing the dialog.
+
+#### Basic hunk selection (main dialog preview)
+- [ ] Right-click a mutable change → **Split…** → dialog shows changed-files list on the left (nothing ticked) and a native read-only diff preview on the right
+- [ ] Click a file in the list → right panel shows a native syntax-highlighted diff titled **"Parent (all changes)"** / **"Child (no changes)"**, with an **empty diff** (nothing ticked yet, so nothing moves)
+- [ ] Tick the file → titles switch to **"Parent (unchanged)"** / **"Child (all changes)"**, showing the **full diff** (the whole file's change moves to the child); untick → back to the "all changes"/"no changes" pair and empty diff
 - [ ] Fully-ticked files show a filled checkbox; unticked show empty; partially-picked (see below) show a **half-checked** box
 - [ ] Directory nodes containing a partial file also show a half-checked box
 
-#### Hunk picking with the native merge window
-- [ ] Click **Pick Hunks…** → IntelliJ's 3-pane merge window opens titled "Pick hunks for first commit — <filename>"
-- [ ] Resolve button reads **"Use for First Commit"** (not "Apply"); cancel button reads **"Cancel Split"**
-- [ ] After editing the result and pressing Cancel → confirmation dialog reads **"Cancel Hunk Selection?"** / **"Discard the hunks you picked for the first commit?"**
-- [ ] Accept some changes (>>) and press "Use for First Commit" → merge window closes; file shows **half-checked** in the file list; summary shows "(N partial)"; right preview shows `Before ↔ First commit` (the picked content)
-- [ ] Accepting **every** change → file remains fully checked (no half-check); summary unchanged
-- [ ] Accepting **no** changes → file becomes unchecked (excluded from first commit)
-- [ ] Cancelling the merge → file state unchanged
-- [ ] Split (linear) → first commit contains only the picked hunks; second commit has the rest
+#### Right-click file(s) → "Split into New Child"
+- [ ] Select one or more files in the working-copy / commit-details file list, right-click → **Split into New Child** → dialog opens with exactly those files **ticked** (moving to the child)
+- [ ] Split → the new child commit contains only the selected files; the parent keeps the rest
+
+#### Hunk picking with the 3-way picker
+- [ ] Click **Pick Hunks…** → a merge-style dialog opens titled "Pick Hunks — <filename>", with **Before** (left), **Parent** (editable, middle), and **Child** (right) panes
+- [ ] On a freshly-opened **unticked** file: Parent (middle) starts with the full content, identical to Child (right) — but differs from Before (left) at every hunk, so **left-side accept arrows are visible and clickable** (this used to show an empty, unusable diff — verify it no longer does)
+- [ ] Accepting a hunk from the **left** (Before) removes it from Parent — that hunk moves to the child
+- [ ] On a freshly-opened **ticked** file: Parent starts empty, matching Before (left) — but differs from Child (right) at every hunk, so **right-side accept arrows are visible**
+- [ ] Accepting a hunk from the **right** (Child) adds it to Parent — that hunk stays in the parent
+- [ ] **After accepting a hunk from one side, the opposite side's arrow reappears for that same hunk** — click it to reverse the pick (regression check: previously there was no way back once a hunk was accepted)
+- [ ] Accept some hunks (not all, mixing both directions is fine) and click **Apply** → a platform confirmation appears first: **"Apply Changes"** / "There is one change left unprocessed. Save changes and mark the conflict resolved anyway?" / **"Continue Merge"** / **"Apply Changes and Mark Resolved"**. This wording is IntelliJ's own conflict-resolution dialog and has no supported override hook (see jj-idea-xuob) — click **"Apply Changes and Mark Resolved"** to proceed; this is expected on every genuinely-partial pick, not a bug
+- [ ] After confirming → dialog closes; file shows **half-checked** in the file list; summary shows "(N partial)"
+- [ ] **The file's tick state is unchanged by a partial pick** — if it was unticked before opening the picker, it's still unticked after a partial accept (regression check: previously this force-ticked the file)
+- [ ] Accepting every hunk toward Parent → Apply results in a **fully ticked** file (no half-check), same as ticking it directly
+- [ ] Accepting no hunks (or reversing back to nothing) → Apply results in the file being **fully ticked or unticked** to match its starting state, with no partial override left over
+- [ ] Click **Cancel** → confirmation reads "Cancel Hunk Selection?" / "Discard your changes to Parent?"; confirming closes the dialog with file state (tick + any prior override) unchanged
+- [ ] **Reopen "Pick Hunks…" on a file with an existing partial selection** → Parent (middle) resumes exactly where you left it (not reset to a tick-derived default) — regression check for lost persistence
+- [ ] Split (linear) → child commit contains only the picked hunks; parent has the rest
 - [ ] Log refreshes selecting the newly created change
-- [ ] (Platform) "All changes have been processed — Save changes and finish merging" balloon appears when all changes accepted — this is platform wording, expected
 
 #### Descriptions
 - [ ] Both description fields are pre-populated with the source commit's description
-- [ ] Editing the parent description field updates the first commit; editing child updates the second
+- [ ] Child description field appears **above** the parent field (matching the child's position above the parent in the log)
+- [ ] Editing the child description field updates the child commit; editing parent updates the parent
 
 #### Parallel split
 - [ ] Check "Create parallel commits" → header labels switch to "First" / "Second"
 - [ ] Split → two sibling commits created (not parent/child)
 
+#### Validation
+- [ ] With nothing ticked → OK is disabled with a message to move at least one file to the child
+- [ ] With everything ticked (no overrides) → OK is disabled with a message that at least one file must remain in the parent
+
 #### Whole-file fast path
-- [ ] With no partial hunk selection (all files fully checked or unchecked) → split completes via file-level `jj split` (no diff-editor overhead); verify via log that both commits have the expected files
+- [ ] With no partial hunk selection (all files fully ticked or unticked) → split completes via file-level `jj split` (no diff-editor overhead); verify via log that both commits have the expected files
 
 #### Binary / conflicted files
 - [ ] A binary file in the changed list shows no "Pick Hunks…" button (whole-file only)

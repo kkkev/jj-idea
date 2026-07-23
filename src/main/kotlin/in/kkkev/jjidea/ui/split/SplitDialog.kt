@@ -22,7 +22,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.diffedit.HunkMergePicker
+import `in`.kkkev.jjidea.diffedit.HunkDiffPicker
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
@@ -51,15 +51,16 @@ import javax.swing.event.TreeSelectionListener
 /**
  * Result of the split dialog.
  *
- * [filePaths] are the files for the **parent/first** commit when [hunkSelection] is null
- * (whole-file fast path). When [hunkSelection] is non-null, at least one file has partial
- * hunk selection and the split must go through the diff-editor path.
+ * [filePaths] are the files that **remain in the parent/first** commit when [hunkSelection]
+ * is null (whole-file fast path) — i.e. everything *not* ticked to move to the child. When
+ * [hunkSelection] is non-null, at least one file has partial hunk selection and the split
+ * must go through the diff-editor path.
  *
  * [childDescription] is applied via `jj describe` after split (null = keep original).
  */
 data class SplitSpec(
     val revision: Revision,
-    /** Whole-file fast path: files for the first commit (empty = all). Ignored when hunkSelection != null. */
+    /** Whole-file fast path: files that stay in the parent (i.e. not ticked to move to the child). */
     val filePaths: List<FilePath>,
     /** Hunk-level selection. Non-null when at least one file is partially selected. */
     val hunkSelection: SplitHunkSelection?,
@@ -73,11 +74,13 @@ data class SplitSpec(
  *
  * Layout: left panel = changed-files list with file-level checkboxes + summary; right panel =
  * native read-only diff preview for the selected file + "Pick Hunks…" button. Description
- * fields and options are at the bottom.
+ * fields (child on top, parent below — matching their order in the log) and options are at
+ * the bottom.
  *
- * Checking/unchecking a file sets it for the first or second commit (whole-file path).
- * "Pick Hunks…" opens IDEA's merge window; the merged result becomes that file's first-commit
- * content, with the remainder going to the second commit.
+ * Ticking a file moves it to the new **child** commit; leaving it unticked keeps it in the
+ * **parent** (whole-file path). Nothing is ticked by default. "Pick Hunks…" opens IDEA's
+ * merge window to move a subset of a file's hunks to the child, leaving the remainder in
+ * the parent.
  */
 class SplitDialog(
     private val project: Project,
@@ -166,13 +169,13 @@ class SplitDialog(
         updateDynamicLabels()
 
         // Populate file selection panel.
-        val initialIncluded = if (preSelectedFiles != null) {
-            allChanges.filter { it.filePath in preSelectedFiles }
-        } else {
-            allChanges
-        }
-        fileSelection.setChanges(allChanges, initialIncluded)
-        previousIncluded = initialIncluded.mapNotNull { it.filePath }.toSet()
+        // Checked/included files are the ones MOVING TO THE CHILD (the new, split-off commit);
+        // everything left unticked stays in the parent. Nothing is ticked by default — the user
+        // opts in to what gets split off. preSelectedFiles (e.g. right-clicked files via
+        // "Split into New Child") start ticked, since that's what the user asked to split off.
+        val initialIncludedPaths = preSelectedFiles ?: emptySet()
+        fileSelection.setChanges(allChanges, allChanges.filter { it.filePath in initialIncludedPaths })
+        previousIncluded = initialIncludedPaths
 
         // Listen for file checkbox changes.
         fileSelection.addInclusionListener { onFileInclusionChanged() }
@@ -194,11 +197,11 @@ class SplitDialog(
     private fun onFileInclusionChanged() {
         val nowIncluded = fileSelection.includedChanges.mapNotNull { it.filePath }.toSet()
 
-        // Files newly excluded → clear any partial override (file is fully in second commit).
+        // Files newly unticked → clear any partial override (file is fully in the parent).
         for (fp in (previousIncluded - nowIncluded)) {
             firstCommitOverrides.remove(fp)
         }
-        // Files newly included → clear any partial override (file is fully in first commit).
+        // Files newly ticked → clear any partial override (file moves fully to the child).
         for (fp in (nowIncluded - previousIncluded)) {
             firstCommitOverrides.remove(fp)
         }
@@ -284,33 +287,31 @@ class SplitDialog(
     /**
      * Update the diff preview for [fp] using [data].
      *
-     * The right side reflects the **actual first-commit content** for this file:
-     * - Excluded (unticked): `baseContent` — no change goes to the first commit.
-     * - Partial (merge-picked override): the picked content.
-     * - Fully included: `afterContent` — all changes go to the first commit.
+     * The preview shows the **split-off change that moves to the child**: the right side is
+     * always [FileData.afterContent] (the child's content — the child is the tip, so it always
+     * holds the full original content). The left side reflects what **remains in the parent**:
+     * - Ticked (moving to child): `baseContent` — nothing left for the parent.
+     * - Partial (merge-picked override): the picked parent-remainder content.
+     * - Unticked (stays in parent): `afterContent` — the parent keeps everything, so there's
+     *   nothing left to move (left == right, empty diff).
      */
     private fun updateDiffPreview(fp: FilePath, data: FileData) {
-        val isIncluded = fileSelection.includedChanges.any { it.filePath == fp }
+        val isChild = fileSelection.includedChanges.any { it.filePath == fp }
         val override = firstCommitOverrides[fp]
+        val leftContent = computePreviewLeftContent(isChild, override, data.baseContent, data.afterContent)
 
-        val (rightContent, rightTitle) = computePreviewRight(
-            isIncluded,
-            override,
+        val (leftTitle, rightTitle) = describeSplitState(
+            leftContent,
             data.baseContent,
             data.afterContent,
-            firstCommitLabel
+            firstCommitLabel,
+            secondCommitLabel
         )
 
-        val leftContent = makeContent(data.baseContent, data.fileType)
-        val rightDiffContent = makeContent(rightContent, data.fileType)
+        val leftDiffContent = makeContent(leftContent, data.fileType)
+        val rightDiffContent = makeContent(data.afterContent, data.fileType)
 
-        val request = SimpleDiffRequest(
-            fp.name,
-            leftContent,
-            rightDiffContent,
-            JujutsuBundle.message("dialog.split.merge.side.original"),
-            rightTitle
-        )
+        val request = SimpleDiffRequest(fp.name, leftDiffContent, rightDiffContent, leftTitle, rightTitle)
         diffPreviewPanel.setRequest(request)
 
         // Enable "Pick Hunks…" only for text files that have changes.
@@ -318,31 +319,20 @@ class SplitDialog(
     }
 
     /**
-     * Compute the right-side (first-commit) content and title for the diff preview.
+     * Compute the left-side (parent-remainder) content for the diff preview: an explicit
+     * override wins, otherwise it's derived from whether the file is ticked to move to the
+     * child (parent ends up empty) or stays put (parent keeps everything).
      * Extracted for test seaming; takes plain strings so the private [FileData] type is not exposed.
-     *
-     * [commitLabel] is the short name of the target commit as shown in the dialog header
-     * (e.g. "Parent" or "Second") so the panel title stays consistent with the file list.
      */
-    internal fun computePreviewRight(
-        isIncluded: Boolean,
+    internal fun computePreviewLeftContent(
+        isIncludedInChild: Boolean,
         override: String?,
         baseContent: String,
-        afterContent: String,
-        commitLabel: String = legendLabel("dialog.split.legend.parent")
-    ): Pair<String, String> = when {
-        !isIncluded -> Pair(
-            baseContent,
-            JujutsuBundle.message("dialog.split.merge.side.firstCommit.unchanged", commitLabel)
-        )
-        override != null -> Pair(
-            override,
-            JujutsuBundle.message("dialog.split.merge.side.firstCommit", commitLabel)
-        )
-        else -> Pair(
-            afterContent,
-            JujutsuBundle.message("dialog.split.merge.side.changes")
-        )
+        afterContent: String
+    ): String = when {
+        override != null -> override
+        isIncludedInChild -> baseContent
+        else -> afterContent
     }
 
     private fun refreshPreview(fp: FilePath) {
@@ -361,44 +351,63 @@ class SplitDialog(
             .takeIf { it != com.intellij.openapi.fileTypes.UnknownFileType.INSTANCE }
             ?: PlainTextFileType.INSTANCE
 
-    // ---- Merge picker ----
+    // ---- Hunk picker ----
 
     private fun onPickHunks() {
         val fp = currentPreviewFile ?: return
         val data = fileDataCache[fp] ?: return
+        val isChild = fileSelection.includedChanges.any { it.filePath == fp }
+
+        // Resume any existing partial pick; otherwise start from the tick-derived default.
+        val initialContent = firstCommitOverrides[fp]
+            ?: computePreviewLeftContent(isChild, null, data.baseContent, data.afterContent)
 
         val pickedContent: String? = hunkPickerForTest?.invoke(fp)
-            ?: HunkMergePicker.pickFirstCommitContent(
+            ?: HunkDiffPicker.pickParentContent(
                 project = project,
                 fileName = fp.name,
                 fileType = data.fileType,
                 baseContent = data.baseContent,
                 afterContent = data.afterContent,
-                commitLabel = firstCommitLabel
+                initialContent = initialContent,
+                parentLabel = firstCommitLabel,
+                childLabel = secondCommitLabel
             )
 
         if (pickedContent == null) return // user cancelled — keep prior state
 
+        applyPickedContent(fp, pickedContent, data.baseContent, data.afterContent)
+        refreshPreview(fp)
+        updateSummary()
+    }
+
+    /**
+     * Apply a hunk-picker result for [fp]. Fully-none/fully-all results are genuinely resolved
+     * states and adjust the tick accordingly; anything else is a genuine partial, which stores
+     * the parent-remainder override but **deliberately leaves the tick state untouched**.
+     *
+     * The tick is inert once an override exists — every downstream read of a file's content
+     * (`doOKAction`, the preview) checks the override first. Force-ticking a partial file here
+     * previously made a half-picked file look fully committed to the child, which wasn't true;
+     * the half-checked render (`partialChanges`, synced by the caller's `updateSummary()`) is
+     * what should communicate "partial" to the user, not the tick.
+     */
+    internal fun applyPickedContent(fp: FilePath, pickedContent: String, baseContent: String, afterContent: String) {
         when (pickedContent) {
-            data.afterContent -> {
-                // User accepted all changes → file fully in first commit, clear override.
+            baseContent -> {
+                // Nothing left for the parent → file fully moved to child, tick it.
                 firstCommitOverrides.remove(fp)
                 ensureFileIncluded(fp)
             }
-            data.baseContent -> {
-                // User accepted no changes → file fully in second commit, uncheck.
+            afterContent -> {
+                // Parent keeps everything → nothing moved to child, untick it.
                 firstCommitOverrides.remove(fp)
                 ensureFileExcluded(fp)
             }
             else -> {
-                // Partial selection → store the override, keep file checked.
                 firstCommitOverrides[fp] = pickedContent
-                ensureFileIncluded(fp)
             }
         }
-
-        refreshPreview(fp)
-        updateSummary()
     }
 
     private fun ensureFileIncluded(fp: FilePath) {
@@ -448,28 +457,29 @@ class SplitDialog(
     }
 
     private fun updateSummary() {
-        val includedFiles = fileSelection.includedChanges.size
+        val childFiles = fileSelection.includedChanges.size // ticked = moving to child
         val totalFiles = allChanges.size
-        val excludedFiles = totalFiles - includedFiles
+        val parentFiles = totalFiles - childFiles
         val partialCount = firstCommitOverrides.size
 
         // Partial files contribute hunks to both commits, so they appear in both counts.
+        // Child first, matching its position above the parent in the log.
         summaryLabel.text = if (partialCount > 0) {
             JujutsuBundle.message(
                 "dialog.split.summary.partial",
-                firstCommitLabel,
-                includedFiles,
-                partialCount,
                 secondCommitLabel,
-                excludedFiles + partialCount
+                childFiles,
+                partialCount,
+                firstCommitLabel,
+                parentFiles + partialCount
             )
         } else {
             JujutsuBundle.message(
                 "dialog.split.summary",
-                firstCommitLabel,
-                includedFiles,
                 secondCommitLabel,
-                excludedFiles
+                childFiles,
+                firstCommitLabel,
+                parentFiles
             )
         }
 
@@ -538,6 +548,20 @@ class SplitDialog(
             border = JBUI.Borders.empty(8)
         }
 
+        // Child description first — matches the child's position above the parent in the log.
+        childHeaderLabel.alignmentX = JLabel.LEFT_ALIGNMENT
+        panel.add(childHeaderLabel)
+        childDescriptionLabel.alignmentX = JLabel.LEFT_ALIGNMENT
+        panel.add(childDescriptionLabel)
+        val childScroll = JBScrollPane(childDescriptionField).apply {
+            alignmentX = JPanel.LEFT_ALIGNMENT
+            preferredSize = Dimension(0, JBUI.scale(46))
+            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(46))
+        }
+        panel.add(childScroll)
+
+        panel.add(Box.createVerticalStrut(JBUI.scale(6)))
+
         // Parent description.
         parentHeaderLabel.alignmentX = JLabel.LEFT_ALIGNMENT
         panel.add(parentHeaderLabel)
@@ -549,20 +573,6 @@ class SplitDialog(
             maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(46))
         }
         panel.add(parentScroll)
-
-        panel.add(Box.createVerticalStrut(JBUI.scale(6)))
-
-        // Child description.
-        childHeaderLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-        panel.add(childHeaderLabel)
-        childDescriptionLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-        panel.add(childDescriptionLabel)
-        val childScroll = JBScrollPane(childDescriptionField).apply {
-            alignmentX = JPanel.LEFT_ALIGNMENT
-            preferredSize = Dimension(0, JBUI.scale(46))
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(46))
-        }
-        panel.add(childScroll)
 
         panel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
@@ -596,7 +606,7 @@ class SplitDialog(
     // ---- Validation ----
 
     override fun doValidate(): ValidationInfo? {
-        val included = fileSelection.includedChanges
+        val included = fileSelection.includedChanges // ticked = moving to child
         val total = allChanges.size
 
         if (included.isEmpty()) {
@@ -621,21 +631,23 @@ class SplitDialog(
     // ---- OK action ----
 
     override fun doOKAction() {
-        val includedChanges = fileSelection.includedChanges.toList()
-        val includedPaths = includedChanges.mapNotNull { it.filePath }
+        // Ticked changes move to the child; everything else stays in the parent.
+        val childChanges = fileSelection.includedChanges.toList()
+        val childFilePaths = childChanges.mapNotNull { it.filePath }.toSet()
+        val parentPaths = allChanges.mapNotNull { it.filePath }.filter { it !in childFilePaths }
 
         val hunkSelection: SplitHunkSelection? = if (firstCommitOverrides.isNotEmpty()) {
-            // Build FileFirstCommit for every changed file.
+            // Build FileFirstCommit (parent-remainder content) for every changed file.
             val files = allChanges.mapNotNull { change ->
                 val fp = change.filePath ?: return@mapNotNull null
                 val root = sourceEntry.repo.directory
                 val relPath = fp.relativeTo(root)
                 val override = firstCommitOverrides[fp]
-                val isIncluded = includedChanges.any { it.filePath == fp }
+                val isChild = fp in childFilePaths
                 val content: String? = when {
                     override != null -> override // partial via merge picker
-                    isIncluded -> fileDataCache[fp]?.afterContent // whole file
-                    else -> null // excluded → absent from first commit
+                    isChild -> null // whole file moves to child → absent from first/parent commit
+                    else -> fileDataCache[fp]?.afterContent // whole file stays in parent
                 }
                 FileFirstCommit(relPath = relPath, filePath = fp, content = content)
             }
@@ -650,7 +662,7 @@ class SplitDialog(
 
         result = SplitSpec(
             revision = sourceEntry.id,
-            filePaths = includedPaths,
+            filePaths = parentPaths,
             hunkSelection = hunkSelection,
             description = Description(parentDesc),
             childDescription = if (childDesc != originalDesc) Description(childDesc) else null,
@@ -690,3 +702,31 @@ class SplitDialog(
 /** Capitalize a legend bundle key value (e.g. "parent" → "Parent"). */
 private fun legendLabel(key: String) =
     JujutsuBundle.message(key).replaceFirstChar { it.uppercaseChar() }
+
+/**
+ * Describe the split state of [content] (relative to [baseContent]/[afterContent]) as a pair
+ * of (parent title, child title) label fragments, for the main file preview's diff titles —
+ * e.g. an untouched (unticked) file reads "Parent (all changes)" / "Child (no changes)"; a
+ * fully-moved (ticked) file reads "Parent (unchanged)" / "Child (all changes)"; anything else
+ * is "partial".
+ */
+internal fun describeSplitState(
+    content: String,
+    baseContent: String,
+    afterContent: String,
+    parentLabel: String,
+    childLabel: String
+): Pair<String, String> = when (content) {
+    afterContent -> Pair(
+        JujutsuBundle.message("dialog.split.hunks.parent.allChanges", parentLabel),
+        JujutsuBundle.message("dialog.split.hunks.child.noChanges", childLabel)
+    )
+    baseContent -> Pair(
+        JujutsuBundle.message("dialog.split.hunks.parent.unchanged", parentLabel),
+        JujutsuBundle.message("dialog.split.hunks.child.allChanges", childLabel)
+    )
+    else -> Pair(
+        JujutsuBundle.message("dialog.split.hunks.parent.partial", parentLabel),
+        JujutsuBundle.message("dialog.split.hunks.child.partial", childLabel)
+    )
+}
