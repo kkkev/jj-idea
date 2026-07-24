@@ -545,6 +545,23 @@ Setup: have a local bookmark that has never been pushed to the remote.
 - [ ] Open push dialog → "Specific bookmark" → select an untracked bookmark → OK → push succeeds
 - [ ] Open push dialog → "All bookmarks" → OK → pushes all bookmarks
 - [ ] Cancel push dialog → no push occurs
+- [ ] The scope radio group (Default / Specific bookmark / All bookmarks) has the correct
+  option selected by default when the dialog opens, the bookmark combo box enables only when
+  "Specific bookmark" is selected, and clicking between all three options multiple times before
+  OK always pushes according to the last-selected option (scope selection is hand-wired via
+  action listeners, not the platform's declarative binding, as of the 2026.2 platform-compat
+  work — jj-idea-gu9q)
+
+### Git Fetch Dialog
+
+Setup: a repository with 2+ remotes (the scope radio group only appears in this case).
+
+- [ ] Open fetch dialog (VCS menu → Fetch) → "Specific remote" selected by default, remote combo
+  box enabled → OK → fetches from the selected remote
+- [ ] Switch to "All remotes" → remote combo box disables → OK → fetches from every remote
+- [ ] Switch back to "Specific remote" → combo box re-enables with the previously selected remote
+  → OK → fetches just that one
+- [ ] Cancel fetch dialog → no fetch occurs
 
 #### New/untracked bookmark push (jj-idea-dt2k, GitHub #53)
 

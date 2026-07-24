@@ -3,7 +3,6 @@ package `in`.kkkev.jjidea.actions.git
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.SimpleListCellRenderer
-import com.intellij.ui.dsl.builder.bind
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.dsl.builder.toNullableProperty
@@ -107,14 +106,16 @@ class GitFetchDialog(
             buttonsGroup {
                 row {
                     val rb = radioButton(JujutsuBundle.message("dialog.git.fetch.scope.specific"), FetchScope.SPECIFIC)
+                        .bindScope(::fetchScope, FetchScope.SPECIFIC)
                     comboBox(remoteModel)
                         .bindItem(::selectedRemote.toNullableProperty())
                         .enabledIf(rb.component.selected)
                 }
                 row {
                     radioButton(JujutsuBundle.message("dialog.git.fetch.scope.all"), FetchScope.ALL)
+                        .bindScope(::fetchScope, FetchScope.ALL)
                 }
-            }.bind(::fetchScope)
+            }
         } else {
             row(JujutsuBundle.message("dialog.git.fetch.remote.label")) {
                 comboBox(remoteModel)

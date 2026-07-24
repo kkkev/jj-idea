@@ -49,8 +49,8 @@ fun extractChangelogNotes(version: String): String {
 
 plugins {
     id("java")
-    id("org.jetbrains.kotlin.jvm") version "2.1.0"
-    id("org.jetbrains.intellij.platform") version "2.10.5"
+    id("org.jetbrains.kotlin.jvm") version "2.4.10"
+    id("org.jetbrains.intellij.platform") version "2.18.1"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.2"
 }
 
@@ -65,14 +65,35 @@ repositories {
     }
 }
 
+// IntelliJ IDEA Community (IC) was retired as a standalone published product as of
+// 2025.3 (253); intellijIdea(version) is the replacement but resolves to the paid
+// Ultimate (IU) coordinates for versions before that cutoff, which fails to resolve
+// without a license. Pick the right helper per version so both legs of the platform
+// version matrix (pre- and post-253) resolve correctly.
+fun isPre253(platformVersion: String): Boolean {
+    val (year, minor) = platformVersion.split(".").map { it.toInt() }
+    return year < 2025 || (year == 2025 && minor < 3)
+}
+
 dependencies {
     intellijPlatform {
         val platformVersion = project.property("platformVersion") as String
-        intellijIdeaCommunity(platformVersion)
+        if (isPre253(platformVersion)) {
+            intellijIdeaCommunity(platformVersion)
+        } else {
+            intellijIdea(platformVersion)
+        }
 
         // VCS modules - including the VCS itself as a plugin
         bundledPlugin("Git4Idea")
         bundledModule("intellij.platform.vcs.impl")
+        // 2025.3 (253) onward splits ChangesTree/TreeModelBuilder/IssueNavigationConfiguration/
+        // VcsUserUtil etc. out of intellij.platform.vcs.impl into a new shared module, and
+        // CloneDvcsValidationUtils out into vcs.dvcs.impl. Neither module exists pre-253.
+        if (!isPre253(project.property("platformVersion") as String)) {
+            bundledModule("intellij.platform.vcs.impl.shared")
+            bundledModule("intellij.platform.vcs.dvcs.impl")
+        }
 
         // Test framework for IntelliJ Platform tests
         testFramework(TestFrameworkType.Platform)
@@ -80,8 +101,11 @@ dependencies {
     }
 
     // Test framework
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")
+    // 2025.3+ (253+) platforms' bundled JUnit5 test framework calls
+    // ExtensionContext.getEnclosingTestClasses(), added in JUnit Jupiter 5.11; older versions
+    // fail platformTest with NoSuchMethodError.
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.14.4")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.14.4")
 
     // Workarounds for IJPL-157292 and IJPL-159134
     testImplementation("org.opentest4j:opentest4j:1.3.0")
@@ -92,6 +116,16 @@ dependencies {
 
     // MockK for mocking
     testImplementation("io.mockk:mockk:1.13.9")
+
+    // kotest/mockk transitively pull an older kotlin-stdlib than this project's own compiler
+    // (kotlin.stdlib.default.dependency=false only suppresses the *automatic* stdlib dependency
+    // Kotlin Gradle Plugin would add for our own module — it doesn't stop other libraries from
+    // requesting their own, older version). 2025.3+ (253+) platforms' own compiled code emits
+    // coroutines debug metadata version 2; an older stdlib on the classpath only understands
+    // version 1, and platformTest hangs/deadlocks inside platform coroutine machinery as a
+    // result rather than failing cleanly. Pin explicitly so Gradle's conflict resolution picks
+    // this version over the older transitive one.
+    testImplementation("org.jetbrains.kotlin:kotlin-stdlib:2.4.10")
 
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     // testRuntimeOnly("idea:ideaIC:aarch64:2025.2")
@@ -132,6 +166,17 @@ java {
 
 kotlin {
     jvmToolchain(21)
+
+    // This plugin never bundles kotlin-stdlib (kotlin.stdlib.default.dependency=false in
+    // gradle.properties) — at runtime it always uses whichever kotlin-stdlib the host IDE
+    // has loaded, all the way down to sinceBuild=251 (2025.1). Pin apiVersion so the compiler
+    // rejects stdlib calls newer than what that oldest supported platform bundles, rather than
+    // deferring the failure to a NoSuchMethodError on a user's older IDE (or in HunkApplyMain's
+    // subprocess — see DiffEditTool.discoverClasspath, which has the same constraint).
+    // languageVersion is left at the compiler default so newer language syntax stays available.
+    compilerOptions {
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+    }
 }
 
 ktlint {
@@ -201,7 +246,17 @@ tasks.register<Test>("platformTest") {
     // Use IJPGP's classpath but exclude old kotlinx-coroutines JARs (1.7.0 from kotest/mockk)
     // that conflict with the platform's bundled version (1.10.1-intellij).
     classpath = ijpgpClasspath.filter { !it.name.startsWith("kotlinx-coroutines-") }
-    javaLauncher.set(ijpgpJavaLauncher)
+    // IJPGP's captured javaLauncher doesn't track the platform's actual bundled JBR version;
+    // 2025.3+ (253+) platforms bundle a JBR built for a newer class file version (2026.2 ships
+    // JBR 25, class file version 69) that an older JDK can't load when it hits the platform's
+    // own bootclasspath jars (e.g. nio-fs.jar). Request a matching toolchain explicitly.
+    javaLauncher.set(
+        if (isPre253(project.property("platformVersion") as String)) {
+            ijpgpJavaLauncher
+        } else {
+            javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
+        }
+    )
     ijpgpSystemProperties.forEach { (k, v) -> if (v != null) systemProperty(k, v) }
     ijpgpJvmArgProviders.forEach { jvmArgumentProviders.add(it) }
 
