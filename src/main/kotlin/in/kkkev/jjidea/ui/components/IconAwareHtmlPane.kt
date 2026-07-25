@@ -28,6 +28,7 @@ import java.util.regex.Pattern
 import javax.swing.Icon
 import javax.swing.event.HyperlinkEvent
 import javax.swing.text.AttributeSet
+import javax.swing.text.BadLocationException
 import javax.swing.text.Element
 import javax.swing.text.Position
 import javax.swing.text.View
@@ -152,13 +153,21 @@ private class ScaleCorrectedIcon(private val source: Icon) : Icon {
 }
 
 /**
- * Resolves `<icon>` elements whose `src` starts with [CHIP_ICON_PREFIX] into a single atomic [ChipView], so that an
- * icon is never separated from its label, nor a label split mid-word, by HTML line wrapping (jj-idea-kds1). Plain
- * icons (no chip prefix) fall through to IntelliJ's built-in icon rendering by returning `null`.
+ * Resolves `<img>` elements whose `src` starts with [CHIP_ICON_PREFIX] into a single atomic [ChipView], so that an
+ * icon is never separated from its label, nor a label split mid-word, by HTML line wrapping (jj-idea-kds1).
+ *
+ * `<img>` (rather than `<icon>`) is used for chips specifically because it's a genuine HTML void element: on
+ * IntelliJ 2026.2, JBHtmlPane's Jsoup transpiler round-trips a self-closed `<icon .../>` into an explicit
+ * `<icon ...></icon>` open/close pair (it marks the custom `<icon>` tag `SelfClose` but not `Void`), which Swing's
+ * parser then turns into two sibling Elements instead of one, breaking the atomic-chip invariant this class exists
+ * for (jj-idea-vll4, jj-idea-m2wr). `<img>` is already void to both Jsoup and Swing's parser, so it always survives
+ * as a single Element; this extension intercepts it (running before any built-in image-loading extension) so no
+ * real image is ever fetched or rendered for it. Non-chip elements (real `<img>` or plain `<icon>`) fall through to
+ * IntelliJ's built-in rendering by returning `null`.
  */
 internal object ChipIconExtension : ExtendableHTMLViewFactory.Extension {
     override fun invoke(element: Element, defaultView: View): View? {
-        if (element.name != "icon") return null
+        if (element.name != "img") return null
         val src = element.attributes.getAttribute(HTML.Attribute.SRC) as? String ?: return null
         if (!src.startsWith(CHIP_ICON_PREFIX)) return null
         val spec = ChipSpec.parse(src.removePrefix(CHIP_ICON_PREFIX)) ?: return null
@@ -206,6 +215,26 @@ private class ChipSpec(
  * spans that would otherwise wrap separate icon/text elements), so chips still inherit ambient styling correctly.
  */
 private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
+    companion object {
+        // Extra fixed-pixel gap painted before every chip's icon/label, on top of whatever
+        // ordinary text (e.g. a space escaped to non-collapsing U+00A0 by append()) already
+        // precedes it. A bare U+00A0 between two chips measures mathematically exact against
+        // fontMetrics (matches how IntelliJ 2026.1 renders the same content pixel-for-pixel), but
+        // on 2026.2 specifically it reads as visually tighter than that -- a residual, milder
+        // cousin of the same "text rendered adjacent to an <img> element behaves oddly" class of
+        // platform bug this whole chip mechanism already works around once (jj-idea-vll4,
+        // jj-idea-m2wr: <icon> vs <img> round-tripping through Jsoup). Applied unconditionally
+        // (not keyed to any specific chip's content) since the underlying rendering difference is
+        // about the *gap*, not about what any particular chip says -- every chip type (bookmark,
+        // tag, name+email, date) can appear adjacent to another one this way. Tuning this via
+        // additional Unicode space characters in the *surrounding text* (e.g. a second U+00A0, or
+        // narrower codepoints like U+2009) doesn't give fine-enough control, since they either
+        // match a full space's width or (in fonts without a distinct narrow-space glyph, like
+        // Inter here) fall back to it anyway; this gives genuine sub-glyph pixel control instead,
+        // tuned empirically against real 2026.2 rendering.
+        private const val CHIP_LEADING_GAP = 2
+    }
+
     private val styleSheet get() = (document as HTMLDocument).styleSheet
     private val attr: AttributeSet by lazy { styleSheet.getViewAttributes(this) }
     private val font by lazy { styleSheet.getFont(attr) }
@@ -215,11 +244,14 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
     }
 
     private val iconsWidth get() = (spec.prefixIcon?.iconWidth ?: 0) + (spec.icon?.iconWidth ?: 0)
+    private val leadingGap: Int
+        get() = (CHIP_LEADING_GAP * JBUIScale.scale(1f)).roundToInt()
 
     override fun getPreferredSpan(axis: Int): Float {
         val fm = fontMetrics
         return when (axis) {
-            X_AXIS -> (iconsWidth + fm.stringWidth(spec.label) + fm.stringWidth(spec.suffix ?: "")).toFloat()
+            X_AXIS -> (leadingGap + iconsWidth + fm.stringWidth(spec.label) + fm.stringWidth(spec.suffix ?: ""))
+                .toFloat()
             Y_AXIS -> max(fm.height, max(spec.icon?.iconHeight ?: 0, spec.prefixIcon?.iconHeight ?: 0)).toFloat()
             else -> throw IllegalArgumentException("Invalid axis: $axis")
         }
@@ -232,7 +264,7 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         val rect = allocation.bounds
         val fm = fontMetrics
         val baseline = rect.y + fm.ascent
-        var x = rect.x
+        var x = rect.x + leadingGap
 
         spec.prefixIcon?.let { icon ->
             icon.paintIcon(null, g, x, baseline - icon.iconHeight)
@@ -259,15 +291,20 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
     }
 
     override fun modelToView(pos: Int, a: Shape, b: Position.Bias): Shape {
-        val p0 = startOffset
-        val p1 = endOffset
-        if (pos in p0..p1) {
-            val r = a.bounds
-            if (pos == p1) r.x += r.width
-            r.width = 0
-            return r
+        if (pos !in startOffset..endOffset) {
+            throw BadLocationException("$pos not in range $startOffset,$endOffset", pos)
         }
-        throw javax.swing.text.BadLocationException("$pos not in range $p0,$p1", pos)
+        val r = a.bounds
+        when (pos) {
+            // a.bounds.x is the left edge of the full allocation, which includes leadingGap's blank
+            // space before any visible content is actually painted -- shift past it so callers (e.g.
+            // click hit-testing, or a test measuring the visible gap before this chip) see where the
+            // chip's content really starts, matching paint()'s own starting x.
+            startOffset -> r.x += leadingGap
+            endOffset -> r.x += r.width
+        }
+        r.width = 0
+        return r
     }
 
     override fun viewToModel(x: Float, y: Float, a: Shape, bias: Array<Position.Bias>): Int {

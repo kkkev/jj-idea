@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.components
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import com.intellij.ui.scale.JBUIScale
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.ints.shouldBeGreaterThan
@@ -10,6 +11,7 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import javax.swing.text.Element
+import kotlin.math.roundToInt
 
 /**
  * Regression tests for jj-idea-c6f5: exercises the *real* rendering pipeline (production HTML generation, then
@@ -28,13 +30,13 @@ class IconAwareHtmlPaneWrapTest {
     @Test
     fun `long committer line wraps between the name-email chip and the date chip, never inside either`() {
         val html = htmlString {
-            control("<body>", "</body>") {
+            control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
                 append("committed by ")
                 appendWithEmail(
                     VcsUserImpl("GitHub", "49699333+dependabot[bot]@users.noreply.github.com")
                 )
-                control(" ")
-                appendUnbreakable("· 12/07/2026, 04:07")
+                append(" ")
+                appendUnbreakable("\u00b7\u00a012/07/2026, 04:07")
             }
         }
 
@@ -45,30 +47,30 @@ class IconAwareHtmlPaneWrapTest {
 
         val icons = mutableListOf<Element>()
         fun collect(e: Element) {
-            if (e.name == "icon") icons.add(e)
+            if (e.name == "img") icons.add(e)
             for (i in 0 until e.elementCount) collect(e.getElement(i))
         }
         collect(pane.document.defaultRootElement)
 
-        // One atomic chip for "GitHub <49699333+...>", one for "· 12/07/2026, 04:07".
+        // One atomic chip for "GitHub <49699333+...>", one for the mid-dot-prefixed date.
         icons shouldHaveSize 2
 
         val nameEmailY = pane.modelToView2D(icons[0].startOffset).bounds.y
         val dateY = pane.modelToView2D(icons[1].startOffset).bounds.y
 
         // The two chips must land on different rows (proving a real break point exists between them, and that
-        // neither chip itself got split — a split chip would still report a single startOffset row per element).
+        // neither chip itself got split -- a split chip would still report a single startOffset row per element).
         dateY shouldBeGreaterThan nameEmailY
     }
 
     @Test
     fun `same committer line leaves a visible gap between the name-email chip and the date chip when both fit`() {
         val html = htmlString {
-            control("<body>", "</body>") {
+            control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
                 append("committed by ")
                 appendWithEmail(VcsUserImpl("GitHub", "noreply@github.com"))
-                control(" ")
-                appendUnbreakable("· 12/07/2026, 04:07")
+                append(" ")
+                appendUnbreakable("\u00b7\u00a012/07/2026, 04:07")
             }
         }
 
@@ -79,7 +81,7 @@ class IconAwareHtmlPaneWrapTest {
 
         val icons = mutableListOf<Element>()
         fun collect(e: Element) {
-            if (e.name == "icon") icons.add(e)
+            if (e.name == "img") icons.add(e)
             for (i in 0 until e.elementCount) collect(e.getElement(i))
         }
         collect(pane.document.defaultRootElement)
@@ -91,8 +93,15 @@ class IconAwareHtmlPaneWrapTest {
         val nameEmailEnd = pane.modelToView2D(icons[0].endOffset).bounds
         val dateStart = pane.modelToView2D(icons[1].startOffset).bounds
 
-        // Both chips on the same row, with a real visible gap between them — not glued together.
+        // The gap consists of a single U+00A0 (matching the space embedded in the date chip's own label after the
+        // mid-dot -- both measured via the identical fontMetrics.stringWidth() call pattern, matching by
+        // construction) plus ChipView's extra CHIP_LEADING_GAP fixed-pixel padding. This padding is applied
+        // unconditionally to every chip, including chip0 (the name/email chip): chip0's own leading gap widens its
+        // total allocation by the same amount it shifts chip0's visible right edge, so it cancels out of this
+        // formula, leaving only chip1's leading gap to account for here. The "2" below must be kept in sync with
+        // ChipView.CHIP_LEADING_GAP.
+        val expectedGap = pane.getFontMetrics(pane.font).stringWidth(" ") + (2 * JBUIScale.scale(1f)).roundToInt()
         nameEmailEnd.y shouldBe dateStart.y
-        (dateStart.x - nameEmailEnd.x) shouldBeGreaterThan 0
+        (dateStart.x - nameEmailEnd.x) shouldBe expectedGap
     }
 }

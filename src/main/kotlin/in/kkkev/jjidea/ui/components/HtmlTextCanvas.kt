@@ -77,7 +77,13 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
             encodedSuffix,
             suffixColorHex
         ).joinToString(";")
-        control("<icon src='$CHIP_ICON_PREFIX$encoded'/>")
+        // A genuinely void/self-closing element (unlike <icon>, jj-idea-vll4/jj-idea-m2wr): JBHtmlPane's Jsoup
+        // transpiler marks the custom <icon> tag SelfClose but not Void, so on IntelliJ 2026.2 it round-trips
+        // through Jsoup's serializer as an explicit <icon ...></icon> pair, which Swing's parser (not knowing
+        // <icon> is empty) then splits into two sibling Elements per chip instead of one. <img> is a real HTML
+        // void element that both Jsoup and Swing's parser already know never has a closing tag, so it survives
+        // the round-trip as a single Element. ChipIconExtension intercepts it before any real image loading.
+        control("<img src='$CHIP_ICON_PREFIX$encoded'/>")
     }
 
     // TODO Optimise nested styles so that they collapse into one if they start and end at the same point

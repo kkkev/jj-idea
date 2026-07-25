@@ -17,6 +17,7 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -28,10 +29,38 @@ import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import kotlinx.datetime.Instant
 import java.awt.BorderLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JPanel
+
+/**
+ * Renders [user] as `Name <email>` (or "Unknown" if absent), followed by a non-breaking gap and
+ * an unbreakable "middle-dot <timestamp>" chip if [timestamp] is present. Shared by the author
+ * and committer lines so their spacing/wrap behavior can't drift apart the way it once did
+ * (jj-idea-vll4, jj-idea-m2wr).
+ */
+private fun TextCanvas.appendUserWithTimestamp(user: VcsUser?, timestamp: Instant?) {
+    user?.let { appendWithEmail(it) } ?: append("Unknown")
+    timestamp?.also {
+        // append (not control): a raw space via control() bypasses HTML escaping and is
+        // vulnerable to whitespace collapsing next to the date chip's <img> element; append()'s
+        // escaping turns a plain space into a non-collapsing &nbsp; (U+00A0). This needs to stay
+        // ordinary, breakable text, not its own chip, so a line that's too long can still wrap
+        // here -- an earlier attempt at using appendUnbreakable(" ") for this gap removed the
+        // only valid break point in the whole run, so a long line stopped wrapping at all.
+        //
+        // The date chip's own label below embeds the identical "\u00A0" right after the mid-dot
+        // for the same reason: matching Unicode codepoints on both sides guarantees
+        // fontMetrics.stringWidth() measures the identical glyph, so the two gaps stay equal.
+        // ChipView also adds a small extra fixed-pixel leading gap before every chip (see
+        // CHIP_LEADING_GAP in IconAwareHtmlPane.kt) to compensate for a 2026.2-specific rendering
+        // difference; that's general to all chips, not specific to this one.
+        append(" ")
+        appendUnbreakable("\u00b7\u00a0${DateTimeFormatter.formatAbsolute(it)}")
+    }
+}
 
 /**
  * Panel that displays detailed information about a selected commit.
@@ -233,19 +262,11 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
                     append(entry.description, IssueNavigationConfiguration.getInstance(project))
                 }
                 control("<p style='margin: 4px 0;'>", "</p>") {
-                    entry.author?.let { appendWithEmail(it) } ?: append("Unknown")
-                    entry.authorTimestamp?.also {
-                        control(" ")
-                        appendUnbreakable("\u00b7 ${DateTimeFormatter.formatAbsolute(it)}")
-                    }
+                    appendUserWithTimestamp(entry.author, entry.authorTimestamp)
                     val committer = entry.committer
                     if (committer != null && committer != entry.author) {
                         append("\ncommitted by ")
-                        appendWithEmail(committer)
-                        entry.committerTimestamp?.also {
-                            control(" ")
-                            appendUnbreakable("\u00b7 ${DateTimeFormatter.formatAbsolute(it)}")
-                        }
+                        appendUserWithTimestamp(committer, entry.committerTimestamp)
                     }
                 }
             }
