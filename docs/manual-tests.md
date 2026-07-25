@@ -506,6 +506,8 @@ Verify these keyboard shortcuts work in the log view:
 ### Working Copy Panel
 
 - [ ] Description text area shows current description
+- [ ] jj-idea-qa8i: clicking into the description text area, typing, and pressing Enter inserts
+  a newline (does not do nothing or trigger another action)
 - [ ] "Describe" button updates description via `jj describe`
 - [ ] "New Change" button creates new change via `jj new`
 - [ ] Changed files tree shows correct status colors

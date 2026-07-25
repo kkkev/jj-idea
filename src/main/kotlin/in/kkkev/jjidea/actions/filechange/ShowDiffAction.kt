@@ -6,6 +6,7 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
@@ -15,6 +16,7 @@ import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import javax.swing.text.JTextComponent
 
 /**
  * Compare file(s) from the parent of a revision with the revision itself.
@@ -51,6 +53,19 @@ class ShowDiffAction :
     }
 
     override fun update(e: AnActionEvent) {
+        // Bound to plain ENTER (see plugin.xml), which is also the natural keystroke for
+        // inserting a newline in any text field living in the same panel (e.g. the Working Copy
+        // description box, jj-idea-qa8i) — this action's data-context checks below don't care
+        // which component actually has focus, so without this guard, Enter in such a field would
+        // both insert a newline and pop open the diff. Never treat plain ENTER as this shortcut
+        // while focus is on editable text.
+        val focusedComponent = e.getData(PlatformDataKeys.CONTEXT_COMPONENT)
+        val focusOnEditableText = focusedComponent is JTextComponent && focusedComponent.isEditable
+        if (e.place == ActionPlaces.KEYBOARD_SHORTCUT && focusOnEditableText) {
+            e.presentation.isEnabledAndVisible = false
+            return
+        }
+
         val hasChanges = e.changes.isNotEmpty()
         val hasLogEntry = e.logEntry != null
         val hasRepo = e.repoForFile != null

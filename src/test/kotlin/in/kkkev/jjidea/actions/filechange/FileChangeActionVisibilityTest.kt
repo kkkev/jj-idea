@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.actions.filechange
 import com.intellij.openapi.actionSystem.ActionPlaces
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.VcsDataKeys
@@ -28,6 +29,8 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import javax.swing.JTextArea
+import javax.swing.JTree
 
 /**
  * Tests that each file-change action shows/hides and enables/disables correctly
@@ -59,6 +62,7 @@ class FileChangeActionVisibilityTest {
         every { event.getData(VcsDataKeys.CHANGES) } returns null
         every { event.getData(CommonDataKeys.VIRTUAL_FILE) } returns null
         every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns null
+        every { event.getData(PlatformDataKeys.CONTEXT_COMPONENT) } returns null
     }
 
     private fun withLogEntry(entry: LogEntry) = also {
@@ -350,6 +354,38 @@ class FileChangeActionVisibilityTest {
                 ShowDiffAction().update(event)
                 presentation.isEnabledAndVisible shouldBe true
             }
+
+            @Test
+            fun `disabled when focus is on an editable text component, even with changes present (jj-idea-qa8i)`() {
+                // Enter is bound to this action globally, but it's also how a text field (e.g. the
+                // Working Copy description box) inserts a newline — don't let the diff shortcut
+                // steal that keystroke just because the surrounding panel's data context happens
+                // to expose changes/a log entry.
+                withChanges(historicalChange("Main.kt"))
+                every { event.getData(PlatformDataKeys.CONTEXT_COMPONENT) } returns mockk<JTextArea> {
+                    every { isEditable } returns true
+                }
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe false
+            }
+
+            @Test
+            fun `enabled when focus is on a non-editable text component`() {
+                withChanges(historicalChange("Main.kt"))
+                every { event.getData(PlatformDataKeys.CONTEXT_COMPONENT) } returns mockk<JTextArea> {
+                    every { isEditable } returns false
+                }
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
+
+            @Test
+            fun `enabled when focus is on a non-text component, such as the changes tree`() {
+                withChanges(historicalChange("Main.kt"))
+                every { event.getData(PlatformDataKeys.CONTEXT_COMPONENT) } returns mockk<JTree>()
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
         }
 
         @Nested
@@ -366,6 +402,16 @@ class FileChangeActionVisibilityTest {
             @Test
             fun `enabled when only repo in context (context menu)`() {
                 every { event.repoForFile } returns repo
+                ShowDiffAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
+
+            @Test
+            fun `focus-on-text-component guard does not apply outside the keyboard shortcut place`() {
+                withChanges(historicalChange("Main.kt"))
+                every { event.getData(PlatformDataKeys.CONTEXT_COMPONENT) } returns mockk<JTextArea> {
+                    every { isEditable } returns true
+                }
                 ShowDiffAction().update(event)
                 presentation.isEnabledAndVisible shouldBe true
             }

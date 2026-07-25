@@ -24,7 +24,9 @@ import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
+import java.awt.event.ActionEvent
 import java.awt.event.ItemEvent
+import java.awt.event.KeyEvent
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
@@ -87,6 +89,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     private val descriptionArea = JBTextArea().apply {
+        val area = this
         rows = 4
         columns = 50
         lineWrap = true
@@ -104,6 +107,21 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
                 updateDescriptionLabel()
             }
         })
+
+        // Explicitly bind Enter to insert a newline rather than relying on JTextArea's default
+        // key binding. On platform 2026.2 (build 262) something higher up the focus/action chain
+        // now consumes VK_ENTER before it reaches the text area (jj-idea-qa8i / GitHub #57), so we
+        // bind it directly at the component level (WHEN_FOCUSED takes priority while this text
+        // area has focus) and consume the event here.
+        getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "jjidea-insert-newline")
+        actionMap.put(
+            "jjidea-insert-newline",
+            object : AbstractAction() {
+                override fun actionPerformed(e: ActionEvent) {
+                    area.replaceSelection("\n")
+                }
+            }
+        )
     }
 
     private val currentChangeLabel = IconAwareHtmlPane(project)
