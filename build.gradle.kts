@@ -114,8 +114,11 @@ dependencies {
     // Kotest assertions
     testImplementation("io.kotest:kotest-assertions-core:5.8.0")
 
-    // MockK for mocking
-    testImplementation("io.mockk:mockk:1.13.9")
+    // MockK for mocking. 1.13.9's bundled ByteBuddy can't generate working proxies for
+    // JDK25-compiled classes (2025.3+/253+ platforms) — @NotNull-instrumented methods like
+    // AnActionEvent.getPresentation() silently fall through to the real (unmocked)
+    // implementation instead of the stubbed return value, throwing at the @NotNull check.
+    testImplementation("io.mockk:mockk:1.14.11")
 
     // kotest/mockk transitively pull an older kotlin-stdlib than this project's own compiler
     // (kotlin.stdlib.default.dependency=false only suppresses the *automatic* stdlib dependency
@@ -203,14 +206,32 @@ tasks.test {
     maxHeapSize = "1g"
     testClassesDirs = sourceSets["test"].output.classesDirs
 
-    classpath = configurations["testCompileClasspath"] +
+    // Clear whatever IJPGP configured directly on the shared, default test task object before
+    // this block runs (this task is meant to be fully independent of IJPGP's platform bootstrap).
+    systemProperties.clear()
+
+    // Exclude specifically test-framework-junit5 (added by IJPGP's testFramework(JUnit5)
+    // declaration): it registers a LauncherSessionListener service provider that JUnit5's
+    // launcher eagerly loads before any tag filtering (excludeTags above) ever applies. Plain
+    // test-framework/test-framework-common/test-framework-core stay on the classpath — plenty of
+    // non-platform-tagged unit tests here legitimately use their Mock* classes
+    // (e.g. com.intellij.mock.MockVirtualFile).
+    val rawClasspath = configurations["testCompileClasspath"] +
         configurations["testRuntimeClasspath"] +
         sourceSets["test"].output +
         sourceSets["main"].output
+    classpath = rawClasspath.filter { !it.name.startsWith("test-framework-junit5") }
 
+    // 2025.3+ (253+) platform classes are uniformly compiled for a newer JVM bytecode version
+    // (2026.2 ships JBR 25, class file version 69) than JDK 21 can load — including plain
+    // interfaces/light types like com.intellij.openapi.vcs.FilePath that plain unit tests here
+    // legitimately mock or implement without needing the full platform sandbox. Match
+    // platformTest's launcher selection.
     javaLauncher.set(
-        javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(21))
+        if (isPre253(project.property("platformVersion") as String)) {
+            javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+        } else {
+            javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
         }
     )
 

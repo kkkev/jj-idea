@@ -21,11 +21,14 @@ import org.junit.jupiter.api.Test
 import java.net.URLDecoder
 import java.net.URLEncoder
 
-private val ICON_TAG = Regex("<icon[^>]*>")
+// <img>, not <icon>: see jj-idea-vll4/jj-idea-m2wr — <icon> isn't a genuine HTML void element, so on IntelliJ
+// 2026.2 it round-trips through JBHtmlPane's Jsoup transpiler as an open/close pair, splitting one chip into two
+// elements. <img> is void to both Jsoup and Swing's parser, so chips are encoded as <img> instead.
+private val ICON_TAG = Regex("<img[^>]*>")
 private val HREF = Regex("href='([^']*)'")
 
 /**
- * Regression tests for jj-idea-kds1: bookmark/tag chips must render as a single atomic `<icon>` element (resolved by
+ * Regression tests for jj-idea-kds1: bookmark/tag chips must render as a single atomic `<img>` element (resolved by
  * [ChipIconExtension] into one [ChipView]) so HTML line-wrapping can never split the icon from its label, nor break
  * the label mid-word.
  */
