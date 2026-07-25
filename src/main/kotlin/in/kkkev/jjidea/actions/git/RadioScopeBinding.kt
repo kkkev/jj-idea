@@ -1,8 +1,8 @@
 package `in`.kkkev.jjidea.actions.git
 
 import com.intellij.ui.dsl.builder.Cell
-import kotlin.reflect.KMutableProperty0
 import javax.swing.AbstractButton
+import kotlin.reflect.KMutableProperty0
 
 /**
  * Two-way binds this radio button's checked state to [prop] matching [value]: selects the
