@@ -299,9 +299,13 @@ tasks.register<Test>("contractTest") {
         configurations["testRuntimeClasspath"] +
         sourceSets["test"].output +
         sourceSets["main"].output
+    // Match tasks.test/platformTest's launcher selection: 2025.3+ (253+) platform classes are
+    // compiled for a newer JVM bytecode version than JDK 21 can load.
     javaLauncher.set(
-        javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(21))
+        if (isPre253(project.property("platformVersion") as String)) {
+            javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+        } else {
+            javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
         }
     )
     jvmArgs(
@@ -329,9 +333,13 @@ tasks.register<Test>("stubTest") {
         configurations["testRuntimeClasspath"] +
         sourceSets["test"].output +
         sourceSets["main"].output
+    // Match tasks.test/platformTest's launcher selection: 2025.3+ (253+) platform classes are
+    // compiled for a newer JVM bytecode version than JDK 21 can load.
     javaLauncher.set(
-        javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(21))
+        if (isPre253(project.property("platformVersion") as String)) {
+            javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) }
+        } else {
+            javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(25)) }
         }
     )
     jvmArgs(
