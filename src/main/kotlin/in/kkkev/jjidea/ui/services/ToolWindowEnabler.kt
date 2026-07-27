@@ -5,7 +5,6 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
@@ -14,6 +13,7 @@ import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 
 /**
  * Service that enables/disables Jujutsu tool windows based on VCS roots.
@@ -42,7 +42,7 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
     private fun handleRootsChange(jjRoots: Collection<JujutsuRepository>) {
         runLater {
             val hasJjRoots = jjRoots.isNotEmpty()
-            val allVcsRoots = ProjectLevelVcsManager.getInstance(project).allVcsRoots
+            val allVcsRoots = project.projectLevelVcsManager.getAllVcsRoots()
             val totalVcsRoots = allVcsRoots.size
             val allRootsAreJj = hasJjRoots && jjRoots.size == totalVcsRoots
 

@@ -8,7 +8,6 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -20,6 +19,7 @@ import `in`.kkkev.jjidea.jj.commandExecutorFactory
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 import javax.swing.JComponent
 
 class InitAction : DumbAwareAction(
@@ -53,9 +53,9 @@ class InitAction : DumbAwareAction(
 
             VfsUtil.markDirtyAndRefresh(false, true, true, newRoot)
 
-            val manager = ProjectLevelVcsManager.getInstance(project)
-            manager.directoryMappings =
-                VcsUtil.addMapping(manager.directoryMappings, newRoot.path, JujutsuVcs.VCS_NAME)
+            val manager = project.projectLevelVcsManager
+            val newMappings = VcsUtil.addMapping(manager.getDirectoryMappings(), newRoot.path, JujutsuVcs.VCS_NAME)
+            manager.setDirectoryMappings(newMappings)
 
             result
         }.onSuccess {

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rebase and duplicate now use jj's `--onto` flag instead of the deprecated `-d`/`--destination`, ahead of its removal in a future jj release.
 
 ### Fixed
+- Fixed a crash risk on IntelliJ/RustRover 2025.1 and 2025.2 (builds 251/252) when initialising a repo or when VCS roots changed.
 - The "Resolve Conflicts…" action now opens the merge dialog on IntelliJ/RustRover 2026.2 (build 262) instead of silently doing nothing. ([#55](https://github.com/kkkev/jj-idea/issues/55))
 - The Split dialog's file checkboxes now work the way you'd expect: ticking a file moves it into the new child commit (unticked files stay in the parent), nothing is ticked by default, and the child's description field is shown above the parent's, matching their order in the log. Right-clicking file(s) and choosing "Split into New Child" now starts those files ticked, so they land in the new child commit instead of the parent. ([#54](https://github.com/kkkev/jj-idea/issues/54))
 - "Pick Hunks…" now has a fixed, always-reversible layout: a "Before" reference on one side and the child's content on the other, with an editable "Parent" in the middle you can pull hunks into or out of from either side, as many times as you like, instead of a one-way pick with no way to change your mind. Picking only some of a file's hunks no longer forces the whole file to look fully assigned to the child. Reopening "Pick Hunks…" on a file you already partially split now resumes where you left off instead of resetting.

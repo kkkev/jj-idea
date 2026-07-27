@@ -68,7 +68,7 @@ class JujutsuChangeProviderTest {
         application.registerService(ProjectLevelVcsManager::class.java, projectLevelVcsManager)
         every { projectLevelVcsManager.getVcsFor(any<FilePath>()) } returns vcs
         every { projectLevelVcsManager.getVcsRootFor(any<FilePath>()) } returns directory
-        every { projectLevelVcsManager.allVcsRoots } returns arrayOf(VcsRoot(vcs, directory))
+        every { projectLevelVcsManager.getAllVcsRoots() } returns arrayOf(VcsRoot(vcs, directory))
         every { project.getService(ProjectLevelVcsManager::class.java) } returns projectLevelVcsManager
         every { project.isDisposed } returns false
     }

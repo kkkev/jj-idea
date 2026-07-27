@@ -29,6 +29,7 @@ import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuTrackedFilesService
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
+import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -95,8 +96,8 @@ class JujutsuStateModel(private val project: Project) : Disposable {
      * Cache of JJ VCS root directories, regardless of whether they have been initialised.
      */
     val jujutsuVcsRoots = notifiableState(project, "Jujutsu VCS Root Directories", emptySet()) {
-        ProjectLevelVcsManager.getInstance(project).findVcsByName(JujutsuVcs.VCS_NAME)
-            ?.let { ProjectLevelVcsManager.getInstance(project).getDirectoryMappings(it) }
+        project.projectLevelVcsManager.findVcsByName(JujutsuVcs.VCS_NAME)
+            ?.let { project.projectLevelVcsManager.getDirectoryMappings(it) }
             ?.mapNotNull {
                 (it.directory.takeIf { it.isNotEmpty() } ?: project.basePath)
                     ?.let { directory -> VfsUtil.findFile(Path.of(directory), true) }

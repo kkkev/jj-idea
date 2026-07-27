@@ -18,11 +18,20 @@ import `in`.kkkev.jjidea.vcs.changes.JujutsuRevisionNumber
 private val log = Logger.getInstance("in.kkkev.jjidea.vcs.VcsExtensions")
 
 /**
+ * [ProjectLevelVcsManager.getInstance] became a Kotlin companion-object method in 2025.3 (253);
+ * calling it from code compiled against 253+ emits a reference to `ProjectLevelVcsManager.Companion`
+ * that does not exist on the Java-class 251/252 platforms (NoSuchFieldError). Fetch the service
+ * directly to stay compatible across the whole sinceBuild=251 range (jj-idea-nwio).
+ */
+internal val Project.projectLevelVcsManager: ProjectLevelVcsManager
+    get() = getService(ProjectLevelVcsManager::class.java)
+
+/**
  * Find JujutsuVcs for a project. Returns null if not found.
  * Use when VCS might not be available (e.g., general actions that could run in any context).
  */
 val Project.possibleJujutsuVcs
-    get() = ProjectLevelVcsManager.getInstance(this).findVcsByName(JujutsuVcs.VCS_NAME) as? JujutsuVcs
+    get() = projectLevelVcsManager.findVcsByName(JujutsuVcs.VCS_NAME) as? JujutsuVcs
 
 val Project?.isJujutsu get() = this?.stateModel?.isJujutsu == true
 

@@ -3,7 +3,6 @@ package `in`.kkkev.jjidea.vcs
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.AbstractVcs
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.VcsType
 import com.intellij.openapi.vfs.VirtualFile
@@ -73,7 +72,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
      * Note: This calls ProjectLevelVcsManager which may be slow - avoid calling on EDT.
      */
     val roots: List<VirtualFile>
-        get() = ProjectLevelVcsManager.getInstance(myProject).getRootsUnderVcs(this).toList()
+        get() = myProject.projectLevelVcsManager.getRootsUnderVcs(this).toList()
 
     companion object {
         const val VCS_NAME = "Jujutsu"
