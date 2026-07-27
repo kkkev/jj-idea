@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 /**
@@ -158,6 +159,7 @@ intellijPlatform {
     pluginVerification {
         ides {
             recommended()
+            create(IntelliJPlatformType.IntellijIdea, "2026.2")
         }
     }
 }

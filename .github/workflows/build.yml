@@ -76,14 +76,20 @@ jobs:
             echo "No source code changes detected. Skipping changelog check."
           fi
 
-  # Compiles and unit-tests against IntelliJ Platform 2026.2 (build 262), separately from
-  # the release `build` job (which stays pinned to the 2025.2 baseline for
-  # buildPlugin/publish). Platform releases have broken plugin-visible behavior without any
-  # binary-incompatible signature change (jj-idea-qfgl / GitHub #55), so this only catches
-  # compile-time breaks; it does not replace a manual runIde smoke test against a new
-  # platform version.
-  compat-2026-2:
+  # Cross-version compatibility gate: compiles, unit-tests, and platform-tests against
+  # both ends of the supported platform range — the sinceBuild=251 baseline (2025.2) and
+  # the newest supported platform (2026.2, build 262) — separately from the release
+  # `build` job (which only builds/publishes on the default platformVersion). Platform
+  # releases have broken plugin-visible behavior without any binary-incompatible signature
+  # change (jj-idea-qfgl / GitHub #55), so this only catches compile- and test-time
+  # breaks; it does not replace a manual runIde smoke test against a new platform version.
+  compat:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ '2025.2', '2026.2' ]
 
     steps:
       - name: Checkout code
@@ -98,8 +104,28 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Compile and unit test against 2026.2
-        run: ./gradlew compileKotlin test -PplatformVersion=2026.2
+      - name: Compile and unit test against ${{ matrix.platform }}
+        run: ./gradlew compileKotlin test -PplatformVersion=${{ matrix.platform }}
+
+      # platformTest runs IntelliJ's LeakHunter at global teardown, which is prone to a
+      # GC-timing false positive (retained-Project report that doesn't reproduce locally or
+      # on a rerun of the same commit). Retry a few times before failing the build.
+      - name: Platform tests against ${{ matrix.platform }} (retry flaky LeakHunter leak detection)
+        run: |
+          for attempt in 1 2 3; do
+            echo "platformTest attempt $attempt"
+            if ./gradlew platformTest --rerun -PplatformVersion=${{ matrix.platform }}; then exit 0; fi
+            echo "::warning::platformTest attempt $attempt failed (likely flaky LeakHunter); retrying"
+          done
+          exit 1
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ matrix.platform }}
+          path: build/reports/tests/
+          retention-days: 14
 
   build:
     runs-on: ubuntu-latest
@@ -177,28 +203,8 @@ jobs:
       - name: Build plugin
         run: ./gradlew buildPlugin
 
-      - name: Lint and unit tests
-        run: ./gradlew test ktlintCheck
-
-      # platformTest runs IntelliJ's LeakHunter at global teardown, which is prone to a
-      # GC-timing false positive (retained-Project report that doesn't reproduce locally or
-      # on a rerun of the same commit). Retry a few times before failing the build.
-      - name: Platform tests (retry flaky LeakHunter leak detection)
-        run: |
-          for attempt in 1 2 3; do
-            echo "platformTest attempt $attempt"
-            if ./gradlew platformTest --rerun; then exit 0; fi
-            echo "::warning::platformTest attempt $attempt failed (likely flaky LeakHunter); retrying"
-          done
-          exit 1
-
-      - name: Upload test reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports
-          path: build/reports/tests/
-          retention-days: 14
+      - name: Lint
+        run: ./gradlew ktlintCheck
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
