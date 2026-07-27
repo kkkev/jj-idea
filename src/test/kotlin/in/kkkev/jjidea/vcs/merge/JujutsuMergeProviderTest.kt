@@ -55,6 +55,24 @@ class JujutsuMergeProviderTest {
         shouldThrow<VcsException> { provider.loadRevisions(file) }
     }
 
+    // -------------------------------------------------------------------------
+    // getMergeInfoColumns
+    //
+    // Regression test for jj-idea-qfgl / GitHub #55: IntelliJ 2026.2's iterative merge
+    // dialog indexes unconditionally into [file name column] + getMergeInfoColumns() and
+    // throws IndexOutOfBoundsException if that list isn't exactly 3 long. Pin the column
+    // count so nobody reverts this to emptyArray().
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `getMergeInfoColumns - returns two non-blank columns`() {
+        val session = provider.createMergeSession(emptyList()) as com.intellij.openapi.vcs.merge.MergeSessionEx
+        val columns = session.mergeInfoColumns
+
+        columns.size shouldBe 2
+        columns.all { it.name.isNotBlank() } shouldBe true
+    }
+
     @Test
     fun `isBinary - binary file type - returns true`() {
         val file = mockk<VirtualFile>()

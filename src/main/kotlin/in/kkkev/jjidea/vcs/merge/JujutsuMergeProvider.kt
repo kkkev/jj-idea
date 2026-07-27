@@ -9,6 +9,7 @@ import com.intellij.openapi.vcs.merge.MergeSession
 import com.intellij.openapi.vcs.merge.MergeSessionEx
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.ui.ColumnInfo
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
@@ -57,7 +58,16 @@ class JujutsuMergeProvider(
     }
 
     private inner class JujutsuMergeSession(files: List<VirtualFile>) : MergeSessionEx {
-        override fun getMergeInfoColumns(): Array<ColumnInfo<*, *>> = emptyArray()
+        // Must return exactly 2 columns (not 0): IntelliJ 2026.2's iterative merge dialog
+        // (IterativeMergeFlowDelegate) builds its column-name list as
+        // [file name] + getMergeInfoColumns() and unconditionally indexes into it for the
+        // "Accept Yours"/"Accept Theirs" labels. An empty array — which the interface
+        // otherwise documents as valid — leaves that list too short and throws
+        // IndexOutOfBoundsException before the dialog can show (jj-idea-qfgl, GitHub #55).
+        // Git4Idea's MyMergeSession always returns 2 columns for the same reason; we don't
+        // have a cheap per-side status to report (jj's conflict markers don't distinguish
+        // added/modified/deleted the way git's index does), so these are label-only.
+        override fun getMergeInfoColumns(): Array<ColumnInfo<*, *>> = arrayOf(yoursColumn, theirsColumn)
 
         override fun canMerge(file: VirtualFile) = !file.isDirectory && !file.fileType.isBinary
 
@@ -83,5 +93,17 @@ class JujutsuMergeProvider(
                 Files.write(file.toNioPath(), content)
             }
         }
+    }
+
+    private companion object {
+        // See the comment on getMergeInfoColumns above for why these exist. valueOf is blank —
+        // the names alone are what the platform needs.
+        val yoursColumn = createColumn("merge.column.yours")
+        val theirsColumn = createColumn("merge.column.theirs")
+
+        private fun createColumn(nameResourceKey: String): ColumnInfo<VirtualFile, String> =
+            object : ColumnInfo<VirtualFile, String>(JujutsuBundle.message(nameResourceKey)) {
+                override fun valueOf(item: VirtualFile) = ""
+            }
     }
 }

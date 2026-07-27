@@ -76,6 +76,31 @@ jobs:
             echo "No source code changes detected. Skipping changelog check."
           fi
 
+  # Compiles and unit-tests against IntelliJ Platform 2026.2 (build 262), separately from
+  # the release `build` job (which stays pinned to the 2025.2 baseline for
+  # buildPlugin/publish). Platform releases have broken plugin-visible behavior without any
+  # binary-incompatible signature change (jj-idea-qfgl / GitHub #55), so this only catches
+  # compile-time breaks; it does not replace a manual runIde smoke test against a new
+  # platform version.
+  compat-2026-2:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Compile and unit test against 2026.2
+        run: ./gradlew compileKotlin test -PplatformVersion=2026.2
+
   build:
     runs-on: ubuntu-latest
 

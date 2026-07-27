@@ -687,6 +687,11 @@ Open `/tmp/jj-conflict-test` as a project in the plugin IDE (`./gradlew runIde`)
 - [ ] Right-clicking any file or directory in the Project view → Jujutsu → Resolve Conflicts…: opens dialog with **all** conflicted files
 - [ ] Opening `file.txt` in the editor, right-clicking → Jujutsu → Resolve Conflicts…: opens all conflicted files (global action, not scoped to editor file)
 
+#### Multi-file merge dialog — file table
+
+- [ ] The file table shows "Yours" and "Theirs" columns alongside the file name (jj-idea-qfgl / GitHub #55: these must always be present — an empty column list crashes the dialog on IntelliJ/RustRover 2026.2, build 262)
+- [ ] **On IntelliJ/RustRover 2026.2 (build 262) specifically**: triggering "Resolve Conflicts…" opens the dialog at all (this used to silently do nothing)
+
 #### Three-way merge dialog — content correctness
 
 - [ ] Left pane shows "ours" content (`changed by A`, the rebased change)
