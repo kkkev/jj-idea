@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.7.16/jj-idea-0.7.16.zip" version="0.7.16">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.0/jj-idea-0.8.0.zip" version="0.8.0">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,23 +23,24 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.7.16</h3>
+      <h3>0.8.0</h3>
       
-<h4>Added</h4>
-<li>The commit details panel now renders issue-tracker references (e.g. `JIRA-123`) and plain URLs in commit descriptions as clickable links, using your IDE's Version Control → Issue Navigation settings. Clicking one opens it in your browser. ([#15](https://github.com/kkkev/jj-idea/issues/15))</li>
-<li>Double-clicking a commit in the log now shows its diff, and pressing Enter does the same — both are rebindable to a different action in Settings → Keymap. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>The log search field now matches a commit's Git hash (full or abbreviated), not just its change ID, description, or author. ([#44](https://github.com/kkkev/jj-idea/issues/44))</li>
-<li>New "Duplicate Change" and "Duplicate Onto..." actions in the log's right-click menu create an identical copy of the selected change(s), either in place or onto a chosen destination — works on immutable changes too. The "Duplicate Onto..." dialog hides destinations and disables placements that would fail because they'd need to rewrite an immutable commit. ([#33](https://github.com/kkkev/jj-idea/issues/33))</li>
+<h4>Changed</h4>
+<li>Rebase and duplicate now use jj's `--onto` flag instead of the deprecated `-d`/`--destination`, ahead of its removal in a future jj release.</li>
 
 <h4>Fixed</h4>
-<li>Pushing a new or untracked bookmark no longer fails on jj 0.42 and later with "unexpected argument '--allow-new'". You're now asked to confirm before the new bookmark is created on the remote, same as before. ([#53](https://github.com/kkkev/jj-idea/issues/53))</li>
-<li>Pushing with the default "tracking bookmarks" scope no longer silently skips a brand-new bookmark with no feedback — you're now asked to confirm creating it on the remote, same as when pushing a specific bookmark.</li>
-<li>Background operations (e.g. Git push/fetch) that hit an unexpected internal error now report it instead of appearing to do nothing.</li>
-<li>The log graph now draws a merge commit's parents in the same left-to-right order as `jj log`, with matching line colors. Previously the parents could appear swapped (e.g. the trunk parent on the right) when a non-mainline parent happened to sit in the row directly below the merge. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>The commit log no longer shows a status icon on ordinary (mutable) revisions; only immutable revisions are marked, removing visual noise from the common case. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>Changing a log filter (reference/bookmark, author, date, text, or root) no longer deselects the current commit, or silently selects a different one, as long as it's still visible in the filtered list.</li>
-<li>Commit pickers in dialogs (Rebase, Squash Into..., Duplicate Onto..., Move Bookmark) now always show commits in the same order as the main log, instead of sometimes showing an unrelated order (e.g. an immutable root commit before the changes on top of it). This could happen the first time a dialog was opened for a repo, and — in multi-repo projects — could affect any repo unpredictably, because different repos' root commits share the same underlying jj change ID and were getting conflated when merging repos' logs.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.7.16">full release notes</a> for details.</p>
+<li>Fixed a crash risk on IntelliJ/RustRover 2025.1 and 2025.2 (builds 251/252) when initialising a repo or when VCS roots changed.</li>
+<li>The "Resolve Conflicts…" action now opens the merge dialog on IntelliJ/RustRover 2026.2 (build 262) instead of silently doing nothing. ([#55](https://github.com/kkkev/jj-idea/issues/55))</li>
+<li>The Split dialog's file checkboxes now work the way you'd expect: ticking a file moves it into the new child commit (unticked files stay in the parent), nothing is ticked by default, and the child's description field is shown above the parent's, matching their order in the log. Right-clicking file(s) and choosing "Split into New Child" now starts those files ticked, so they land in the new child commit instead of the parent. ([#54](https://github.com/kkkev/jj-idea/issues/54))</li>
+<li>"Pick Hunks…" now has a fixed, always-reversible layout: a "Before" reference on one side and the child's content on the other, with an editable "Parent" in the middle you can pull hunks into or out of from either side, as many times as you like, instead of a one-way pick with no way to change your mind. Picking only some of a file's hunks no longer forces the whole file to look fully assigned to the child. Reopening "Pick Hunks…" on a file you already partially split now resumes where you left off instead of resetting.</li>
+<li>Splitting with individual hunks picked (via "Pick Hunks…") no longer fails with "Failed to edit diff" / `NoClassDefFoundError: kotlin/jvm/internal/Intrinsics` on some IDE installs.</li>
+<li>"Annotate Previous Revision" now re-annotates at the correct parent commit instead of an arbitrary one. On a line introduced by a merge commit, where there's no single correct "previous" revision, the action is unavailable rather than guessing wrong.</li>
+<li>Annotating a file whose working copy (or an ancestor) is a merge commit no longer fails with "Revset `@-` resolved to more than one revision".</li>
+<li>Annotating a resolved merge conflict no longer shows a spurious "number of lines annotated is not equal to number of lines in the file" warning. Blame now correctly attributes each line to whichever original commit introduced it, with conflict-resolution lines attributed to the merge itself.</li>
+<li>Annotating a merge no longer fails with "No such path" when the file exists in only some of the merge's parents (e.g. a criss-cross merge where a file was added on only one side). Blame is now assembled from whichever parents actually have the file.</li>
+<li>Pressing Enter in the Working Copy tool window's description box inserts a newline again. On 2026.2, it instead opened the current commit's diff — the log's "Enter shows diff" shortcut was firing even while typing in the description field, not just when the log itself had focus. ([#57](https://github.com/kkkev/jj-idea/issues/57))</li>
+<li>On 2026.2, the committer name/email and date chips in the commit details panel could render as two overlapping icons instead of one, breaking the line-wrap point between them.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.0">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-27
+
 ### Changed
 - Rebase and duplicate now use jj's `--onto` flag instead of the deprecated `-d`/`--destination`, ahead of its removal in a future jj release.
 
@@ -700,7 +702,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.7.16...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.0
 [0.7.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.16
 [0.7.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.15
 [0.7.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.7.14
