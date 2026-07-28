@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The Push dialog no longer crashes with an error when opened. The Fetch dialog had the same problem for repositories with more than one remote. ([#60](https://github.com/kkkev/jj-idea/issues/60))
+
 ## [0.8.0] - 2026-07-27
 
 ### Changed

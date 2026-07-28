@@ -105,14 +105,14 @@ class GitFetchDialog(
         if (showAllRemotesOption) {
             buttonsGroup {
                 row {
-                    val rb = radioButton(JujutsuBundle.message("dialog.git.fetch.scope.specific"), FetchScope.SPECIFIC)
+                    val rb = radioButton(JujutsuBundle.message("dialog.git.fetch.scope.specific"))
                         .bindScope(::fetchScope, FetchScope.SPECIFIC)
                     comboBox(remoteModel)
                         .bindItem(::selectedRemote.toNullableProperty())
                         .enabledIf(rb.component.selected)
                 }
                 row {
-                    radioButton(JujutsuBundle.message("dialog.git.fetch.scope.all"), FetchScope.ALL)
+                    radioButton(JujutsuBundle.message("dialog.git.fetch.scope.all"))
                         .bindScope(::fetchScope, FetchScope.ALL)
                 }
             }
