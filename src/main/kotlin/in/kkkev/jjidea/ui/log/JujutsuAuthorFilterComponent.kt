@@ -1,13 +1,15 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.jj.stateModel
 
 /**
  * Filter component for authors.
  */
-class JujutsuAuthorFilterComponent(private val tableModel: JujutsuLogTableModel) :
+class JujutsuAuthorFilterComponent(private val tableModel: JujutsuLogTableModel, private val project: Project) :
     JujutsuFilterComponent(JujutsuBundle.message("log.filter.author")) {
     private val selectedAuthors = mutableSetOf<String>()
 
@@ -22,6 +24,10 @@ class JujutsuAuthorFilterComponent(private val tableModel: JujutsuLogTableModel)
     fun initialize() {
         addChangeListener {
             tableModel.setAuthorFilter(selectedAuthors)
+            // Single choke point for syncing the project-wide "active author filter" state
+            // (jj-idea-iesq) - every mutation of selectedAuthors (dropdown toggle, clear, or
+            // setSelectedAuthors()'s toggle) ends up here via notifyFilterChanged().
+            project.stateModel.activeAuthorFilter = selectedAuthors.toSet()
         }
     }
 

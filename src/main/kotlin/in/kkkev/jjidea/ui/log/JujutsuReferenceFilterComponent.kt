@@ -149,6 +149,10 @@ class JujutsuReferenceFilterComponent(
     }
 
     private fun applyFilter() {
+        // Single choke point for syncing the project-wide "active reference filter" state
+        // (jj-idea-iesq) - every mutation of selectedReference (dropdown pick, clear, or
+        // selectReference()'s toggle) ends up here via notifyFilterChanged().
+        project.stateModel.activeReferenceFilter = selectedReference?.name ?: ""
         val ref = selectedReference ?: run {
             tableModel.setBookmarkFilter(emptySet())
             return

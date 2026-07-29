@@ -241,7 +241,7 @@ abstract class CommitTablePanel<D>(
         filters += referenceFilterComponent
 
         // Author filter
-        authorFilterComponent = JujutsuAuthorFilterComponent(logTable.logModel).apply {
+        authorFilterComponent = JujutsuAuthorFilterComponent(logTable.logModel, project).apply {
             initUi()
             initialize()
         }

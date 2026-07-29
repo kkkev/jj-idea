@@ -217,6 +217,23 @@ class JujutsuStateModel(private val project: Project) : Disposable {
      */
     val changeSelection = simpleNotifier<ChangeKey>(project, "Jujutsu Change Selection")
 
+    /**
+     * The reference name (bookmark/tag/`@`) currently selected by the log's References filter, or
+     * `""` if none. Single source of truth for "is this reference the active filter" (jj-idea-iesq)
+     * - set by [in.kkkev.jjidea.ui.log.JujutsuReferenceFilterComponent] whenever its selection is
+     * applied, and read by [in.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions]' right-click
+     * "Filter Log to '...'" checkmark. Living here (rather than threaded through as a callback
+     * property on `JujutsuLogTable`/`JujutsuCommitDetailsPanel`) means neither of those UI classes
+     * needs to know this state exists just to pass it along - both the filter component (writer)
+     * and the menu actions (reader) depend on this project-level service instead of on each other.
+     * No live-update notification: each right-click menu freshly re-reads this when built, and
+     * nothing today needs to react to it changing while already open.
+     */
+    var activeReferenceFilter: String = ""
+
+    /** The author emails currently selected by the log's Author filter (jj-idea-iesq); see [activeReferenceFilter]. */
+    var activeAuthorFilter: Set<String> = emptySet()
+
     private val repositoryStateAlarm = Alarm(Alarm.ThreadToUse.POOLED_THREAD, this)
 
     /** Suppress file-change refreshes (e.g., during batch operations). Pairs with [resumeRefresh]. */
