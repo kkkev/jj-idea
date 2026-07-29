@@ -1,12 +1,9 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.diff.tools.util.DiffDataKeys
-import com.intellij.ide.CommonActionsManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.DataSink
-import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -26,6 +23,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
+import `in`.kkkev.jjidea.ui.common.changesTreeToolbar
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -152,33 +150,12 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
 
     private fun setupChangesPanel() {
         // Add toolbar
-        val toolbar = createChangesToolbar()
+        val toolbar = changesTreeToolbar(changesTree, "JujutsuCommitDetailsChangesToolbar")
         changesPanel.add(toolbar.component, BorderLayout.NORTH)
 
         // Add tree
         val treeScrollPane = ScrollPaneFactory.createScrollPane(changesTree)
         changesPanel.add(treeScrollPane, BorderLayout.CENTER)
-    }
-
-    private fun createChangesToolbar(): ActionToolbar {
-        val group = DefaultActionGroup()
-
-        // Tree expander actions (expand all / collapse all)
-        val treeExpander = changesTree.treeExpander
-        val commonActionsManager = CommonActionsManager.getInstance()
-        group.add(commonActionsManager.createExpandAllAction(treeExpander, changesTree))
-        group.add(commonActionsManager.createCollapseAllAction(treeExpander, changesTree))
-
-        group.addSeparator()
-
-        // Grouping actions
-        group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
-
-        return ActionManager.getInstance()
-            .createActionToolbar("JujutsuCommitDetailsChangesToolbar", group, true)
-            .apply {
-                targetComponent = changesTree
-            }
     }
 
     override fun uiDataSnapshot(sink: DataSink) {

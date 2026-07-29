@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- "Compare with Working Copy" and "Show Diff in New Tab" (for multiple files) now open a Changes pane listing every differing file, with the current one highlighted, instead of a bare diff with only a file-selector dropdown. Selecting a file in the list updates the diff in place. ([#52](https://github.com/kkkev/jj-idea/issues/52))
 - Bookmark/tag chips and author/committer names in the log now do something when clicked, instead of just looking like links. Click a bookmark or tag to filter the log to it; click an author or committer name to email them. Right-click either for more options, including filtering by author. Clicking the same bookmark/tag or author filter again toggles it off, and the right-click menu shows a checkmark on whichever filter is currently active. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - Author/committer names in the log, and the author/committer `Name <email>` link and bookmark/tag chips in the commit details pane, are no longer permanently underlined — they're link-colored at rest and underline only while hovered, consistent everywhere.
 

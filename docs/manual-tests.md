@@ -201,15 +201,21 @@ In a **multi-repo** project (multiple `.jj` roots open together):
 - [ ] Multi-selecting two commits (same repo) and choosing **New Change From These** (or the shortcut) creates a merge change with both as parents
 - [ ] Multi-selecting commits across two repos in a multi-root project: **New Change From This/These** is disabled/hidden (no arbitrary repo is picked)
 
-#### Compare with Working Copy (jj-idea-a6cz)
+#### Compare with Working Copy (jj-idea-a6cz, jj-idea-vtdl)
 
 - [ ] Right-clicking a non-working-copy commit shows **Compare with Working Copy**
 - [ ] Right-clicking the working-copy entry: **Compare with Working Copy** is **not visible**
-- [ ] Invoking it on a commit with differences from `@` opens a single editor tab listing every changed file (added/modified/deleted/renamed all included)
+- [ ] Invoking it on a commit with differences from `@` opens the **VcsChanges** tool window with a Changes tree listing every changed file (added/modified/deleted/renamed all included), and the first file's diff open in the editor
+- [ ] Selecting other files in the tree updates the diff in the same reusable editor tab
 - [ ] The right (working-copy) side of the diff is editable, and edits are written through to the real file on disk
 - [ ] The left (commit) side is read-only
-- [ ] Next/Previous Difference navigates across all files in the tab
-- [ ] Invoking it on a commit identical to `@` shows a "No Differences" notification instead of an empty tab
+- [ ] Right-clicking a file in the Changes tree shows the jj file-change context menu (Show Diff, Restore, etc.)
+- [ ] Invoking it on a commit identical to `@` shows a "No Differences" notification instead of an empty pane
+
+#### Show Diff in New Tab, multi-file (jj-idea-vtdl)
+
+- [ ] Multi-selecting files (in the log's file list or a commit's changes) and choosing **Show Diff in New Tab** opens the same VcsChanges Changes-pane view as Compare with Working Copy, with the first file's diff open
+- [ ] Selecting a single file still shows a title with just that file's name; multiple files show "N files"
 
 ### Squash Into...
 

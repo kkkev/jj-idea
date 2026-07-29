@@ -4,12 +4,14 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.vcs.changes.ChangesUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.fileList
 import `in`.kkkev.jjidea.actions.filesFor
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.repoForFile
+import `in`.kkkev.jjidea.ui.common.JujutsuCompareChangesPanel.Companion.showCompareChangesTab
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
@@ -30,13 +32,19 @@ class ShowDiffInNewTabAction : DumbAwareAction(
             val files = project.filesFor(fileList, changes)
             if (logEntry != null) {
                 val fileChanges = logEntry.repo.logService.getFileChanges(logEntry).getOrElse { emptyList() }
-                val requests = buildDiffRequests(project, fileChanges, emptyList())
-                if (requests.isNotEmpty()) runLater { openDiffChain(project, requests, logEntry.id.short) }
+                val diffChanges = buildChanges(project, fileChanges, emptyList())
+                if (diffChanges.isNotEmpty()) {
+                    runLater { showCompareChangesTab(project, diffChanges, logEntry.id.short) { logEntry.id.short } }
+                }
             } else {
-                val requests = buildDiffRequests(project, changes, files)
-                if (requests.isEmpty()) return@runInBackground
-                val tabTitle = if (requests.size == 1) requests.first().title ?: "Diff" else "${requests.size} files"
-                runLater { openDiffChain(project, requests, tabTitle) }
+                val diffChanges = buildChanges(project, changes, files)
+                if (diffChanges.isEmpty()) return@runInBackground
+                val tabTitle = if (diffChanges.size == 1) {
+                    ChangesUtil.getFilePath(diffChanges.first()).name
+                } else {
+                    "${diffChanges.size} files"
+                }
+                runLater { showCompareChangesTab(project, diffChanges, tabTitle) { tabTitle } }
             }
         }
     }

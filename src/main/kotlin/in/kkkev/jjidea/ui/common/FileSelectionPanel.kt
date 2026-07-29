@@ -1,9 +1,6 @@
 package `in`.kkkev.jjidea.ui.common
 
-import com.intellij.ide.CommonActionsManager
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.ui.ScrollPaneFactory
@@ -22,8 +19,7 @@ class FileSelectionPanel(project: Project) : JPanel(BorderLayout()) {
     val changesTree = JujutsuChangesTree(project, showCheckboxes = true)
 
     init {
-        val toolbar = createToolbar()
-        toolbar.targetComponent = changesTree
+        val toolbar = changesTreeToolbar(changesTree, ActionPlaces.CHANGES_VIEW_TOOLBAR)
         add(toolbar.component, BorderLayout.NORTH)
         add(ScrollPaneFactory.createScrollPane(changesTree), BorderLayout.CENTER)
     }
@@ -68,17 +64,4 @@ class FileSelectionPanel(project: Project) : JPanel(BorderLayout()) {
     fun setPartialChanges(changes: Set<Change>) {
         changesTree.partialChanges = changes
     }
-
-    private fun createToolbar() = ActionManager.getInstance().createActionToolbar(
-        ActionPlaces.CHANGES_VIEW_TOOLBAR,
-        DefaultActionGroup().apply {
-            val commonActionsManager = CommonActionsManager.getInstance()
-            val treeExpander = changesTree.treeExpander
-            add(commonActionsManager.createExpandAllAction(treeExpander, changesTree))
-            add(commonActionsManager.createCollapseAllAction(treeExpander, changesTree))
-            addSeparator()
-            add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
-        },
-        true
-    )
 }
