@@ -101,6 +101,25 @@ class JujutsuReferenceFilterComponent(
     fun getSelectedReferenceName(): String = selectedReference?.name ?: ""
 
     /**
+     * Select and apply a reference filter by [name] (bookmark, tag, or "@"; type auto-detected
+     * the same way [setInitialReference] does). Used to drive the filter programmatically, e.g.
+     * from a clicked bookmark/tag chip (jj-idea-iesq). A no-op for an empty name.
+     */
+    fun selectReference(name: String) {
+        if (name.isEmpty()) return
+        setInitialReference(name)
+        expansionInFlight = false
+        notifyFilterChanged()
+    }
+
+    /**
+     * Clear the reference filter. Used to toggle a filter off when the same bookmark/tag chip or
+     * "Filter Log to..." action is triggered again while it's already the active filter
+     * (jj-idea-iesq), mirroring familiar toggle-button UX.
+     */
+    fun clearReference() = doResetFilter()
+
+    /**
      * Pre-sets the selected reference from a persisted name so it is applied when [retryFilter] is
      * called from [onDataLoaded]. Determines the reference type from the known bookmark/tag lists;
      * falls back to BOOKMARK for unknown names (e.g., stale state before the lists are populated).

@@ -431,20 +431,34 @@ push a bookmark from another clone without running `jj bookmark track` in this o
 - [ ] Arrow up/down moves the highlight; Enter applies the highlighted reference and closes the dropdown
 - [ ] Clearing the filter restores the full (limited) log
 
-### Log Row Link Hover Styling (jj-idea-iesq)
+### Log Row Click Actions (jj-idea-iesq)
 
-Bookmark/tag chips and author/committer names render with link styling, colored at rest with
-underline reserved for hover — matching the platform's usual "colored always, underlined on
-hover" link convention.
+Log rows render bookmark/tag chips and author/committer names with link styling. Left-click
+performs the element's default action; right-click opens a menu with that default action
+pre-highlighted, so the menu doubles as a hint for what left-click does.
 
 - [ ] Author/committer names are link-colored at rest, with **no underline**; hovering the name adds an underline, and moving off it removes the underline again (jj-idea-iesq: was permanently underlined before)
-- [ ] Hovering blank cell space to the right of a short author/committer name does **not** add an underline
+- [ ] Hovering blank cell space to the right of a short author/committer name does **not** add an underline (matches the existing "no click target" boundary)
 - [ ] Hovering a bookmark or tag chip shows a hand cursor
+- [ ] **Left-clicking** a bookmark/tag chip filters the log to that reference and its ancestors (the References filter chip updates to show the name)
+- [ ] **Left-clicking the same chip again** clears the filter (toggle off) instead of re-applying it
+- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/track actions
+- [ ] Choosing **Filter Log to '...'** from the right-click menu applies the same filter as left-click and closes the menu; choosing it again while already active clears the filter and closes the menu
+- [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
+- [ ] The bookmark/tag right-click menu in the commit **details** pane also shows the checkmark when that reference is the active filter
 - [ ] Hovering an author name (not blank space in the cell) shows a hand cursor
+- [ ] **Left-clicking** an author name opens the OS mail client addressed to that author's email
+- [ ] **Right-clicking** an author name opens a menu with **Send Email to ...** highlighted, a separator, then **Filter Log by ...**
+- [ ] Choosing **Filter Log by ...** narrows the log to that author (the Author filter chip updates) and closes the menu; choosing it again while already active clears the filter and closes the menu
+- [ ] **Filter Log by ...** shows a checkmark when that author is the currently active author filter, and no checkmark otherwise
+- [ ] **Left-clicking** a committer name opens the OS mail client (same as author)
+- [ ] **Right-clicking** a committer name shows only **Send Email to ...** — no filter option
+- [ ] Clicking blank cell space to the right of a short author/committer name does **not** launch the mail client
 - [ ] The commit **details** pane's author `Name <email>` link still opens the mail client (unchanged)
 - [ ] The commit **details** pane's `Name <email>` link is link-colored, with **no underline** at rest; hovering it adds an underline, moving off removes it (jj-idea-iesq: previously never underlined, at any point)
 - [ ] The commit **details** pane's bookmark/tag chips also underline on hover, and their own accent color (bookmark/tag color) is unaffected
 - [ ] **Right-clicking** a bookmark/tag chip in the commit **details** pane opens its ref menu (rename/delete/etc.) — this was silently broken for every chip before jj-idea-iesq (a Swing HTML parsing quirk meant the chip's `href` was never found)
+- [ ] The "+N more" overflow chip's popup (jj-idea-w61m) still shows hidden refs, each still openable via their own submenu
 
 ### Bookmark Widget
 

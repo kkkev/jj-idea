@@ -86,4 +86,38 @@ class JujutsuStateModelPlatformTest {
             Disposer.dispose(disposable)
         }
     }
+
+    @Test
+    fun `filterToReference notifier fires connected listener with the reference name`() {
+        val stateModel = project.get().stateModel
+        val disposable = Disposer.newDisposable()
+        try {
+            var notified: String? = null
+            stateModel.filterToReference.connect(disposable) { notified = it }
+
+            stateModel.filterToReference.notify("main")
+            UIUtil.dispatchAllInvocationEvents()
+
+            notified shouldBe "main"
+        } finally {
+            Disposer.dispose(disposable)
+        }
+    }
+
+    @Test
+    fun `filterByAuthor notifier fires connected listener with the author email`() {
+        val stateModel = project.get().stateModel
+        val disposable = Disposer.newDisposable()
+        try {
+            var notified: String? = null
+            stateModel.filterByAuthor.connect(disposable) { notified = it }
+
+            stateModel.filterByAuthor.notify("alice@example.com")
+            UIUtil.dispatchAllInvocationEvents()
+
+            notified shouldBe "alice@example.com"
+        } finally {
+            Disposer.dispose(disposable)
+        }
+    }
 }

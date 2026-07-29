@@ -1,5 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.ide.BrowserUtil
+import com.intellij.ide.DataManager
 import com.intellij.ide.IdeTooltip
 import com.intellij.ide.IdeTooltipManager
 import com.intellij.openapi.Disposable
@@ -11,9 +13,12 @@ import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.Condition
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScreenUtil
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.table.JBTable
@@ -32,6 +37,7 @@ import java.awt.Dimension
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.*
+import java.net.URI
 import javax.swing.JComponent
 import javax.swing.JViewport
 import javax.swing.KeyStroke
@@ -317,17 +323,19 @@ class JujutsuLogTable(
             }
         )
 
-        // Handle left-click on ref chips (bookmarks, tags) for navigation, or the "+N more"
-        // overflow chip (jj-idea-w61m) to show the hidden refs in a popup.
+        // Handle left-click on ref chips (filter to that reference) and author/committer names
+        // (open the OS mail client), or the "+N more" overflow chip (jj-idea-w61m) to show the
+        // hidden refs in a popup. Each element's default action is mirrored, with the default
+        // highlighted, in the right-click menu built by clickActionGroup (jj-idea-iesq).
         addMouseListener(
             object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
-                    val target = clickTargetAt(e) ?: return
-                    if (target is MoreRefsClick) {
-                        showMoreRefsPopup(e.component, e.x, e.y, target)
-                    } else {
-                        project.stateModel.changeSelection.notify(ChangeKey(target.repo, target.entry.id))
+                    when (val target = clickTargetAt(e) ?: return) {
+                        is MoreRefsClick -> showMoreRefsPopup(e.component, e.x, e.y, target)
+                        is PersonClick -> BrowserUtil.browse(URI("mailto", target.user.email, null))
+                        is BookmarkClick -> project.stateModel.filterToReference.notify(target.bookmark.name.name)
+                        is TagClick -> project.stateModel.filterToReference.notify(target.tag.name)
                     }
                     e.consume()
                 }
@@ -364,10 +372,23 @@ class JujutsuLogTable(
                         null -> showContextMenu(comp, x, y)
                         is MoreRefsClick -> showMoreRefsPopup(comp, x, y, target)
                         else -> {
+                            // Highlighted-default ListPopup (same idiom as JujutsuFilterComponent's
+                            // toolbar popups) instead of a plain JPopupMenu, so the action mirroring
+                            // this element's left-click default is pre-selected (jj-idea-iesq).
                             val group = clickActionGroup(project, target)
-                            ActionManager.getInstance()
-                                .createActionPopupMenu(ActionPlaces.UNKNOWN, group)
-                                .component.show(comp, x, y)
+                            JBPopupFactory.getInstance()
+                                .createActionGroupPopup(
+                                    null,
+                                    group,
+                                    DataManager.getInstance().getDataContext(comp),
+                                    JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                                    true,
+                                    null,
+                                    -1,
+                                    Condition { it is DefaultClickAction },
+                                    null
+                                )
+                                .show(RelativePoint(comp, Point(x, y)))
                         }
                     }
                 }

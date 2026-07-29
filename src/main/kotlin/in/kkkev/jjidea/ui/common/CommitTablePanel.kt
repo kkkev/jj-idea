@@ -19,6 +19,7 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -246,6 +247,28 @@ abstract class CommitTablePanel<D>(
             initialize()
         }
         filters += authorFilterComponent
+
+        // Wire the log row's own click actions (jj-idea-iesq) to these filter components: a
+        // clicked bookmark/tag chip's "Filter log to this reference" and an author name's
+        // "Filter log by this author" both go through project.stateModel rather than a direct
+        // reference, since the actions are built statically in JujutsuLogContextMenuActions
+        // without a handle to this panel. Both toggle: triggering the same reference/author again
+        // while it's already the active filter clears it instead of re-applying it, so repeatedly
+        // clicking the same bookmark chip or menu item acts as an on/off switch.
+        project.stateModel.filterToReference.connect(this@CommitTablePanel) { name ->
+            if (referenceFilterComponent.getSelectedReferenceName() == name) {
+                referenceFilterComponent.clearReference()
+            } else {
+                referenceFilterComponent.selectReference(name)
+            }
+        }
+        project.stateModel.filterByAuthor.connect(this@CommitTablePanel) { email ->
+            if (authorFilterComponent.getSelectedAuthors() == setOf(email)) {
+                authorFilterComponent.setSelectedAuthors(emptySet())
+            } else {
+                authorFilterComponent.setSelectedAuthors(setOf(email))
+            }
+        }
 
         // Date filter
         dateFilterComponent = JujutsuDateFilterComponent(logTable.logModel).apply {

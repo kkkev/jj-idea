@@ -218,6 +218,22 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     val changeSelection = simpleNotifier<ChangeKey>(project, "Jujutsu Change Selection")
 
     /**
+     * Fired when a log-row bookmark/tag chip's default click action (or its "Filter log to this
+     * reference" menu item) requests narrowing the log to a reference and its ancestors. Payload
+     * is the reference name (bookmark or tag). Log panels listen and delegate to their
+     * [in.kkkev.jjidea.ui.log.JujutsuReferenceFilterComponent.selectReference] (jj-idea-iesq).
+     */
+    val filterToReference = simpleNotifier<String>(project, "Jujutsu Filter To Reference")
+
+    /**
+     * Fired when a log-row author name's "Filter log by this author" menu item is chosen. Payload
+     * is the author's email (the key the author filter matches on). Log panels listen and
+     * delegate to their [in.kkkev.jjidea.ui.log.JujutsuAuthorFilterComponent.setSelectedAuthors]
+     * (jj-idea-iesq).
+     */
+    val filterByAuthor = simpleNotifier<String>(project, "Jujutsu Filter By Author")
+
+    /**
      * The reference name (bookmark/tag/`@`) currently selected by the log's References filter, or
      * `""` if none. Single source of truth for "is this reference the active filter" (jj-idea-iesq)
      * - set by [in.kkkev.jjidea.ui.log.JujutsuReferenceFilterComponent] whenever its selection is
