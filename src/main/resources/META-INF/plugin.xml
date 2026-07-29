@@ -102,8 +102,6 @@
   </extensions>
 
   <actions>
-    <action id="Jujutsu.ResolveConflicts"
-            class="in.kkkev.jjidea.actions.file.ResolveConflictsAction"/>
     <action id="Jujutsu.ResolveSelectedConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveSelectedConflictsAction"/>
 

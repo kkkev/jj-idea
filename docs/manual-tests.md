@@ -711,42 +711,63 @@ Open `/tmp/jj-conflict-test` as a project in the plugin IDE (`./gradlew runIde`)
 
 #### "Resolve Conflicts" context menu action (selection-scoped)
 
-- [ ] Right-clicking a **non-conflicted** file in the Working Copy panel: "Resolve Conflicts…" is **not visible**
+There is a single `Jujutsu.ResolveSelectedConflicts` action behind "Resolve Conflicts…";
+it's wired into both the Working Copy panel / commit details pane's file context menu and
+the Project view / editor "Jujutsu" submenu. It always resolves an explicit selection when
+there is one, and otherwise falls back to the single focused file (editor/project view) or
+every conflicted file inherited from the working copy's ancestors (see "Inherited conflicts"
+below) — there is no separate "resolve every conflicted file regardless of context" action at
+the file level (for that, see "Log row context menu" further down, which resolves every
+conflicted file reachable from the working copy).
+
+- [ ] Right-clicking a **non-conflicted** file in the Working Copy panel: "Resolve Conflicts…" is **not visible**, even when other, unrelated files elsewhere in the repo are conflicted
 - [ ] Right-clicking `file.txt` (conflicted): "Resolve Conflicts…" **is visible**
-- [ ] Invoking it opens the merge dialog containing **only** `file.txt`, not unrelated files
-- [ ] Multi-select: selecting one conflicted + one non-conflicted file → dialog contains only the conflicted file
-- [ ] Multi-select: selecting two conflicted files → dialog contains both
+- [ ] Invoking it opens the merge tool for **only** `file.txt`, not unrelated files
+- [ ] Multi-select: selecting one conflicted + one non-conflicted file → only the conflicted file's merge tool opens
+- [ ] Multi-select: selecting two conflicted files → both open in turn (second opens after the first is resolved)
+- [ ] Multi-select: selecting two **non-conflicted** files (with some other file elsewhere in the repo conflicted): "Resolve Conflicts…" is **not visible**
+- [ ] Right-clicking a **directory**, or the project root, in the Project view → Jujutsu submenu: "Resolve Conflicts…" is **not present** (no single file in scope to act on — there is no "resolve every conflicted file in the project" entry point at the file/project-view level; use the log row context menu for that, see below)
+- [ ] Right-clicking `file.txt` itself in the Project view → Jujutsu → Resolve Conflicts…: opens the merge tool for `file.txt`
+- [ ] Opening `file.txt` in the editor, right-clicking → Jujutsu → Resolve Conflicts…: opens the merge tool for **only** `file.txt` (scoped to the focused editor file, not every conflicted file)
+- [ ] **On IntelliJ/RustRover 2026.2 (build 262) specifically**: triggering "Resolve Conflicts…" opens the merge tool at all (jj-idea-qfgl / GitHub #55 — this used to silently do nothing)
 
-#### "Resolve Conflicts" global action (editor / project view / VCS menu)
+#### Three-way merge tool — content correctness
 
-- [ ] Right-clicking any file or directory in the Project view → Jujutsu → Resolve Conflicts…: opens dialog with **all** conflicted files
-- [ ] Opening `file.txt` in the editor, right-clicking → Jujutsu → Resolve Conflicts…: opens all conflicted files (global action, not scoped to editor file)
-
-#### Multi-file merge dialog — file table
-
-- [ ] The file table shows "Yours" and "Theirs" columns alongside the file name (jj-idea-qfgl / GitHub #55: these must always be present — an empty column list crashes the dialog on IntelliJ/RustRover 2026.2, build 262)
-- [ ] **On IntelliJ/RustRover 2026.2 (build 262) specifically**: triggering "Resolve Conflicts…" opens the dialog at all (this used to silently do nothing)
-
-#### Three-way merge dialog — content correctness
-
-- [ ] Left pane shows "ours" content (`changed by A`, the rebased change)
-- [ ] Right pane shows "theirs" content (`changed by B`, the destination)
+- [ ] Left pane ("Yours") shows "ours" content (`changed by A`, the rebased change)
+- [ ] Right pane ("Theirs") shows "theirs" content (`changed by B`, the destination)
 - [ ] Center pane is editable; initially shows a proposed merge result (not identical to left or right)
 - [ ] Left and right panes are **not** identical — conflict regions are highlighted
 - [ ] Works correctly for all three marker styles (git, snapshot, diff)
 
-#### Resolving via the merge dialog
+#### Resolving via the merge tool
 
-- [ ] Edit the center pane to a desired resolution and click Apply / Save
-- [ ] After closing the dialog, `file.txt` content on disk reflects the resolution (no conflict markers)
+- [ ] Edit the center pane to a desired resolution and click Apply Changes
+- [ ] After closing the tool, `file.txt` content on disk reflects the resolution (no conflict markers)
 - [ ] `file.txt` disappears from the Working Copy panel's conflict list **automatically**, without pressing Refresh (jj-idea-3cvb: a stale conflict decoration used to survive even a manual Refresh)
 - [ ] Right-clicking `file.txt` again (now resolved): "Resolve Conflicts…" is **not visible**, and if triggered anyway does not throw
 
-#### Accept Yours / Accept Theirs (bulk)
+#### Cancelling must never discard a side (GitHub #63 — critical regression check)
 
-- [ ] In the multi-file merge dialog, selecting `file.txt` and clicking **Accept Yours**: file on disk contains "ours" content with no conflict markers
+- [ ] Open the merge tool for `file.txt` and close it via the window's `x` button **without** touching anything: `file.txt` **stays conflicted** — content on disk still has its original conflict markers, and it still shows red (MERGED_WITH_CONFLICTS) in the Working Copy panel
+- [ ] Same, but click the **Cancel** button instead of `x`: same result — file stays fully conflicted
+- [ ] Resolve only *some* of the conflict's hunks in the center pane, then close via `x` (don't click Apply): `file.txt` **stays fully conflicted** on disk (no partial write, original markers intact) — not partially resolved, not resolved-by-discarding
+- [ ] Repeat all three checks above for each marker style (git, snapshot, diff)
+- [ ] Multi-file: with two conflicted files, cancel the merge tool for the first → the second file's merge tool **never opens** and remains conflicted untouched
+
+#### ⚠️ Known gap: the native Commit tool window's "Resolve" link is still unsafe (jj-idea-ddcd)
+
+The standard Commit tool window's own "Merge Conflicts" node has a built-in "Resolve" link
+that is *not* covered by the fix above and still discards a side on cancel — see jj-idea-ddcd
+for why (platform UI jj-idea can't safely intercept yet). Don't use it for jj conflicts; use
+one of jj-idea's own "Resolve Conflicts…" entries instead.
+
+- [ ] Confirm the "Merge Conflicts" node with the native "Resolve" link is visible in the standard Commit tool window (View → Tool Windows → Commit) whenever `file.txt` is conflicted, and is not accidentally relied upon by users
+
+#### Accept Yours / Accept Theirs (in the merge tool)
+
+- [ ] In the three-way merge tool, click **Accept Left** (yours): `file.txt` on disk contains "ours" content with no conflict markers
 - [ ] `file.txt` leaves conflicted state automatically, without pressing Refresh
-- [ ] **Accept Theirs** analogously writes "theirs" content
+- [ ] **Accept Right** (theirs) analogously writes "theirs" content
 
 #### Log details pane (commit selected in log table)
 
@@ -754,7 +775,7 @@ Use the same conflict setup above. The test repo has a conflicted commit that is
 
 - [ ] Selecting the **conflicted historical commit** in the log: conflicted file appears in the details panel with red (MERGED_WITH_CONFLICTS) status
 - [ ] Selecting the **conflicted historical commit**: "Resolve Conflicts… (edit this change first)" is **visible but disabled** in the details panel context menu (jj-idea-sm1s: resolution requires this commit to become the working copy first)
-- [ ] Selecting the **working copy commit** (empty, inherits conflict): "Resolve Conflicts…" **is visible and enabled** in the details panel context menu and opens the merge dialog for the inherited conflicted files
+- [ ] Selecting the **working copy commit** (empty, inherits conflict): "Resolve Conflicts…" **is visible and enabled** in the details panel context menu and opens the merge tool for the inherited conflicted files
 
 #### Log row context menu
 
@@ -762,7 +783,7 @@ Use the same conflict setup above. The test repo has a conflicted commit that is
 - [ ] Right-clicking the **working copy entry** when no conflicts exist: "Resolve Conflicts…" is **not visible** (hidden, not just disabled)
 - [ ] Right-clicking a **non-conflicted, non-working-copy entry**: "Resolve Conflicts…" is **not visible**
 - [ ] Right-clicking a **conflicted, non-working-copy entry** (jj-idea-sm1s — e.g. a merge commit, or a child that only *inherits* the conflict): "Resolve Conflicts… (edit this change first)" is **visible but disabled**, with a tooltip/description prompting the user to `jj edit` the change first
-- [ ] Invoking "Resolve Conflicts…" from the log row context menu opens the merge dialog with all conflicted files
+- [ ] Invoking "Resolve Conflicts…" from the log row context menu opens the merge tool for all conflicted files, one after another
 
 #### Inherited conflicts (jj-idea-sm1s)
 
@@ -776,9 +797,9 @@ Extend the setup above: with the working copy on the conflicted commit, run `jj 
 
 In a project with two jj roots each having conflicts:
 
-- [ ] Right-clicking a conflicted file in root A's Working Copy panel → dialog shows only root A's conflicts
-- [ ] Right-clicking a conflicted file in root B's → dialog shows only root B's conflicts
-- [ ] Global action (VCS menu) → dialog shows conflicts from both roots
+- [ ] Right-clicking a conflicted file in root A's Working Copy panel → merge tool opens only for root A's conflicts
+- [ ] Right-clicking a conflicted file in root B's → merge tool opens only for root B's conflicts
+- [ ] Global action (VCS menu) → merge tool opens for conflicts from both roots, one after another
 
 ### .gitignore File Status (jj-idea-ww5)
 

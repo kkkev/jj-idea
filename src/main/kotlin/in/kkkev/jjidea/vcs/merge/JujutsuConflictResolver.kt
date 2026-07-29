@@ -1,0 +1,104 @@
+package `in`.kkkev.jjidea.vcs.merge
+
+import com.intellij.diff.DiffManager
+import com.intellij.diff.DiffRequestFactory
+import com.intellij.diff.merge.MergeResult
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.VcsException
+import com.intellij.openapi.vcs.merge.MergeData
+import com.intellij.openapi.vcs.merge.MergeProvider
+import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.diffedit.HunkDiffPicker
+import java.nio.file.Files
+
+/**
+ * Resolves conflicted files one at a time via IntelliJ's three-way merge tool, without ever
+ * handing the platform the real file's [com.intellij.openapi.editor.Document] as merge output.
+ *
+ * ### Why this exists (GitHub #63)
+ * [com.intellij.openapi.vcs.AbstractVcsHelper.showMergeDialog] drives the platform's
+ * `MultipleFileMergeDialog`, which uses the real file's Document as the editable "merged
+ * result" pane and resets it to the base/original side at init
+ * (`MergeConflictModel.setInitialOutputContent`). On IntelliJ 2026.2's default iterative merge
+ * flow, closing the tool without resolving (`MergeResult.CANCEL`) no longer restores that
+ * original content (`MergeUtil.shouldRestoreOriginalContentOnCancel` returns false whenever the
+ * request carries iterative data), and the dialog saves the document unconditionally — silently
+ * discarding a side of the conflict.
+ *
+ * That's harmless for git, where the index (not the working file) is the source of truth for a
+ * conflict. It's destructive for jj: there is no index, so the working file's conflict markers
+ * *are* the conflict record, re-parsed from scratch on every snapshot. Losing the markers loses
+ * the conflict.
+ *
+ * ### The fix
+ * Give the merge tool a throwaway output [com.intellij.openapi.editor.Document] — the same
+ * pattern [HunkDiffPicker] already uses safely for `jj split` — and only write the real file
+ * when the tool reports a non-cancel result. Files resolve one at a time; cancelling stops the
+ * remaining queue, matching `showMergeDialog`'s one-shot-per-invocation semantics.
+ *
+ * @param resolveOne Runs the merge tool for one file and returns the resolved bytes, or null if
+ *   cancelled. Overridable for testing; the default opens the real three-way merge tool.
+ * @param writeResolved Writes resolved bytes back to the file. Overridable for testing.
+ */
+class JujutsuConflictResolver(
+    private val project: Project,
+    private val mergeProvider: MergeProvider,
+    private val resolveOne: (VirtualFile, MergeData) -> ByteArray? = { file, data ->
+        defaultResolveOne(project, file, data)
+    },
+    private val writeResolved: (VirtualFile, ByteArray) -> Unit = { file, bytes ->
+        Files.write(file.toNioPath(), bytes)
+    }
+) {
+    /**
+     * Resolves each conflicted file in turn. Stops (leaving any remaining files untouched) as
+     * soon as the user cancels the merge tool for one of them.
+     */
+    fun resolve(files: List<VirtualFile>) {
+        for (file in files) {
+            val mergeData = try {
+                mergeProvider.loadRevisions(file)
+            } catch (_: VcsException) {
+                continue // Already resolved (or no conflict markers found) - nothing to do.
+            }
+
+            val resolved = resolveOne(file, mergeData) ?: return // Cancelled: stop the queue.
+
+            writeResolved(file, resolved)
+            // Marks the file dirty and invalidates the repo so jj re-snapshots and clears the
+            // conflict decoration (see JujutsuMergeProvider.refreshResolved).
+            mergeProvider.conflictResolvedForFile(file)
+        }
+    }
+
+    private companion object {
+        fun defaultResolveOne(project: Project, file: VirtualFile, mergeData: MergeData): ByteArray? {
+            // Scratch document, never the real file's - see class doc for why that matters.
+            val outputDocument = EditorFactory.getInstance().createDocument("")
+            var resolved: ByteArray? = null
+
+            val request = DiffRequestFactory.getInstance().createMergeRequest(
+                project,
+                HunkDiffPicker.fileTypeFor(file.name),
+                outputDocument,
+                listOf(mergeData.CURRENT, mergeData.ORIGINAL, mergeData.LAST)
+                    .map { String(it, Charsets.UTF_8) },
+                JujutsuBundle.message("dialog.resolve.conflict.title", file.name),
+                listOf(
+                    JujutsuBundle.message("merge.column.yours"),
+                    JujutsuBundle.message("merge.column.result"),
+                    JujutsuBundle.message("merge.column.theirs")
+                )
+            ) { result ->
+                if (result != MergeResult.CANCEL) {
+                    resolved = outputDocument.text.toByteArray(Charsets.UTF_8)
+                }
+            }
+
+            DiffManager.getInstance().showMerge(project, request)
+            return resolved
+        }
+    }
+}

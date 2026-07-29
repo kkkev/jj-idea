@@ -4,13 +4,13 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.AbstractVcsHelper
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
+import `in`.kkkev.jjidea.vcs.merge.JujutsuConflictResolver
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
 // Read live rather than capturing once at construction time: a stale snapshot could hand
@@ -52,7 +52,7 @@ fun resolveConflictsAction(project: Project, entry: LogEntry?): DumbAwareAction 
             val mergeProvider = project.possibleJujutsuVcs?.mergeProvider ?: return
             val files = conflictedFiles(project, entry)
             if (files.isEmpty()) return
-            AbstractVcsHelper.getInstance(project).showMergeDialog(files, mergeProvider)
+            JujutsuConflictResolver(project, mergeProvider).resolve(files)
         }
 
         override fun getActionUpdateThread() = ActionUpdateThread.EDT

@@ -3,7 +3,6 @@ package `in`.kkkev.jjidea.actions.file
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.vcs.AbstractVcsHelper
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
@@ -12,8 +11,26 @@ import `in`.kkkev.jjidea.actions.change.resolveSelectedAvailability
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
+import `in`.kkkev.jjidea.vcs.merge.JujutsuConflictResolver
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
+
+/**
+ * Scopes conflict resolution to an explicit changes-tree selection, when there is one.
+ *
+ * Returns `null` when [changes] is empty, meaning the caller had no file-level selection at
+ * all (e.g. invoked from a commit whose own diff is empty, or from a context with no changes
+ * tree) - the caller should then fall back to a broader lookup (inherited conflicts, or the
+ * single focused file).
+ *
+ * Returns a (possibly empty) list when [changes] is non-empty: an explicit selection is always
+ * honored exactly, even if none of the selected files are conflicted. Falling through to a
+ * broader lookup in that case would wrongly surface "Resolve Conflicts…" for a selected
+ * non-conflicted file just because some unrelated file elsewhere in the repo is conflicted.
+ */
+internal fun scopeToConflicted(changes: List<FileChange>): List<FileChange>? =
+    changes.takeIf { it.isNotEmpty() }?.filter { it.isConflicted }
 
 class ResolveSelectedConflictsAction : DumbAwareAction(
     JujutsuBundle.message("action.resolve.selected.conflicts"),
@@ -25,7 +42,7 @@ class ResolveSelectedConflictsAction : DumbAwareAction(
         val mergeProvider = project.possibleJujutsuVcs?.mergeProvider ?: return
         val files = conflictedFilesFromContext(e)
         if (files.isEmpty()) return
-        AbstractVcsHelper.getInstance(project).showMergeDialog(files, mergeProvider)
+        JujutsuConflictResolver(project, mergeProvider).resolve(files)
     }
 
     override fun update(e: AnActionEvent) {
@@ -46,9 +63,7 @@ class ResolveSelectedConflictsAction : DumbAwareAction(
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun conflictedFilesFromContext(e: AnActionEvent): List<VirtualFile> {
-        // Look at changes, if invoked from a changes tree
-        val fromChanges = e.changes.filter { it.isConflicted }.mapNotNull { it.filePath.virtualFile }
-        if (fromChanges.isNotEmpty()) return fromChanges
+        scopeToConflicted(e.changes)?.let { conflicted -> return conflicted.mapNotNull { it.filePath.virtualFile } }
 
         val project = e.project ?: return emptyList()
         val changeListManager = ChangeListManager.getInstance(project)

@@ -11,9 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Compare with Working Copy" and "Show Diff in New Tab" (for multiple files) now open a Changes pane listing every differing file, with the current one highlighted, instead of a bare diff with only a file-selector dropdown. Selecting a file in the list updates the diff in place. ([#52](https://github.com/kkkev/jj-idea/issues/52))
 - Bookmark/tag chips and author/committer names in the log now do something when clicked, instead of just looking like links. Click a bookmark or tag to filter the log to it; click an author or committer name to email them. Right-click either for more options, including filtering by author. Clicking the same bookmark/tag or author filter again toggles it off, and the right-click menu shows a checkmark on whichever filter is currently active. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - Author/committer names in the log, and the author/committer `Name <email>` link and bookmark/tag chips in the commit details pane, are no longer permanently underlined — they're link-colored at rest and underline only while hovered, consistent everywhere.
+- "Resolve Conflicts…" now opens conflicted files one at a time in the three-way merge tool instead of a single dialog listing all of them together, as part of the fix below.
 
 ### Fixed
 - Right-clicking a bookmark or tag chip in the commit details pane now opens its context menu (rename/delete/etc.) — it silently did nothing before, for every chip.
+- Closing the conflict resolution window without resolving (or after resolving only some conflicts) no longer discards a side of the conflict, for every "Resolve Conflicts…" entry point jj-idea provides (Working Copy panel, commit details pane, log context menu, editor/Project view). Each conflicted file is now resolved through its own merge window; cancelling leaves the file's conflict untouched. ([#63](https://github.com/kkkev/jj-idea/issues/63)) **Known gap:** the native IntelliJ Commit tool window's own "Resolve" link (on the "Merge Conflicts" node) is separate platform UI that jj-idea cannot intercept, and is still affected — see docs/manual-tests.md for details; avoid it for jj conflicts for now.
+- "Resolve Conflicts…" no longer appears on a non-conflicted file just because some other, unrelated file in the repository has a conflict.
 
 ## [0.8.1] - 2026-07-28
 
