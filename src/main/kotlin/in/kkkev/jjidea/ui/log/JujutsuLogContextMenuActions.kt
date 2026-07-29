@@ -154,6 +154,8 @@ object JujutsuLogContextMenuActions {
                 // MoreRefsClick (the "+N more" overflow chip, jj-idea-w61m) is handled separately by
                 // JujutsuLogTable, which shows a popup over the hidden refs instead of this menu.
                 is MoreRefsClick -> Unit
+                // Author/committer name right-click menu not wired up yet (jj-idea-iesq follow-up).
+                is PersonClick -> Unit
             }
         }
 }

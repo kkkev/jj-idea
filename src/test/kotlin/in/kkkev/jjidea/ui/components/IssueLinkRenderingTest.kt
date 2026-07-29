@@ -27,7 +27,10 @@ class IssueLinkRenderingTest {
     fun `matching issue reference renders as a link in HTML output`() {
         val html = htmlString { append(Description("Fixes JIRA-123 now"), jiraConfig) }
 
-        html shouldContain "<a href='https://tracker/JIRA-123'>JIRA-123</a>"
+        // Wrapped in a link-color span (jj-idea-iesq): linked() now emits an explicit color, since
+        // the HTML backend has no other way to apply link styling to arbitrary linked content.
+        html shouldContain "<a href='https://tracker/JIRA-123'>"
+        html shouldContain "JIRA-123</span></a>"
         html shouldContain "Fixes"
         html shouldContain "now"
     }
@@ -36,7 +39,8 @@ class IssueLinkRenderingTest {
     fun `summary variant also linkifies the first line only`() {
         val html = htmlString { appendSummary(Description("Fixes JIRA-123\nsecond line"), jiraConfig) }
 
-        html shouldContain "<a href='https://tracker/JIRA-123'>JIRA-123</a>"
+        html shouldContain "<a href='https://tracker/JIRA-123'>"
+        html shouldContain "JIRA-123</span></a>"
         html shouldNotContain "second line"
     }
 

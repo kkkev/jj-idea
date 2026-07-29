@@ -55,6 +55,14 @@ interface TextCanvas {
     fun smaller(builder: TextCanvas.() -> Unit) = styled(SimpleTextAttributes.STYLE_SMALLER, builder)
     fun strikethrough(builder: TextCanvas.() -> Unit) = styled(SimpleTextAttributes.STYLE_STRIKEOUT, builder)
 
+    /**
+     * Underline content, e.g. to show a [linked] fragment as hovered (jj-idea-iesq): links are
+     * colored via [linked] but otherwise plain, underlining only while the pointer is actually
+     * over them (see [in.kkkev.jjidea.ui.log.UserCellRenderer]) — the HTML details pane gets the
+     * same hover-underline behavior for free from the platform's native `<a>` rendering instead.
+     */
+    fun underlined(builder: TextCanvas.() -> Unit) = styled(SimpleTextAttributes.STYLE_UNDERLINE, builder)
+
     fun colored(color: Color, builder: TextCanvas.() -> Unit)
     fun grey(builder: TextCanvas.() -> Unit) = colored(JBColor.GRAY, builder)
 
@@ -125,9 +133,12 @@ abstract class StyledTextCanvas : TextCanvas {
     open fun foreground(color: Color, builder: TextCanvas.() -> Unit) =
         surround(builder) { derive(this.style, color, null, null) }
 
-    // TODO Actually build the link
+    // Plain (no underline) by default - underline is reserved for hover, applied by wrapping in
+    // underlined{} at the actual point of hover (see UserCellRenderer, jj-idea-iesq), matching the
+    // idiomatic SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES/LINK_ATTRIBUTES split IntelliJ itself
+    // uses elsewhere (e.g. VcsLogGraphTable's empty-state links).
     override fun linked(target: URI, builder: TextCanvas.() -> Unit) =
-        surround(builder) { SimpleTextAttributes.merge(this, SimpleTextAttributes.LINK_ATTRIBUTES) }
+        surround(builder) { SimpleTextAttributes.merge(this, SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) }
 
     /** Apply the current [iconColor] to an icon that lacks an explicit [IconSpec.fillColor]. */
     protected fun applyCurrentColor(icon: IconSpec) =

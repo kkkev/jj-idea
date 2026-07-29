@@ -23,6 +23,8 @@ import java.awt.Graphics
 import java.awt.Rectangle
 import java.awt.Shape
 import java.awt.Toolkit
+import java.awt.event.MouseEvent
+import java.awt.event.MouseMotionAdapter
 import java.net.URLDecoder
 import java.util.regex.Pattern
 import javax.swing.Icon
@@ -57,8 +59,33 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
         extensions(ChipIconExtension)
     }
 ) {
+    /**
+     * The chip `<img>` [Element] currently under the pointer, if it's inside a link (jj-idea-iesq)
+     * - read by [ChipView.paint] to underline only that one chip while hovered, matching the
+     * "colored always, underlined on hover" convention already applied to real (non-chip) links
+     * here via native `<a>` hover rendering, and to the log table via `JujutsuLogTable
+     * .hoveredLinkRow`/`hoveredLinkCol`.
+     */
+    internal var hoveredChipElement: Element? = null
+        private set
+
     init {
         isOpaque = false
+        addMouseMotionListener(
+            object : MouseMotionAdapter() {
+                override fun mouseMoved(e: MouseEvent) {
+                    val newHovered = linkedChipElementAt(e.point)
+                    if (newHovered !== hoveredChipElement) {
+                        hoveredChipElement = newHovered
+                        // Chips are small and this pane's content is short (commit metadata), so a
+                        // full repaint on hover change is cheap - no need to compute exact chip
+                        // bounds (ChipView.modelToView reports a zero-width point, not its real
+                        // painted extent, so precise invalidation isn't straightforward here).
+                        repaint()
+                    }
+                }
+            }
+        )
         addHyperlinkListener { e ->
             if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
                 val url = e.description
@@ -90,10 +117,10 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     /** Parse a `jjref://` href from the HTML element under [point], or null if not a ref link. */
     fun refUriAt(point: java.awt.Point): java.net.URI? {
         val offset = viewToModel2D(point).toInt()
-        val doc = document as? javax.swing.text.html.HTMLDocument ?: return null
-        var elem: javax.swing.text.Element? = doc.getCharacterElement(offset)
+        val doc = document as? HTMLDocument ?: return null
+        var elem: Element? = doc.getCharacterElement(offset)
         while (elem != null) {
-            val href = elem.attributes.getAttribute(javax.swing.text.html.HTML.Attribute.HREF) as? String
+            val href = hrefOf(elem)
             if (href != null && REF_URL_PARSER.matcher(href).matches()) {
                 return runCatching { java.net.URI(href) }.getOrNull()
             }
@@ -101,6 +128,42 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
         }
         return null
     }
+
+    /** The chip `<img>` element at [point], if any, and only if it's inside a link (jj-idea-iesq). */
+    private fun linkedChipElementAt(point: java.awt.Point): Element? {
+        val offset = viewToModel2D(point).toInt()
+        val doc = document as? HTMLDocument ?: return null
+        val elem = doc.getCharacterElement(offset)
+        if (elem.name != "img") return null
+        val src = elem.attributes.getAttribute(HTML.Attribute.SRC) as? String ?: return null
+        if (!src.startsWith(CHIP_ICON_PREFIX)) return null
+        return if (hasHrefAncestor(elem)) elem else null
+    }
+}
+
+/**
+ * The `href` on [element] itself, if any (jj-idea-iesq).
+ *
+ * Character-level tags like `<a>` are flattened by Swing's HTML parser onto the wrapped leaf's own
+ * `AttributeSet` as a *nested* `AttributeSet` keyed by [HTML.Tag.A] - unlike block-level tags,
+ * they're never represented as separate ancestor `Element`s to find `HTML.Attribute.HREF` on
+ * directly. This checks both the (rare) direct case and the actual nested-under-`<a>` case.
+ */
+private fun hrefOf(element: Element): String? {
+    val attrs = element.attributes
+    (attrs.getAttribute(HTML.Attribute.HREF) as? String)?.let { return it }
+    val anchorAttrs = attrs.getAttribute(HTML.Tag.A) as? AttributeSet
+    return anchorAttrs?.getAttribute(HTML.Attribute.HREF) as? String
+}
+
+/** True if [element] or any of its ancestors carries an `href` attribute (jj-idea-iesq). */
+private fun hasHrefAncestor(element: Element): Boolean {
+    var elem: Element? = element
+    while (elem != null) {
+        if (hrefOf(elem) != null) return true
+        elem = elem.parentElement
+    }
+    return false
 }
 
 object IconResolver {
@@ -243,6 +306,13 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         container?.getFontMetrics(font) ?: Toolkit.getDefaultToolkit().getFontMetrics(font)
     }
 
+    // Underline the label only while hovered (jj-idea-iesq), matching the "colored always,
+    // underlined on hover" convention used for real (non-chip) links and the log table. isLinked
+    // is fixed for this element's lifetime (its href-ness doesn't change), so only re-derived
+    // lazily once; hovered is re-read on every paint since IconAwareHtmlPane repaints on change.
+    private val isLinked: Boolean by lazy { hasHrefAncestor(element) }
+    private val isHovered: Boolean get() = isLinked && (container as? IconAwareHtmlPane)?.hoveredChipElement === element
+
     private val iconsWidth get() = (spec.prefixIcon?.iconWidth ?: 0) + (spec.icon?.iconWidth ?: 0)
     private val leadingGap: Int
         get() = (CHIP_LEADING_GAP * JBUIScale.scale(1f)).roundToInt()
@@ -281,6 +351,12 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         if (spec.strikethrough) {
             val lineY = baseline - fm.ascent / 3
             g.drawLine(x, lineY, x + fm.stringWidth(spec.label), lineY)
+        }
+        if (isHovered) {
+            // Underline only the label (not any suffix) while hovered, matching a plain <a>'s
+            // native hover-underline extent (jj-idea-iesq).
+            val underlineY = baseline + (fm.descent / 2).coerceAtLeast(1)
+            g.drawLine(x, underlineY, x + fm.stringWidth(spec.label), underlineY)
         }
         x += fm.stringWidth(spec.label)
 

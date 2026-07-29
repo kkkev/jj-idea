@@ -36,7 +36,7 @@ class IconAwareHtmlPaneWrapTest {
                     VcsUserImpl("GitHub", "49699333+dependabot[bot]@users.noreply.github.com")
                 )
                 append(" ")
-                appendUnbreakable("\u00b7\u00a012/07/2026, 04:07")
+                appendUnbreakable("· 12/07/2026, 04:07")
             }
         }
 
@@ -70,7 +70,7 @@ class IconAwareHtmlPaneWrapTest {
                 append("committed by ")
                 appendWithEmail(VcsUserImpl("GitHub", "noreply@github.com"))
                 append(" ")
-                appendUnbreakable("\u00b7\u00a012/07/2026, 04:07")
+                appendUnbreakable("· 12/07/2026, 04:07")
             }
         }
 

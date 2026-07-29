@@ -431,6 +431,21 @@ push a bookmark from another clone without running `jj bookmark track` in this o
 - [ ] Arrow up/down moves the highlight; Enter applies the highlighted reference and closes the dropdown
 - [ ] Clearing the filter restores the full (limited) log
 
+### Log Row Link Hover Styling (jj-idea-iesq)
+
+Bookmark/tag chips and author/committer names render with link styling, colored at rest with
+underline reserved for hover — matching the platform's usual "colored always, underlined on
+hover" link convention.
+
+- [ ] Author/committer names are link-colored at rest, with **no underline**; hovering the name adds an underline, and moving off it removes the underline again (jj-idea-iesq: was permanently underlined before)
+- [ ] Hovering blank cell space to the right of a short author/committer name does **not** add an underline
+- [ ] Hovering a bookmark or tag chip shows a hand cursor
+- [ ] Hovering an author name (not blank space in the cell) shows a hand cursor
+- [ ] The commit **details** pane's author `Name <email>` link still opens the mail client (unchanged)
+- [ ] The commit **details** pane's `Name <email>` link is link-colored, with **no underline** at rest; hovering it adds an underline, moving off removes it (jj-idea-iesq: previously never underlined, at any point)
+- [ ] The commit **details** pane's bookmark/tag chips also underline on hover, and their own accent color (bookmark/tag color) is unaffected
+- [ ] **Right-clicking** a bookmark/tag chip in the commit **details** pane opens its ref menu (rename/delete/etc.) — this was silently broken for every chip before jj-idea-iesq (a Swing HTML parsing quirk meant the chip's `href` was never found)
+
 ### Bookmark Widget
 
 #### Single-repo project

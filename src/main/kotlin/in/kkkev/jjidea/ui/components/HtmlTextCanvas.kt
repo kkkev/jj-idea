@@ -119,8 +119,17 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
     }
 
     override fun linked(target: URI, builder: TextCanvas.() -> Unit) {
+        // Link color, mirroring the Swing backend's StyledTextCanvas.linked() (which merges
+        // SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES) - the HTML backend never consumes `style`
+        // for actual rendering (see colored()/foreground()), so it needs its own explicit color
+        // span here. A nested colored()/foreground() call (e.g. a bookmark chip's own accent
+        // color) still wins, since its span nests inside this one (jj-idea-iesq).
+        val linkColor = SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES.fgColor
+        val needsSpan = linkColor != style.fgColor
         sb.append("<a href='$target'>")
+        if (needsSpan) sb.append("<span style='color: ${linkColor.rgbString}'>")
         super.linked(target, builder)
+        if (needsSpan) sb.append("</span>")
         sb.append("</a>")
     }
 

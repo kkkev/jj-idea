@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -44,6 +45,18 @@ data class TagClick(
     override val repo: JujutsuRepository,
     override val entry: LogEntry,
     val tag: Tag
+) : LogClickTarget
+
+/**
+ * The author or committer name column was clicked (jj-idea-iesq). [canFilter] is true only for
+ * the author column — the author filter matches on `LogEntry.author.email`, so filtering by a
+ * committer's email would silently never match.
+ */
+data class PersonClick(
+    override val repo: JujutsuRepository,
+    override val entry: LogEntry,
+    val user: VcsUser,
+    val canFilter: Boolean
 ) : LogClickTarget
 
 /**

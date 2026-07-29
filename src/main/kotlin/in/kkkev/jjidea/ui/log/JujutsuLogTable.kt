@@ -63,6 +63,17 @@ class JujutsuLogTable(
     var hoveredRow: Int = -1
         private set
 
+    // (View) row/column of the currently-hovered clickable link (jj-idea-iesq) - i.e. the exact
+    // cell clickTargetAt(e) last resolved non-null for, or -1/-1 when the pointer isn't over one.
+    // Read by UserCellRenderer (via TextTableCellRenderer) to underline only that cell's link,
+    // matching the "colored always, underlined only on hover" convention (SimpleTextAttributes
+    // .LINK_PLAIN_ATTRIBUTES vs .LINK_ATTRIBUTES) used elsewhere in the platform, e.g.
+    // VcsLogGraphTable's empty-state links.
+    var hoveredLinkRow: Int = -1
+        private set
+    var hoveredLinkCol: Int = -1
+        private set
+
     // Tooltip cell tracking — hideCurrentNow() on cell change forces IdeTooltipManager
     // to call beforeShow() again with fresh content for the new cell
     private var tooltipRow = -1
@@ -228,11 +239,24 @@ class JujutsuLogTable(
                         tooltipCol = newCol
                         IdeTooltipManager.getInstance().hideCurrentNow(false)
                     }
-                    // Show hand cursor when hovering over a ref chip (bookmark or tag)
-                    cursor = if (clickTargetAt(e) != null) {
+                    // Show hand cursor over a clickable element (ref chip or author/committer
+                    // name), and underline it (only it - jj-idea-iesq) while the pointer is over
+                    // it. Computed once and reused for both, rather than calling clickTargetAt
+                    // twice per move.
+                    val target = clickTargetAt(e)
+                    cursor = if (target != null) {
                         Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     } else {
                         Cursor.getDefaultCursor()
+                    }
+                    val newHoveredLinkRow = if (target != null) newRow else -1
+                    val newHoveredLinkCol = if (target != null) newCol else -1
+                    if (newHoveredLinkRow != hoveredLinkRow || newHoveredLinkCol != hoveredLinkCol) {
+                        val oldLinkRow = hoveredLinkRow
+                        hoveredLinkRow = newHoveredLinkRow
+                        hoveredLinkCol = newHoveredLinkCol
+                        if (oldLinkRow >= 0) repaintRow(oldLinkRow)
+                        if (newHoveredLinkRow >= 0) repaintRow(newHoveredLinkRow)
                     }
                 }
             }
@@ -405,9 +429,10 @@ class JujutsuLogTable(
     }
 
     /**
-     * Return the [LogClickTarget] under [e] (a bookmark or tag chip, or a "+N more" overflow chip —
-     * jj-idea-w61m), or null if the event is not over a clickable ref chip.
-     * Handles both the Decorations column (SCC-based) and the graph+description column (fragment canvas).
+     * Return the [LogClickTarget] under [e] (a bookmark/tag chip, a "+N more" overflow chip —
+     * jj-idea-w61m, or an author/committer name — jj-idea-iesq), or null if the event is not over
+     * a clickable element. Handles the Decorations column (SCC-based), the graph+description
+     * column (fragment canvas), and the Author/Committer columns (name-width hit-test).
      */
     private fun clickTargetAt(e: MouseEvent): LogClickTarget? {
         val row = rowAtPoint(e.point).takeIf { it >= 0 } ?: return null
@@ -417,6 +442,10 @@ class JujutsuLogTable(
         val cellRect = getCellRect(row, col, false)
         val localX = e.x - cellRect.x
         val modelCol = convertColumnIndexToModel(col)
+        if (modelCol == JujutsuLogTableModel.COLUMN_AUTHOR || modelCol == JujutsuLogTableModel.COLUMN_COMMITTER) {
+            val frc = getFontMetrics(font).fontRenderContext
+            return findPersonClickTarget(entry, modelCol, localX, font, frc)
+        }
         val uri = when (modelCol) {
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 val frc = getFontMetrics(font).fontRenderContext
@@ -440,7 +469,7 @@ class JujutsuLogTable(
                 val label = when (hiddenTarget) {
                     is BookmarkClick -> hiddenTarget.bookmark.name.name
                     is TagClick -> hiddenTarget.tag.name
-                    is MoreRefsClick -> return@forEach
+                    is MoreRefsClick, is PersonClick -> return@forEach
                 }
                 add(DefaultActionGroup(label, true).apply { addAll(clickActionGroup(project, hiddenTarget)) })
             }

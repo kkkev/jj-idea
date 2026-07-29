@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Author/committer names in the log, and the author/committer `Name <email>` link and bookmark/tag chips in the commit details pane, are no longer permanently underlined — they're link-colored at rest and underline only while hovered, consistent everywhere.
+
+### Fixed
+- Right-clicking a bookmark or tag chip in the commit details pane now opens its context menu (rename/delete/etc.) — it silently did nothing before, for every chip.
+
 ## [0.8.1] - 2026-07-28
 
 ### Fixed

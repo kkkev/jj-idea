@@ -21,7 +21,11 @@ import java.net.URI
  */
 class UserCellRenderer : TextTableCellRenderer<VcsUser>() {
     override fun render(value: VcsUser) {
-        canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) { append(value) }
+        canvas.styled(if (isWorkingCopyRow) Font.BOLD else 0) {
+            // Link color always (via append(VcsUser)'s linked()); underline only while this
+            // exact cell's link is hovered (jj-idea-iesq) - see isHoveredLinkCell's doc.
+            if (isHoveredLinkCell) underlined { append(value) } else append(value)
+        }
         toolTipText = value.email
     }
 }
@@ -194,6 +198,39 @@ internal fun findInlinedRefUri(
         xAccum += w
     }
     return null
+}
+
+/**
+ * Left inset before the author/committer name text within its cell (matches
+ * [com.intellij.ui.SimpleColoredComponent]'s default `ipad` of `JBInsets.create(1,2)`, i.e. 2px
+ * before the first fragment — see the same allowance in [in.kkkev.jjidea.ui.components.TextListCellRenderer]).
+ */
+private val PERSON_CELL_LEFT_INSET = JBUI.scale(2).toDouble()
+
+/**
+ * If [localX] falls within the rendered author/committer name for [entry] in [column] (a
+ * [JujutsuLogTableModel.COLUMN_AUTHOR] or [JujutsuLogTableModel.COLUMN_COMMITTER]), return the
+ * matching [PersonClick]; otherwise null. Deliberately narrower than the whole cell — clicking
+ * blank cell space must not launch the mail client (jj-idea-iesq). Bold matches the working-copy
+ * row styling applied by [UserCellRenderer].
+ */
+internal fun findPersonClickTarget(
+    entry: LogEntry,
+    column: Int,
+    localX: Int,
+    font: Font,
+    frc: FontRenderContext
+): PersonClick? {
+    val (user, canFilter) = when (column) {
+        JujutsuLogTableModel.COLUMN_AUTHOR -> (entry.author ?: return null) to true
+        JujutsuLogTableModel.COLUMN_COMMITTER -> ((entry.committer ?: entry.author) ?: return null) to false
+        else -> return null
+    }
+    if (user.email.isBlank()) return null
+    val rowFont = if (entry.isWorkingCopy) font.deriveFont(Font.BOLD) else font
+    val nameWidth = rowFont.getStringBounds(user.name, frc).width
+    if (localX < PERSON_CELL_LEFT_INSET || localX > PERSON_CELL_LEFT_INSET + nameWidth) return null
+    return PersonClick(entry.repo, entry, user, canFilter)
 }
 
 /**
