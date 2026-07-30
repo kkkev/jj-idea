@@ -538,6 +538,19 @@ Verify these keyboard shortcuts work in the log view:
 | Delete | Abandon selected change (with confirmation) |
 | F2 | Rename/describe selected change |
 
+### Status Bar Widget (Switch Working Copy)
+
+- [ ] jj-idea-fmrj: click the Jujutsu widget in the IDE status bar to open the "Switch Working
+  Copy" popup, in a repo with at least one local bookmark and one tag
+- [ ] Hover a bookmark or tag row — tooltip shows the bookmark/tag chip (icon + name, correct
+  accent color) followed by `(changeid)`, with **no broken-image glyph**
+- [ ] Hover a change row — tooltip shows change id, commit id, author (as a mailto link),
+  timestamp and description, each on its own line
+- [ ] Move the pointer between rows without leaving the list — tooltip content updates to the
+  newly hovered row
+- [ ] Regression: hover a commit row in the Jujutsu log — its tooltip still renders bookmark/tag
+  chips correctly and still reflows/scrolls for a commit with many bookmarks (jj-idea-szn8)
+
 ### Working Copy Panel
 
 - [ ] Description text area shows current description

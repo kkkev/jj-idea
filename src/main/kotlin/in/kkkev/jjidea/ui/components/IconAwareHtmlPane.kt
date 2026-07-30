@@ -336,12 +336,16 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         val baseline = rect.y + fm.ascent
         var x = rect.x + leadingGap
 
+        // Bottom-align each icon to the text's descent line (baseline + descent), matching
+        // HtmlIcon's "- iconHeight + descent" convention for plain <icon> tags (jj-idea-fmrj) --
+        // aligning to the baseline itself (dropping the descent term) makes the icon float
+        // visibly above the text's vertical center instead of sitting level with it.
         spec.prefixIcon?.let { icon ->
-            icon.paintIcon(null, g, x, baseline - icon.iconHeight)
+            icon.paintIcon(null, g, x, baseline - icon.iconHeight + fm.descent)
             x += icon.iconWidth
         }
         spec.icon?.let { icon ->
-            icon.paintIcon(null, g, x, baseline - icon.iconHeight)
+            icon.paintIcon(null, g, x, baseline - icon.iconHeight + fm.descent)
             x += icon.iconWidth
         }
 

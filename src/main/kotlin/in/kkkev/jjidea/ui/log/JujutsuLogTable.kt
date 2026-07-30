@@ -2,8 +2,6 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.DataManager
-import com.intellij.ide.IdeTooltip
-import com.intellij.ide.IdeTooltipManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPlaces
@@ -17,23 +15,18 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Condition
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.PopupHandler
-import com.intellij.ui.ScreenUtil
 import com.intellij.ui.awt.RelativePoint
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.components.panels.Wrapper
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
-import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
+import `in`.kkkev.jjidea.ui.components.installIconAwareTooltip
 import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
 import kotlinx.datetime.Instant
 import java.awt.Color
 import java.awt.Component
 import java.awt.Cursor
-import java.awt.Dimension
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.*
@@ -42,7 +35,6 @@ import javax.swing.JComponent
 import javax.swing.JViewport
 import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
-import javax.swing.ScrollPaneConstants
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ListSelectionEvent
 import javax.swing.event.TableColumnModelEvent
@@ -79,39 +71,6 @@ class JujutsuLogTable(
         private set
     var hoveredLinkCol: Int = -1
         private set
-
-    // Tooltip cell tracking — hideCurrentNow() on cell change forces IdeTooltipManager
-    // to call beforeShow() again with fresh content for the new cell
-    private var tooltipRow = -1
-    private var tooltipCol = -1
-
-    private val customTooltip = object : IdeTooltip(this, Point(0, 0), null) {
-        override fun beforeShow(): Boolean {
-            val mousePos = this@JujutsuLogTable.mousePosition ?: return false
-            val row = rowAtPoint(mousePos)
-            val col = columnAtPoint(mousePos)
-            if (row < 0 || col < 0) return false
-
-            val renderer = getCellRenderer(row, col)
-            val component = prepareRenderer(renderer, row, col) as? JComponent ?: return false
-            val text = component.toolTipText
-            if (text.isNullOrBlank()) return false
-
-            val pane = IconAwareHtmlPane(project)
-            pane.foreground = UIUtil.getToolTipForeground()
-            pane.text = text
-
-            val screen = ScreenUtil.getScreenRectangle(this@JujutsuLogTable)
-            val maxWidth = minOf(JBUI.scale(500), screen.width - JBUI.scale(40))
-            val maxHeight = screen.height - JBUI.scale(40)
-
-            point = mousePos
-            tipComponent = Wrapper(tooltipComponent(pane, maxWidth, maxHeight))
-            return true
-        }
-
-        override fun canBeDismissedOnTimeout() = false
-    }
 
     // Root gutter state: true = expanded (shows repo name), false = collapsed (just colored strip).
     // Defaults to expanded for discoverability (GitHub #10); restored/persisted per-tab via
@@ -238,17 +197,11 @@ class JujutsuLogTable(
                         if (oldRow >= 0) repaintRow(oldRow)
                         if (newRow >= 0) repaintRow(newRow)
                     }
-                    // Force tooltip re-evaluation when the cell changes
-                    val newCol = columnAtPoint(e.point)
-                    if (newRow != tooltipRow || newCol != tooltipCol) {
-                        tooltipRow = newRow
-                        tooltipCol = newCol
-                        IdeTooltipManager.getInstance().hideCurrentNow(false)
-                    }
                     // Show hand cursor over a clickable element (ref chip or author/committer
                     // name), and underline it (only it - jj-idea-iesq) while the pointer is over
                     // it. Computed once and reused for both, rather than calling clickTargetAt
                     // twice per move.
+                    val newCol = columnAtPoint(e.point)
                     val target = clickTargetAt(e)
                     cursor = if (target != null) {
                         Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
@@ -268,12 +221,23 @@ class JujutsuLogTable(
             }
         )
 
-        // Register custom tooltip that renders all tooltips via IconAwareHtmlPane.
-        // This ensures <icon> tags render correctly and all tooltips have consistent styling.
-        // The identity check (currentTooltip === tooltip) in IdeTooltipManager keeps the
-        // tooltip stable during mouse movement within the same cell; hideCurrentNow() in
-        // the MouseMotionListener above forces re-evaluation on cell changes.
-        IdeTooltipManager.getInstance().setCustomTooltip(this, customTooltip)
+        // Register custom tooltip that renders all tooltips via IconAwareHtmlPane, so chip
+        // <img> tags render correctly and all tooltips have consistent styling.
+        installIconAwareTooltip(
+            owner = this,
+            project = project,
+            cellKeyAt = { rowAtPoint(it) to columnAtPoint(it) },
+            htmlAt = { point ->
+                val row = rowAtPoint(point)
+                val col = columnAtPoint(point)
+                if (row < 0 || col < 0) {
+                    null
+                } else {
+                    val renderer = getCellRenderer(row, col)
+                    (prepareRenderer(renderer, row, col) as? JComponent)?.toolTipText
+                }
+            }
+        )
 
         // Handle clicks on the gutter column to toggle expansion
         addMouseListener(
@@ -1094,27 +1058,5 @@ class JujutsuLogTableModel : AbstractTableModel() {
         entries.clear()
         filteredEntries.clear()
         fireTableDataChanged()
-    }
-}
-
-/**
- * Bounds [pane] to [maxWidth] so its HTML reflows (e.g. bookmark chips wrap across lines)
- * instead of laying out as one oversized line. If the resulting preferred height still
- * exceeds [maxHeight], wraps it in a vertically scrollable pane instead of letting the
- * tooltip get clipped by the screen (jj-idea-szn8).
- */
-internal fun tooltipComponent(pane: JComponent, maxWidth: Int, maxHeight: Int): JComponent {
-    pane.setSize(maxWidth, Int.MAX_VALUE)
-    val pref = pane.preferredSize
-    val boundedWidth = minOf(pref.width, maxWidth)
-    pane.preferredSize = Dimension(boundedWidth, pref.height)
-
-    if (pref.height <= maxHeight) return pane
-
-    return JBScrollPane(pane).apply {
-        border = JBUI.Borders.empty()
-        horizontalScrollBarPolicy = ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER
-        verticalScrollBarPolicy = ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED
-        preferredSize = Dimension(boundedWidth, maxHeight)
     }
 }

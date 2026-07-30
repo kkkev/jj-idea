@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui.log
+package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication

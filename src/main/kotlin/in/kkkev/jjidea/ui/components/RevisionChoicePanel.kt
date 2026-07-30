@@ -76,6 +76,41 @@ internal fun buildRevisionChoices(repo: JujutsuRepository, filter: Filter): List
     return items
 }
 
+/**
+ * Tooltip HTML for a single row of [buildRevisionChoices] — a change's id/commit id/author/
+ * timestamp/description summary, or a ref's name and target id. Renders bookmark/tag chips as
+ * `<img src='chip:…'>`, so it must only ever be shown via a chip-aware pane (e.g.
+ * [IconAwareHtmlPane], installed by [installIconAwareTooltip]) rather than a plain Swing tooltip
+ * (jj-idea-fmrj).
+ */
+internal fun revisionChoiceTooltip(item: RevisionChoice): String? = when (item) {
+    is RevisionChoice.Change -> htmlString {
+        append(item.entry.id)
+        append(" (")
+        append(item.entry.commitId)
+        append(")\n")
+        item.entry.author?.let {
+            append(it)
+            append("\n")
+        }
+        item.entry.authorTimestamp?.let {
+            append(it)
+            append("\n")
+        }
+        append("\n")
+        appendSummary(item.entry.description)
+    }
+    is RevisionChoice.Ref -> htmlString {
+        append(item.item)
+        item.item.id?.let { id ->
+            append(" (")
+            append(id)
+            append(")")
+        }
+    }
+    is RevisionChoice.FreeForm -> null
+}
+
 abstract class RevisionChoicePanel(
     protected val repo: JujutsuRepository,
     initialFilter: Filter
@@ -95,6 +130,20 @@ abstract class RevisionChoicePanel(
         selectionMode = ListSelectionModel.SINGLE_SELECTION
         cellRenderer = MutabilityAwareRenderer()
         visibleRowCount = 15
+    }
+
+    init {
+        // Render tooltips via IconAwareHtmlPane so bookmark/tag chip <img> tags in tooltipFor()
+        // resolve instead of painting as broken images (jj-idea-fmrj).
+        installIconAwareTooltip(
+            owner = list,
+            project = repo.project,
+            cellKeyAt = { list.locationToIndex(it) },
+            htmlAt = { point ->
+                val index = list.locationToIndex(point)
+                if (index < 0) null else tooltipFor(listModel.getElementAt(index))
+            }
+        )
     }
 
     private var filter: Filter = initialFilter
@@ -153,33 +202,7 @@ abstract class RevisionChoicePanel(
 
     open fun buildItems(filter: Filter): List<RevisionChoice> = buildRevisionChoices(repo, filter)
 
-    open fun tooltipFor(item: RevisionChoice): String? = when (item) {
-        is RevisionChoice.Change -> htmlString {
-            append(item.entry.id)
-            append(" (")
-            append(item.entry.commitId)
-            append(")\n")
-            item.entry.author?.let {
-                append(it)
-                append("\n")
-            }
-            item.entry.authorTimestamp?.let {
-                append(it)
-                append("\n")
-            }
-            append("\n")
-            appendSummary(item.entry.description)
-        }
-        is RevisionChoice.Ref -> htmlString {
-            append(item.item)
-            item.item.id?.let { id ->
-                append(" (")
-                append(id)
-                append(")")
-            }
-        }
-        is RevisionChoice.FreeForm -> null
-    }
+    open fun tooltipFor(item: RevisionChoice): String? = revisionChoiceTooltip(item)
 
     fun setPopup(popup: JBPopup) {
         this.popup = popup

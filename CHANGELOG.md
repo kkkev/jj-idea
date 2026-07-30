@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Right-clicking a bookmark or tag chip in the commit details pane now opens its context menu (rename/delete/etc.) — it silently did nothing before, for every chip.
 - Closing the conflict resolution window without resolving (or after resolving only some conflicts) no longer discards a side of the conflict, for every "Resolve Conflicts…" entry point jj-idea provides (Working Copy panel, commit details pane, log context menu, editor/Project view). Each conflicted file is now resolved through its own merge window; cancelling leaves the file's conflict untouched. ([#63](https://github.com/kkkev/jj-idea/issues/63)) **Known gap:** the native IntelliJ Commit tool window's own "Resolve" link (on the "Merge Conflicts" node) is separate platform UI that jj-idea cannot intercept, and is still affected — see docs/manual-tests.md for details; avoid it for jj conflicts for now.
 - "Resolve Conflicts…" no longer appears on a non-conflicted file just because some other, unrelated file in the repository has a conflict.
+- Hovering a bookmark or tag in the "Switch Working Copy" popup (opened from the status bar widget) no longer shows a broken-image icon in the tooltip.
+- Bookmark/tag chip icons in tooltips (and the commit details pane) are now vertically aligned with the surrounding text instead of floating above it.
 
 ## [0.8.1] - 2026-07-28
 
