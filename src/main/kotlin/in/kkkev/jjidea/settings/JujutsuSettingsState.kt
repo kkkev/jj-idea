@@ -17,5 +17,8 @@ data class JujutsuSettingsState(
     var repositoryOverrides: MutableMap<String, RepositoryConfig> = mutableMapOf(),
     var settingsVersion: Int = 0,
     var squashDeleteEmptyAndMove: Boolean = false,
-    var logWindows: MutableList<LogWindowConfig> = mutableListOf()
+    var logWindows: MutableList<LogWindowConfig> = mutableListOf(),
+    // jj-idea-wb5l: hides the standard Commit tool window / Local Changes tab for jj-only
+    // projects in favor of the plugin's own "Working copy" tool window.
+    var hideStandardCommitToolWindow: Boolean = true
 )

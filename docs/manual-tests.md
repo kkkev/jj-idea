@@ -586,6 +586,21 @@ Verify these keyboard shortcuts work in the log view:
   log, and jj's file-change actions (Open, Compare, Restore, etc.) simply don't offer that
   change
 
+### Standard Commit Tool Window Suppression (jj-idea-wb5l)
+
+- [ ] In a **jj-only** project (default setting), the standard **Commit** tool window and
+  the **Local Changes** tab are not shown; the **Working copy** tool window is the only
+  changes UI. Ctrl/Cmd+K still opens Describe (unchanged)
+- [ ] Settings → Version Control → Jujutsu → uncheck "Hide the standard Commit tool window"
+  → the Commit tool window / Local Changes tab reappears immediately, without reopening the
+  project. Re-check it → it disappears again
+- [ ] With the setting on: editor-tab and Project-view file colors for added/modified files
+  still render; editor gutter change markers still show; Annotate still works; the Working
+  copy panel's changed-files list still updates live as files change
+- [ ] In a **mixed jj + Git** project (both VCSes mapped), the standard Commit tool window
+  is still shown regardless of the setting (jj is not the single active VCS, so the setting
+  has no effect) — Git's own commit workflow is unaffected
+
 ### Git Push Dialog
 
 Setup: have a local bookmark that has never been pushed to the remote.

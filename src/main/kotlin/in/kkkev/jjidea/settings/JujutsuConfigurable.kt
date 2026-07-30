@@ -10,6 +10,7 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
@@ -41,6 +42,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private var previousPath = appSettings.state.jjExecutablePath
     private var previousLogLimit = settings.state.logChangeLimit
     private var previousLogRevset = settings.state.logRevset
+    private var previousHideStandardCommitToolWindow = settings.state.hideStandardCommitToolWindow
     private val finder = JjExecutableFinder()
 
     // UI components for validation feedback
@@ -165,6 +167,14 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             }
             row {
                 comment(JujutsuBundle.message("settings.identity.comment"))
+            }
+        }
+
+        group(JujutsuBundle.message("settings.group.general")) {
+            row {
+                checkBox(JujutsuBundle.message("settings.general.hide.commit.toolwindow"))
+                    .bindSelected(settings.state::hideStandardCommitToolWindow)
+                    .comment(JujutsuBundle.message("settings.general.hide.commit.toolwindow.comment"))
             }
         }
 
@@ -382,6 +392,14 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
 
     override fun apply() {
         super.apply()
+
+        // Re-evaluate the Commit tool window's visibility immediately, without requiring a
+        // project reopen: CommitModeManager subscribes to this topic and recomputes the
+        // CommitMode from JujutsuVcs.getForcedCommitMode() (jj-idea-wb5l).
+        if (settings.state.hideStandardCommitToolWindow != previousHideStandardCommitToolWindow) {
+            previousHideStandardCommitToolWindow = settings.state.hideStandardCommitToolWindow
+            project.messageBus.syncPublisher(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED).directoryMappingChanged()
+        }
 
         // Save global identity — bindings were updated from the fields by super.apply()
         val config = rootlessConfig.user

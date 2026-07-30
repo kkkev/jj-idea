@@ -6,7 +6,9 @@ import com.intellij.openapi.vcs.AbstractVcs
 import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.VcsType
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.vcs.commit.CommitMode
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
 import `in`.kkkev.jjidea.vcs.diff.JujutsuDiffProvider
@@ -66,6 +68,17 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
      * multiple VCS roots are active, so Git roots remain unaffected.
      */
     override fun isCommitActionDisabled() = true
+
+    /**
+     * For jj-only projects, hides the standard Commit tool window and Local Changes tab in
+     * favor of the plugin's jj-aware "Working copy" tool window (see [JujutsuHiddenCommitMode]).
+     * Only consulted by the platform when Jujutsu is the *single* active VCS, so mixed
+     * Jujutsu + Git projects are unaffected and keep the standard Commit panel for their
+     * Git roots. Gated by [JujutsuSettings.hideStandardCommitToolWindow] so users who prefer
+     * the standard panel can opt back in (jj-idea-wb5l).
+     */
+    override fun getForcedCommitMode(originalMode: CommitMode): CommitMode? =
+        if (JujutsuSettings.getInstance(myProject).state.hideStandardCommitToolWindow) JujutsuHiddenCommitMode else null
 
     /**
      * The roots for this VCS.
