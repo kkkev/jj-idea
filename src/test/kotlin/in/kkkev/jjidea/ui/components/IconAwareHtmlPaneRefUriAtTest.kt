@@ -19,7 +19,10 @@ import javax.swing.text.Element
  * `<a href>` onto the wrapped leaf's own `AttributeSet` as a nested set keyed by `HTML.Tag.A`,
  * not as a directly-queryable `HTML.Attribute.HREF` the way `refUriAt`'s original
  * `elem.attributes.getAttribute(HTML.Attribute.HREF)` assumed - discovered while adding chip
- * hover-underline tracking, which hit the identical lookup bug (see `hasHrefAncestor`/`hrefOf`).
+ * hover tracking, which hit the identical lookup bug (see `hrefAncestorOf`/`hrefOf`). Also covers
+ * that hovering a bookmark chip *does* set a hovered link element (jj-idea-a52h) - it just paints
+ * a background highlight instead of an underline (ChipView.isRefOnly vs isRealLink), since the chip
+ * has no left-click action but does have a right-click menu.
  */
 @Tag("platform")
 @TestApplication
@@ -58,6 +61,34 @@ class IconAwareHtmlPaneRefUriAtTest {
     }
 
     @Test
+    fun `refUriAt resolves the jjref href from a point over the right half of the chip`() {
+        // Regression for a real bug report: ChipView.viewToModel (needed for caret placement)
+        // returns the chip's own endOffset for its right half, but a leaf's range is
+        // [startOffset, endOffset) - exclusive of endOffset - so getCharacterElement(endOffset)
+        // used to resolve the *next* sibling instead of the chip, silently breaking hover/
+        // right-click over roughly the right half of every chip (jj-idea-wkcz follow-up).
+        val refUri = URI("jjref://repo?abc123&kind=bookmark&name=main")
+        val html = htmlString {
+            control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
+                linked(refUri) { appendChip(icon(JujutsuIcons::Bookmark), "main") }
+            }
+        }
+
+        val pane = IconAwareHtmlPane(project.get())
+        pane.text = html
+        pane.setSize(2000, 1000)
+        pane.doLayout()
+
+        val chip = collectImgElements(pane.document.defaultRootElement).single()
+        // ChipView.modelToView reports the chip's real right edge for its own endOffset (unlike a
+        // regular text run, where end-of-run x wouldn't necessarily coincide with this element).
+        val rightEdge = pane.modelToView2D(chip.endOffset).bounds
+        val point = java.awt.Point(rightEdge.x - 2, rightEdge.centerY.toInt())
+
+        pane.refUriAt(point) shouldBe refUri
+    }
+
+    @Test
     fun `refUriAt returns null for a point not over any ref chip`() {
         val html = htmlString {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
@@ -74,8 +105,32 @@ class IconAwareHtmlPaneRefUriAtTest {
     }
 
     @Test
-    fun `hasHrefAncestor-driven chip hover also resolves for a bookmark chip`() {
-        // Same underlying lookup as refUriAt, exercised via the hover path added alongside it.
+    fun `hrefAt resolves a mailto href, unlike refUriAt which is jjref-only (jj-idea-a52h)`() {
+        // The commit details pane's right-click handler used to only ever call refUriAt, so an
+        // author/committer mailto: link had no way to resolve to a PersonClick at all - hrefAt is
+        // the general entry point that makes that possible.
+        val html = htmlString {
+            control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
+                appendWithEmail(`in`.kkkev.jjidea.vcs.VcsUserImpl("Alice", "alice@example.com"))
+            }
+        }
+
+        val pane = IconAwareHtmlPane(project.get())
+        pane.text = html
+        pane.setSize(2000, 1000)
+        pane.doLayout()
+
+        val chip = collectImgElements(pane.document.defaultRootElement).single()
+        val point = pane.modelToView2D(chip.startOffset).bounds.let { java.awt.Point(it.x + 1, it.centerY.toInt()) }
+
+        pane.hrefAt(point) shouldBe "mailto:alice@example.com"
+        pane.refUriAt(point).shouldBeNull()
+    }
+
+    @Test
+    fun `hovering a bookmark chip sets a hovered link element (jj-idea-a52h)`() {
+        // Bookmark/tag chips have no left-click action, but they do get a hover cue - a background
+        // highlight rather than an underline (ChipView paints based on isRefOnly vs isRealLink).
         val refUri = URI("jjref://repo?abc123&kind=bookmark&name=main")
         val html = htmlString {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {

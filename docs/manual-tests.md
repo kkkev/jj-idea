@@ -41,7 +41,8 @@ Use this checklist:
 - [ ] Select a commit row and press Enter → that commit's diff opens (Show Diff)
 - [ ] Double-click a commit row (not on a bookmark/tag chip or the root gutter) → the same
       diff opens
-- [ ] Double-click a bookmark or tag chip → navigates to that ref (no diff opens)
+- [ ] Double-click a bookmark or tag chip → does nothing (no diff opens, no filter change,
+      jj-idea-wkcz — bookmark/tag chips have no left-click action, only a right-click menu)
 - [ ] Double-click the "+N more" overflow chip → shows the hidden-refs popup (no diff opens)
 - [ ] Double-click the root gutter column (multi-repo view) → toggles expansion (no diff opens)
 - [ ] In Settings → Keymap, rebind "Show Diff" off Enter onto a different jj action (or clear
@@ -415,6 +416,12 @@ and the `release-*` bookmarks/tags sit deep in history, and `main`'s ancestry is
 - [ ] Dropdown lists **all** tags (with the green tag icon), including tags beyond the log limit
 - [ ] Bookmark and tag icons are visibly distinct from each other and from the "@" working-copy icon, and colored to match the bookmark/tag colors used in the log table
 
+#### Loading placeholder (jj-idea-a52h)
+
+- [ ] Open the dropdown as early as possible after opening the project/log tab (before bookmarks/tags have had time to load) — it shows a single disabled "Loading bookmarks and tags…" entry instead of looking empty
+- [ ] Reopen the dropdown once bookmarks/tags have loaded — the placeholder is gone, replaced by the real list
+- [ ] For a repo that genuinely has no bookmarks or tags, the dropdown eventually shows as empty (no bookmark/tag rows, no "@" if there's no working copy either) once loading finishes — it does **not** get stuck on the loading placeholder forever
+
 #### Remote-only bookmarks (jj-idea-iadu)
 
 Clone a repo and leave at least one remote bookmark **untracked** (e.g. `jj git clone`, then
@@ -437,21 +444,19 @@ push a bookmark from another clone without running `jj bookmark track` in this o
 - [ ] Arrow up/down moves the highlight; Enter applies the highlighted reference and closes the dropdown
 - [ ] Clearing the filter restores the full (limited) log
 
-### Log Row Click Actions (jj-idea-iesq)
+### Log Row Click Actions (jj-idea-iesq, jj-idea-wkcz, jj-idea-a52h)
 
-Log rows render bookmark/tag chips and author/committer names with link styling. Left-click
-performs the element's default action; right-click opens a menu with that default action
-pre-highlighted, so the menu doubles as a hint for what left-click does.
+Log rows render bookmark/tag chips and author/committer names with link styling. Author/committer
+names are real left-click hyperlinks (left-click performs the default action; right-click opens a
+menu with that default action pre-highlighted). Bookmark/tag chips are **not** — they have no
+left-click action; only the right-click menu reaches their actions (jj-idea-wkcz, a prerequisite
+for letting issue-tracker references *inside* a bookmark/tag name become their own links later,
+without a link-inside-a-link). Hovering one instead shows a subtle grey background highlight
+(jj-idea-a52h) — the same "hover" tint used for a hovered row elsewhere — signaling "right-click
+here" without a hand cursor implying a left-click action that doesn't exist.
 
 - [ ] Author/committer names are link-colored at rest, with **no underline**; hovering the name adds an underline, and moving off it removes the underline again (jj-idea-iesq: was permanently underlined before)
 - [ ] Hovering blank cell space to the right of a short author/committer name does **not** add an underline (matches the existing "no click target" boundary)
-- [ ] Hovering a bookmark or tag chip shows a hand cursor
-- [ ] **Left-clicking** a bookmark/tag chip filters the log to that reference and its ancestors (the References filter chip updates to show the name)
-- [ ] **Left-clicking the same chip again** clears the filter (toggle off) instead of re-applying it
-- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/track actions
-- [ ] Choosing **Filter Log to '...'** from the right-click menu applies the same filter as left-click and closes the menu; choosing it again while already active clears the filter and closes the menu
-- [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
-- [ ] The bookmark/tag right-click menu in the commit **details** pane also shows the checkmark when that reference is the active filter
 - [ ] Hovering an author name (not blank space in the cell) shows a hand cursor
 - [ ] **Left-clicking** an author name opens the OS mail client addressed to that author's email
 - [ ] **Right-clicking** an author name opens a menu with **Send Email to ...** highlighted, a separator, then **Filter Log by ...**
@@ -462,9 +467,15 @@ pre-highlighted, so the menu doubles as a hint for what left-click does.
 - [ ] Clicking blank cell space to the right of a short author/committer name does **not** launch the mail client
 - [ ] The commit **details** pane's author `Name <email>` link still opens the mail client (unchanged)
 - [ ] The commit **details** pane's `Name <email>` link is link-colored, with **no underline** at rest; hovering it adds an underline, moving off removes it (jj-idea-iesq: previously never underlined, at any point)
-- [ ] The commit **details** pane's bookmark/tag chips also underline on hover, and their own accent color (bookmark/tag color) is unaffected
-- [ ] **Right-clicking** a bookmark/tag chip in the commit **details** pane opens its ref menu (rename/delete/etc.) — this was silently broken for every chip before jj-idea-iesq (a Swing HTML parsing quirk meant the chip's `href` was never found)
-- [ ] The "+N more" overflow chip's popup (jj-idea-w61m) still shows hidden refs, each still openable via their own submenu
+- [ ] Hovering a bookmark or tag chip does **not** show a hand cursor, but does show a subtle grey background highlight, in **both** the log table and the commit **details** pane (jj-idea-a52h) — its accent color (bookmark/tag color) stays visible on top of the highlight. Check this across the **whole width** of the chip (left edge, middle, right edge), not just one spot — a hit-testing bug meant this only held over roughly the left half in the commit details pane
+- [ ] The highlight covers only the hovered chip's own icon+label(+suffix) — not the space before/after it, and not a neighboring chip
+- [ ] **Left-clicking** a bookmark/tag chip does nothing, in either the log table or the commit **details** pane — no filter change, no navigation
+- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/track actions. In the commit **details** pane, check this from several x-positions across the chip's width, including near its right edge — this used to silently fail there
+- [ ] Choosing **Filter Log to '...'** from the right-click menu applies the filter and closes the menu; choosing it again while already active clears the filter and closes the menu
+- [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
+- [ ] The bookmark/tag right-click menu in the commit **details** pane also shows the checkmark when that reference is the active filter, and still opens correctly (rename/delete/etc.) — right-click resolution is unaffected by the chip having no left-click action
+- [ ] The "+N more" overflow chip still shows a hand cursor on hover (not the grey background highlight), and **left-clicking** it still opens its popup of hidden refs (jj-idea-w61m unaffected — only bookmark/tag chips lost their hand-cursor/left-click), each still openable via their own submenu
+- [ ] **Right-clicking** an author or committer email in the commit **details** pane opens the same menu as the log table (**Send Email to ...**, plus **Filter Log by ...** for the author) — this previously did nothing at all (jj-idea-a52h)
 
 ### Bookmark Widget
 

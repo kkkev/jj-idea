@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.components.*
 import java.awt.*
+import java.net.URI
 import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.table.TableCellRenderer
@@ -86,7 +87,7 @@ class JujutsuGraphAndDescriptionRenderer(
     ): Component {
         val mousePos = table.mousePosition
         val isHovered = mousePos != null && table.rowAtPoint(mousePos) == row
-        return GraphAndDescriptionPanel(table, row, column, isSelected, isHovered)
+        return GraphAndDescriptionPanel(table, row, column, isSelected, isHovered, mousePos)
     }
 
     private inner class GraphAndDescriptionPanel(
@@ -94,7 +95,8 @@ class JujutsuGraphAndDescriptionRenderer(
         private val row: Int,
         private val column: Int,
         private val isSelected: Boolean,
-        isHovered: Boolean
+        isHovered: Boolean,
+        private val mousePos: Point?
     ) : JPanel(null) {
         private val entry = (table.model as? JujutsuLogTableModel)?.getEntry(row)
         private val graphNode = entry?.let { graphNodes[it.id] }
@@ -147,8 +149,8 @@ class JujutsuGraphAndDescriptionRenderer(
             }
 
             val columnWidth = table.columnModel.getColumn(column).width
+            val frc = table.getFontMetrics(table.font).fontRenderContext
             val rightCanvas = if (columnManager.showDecorations) {
-                val frc = table.getFontMetrics(table.font).fontRenderContext
                 cappedDecorations(entry, fg, columnWidth * DECORATION_WIDTH_FRACTION, table.font, frc).canvas
             } else {
                 FragmentRecordingCanvas()
@@ -158,8 +160,27 @@ class JujutsuGraphAndDescriptionRenderer(
                 leftCanvas = leftCanvas,
                 rightCanvas = rightCanvas,
                 cellWidth = columnWidth - textStartX(),
-                background = background
+                background = background,
+                rightHighlightTarget = hoveredBookmarkOrTagUri(entry, frc)
             )
+        }
+
+        /**
+         * The `jjref://` URI of the bookmark/tag chip under [mousePos], if any (jj-idea-a52h) - used
+         * to paint a hover-highlight background behind it, since these chips have no left-click
+         * action or cursor cue of their own (jj-idea-wkcz) and would otherwise look completely
+         * inert despite having a right-click menu. Excludes the "+N more" overflow chip, which
+         * already has its own hand-cursor/left-click affordance.
+         */
+        private fun hoveredBookmarkOrTagUri(entry: LogEntry, frc: java.awt.font.FontRenderContext): URI? {
+            if (!columnManager.showDecorations) return null
+            val point = mousePos ?: return null
+            val cellRect = table.getCellRect(row, column, false)
+            if (!cellRect.contains(point)) return null
+            val columnWidth = table.columnModel.getColumn(column).width
+            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true) ?: return null
+            val target = LogClickTarget.resolve(uri, entry)
+            return uri.takeIf { target is BookmarkClick || target is TagClick }
         }
 
         private fun textStartX(): Int {

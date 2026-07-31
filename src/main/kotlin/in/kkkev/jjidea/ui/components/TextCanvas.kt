@@ -236,7 +236,12 @@ fun TextCanvas.appendWithEmail(user: VcsUser) {
 
 fun TextCanvas.append(instant: Instant) = append(DateTimeFormatter.formatRelative(instant))
 
-/** Canonical `jjref://` URI identifying a specific clickable ref (bookmark or tag) on a log entry. */
+/**
+ * Canonical `jjref://` URI identifying a specific ref (bookmark or tag) on a log entry. Wrapping a
+ * chip in [linked] with this URI makes it resolvable by right-click
+ * ([in.kkkev.jjidea.ui.log.LogClickTarget.resolve]) - bookmark/tag chips have no left-click action
+ * or hover cue of their own (jj-idea-wkcz), only the right-click context menu.
+ */
 fun refUri(entry: LogEntry, kind: String, name: String): URI =
     URI(
         "jjref://${URLUtil.encodePath(entry.repo.directory.path)}?${entry.id}" +

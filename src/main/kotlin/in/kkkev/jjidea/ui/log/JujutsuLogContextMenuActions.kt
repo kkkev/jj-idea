@@ -153,8 +153,10 @@ object JujutsuLogContextMenuActions {
      * Build the action group for a right-click on any clickable log-row element (ref chip or
      * author/committer name). This is the single dispatcher — `BookmarkClick`, `TagClick`, and
      * `PersonClick` each get their own menu. The first action in each menu (marked
-     * [DefaultClickAction]) mirrors that element's left-click default action and is pre-selected
-     * by `JujutsuLogTable`'s popup, so the menu doubles as a discoverability hint (jj-idea-iesq).
+     * [DefaultClickAction]) is pre-selected by `JujutsuLogTable`'s popup (jj-idea-iesq). For
+     * `PersonClick` this still mirrors the element's left-click default (open the mail client);
+     * bookmark/tag chips have no left-click action of their own (jj-idea-wkcz), so their
+     * `DefaultClickAction` (filter to reference) is just the most useful entry to pre-highlight.
      *
      * The "Filter Log to '...'"/"Filter Log by ..." checkmark reads
      * [in.kkkev.jjidea.jj.JujutsuStateModel.activeReferenceFilter]/`activeAuthorFilter` directly
@@ -199,10 +201,11 @@ object JujutsuLogContextMenuActions {
         }
 
     /**
-     * Left-click default for a bookmark/tag chip: narrow the log to that reference and its
-     * ancestors, or clear the filter if [name] is already the active one — toggled by whichever
-     * `filterToReference` listener is wired up (see `CommitTablePanel.createFilterComponents`).
-     * Checked when [name] is [in.kkkev.jjidea.jj.JujutsuStateModel.activeReferenceFilter].
+     * Right-click default for a bookmark/tag chip (jj-idea-wkcz — chips have no left-click action):
+     * narrow the log to that reference and its ancestors, or clear the filter if [name] is already
+     * the active one — toggled by whichever `filterToReference` listener is wired up (see
+     * `CommitTablePanel.createFilterComponents`). Checked when [name] is
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.activeReferenceFilter].
      */
     private class FilterToReferenceAction(
         private val project: Project,

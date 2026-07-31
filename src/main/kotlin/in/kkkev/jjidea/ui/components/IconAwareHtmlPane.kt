@@ -10,6 +10,7 @@ import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
 import com.intellij.ui.scale.JBUIScale
 import com.intellij.util.io.URLUtil
 import com.intellij.util.ui.ExtendableHTMLViewFactory
+import com.intellij.util.ui.UIUtil
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
@@ -19,6 +20,7 @@ import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.common.accented
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import java.awt.Component
+import java.awt.Cursor
 import java.awt.Graphics
 import java.awt.Rectangle
 import java.awt.Shape
@@ -50,7 +52,9 @@ internal const val CHIP_ICON_PREFIX = "chip:"
  * An HTML pane that can resolve icons from a set of icon libraries, including IDEA's icons
  * [com.intellij.icons.AllIcons].
  *
- * Navigates on `jjc://` (change ID) and `jjref://` (bookmark/tag) hyperlinks.
+ * Navigates on `jjc://` (change ID) hyperlinks. `jjref://` (bookmark/tag) links are resolvable for
+ * the right-click context menu ([refUriAt]) but have no left-click action and no hover cue - a
+ * bookmark/tag chip's only interactive affordance is the right-click menu (jj-idea-wkcz).
  */
 class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     JBHtmlPaneStyleConfiguration(),
@@ -83,6 +87,12 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                         // painted extent, so precise invalidation isn't straightforward here).
                         repaint()
                     }
+                    // Bookmark/tag chips have no left-click action (jj-idea-wkcz), so suppress the
+                    // hand cursor Swing's built-in HTMLEditorKit.LinkController shows for any <a>
+                    // element (it registers its own mouseMoved during editor-kit setup, before this
+                    // listener is added in this class's init block, so overriding the cursor here -
+                    // after it runs for the same event - wins).
+                    if (refUriAt(e.point) != null) cursor = Cursor.getDefaultCursor()
                 }
             }
         )
@@ -98,14 +108,10 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                             return@addHyperlinkListener
                         }
                     }
-                    with(REF_URL_PARSER.matcher(url)) {
-                        if (matches()) {
-                            val path = URLUtil.unescapePercentSequences(group(1))
-                            val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
-                            project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
-                            return@addHyperlinkListener
-                        }
-                    }
+                    // Bookmark/tag chips have no left-click action (jj-idea-wkcz) - the right-click
+                    // menu (see refUriAt) is their only interactive affordance - so a jjref:// match
+                    // here is a no-op rather than falling through to the browser handler below.
+                    if (REF_URL_PARSER.matcher(url).matches()) return@addHyperlinkListener
                 }
                 // Not one of our internal jjc:/jjref: schemes (e.g. an issue-tracker link, jj-idea-10fo, or a
                 // mailto: author link) — hand off to the platform's standard browser/mail handler.
@@ -114,30 +120,60 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
         }
     }
 
-    /** Parse a `jjref://` href from the HTML element under [point], or null if not a ref link. */
-    fun refUriAt(point: java.awt.Point): java.net.URI? {
-        val offset = viewToModel2D(point).toInt()
+    /**
+     * The raw `href` (any scheme - `jjref://`, `jjc://`, `mailto:`, an issue-tracker link, ...) of
+     * whatever's under [point], or null if it's not a link at all. Used for right-click resolution
+     * ([in.kkkev.jjidea.ui.log.JujutsuCommitDetailsPanel] builds a context menu per scheme) -
+     * [refUriAt] is the `jjref://`-only convenience wrapper most callers actually want.
+     */
+    fun hrefAt(point: java.awt.Point): String? {
         val doc = document as? HTMLDocument ?: return null
-        var elem: Element? = doc.getCharacterElement(offset)
-        while (elem != null) {
-            val href = hrefOf(elem)
-            if (href != null && REF_URL_PARSER.matcher(href).matches()) {
-                return runCatching { java.net.URI(href) }.getOrNull()
-            }
-            elem = elem.parentElement
-        }
-        return null
+        return hrefAncestorOf(doc.getCharacterElement(characterOffsetAt(point)))
     }
 
-    /** The chip `<img>` element at [point], if any, and only if it's inside a link (jj-idea-iesq). */
+    /** Parse a `jjref://` href from the HTML element under [point], or null if not a ref link. */
+    fun refUriAt(point: java.awt.Point): java.net.URI? =
+        hrefAt(point)?.takeIf { REF_URL_PARSER.matcher(it).matches() }?.let { href ->
+            runCatching { java.net.URI(href) }.getOrNull()
+        }
+
+    /**
+     * The chip `<img>` element at [point], if any, and only if it's inside a link (jj-idea-iesq) -
+     * a real hyperlink (e.g. mailto) or a `jjref://` (bookmark/tag) ref, either of which [ChipView]
+     * paints its own hover cue for (underline vs. a hover-highlight background respectively,
+     * jj-idea-a52h).
+     */
     private fun linkedChipElementAt(point: java.awt.Point): Element? {
-        val offset = viewToModel2D(point).toInt()
         val doc = document as? HTMLDocument ?: return null
-        val elem = doc.getCharacterElement(offset)
+        val elem = doc.getCharacterElement(characterOffsetAt(point))
         if (elem.name != "img") return null
         val src = elem.attributes.getAttribute(HTML.Attribute.SRC) as? String ?: return null
         if (!src.startsWith(CHIP_ICON_PREFIX)) return null
-        return if (hasHrefAncestor(elem)) elem else null
+        return if (hrefAncestorOf(elem) != null) elem else null
+    }
+
+    /**
+     * The document offset of the character under [point], correctly attributing the *whole* visual
+     * width of an atomic one-position-wide chip ([ChipView]) to itself (jj-idea-wkcz follow-up).
+     *
+     * [javax.swing.text.JTextComponent.viewToModel2D] alone isn't enough: `ChipView.viewToModel`
+     * (needed for caret placement) returns its own `startOffset` for the left half of the chip and
+     * `endOffset` for the right half - but a leaf element's range is `[startOffset, endOffset)`,
+     * *exclusive* of `endOffset`, so [HTMLDocument.getCharacterElement] at exactly `endOffset`
+     * resolves to the *next* sibling instead, not the chip. Without this, hovering/right-clicking
+     * the right half of any chip silently missed its `href` - noticeably breaking bookmark/tag
+     * chips once they lost their native `<a>` hand-cursor cue as the fallback affordance (a real
+     * left-click hyperlink never had this problem, since Swing's own hit-testing for cursor/click
+     * activation doesn't go through this offset-based path at all).
+     *
+     * The fix reads the [Position.Bias] the platform's hit-testing actually computed - `Backward`
+     * means "the character *before* this offset", i.e. still inside the chip that ends here - and
+     * shifts back by one in that case, rather than guessing from pixel position ourselves.
+     */
+    private fun characterOffsetAt(point: java.awt.Point): Int {
+        val biasReturn = arrayOf(Position.Bias.Forward)
+        val offset = getUI().viewToModel2D(this, point, biasReturn)
+        return if (biasReturn[0] == Position.Bias.Backward) (offset - 1).coerceAtLeast(0) else offset
     }
 }
 
@@ -156,14 +192,19 @@ private fun hrefOf(element: Element): String? {
     return anchorAttrs?.getAttribute(HTML.Attribute.HREF) as? String
 }
 
-/** True if [element] or any of its ancestors carries an `href` attribute (jj-idea-iesq). */
-private fun hasHrefAncestor(element: Element): Boolean {
+/**
+ * The `href` on [element] or its nearest ancestor carrying one, if any (jj-idea-iesq). Used to
+ * decide whether a chip gets a hover cue at all ([IconAwareHtmlPane.linkedChipElementAt]); which
+ * *kind* of cue - underline for a real link, background highlight for a `jjref://` ref
+ * (jj-idea-wkcz, jj-idea-a52h) - is then decided in [ChipView] itself.
+ */
+private fun hrefAncestorOf(element: Element): String? {
     var elem: Element? = element
     while (elem != null) {
-        if (hrefOf(elem) != null) return true
+        hrefOf(elem)?.let { return it }
         elem = elem.parentElement
     }
-    return false
+    return null
 }
 
 object IconResolver {
@@ -307,11 +348,17 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
     }
 
     // Underline the label only while hovered (jj-idea-iesq), matching the "colored always,
-    // underlined on hover" convention used for real (non-chip) links and the log table. isLinked
-    // is fixed for this element's lifetime (its href-ness doesn't change), so only re-derived
-    // lazily once; hovered is re-read on every paint since IconAwareHtmlPane repaints on change.
-    private val isLinked: Boolean by lazy { hasHrefAncestor(element) }
-    private val isHovered: Boolean get() = isLinked && (container as? IconAwareHtmlPane)?.hoveredChipElement === element
+    // underlined on hover" convention used for real (non-chip) links and the log table. A
+    // `jjref://` (bookmark/tag) ref gets a background highlight instead (jj-idea-a52h): it has no
+    // left-click action, so an underline would misleadingly suggest one - but it does have a
+    // right-click menu, and needs *some* visual cue that it's interactive at all. ancestorHref is
+    // fixed for this element's lifetime (its href-ness doesn't change), so only re-derived lazily
+    // once; hovered is re-read on every paint since IconAwareHtmlPane repaints on change.
+    private val ancestorHref: String? by lazy { hrefAncestorOf(element) }
+    private val isRealLink: Boolean by lazy { ancestorHref?.startsWith("jjref://") == false }
+    private val isRefOnly: Boolean by lazy { ancestorHref?.startsWith("jjref://") == true }
+    private val isHovered: Boolean
+        get() = (isRealLink || isRefOnly) && (container as? IconAwareHtmlPane)?.hoveredChipElement === element
 
     private val iconsWidth get() = (spec.prefixIcon?.iconWidth ?: 0) + (spec.icon?.iconWidth ?: 0)
     private val leadingGap: Int
@@ -336,6 +383,15 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         val baseline = rect.y + fm.ascent
         var x = rect.x + leadingGap
 
+        if (isHovered && isRefOnly) {
+            // Hover-highlight background for a right-click-only ref chip (jj-idea-a52h) - the same
+            // greyish "list hover" tint used for the log table's equivalent chips
+            // (TextCanvasPanel.highlightTarget), painted behind the whole chip (icon(s) + label +
+            // suffix), before any of that content is drawn.
+            g.color = UIUtil.getListBackground(true, false)
+            g.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 4, 4)
+        }
+
         // Bottom-align each icon to the text's descent line (baseline + descent), matching
         // HtmlIcon's "- iconHeight + descent" convention for plain <icon> tags (jj-idea-fmrj) --
         // aligning to the baseline itself (dropping the descent term) makes the icon float
@@ -356,7 +412,7 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
             val lineY = baseline - fm.ascent / 3
             g.drawLine(x, lineY, x + fm.stringWidth(spec.label), lineY)
         }
-        if (isHovered) {
+        if (isHovered && isRealLink) {
             // Underline only the label (not any suffix) while hovered, matching a plain <a>'s
             // native hover-underline extent (jj-idea-iesq).
             val underlineY = baseline + (fm.descent / 2).coerceAtLeast(1)

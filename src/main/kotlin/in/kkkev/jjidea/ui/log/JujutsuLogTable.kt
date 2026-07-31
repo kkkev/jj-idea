@@ -197,19 +197,27 @@ class JujutsuLogTable(
                         if (oldRow >= 0) repaintRow(oldRow)
                         if (newRow >= 0) repaintRow(newRow)
                     }
-                    // Show hand cursor over a clickable element (ref chip or author/committer
-                    // name), and underline it (only it - jj-idea-iesq) while the pointer is over
-                    // it. Computed once and reused for both, rather than calling clickTargetAt
-                    // twice per move.
+                    // Show hand cursor over a clickable element (author/committer name, or the
+                    // "+N more" overflow chip), and underline it (only it - jj-idea-iesq) while
+                    // the pointer is over it. Computed once and reused for both, rather than
+                    // calling clickTargetAt twice per move.
+                    //
+                    // Bookmark/tag chips deliberately do NOT get a hover cue (jj-idea-wkcz):
+                    // clickTargetAt still resolves them (right-click still works, via
+                    // clickActionGroup), but they have no left-click action, so hinting
+                    // "clickable" here would be misleading - and it'd clash visually once a chip
+                    // can itself contain a linkified issue reference (jj-idea-vrmv), where only
+                    // that inner fragment should look interactive.
                     val newCol = columnAtPoint(e.point)
                     val target = clickTargetAt(e)
-                    cursor = if (target != null) {
+                    val hasHoverCue = target != null && target !is BookmarkClick && target !is TagClick
+                    cursor = if (hasHoverCue) {
                         Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     } else {
                         Cursor.getDefaultCursor()
                     }
-                    val newHoveredLinkRow = if (target != null) newRow else -1
-                    val newHoveredLinkCol = if (target != null) newCol else -1
+                    val newHoveredLinkRow = if (hasHoverCue) newRow else -1
+                    val newHoveredLinkCol = if (hasHoverCue) newCol else -1
                     if (newHoveredLinkRow != hoveredLinkRow || newHoveredLinkCol != hoveredLinkCol) {
                         val oldLinkRow = hoveredLinkRow
                         hoveredLinkRow = newHoveredLinkRow
@@ -287,10 +295,10 @@ class JujutsuLogTable(
             }
         )
 
-        // Handle left-click on ref chips (filter to that reference) and author/committer names
-        // (open the OS mail client), or the "+N more" overflow chip (jj-idea-w61m) to show the
-        // hidden refs in a popup. Each element's default action is mirrored, with the default
-        // highlighted, in the right-click menu built by clickActionGroup (jj-idea-iesq).
+        // Handle left-click on author/committer names (open the OS mail client), or the "+N more"
+        // overflow chip (jj-idea-w61m) to show the hidden refs in a popup. Bookmark/tag chips have
+        // no left-click action (jj-idea-wkcz) - only the right-click menu built by clickActionGroup
+        // (jj-idea-iesq) reaches them, mirroring each other element's default action.
         addMouseListener(
             object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
@@ -298,8 +306,7 @@ class JujutsuLogTable(
                     when (val target = clickTargetAt(e) ?: return) {
                         is MoreRefsClick -> showMoreRefsPopup(e.component, e.x, e.y, target)
                         is PersonClick -> BrowserUtil.browse(URI("mailto", target.user.email, null))
-                        is BookmarkClick -> project.stateModel.filterToReference.notify(target.bookmark.name.name)
-                        is TagClick -> project.stateModel.filterToReference.notify(target.tag.name)
+                        is BookmarkClick, is TagClick -> return
                     }
                     e.consume()
                 }

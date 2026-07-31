@@ -45,7 +45,9 @@ internal fun selectableBookmarkNames(bookmarks: List<Bookmark>): Map<String, Boo
  * Out-of-limit references trigger a context-window expansion (same as navigate-to-out-of-limit).
  *
  * Bookmark and tag lists are sourced from [in.kkkev.jjidea.jj.JujutsuStateModel.references]
- * and kept current automatically — no background loading is needed here.
+ * and kept current automatically — no background loading is needed here. While that first load is
+ * still in flight, the dropdown shows a disabled "Loading…" placeholder instead of looking like an
+ * empty (bookmark/tag-free) repo (jj-idea-a52h).
  */
 class JujutsuReferenceFilterComponent(
     private val tableModel: JujutsuLogTableModel,
@@ -140,6 +142,15 @@ class JujutsuReferenceFilterComponent(
 
     override fun createActionGroup(): ActionGroup {
         val group = BackgroundActionGroup()
+
+        // Bookmarks/tags load on a pooled thread and can genuinely still be empty right after the
+        // log opens (jj-idea-a52h) - without this, that transient state is indistinguishable from
+        // "this repo really has no bookmarks or tags".
+        if (!project.stateModel.references.hasLoaded) {
+            group.add(LoadingReferencesAction())
+            group.addSeparator()
+        }
+
         val references = getAllReferences()
 
         if (references.workingCopy != null) {
@@ -261,6 +272,17 @@ class JujutsuReferenceFilterComponent(
 
     private inner class ClearFilterAction : AnAction(JujutsuBundle.message("log.filter.clear")) {
         override fun actionPerformed(e: AnActionEvent) = doResetFilter()
+    }
+
+    /** Disabled placeholder shown while [in.kkkev.jjidea.jj.JujutsuStateModel.references] is still
+     * loading (jj-idea-a52h), so an empty dropdown isn't mistaken for "this repo has no bookmarks
+     * or tags". */
+    private class LoadingReferencesAction : AnAction(JujutsuBundle.message("log.filter.reference.loading")) {
+        init {
+            templatePresentation.isEnabled = false
+        }
+
+        override fun actionPerformed(e: AnActionEvent) = Unit
     }
 
     private data class References(

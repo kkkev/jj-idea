@@ -22,6 +22,14 @@ interface NotifiableState<T> {
     val value: T
 
     /**
+     * True once at least one [invalidate] call has finished loading — regardless of whether the
+     * loaded value differs from [T]'s start value. Lets a consumer distinguish "genuinely empty"
+     * (loaded, but there's nothing) from "hasn't loaded yet" (still showing the start value),
+     * e.g. to show a loading placeholder instead of an empty list (jj-idea-a52h).
+     */
+    val hasLoaded: Boolean
+
+    /**
      * Returns the current cached value if already loaded, or runs the loader synchronously
      * on the calling thread if the cache is still at its start value.
      *
@@ -127,6 +135,10 @@ class SimpleNotifiableState<T : Any>(
     @Volatile
     override var value: T = startValue
 
+    @Volatile
+    override var hasLoaded: Boolean = false
+        private set
+
     override val immediateValue: T
         get() = if (!equalityCheck(value, startValue)) value else loader()
 
@@ -157,6 +169,7 @@ class SimpleNotifiableState<T : Any>(
             }
             val changed = !equalityCheck(value, newValue)
             log.info("[$topicDisplayName] v$myVersion loaded, changed=$changed")
+            hasLoaded = true
             if (changed) {
                 value = newValue
                 runLater {
