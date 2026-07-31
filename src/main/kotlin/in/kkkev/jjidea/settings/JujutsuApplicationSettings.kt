@@ -32,5 +32,8 @@ class JujutsuApplicationSettings : PersistentStateComponent<JujutsuApplicationSe
 }
 
 data class JujutsuApplicationSettingsState(
-    var jjExecutablePath: String = "jj"
+    var jjExecutablePath: String = "jj",
+    // jj-idea-jqpe: tracks whether the one-time "Working copy" tool window signpost balloon
+    // has already been shown on this machine, across all projects.
+    var workingCopySignpostShown: Boolean = false
 )

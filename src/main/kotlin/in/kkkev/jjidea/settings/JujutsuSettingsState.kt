@@ -20,5 +20,8 @@ data class JujutsuSettingsState(
     var logWindows: MutableList<LogWindowConfig> = mutableListOf(),
     // jj-idea-wb5l: hides the standard Commit tool window / Local Changes tab for jj-only
     // projects in favor of the plugin's own "Working copy" tool window.
-    var hideStandardCommitToolWindow: Boolean = true
+    var hideStandardCommitToolWindow: Boolean = true,
+    // jj-idea-jqpe: tracks whether we've already auto-opened the Working copy tool window
+    // once for this project, so it only happens on first discovery, not every startup.
+    var workingCopyAutoOpened: Boolean = false
 )

@@ -68,6 +68,7 @@
 
     <!-- Notifications -->
     <notificationGroup id="Jujutsu" displayType="BALLOON"/>
+    <notificationGroup id="Jujutsu Onboarding" displayType="STICKY_BALLOON"/>
 
     <!-- Settings -->
     <projectConfigurable

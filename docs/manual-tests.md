@@ -601,6 +601,19 @@ Verify these keyboard shortcuts work in the log view:
   is still shown regardless of the setting (jj is not the single active VCS, so the setting
   has no effect) — Git's own commit workflow is unaffected
 
+### Working Copy Tool Window Signpost (jj-idea-jqpe)
+
+- [ ] With a fresh sandbox config (no prior `jujutsu.xml` app or project settings), open a
+  jj project → the **Working copy** tool window opens on the left automatically, but keyboard
+  focus stays wherever it was (e.g. the editor) — it doesn't steal focus
+- [ ] A sticky balloon notification appears explaining the Working copy panel and its
+  "Open Working Copy" action; clicking it activates and focuses the tool window
+- [ ] Close and reopen the same project → the tool window is not force-reopened again and no
+  balloon appears (both are one-shot per project/install)
+- [ ] Open a **second, different** jj project in the same sandbox → the tool window opens
+  automatically again (per-project), but no balloon appears (per-install, already shown)
+- [ ] Open a non-jj project → neither the tool window nor the balloon appear
+
 ### Git Push Dialog
 
 Setup: have a local bookmark that has never been pushed to the remote.

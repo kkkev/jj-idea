@@ -39,6 +39,11 @@ class JujutsuStartupActivity : ProjectActivity {
         // settings. Must happen before the availability check reads from app settings.
         JujutsuSettings.getInstance(project)
 
+        // Direct new users to the Working copy tool window (jj-idea-jqpe). Runs via its own
+        // runLater, so it's queued behind ToolWindowEnabler's own runLater (triggered above by
+        // ToolWindowEnabler.getInstance(project)), ensuring tool window availability is settled.
+        WorkingCopySignpost.signpostIfNeeded(project)
+
         // Initialize availability checking
         val checker = JjAvailabilityChecker.getInstance(project)
         checker.status.connect(project) { status ->

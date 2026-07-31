@@ -182,6 +182,13 @@ class JujutsuSettingsTest {
         settings.state.repositoryOverrides["/repo"]?.disableIgnoredFileScanning shouldBe null
     }
 
+    // ── workingCopyAutoOpened default (jj-idea-jqpe) ────────────────────────────
+
+    @Test
+    fun `workingCopyAutoOpened defaults to false`() {
+        JujutsuSettingsState().workingCopyAutoOpened shouldBe false
+    }
+
     private fun mockRepo(path: String): JujutsuRepository {
         val dir = mockk<VirtualFile>()
         every { dir.path } returns path
