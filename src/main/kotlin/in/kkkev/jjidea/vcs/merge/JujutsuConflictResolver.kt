@@ -38,6 +38,20 @@ import java.nio.file.Files
  * when the tool reports a non-cancel result. Files resolve one at a time; cancelling stops the
  * remaining queue, matching `showMergeDialog`'s one-shot-per-invocation semantics.
  *
+ * ### Known residual gap: the native Commit tool window's own "Resolve" link (jj-idea-ddcd)
+ * The standard Commit / Local Changes tool window renders its own "Merge Conflicts" node
+ * (`ChangesBrowserConflictsNode` in the platform) with a built-in "Resolve" link that calls
+ * `AbstractVcsHelper.showMergeDialog` directly — bypassing this class entirely — so it has the
+ * exact same discard-on-cancel bug described above. jj-idea cannot intercept, replace, or
+ * suppress that link: there's no extension point to remove/override it, and the one EP that can
+ * add an *alternative* link next to it (`MergeResolveActionProvider`) is unusable — it's
+ * `@ApiStatus.Internal` and only exists on 2026.2+, and the only way to register into it at
+ * runtime without a hard compile-time dependency on that missing class is a platform method
+ * marked `@TestOnly` (see jj-idea-ddcd's notes for the full investigation). Since jj-idea-wb5l,
+ * this is masked for the common case by hiding the standard Commit tool window entirely for
+ * jj-only projects; the gap only remains reachable if a user opts back into that window, or in
+ * a mixed jj + Git project.
+ *
  * @param resolveOne Runs the merge tool for one file and returns the resolved bytes, or null if
  *   cancelled. Overridable for testing; the default opens the real three-way merge tool.
  * @param writeResolved Writes resolved bytes back to the file. Overridable for testing.
