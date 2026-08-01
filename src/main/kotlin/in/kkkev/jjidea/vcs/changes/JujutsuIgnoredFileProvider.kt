@@ -5,7 +5,7 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.IgnoredBeanFactory
 import com.intellij.openapi.vcs.changes.IgnoredFileDescriptor
 import com.intellij.openapi.vcs.changes.IgnoredFileProvider
-import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase.Companion.DOT_JJ
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor

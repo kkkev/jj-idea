@@ -76,6 +76,38 @@ fun isPre253(platformVersion: String): Boolean {
     return year < 2025 || (year == 2025 && minor < 3)
 }
 
+// com.intellij.vcs.commit.CommitMode's members were renamed (useCommitToolWindow ->
+// isCommitTwEnabled, etc.) and AbstractVcs.getForcedCommitMode gained a CommitMode parameter in
+// intellij-community commit debbc20aea333c8c6c8ca06935a8ee96e0c818d9 (2026-01-06), which shipped
+// in build 261 (2026.1) onward - 2025.3 (build 253, released 2025-12-08, before that commit)
+// still has the old shape, confirmed via javap on the real 2025.2/2026.2 platform jars. No compat
+// shim exists on either side, so JujutsuVcs.getForcedCommitMode/JujutsuHiddenCommitMode can't be
+// written once against both - see the kotlin-commitModeOld/kotlin-commitModeNew source dirs below
+// and JujutsuVcsBase (jj-idea-r5jf).
+fun hasNewCommitModeShape(platformVersion: String): Boolean {
+    val (year, minor) = platformVersion.split(".").map { it.toInt() }
+    val build = (year - 2000) * 10 + minor // e.g. 2026.1 -> 261, matching JetBrains' own scheme
+    return build >= 261
+}
+
+sourceSets {
+    val commitModeDir = if (hasNewCommitModeShape(project.property("platformVersion") as String)) {
+        "kotlin-commitModeNew"
+    } else {
+        "kotlin-commitModeOld"
+    }
+    main {
+        kotlin {
+            srcDir("src/main/$commitModeDir")
+        }
+    }
+    test {
+        kotlin {
+            srcDir("src/test/$commitModeDir")
+        }
+    }
+}
+
 dependencies {
     intellijPlatform {
         val platformVersion = project.property("platformVersion") as String

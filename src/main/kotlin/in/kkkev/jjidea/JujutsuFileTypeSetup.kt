@@ -5,7 +5,7 @@ import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import `in`.kkkev.jjidea.util.runLater
-import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase.Companion.DOT_JJ
 import java.util.concurrent.atomic.AtomicBoolean
 
 class JujutsuFileTypeSetup : ProjectActivity {

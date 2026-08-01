@@ -31,7 +31,7 @@ internal val Project.projectLevelVcsManager: ProjectLevelVcsManager
  * Use when VCS might not be available (e.g., general actions that could run in any context).
  */
 val Project.possibleJujutsuVcs
-    get() = projectLevelVcsManager.findVcsByName(JujutsuVcs.VCS_NAME) as? JujutsuVcs
+    get() = projectLevelVcsManager.findVcsByName(JujutsuVcsBase.VCS_NAME) as? JujutsuVcs
 
 val Project?.isJujutsu get() = this?.stateModel?.isJujutsu == true
 

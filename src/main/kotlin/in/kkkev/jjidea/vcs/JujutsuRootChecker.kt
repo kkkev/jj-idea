@@ -9,18 +9,18 @@ import java.io.File
  * Checks if a directory is a jujutsu repository root
  */
 class JujutsuRootChecker : VcsRootChecker() {
-    override fun getSupportedVcs() = JujutsuVcs.getKey()
+    override fun getSupportedVcs() = JujutsuVcsBase.getKey()
 
     override fun isRoot(path: VirtualFile) = isJujutsuRoot(path)
 
-    override fun isVcsDir(dirName: String) = dirName == JujutsuVcs.DOT_JJ
+    override fun isVcsDir(dirName: String) = dirName == JujutsuVcsBase.DOT_JJ
 
     companion object {
         /**
          * Check if the given directory is a jujutsu repository root.
          * Uses file system directly to avoid VFS cache staleness issues.
          */
-        fun isJujutsuRoot(dir: VirtualFile) = File(dir.path, JujutsuVcs.DOT_JJ).isDirectory
+        fun isJujutsuRoot(dir: VirtualFile) = File(dir.path, JujutsuVcsBase.DOT_JJ).isDirectory
 
         /**
          * Search upward from the given directory to find the JJ repository root.

@@ -27,7 +27,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import java.io.File
 import javax.swing.JCheckBox
 import javax.swing.JComponent
@@ -141,7 +141,7 @@ class JujutsuCloneComponent(private val project: Project) : VcsCloneDialogExtens
                     LocalFileSystem.getInstance().findFileByIoFile(parentDir)?.refresh(true, true)
 
                     // Call listener on background thread (required by CheckoutListener contract)
-                    checkoutListener.directoryCheckedOut(destDir, JujutsuVcs.getKey())
+                    checkoutListener.directoryCheckedOut(destDir, JujutsuVcsBase.getKey())
                     checkoutListener.checkoutCompleted()
                 } else {
                     invokeLater(ModalityState.defaultModalityState()) {

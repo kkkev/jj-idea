@@ -18,6 +18,7 @@ import com.intellij.openapi.vcs.util.paths.RecursiveFilePathSet
 import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.ignore.IGNORE_REPORT_CAP
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import `in`.kkkev.jjidea.vcs.relativeTo
@@ -103,7 +104,7 @@ class JujutsuChangeProviderTest {
 
         val changeSlot = slot<Change>()
         every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+            builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey())
         } returns Unit
 
         jcp.parseStatus(output, repo, builder)
@@ -122,7 +123,7 @@ class JujutsuChangeProviderTest {
 
         val changeSlot = slot<Change>()
         every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+            builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey())
         } returns Unit
 
         val filePathSlot = slot<FilePath>()
@@ -148,7 +149,7 @@ class JujutsuChangeProviderTest {
 
         val changeSlot = slot<Change>()
         every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+            builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey())
         } returns Unit
 
         val filePathSlot = slot<FilePath>()
@@ -176,7 +177,7 @@ class JujutsuChangeProviderTest {
 
         val changeSlot = slot<Change>()
         every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+            builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey())
         } returns Unit
 
         val filePathSlot = slot<FilePath>()
@@ -206,7 +207,7 @@ class JujutsuChangeProviderTest {
 
         val changeSlot = slot<Change>()
         every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+            builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey())
         } returns Unit
 
         val filePathSlot = slot<FilePath>()
@@ -236,7 +237,7 @@ class JujutsuChangeProviderTest {
 
         val changeSlot = slot<Change>()
         every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+            builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey())
         } returns Unit
 
         val filePathSlot = slot<FilePath>()
@@ -264,7 +265,7 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("C {foo.txt => bar.txt}")
 
         val changeSlot = slot<Change>()
-        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
         every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
@@ -287,7 +288,7 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("C {foo/bar.txt => bar/bam.txt}")
 
         val changeSlot = slot<Change>()
-        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
         every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
@@ -310,7 +311,7 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("C foo/{bar.txt => bam.txt}")
 
         val changeSlot = slot<Change>()
-        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
         every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
@@ -333,7 +334,7 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("C {foo => bar}/bar.txt")
 
         val changeSlot = slot<Change>()
-        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
         every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
@@ -356,7 +357,7 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("C {bookmark.svg => bookmarkAction.svg}", "M other.txt")
 
         val changes = mutableListOf<Change>()
-        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changes), JujutsuVcsBase.getKey()) } returns Unit
         every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
@@ -378,7 +379,7 @@ class JujutsuChangeProviderTest {
 
         val changeSlot = slot<Change>()
         every {
-            builder.processChange(capture(changeSlot), JujutsuVcs.getKey())
+            builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey())
         } returns Unit
 
         val filePathSlot = slot<FilePath>()
@@ -407,7 +408,7 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("R pages/{ => blankExperience}/blankExperience.tsx")
 
         val changeSlot = slot<Change>()
-        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
         every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
@@ -429,7 +430,7 @@ class JujutsuChangeProviderTest {
         val output = statusOutput("R pages/{blankExperience => }/blankExperience.tsx")
 
         val changeSlot = slot<Change>()
-        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
         every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
@@ -455,7 +456,7 @@ class JujutsuChangeProviderTest {
         )
 
         val changes = mutableListOf<Change>()
-        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changes), JujutsuVcsBase.getKey()) } returns Unit
 
         every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
@@ -480,7 +481,7 @@ class JujutsuChangeProviderTest {
         )
 
         val changes = mutableListOf<Change>()
-        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changes), JujutsuVcsBase.getKey()) } returns Unit
 
         every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
@@ -500,7 +501,7 @@ class JujutsuChangeProviderTest {
         val output = emptyMergeWithConflicts("conflict-test.txt    2-sided conflict")
 
         val changeSlot = slot<Change>()
-        every { builder.processChange(capture(changeSlot), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changeSlot), JujutsuVcsBase.getKey()) } returns Unit
 
         val filePathSlot = slot<FilePath>()
         every { repo.createContentRevision(capture(filePathSlot), any<ContentLocator>()) } answers {
@@ -526,7 +527,7 @@ class JujutsuChangeProviderTest {
         )
 
         val changes = mutableListOf<Change>()
-        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changes), JujutsuVcsBase.getKey()) } returns Unit
 
         every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
@@ -553,7 +554,7 @@ class JujutsuChangeProviderTest {
         )
 
         val changes = mutableListOf<Change>()
-        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changes), JujutsuVcsBase.getKey()) } returns Unit
         every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }
@@ -696,7 +697,7 @@ class JujutsuChangeProviderTest {
         val explicitConflictPaths = setOf(longPath)
 
         val changes = mutableListOf<Change>()
-        every { builder.processChange(capture(changes), JujutsuVcs.getKey()) } returns Unit
+        every { builder.processChange(capture(changes), JujutsuVcsBase.getKey()) } returns Unit
         every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
             val fp = firstArg<FilePath>()
             mockk<ContentRevision> { every { file } returns fp }

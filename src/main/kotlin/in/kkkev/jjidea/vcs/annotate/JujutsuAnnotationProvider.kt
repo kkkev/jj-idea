@@ -20,7 +20,7 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.jj.reconstructMergeParentContent
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.contentLocator
 import `in`.kkkev.jjidea.vcs.filePath
@@ -31,7 +31,7 @@ import java.util.concurrent.CancellationException
 /**
  * Provides file annotations (blame) for Jujutsu files
  */
-class JujutsuAnnotationProvider(private val project: Project, private val vcs: JujutsuVcs) :
+class JujutsuAnnotationProvider(private val project: Project, private val vcs: JujutsuVcsBase) :
     AnnotationProvider,
     CacheableAnnotationProvider {
     private val log = Logger.getInstance(javaClass)

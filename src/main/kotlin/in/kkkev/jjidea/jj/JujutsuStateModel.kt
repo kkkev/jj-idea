@@ -23,8 +23,8 @@ import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.notifiableState
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.simpleNotifier
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
-import `in`.kkkev.jjidea.vcs.JujutsuVcs.Companion.DOT_JJ
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase.Companion.DOT_JJ
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuTrackedFilesService
@@ -96,7 +96,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
      * Cache of JJ VCS root directories, regardless of whether they have been initialised.
      */
     val jujutsuVcsRoots = notifiableState(project, "Jujutsu VCS Root Directories", emptySet()) {
-        project.projectLevelVcsManager.findVcsByName(JujutsuVcs.VCS_NAME)
+        project.projectLevelVcsManager.findVcsByName(JujutsuVcsBase.VCS_NAME)
             ?.let { project.projectLevelVcsManager.getDirectoryMappings(it) }
             ?.mapNotNull {
                 (it.directory.takeIf { it.isNotEmpty() } ?: project.basePath)

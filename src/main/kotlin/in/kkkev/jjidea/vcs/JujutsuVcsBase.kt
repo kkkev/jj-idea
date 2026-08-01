@@ -6,9 +6,7 @@ import com.intellij.openapi.vcs.AbstractVcs
 import com.intellij.openapi.vcs.VcsKey
 import com.intellij.openapi.vcs.VcsType
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.vcs.commit.CommitMode
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider
 import `in`.kkkev.jjidea.vcs.changes.JujutsuChangeProvider
 import `in`.kkkev.jjidea.vcs.diff.JujutsuDiffProvider
@@ -16,9 +14,15 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuHistoryProvider
 import `in`.kkkev.jjidea.vcs.merge.JujutsuMergeProvider
 
 /**
- * Main VCS implementation for Jujutsu
+ * Main VCS implementation for Jujutsu.
+ *
+ * `open` so the platform-version-gated `JujutsuVcs` subclass (`src/main/kotlin-commitModeOld`/
+ * `kotlin-commitModeNew`, switched in build.gradle.kts) can add [AbstractVcs.getForcedCommitMode]
+ * — its signature, and the shape of `com.intellij.vcs.commit.CommitMode` it returns, changed
+ * incompatibly between platform build 253 (2025.3) and 261 (2026.1), with no compat shim on
+ * either side, so it can't live in this version-agnostic base class (jj-idea-r5jf).
  */
-class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
+open class JujutsuVcsBase(project: Project) : AbstractVcs(project, VCS_NAME) {
     private val lazyChangeProvider by lazy { JujutsuChangeProvider(this) }
     private val lazyDiffProvider by lazy { JujutsuDiffProvider(project) }
     private val lazyHistoryProvider by lazy { JujutsuHistoryProvider(project) }
@@ -70,17 +74,6 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun isCommitActionDisabled() = true
 
     /**
-     * For jj-only projects, hides the standard Commit tool window and Local Changes tab in
-     * favor of the plugin's jj-aware "Working copy" tool window (see [JujutsuHiddenCommitMode]).
-     * Only consulted by the platform when Jujutsu is the *single* active VCS, so mixed
-     * Jujutsu + Git projects are unaffected and keep the standard Commit panel for their
-     * Git roots. Gated by [JujutsuSettings.hideStandardCommitToolWindow] so users who prefer
-     * the standard panel can opt back in (jj-idea-wb5l).
-     */
-    override fun getForcedCommitMode(originalMode: CommitMode): CommitMode? =
-        if (JujutsuSettings.getInstance(myProject).state.hideStandardCommitToolWindow) JujutsuHiddenCommitMode else null
-
-    /**
      * The roots for this VCS.
      * Note: This calls ProjectLevelVcsManager which may be slow - avoid calling on EDT.
      */
@@ -91,7 +84,7 @@ class JujutsuVcs(project: Project) : AbstractVcs(project, VCS_NAME) {
         const val VCS_NAME = "Jujutsu"
         const val DOT_JJ = ".jj"
 
-        private val log = Logger.getInstance(JujutsuVcs::class.java)
+        private val log = Logger.getInstance(JujutsuVcsBase::class.java)
 
         private val KEY = createKey(VCS_NAME)
 

@@ -11,7 +11,7 @@ import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.measurePerf
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.getChildPath
 import `in`.kkkev.jjidea.vcs.ignore.IGNORE_REPORT_CAP
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
@@ -20,7 +20,7 @@ import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 /**
  * Provides change information for jujutsu working copy
  */
-class JujutsuChangeProvider(private val vcs: JujutsuVcs) : ChangeProvider {
+class JujutsuChangeProvider(private val vcs: JujutsuVcsBase) : ChangeProvider {
     private val log = Logger.getInstance(javaClass)
 
     override fun getChanges(

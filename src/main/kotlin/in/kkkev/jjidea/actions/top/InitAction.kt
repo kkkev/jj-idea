@@ -18,7 +18,7 @@ import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.jj.commandExecutorFactory
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuRootChecker
-import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 import javax.swing.JComponent
 
@@ -54,7 +54,7 @@ class InitAction : DumbAwareAction(
             VfsUtil.markDirtyAndRefresh(false, true, true, newRoot)
 
             val manager = project.projectLevelVcsManager
-            val newMappings = VcsUtil.addMapping(manager.getDirectoryMappings(), newRoot.path, JujutsuVcs.VCS_NAME)
+            val newMappings = VcsUtil.addMapping(manager.getDirectoryMappings(), newRoot.path, JujutsuVcsBase.VCS_NAME)
             manager.setDirectoryMappings(newMappings)
 
             result
