@@ -228,7 +228,9 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
      * Build HTML for one or more commit details.
      * Multiple entries are separated by <hr> dividers, capped at MAX_DISPLAYED_COMMITS.
      */
-    private fun buildCommitHtml(entries: List<LogEntry>) = htmlString {
+    private fun buildCommitHtml(entries: List<LogEntry>) = htmlString(
+        issueLinks = IssueNavigationConfiguration.getInstance(project)
+    ) {
         val displayed = entries.take(MAX_DISPLAYED_COMMITS)
         control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
             displayed.forEachIndexed { index, entry ->
@@ -236,7 +238,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
                 appendSummaryAndStatuses(entry)
                 appendParents(entry)
                 control("<pre style='white-space: pre-wrap;'>", "</pre>") {
-                    append(entry.description, IssueNavigationConfiguration.getInstance(project))
+                    append(entry.description)
                 }
                 control("<p style='margin: 4px 0;'>", "</p>") {
                     appendUserWithTimestamp(entry.author, entry.authorTimestamp)

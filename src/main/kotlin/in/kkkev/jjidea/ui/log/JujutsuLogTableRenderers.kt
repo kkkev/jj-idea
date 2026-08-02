@@ -47,9 +47,17 @@ class DateCellRenderer : TextTableCellRenderer<Instant>() {
 
 /**
  * Build a [FragmentRecordingCanvas] with the standard row styling (bold for working copy,
- * foreground color for selection state) applied around [builder].
+ * foreground color for selection state) applied around [builder]. [issueLinks]/[hoveredTarget] are
+ * injected into the canvas itself (jj-idea-91qf, jj-idea-vrmv) rather than threaded through every
+ * append call inside [builder] - see [TextCanvas.issueLinks]/[TextCanvas.hoveredTarget].
  */
-fun entryCanvas(entry: LogEntry, fg: Color, builder: TextCanvas.() -> Unit) = FragmentRecordingCanvas().apply {
+fun entryCanvas(
+    entry: LogEntry,
+    fg: Color,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null,
+    builder: TextCanvas.() -> Unit
+) = FragmentRecordingCanvas(issueLinks = issueLinks, hoveredTarget = hoveredTarget).apply {
     foreground(fg) {
         styled(if (entry.isWorkingCopy) Font.BOLD else 0, builder)
     }
@@ -111,8 +119,7 @@ fun cappedDecorations(
     issueLinks: IssueNavigationConfiguration? = null,
     hoveredTarget: URI? = null
 ): CappedDecorations {
-    val units =
-        bookmarkDecorationUnits(entry, issueLinks, hoveredTarget) + tagDecorationUnits(entry, issueLinks, hoveredTarget)
+    val units = bookmarkDecorationUnits(entry) + tagDecorationUnits(entry)
 
     fun widthOf(builder: TextCanvas.() -> Unit) =
         FragmentRecordingCanvas().apply(builder).fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
@@ -140,7 +147,7 @@ fun cappedDecorations(
     }
 
     val hiddenUnits = units.drop(kept)
-    val canvas = entryCanvas(entry, fg) {
+    val canvas = entryCanvas(entry, fg, issueLinks, hoveredTarget) {
         units.take(kept).forEachIndexed { i, unit ->
             if (i > 0) append(" ")
             unit.build(this)
@@ -234,13 +241,13 @@ internal fun findDescriptionLinkUri(
     frc: FontRenderContext
 ): URI? {
     if (!columnManager.showDescription) return null
-    val leftCanvas = entryCanvas(entry, Color.BLACK) {
+    val leftCanvas = entryCanvas(entry, Color.BLACK, issueLinks) {
         if (columnManager.showStatus) appendStatusIndicators(entry)
         if (columnManager.showChangeId) {
             append(entry.id)
             append(" ")
         }
-        appendDescriptionAndEmptyIndicator(entry, issueLinks)
+        appendDescriptionAndEmptyIndicator(entry)
     }
     val rightWidth = if (columnManager.showDecorations) {
         cappedDecorations(entry, Color.BLACK, cellWidth * DECORATION_WIDTH_FRACTION, font, frc)

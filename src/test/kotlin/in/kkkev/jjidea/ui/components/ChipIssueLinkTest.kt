@@ -37,9 +37,9 @@ class ChipIssueLinkTest {
     @Test
     fun `a bookmark name containing an issue reference linkifies just that substring`() {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
-        val canvas = FragmentRecordingCanvas()
+        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
 
-        canvas.appendBookmarks(e, issueLinks = jiraConfig)
+        canvas.appendBookmarks(e)
 
         val issueFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "JIRA-123" }
@@ -50,9 +50,9 @@ class ChipIssueLinkTest {
     @Test
     fun `the rest of the chip keeps the bookmark's jjref target, not the inner issue link`() {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
-        val canvas = FragmentRecordingCanvas()
+        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
 
-        canvas.appendBookmarks(e, issueLinks = jiraConfig)
+        canvas.appendBookmarks(e)
 
         val suffixFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "-fix-thing" }
@@ -66,9 +66,9 @@ class ChipIssueLinkTest {
     @Test
     fun `a bookmark name with no matching reference renders unaffected`() {
         val e = entry(listOf(Bookmark("plain-bookmark")))
-        val canvas = FragmentRecordingCanvas()
+        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
 
-        canvas.appendBookmarks(e, issueLinks = jiraConfig)
+        canvas.appendBookmarks(e)
 
         val labelFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "plain-bookmark" }
@@ -79,9 +79,9 @@ class ChipIssueLinkTest {
     fun `the linkified chip substring underlines only while its URI matches hoveredTarget`() {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
         val trackerUri = URI("https://tracker/JIRA-123")
-        val canvas = FragmentRecordingCanvas()
+        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig, hoveredTarget = trackerUri)
 
-        canvas.appendBookmarks(e, issueLinks = jiraConfig, hoveredTarget = trackerUri)
+        canvas.appendBookmarks(e)
 
         val issueFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "JIRA-123" }
@@ -93,25 +93,35 @@ class ChipIssueLinkTest {
     }
 
     @Test
-    fun `a tag name containing an issue reference linkifies just that substring`() {
+    fun `a tag name containing an issue reference linkifies via the injected canvas config`() {
+        val e = entry(tags = listOf(Tag("JIRA-123-fix-thing")))
+        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
+
+        canvas.appendTags(e)
+
+        val issueFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+            .single { it.text == "JIRA-123" }
+        issueFragment.linkTarget shouldBe URI("https://tracker/JIRA-123")
+    }
+
+    @Test
+    fun `a tag name renders unaffected when the canvas has no issueLinks injected`() {
         val e = entry(tags = listOf(Tag("JIRA-123-fix-thing")))
         val canvas = FragmentRecordingCanvas()
 
         canvas.appendTags(e)
 
-        // appendTags doesn't thread issueLinks (tooltip/uncapped path); linkification for tags goes
-        // through tagDecorationUnits (the capped, interactive log-column path) instead.
         val issueFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .singleOrNull { it.text == "JIRA-123" }
         issueFragment shouldBe null
     }
 
     @Test
-    fun `tagDecorationUnits linkifies an issue reference inside a tag name`() {
+    fun `tagDecorationUnits linkifies an issue reference inside a tag name when built on an injected canvas`() {
         val e = entry(tags = listOf(Tag("JIRA-123-fix-thing")))
 
-        val units = tagDecorationUnits(e, jiraConfig)
-        val canvas = FragmentRecordingCanvas().apply { units.single().build(this) }
+        val units = tagDecorationUnits(e)
+        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig).apply { units.single().build(this) }
 
         val issueFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "JIRA-123" }

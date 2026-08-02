@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.SimpleTextAttributes
 import java.net.URI
 
@@ -13,8 +14,15 @@ import java.net.URI
  *
  * Fragments inside a [linked] block carry that URI as their [Fragment.linkTarget], enabling
  * hit-testing in interactive table renderers.
+ *
+ * [issueLinks]/[hoveredTarget] are injected once here rather than threaded through every append
+ * call (jj-idea-91qf, jj-idea-vrmv) - see [TextCanvas.issueLinks]/[TextCanvas.hoveredTarget].
  */
-class FragmentRecordingCanvas(initialFragments: List<Fragment> = emptyList()) : StyledTextCanvas() {
+class FragmentRecordingCanvas(
+    initialFragments: List<Fragment> = emptyList(),
+    override val issueLinks: IssueNavigationConfiguration? = null,
+    override val hoveredTarget: URI? = null
+) : StyledTextCanvas() {
     sealed interface Fragment {
         val truncatable: Boolean
         val linkTarget: Any?

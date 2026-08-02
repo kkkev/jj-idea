@@ -9,16 +9,24 @@ import java.net.URI
 import java.net.URLEncoder
 
 /**
- * Create a full HTML document including wrapping `<html>` tag.
+ * Create a full HTML document including wrapping `<html>` tag. [issueLinks], when non-null,
+ * linkifies issue-tracker references in any [appendLinkified]-based content (e.g. a description)
+ * for the whole document - injected once here rather than threaded through every append call
+ * (jj-idea-91qf).
  */
-fun htmlString(builder: (TextCanvas.() -> Unit)) = htmlText { control("<html>", "</html>", builder) }
+fun htmlString(issueLinks: IssueNavigationConfiguration? = null, builder: (TextCanvas.() -> Unit)) =
+    htmlText(issueLinks) { control("<html>", "</html>", builder) }
 
 /**
  * Create some inline HTML text, to be used inside an existing HTML document.
  */
-private fun htmlText(builder: (TextCanvas.() -> Unit)) = HtmlTextCanvas(StringBuilder()).apply(builder).sb.toString()
+private fun htmlText(issueLinks: IssueNavigationConfiguration? = null, builder: (TextCanvas.() -> Unit)) =
+    HtmlTextCanvas(StringBuilder(), issueLinks).apply(builder).sb.toString()
 
-private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
+private class HtmlTextCanvas(
+    val sb: StringBuilder,
+    override val issueLinks: IssueNavigationConfiguration? = null
+) : StyledTextCanvas() {
     override fun control(open: String, close: String, builder: TextCanvas.() -> Unit) {
         sb.append(open)
         builder()
@@ -40,8 +48,8 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
      * split the icon from its label, or the label across lines, when the row needs to wrap (jj-idea-kds1) — folding
      * everything into a single leaf view makes that impossible.
      *
-     * Since the label is opaque (URL-encoded into an `<icon>` `src`, not real text runs), [issueLinks] can't
-     * linkify a substring of it here the way [appendLinkified] does for plain text - chip labels only get
+     * Since the label is opaque (URL-encoded into an `<icon>` `src`, not real text runs), [TextCanvas.issueLinks]
+     * can't linkify a substring of it here the way [appendLinkified] does for plain text - chip labels only get
      * interactive issue-tracker sub-links in the fragment-based log column (jj-idea-vrmv), not this HTML backend.
      */
     override fun appendChip(
@@ -50,9 +58,7 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
         prefixIcon: IconSpec?,
         strikethrough: Boolean,
         suffix: String?,
-        suffixColor: Color?,
-        issueLinks: IssueNavigationConfiguration?,
-        hoveredTarget: URI?
+        suffixColor: Color?
     ) {
         fun key(spec: IconSpec): String {
             val src = applyCurrentColor(spec).qualified

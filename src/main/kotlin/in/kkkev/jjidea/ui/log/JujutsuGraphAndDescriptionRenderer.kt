@@ -129,7 +129,7 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
-        private fun buildTooltip(entry: LogEntry) = htmlString {
+        private fun buildTooltip(entry: LogEntry) = htmlString(issueLinks = issueLinks) {
             appendSummaryAndStatuses(entry)
             entry.author?.let { author ->
                 append(author)
@@ -140,7 +140,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 append("\n")
             }
             control("<pre style='white-space: pre-wrap;'>", "</pre>") {
-                appendSummary(entry.description, issueLinks)
+                appendSummary(entry.description)
             }
         }
 
@@ -150,14 +150,14 @@ class JujutsuGraphAndDescriptionRenderer(
             val frc = table.getFontMetrics(table.font).fontRenderContext
             val hoveredDescriptionUri = hoveredDescriptionLinkUri(entry, columnWidth, frc)
 
-            val leftCanvas = entryCanvas(entry, fg) {
+            val leftCanvas = entryCanvas(entry, fg, issueLinks, hoveredDescriptionUri) {
                 if (columnManager.showStatus) appendStatusIndicators(entry)
                 if (columnManager.showChangeId) {
                     append(entry.id)
                     append(" ")
                 }
                 if (columnManager.showDescription) {
-                    appendDescriptionAndEmptyIndicator(entry, issueLinks, hoveredDescriptionUri)
+                    appendDescriptionAndEmptyIndicator(entry)
                 }
             }
 
