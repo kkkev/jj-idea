@@ -8,6 +8,7 @@ import com.intellij.openapi.vcs.merge.MergeProvider2
 import com.intellij.openapi.vcs.merge.MergeSession
 import com.intellij.openapi.vcs.merge.MergeSessionEx
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.EditorNotifications
 import com.intellij.util.ui.ColumnInfo
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -23,7 +24,10 @@ class JujutsuMergeProvider(
     private val project: Project,
     private val extractor: ConflictExtractor = JjMarkerConflictExtractor(),
     private val repoFor: (VirtualFile) -> JujutsuRepository? = { project.possibleJujutsuRepositoryFor(it) },
-    private val refreshAfterResolve: (JujutsuRepository) -> Unit = { it.invalidate(vfsChanged = true) }
+    private val refreshAfterResolve: (JujutsuRepository) -> Unit = { it.invalidate(vfsChanged = true) },
+    private val refreshEditorNotifications: (VirtualFile) -> Unit = {
+        EditorNotifications.getInstance(project).updateNotifications(it)
+    }
 ) : MergeProvider2 {
     // Called on a background thread by the merge framework
     override fun loadRevisions(file: VirtualFile): MergeData {
@@ -51,10 +55,16 @@ class JujutsuMergeProvider(
      * Without the repo-level invalidate, [VcsDirtyScopeManager.fileDirty] alone is insufficient:
      * the cached working-copy [LogEntry] keeps `hasConflict = true`, the stateKey doesn't change,
      * and the dirty cascade never fires — leaving resolved files perpetually conflicted in the panel.
+     *
+     * Also refreshes any open editor's [in.kkkev.jjidea.ui.editor.JujutsuConflictEditorNotificationProvider]
+     * banner directly: that provider re-evaluates from [ChangeListManager][com.intellij.openapi.vcs.changes.ChangeListManager],
+     * which the `fileDirty`/`invalidate` calls above only update asynchronously, so without this the
+     * banner could linger stale for a file the user just resolved.
      */
     private fun refreshResolved(files: List<VirtualFile>) {
         files.forEach { VcsDirtyScopeManager.getInstance(project).fileDirty(it) }
         files.mapNotNull { repoFor(it) }.distinct().forEach(refreshAfterResolve)
+        files.forEach(refreshEditorNotifications)
     }
 
     private inner class JujutsuMergeSession(files: List<VirtualFile>) : MergeSessionEx {

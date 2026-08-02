@@ -104,6 +104,23 @@ Use this checklist:
       as a sub-menu with the usual bookmark actions (Rename…, Delete, Forget, etc.); right-
       clicking it does the same (jj-idea-w61m)
 
+#### Issue-tracker links in the log table's description column (jj-idea-91qf)
+
+- [ ] In Settings → Version Control → Issue Navigation, add a pattern (e.g. issue regexp
+      `[A-Z]+-\d+`, link `https://example.com/browse/$0`); Apply
+- [ ] A commit whose description contains a matching reference (e.g. `Fixes JIRA-123`) shows it
+      link-colored (not underlined at rest) in the log table's description column
+- [ ] Hovering just the reference shows a hand cursor and underlines only that word, not the rest
+      of the description; hovering elsewhere in the description shows the default cursor
+- [ ] Left-clicking the reference opens the URL in your default browser
+- [ ] Right-clicking the reference shows a popup with a single "Open <url>" action that does the same
+- [ ] The row tooltip's description also renders the reference as a link
+- [ ] With no Issue Navigation patterns configured, the description column renders exactly as
+      before (no link, no hover cue)
+- [ ] Narrowing the column so the description truncates still linkifies a reference that appears
+      before the truncation point; one that would appear after it is dropped along with the rest
+      of the truncated text, not left half-rendered
+
 ### Details Panel
 
 - [ ] Details panel shows on row selection
@@ -817,6 +834,16 @@ conflicted file reachable from the working copy).
 - [ ] After closing the tool, `file.txt` content on disk reflects the resolution (no conflict markers)
 - [ ] `file.txt` disappears from the Working Copy panel's conflict list **automatically**, without pressing Refresh (jj-idea-3cvb: a stale conflict decoration used to survive even a manual Refresh)
 - [ ] Right-clicking `file.txt` again (now resolved): "Resolve Conflicts…" is **not visible**, and if triggered anyway does not throw
+
+#### Editor notification banner (jj-idea-aunm, GitHub #56)
+
+- [ ] Open `file.txt` in the editor: a warning-colored banner appears at the top with text like "This file has merge conflicts" and a **"Resolve"** action link
+- [ ] Clicking "Resolve" opens the merge tool for `file.txt` (same three-way merge tool as the other entry points)
+- [ ] Cancelling out of the merge tool from this entry point still **leaves conflict markers intact** (the GitHub #63 invariant)
+- [ ] After resolving `file.txt` via the banner (or via any other entry point while the file is open in the editor), the banner **disappears automatically**, without switching tabs or reopening the file
+- [ ] Open a **non-conflicted** jj-tracked file: no banner appears
+- [ ] Mixed jj + Git project: opening a file with a **Git** conflict shows no jj banner (and vice versa)
+- [ ] Open a conflicted file that is **outside** any jj repo (e.g. an unrelated Git-only root in a multi-root project): no jj banner appears
 
 #### Cancelling must never discard a side (GitHub #63 — critical regression check)
 

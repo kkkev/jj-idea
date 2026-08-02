@@ -52,6 +52,11 @@ import java.nio.file.Files
  * jj-only projects; the gap only remains reachable if a user opts back into that window, or in
  * a mixed jj + Git project.
  *
+ * The Working Copy tool window's own replacement for that grouped affordance is
+ * [in.kkkev.jjidea.ui.common.JujutsuConflictsNode] (GitHub #56, jj-idea-uoeg) — a "Merge
+ * Conflicts" tag node pinned to the top of its changes tree, whose "Resolve" link and the
+ * companion `Jujutsu.ResolveAllConflicts` toolbar action both route through this class.
+ *
  * @param resolveOne Runs the merge tool for one file and returns the resolved bytes, or null if
  *   cancelled. Overridable for testing; the default opens the real three-way merge tool.
  * @param writeResolved Writes resolved bytes back to the file. Overridable for testing.

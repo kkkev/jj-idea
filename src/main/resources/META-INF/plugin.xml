@@ -100,6 +100,10 @@
 
     <openapi.vcs.changes.ui.filePathIconProvider
         implementation="in.kkkev.jjidea.ui.common.JujutsuFilePathIconProvider"/>
+
+    <!-- Editor banner nudging the user to resolve a conflicted file (jj-idea-aunm, GitHub #56) -->
+    <editorNotificationProvider
+        implementation="in.kkkev.jjidea.ui.editor.JujutsuConflictEditorNotificationProvider"/>
   </extensions>
 
   <actions>

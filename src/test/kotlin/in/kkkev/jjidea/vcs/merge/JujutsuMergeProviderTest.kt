@@ -22,7 +22,7 @@ import org.junit.jupiter.api.Test
 class JujutsuMergeProviderTest {
     private val project = mockk<Project>()
     private val extractor = mockk<ConflictExtractor>()
-    private val provider = JujutsuMergeProvider(project, extractor, repoFor = { null })
+    private val provider = JujutsuMergeProvider(project, extractor, repoFor = { null }, refreshEditorNotifications = {})
 
     @Test
     fun `loadRevisions - conflict content - returns correct MergeData`() {
@@ -107,7 +107,7 @@ class JujutsuMergeProviderTest {
     private fun refreshProvider(
         repoFor: (VirtualFile) -> JujutsuRepository?,
         refreshAfterResolve: (JujutsuRepository) -> Unit
-    ) = JujutsuMergeProvider(project, extractor, repoFor, refreshAfterResolve)
+    ) = JujutsuMergeProvider(project, extractor, repoFor, refreshAfterResolve, refreshEditorNotifications = {})
 
     @Test
     fun `conflictResolvedForFile - known repo - calls refreshAfterResolve once`() {
@@ -132,6 +132,25 @@ class JujutsuMergeProviderTest {
 
         refreshed shouldBe emptyList()
         verify { dirtyScopeManager.fileDirty(file) }
+    }
+
+    @Test
+    fun `conflictResolvedForFile - refreshes the editor notification banner for the resolved file`() {
+        // jj-idea-aunm: without this, a conflict banner already open in the editor could linger
+        // stale after the user resolves the file through some other entry point.
+        val file = mockk<VirtualFile>()
+        val notified = mutableListOf<VirtualFile>()
+        val p = JujutsuMergeProvider(
+            project,
+            extractor,
+            repoFor = { null },
+            refreshAfterResolve = {},
+            refreshEditorNotifications = { notified += it }
+        )
+
+        p.conflictResolvedForFile(file)
+
+        notified shouldBe listOf(file)
     }
 
     @Test
