@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.5] - 2026-08-02
+
 ### Changed
 - In a jj-only project, the standard IDE "Commit" tool window and its "Local Changes" tab are now hidden — they only ever showed a half-working commit dialog and a look-alike changes list that lacked jj's actions, which confused people into using it instead of the "Working copy" tool window. This also removes the "Resolve" link on the Commit tool window's conflict node, which never worked for jj conflicts. A new "Hide the standard Commit tool window" setting (Settings → Version Control → Jujutsu) lets you turn it back on; projects that also use Git alongside jj are unaffected either way. ([#56](https://github.com/kkkev/jj-idea/issues/56))
 - The "Working copy" tool window now opens automatically (without stealing focus) the first time you open a jj project, and a one-time tip explains what it's for and how it replaces the standard Commit panel. ([#56](https://github.com/kkkev/jj-idea/issues/56))
@@ -722,7 +724,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.5...HEAD
+[0.8.5]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.5
 [0.8.4]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.4
 [0.8.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.3
 [0.8.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.2
