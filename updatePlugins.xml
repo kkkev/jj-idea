@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.3/jj-idea-0.8.3.zip" version="0.8.3">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.4/jj-idea-0.8.4.zip" version="0.8.4">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,11 +23,11 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.8.3</h3>
+      <h3>0.8.4</h3>
       
 <h4>Fixed</h4>
-<li>The "Hide the standard Commit tool window" setting (and the rest of the jj-only-project Commit tool window behavior it controls) silently stopped applying on IntelliJ 2025.2 and 2025.3 as of 0.8.2 — a platform API the plugin relies on was renamed in a later IntelliJ release the plugin happened to be built against. IntelliJ 2026.1 and newer were unaffected.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.3">full release notes</a> for details.</p>
+<li>The JetBrains Plugin Verifier still flagged a binary incompatibility with IntelliJ 2025.3 in 0.8.3 ("Abstract method CommitMode.useCommitToolWindow() is not implemented") — 0.8.3's fix only addressed this plugin's own local compile-time checks, not the actual published build, which is always compiled against the newest supported IntelliJ version and therefore can't statically implement the differently-shaped `CommitMode` interface from older versions at the same time. The "Hide the standard Commit tool window" feature now builds its `CommitMode` value at runtime instead of as a fixed class, so the same published build is binary-compatible with every supported IntelliJ version.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.4">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
