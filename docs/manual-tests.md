@@ -121,6 +121,23 @@ Use this checklist:
       before the truncation point; one that would appear after it is dropped along with the rest
       of the truncated text, not left half-rendered
 
+#### Issue-tracker links inside bookmark/tag chip names (jj-idea-vrmv)
+
+- [ ] With an Issue Navigation pattern configured (as above), create/rename a bookmark to include a
+      matching reference (e.g. `jira-123-fix-thing`, regexp `[A-Za-z]+-\d+`) — the reference renders
+      link-colored within the chip; the rest of the chip (icon, remaining text) stays plain
+- [ ] Hovering just the reference substring shows a hand cursor and underlines only it; hovering the
+      rest of the same chip (icon or non-matching text) shows no hand cursor, matching plain
+      bookmark/tag chip hover (jj-idea-wkcz)
+- [ ] Left-clicking the reference substring opens the URL in your default browser; left-clicking
+      elsewhere in the chip does nothing (still no whole-chip left-click action)
+- [ ] Right-clicking the reference substring shows a popup with a single "Open <url>" action;
+      right-clicking elsewhere in the same chip still shows the usual bookmark/tag actions menu
+      (Rename…, Delete, Forget, etc.) — the two right-click behaviors are position-sensitive
+- [ ] Repeat for a tag name containing a matching reference
+- [ ] A bookmark/tag name with no matching reference renders unaffected
+- [ ] With no Issue Navigation patterns configured, chip names render exactly as before
+
 ### Details Panel
 
 - [ ] Details panel shows on row selection

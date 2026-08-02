@@ -97,15 +97,22 @@ data class CappedDecorations(val canvas: FragmentRecordingCanvas, val hidden: Li
  * `@` marker is never collapsed. The full, uncapped list remains available via the row tooltip
  * ([appendSummaryAndStatuses]/[appendDecorations]), so capping only narrows what's painted, never
  * what's discoverable.
+ *
+ * [issueLinks], when non-null, linkifies issue-tracker references inside a chip's own name (e.g.
+ * a bookmark named `jira-123-fix-thing`), underlining the fragment matching [hoveredTarget]
+ * (jj-idea-vrmv) - see [in.kkkev.jjidea.ui.components.appendChip].
  */
 fun cappedDecorations(
     entry: LogEntry,
     fg: Color,
     maxWidth: Double,
     font: Font,
-    frc: FontRenderContext
+    frc: FontRenderContext,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
 ): CappedDecorations {
-    val units = bookmarkDecorationUnits(entry) + tagDecorationUnits(entry)
+    val units =
+        bookmarkDecorationUnits(entry, issueLinks, hoveredTarget) + tagDecorationUnits(entry, issueLinks, hoveredTarget)
 
     fun widthOf(builder: TextCanvas.() -> Unit) =
         FragmentRecordingCanvas().apply(builder).fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
@@ -178,6 +185,8 @@ private fun TextCanvas.overflowChip(entry: LogEntry, hiddenCount: Int) {
  * @param font    base font of the table
  * @param frc     font render context from the table
  * @param showDecorations whether the decoration inlining is enabled
+ * @param issueLinks when non-null, also hit-tests an issue-tracker reference linkified inside a
+ *   chip's own name (e.g. a bookmark named `JIRA-123-fix-thing`) - jj-idea-vrmv.
  */
 internal fun findInlinedRefUri(
     entry: LogEntry,
@@ -185,10 +194,12 @@ internal fun findInlinedRefUri(
     colWidth: Int,
     font: Font,
     frc: FontRenderContext,
-    showDecorations: Boolean
+    showDecorations: Boolean,
+    issueLinks: IssueNavigationConfiguration? = null
 ): URI? {
     if (!showDecorations) return null
-    val rightCanvas = cappedDecorations(entry, Color.BLACK, colWidth * DECORATION_WIDTH_FRACTION, font, frc).canvas
+    val rightCanvas =
+        cappedDecorations(entry, Color.BLACK, colWidth * DECORATION_WIDTH_FRACTION, font, frc, issueLinks).canvas
     val rightWidth = rightCanvas.fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
     val rightStart = colWidth - rightWidth
     if (localX < rightStart) return null

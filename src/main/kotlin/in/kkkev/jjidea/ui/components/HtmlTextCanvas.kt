@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.SimpleTextAttributes
 import java.awt.Color
@@ -38,6 +39,10 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
      * one atomic [ChipView]. A plain sequence of `<icon>` + text elements would let the surrounding HTML layout
      * split the icon from its label, or the label across lines, when the row needs to wrap (jj-idea-kds1) — folding
      * everything into a single leaf view makes that impossible.
+     *
+     * Since the label is opaque (URL-encoded into an `<icon>` `src`, not real text runs), [issueLinks] can't
+     * linkify a substring of it here the way [appendLinkified] does for plain text - chip labels only get
+     * interactive issue-tracker sub-links in the fragment-based log column (jj-idea-vrmv), not this HTML backend.
      */
     override fun appendChip(
         icon: IconSpec,
@@ -45,7 +50,9 @@ private class HtmlTextCanvas(val sb: StringBuilder) : StyledTextCanvas() {
         prefixIcon: IconSpec?,
         strikethrough: Boolean,
         suffix: String?,
-        suffixColor: Color?
+        suffixColor: Color?,
+        issueLinks: IssueNavigationConfiguration?,
+        hoveredTarget: URI?
     ) {
         fun key(spec: IconSpec): String {
             val src = applyCurrentColor(spec).qualified

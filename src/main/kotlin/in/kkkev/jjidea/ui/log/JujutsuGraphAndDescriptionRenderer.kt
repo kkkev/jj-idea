@@ -162,7 +162,15 @@ class JujutsuGraphAndDescriptionRenderer(
             }
 
             val rightCanvas = if (columnManager.showDecorations) {
-                cappedDecorations(entry, fg, columnWidth * DECORATION_WIDTH_FRACTION, table.font, frc).canvas
+                cappedDecorations(
+                    entry,
+                    fg,
+                    columnWidth * DECORATION_WIDTH_FRACTION,
+                    table.font,
+                    frc,
+                    issueLinks,
+                    hoveredChipIssueLinkUri(entry, columnWidth, frc)
+                ).canvas
             } else {
                 FragmentRecordingCanvas()
             }
@@ -219,9 +227,32 @@ class JujutsuGraphAndDescriptionRenderer(
             val cellRect = table.getCellRect(row, column, false)
             if (!cellRect.contains(point)) return null
             val columnWidth = table.columnModel.getColumn(column).width
-            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true) ?: return null
+            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, issueLinks)
+                ?: return null
             val target = LogClickTarget.resolve(uri, project = null, listOf(entry))
             return uri.takeIf { target is BookmarkClick || target is TagClick }
+        }
+
+        /**
+         * The URI of a linkified issue-tracker reference (e.g. `JIRA-123`) inside a bookmark/tag
+         * chip's own name under [mousePos], if any (jj-idea-vrmv) - underlines just that inner
+         * fragment while hovered, distinct from [hoveredBookmarkOrTagUri]'s whole-chip background
+         * highlight (the two are mutually exclusive: a hit inside the linkified substring resolves
+         * to [IssueLinkClick], not [BookmarkClick]/[TagClick], so only one cue is ever active).
+         */
+        private fun hoveredChipIssueLinkUri(
+            entry: LogEntry,
+            columnWidth: Int,
+            frc: java.awt.font.FontRenderContext
+        ): URI? {
+            if (issueLinks == null || !columnManager.showDecorations) return null
+            val point = mousePos ?: return null
+            val cellRect = table.getCellRect(row, column, false)
+            if (!cellRect.contains(point)) return null
+            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, issueLinks)
+                ?: return null
+            val target = LogClickTarget.resolve(uri, project = null, listOf(entry))
+            return uri.takeIf { target is IssueLinkClick }
         }
 
         private fun textStartX(): Int {

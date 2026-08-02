@@ -444,7 +444,8 @@ class JujutsuLogTable(
         val uri = when (modelCol) {
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 val frc = getFontMetrics(font).fontRenderContext
-                findInlinedRefUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations)
+                val issueLinks = IssueNavigationConfiguration.getInstance(project)
+                findInlinedRefUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations, issueLinks)
                     ?: descriptionLinkUriAt(modelRow, entry, localX, cellRect.width, font, frc)
             }
             else -> null

@@ -75,6 +75,11 @@ interface TextCanvas {
      * with an optional trailing [suffix] in [suffixColor]. Implementations should render this as a single
      * unbreakable unit, so a bookmark/tag chip's icon is never separated from its name, and the name never wraps
      * mid-word, when the surrounding layout needs to wrap (jj-idea-kds1).
+     *
+     * [issueLinks], when non-null, linkifies any issue-tracker reference within [label] itself (e.g. a bookmark
+     * named `jira-123-fix-thing`), the same as [appendLinkified] does for description text (jj-idea-vrmv). The
+     * surrounding chip keeps its own [linked] target (set by the caller) for right-click resolution; only the
+     * matching substring gets the inner issue-link target, underlined while it equals [hoveredTarget].
      */
     fun appendChip(
         icon: IconSpec,
@@ -82,11 +87,19 @@ interface TextCanvas {
         prefixIcon: IconSpec? = null,
         strikethrough: Boolean = false,
         suffix: String? = null,
-        suffixColor: Color? = null
+        suffixColor: Color? = null,
+        issueLinks: IssueNavigationConfiguration? = null,
+        hoveredTarget: URI? = null
     ) {
         prefixIcon?.let { append(it) }
         append(icon)
-        if (strikethrough) strikethrough { append(label) } else append(label)
+        val linkLambda: TextCanvas.() -> Unit = { appendLinkified(label, issueLinks, hoveredTarget) }
+
+        if (strikethrough) {
+            strikethrough(linkLambda)
+        } else {
+            linkLambda()
+        }
         suffix?.let { if (suffixColor != null) colored(suffixColor) { append(it) } else append(it) }
     }
 
@@ -276,7 +289,12 @@ fun TextCanvas.append(name: BookmarkName) = colored(JujutsuColors.BOOKMARK) {
     }
 }
 
-private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = colored(JujutsuColors.BOOKMARK) {
+private fun TextCanvas.appendBookmarkChip(
+    bookmark: Bookmark,
+    label: String,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
+) = colored(JujutsuColors.BOOKMARK) {
     smaller {
         val iconRef = if (!bookmark.isRemote || bookmark.tracked) {
             JujutsuIcons::BookmarkTracked
@@ -293,7 +311,9 @@ private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = c
             prefixIcon = if (bookmark.conflict) icon(JujutsuIcons::Conflict) else null,
             strikethrough = bookmark.deleted,
             suffix = divergence.takeIf { it.isNotEmpty() },
-            suffixColor = JujutsuColors.DIVERGENT
+            suffixColor = JujutsuColors.DIVERGENT,
+            issueLinks = issueLinks,
+            hoveredTarget = hoveredTarget
         )
     }
 }
@@ -384,20 +404,34 @@ fun TextCanvas.appendDescriptionAndEmptyIndicator(
     }
 }
 
-fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
+/**
+ * Append every bookmark chip for [entry]. [issueLinks], when non-null, linkifies any issue-tracker
+ * reference within a bookmark's own name (e.g. `jira-123-fix-thing`), underlining the fragment
+ * matching [hoveredTarget] (jj-idea-vrmv) - see [appendChip].
+ */
+fun TextCanvas.appendBookmarks(
+    entry: LogEntry,
+    suffix: String = "",
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
+) {
     val groups = entry.bookmarks.grouped()
     var first = true
     for (group in groups) {
         group.local?.let { local ->
             if (!first) append(" ")
             first = false
-            linked(refUri(entry, "bookmark", local.name.name)) { appendBookmarkChip(local, group.localName) }
+            linked(refUri(entry, "bookmark", local.name.name)) {
+                appendBookmarkChip(local, group.localName, issueLinks, hoveredTarget)
+            }
         }
         for (remote in group.remotes) {
             if (!first) append(" ")
             first = false
             val label = if (group.local != null) "@${remote.remote}" else remote.name.name
-            linked(refUri(entry, "bookmark", remote.name.name)) { appendBookmarkChip(remote, label) }
+            linked(refUri(entry, "bookmark", remote.name.name)) {
+                appendBookmarkChip(remote, label, issueLinks, hoveredTarget)
+            }
         }
     }
     if (suffix.isNotEmpty()) append(suffix)
@@ -411,18 +445,26 @@ fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
 internal data class DecorationUnit(val ref: Any, val build: TextCanvas.() -> Unit)
 
 /** One [DecorationUnit] per bookmark chip that [appendBookmarks] would render, in the same order. */
-internal fun bookmarkDecorationUnits(entry: LogEntry): List<DecorationUnit> {
+internal fun bookmarkDecorationUnits(
+    entry: LogEntry,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
+): List<DecorationUnit> {
     val units = mutableListOf<DecorationUnit>()
     for (group in entry.bookmarks.grouped()) {
         group.local?.let { local ->
             units += DecorationUnit(local) {
-                linked(refUri(entry, "bookmark", local.name.name)) { appendBookmarkChip(local, group.localName) }
+                linked(refUri(entry, "bookmark", local.name.name)) {
+                    appendBookmarkChip(local, group.localName, issueLinks, hoveredTarget)
+                }
             }
         }
         for (remote in group.remotes) {
             val label = if (group.local != null) "@${remote.remote}" else remote.name.name
             units += DecorationUnit(remote) {
-                linked(refUri(entry, "bookmark", remote.name.name)) { appendBookmarkChip(remote, label) }
+                linked(refUri(entry, "bookmark", remote.name.name)) {
+                    appendBookmarkChip(remote, label, issueLinks, hoveredTarget)
+                }
             }
         }
     }
@@ -430,14 +472,25 @@ internal fun bookmarkDecorationUnits(entry: LogEntry): List<DecorationUnit> {
 }
 
 /** One [DecorationUnit] per tag chip that [appendTags] would render, in the same order. */
-internal fun tagDecorationUnits(entry: LogEntry): List<DecorationUnit> =
-    entry.tags.map { tag -> DecorationUnit(tag) { linked(refUri(entry, "tag", tag.name)) { append(tag) } } }
-
-fun TextCanvas.append(tag: Tag) = colored(JujutsuColors.TAG) {
-    smaller {
-        appendChip(icon(JujutsuIcons::Tag), tag.name)
+internal fun tagDecorationUnits(
+    entry: LogEntry,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
+): List<DecorationUnit> =
+    entry.tags.map { tag ->
+        DecorationUnit(tag) { linked(refUri(entry, "tag", tag.name)) { append(tag, issueLinks, hoveredTarget) } }
     }
-}
+
+/**
+ * [issueLinks], when non-null, linkifies any issue-tracker reference within the tag's own name
+ * (jj-idea-vrmv), underlining the fragment matching [hoveredTarget] - see [appendChip].
+ */
+fun TextCanvas.append(tag: Tag, issueLinks: IssueNavigationConfiguration? = null, hoveredTarget: URI? = null) =
+    colored(JujutsuColors.TAG) {
+        smaller {
+            appendChip(icon(JujutsuIcons::Tag), tag.name, issueLinks = issueLinks, hoveredTarget = hoveredTarget)
+        }
+    }
 
 fun TextCanvas.appendTags(entry: LogEntry, suffix: String = "") {
     var first = true
@@ -474,12 +527,14 @@ fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyLis
                 appendSummary(entry.description)
             }
         }
+
         is RevisionChoice.Change -> {
             append(icon(AllIcons.Vcs::CommitNode))
             append(choice.id)
             append(" ")
             appendSummary(choice.description)
         }
+
         is RevisionChoice.FreeForm -> grey {
             append(icon(AllIcons.Actions::Search))
             append(" ")
