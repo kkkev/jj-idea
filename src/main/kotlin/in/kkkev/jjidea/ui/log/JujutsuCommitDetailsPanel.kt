@@ -17,7 +17,6 @@ import com.intellij.util.ui.UIUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.message
@@ -112,7 +111,8 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
             private fun handlePopupTrigger(e: MouseEvent) {
                 if (!e.isPopupTrigger) return
                 val href = metadataPane.hrefAt(e.point) ?: return
-                val target = resolveClickTarget(href, currentEntries) ?: return
+                val uri = runCatching { java.net.URI(href) }.getOrNull() ?: return
+                val target = LogClickTarget.resolve(uri, project, currentEntries) ?: return
                 val actionGroup = JujutsuLogContextMenuActions.clickActionGroup(project, target)
                 ActionManager.getInstance()
                     .createActionPopupMenu("JujutsuRefPopup", actionGroup)
@@ -276,33 +276,5 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
 
     override fun dispose() {
         // Cleanup if needed
-    }
-}
-
-/**
- * Resolve a right-clicked [href] (from the metadata pane) to a [LogClickTarget] among [entries],
- * for either a `jjref://` bookmark/tag chip or a `mailto:` author/committer link (jj-idea-a52h).
- */
-internal fun resolveClickTarget(href: String, entries: List<LogEntry>): LogClickTarget? {
-    if (href.startsWith("mailto:")) return personClickForEmail(href.removePrefix("mailto:"), entries)
-    val uri = runCatching { java.net.URI(href) }.getOrNull() ?: return null
-    val changeIdStr = uri.rawQuery?.substringBefore("&")?.takeIf { it.isNotEmpty() } ?: return null
-    val entry = entries.find { it.id == ChangeId(changeIdStr) } ?: return null
-    return LogClickTarget.resolve(uri, entry)
-}
-
-/**
- * Find the [PersonClick] matching [email] among [entries]' authors/committers - a `mailto:` href
- * only carries the email, not which entry or role (author vs. committer) it came from, so this
- * recovers both by matching. Author matches take priority over committer matches (mirroring
- * [JujutsuLogTableRenderers.findPersonClickTarget]'s per-column precedence), since `canFilter` is
- * only meaningful for the author role.
- */
-internal fun personClickForEmail(email: String, entries: List<LogEntry>): PersonClick? {
-    entries.firstNotNullOfOrNull { entry ->
-        entry.author?.takeIf { it.email == email }?.let { PersonClick(entry.repo, entry, it, canFilter = true) }
-    }?.let { return it }
-    return entries.firstNotNullOfOrNull { entry ->
-        entry.committer?.takeIf { it.email == email }?.let { PersonClick(entry.repo, entry, it, canFilter = false) }
     }
 }

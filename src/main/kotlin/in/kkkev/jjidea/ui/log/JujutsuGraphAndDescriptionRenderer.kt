@@ -181,7 +181,7 @@ class JujutsuGraphAndDescriptionRenderer(
             if (!cellRect.contains(point)) return null
             val columnWidth = table.columnModel.getColumn(column).width
             val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true) ?: return null
-            val target = LogClickTarget.resolve(uri, entry)
+            val target = LogClickTarget.resolve(uri, project = null, listOf(entry))
             return uri.takeIf { target is BookmarkClick || target is TagClick }
         }
 

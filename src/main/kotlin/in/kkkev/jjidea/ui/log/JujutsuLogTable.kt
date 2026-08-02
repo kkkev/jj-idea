@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.ide.BrowserUtil
 import com.intellij.ide.DataManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
@@ -30,7 +29,6 @@ import java.awt.Cursor
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.*
-import java.net.URI
 import javax.swing.JComponent
 import javax.swing.JViewport
 import javax.swing.KeyStroke
@@ -210,14 +208,14 @@ class JujutsuLogTable(
                     // that inner fragment should look interactive.
                     val newCol = columnAtPoint(e.point)
                     val target = clickTargetAt(e)
-                    val hasHoverCue = target != null && target !is BookmarkClick && target !is TagClick
-                    cursor = if (hasHoverCue) {
+                    val showsHoverCue = target?.hasHoverCue == true
+                    cursor = if (showsHoverCue) {
                         Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                     } else {
                         Cursor.getDefaultCursor()
                     }
-                    val newHoveredLinkRow = if (hasHoverCue) newRow else -1
-                    val newHoveredLinkCol = if (hasHoverCue) newCol else -1
+                    val newHoveredLinkRow = if (showsHoverCue) newRow else -1
+                    val newHoveredLinkCol = if (showsHoverCue) newCol else -1
                     if (newHoveredLinkRow != hoveredLinkRow || newHoveredLinkCol != hoveredLinkCol) {
                         val oldLinkRow = hoveredLinkRow
                         hoveredLinkRow = newHoveredLinkRow
@@ -305,9 +303,7 @@ class JujutsuLogTable(
                     if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
                     when (val target = clickTargetAt(e) ?: return) {
                         is MoreRefsClick -> showMoreRefsPopup(e.component, e.x, e.y, target)
-                        is PersonClick -> BrowserUtil.browse(URI("mailto", target.user.email, null))
-                        is IssueLinkClick -> BrowserUtil.browse(target.uri)
-                        is BookmarkClick, is TagClick -> return
+                        else -> target.performDefaultAction(project)
                     }
                     e.consume()
                 }
@@ -452,19 +448,17 @@ class JujutsuLogTable(
             val hidden = cappedDecorations(entry, Color.BLACK, budget, font, frc).hidden
             return MoreRefsClick(entry.repo, entry, hidden)
         }
-        return LogClickTarget.resolve(uri, entry)
+        return LogClickTarget.resolve(uri, project, listOf(entry))
     }
 
     /** Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref action menu. */
     private fun showMoreRefsPopup(component: Component, x: Int, y: Int, target: MoreRefsClick) {
         val group = DefaultActionGroup().apply {
             target.hidden.forEach { hiddenTarget ->
-                val label = when (hiddenTarget) {
-                    is BookmarkClick -> hiddenTarget.bookmark.name.name
-                    is TagClick -> hiddenTarget.tag.name
-                    is MoreRefsClick, is PersonClick, is IssueLinkClick -> return@forEach
-                }
-                add(DefaultActionGroup(label, true).apply { addAll(clickActionGroup(project, hiddenTarget)) })
+                add(
+                    DefaultActionGroup(hiddenTarget.displayName, true)
+                        .apply { addAll(clickActionGroup(project, hiddenTarget)) }
+                )
             }
         }
         ActionManager.getInstance()

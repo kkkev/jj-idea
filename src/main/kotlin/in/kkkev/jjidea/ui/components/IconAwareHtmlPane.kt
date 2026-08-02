@@ -8,17 +8,13 @@ import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
 import com.intellij.ui.scale.JBUIScale
-import com.intellij.util.io.URLUtil
 import com.intellij.util.ui.ExtendableHTMLViewFactory
 import com.intellij.util.ui.UIUtil
-import com.intellij.vcsUtil.VcsUtil
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.ChangeKey
-import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.common.accented
-import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
+import `in`.kkkev.jjidea.ui.log.LogClickTarget
+import `in`.kkkev.jjidea.ui.log.performDefaultAction
 import java.awt.Component
 import java.awt.Cursor
 import java.awt.Graphics
@@ -42,7 +38,6 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.reflect.KClass
 
-private val CHANGE_ID_URL_PARSER = Pattern.compile("^jjc://([^?]+)\\?(.+)$")
 private val REF_URL_PARSER = Pattern.compile("^jjref://([^?]+)\\?([^&]+)&kind=([^&]+)&name=(.+)$")
 
 /** Marker prefix on an `<icon>` element's `src`, recognized by [ChipIconExtension], identifying a [TextCanvas.appendChip]. */
@@ -98,24 +93,25 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
         )
         addHyperlinkListener { e ->
             if (e.eventType == HyperlinkEvent.EventType.ACTIVATED) {
-                val url = e.description
-                if (url != null) {
-                    with(CHANGE_ID_URL_PARSER.matcher(url)) {
-                        if (matches()) {
-                            val path = URLUtil.unescapePercentSequences(group(1))
-                            val repo = project.jujutsuRepositoryFor(VcsUtil.getFilePath(path, true))
-                            project.stateModel.changeSelection.notify(ChangeKey(repo, ChangeId(group(2))))
-                            return@addHyperlinkListener
-                        }
-                    }
+                // This pane has no LogEntry list to look a jjref:// bookmark/tag or a mailto: author
+                // up against (it's shared by the details pane and plain tooltips alike) - resolve()
+                // is passed an empty list, so only jjc:// (self-sufficient from project + the URI's
+                // own path) and issue-tracker http(s) links ever actually resolve here. Right-click
+                // resolution against the *right* entry happens separately in
+                // JujutsuCommitDetailsPanel, which does have one.
+                val uri = e.description?.let { runCatching { java.net.URI(it) }.getOrNull() }
+                val target = uri?.let { LogClickTarget.resolve(it, project, emptyList()) }
+                when {
+                    target != null -> target.performDefaultAction(project)
                     // Bookmark/tag chips have no left-click action (jj-idea-wkcz) - the right-click
-                    // menu (see refUriAt) is their only interactive affordance - so a jjref:// match
+                    // menu (see refUriAt) is their only interactive affordance - so a jjref:// link
                     // here is a no-op rather than falling through to the browser handler below.
-                    if (REF_URL_PARSER.matcher(url).matches()) return@addHyperlinkListener
+                    uri?.scheme == "jjref" -> Unit
+                    // Not one of our internal schemes (e.g. an issue-tracker link, jj-idea-10fo, or a
+                    // mailto: author link that couldn't resolve without an entry list) — hand off to
+                    // the platform's standard browser/mail handler.
+                    else -> BrowserHyperlinkListener.INSTANCE.hyperlinkUpdate(e)
                 }
-                // Not one of our internal jjc:/jjref: schemes (e.g. an issue-tracker link, jj-idea-10fo, or a
-                // mailto: author link) — hand off to the platform's standard browser/mail handler.
-                BrowserHyperlinkListener.INSTANCE.hyperlinkUpdate(e)
             }
         }
     }

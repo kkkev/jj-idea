@@ -195,6 +195,9 @@ object JujutsuLogContextMenuActions {
                     }
                 }
                 is IssueLinkClick -> add(OpenIssueLinkAction(target.uri))
+                // jjc:// change-navigation links have never had a right-click menu (their default,
+                // and only, action is left-click navigation - see LogClickTarget.performDefaultAction).
+                is ChangeNavigationClick -> Unit
                 // MoreRefsClick (the "+N more" overflow chip, jj-idea-w61m) is handled separately by
                 // JujutsuLogTable, which shows a popup over the hidden refs instead of this menu.
                 is MoreRefsClick -> Unit
