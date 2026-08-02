@@ -12,6 +12,7 @@ import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Condition
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.awt.RelativePoint
@@ -26,9 +27,11 @@ import kotlinx.datetime.Instant
 import java.awt.Color
 import java.awt.Component
 import java.awt.Cursor
+import java.awt.Font
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.*
+import java.net.URI
 import javax.swing.JComponent
 import javax.swing.JViewport
 import javax.swing.KeyStroke
@@ -46,7 +49,10 @@ import javax.swing.table.AbstractTableModel
  * This gives us complete control over rendering and behavior.
  */
 class JujutsuLogTable(
-    private val project: Project,
+    // internal, not private: JujutsuLogTableRenderers.installRenderers (a same-package extension
+    // function) needs it to fetch IssueNavigationConfiguration for the graph+description renderer
+    // (jj-idea-91qf).
+    internal val project: Project,
     val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
 ) : JBTable(JujutsuLogTableModel()), Disposable, UiDataProvider {
     private val log = Logger.getInstance(javaClass)
@@ -439,6 +445,7 @@ class JujutsuLogTable(
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 val frc = getFontMetrics(font).fontRenderContext
                 findInlinedRefUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations)
+                    ?: descriptionLinkUriAt(modelRow, entry, localX, cellRect.width, font, frc)
             }
             else -> null
         } ?: return null
@@ -449,6 +456,35 @@ class JujutsuLogTable(
             return MoreRefsClick(entry.repo, entry, hidden)
         }
         return LogClickTarget.resolve(uri, project, listOf(entry))
+    }
+
+    /**
+     * The URI of a linkified issue-tracker reference (e.g. `JIRA-123`) at [localX] within the
+     * description text of the graph+description column, or null (jj-idea-91qf) - the counterpart
+     * to `findInlinedRefUri` for the description itself, which [clickTargetAt] falls back to when
+     * that returns null (i.e. [localX] isn't over a decoration chip). [localX] and [cellWidth] are
+     * relative to the whole cell, matching `findInlinedRefUri`'s convention; [graphTextStartX]
+     * (uncached, safe for a one-off click) locates where the text area actually begins.
+     */
+    private fun descriptionLinkUriAt(
+        modelRow: Int,
+        entry: LogEntry,
+        localX: Int,
+        cellWidth: Int,
+        font: Font,
+        frc: java.awt.font.FontRenderContext
+    ): URI? {
+        val textStart = graphTextStartX(modelRow, logModel, graphNodes)
+        if (localX < textStart) return null
+        return findDescriptionLinkUri(
+            entry,
+            localX - textStart,
+            cellWidth - textStart,
+            columnManager,
+            IssueNavigationConfiguration.getInstance(project),
+            font,
+            frc
+        )
     }
 
     /** Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref action menu. */
@@ -609,7 +645,11 @@ class JujutsuLogTable(
         for (i in 0 until columnModel.columnCount) {
             val column = columnModel.getColumn(i)
             if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(graphNodes, columnManager)
+                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(
+                    graphNodes,
+                    columnManager,
+                    IssueNavigationConfiguration.getInstance(project)
+                )
                 break
             }
         }

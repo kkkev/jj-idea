@@ -365,7 +365,11 @@ fun JujutsuLogTable.installRenderers() {
                 column.maxWidth = gutterWidth
             }
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(graphNodes, columnManager)
+                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(
+                    graphNodes,
+                    columnManager,
+                    IssueNavigationConfiguration.getInstance(project)
+                )
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
                 column.minWidth = DESC_MIN_WIDTH

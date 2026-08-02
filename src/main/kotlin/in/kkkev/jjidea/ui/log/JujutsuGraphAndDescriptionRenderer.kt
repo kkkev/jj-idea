@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
@@ -20,10 +21,15 @@ import javax.swing.table.TableCellRenderer
  * 2. Text area using [TruncatingLeftRightLayout]:
  *    - Left: status indicators, optional change ID, description (truncatable)
  *    - Right: optional decorations (bookmarks, working copy indicator)
+ *
+ * [issueLinks], when non-null, linkifies issue-tracker references (e.g. `JIRA-123`) in the
+ * description (jj-idea-91qf) - null for the Split/Squash/Rebase/Duplicate picker tables, which
+ * construct this renderer without it.
  */
 class JujutsuGraphAndDescriptionRenderer(
     private val graphNodes: Map<ChangeId, GraphNode>,
-    private val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
+    private val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT,
+    private val issueLinks: IssueNavigationConfiguration? = null
 ) : TableCellRenderer {
     companion object {
         // HiDPI-aware dimensions using JBValue for proper scaling. LANE_WIDTH/HORIZONTAL_PADDING
@@ -134,12 +140,15 @@ class JujutsuGraphAndDescriptionRenderer(
                 append("\n")
             }
             control("<pre style='white-space: pre-wrap;'>", "</pre>") {
-                appendSummary(entry.description)
+                appendSummary(entry.description, issueLinks)
             }
         }
 
         private fun configureTextPanel(entry: LogEntry) {
             val fg = if (isSelected) table.selectionForeground else table.foreground
+            val columnWidth = table.columnModel.getColumn(column).width
+            val frc = table.getFontMetrics(table.font).fontRenderContext
+            val hoveredDescriptionUri = hoveredDescriptionLinkUri(entry, columnWidth, frc)
 
             val leftCanvas = entryCanvas(entry, fg) {
                 if (columnManager.showStatus) appendStatusIndicators(entry)
@@ -147,11 +156,11 @@ class JujutsuGraphAndDescriptionRenderer(
                     append(entry.id)
                     append(" ")
                 }
-                if (columnManager.showDescription) appendDescriptionAndEmptyIndicator(entry)
+                if (columnManager.showDescription) {
+                    appendDescriptionAndEmptyIndicator(entry, issueLinks, hoveredDescriptionUri)
+                }
             }
 
-            val columnWidth = table.columnModel.getColumn(column).width
-            val frc = table.getFontMetrics(table.font).fontRenderContext
             val rightCanvas = if (columnManager.showDecorations) {
                 cappedDecorations(entry, fg, columnWidth * DECORATION_WIDTH_FRACTION, table.font, frc).canvas
             } else {
@@ -164,6 +173,36 @@ class JujutsuGraphAndDescriptionRenderer(
                 cellWidth = columnWidth - textStartX(),
                 background = background,
                 rightHighlightTarget = hoveredBookmarkOrTagUri(entry, frc)
+            )
+        }
+
+        /**
+         * The URI of the linkified issue-tracker reference (e.g. `JIRA-123`) in the description
+         * under [mousePos], if any (jj-idea-91qf) - underlines just that fragment while hovered,
+         * matching the "colored always, underlined on hover" convention used for author/committer
+         * links (jj-idea-iesq). Null when [issueLinks] isn't configured, since there's then nothing
+         * in the description that [findDescriptionLinkUri] could ever match.
+         */
+        private fun hoveredDescriptionLinkUri(
+            entry: LogEntry,
+            columnWidth: Int,
+            frc: java.awt.font.FontRenderContext
+        ): URI? {
+            if (issueLinks == null || !columnManager.showDescription) return null
+            val point = mousePos ?: return null
+            val cellRect = table.getCellRect(row, column, false)
+            if (!cellRect.contains(point)) return null
+            val textStart = textStartX()
+            val localX = point.x - cellRect.x
+            if (localX < textStart) return null
+            return findDescriptionLinkUri(
+                entry,
+                localX - textStart,
+                cellRect.width - textStart,
+                columnManager,
+                issueLinks,
+                table.font,
+                frc
             )
         }
 
