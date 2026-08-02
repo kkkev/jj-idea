@@ -306,6 +306,7 @@ class JujutsuLogTable(
                     when (val target = clickTargetAt(e) ?: return) {
                         is MoreRefsClick -> showMoreRefsPopup(e.component, e.x, e.y, target)
                         is PersonClick -> BrowserUtil.browse(URI("mailto", target.user.email, null))
+                        is IssueLinkClick -> BrowserUtil.browse(target.uri)
                         is BookmarkClick, is TagClick -> return
                     }
                     e.consume()
@@ -461,7 +462,7 @@ class JujutsuLogTable(
                 val label = when (hiddenTarget) {
                     is BookmarkClick -> hiddenTarget.bookmark.name.name
                     is TagClick -> hiddenTarget.tag.name
-                    is MoreRefsClick, is PersonClick -> return@forEach
+                    is MoreRefsClick, is PersonClick, is IssueLinkClick -> return@forEach
                 }
                 add(DefaultActionGroup(label, true).apply { addAll(clickActionGroup(project, hiddenTarget)) })
             }

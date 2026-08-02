@@ -15,8 +15,14 @@ sealed interface LogClickTarget {
     companion object {
         private val REF_URL_PARSER = Regex("^jjref://([^?]+)\\?([^&]+)&kind=([^&]+)&name=(.+)$")
 
-        /** Resolve a `jjref://` [uri] to a [LogClickTarget] using the given [entry]'s ref lists. */
+        /**
+         * Resolve a [uri] to a [LogClickTarget] using the given [entry]'s ref lists: either a
+         * `jjref://` bookmark/tag chip, or an `http(s)://` issue-tracker link linkified inside the
+         * description or a chip label by [in.kkkev.jjidea.ui.components.appendLinkified]
+         * (jj-idea-91qf, jj-idea-vrmv).
+         */
         fun resolve(uri: URI, entry: LogEntry): LogClickTarget? {
+            if (uri.scheme == "http" || uri.scheme == "https") return IssueLinkClick(entry.repo, entry, uri)
             val m = REF_URL_PARSER.matchEntire(uri.toString()) ?: return null
             val kind = m.groupValues[3]
             val name = URLDecoder.decode(m.groupValues[4], "UTF-8")
@@ -69,4 +75,16 @@ data class MoreRefsClick(
     override val repo: JujutsuRepository,
     override val entry: LogEntry,
     val hidden: List<LogClickTarget>
+) : LogClickTarget
+
+/**
+ * An issue-tracker reference (e.g. `JIRA-123`) linkified by
+ * [in.kkkev.jjidea.ui.components.appendLinkified] was clicked - in the description
+ * (jj-idea-91qf) or inside a bookmark/tag chip label (jj-idea-vrmv). [uri] is the tracker URL
+ * built from the matching [com.intellij.openapi.vcs.IssueNavigationConfiguration] link.
+ */
+data class IssueLinkClick(
+    override val repo: JujutsuRepository,
+    override val entry: LogEntry,
+    val uri: URI
 ) : LogClickTarget

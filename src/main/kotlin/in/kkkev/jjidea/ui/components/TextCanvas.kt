@@ -174,22 +174,31 @@ fun TextCanvas.append(changeKey: ChangeKey) {
 /**
  * Append [description], optionally linkifying issue-tracker references (e.g. `JIRA-123`) and bare URLs found by
  * [issueLinks] (an [IssueNavigationConfiguration], resolved from a `Project`) as clickable links (jj-idea-10fo).
- * When [issueLinks] is null (the default), or finds no matches, this renders exactly as before.
+ * When [issueLinks] is null (the default), or finds no matches, this renders exactly as before. [hoveredTarget]
+ * underlines the one matching link fragment, e.g. while the pointer is over it (jj-idea-91qf) - see [appendLinkified].
  */
-fun TextCanvas.append(description: Description, issueLinks: IssueNavigationConfiguration? = null) {
+fun TextCanvas.append(
+    description: Description,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
+) {
     if (description.empty) {
         grey { italic { append(description.display) } }
     } else {
-        appendLinkified(description.display, issueLinks)
+        appendLinkified(description.display, issueLinks, hoveredTarget)
     }
 }
 
 /** As [append], but only the first line of [description], for summary contexts. */
-fun TextCanvas.appendSummary(description: Description, issueLinks: IssueNavigationConfiguration? = null) = truncate {
+fun TextCanvas.appendSummary(
+    description: Description,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
+) = truncate {
     if (description.empty) {
         grey { italic { append(description.summary) } }
     } else {
-        appendLinkified(description.summary, issueLinks)
+        appendLinkified(description.summary, issueLinks, hoveredTarget)
     }
 }
 
@@ -198,8 +207,17 @@ fun TextCanvas.appendSummary(description: Description, issueLinks: IssueNavigati
  * Links are emitted via [TextCanvas.linked] (rather than raw HTML), so they carry over into any backend — including
  * [FragmentRecordingCanvas], where the URI becomes a [FragmentRecordingCanvas.Fragment.linkTarget] usable for
  * hit-testing (jj-idea-iesq) — not just the HTML details pane.
+ *
+ * The link fragment whose URI equals [hoveredTarget] is wrapped in [TextCanvas.underlined], matching the "colored
+ * always, underlined on hover" convention used elsewhere (jj-idea-iesq) - the HTML backend gets hover-underline for
+ * free from the platform's native `<a>` rendering instead, so [hoveredTarget] only matters for interactive column
+ * rendering (jj-idea-91qf).
  */
-private fun TextCanvas.appendLinkified(text: String, config: IssueNavigationConfiguration?) {
+internal fun TextCanvas.appendLinkified(
+    text: String,
+    config: IssueNavigationConfiguration?,
+    hoveredTarget: URI? = null
+) {
     val matches = config?.findIssueLinks(text).orEmpty()
     if (matches.isEmpty()) {
         append(text)
@@ -211,7 +229,11 @@ private fun TextCanvas.appendLinkified(text: String, config: IssueNavigationConf
         { plain -> append(plain) },
         { linkText, target ->
             runCatching { URI(target) }.getOrNull()
-                ?.let { uri -> linked(uri) { append(linkText) } }
+                ?.let { uri ->
+                    linked(uri) {
+                        if (uri == hoveredTarget) underlined { append(linkText) } else append(linkText)
+                    }
+                }
                 ?: append(linkText)
         }
     )
@@ -341,9 +363,17 @@ fun TextCanvas.appendSummary(entry: LogEntry) {
     appendTags(entry, "\n")
 }
 
-/** Append the description summary and "(empty)" indicator for a log entry. */
-fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
-    appendSummary(entry.description)
+/**
+ * Append the description summary and "(empty)" indicator for a log entry, optionally linkifying
+ * issue-tracker references via [issueLinks] and underlining the fragment matching [hoveredTarget]
+ * (jj-idea-91qf) - see [appendLinkified].
+ */
+fun TextCanvas.appendDescriptionAndEmptyIndicator(
+    entry: LogEntry,
+    issueLinks: IssueNavigationConfiguration? = null,
+    hoveredTarget: URI? = null
+) {
+    appendSummary(entry.description, issueLinks, hoveredTarget)
     if (entry.isEmpty) {
         grey {
             italic {

@@ -136,7 +136,9 @@
       "Read(//Users/kevin/IdeaProjects/jj/.jj/**)",
       "Read(//Users/kevin/workspace/intellij-community/**)",
       "Read(//Users/kevin/workspace/jj-idea/**)",
-      "Bash(gh workflow *)"
+      "Bash(gh workflow *)",
+      "Bash(jj next *)",
+      "Bash(jj edit *)"
     ],
     "deny": [],
     "ask": []

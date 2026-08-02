@@ -1,9 +1,11 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.util.ui.JBUI
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.WorkingCopy
@@ -198,6 +200,88 @@ internal fun findInlinedRefUri(
         xAccum += w
     }
     return null
+}
+
+/**
+ * Compute the link hit at [localX] within the truncated description/left text region of the
+ * graph-description column - the counterpart to [findInlinedRefUri] for a linkified issue
+ * reference (e.g. `JIRA-123`) inside the description itself, rather than the right-aligned
+ * decoration chips (jj-idea-91qf). [localX] is relative to the start of the text area, i.e.
+ * already offset past the graph indent (see [graphTextStartX]).
+ *
+ * Mirrors the canvas construction/truncation in [JujutsuGraphAndDescriptionRenderer]'s
+ * `configureTextPanel` and [in.kkkev.jjidea.ui.components.TruncatingLeftRightLayout.configure]
+ * exactly, so the hit test lines up with what's actually painted.
+ */
+internal fun findDescriptionLinkUri(
+    entry: LogEntry,
+    localX: Int,
+    cellWidth: Int,
+    columnManager: JujutsuColumnManager,
+    issueLinks: IssueNavigationConfiguration?,
+    font: Font,
+    frc: FontRenderContext
+): URI? {
+    if (!columnManager.showDescription) return null
+    val leftCanvas = entryCanvas(entry, Color.BLACK) {
+        if (columnManager.showStatus) appendStatusIndicators(entry)
+        if (columnManager.showChangeId) {
+            append(entry.id)
+            append(" ")
+        }
+        appendDescriptionAndEmptyIndicator(entry, issueLinks)
+    }
+    val rightWidth = if (columnManager.showDecorations) {
+        cappedDecorations(entry, Color.BLACK, cellWidth * DECORATION_WIDTH_FRACTION, font, frc)
+            .canvas.fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
+    } else {
+        0.0
+    }
+    val availableForLeft = cellWidth - rightWidth
+    val truncated =
+        FragmentLayout.truncateToFit(leftCanvas.fragments, leftCanvas.truncateRange, availableForLeft, font, frc)
+    var xAccum = 0.0
+    for (fragment in truncated) {
+        val w = FragmentLayout.fragmentWidth(fragment, font, frc)
+        if (xAccum + w > localX) return fragment.linkTarget as? URI
+        xAccum += w
+    }
+    return null
+}
+
+/**
+ * Compute the x-offset where the description text area begins for [row], mirroring
+ * [JujutsuGraphAndDescriptionRenderer]'s private `textStartX()` exactly, but without its
+ * per-renderer-instance passthrough-lane cache (jj-idea-91qf) - this runs once per discrete mouse
+ * click (via `JujutsuLogTable.clickTargetAt`), not on every cell repaint, so recomputing row
+ * passthroughs here (O(rows)) doesn't hit the same hot path the render-time cache protects.
+ */
+internal fun graphTextStartX(row: Int, model: JujutsuLogTableModel, graphNodes: Map<ChangeId, GraphNode>): Int {
+    val entry = model.getEntry(row) ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
+    val graphNode = graphNodes[entry.id] ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
+    val laneWidth = JujutsuGraphAndDescriptionRenderer.LANE_WIDTH.get()
+    val horizontalPadding = JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
+
+    val rowByChangeId = HashMap<ChangeId, Int>()
+    for (r in 0 until model.rowCount) {
+        model.getEntry(r)?.let { rowByChangeId[it.id] = r }
+    }
+    val activeLanes = mutableSetOf(graphNode.lane)
+    for (r in 0 until row) {
+        val prevEntry = model.getEntry(r) ?: continue
+        val prevNode = graphNodes[prevEntry.id] ?: continue
+        for ((parentId, lane) in prevNode.passthroughLanes) {
+            val parentRow = rowByChangeId[parentId] ?: continue
+            if (row in (r + 1) until parentRow) activeLanes.add(lane)
+        }
+        if (prevEntry.parentIds.contains(entry.id)) activeLanes.add(prevNode.lane)
+    }
+    for (parentLane in graphNode.parentLanes) {
+        if (parentLane != graphNode.lane) activeLanes.add(parentLane)
+    }
+
+    val rightmostLane = activeLanes.maxOrNull() ?: graphNode.lane
+    return horizontalPadding + (rightmostLane + 1) * laneWidth
 }
 
 /**

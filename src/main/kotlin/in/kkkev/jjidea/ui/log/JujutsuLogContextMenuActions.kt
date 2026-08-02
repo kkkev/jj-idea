@@ -194,6 +194,7 @@ object JujutsuLogContextMenuActions {
                         add(FilterByAuthorAction(project, target.user))
                     }
                 }
+                is IssueLinkClick -> add(OpenIssueLinkAction(target.uri))
                 // MoreRefsClick (the "+N more" overflow chip, jj-idea-w61m) is handled separately by
                 // JujutsuLogTable, which shows a popup over the hidden refs instead of this menu.
                 is MoreRefsClick -> Unit
@@ -234,6 +235,18 @@ object JujutsuLogContextMenuActions {
         DefaultClickAction {
         override fun actionPerformed(e: AnActionEvent) {
             BrowserUtil.browse(URI("mailto", user.email, null))
+        }
+    }
+
+    /**
+     * Left-click default for a linkified issue-tracker reference (e.g. `JIRA-123`) inside the
+     * description or a bookmark/tag chip label: open the tracker URL (jj-idea-91qf, jj-idea-vrmv).
+     */
+    private class OpenIssueLinkAction(private val uri: URI) :
+        AnAction(JujutsuBundle.message("log.click.openIssueLink", uri)),
+        DefaultClickAction {
+        override fun actionPerformed(e: AnActionEvent) {
+            BrowserUtil.browse(uri)
         }
     }
 

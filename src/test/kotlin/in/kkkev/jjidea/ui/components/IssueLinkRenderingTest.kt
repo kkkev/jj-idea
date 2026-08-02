@@ -83,4 +83,29 @@ class IssueLinkRenderingTest {
         linked[0].linkTarget.shouldBeInstanceOf<URI>()
         linked[0].linkTarget shouldBe URI("https://tracker/JIRA-123")
     }
+
+    @Test
+    fun `the linkified fragment underlines only while its URI matches hoveredTarget (jj-idea-91qf)`() {
+        val trackerUri = URI("https://tracker/JIRA-123")
+        val canvas = FragmentRecordingCanvas()
+        canvas.append(Description("See JIRA-123 please"), jiraConfig, hoveredTarget = trackerUri)
+
+        val linkFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+            .single { it.text == "JIRA-123" }
+        linkFragment.style.isUnderline shouldBe true
+
+        val plainFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+            .single { it.text.contains("See") }
+        plainFragment.style.isUnderline shouldBe false
+    }
+
+    @Test
+    fun `a non-matching hoveredTarget leaves the link fragment plain`() {
+        val canvas = FragmentRecordingCanvas()
+        canvas.append(Description("See JIRA-123 please"), jiraConfig, hoveredTarget = URI("https://tracker/OTHER-1"))
+
+        val linkFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+            .single { it.text == "JIRA-123" }
+        linkFragment.style.isUnderline shouldBe false
+    }
 }

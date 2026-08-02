@@ -26,11 +26,13 @@ class JujutsuGraphAndDescriptionRenderer(
     private val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT
 ) : TableCellRenderer {
     companion object {
-        // HiDPI-aware dimensions using JBValue for proper scaling
-        private val LANE_WIDTH = JBValue.UIInteger("Jujutsu.Graph.laneWidth", 16)
+        // HiDPI-aware dimensions using JBValue for proper scaling. LANE_WIDTH/HORIZONTAL_PADDING
+        // are internal so JujutsuLogTableRenderers.graphTextStartX can reproduce the graph indent
+        // for click resolution (jj-idea-91qf).
+        internal val LANE_WIDTH = JBValue.UIInteger("Jujutsu.Graph.laneWidth", 16)
         private val ROW_HEIGHT = JBValue.UIInteger("Jujutsu.Graph.rowHeight", 22)
         private val COMMIT_RADIUS = JBValue.UIInteger("Jujutsu.Graph.commitRadius", 4)
-        private val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Graph.horizontalPadding", 4)
+        internal val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Graph.horizontalPadding", 4)
 
         // Lane colors - must match CommitGraphBuilder colors for consistent coloring
         private val LANE_COLORS =
