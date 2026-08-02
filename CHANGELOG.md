@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The JetBrains Plugin Verifier still flagged a binary incompatibility with IntelliJ 2025.3 in 0.8.3 ("Abstract method CommitMode.useCommitToolWindow() is not implemented") — 0.8.3's fix only addressed this plugin's own local compile-time checks, not the actual published build, which is always compiled against the newest supported IntelliJ version and therefore can't statically implement the differently-shaped `CommitMode` interface from older versions at the same time. The "Hide the standard Commit tool window" feature now builds its `CommitMode` value at runtime instead of as a fixed class, so the same published build is binary-compatible with every supported IntelliJ version.
+
 ## [0.8.3] - 2026-08-02
 
 ### Fixed
