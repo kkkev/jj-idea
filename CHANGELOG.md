@@ -7,18 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.4] - 2026-08-02
-
-### Fixed
-- The JetBrains Plugin Verifier still flagged a binary incompatibility with IntelliJ 2025.3 in 0.8.3 ("Abstract method CommitMode.useCommitToolWindow() is not implemented") — 0.8.3's fix only addressed this plugin's own local compile-time checks, not the actual published build, which is always compiled against the newest supported IntelliJ version and therefore can't statically implement the differently-shaped `CommitMode` interface from older versions at the same time. The "Hide the standard Commit tool window" feature now builds its `CommitMode` value at runtime instead of as a fixed class, so the same published build is binary-compatible with every supported IntelliJ version.
-
-## [0.8.3] - 2026-08-02
-
-### Fixed
-- The "Hide the standard Commit tool window" setting (and the rest of the jj-only-project Commit tool window behavior it controls) silently stopped applying on IntelliJ 2025.2 and 2025.3 as of 0.8.2 — a platform API the plugin relies on was renamed in a later IntelliJ release the plugin happened to be built against. IntelliJ 2026.1 and newer were unaffected.
-
-## [0.8.2] - 2026-07-31
-
 ### Changed
 - In a jj-only project, the standard IDE "Commit" tool window and its "Local Changes" tab are now hidden — they only ever showed a half-working commit dialog and a look-alike changes list that lacked jj's actions, which confused people into using it instead of the "Working copy" tool window. This also removes the "Resolve" link on the Commit tool window's conflict node, which never worked for jj conflicts. A new "Hide the standard Commit tool window" setting (Settings → Version Control → Jujutsu) lets you turn it back on; projects that also use Git alongside jj are unaffected either way. ([#56](https://github.com/kkkev/jj-idea/issues/56))
 - The "Working copy" tool window now opens automatically (without stealing focus) the first time you open a jj project, and a one-time tip explains what it's for and how it replaces the standard Commit panel. ([#56](https://github.com/kkkev/jj-idea/issues/56))
