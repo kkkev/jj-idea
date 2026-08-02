@@ -66,7 +66,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     private val descriptionStates = mutableMapOf<DescriptionState.Key, DescriptionState>()
 
     // UI Components
-    private val changesTree = JujutsuChangesTree(project)
+    private val changesTree = JujutsuChangesTree(project, groupConflicts = true)
     private val diffPreview = JujutsuEditorTabDiffPreview(changesTree) { "@" }
     private val controlsPanel = WorkingCopyControlsPanel(project)
     private val emptyStatePanel = createEmptyStatePanel()
@@ -169,6 +169,12 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
                 refresh()
             }
         })
+
+        group.addSeparator()
+
+        // Resolve all conflicts (GitHub #56): visible only when the working copy has conflicts,
+        // so it's reachable even when the JujutsuConflictsNode is collapsed or scrolled out of view.
+        ActionManager.getInstance().getAction("Jujutsu.ResolveAllConflicts")?.let { group.add(it) }
 
         group.addSeparator()
 

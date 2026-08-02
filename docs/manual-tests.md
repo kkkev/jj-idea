@@ -761,6 +761,26 @@ Open `/tmp/jj-conflict-test` as a project in the plugin IDE (`./gradlew runIde`)
 - [ ] `file.txt` appears in the Working Copy panel with red (MERGED_WITH_CONFLICTS) status
 - [ ] All three marker styles (git, snapshot, diff) correctly mark the file as conflicted
 
+#### Conflicts grouping node and "Resolve All Conflicts" toolbar button (GitHub #56, jj-idea-uoeg)
+
+A reporter on GitHub #56 declined to use the Working Copy panel because, unlike the standard
+Commit tool window's single "Merge Conflicts / Resolve" grouping, it required hunting for red
+files one at a time. This adds an equivalent affordance directly to the Working Copy panel.
+
+- [ ] With `file.txt` conflicted, a bold **"Merge Conflicts"** node appears at the **top** of the Working Copy changes tree, above the normal directory/repository grouping, showing a file count and a clickable **"Resolve"** link
+- [ ] Clicking the node's "Resolve" link opens the merge tool for every file under that node, one after another
+- [ ] Cancelling out of the merge tool from this entry point still **leaves conflict markers intact** (the GitHub #63 invariant — confirm with `jj status` after cancelling)
+- [ ] After resolving the only conflicted file, the "Merge Conflicts" node **disappears** on the next automatic refresh, without pressing Refresh (exercises the same jj-idea-3cvb fix as the file-level action)
+- [ ] Toggle **Group By → Directory / Repository / None** in the changes-tree toolbar: the "Merge Conflicts" node stays pinned at the top in all three modes, with the chosen grouping nested *inside* it
+- [ ] Multi-repo project with conflicts in two jj roots: a single "Merge Conflicts" node contains both roots' conflicted files (grouped by repository underneath, if that grouping is active)
+- [ ] Collapse the "Merge Conflicts" node, restart the IDE: it's still collapsed. Then create/resolve a conflict so the file count changes: it's **still collapsed** (the node's persisted collapse-state key must not embed the count)
+- [ ] Right-click the "Merge Conflicts" node itself → "Resolve Conflicts…": acts on every conflicted file under it (same as clicking the inline "Resolve" link)
+- [ ] The changes-tree toolbar has a **"Resolve All Conflicts…"** button, visible only when the working copy has at least one conflict
+- [ ] Select a **non-conflicted** file in the tree, with `file.txt` still conflicted elsewhere: the toolbar button **stays visible and works** (it must not depend on tree selection — this is the specific regression the button's separate action implementation exists to prevent)
+- [ ] Clicking the toolbar button resolves every conflicted file in the working copy, same as the node's link
+- [ ] With no conflicts at all: neither the "Merge Conflicts" node nor the toolbar button appear
+- [ ] Mixed jj + Git project: the node contains only jj conflicts, never Git-tracked conflicts from a co-located Git root
+
 #### "Resolve Conflicts" context menu action (selection-scoped)
 
 There is a single `Jujutsu.ResolveSelectedConflicts` action behind "Resolve Conflicts…";

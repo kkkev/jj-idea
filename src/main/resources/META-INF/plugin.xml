@@ -106,6 +106,9 @@
     <action id="Jujutsu.ResolveSelectedConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveSelectedConflictsAction"/>
 
+    <action id="Jujutsu.ResolveAllConflicts"
+            class="in.kkkev.jjidea.actions.file.ResolveAllConflictsAction"/>
+
     <action id="Jujutsu.Init" class="in.kkkev.jjidea.actions.top.InitAction">
       <add-to-group group-id="Vcs.Import"/>
       <add-to-group group-id="Vcs.Operations.Popup.NonVcsAware" relative-to-action="Start.Use.Vcs"

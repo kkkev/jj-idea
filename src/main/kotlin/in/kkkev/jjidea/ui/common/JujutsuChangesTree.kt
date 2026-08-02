@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.common
 
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl
@@ -18,9 +19,19 @@ import javax.swing.tree.DefaultTreeModel
 /**
  * Changes tree for Jujutsu tool window using IntelliJ's built-in changes tree infrastructure.
  * Provides grouping, speed search, and standard VCS actions.
+ *
+ * @param groupConflicts when true, conflicted changes ([FileStatus.MERGED_WITH_CONFLICTS]) are
+ * pulled out from the normal directory/repository grouping and shown under a single
+ * [JujutsuConflictsNode] pinned to the top of the tree (GitHub #56: a reporter declined to use
+ * this panel because, unlike the stock Commit tool window, it had no such grouping). Defaults to
+ * false so the tree's other consumers (commit details pane, file-selection dialog, compare-changes
+ * panel) are unaffected; only the Working Copy tool window opts in.
  */
-class JujutsuChangesTree(project: Project, showCheckboxes: Boolean = false) :
-    AsyncChangesTreeImpl.Changes(project, showCheckboxes, true) {
+class JujutsuChangesTree(
+    project: Project,
+    showCheckboxes: Boolean = false,
+    private val groupConflicts: Boolean = false
+) : AsyncChangesTreeImpl.Changes(project, showCheckboxes, true) {
     /**
      * Optional additional data provider to inject context-specific data keys.
      * Called from [uiDataSnapshot] to allow parent panels to provide context like
@@ -62,8 +73,22 @@ class JujutsuChangesTree(project: Project, showCheckboxes: Boolean = false) :
         treeStateStrategy = KEEP_NON_EMPTY
     }
 
-    override fun buildTreeModel(grouping: ChangesGroupingPolicyFactory, changes: List<Change>): DefaultTreeModel =
-        TreeModelBuilder.buildFromChanges(myProject, grouping, changes, null)
+    override fun buildTreeModel(grouping: ChangesGroupingPolicyFactory, changes: List<Change>): DefaultTreeModel {
+        // Note: groupConflicts may still read its JVM default (false) if this is invoked during
+        // superclass construction, before the constructor parameter is assigned - same hazard as
+        // partialChanges above. That is harmless here: it just means the very first (synthetic,
+        // empty) model build uses ungrouped behaviour, and every real rebuild after construction
+        // sees the correct value.
+        if (!groupConflicts) return TreeModelBuilder.buildFromChanges(myProject, grouping, changes, null)
+
+        val (conflicted, rest) = changes.partition { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
+        val builder = TreeModelBuilder(myProject, grouping)
+        if (conflicted.isNotEmpty()) {
+            builder.insertChanges(conflicted, builder.insertTagNode(JujutsuConflictsNode(myProject)), null)
+        }
+        builder.setChanges(rest, null)
+        return builder.build()
+    }
 
     override fun installGroupingSupport(): ChangesGroupingSupport {
         val support = ChangesGroupingSupport(myProject, this, false)

@@ -4,28 +4,13 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.vcs.FileStatus
-import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
-import `in`.kkkev.jjidea.vcs.merge.JujutsuConflictResolver
-import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
-// Read live rather than capturing once at construction time: a stale snapshot could hand
-// the merge dialog a file that jj has already resolved (e.g. resolved externally, or in a
-// prior invocation of this same action instance), which throws in JujutsuMergeProvider
-// (jj-idea-3cvb).
+// Read live rather than capturing once at construction time: see workingCopyConflicts's doc.
 private fun conflictedFiles(project: Project, entry: LogEntry?): List<VirtualFile> =
-    if (entry?.isWorkingCopy == true) {
-        ChangeListManager.getInstance(project).allChanges
-            .filterInJujutsuRepo(project)
-            .filter { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
-            .mapNotNull { it.virtualFile }
-    } else {
-        emptyList()
-    }
+    if (entry?.isWorkingCopy == true) workingCopyConflicts(project) else emptyList()
 
 fun resolveConflictsAction(project: Project, entry: LogEntry?): DumbAwareAction =
     object : DumbAwareAction(
@@ -49,10 +34,7 @@ fun resolveConflictsAction(project: Project, entry: LogEntry?): DumbAwareAction 
         }
 
         override fun actionPerformed(e: AnActionEvent) {
-            val mergeProvider = project.possibleJujutsuVcs?.mergeProvider ?: return
-            val files = conflictedFiles(project, entry)
-            if (files.isEmpty()) return
-            JujutsuConflictResolver(project, mergeProvider).resolve(files)
+            resolveConflicts(project, conflictedFiles(project, entry))
         }
 
         override fun getActionUpdateThread() = ActionUpdateThread.EDT

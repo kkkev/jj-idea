@@ -7,13 +7,13 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.change.resolveConflicts
 import `in`.kkkev.jjidea.actions.change.resolveSelectedAvailability
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
-import `in`.kkkev.jjidea.vcs.merge.JujutsuConflictResolver
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
 /**
@@ -39,10 +39,7 @@ class ResolveSelectedConflictsAction : DumbAwareAction(
 ) {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val mergeProvider = project.possibleJujutsuVcs?.mergeProvider ?: return
-        val files = conflictedFilesFromContext(e)
-        if (files.isEmpty()) return
-        JujutsuConflictResolver(project, mergeProvider).resolve(files)
+        resolveConflicts(project, conflictedFilesFromContext(e))
     }
 
     override fun update(e: AnActionEvent) {
