@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-08-02
+
 ### Fixed
 - The "Hide the standard Commit tool window" setting (and the rest of the jj-only-project Commit tool window behavior it controls) silently stopped applying on IntelliJ 2025.2 and 2025.3 as of 0.8.2 — a platform API the plugin relies on was renamed in a later IntelliJ release the plugin happened to be built against. IntelliJ 2026.1 and newer were unaffected.
 
@@ -727,7 +729,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.3
 [0.8.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.2
 [0.8.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.1
 [0.8.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.0
