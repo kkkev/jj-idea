@@ -75,7 +75,11 @@ class FragmentRecordingCanvas(
     override fun linked(target: URI, builder: TextCanvas.() -> Unit) {
         val old = currentLinkTarget
         currentLinkTarget = target
-        builder()
+        // super.linked applies the link-color style (StyledTextCanvas.linked); a bare `builder()`
+        // here would only track currentLinkTarget for hit-testing and silently skip coloring -
+        // any caller not already wrapped in its own colored() (e.g. a description's issue-tracker
+        // link, which has no such wrapper) would render in the surrounding plain-text color.
+        super.linked(target, builder)
         currentLinkTarget = old
     }
 }

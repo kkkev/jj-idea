@@ -75,4 +75,49 @@ class TextCanvasPanelHighlightTest {
         matching shouldHaveSize 2
         matching.all { it is JLabel || it is SimpleColoredComponent } shouldBe true
     }
+
+    @Test
+    fun `each SCC created on a link-target boundary has no ipad`() {
+        // Regression test: a mid-sentence link (e.g. a description's issue-tracker reference)
+        // splits the row into several adjacent SimpleColoredComponents at each linkTarget change.
+        // SimpleColoredComponent's default ipad (JBInsets.create(1, 2)) would stack into visible
+        // gaps between them that FragmentLayout.fragmentWidth's pure-text-width measurement never
+        // budgeted for - every SCC this panel creates must have it zeroed out.
+        val target = URI("https://tracker/JIRA-123")
+        val canvas = FragmentRecordingCanvas().apply {
+            append("Fixes ")
+            linked(target) { append("JIRA-123") }
+            append(" now")
+        }
+
+        val panel = TextCanvasPanel()
+        panel.renderFrom(canvas)
+
+        val sccs = panel.components.filterIsInstance<SimpleColoredComponent>()
+        sccs shouldHaveSize 3
+        sccs.forEach { it.ipad shouldBe java.awt.Insets(0, 0, 0, 0) }
+    }
+
+    @Test
+    fun `adjacent SCCs' total preferred width matches pure text width, with no border padding either`() {
+        // Regression test: SimpleColoredComponent.computePreferredSize also counts a separate
+        // `border` field (default JBUI.Borders.empty(1)) alongside ipad - zeroing only ipad (the
+        // previous regression test above) left a residual 2px-per-SCC gap from this border, visible
+        // as e.g. "release ( #50713 )" instead of "release (#50713)" once a description's issue-link
+        // split the row into three adjacent SCCs.
+        val target = URI("https://tracker/JIRA-123")
+        val canvas = FragmentRecordingCanvas().apply {
+            append("release (")
+            linked(target) { append("JIRA-123") }
+            append(")")
+        }
+
+        val panel = TextCanvasPanel()
+        panel.renderFrom(canvas)
+
+        val fm = panel.getFontMetrics(panel.font)
+        val pureWidth = fm.stringWidth("release (") + fm.stringWidth("JIRA-123") + fm.stringWidth(")")
+        val actualWidth = panel.components.sumOf { it.preferredSize.width }
+        actualWidth shouldBe pureWidth
+    }
 }

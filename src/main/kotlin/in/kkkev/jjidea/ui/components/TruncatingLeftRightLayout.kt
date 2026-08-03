@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.ui.SimpleColoredComponent
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
@@ -53,6 +54,16 @@ open class TextCanvasPanel : JPanel() {
                         currentSccTarget = fragment.linkTarget
                         currentScc = SimpleColoredComponent().also {
                             it.isOpaque = false
+                            // A row of text is composited from several adjacent SCCs whenever the
+                            // link target changes mid-sentence (e.g. "Fixes " / "JIRA-123" / " now")
+                            // - each SCC's default ipad (JBInsets.create(1, 2), i.e. 2px left/right)
+                            // AND its separate `border` field (JBUI.Borders.empty(1), also counted
+                            // in computePreferredSize's width) would otherwise stack into visible
+                            // gaps between them, since fragment width measurement
+                            // (FragmentLayout.fragmentWidth) is pure text width and doesn't budget
+                            // for either.
+                            it.ipad = JBUI.emptyInsets()
+                            it.setMyBorder(null)
                             it.putClientProperty(LINK_TARGET_KEY, currentSccTarget)
                             add(it)
                         }
