@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.project.Project
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.addPopup
 import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.deleteBookmarkAction
@@ -65,7 +66,7 @@ object JujutsuLogContextMenuActions {
     fun createActionGroup(
         project: Project,
         entries: List<LogEntry>
-    ): DefaultActionGroup = DefaultActionGroup().apply {
+    ): DefaultActionGroup = BackgroundActionGroup().apply {
         ActionManager.getInstance().getAction("Jujutsu.ShowChangesDiff")?.let { add(it) }
 
         val entry = entries.singleOrNull()
@@ -166,7 +167,7 @@ object JujutsuLogContextMenuActions {
      * pass it along.
      */
     fun clickActionGroup(project: Project, target: LogClickTarget): DefaultActionGroup =
-        DefaultActionGroup().apply {
+        BackgroundActionGroup().apply {
             when (target) {
                 is BookmarkClick -> {
                     val name = target.bookmark.name.name

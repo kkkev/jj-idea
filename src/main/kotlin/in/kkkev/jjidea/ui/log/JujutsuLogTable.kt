@@ -18,6 +18,7 @@ import com.intellij.ui.PopupHandler
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
@@ -490,7 +491,7 @@ class JujutsuLogTable(
 
     /** Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref action menu. */
     private fun showMoreRefsPopup(component: Component, x: Int, y: Int, target: MoreRefsClick) {
-        val group = DefaultActionGroup().apply {
+        val group = BackgroundActionGroup().apply {
             target.hidden.forEach { hiddenTarget ->
                 add(
                     DefaultActionGroup(hiddenTarget.displayName, true)
