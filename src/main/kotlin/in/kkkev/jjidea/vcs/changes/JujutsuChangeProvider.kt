@@ -7,6 +7,9 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
+import `in`.kkkev.jjidea.jj.conflict.ConflictInfoParser
+import `in`.kkkev.jjidea.jj.conflict.conflictRegistry
 import `in`.kkkev.jjidea.jj.parseRenameSpec
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -47,18 +50,21 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcsBase) : ChangeProvider {
                             return@measurePerf
                         }
 
-                        val conflictedPaths = if (workingCopyInConflict(result.stdout)) {
+                        val conflictInfos = if (workingCopyInConflict(result.stdout)) {
                             val resolveResult = repo.commandExecutor.resolveList()
                             if (resolveResult.isSuccess) {
-                                parseConflictPaths(resolveResult.stdout)
+                                ConflictInfoParser.parse(resolveResult.stdout)
                             } else {
-                                collectConflictPathsFromStatus(result.stdout)
+                                collectConflictPathsFromStatus(result.stdout).associateWith {
+                                    ConflictInfo(it, sides = 0, deletions = 0, description = "")
+                                }
                             }
                         } else {
-                            emptySet()
+                            emptyMap()
                         }
+                        vcs.project.conflictRegistry.replace(repo.directory, conflictInfos.values)
 
-                        parseStatus(result.stdout, repo, builder, conflictedPaths)
+                        parseStatus(result.stdout, repo, builder, conflictInfos.keys)
                         reportIgnoredFiles(
                             repo,
                             builder,
@@ -186,10 +192,7 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcsBase) : ChangeProvider {
      * Parses `jj resolve -l` output. Each line is "<path>  <description>" with any amount
      * of whitespace between path and description.
      */
-    internal fun parseConflictPaths(output: String): Set<String> =
-        output.lines()
-            .mapNotNull { it.trim().split(Regex("\\s+")).firstOrNull()?.takeIf { p -> p.isNotEmpty() } }
-            .toSet()
+    internal fun parseConflictPaths(output: String): Set<String> = ConflictInfoParser.parse(output).keys
 
     /**
      * Parse a single status line

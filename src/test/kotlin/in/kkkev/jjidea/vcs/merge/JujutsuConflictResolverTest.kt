@@ -5,6 +5,7 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.merge.MergeData
 import com.intellij.openapi.vcs.merge.MergeProvider
 import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -31,12 +32,16 @@ class JujutsuConflictResolverTest {
 
     private fun resolverWith(
         resolveOne: (VirtualFile, MergeData) -> ByteArray?,
-        writeResolved: MutableMap<VirtualFile, ByteArray> = mutableMapOf()
+        writeResolved: MutableMap<VirtualFile, ByteArray> = mutableMapOf(),
+        deleted: MutableList<VirtualFile> = mutableListOf(),
+        conflictInfoFor: (VirtualFile) -> ConflictInfo? = { null }
     ) = JujutsuConflictResolver(
         project = project,
         mergeProvider = mergeProvider,
         resolveOne = resolveOne,
-        writeResolved = { file, bytes -> writeResolved[file] = bytes }
+        writeResolved = { file, bytes -> writeResolved[file] = bytes },
+        deleteResolved = { deleted += it },
+        conflictInfoFor = conflictInfoFor
     ) to writeResolved
 
     @Test
@@ -140,5 +145,90 @@ class JujutsuConflictResolverTest {
         written shouldBe mapOf(file1 to bytes1, file2 to bytes2)
         verify(exactly = 1) { mergeProvider.conflictResolvedForFile(file1) }
         verify(exactly = 1) { mergeProvider.conflictResolvedForFile(file2) }
+    }
+
+    // -------------------------------------------------------------------------
+    // Modify/delete conflicts (jj-idea-x283)
+    //
+    // If the merge tool's output is empty AND the conflict is known to be modify/delete, an
+    // empty result means the user picked the deleted side - the deletion should actually happen
+    // rather than leaving an empty file behind.
+    // -------------------------------------------------------------------------
+
+    private fun modifyDeleteInfo(path: String = "a.txt") =
+        ConflictInfo(path, sides = 2, deletions = 1, description = "")
+
+    @Test
+    fun `empty result on a modify-delete conflict - deletes the file instead of writing it`() {
+        val file = mockk<VirtualFile>()
+        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        val deleted = mutableListOf<VirtualFile>()
+
+        val (resolver, written) = resolverWith(
+            resolveOne = { _, _ -> ByteArray(0) },
+            deleted = deleted,
+            conflictInfoFor = { modifyDeleteInfo() }
+        )
+
+        resolver.resolve(listOf(file))
+
+        deleted shouldBe listOf(file)
+        written shouldBe emptyMap()
+        verify(exactly = 1) { mergeProvider.conflictResolvedForFile(file) }
+    }
+
+    @Test
+    fun `empty result on a content-only conflict - still writes the empty bytes`() {
+        val file = mockk<VirtualFile>()
+        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        val deleted = mutableListOf<VirtualFile>()
+
+        val (resolver, written) = resolverWith(
+            resolveOne = { _, _ -> ByteArray(0) },
+            deleted = deleted,
+            conflictInfoFor = { ConflictInfo("a.txt", sides = 2, deletions = 0, description = "") }
+        )
+
+        resolver.resolve(listOf(file))
+
+        deleted shouldBe emptyList()
+        written[file] shouldBe ByteArray(0)
+    }
+
+    @Test
+    fun `empty result with unknown conflict shape - writes the empty bytes`() {
+        val file = mockk<VirtualFile>()
+        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        val deleted = mutableListOf<VirtualFile>()
+
+        val (resolver, written) = resolverWith(
+            resolveOne = { _, _ -> ByteArray(0) },
+            deleted = deleted,
+            conflictInfoFor = { null }
+        )
+
+        resolver.resolve(listOf(file))
+
+        deleted shouldBe emptyList()
+        written[file] shouldBe ByteArray(0)
+    }
+
+    @Test
+    fun `non-empty result on a modify-delete conflict - still writes the content`() {
+        val file = mockk<VirtualFile>()
+        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        val deleted = mutableListOf<VirtualFile>()
+        val resolvedBytes = "kept content".toByteArray(Charsets.UTF_8)
+
+        val (resolver, written) = resolverWith(
+            resolveOne = { _, _ -> resolvedBytes },
+            deleted = deleted,
+            conflictInfoFor = { modifyDeleteInfo() }
+        )
+
+        resolver.resolve(listOf(file))
+
+        deleted shouldBe emptyList()
+        written[file] shouldBe resolvedBytes
     }
 }

@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Issue-tracker references (e.g. `JIRA-123`) in a commit's description now render as clickable links in the log table itself, not just the commit details pane — link-colored, underlining only the exact reference while hovered, with the same left-click-to-open/right-click "Open" menu as elsewhere. Requires an Issue Navigation pattern configured under Settings → Version Control. ([#15](https://github.com/kkkev/jj-idea/issues/15))
 - Issue-tracker references (e.g. `JIRA-123`) *inside* a bookmark or tag name (e.g. a bookmark named `jira-123-fix-thing`) are now their own clickable link within the chip, separate from the chip's own right-click menu — link-colored, hand cursor and underline only on that exact reference, opening the same as elsewhere on left-click, in both the log table and the commit details pane. ([#15](https://github.com/kkkev/jj-idea/issues/15))
 
+### Fixed
+- Resolving a conflict where one side deleted the file (a "modify/delete" conflict) by accepting the deleted side now actually removes the file, instead of leaving behind an empty file. Failures while resolving a conflict now show an error notification instead of failing silently.
+
 ## [0.8.5] - 2026-08-02
 
 ### Changed

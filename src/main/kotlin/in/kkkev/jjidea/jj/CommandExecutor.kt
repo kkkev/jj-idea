@@ -242,6 +242,16 @@ interface CommandExecutor {
     fun resolveList(revision: Revision = WorkingCopy): CommandResult
 
     /**
+     * Resolve one or more conflicted paths with a non-interactive tool (`jj resolve --tool`).
+     * `:ours` and `:theirs` correctly turn a modify/delete conflict into an actual file
+     * deletion when the deleted side is chosen, unlike writing bytes directly to disk.
+     * @param paths Paths relative to the repository root
+     * @param tool Tool name, e.g. `:ours` or `:theirs`
+     * @param revision Revision to resolve in (default: working copy)
+     */
+    fun resolve(paths: List<String>, tool: String, revision: Revision = WorkingCopy): CommandResult
+
+    /**
      * Rebase revisions onto a new destination.
      * @param revisions Revisions to rebase
      * @param destinations Destination revisions (multiple creates a merge)

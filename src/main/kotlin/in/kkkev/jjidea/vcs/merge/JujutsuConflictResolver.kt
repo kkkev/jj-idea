@@ -11,6 +11,8 @@ import com.intellij.openapi.vcs.merge.MergeProvider
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkDiffPicker
+import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
+import `in`.kkkev.jjidea.jj.conflict.conflictRegistry
 import java.nio.file.Files
 
 /**
@@ -60,6 +62,11 @@ import java.nio.file.Files
  * @param resolveOne Runs the merge tool for one file and returns the resolved bytes, or null if
  *   cancelled. Overridable for testing; the default opens the real three-way merge tool.
  * @param writeResolved Writes resolved bytes back to the file. Overridable for testing.
+ * @param deleteResolved Deletes the file from disk. Used instead of [writeResolved] when the
+ *   conflict was modify/delete and the user resolved it to the deleted side (see [resolve]).
+ *   Overridable for testing.
+ * @param conflictInfoFor Looks up the [ConflictInfo] for a file, if known. Overridable for
+ *   testing; the default consults [in.kkkev.jjidea.jj.conflict.JujutsuConflictRegistry].
  */
 class JujutsuConflictResolver(
     private val project: Project,
@@ -69,11 +76,20 @@ class JujutsuConflictResolver(
     },
     private val writeResolved: (VirtualFile, ByteArray) -> Unit = { file, bytes ->
         Files.write(file.toNioPath(), bytes)
-    }
+    },
+    private val deleteResolved: (VirtualFile) -> Unit = { file ->
+        Files.deleteIfExists(file.toNioPath())
+    },
+    private val conflictInfoFor: (VirtualFile) -> ConflictInfo? = { project.conflictRegistry.get(it) }
 ) {
     /**
      * Resolves each conflicted file in turn. Stops (leaving any remaining files untouched) as
      * soon as the user cancels the merge tool for one of them.
+     *
+     * For a modify/delete conflict, an empty resolved result means the user picked the deleted
+     * side in the merge tool - the deleted side's pane is empty because there's no content on
+     * that side. Writing those empty bytes to disk would leave an empty file behind instead of
+     * actually deleting it, so that case is routed to [deleteResolved] instead of [writeResolved].
      */
     fun resolve(files: List<VirtualFile>) {
         for (file in files) {
@@ -85,7 +101,11 @@ class JujutsuConflictResolver(
 
             val resolved = resolveOne(file, mergeData) ?: return // Cancelled: stop the queue.
 
-            writeResolved(file, resolved)
+            if (resolved.isEmpty() && conflictInfoFor(file)?.isModifyDelete == true) {
+                deleteResolved(file)
+            } else {
+                writeResolved(file, resolved)
+            }
             // Marks the file dirty and invalidates the repo so jj re-snapshots and clears the
             // conflict decoration (see JujutsuMergeProvider.refreshResolved).
             mergeProvider.conflictResolvedForFile(file)

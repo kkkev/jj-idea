@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.vcs.merge
 
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
@@ -16,9 +17,9 @@ import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
 import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
-import java.nio.file.Files
 
 class JujutsuMergeProvider(
     private val project: Project,
@@ -27,6 +28,9 @@ class JujutsuMergeProvider(
     private val refreshAfterResolve: (JujutsuRepository) -> Unit = { it.invalidate(vfsChanged = true) },
     private val refreshEditorNotifications: (VirtualFile) -> Unit = {
         EditorNotifications.getInstance(project).updateNotifications(it)
+    },
+    private val notifyError: (title: String, message: String) -> Unit = { title, message ->
+        JujutsuNotifications.notify(project, title, message, NotificationType.ERROR)
     }
 ) : MergeProvider2 {
     // Called on a background thread by the merge framework
@@ -87,21 +91,38 @@ class JujutsuMergeProvider(
         override fun conflictResolvedForFiles(files: List<VirtualFile>, resolution: MergeSession.Resolution) =
             refreshResolved(files)
 
-        // Called on a background thread inside a modal task
+        // Called on a background thread inside a modal task. Goes through `jj resolve --tool`
+        // rather than writing CURRENT/LAST bytes to disk directly: for a modify/delete conflict
+        // where the chosen side is the deletion, `:ours`/`:theirs` actually remove the file,
+        // whereas writing its (empty) bytes would leave behind an empty file instead.
         override fun acceptFilesRevisions(files: List<VirtualFile>, resolution: MergeSession.Resolution) {
+            val tool = when (resolution) {
+                MergeSession.Resolution.AcceptedYours -> ":ours"
+                MergeSession.Resolution.AcceptedTheirs -> ":theirs"
+                else -> return
+            }
+            val failures = mutableListOf<Pair<VirtualFile, String>>()
             for (file in files) {
-                val mergeData = try {
-                    loadRevisions(file)
-                } catch (_: VcsException) {
+                val repo = repoFor(file)
+                if (repo == null) {
+                    failures += file to JujutsuBundle.message("merge.resolve.noRepo")
                     continue
                 }
-                val content = when (resolution) {
-                    MergeSession.Resolution.AcceptedYours -> mergeData.CURRENT
-                    MergeSession.Resolution.AcceptedTheirs -> mergeData.LAST
-                    else -> continue
+                val relativePath = file.path.removePrefix(repo.directory.path).removePrefix("/")
+                val result = repo.commandExecutor.resolve(listOf(relativePath), tool)
+                if (!result.isSuccess) {
+                    failures += file to result.stderr.ifBlank { "exit ${result.exitCode}" }
                 }
-                Files.write(file.toNioPath(), content)
             }
+            if (failures.isNotEmpty()) reportFailures(failures)
+        }
+
+        private fun reportFailures(failures: List<Pair<VirtualFile, String>>) {
+            val detail = failures.joinToString("\n") { (file, reason) -> "${file.name}: $reason" }
+            notifyError(
+                JujutsuBundle.message("notification.resolve.failed.title"),
+                JujutsuBundle.message("notification.resolve.failed.message", detail)
+            )
         }
     }
 

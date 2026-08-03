@@ -153,6 +153,17 @@ internal fun squashArgs(
 internal fun resolveListArgs(revision: Revision = WorkingCopy): List<String> =
     listOf("resolve", "--list", "-r", revision.toString())
 
+/** Build the argument list for `jj resolve --tool <tool>`. */
+internal fun resolveArgs(paths: List<String>, tool: String, revision: Revision = WorkingCopy): List<String> =
+    buildList {
+        add("resolve")
+        add("-r")
+        add(revision.toString())
+        add("--tool")
+        add(tool)
+        addAll(paths)
+    }
+
 /** Build the argument list for `jj split`. */
 internal fun splitArgs(
     revision: Revision,
@@ -288,6 +299,9 @@ class CliExecutor(
     override fun status() = execute(root, listOf("status"))
 
     override fun resolveList(revision: Revision) = execute(root, resolveListArgs(revision))
+
+    override fun resolve(paths: List<String>, tool: String, revision: Revision) =
+        execute(root, resolveArgs(paths, tool, revision))
 
     override fun diff(filePath: String) = execute(root, listOf("diff", filePath))
 

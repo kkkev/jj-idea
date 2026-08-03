@@ -6,10 +6,13 @@ import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.merge.MergeData
 import com.intellij.openapi.vcs.merge.MergeSession
 import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
@@ -186,5 +189,109 @@ class JujutsuMergeProviderTest {
 
         refreshed.toSet() shouldBe setOf(repo1, repo2)
         refreshed.size shouldBe 2
+    }
+
+    // -------------------------------------------------------------------------
+    // acceptFilesRevisions
+    //
+    // jj-idea-x283: routed through `jj resolve --tool :ours|:theirs` instead of writing
+    // MergeData bytes directly, so a modify/delete conflict resolves to an actual deletion
+    // rather than an empty file.
+    // -------------------------------------------------------------------------
+
+    private fun mockFile(filePath: String): VirtualFile {
+        val file = mockk<VirtualFile>()
+        every { file.path } returns filePath
+        return file
+    }
+
+    private fun mockRepo(directoryPath: String, executor: CommandExecutor): JujutsuRepository {
+        val directory = mockk<VirtualFile>()
+        every { directory.path } returns directoryPath
+        val repo = mockk<JujutsuRepository>()
+        every { repo.directory } returns directory
+        every { repo.commandExecutor } returns executor
+        return repo
+    }
+
+    private fun acceptSession(
+        repoFor: (VirtualFile) -> JujutsuRepository?,
+        notifyError: (String, String) -> Unit = { _, _ -> }
+    ) = JujutsuMergeProvider(
+        project,
+        extractor,
+        repoFor = repoFor,
+        refreshEditorNotifications = {},
+        notifyError = notifyError
+    ).createMergeSession(emptyList()) as com.intellij.openapi.vcs.merge.MergeSessionEx
+
+    @Test
+    fun `acceptFilesRevisions - AcceptedYours - resolves with the ours tool`() {
+        val executor = mockk<CommandExecutor>()
+        every { executor.resolve(listOf("foo.txt"), ":ours", WorkingCopy) } returns
+            CommandExecutor.CommandResult(0, "", "")
+        val repo = mockRepo("/repo", executor)
+        val file = mockFile("/repo/foo.txt")
+
+        acceptSession(repoFor = { repo }).acceptFilesRevisions(listOf(file), MergeSession.Resolution.AcceptedYours)
+
+        verify { executor.resolve(listOf("foo.txt"), ":ours", WorkingCopy) }
+    }
+
+    @Test
+    fun `acceptFilesRevisions - AcceptedTheirs - resolves with the theirs tool`() {
+        val executor = mockk<CommandExecutor>()
+        every { executor.resolve(listOf("foo.txt"), ":theirs", WorkingCopy) } returns
+            CommandExecutor.CommandResult(0, "", "")
+        val repo = mockRepo("/repo", executor)
+        val file = mockFile("/repo/foo.txt")
+
+        acceptSession(repoFor = { repo }).acceptFilesRevisions(listOf(file), MergeSession.Resolution.AcceptedTheirs)
+
+        verify { executor.resolve(listOf("foo.txt"), ":theirs", WorkingCopy) }
+    }
+
+    @Test
+    fun `acceptFilesRevisions - resolve fails - notifies with the failure reason, does not throw`() {
+        val executor = mockk<CommandExecutor>()
+        every { executor.resolve(listOf("foo.txt"), ":ours", WorkingCopy) } returns
+            CommandExecutor.CommandResult(1, "", "boom")
+        val repo = mockRepo("/repo", executor)
+        val file = mockk<VirtualFile> {
+            every { path } returns "/repo/foo.txt"
+            every { name } returns "foo.txt"
+        }
+        val notifications = mutableListOf<Pair<String, String>>()
+
+        acceptSession(repoFor = { repo }, notifyError = { title, message -> notifications += title to message })
+            .acceptFilesRevisions(listOf(file), MergeSession.Resolution.AcceptedYours)
+
+        notifications.size shouldBe 1
+        notifications.single().second shouldContain "foo.txt: boom"
+    }
+
+    @Test
+    fun `acceptFilesRevisions - no repo for file - notifies, does not throw`() {
+        val file = mockk<VirtualFile> {
+            every { path } returns "/repo/foo.txt"
+            every { name } returns "foo.txt"
+        }
+        val notifications = mutableListOf<Pair<String, String>>()
+
+        acceptSession(repoFor = { null }, notifyError = { title, message -> notifications += title to message })
+            .acceptFilesRevisions(listOf(file), MergeSession.Resolution.AcceptedYours)
+
+        notifications.size shouldBe 1
+    }
+
+    @Test
+    fun `acceptFilesRevisions - Merged resolution - does nothing`() {
+        val executor = mockk<CommandExecutor>(relaxed = true)
+        val repo = mockRepo("/repo", executor)
+        val file = mockFile("/repo/foo.txt")
+
+        acceptSession(repoFor = { repo }).acceptFilesRevisions(listOf(file), MergeSession.Resolution.Merged)
+
+        verify(exactly = 0) { executor.resolve(any(), any(), any()) }
     }
 }
