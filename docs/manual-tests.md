@@ -164,6 +164,23 @@ Use this checklist:
 - [ ] Clicking the reference opens the URL in your default browser
 - [ ] A bare `https://…` URL in a description is also clickable and opens correctly
 - [ ] A commit description with no matching reference renders unchanged (plain text, no link)
+
+#### Issue-tracker links inside bookmark/tag chip names in the details panel (jj-idea-vrmv)
+
+- [ ] With an Issue Navigation pattern configured (as above), select a commit with a bookmark/tag
+      whose name contains a matching reference (e.g. `jira-123-fix-thing`) — the reference renders
+      link-colored within the chip in the details panel's bookmark/tag line; the rest of the chip
+      (icon, remaining text) stays plain
+- [ ] Hovering just the reference substring shows a hand cursor and underlines only it; hovering the
+      rest of the same chip (icon or non-matching text) shows no hand cursor and no background
+      highlight — the two hover cues don't overlap
+- [ ] Left-clicking the reference substring opens the URL in your default browser; left-clicking
+      elsewhere in the chip still does nothing (bookmarks/tags have no whole-chip left-click action)
+- [ ] Right-clicking the reference substring shows a popup with a single "Open <url>" action;
+      right-clicking elsewhere in the same chip still shows the usual bookmark/tag actions menu
+      (Rename…, Delete, Forget, etc.)
+- [ ] A bookmark/tag name with no matching reference in the details panel renders and right-clicks
+      exactly as before (ref-only hover highlight, no link)
 - [ ] With no Issue Navigation patterns configured, descriptions render exactly as before
 
 ### Details Changes Panel

@@ -221,12 +221,35 @@ fun TextCanvas.appendSummary(description: Description) = truncate {
     }
 }
 
+/** One run of text produced by [linkifyText] - [uri] is null for a plain (non-matching) run. */
+internal data class LinkifiedRun(val text: String, val uri: URI?)
+
 /**
- * Split [text] into plain runs and issue-tracker/URL link runs found by [TextCanvas.issueLinks], appending each
- * accordingly. Links are emitted via [TextCanvas.linked] (rather than raw HTML), so they carry over into any
- * backend — including [FragmentRecordingCanvas], where the URI becomes a
- * [FragmentRecordingCanvas.Fragment.linkTarget] usable for hit-testing (jj-idea-iesq) — not just the HTML details
- * pane.
+ * Split [text] into plain and issue-tracker/URL link runs found by [config] (an
+ * [IssueNavigationConfiguration], resolved from a `Project`) - the single place both
+ * [appendLinkified] (plain text, e.g. a description) and [in.kkkev.jjidea.ui.components.HtmlTextCanvas]'s
+ * chip-label rendering (jj-idea-vrmv follow-up: a chip's own name can itself contain a reference)
+ * derive their runs from, so the two backends can't drift on what counts as a match. A malformed
+ * link target (an invalid URI) falls back to a plain run for that piece rather than throwing.
+ */
+internal fun linkifyText(text: String, config: IssueNavigationConfiguration?): List<LinkifiedRun> {
+    val matches = config?.findIssueLinks(text).orEmpty()
+    if (matches.isEmpty()) return listOf(LinkifiedRun(text, null))
+    val runs = mutableListOf<LinkifiedRun>()
+    IssueNavigationConfiguration.processTextWithLinks(
+        text,
+        matches,
+        { plain -> runs += LinkifiedRun(plain, null) },
+        { linkText, target -> runs += LinkifiedRun(linkText, runCatching { URI(target) }.getOrNull()) }
+    )
+    return runs
+}
+
+/**
+ * Append [text], linkifying issue-tracker references/URLs found by [TextCanvas.issueLinks] via
+ * [TextCanvas.linked] (rather than raw HTML), so they carry over into any backend — including
+ * [FragmentRecordingCanvas], where the URI becomes a [FragmentRecordingCanvas.Fragment.linkTarget]
+ * usable for hit-testing (jj-idea-iesq) — not just the HTML details pane.
  *
  * The link fragment whose URI equals [TextCanvas.hoveredTarget] is wrapped in [TextCanvas.underlined], matching the
  * "colored always, underlined on hover" convention used elsewhere (jj-idea-iesq) - the HTML backend gets
@@ -234,25 +257,16 @@ fun TextCanvas.appendSummary(description: Description) = truncate {
  * interactive column rendering (jj-idea-91qf).
  */
 internal fun TextCanvas.appendLinkified(text: String) {
-    val matches = issueLinks?.findIssueLinks(text).orEmpty()
-    if (matches.isEmpty()) {
-        append(text)
-        return
-    }
-    IssueNavigationConfiguration.processTextWithLinks(
-        text,
-        matches,
-        { plain -> append(plain) },
-        { linkText, target ->
-            runCatching { URI(target) }.getOrNull()
-                ?.let { uri ->
-                    linked(uri) {
-                        if (uri == hoveredTarget) underlined { append(linkText) } else append(linkText)
-                    }
-                }
-                ?: append(linkText)
+    for (run in linkifyText(text, issueLinks)) {
+        val uri = run.uri
+        if (uri == null) {
+            append(run.text)
+        } else {
+            linked(uri) {
+                if (uri == hoveredTarget) underlined { append(run.text) } else append(run.text)
+            }
         }
-    )
+    }
 }
 
 fun TextCanvas.append(user: VcsUser) = user.email.takeIf { it.isNotEmpty() }

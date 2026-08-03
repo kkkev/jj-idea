@@ -110,9 +110,17 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
 
             private fun handlePopupTrigger(e: MouseEvent) {
                 if (!e.isPopupTrigger) return
-                val href = metadataPane.hrefAt(e.point) ?: return
-                val uri = runCatching { java.net.URI(href) }.getOrNull() ?: return
-                val target = LogClickTarget.resolve(uri, project, currentEntries) ?: return
+                // A linkified issue-tracker substring inside a bookmark/tag chip's own label
+                // (jj-idea-vrmv follow-up) takes priority over the chip's own jjref:// href - it's the
+                // more specific target under the cursor.
+                val issueLinkUri = metadataPane.issueLinkUriAt(e.point)
+                val target = if (issueLinkUri != null) {
+                    IssueLinkClick(issueLinkUri)
+                } else {
+                    val href = metadataPane.hrefAt(e.point) ?: return
+                    val uri = runCatching { java.net.URI(href) }.getOrNull() ?: return
+                    LogClickTarget.resolve(uri, project, currentEntries) ?: return
+                }
                 val actionGroup = JujutsuLogContextMenuActions.clickActionGroup(project, target)
                 ActionManager.getInstance()
                     .createActionPopupMenu("JujutsuRefPopup", actionGroup)

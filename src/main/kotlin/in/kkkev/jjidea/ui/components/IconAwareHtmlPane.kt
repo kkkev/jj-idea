@@ -1,9 +1,11 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.project.Project
 import com.intellij.ui.BrowserHyperlinkListener
 import com.intellij.ui.ColorUtil
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
@@ -18,11 +20,14 @@ import `in`.kkkev.jjidea.ui.log.performDefaultAction
 import java.awt.Component
 import java.awt.Cursor
 import java.awt.Graphics
+import java.awt.Point
 import java.awt.Rectangle
 import java.awt.Shape
 import java.awt.Toolkit
+import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
+import java.net.URI
 import java.net.URLDecoder
 import java.util.regex.Pattern
 import javax.swing.Icon
@@ -68,14 +73,26 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     internal var hoveredChipElement: Element? = null
         private set
 
+    /**
+     * The URI of the linkified issue-tracker reference inside a bookmark/tag chip's own name
+     * currently under the pointer, if any (jj-idea-vrmv follow-up) - read by [ChipView.paint] to
+     * underline just that inner run, and to gate the whole-chip [ChipView.isRefOnly] background
+     * highlight off while it's non-null (the two cues are mutually exclusive, matching the
+     * fragment backend's `hoveredBookmarkOrTagUri`/`hoveredChipIssueLinkUri`).
+     */
+    internal var hoveredIssueLinkUri: URI? = null
+        private set
+
     init {
         isOpaque = false
         addMouseMotionListener(
             object : MouseMotionAdapter() {
                 override fun mouseMoved(e: MouseEvent) {
                     val newHovered = linkedChipElementAt(e.point)
-                    if (newHovered !== hoveredChipElement) {
+                    val newIssueLinkUri = issueLinkUriAt(e.point)
+                    if (newHovered !== hoveredChipElement || newIssueLinkUri != hoveredIssueLinkUri) {
                         hoveredChipElement = newHovered
+                        hoveredIssueLinkUri = newIssueLinkUri
                         // Chips are small and this pane's content is short (commit metadata), so a
                         // full repaint on hover change is cheap - no need to compute exact chip
                         // bounds (ChipView.modelToView reports a zero-width point, not its real
@@ -86,8 +103,27 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                     // hand cursor Swing's built-in HTMLEditorKit.LinkController shows for any <a>
                     // element (it registers its own mouseMoved during editor-kit setup, before this
                     // listener is added in this class's init block, so overriding the cursor here -
-                    // after it runs for the same event - wins).
-                    if (refUriAt(e.point) != null) cursor = Cursor.getDefaultCursor()
+                    // after it runs for the same event - wins) - unless hovering a linkified
+                    // issue-tracker substring within the chip, which does have a left-click action;
+                    // LinkController's hand cursor already applies there (still inside the chip's
+                    // own <a> anchor), so there's nothing further to override.
+                    if (refUriAt(e.point) != null && newIssueLinkUri == null) cursor = Cursor.getDefaultCursor()
+                }
+            }
+        )
+        // Left-click on a linkified issue-tracker substring inside a bookmark/tag chip's own name
+        // (jj-idea-vrmv follow-up). This can't be handled by the addHyperlinkListener below:
+        // Swing's hyperlink activation always reports the *whole* anchor's href (the chip's own
+        // jjref://, a no-op) regardless of which pixel inside it was clicked, so distinguishing
+        // "clicked the inner substring" needs our own pixel-level hit-test instead. Both listeners
+        // fire for the same click; the jjref:// activation below still resolves to its usual no-op.
+        addMouseListener(
+            object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) {
+                    if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
+                    val uri = issueLinkUriAt(e.point) ?: return
+                    BrowserUtil.browse(uri)
+                    e.consume()
                 }
             }
         )
@@ -114,6 +150,38 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                 }
             }
         }
+    }
+
+    /**
+     * The URI of a linkified issue-tracker reference inside a bookmark/tag chip's own name at
+     * [point], if any (jj-idea-vrmv follow-up) - the HTML-backend counterpart to the log table's
+     * `findInlinedRefUri`. Needs pixel-level hit-testing within the chip's painted label (see
+     * [ChipView.uriAtContentX]), since Swing's hyperlink activation only ever reports the whole
+     * anchor's href regardless of exactly where inside it was clicked.
+     */
+    fun issueLinkUriAt(point: Point): URI? {
+        val doc = document as? HTMLDocument ?: return null
+        val offset = characterOffsetAt(point)
+        val elem = doc.getCharacterElement(offset)
+        if (elem.name != "img") return null
+        val chipView = leafViewAt(elem.startOffset) as? ChipView ?: return null
+        val leftEdge = runCatching { modelToView2D(elem.startOffset) }.getOrNull() ?: return null
+        return chipView.uriAtContentX((point.x - leftEdge.x).roundToInt())
+    }
+
+    /**
+     * The leaf [View] rendering document position [pos] - standard Swing idiom for resolving the
+     * concrete `View` (here, a [ChipView]) backing a given offset, since [javax.swing.text.Element]
+     * alone doesn't expose which View class was created for it.
+     */
+    private fun leafViewAt(pos: Int): View? {
+        var view: View = getUI().getRootView(this)
+        while (view.viewCount > 0) {
+            val idx = view.getViewIndex(pos, Position.Bias.Forward)
+            if (idx < 0) return null
+            view = view.getView(idx)
+        }
+        return view
     }
 
     /**
@@ -277,12 +345,15 @@ internal object ChipIconExtension : ExtendableHTMLViewFactory.Extension {
 
 /**
  * Parsed contents of a [TextCanvas.appendChip] (or [TextCanvas.appendUnbreakable]) call, encoded by `HtmlTextCanvas`
- * into a single `src` attribute. [icon] is null for a plain unbreakable text label with no icon.
+ * into a single `src` attribute. [icon] is null for a plain unbreakable text label with no icon. [label] is a list
+ * of runs rather than one string: [linkifyText] may have split it around a linkified issue-tracker reference
+ * (jj-idea-vrmv follow-up), each run with its own optional target URI - [ChipView] paints (and hit-tests) them
+ * individually.
  */
 private class ChipSpec(
     val icon: Icon?,
     val prefixIcon: Icon?,
-    val label: String,
+    val label: List<LinkifiedRun>,
     val strikethrough: Boolean,
     val suffix: String?,
     val suffixColor: java.awt.Color?
@@ -293,7 +364,7 @@ private class ChipSpec(
             if (parts.size != 6) return null
             val icon = parts[0].takeIf { it.isNotEmpty() }?.let { resolveChipIcon(it) ?: return null }
             val prefixIcon = parts[1].takeIf { it.isNotEmpty() }?.let(::resolveChipIcon)
-            val label = URLDecoder.decode(parts[2], "UTF-8")
+            val label = parts[2].split(",").map(::parseRun)
             val strikethrough = parts[3] == "1"
             val suffix = parts[4].takeIf { it.isNotEmpty() }?.let { URLDecoder.decode(it, "UTF-8") }
             val suffixColor = parts[5].takeIf { it.isNotEmpty() }?.let { ColorUtil.fromHex(it) }
@@ -301,6 +372,17 @@ private class ChipSpec(
         }
 
         private fun resolveChipIcon(key: String): Icon? = IconResolver.resolveIcon(key)?.let(::ScaleCorrectedIcon)
+
+        /** Decode one `text~uri` run encoded by `HtmlTextCanvas.appendChipHtml` - `uri` is empty for a plain run. */
+        private fun parseRun(encoded: String): LinkifiedRun {
+            val tilde = encoded.indexOf('~')
+            val textPart = if (tilde >= 0) encoded.substring(0, tilde) else encoded
+            val uriPart = if (tilde >= 0) encoded.substring(tilde + 1) else ""
+            val text = URLDecoder.decode(textPart, "UTF-8")
+            val uri = uriPart.takeIf { it.isNotEmpty() }
+                ?.let { runCatching { URI(URLDecoder.decode(it, "UTF-8")) }.getOrNull() }
+            return LinkifiedRun(text, uri)
+        }
     }
 }
 
@@ -360,14 +442,33 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
     private val leadingGap: Int
         get() = (CHIP_LEADING_GAP * JBUIScale.scale(1f)).roundToInt()
 
+    private val labelWidth get() = fontMetrics.let { fm -> spec.label.sumOf { fm.stringWidth(it.text) } }
+
     override fun getPreferredSpan(axis: Int): Float {
         val fm = fontMetrics
         return when (axis) {
-            X_AXIS -> (leadingGap + iconsWidth + fm.stringWidth(spec.label) + fm.stringWidth(spec.suffix ?: ""))
-                .toFloat()
+            X_AXIS -> (leadingGap + iconsWidth + labelWidth + fm.stringWidth(spec.suffix ?: "")).toFloat()
             Y_AXIS -> max(fm.height, max(spec.icon?.iconHeight ?: 0, spec.prefixIcon?.iconHeight ?: 0)).toFloat()
             else -> throw IllegalArgumentException("Invalid axis: $axis")
         }
+    }
+
+    /**
+     * The [LinkifiedRun.uri] of whichever label run contains pixel offset [contentX], measured from
+     * this view's [modelToView]-adjusted left edge (i.e. already past [leadingGap], matching
+     * [IconAwareHtmlPane.issueLinkUriAt]'s coordinate space) - or null if [contentX] falls before/after
+     * the label or lands in a run with no link (jj-idea-vrmv follow-up: a chip label can contain a
+     * linkified issue-tracker reference alongside plain text).
+     */
+    fun uriAtContentX(contentX: Int): URI? {
+        val fm = fontMetrics
+        var x = iconsWidth
+        for (run in spec.label) {
+            val width = fm.stringWidth(run.text)
+            if (contentX in x until (x + width)) return run.uri
+            x += width
+        }
+        return null
     }
 
     override fun getAlignment(axis: Int): Float =
@@ -379,11 +480,16 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         val baseline = rect.y + fm.ascent
         var x = rect.x + leadingGap
 
-        if (isHovered && isRefOnly) {
+        val hoveredIssueLinkUri = (container as? IconAwareHtmlPane)?.hoveredIssueLinkUri
+
+        if (isHovered && isRefOnly && hoveredIssueLinkUri == null) {
             // Hover-highlight background for a right-click-only ref chip (jj-idea-a52h) - the same
             // greyish "list hover" tint used for the log table's equivalent chips
             // (TextCanvasPanel.highlightTarget), painted behind the whole chip (icon(s) + label +
-            // suffix), before any of that content is drawn.
+            // suffix), before any of that content is drawn. Suppressed while a linkified issue-tracker
+            // substring inside the label is itself hovered (jj-idea-vrmv follow-up) - the two hover
+            // cues are mutually exclusive, since a left-click there opens the issue link, not the ref's
+            // right-click menu.
             g.color = UIUtil.getListBackground(true, false)
             g.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 4, 4)
         }
@@ -402,19 +508,32 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         }
 
         g.font = font
-        g.color = foreground
-        g.drawString(spec.label, x, baseline)
+        val labelStartX = x
+        for (run in spec.label) {
+            val runWidth = fm.stringWidth(run.text)
+            val linked = run.uri != null
+            g.color = if (linked) SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES.fgColor else foreground
+            g.drawString(run.text, x, baseline)
+            if (linked && run.uri == hoveredIssueLinkUri) {
+                // Underline just this run while its issue-tracker link is hovered (jj-idea-vrmv
+                // follow-up), matching the "colored always, underlined on hover" convention used for
+                // real links elsewhere - the surrounding plain-text runs of the same chip label stay
+                // un-underlined.
+                val underlineY = baseline + (fm.descent / 2).coerceAtLeast(1)
+                g.drawLine(x, underlineY, x + runWidth, underlineY)
+            }
+            x += runWidth
+        }
         if (spec.strikethrough) {
             val lineY = baseline - fm.ascent / 3
-            g.drawLine(x, lineY, x + fm.stringWidth(spec.label), lineY)
+            g.drawLine(labelStartX, lineY, x, lineY)
         }
         if (isHovered && isRealLink) {
-            // Underline only the label (not any suffix) while hovered, matching a plain <a>'s
+            // Underline the whole label (not any suffix) while hovered, matching a plain <a>'s
             // native hover-underline extent (jj-idea-iesq).
             val underlineY = baseline + (fm.descent / 2).coerceAtLeast(1)
-            g.drawLine(x, underlineY, x + fm.stringWidth(spec.label), underlineY)
+            g.drawLine(labelStartX, underlineY, x, underlineY)
         }
-        x += fm.stringWidth(spec.label)
 
         spec.suffix?.let { suffix ->
             g.color = spec.suffixColor ?: foreground

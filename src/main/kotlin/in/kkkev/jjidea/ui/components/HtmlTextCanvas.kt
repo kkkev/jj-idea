@@ -48,9 +48,10 @@ private class HtmlTextCanvas(
      * split the icon from its label, or the label across lines, when the row needs to wrap (jj-idea-kds1) — folding
      * everything into a single leaf view makes that impossible.
      *
-     * Since the label is opaque (URL-encoded into an `<icon>` `src`, not real text runs), [TextCanvas.issueLinks]
-     * can't linkify a substring of it here the way [appendLinkified] does for plain text - chip labels only get
-     * interactive issue-tracker sub-links in the fragment-based log column (jj-idea-vrmv), not this HTML backend.
+     * [label] is split into runs via [linkifyText] using [TextCanvas.issueLinks] (jj-idea-vrmv follow-up), the same
+     * as [appendLinkified] does for plain text - [ChipView] paints each run individually so a linkified substring
+     * within an otherwise-atomic chip still gets its own color/hover cue, without breaking the wrap/word-split
+     * guarantee this atomic encoding exists for.
      */
     override fun appendChip(
         icon: IconSpec,
@@ -64,22 +65,41 @@ private class HtmlTextCanvas(
             val src = applyCurrentColor(spec).qualified
             return if (style.isSmaller) "$src@$SMALLER_SCALE" else src
         }
-        appendChipHtml(key(icon), prefixIcon?.let(::key) ?: "", label, strikethrough, suffix, suffixColor)
+        appendChipHtml(
+            key(icon),
+            prefixIcon?.let(::key) ?: "",
+            linkifyText(label, issueLinks),
+            strikethrough,
+            suffix,
+            suffixColor
+        )
     }
 
     /** Same atomic-leaf mechanism as [appendChip], but with no icon — just a plain unbreakable text run. */
     override fun appendUnbreakable(text: String) =
-        appendChipHtml("", "", text, strikethrough = false, suffix = null, suffixColor = null)
+        appendChipHtml(
+            "",
+            "",
+            listOf(LinkifiedRun(text, null)),
+            strikethrough = false,
+            suffix = null,
+            suffixColor = null
+        )
 
     private fun appendChipHtml(
         iconKey: String,
         prefixIconKey: String,
-        label: String,
+        label: List<LinkifiedRun>,
         strikethrough: Boolean,
         suffix: String?,
         suffixColor: Color?
     ) {
-        val encodedLabel = URLEncoder.encode(label, "UTF-8")
+        // `~`/`,` are safe run/field delimiters: URLEncoder always escapes both, so neither can
+        // appear literally in an encoded run's text or URI.
+        val encodedLabel = label.joinToString(",") { run ->
+            val encodedUri = run.uri?.let { URLEncoder.encode(it.toString(), "UTF-8") } ?: ""
+            "${URLEncoder.encode(run.text, "UTF-8")}~$encodedUri"
+        }
         val encodedSuffix = suffix?.let { URLEncoder.encode(it, "UTF-8") } ?: ""
         val suffixColorHex = suffixColor?.let { ColorUtil.toHex(it) } ?: ""
         val encoded = listOf(
