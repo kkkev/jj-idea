@@ -15,6 +15,7 @@ import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
@@ -93,5 +94,22 @@ class JujutsuAnnotationProviderTest {
         val result = provider.beforeRevisionFor(parent, WorkingCopy, repo)
 
         result shouldBe parent
+    }
+
+    // Regression test for jj-idea-hpvu / GitHub #64: a timed-out annotate used to surface as
+    // "Failed to annotate file: " with an empty stderr, because CommandResult had no way to
+    // distinguish a timeout from an ordinary failure. It must now render a real, non-empty message.
+    @Test
+    fun `surfaces a real message instead of an empty string when annotate times out`() {
+        every { repo.commandExecutor } returns commandExecutor
+        every { commandExecutor.annotate(any(), any(), any()) } returns
+            CommandExecutor.CommandResult(exitCode = -1, stdout = "", stderr = "", timedOut = true)
+
+        val exception = shouldThrow<VcsException> {
+            provider.annotateInternal(file, WorkingCopy, repo)
+        }
+
+        exception.message shouldNotBe null
+        exception.message!!.isBlank() shouldBe false
     }
 }

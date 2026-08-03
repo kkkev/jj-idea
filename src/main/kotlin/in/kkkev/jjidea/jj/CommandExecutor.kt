@@ -19,7 +19,12 @@ interface CommandExecutor {
     /**
      * Result of a jujutsu command execution
      */
-    data class CommandResult(val exitCode: Int, val stdout: String, val stderr: String) {
+    data class CommandResult(
+        val exitCode: Int,
+        val stdout: String,
+        val stderr: String,
+        val timedOut: Boolean = false
+    ) {
         val isSuccess: Boolean get() = exitCode == 0
 
         fun tellUser(project: Project, resourceKeyPrefix: String) {

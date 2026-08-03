@@ -8,6 +8,7 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.containers.addAllIfNotNull
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import `in`.kkkev.jjidea.vcs.relativeTo
@@ -273,6 +274,27 @@ internal fun rebaseArgs(
 }
 
 /**
+ * Converts a completed [ProcessOutput] into a [CommandExecutor.CommandResult], distinguishing a
+ * killed-by-timeout process from an ordinary failure. `runProcess(timeout)` destroys the process on
+ * timeout without setting an exit code, so [ProcessOutput.getExitCode] alone can't tell the two apart —
+ * and stderr is typically empty since the process never got to report anything. On timeout we
+ * synthesize a stderr message naming the command and the limit, so callers (e.g. annotate) have
+ * something real to show the user instead of a blank string.
+ */
+internal fun ProcessOutput.toCommandResult(cmdName: String, timeoutMillis: Long): CommandExecutor.CommandResult =
+    if (isTimeout) {
+        val seconds = TimeUnit.MILLISECONDS.toSeconds(timeoutMillis)
+        CommandExecutor.CommandResult(
+            exitCode = -1,
+            stdout = stdout,
+            stderr = JujutsuBundle.message("cli.error.timeout", cmdName, seconds.toString()),
+            timedOut = true
+        )
+    } else {
+        CommandExecutor.CommandResult(exitCode, stdout, stderr)
+    }
+
+/**
  * CLI-based implementation of JujutsuCommandExecutor
  */
 class CliExecutor(
@@ -283,6 +305,11 @@ class CliExecutor(
     private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
     private val networkTimeout = TimeUnit.SECONDS.toMillis(120)
+
+    // `jj file annotate` can take far longer than other commands on very large/deep-history repos
+    // (see jj-idea-hpvu); give it the same generous budget as network operations rather than the
+    // 30s default, which was observed to kill a ~100s annotate outright.
+    private val annotateTimeout = TimeUnit.SECONDS.toMillis(120)
 
     companion object {
         /** Pattern to extract percentage from git progress output (e.g., "Receiving objects:  45% (123/456)") */
@@ -396,7 +423,7 @@ class CliExecutor(
             args.add(template)
         }
         args.add(file.pathRelativeTo(root!!))
-        return execute(root, args, warnOnFailure = false)
+        return execute(root, args, timeout = annotateTimeout, warnOnFailure = false)
     }
 
     override fun tagList(template: String?): CommandExecutor.CommandResult {
@@ -584,16 +611,28 @@ class CliExecutor(
             })
 
             handler.startNotify()
-            handler.waitFor(networkTimeout)
+            val completed = handler.waitFor(networkTimeout)
 
             val exitCode = handler.exitCode ?: -1
 
-            log.info("Clone completed: exit=$exitCode")
-            if (exitCode != 0) {
-                log.warn("Clone failed: $stderr")
-            }
+            if (!completed) {
+                log.warn("Clone timed out after ${networkTimeout}ms")
+                handler.destroyProcess()
+                val seconds = TimeUnit.MILLISECONDS.toSeconds(networkTimeout)
+                CommandExecutor.CommandResult(
+                    exitCode = -1,
+                    stdout = stdout.toString(),
+                    stderr = JujutsuBundle.message("cli.error.timeout", "git clone", seconds.toString()),
+                    timedOut = true
+                )
+            } else {
+                log.info("Clone completed: exit=$exitCode")
+                if (exitCode != 0) {
+                    log.warn("Clone failed: $stderr")
+                }
 
-            CommandExecutor.CommandResult(exitCode, stdout.toString(), stderr.toString())
+                CommandExecutor.CommandResult(exitCode, stdout.toString(), stderr.toString())
+            }
         } catch (_: ProcessNotCreatedException) {
             log.warn("jj executable not found: $executable")
             onJjNotFound?.invoke()
@@ -666,13 +705,22 @@ class CliExecutor(
         val output: ProcessOutput = processHandler.runProcess(timeout.toInt())
         val duration = System.currentTimeMillis() - startTime
 
-        log.info("Completed in ${workingDir?.path ?: "."}: jj $cmdName in ${duration}ms (exit=${output.exitCode})")
+        log.info(
+            "Completed in ${workingDir?.path ?: "."}: jj $cmdName in ${duration}ms " +
+                "(exit=${output.exitCode}, timeout=${output.isTimeout})"
+        )
 
-        output.takeIf { it.exitCode != 0 }?.run {
-            val message = "jj $cmdName failed with exit code $exitCode:\n$stderr"
-            if (warnOnFailure) log.warn(message) else log.info(message)
+        if (output.isTimeout) {
+            // A timeout is always worth a log line, regardless of warnOnFailure: it's never the
+            // caller's expected outcome the way an ordinary non-zero exit code sometimes is.
+            log.warn("jj $cmdName timed out after ${timeout}ms")
+        } else {
+            output.takeIf { it.exitCode != 0 }?.run {
+                val message = "jj $cmdName failed with exit code $exitCode:\n$stderr"
+                if (warnOnFailure) log.warn(message) else log.info(message)
+            }
         }
 
-        return with(output) { CommandExecutor.CommandResult(exitCode, stdout, stderr) }
+        return output.toCommandResult(cmdName, timeout)
     }
 }

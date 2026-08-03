@@ -11,6 +11,7 @@ import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcs.CacheableAnnotationProvider
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
 import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.FileAtVersion
@@ -186,8 +187,13 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
     ): List<AnnotationLine> {
         val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
         if (!result.isSuccess) {
-            log.warn("Failed to annotate file: ${result.stderr}")
-            throw VcsException("Failed to annotate file: ${result.stderr}")
+            val message = if (result.timedOut) {
+                JujutsuBundle.message("annotation.error.timeout", file.name)
+            } else {
+                JujutsuBundle.message("annotation.error.failed", file.name, result.stderr)
+            }
+            log.warn(message)
+            throw VcsException(message)
         }
         return AnnotationParser.parse(result.stdout)
     }
