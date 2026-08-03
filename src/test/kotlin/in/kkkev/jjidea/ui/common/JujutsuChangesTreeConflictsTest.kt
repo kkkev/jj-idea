@@ -102,7 +102,12 @@ class JujutsuChangesTreeConflictsTest {
         val tree = JujutsuChangesTree(project.get(), groupConflicts = true)
 
         tree.setChangesToDisplay(changes)
-        waitForRefresh(tree)
+        // 5000 items genuinely takes longer to build off-EDT than the other cases here, and CI
+        // legs (especially older-platform ones under retry load) can be markedly slower than a
+        // local run - the default 5s deadline flaked on 2025.2 CI (GitHub Actions) with a plain
+        // timeout, not a real assertion failure. This test only checks final partition counts,
+        // not wall-clock behaviour, so a generous deadline costs nothing when the build is fast.
+        waitForRefresh(tree, timeoutMillis = 20_000)
 
         val conflictsNode = tree.root.childNodes().filterIsInstance<JujutsuConflictsNode>().single()
         conflictsNode.traverseObjectsUnder().filterIsInstance<Change>().count() shouldBe expectedConflicted
@@ -113,10 +118,10 @@ class JujutsuChangesTreeConflictsTest {
     private fun ChangesBrowserNode<*>.childNodes(): List<ChangesBrowserNode<*>> =
         (0 until childCount).map { getChildAt(it) as ChangesBrowserNode<*> }
 
-    private fun waitForRefresh(tree: JujutsuChangesTree) {
+    private fun waitForRefresh(tree: JujutsuChangesTree, timeoutMillis: Long = 5_000) {
         var refreshed = false
         tree.invokeAfterRefresh { refreshed = true }
-        val deadline = System.currentTimeMillis() + 5_000
+        val deadline = System.currentTimeMillis() + timeoutMillis
         while (!refreshed && System.currentTimeMillis() < deadline) {
             UIUtil.dispatchAllInvocationEvents()
         }
