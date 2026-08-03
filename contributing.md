@@ -360,21 +360,59 @@ parsing.
   surface. That checklist is the canonical pre-release regression list; it only stays
   useful if every PR that touches a manual surface updates it.
 
+### Manual regression scope as a deliverable
+
+`docs/manual-tests.md` has grown too large to run end-to-end for every change (~500
+checkboxes across 17 sections as of this writing). Any change touching a manual-testable
+surface must:
+
+**(a)** identify which existing `docs/manual-tests.md` sections its blast radius reaches,
+not just describe new steps for the change itself.
+
+**(b)** report a **Manual regression scope** block listing the `MT-*` section IDs to
+re-run, with a one-line reason each.
+
+The procedure:
+
+1. List the files/components the change touches.
+2. `grep -n 'Code:' docs/manual-tests.md` for each touched path, to find every section
+   whose `Code:` tag names it.
+3. Check the doc's own [Shared Surfaces](docs/manual-tests.md#shared-surfaces) table for
+   anything cross-cutting the change also hits, and each matched section's `Also re-run:`
+   line for coupled sections.
+4. Take the union and report it. If nothing matches, say so explicitly — "no manual
+   surface affected." If a manual surface *was* touched but no section covers it, add one
+   (this is also when `docs/manual-tests.md` gets updated, per the bullet above).
+5. **Escalation:** if more than ~6 sections match, the change hit a shared surface — say
+   so and flag it as warranting a broader pass rather than silently listing 15 IDs.
+
+Ask this question on any review touching a renderer, dialog, panel, or action wired into
+more than one entry point:
+
+> Does this component feed more than one manual-tests.md section? If so, are all of them
+> in the reported scope, or does the mapping in `docs/manual-tests.md` need updating?
+
 ### Manual test patterns
 
-- **Rendering surfaces**: bookmark/status decorations appear in three places —
-  the Decorations column (`SeparateDecorationsCellRenderer`), the inlined graph column
-  (`JujutsuGraphAndDescriptionRenderer`), and the commit details panel (`HtmlTextCanvas`
-  via `appendSummaryAndStatuses`). Check all three when changing bookmark rendering.
+Worked examples of the scoping procedure above:
+
 - **Log state changes**: use `jj bookmark create/delete/set/track` in the sandbox repo,
   trigger a refresh (file save or toolbar button), verify the log updates (~300ms
-  auto-refresh debounce).
+  auto-refresh debounce) — this is MT-LOG-REFRESH, but the same op-heads watch feeds the
+  reactive labels in MT-BOOKMARK, so a change to it needs both re-run.
 - **Popup filter correctness**: `RevisionSelectorPopup` ("Compare with Another Commit…")
   must only show bookmarks that are valid revision targets — verify unusual states
-  (deleted, conflict) are filtered or displayed correctly.
+  (deleted, conflict) are filtered or displayed correctly. `RevisionSelectorPopup` is a
+  Shared Surface (MT-CTXMENU, MT-DIFF) — see the table.
 - **Tooltip content**: hover icons/decorated names, confirm text matches
   `JujutsuBundle.properties` keys. `HtmlTextCanvas` tooltips render Swing HTML — check
-  for tag mismatches when editing it.
+  for tag mismatches when editing it. `HtmlTextCanvas` is also a Shared Surface (MT-LOG-
+  DETAILS, MT-WORKINGCOPY, MT-BOOKMARK).
+
+For the full cross-cutting component list (the renderer trio, the shared commit picker,
+the diff preview-tab helper, multi-repo scoping), see
+[Shared Surfaces](docs/manual-tests.md#shared-surfaces) — that table is the one place
+this mapping is maintained; don't duplicate it here.
 
 ## Building & Running
 
@@ -548,8 +586,9 @@ When making changes that affect users (features, fixes, behavior changes):
    if non-trivial); file new issues (`bug`/`task`/`feature`) for anything left unresolved.
 3. **Manual verification**: state the exact `./gradlew runIde` smoke steps for any
    UI-affecting change, and update `docs/manual-tests.md` if it adds/changes a
-   manual-testable surface. For parser/model-only changes, confirm automated tests cover
-   it and say so explicitly.
+   manual-testable surface. Report the **Manual regression scope** (the `MT-*` sections to
+   re-run) per § Manual regression scope as a deliverable above. For parser/model-only
+   changes, confirm automated tests cover it and say so explicitly.
 4. **Update `CHANGELOG.md`** per Contributing Changes above.
 5. **Sync remotes and push** per Git Workflow above.
 6. **Release decision**: ask whether to release. If yes, run the GitHub Actions

@@ -21,9 +21,10 @@ rules that supplement it.
 - **Scale analysis is a deliverable.** Any change adding a filesystem traversal or a
   per-file/per-commit loop must state its complexity against the scale envelope and ship
   an operation-count test — see contributing.md § Performance & Scale.
-- **After any UI-affecting change**: report the exact manual smoke steps, and update
+- **After any UI-affecting change**: report the exact manual smoke steps, update
   [docs/manual-tests.md](docs/manual-tests.md) if it adds or changes a manual-testable
-  surface.
+  surface, and report a **Manual regression scope** — the `MT-*` section IDs to re-run,
+  derived per contributing.md § Manual regression scope as a deliverable.
 - Follow contributing.md's End of Task Checklist before declaring work done.
 - **When the user says "finish"**, run in order: `./gradlew check` → update `CHANGELOG.md`
   (add a user-facing entry under `[Unreleased]`) → `jj describe` (write a commit message
