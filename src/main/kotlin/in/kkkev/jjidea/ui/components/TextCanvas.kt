@@ -74,14 +74,6 @@ interface TextCanvas {
      */
     val linkifier: Linkifier get() = Linkifier.None
 
-    /**
-     * The linked target to underline while "hovered" (jj-idea-91qf) - see [appendLinkified]. Only
-     * ever set on a [FragmentRecordingCanvas] (the interactive log table); the HTML backend gets
-     * hover-underline for free from the platform's native `<a>` rendering instead, so this always
-     * reads null there.
-     */
-    val hoveredTarget: URI? get() = null
-
     fun append(icon: IconSpec) = control("<icon src='${icon.qualified}'/>")
 
     fun truncate(builder: TextCanvas.() -> Unit) = builder()
@@ -177,8 +169,7 @@ fun TextCanvas.append(changeKey: ChangeKey) {
 
 /**
  * Append [description], linkifying issue-tracker references and bare URLs via [TextCanvas.linkifier]
- * as clickable links (jj-idea-10fo). [TextCanvas.hoveredTarget] underlines the one matching link
- * fragment, e.g. while the pointer is over it (jj-idea-91qf) - see [appendLinkified].
+ * as clickable links (jj-idea-10fo) - see [appendLinkified] and [underlining] for hover.
  */
 fun TextCanvas.append(description: Description) {
     if (description.empty) {
@@ -201,20 +192,14 @@ fun TextCanvas.appendSummary(description: Description) = truncate {
  * Append [text], linkifying via [TextCanvas.linkifier] and [TextCanvas.linked] (rather than raw HTML),
  * so links carry over into any backend — including [FragmentRecordingCanvas], where the target becomes
  * a [FragmentRecordingCanvas.Fragment.linkTarget] usable for hit-testing (jj-idea-iesq) — not just the
- * HTML details pane.
- *
- * The link matching [TextCanvas.hoveredTarget] is wrapped in [TextCanvas.underlined], matching the
- * "colored always, underlined on hover" convention used elsewhere (jj-idea-iesq) - the HTML backend gets
- * hover-underline for free from the platform's native `<a>` rendering instead, so `hoveredTarget` only
- * matters for interactive column rendering (jj-idea-91qf).
+ * HTML details pane. Hover-underline (jj-idea-91qf) is applied afterwards by [underlining], not here -
+ * see its doc for why.
  */
 internal fun TextCanvas.appendLinkified(text: String) {
     for (run in linkifier.linkify(text)) {
         when (run) {
             is TextRun.Plain -> append(run.text)
-            is TextRun.Link -> linked(run.target) {
-                if (run.target == hoveredTarget) underlined { append(run.text) } else append(run.text)
-            }
+            is TextRun.Link -> linked(run.target) { append(run.text) }
         }
     }
 }
@@ -348,8 +333,7 @@ fun TextCanvas.appendSummary(entry: LogEntry) {
 
 /**
  * Append the description summary and "(empty)" indicator for a log entry, linkifying via
- * [TextCanvas.linkifier] and underlining the fragment matching [TextCanvas.hoveredTarget]
- * (jj-idea-91qf) - see [appendLinkified].
+ * [TextCanvas.linkifier] (jj-idea-91qf) - see [appendLinkified].
  */
 fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
     appendSummary(entry.description)

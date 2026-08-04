@@ -76,18 +76,19 @@ class ChipIssueLinkTest {
     }
 
     @Test
-    fun `the linkified chip substring underlines only while its URI matches hoveredTarget`() {
+    fun `the linkified chip substring underlines only while its URI matches the hovered target`() {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
         val trackerUri = URI("https://tracker/JIRA-123")
-        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig), hoveredTarget = trackerUri)
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig))
 
         canvas.appendBookmarks(e)
+        val fragments = canvas.fragments.underlining(trackerUri)
 
-        val issueFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+        val issueFragment = fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "JIRA-123" }
         issueFragment.style.isUnderline shouldBe true
 
-        val suffixFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+        val suffixFragment = fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "-fix-thing" }
         suffixFragment.style.isUnderline shouldBe false
     }

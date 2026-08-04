@@ -47,9 +47,10 @@ class DateCellRenderer : TextTableCellRenderer<Instant>() {
 
 /**
  * Build a [FragmentRecordingCanvas] with the standard row styling (bold for working copy,
- * foreground color for selection state) applied around [builder]. [linkifier]/[hoveredTarget] are
- * injected into the canvas itself (jj-idea-91qf, jj-idea-vrmv) rather than threaded through every
- * append call inside [builder] - see [TextCanvas.linkifier]/[TextCanvas.hoveredTarget].
+ * foreground color for selection state) applied around [builder]. [linkifier] is injected into the
+ * canvas itself (jj-idea-91qf, jj-idea-vrmv) rather than threaded through every append call inside
+ * [builder] - see [TextCanvas.linkifier]. [hoveredTarget], if any, is underlined afterwards (see
+ * [underlining]) rather than baked in at append time.
  */
 fun entryCanvas(
     entry: LogEntry,
@@ -57,10 +58,13 @@ fun entryCanvas(
     linkifier: Linkifier = Linkifier.None,
     hoveredTarget: URI? = null,
     builder: TextCanvas.() -> Unit
-) = FragmentRecordingCanvas(linkifier = linkifier, hoveredTarget = hoveredTarget).apply {
-    foreground(fg) {
-        styled(if (entry.isWorkingCopy) Font.BOLD else 0, builder)
+): FragmentRecordingCanvas {
+    val canvas = FragmentRecordingCanvas(linkifier = linkifier).apply {
+        foreground(fg) {
+            styled(if (entry.isWorkingCopy) Font.BOLD else 0, builder)
+        }
     }
+    return FragmentRecordingCanvas(canvas.fragments.underlining(hoveredTarget))
 }
 
 /** Append status indicators: immutable/public icon and conflict warning. */

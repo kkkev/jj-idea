@@ -15,9 +15,9 @@ import java.net.URI
  * Tests for jj-idea-10fo: rendering issue-tracker references (e.g. `JIRA-123`) as clickable links, resolved via
  * [IssueLinkifier]. Links are emitted through [TextCanvas.linked] rather than raw HTML injection, so they carry
  * over into [FragmentRecordingCanvas] (the log-column backend) as well as the HTML details pane — see
- * `appendLinkified` in `TextCanvas.kt`. The [Linkifier]/hover state are injected once per canvas (constructor for
+ * `appendLinkified` in `TextCanvas.kt`. The [Linkifier] is injected once per canvas (constructor for
  * [FragmentRecordingCanvas], the `linkifier` param for [htmlString]) rather than passed to each append call - see
- * [TextCanvas.linkifier]/[TextCanvas.hoveredTarget].
+ * [TextCanvas.linkifier]. Hover-underline is a separate, later step - see [underlining].
  */
 class IssueLinkRenderingTest {
     private fun configWith(issueRegexp: String, linkRegexp: String) =
@@ -90,30 +90,30 @@ class IssueLinkRenderingTest {
     }
 
     @Test
-    fun `the linkified fragment underlines only while its URI matches hoveredTarget (jj-idea-91qf)`() {
+    fun `the linkified fragment underlines only while its URI matches the hovered target (jj-idea-91qf)`() {
         val trackerUri = URI("https://tracker/JIRA-123")
-        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig), hoveredTarget = trackerUri)
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig))
         canvas.append(Description("See JIRA-123 please"))
 
-        val linkFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+        val fragments = canvas.fragments.underlining(trackerUri)
+
+        val linkFragment = fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "JIRA-123" }
         linkFragment.style.isUnderline shouldBe true
 
-        val plainFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+        val plainFragment = fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text.contains("See") }
         plainFragment.style.isUnderline shouldBe false
     }
 
     @Test
-    fun `a non-matching hoveredTarget leaves the link fragment plain`() {
-        val canvas =
-            FragmentRecordingCanvas(
-                linkifier = IssueLinkifier(jiraConfig),
-                hoveredTarget = URI("https://tracker/OTHER-1")
-            )
+    fun `a non-matching hovered target leaves the link fragment plain`() {
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig))
         canvas.append(Description("See JIRA-123 please"))
 
-        val linkFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
+        val fragments = canvas.fragments.underlining(URI("https://tracker/OTHER-1"))
+
+        val linkFragment = fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "JIRA-123" }
         linkFragment.style.isUnderline shouldBe false
     }
