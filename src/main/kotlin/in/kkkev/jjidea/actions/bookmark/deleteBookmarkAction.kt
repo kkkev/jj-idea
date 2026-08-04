@@ -1,12 +1,12 @@
 package `in`.kkkev.jjidea.actions.bookmark
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
 /**
  * Delete bookmark action.
@@ -15,7 +15,7 @@ import `in`.kkkev.jjidea.jj.invalidate
 fun deleteBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark) = nullAndDumbAwareAction(
     bookmark,
     "action.bookmark.delete",
-    AllIcons.General.Delete
+    JujutsuIcons.BookmarkDelete
 ) {
     if (Messages.showYesNoDialog(
             repo.project,

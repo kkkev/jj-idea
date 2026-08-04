@@ -449,6 +449,8 @@ push a bookmark from another clone without running `jj bookmark track` in this o
 - [ ] **Abandon** action removes change after confirmation
 - [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
 - [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
+- [ ] jj-idea-rskx: **Set Tag Here...** shows a distinct tag-plus badge icon (not the platform's
+      generic + icon); entering a name creates the tag at that commit and the log updates
 
 #### Duplicate Change (jj-idea-vu35)
 
@@ -719,6 +721,13 @@ state/routing logic, not rendering)
 - [ ] "Create Bookmark Here…" (enter name → confirm) creates the bookmark at @, label and log
       decorations update; Rename… renames it in log and label; Delete removes it (label
       reverts to blank if it was on @); Forget (remote entry) removes remote tracking
+- [ ] jj-idea-rskx: Create/Delete/Forget context-menu items show distinct bookmark-pennant
+      icons (plus/cross/minus overlay), not the platform's generic +/trash/- icons
+- [ ] jj-idea-rskx: a bookmark deleted locally but not yet pushed (`jj bookmark delete X`)
+      shows a dashed/hollow pennant in the log chip (in addition to strikethrough text); a
+      conflicted bookmark (e.g. after a divergent fetch) shows a red forked-tail pennant
+      instead of the generic red warning triangle. Both remain legible at 125%/150% IDE
+      text size and in both Light and Dark themes
 
 #### Multi-repo project
 

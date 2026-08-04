@@ -1,0 +1,13 @@
+<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .accent { stroke: #20a070 }
+  </style>
+  <defs>
+    <mask id="knockout" maskUnits="userSpaceOnUse" x="0" y="0" width="16" height="16">
+      <rect x="0" y="0" width="16" height="16" fill="white"/>
+      <path d="M12,9.6 V14.4 M9.6,12 H14.4" stroke="black" stroke-width="4.8" stroke-linecap="round" fill="none"/>
+    </mask>
+  </defs>
+  <path d="M4,15 L8,11.5 L11.5,14 V1 H4 Z" class="accent" mask="url(#knockout)" stroke-linejoin="round"/>
+  <path d="M12,9.6 V14.4 M9.6,12 H14.4" class="accent" stroke-width="1.6" stroke-linecap="round"/>
+</svg>

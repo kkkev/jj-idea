@@ -308,10 +308,13 @@ fun TextCanvas.append(name: BookmarkName) = colored(JujutsuColors.BOOKMARK) {
 
 private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = colored(JujutsuColors.BOOKMARK) {
     smaller {
-        val iconRef = if (!bookmark.isRemote || bookmark.tracked) {
-            JujutsuIcons::BookmarkTracked
-        } else {
-            JujutsuIcons::Bookmark
+        // Precedence: a conflicted bookmark always shows the conflict glyph, even if it's also pending
+        // deletion (still conveyed by strikethrough); otherwise deleted beats tracked/plain.
+        val iconRef = when {
+            bookmark.conflict -> JujutsuIcons::BookmarkConflict
+            bookmark.deleted -> JujutsuIcons::BookmarkDeleted
+            !bookmark.isRemote || bookmark.tracked -> JujutsuIcons::BookmarkTracked
+            else -> JujutsuIcons::Bookmark
         }
         val divergence = buildString {
             if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
@@ -320,7 +323,6 @@ private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = c
         appendChip(
             icon(iconRef),
             label,
-            prefixIcon = if (bookmark.conflict) icon(JujutsuIcons::Conflict) else null,
             strikethrough = bookmark.deleted,
             suffix = divergence.takeIf { it.isNotEmpty() },
             suffixColor = JujutsuColors.DIVERGENT

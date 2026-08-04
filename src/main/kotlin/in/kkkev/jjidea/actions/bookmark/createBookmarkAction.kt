@@ -1,12 +1,12 @@
 package `in`.kkkev.jjidea.actions.bookmark
 
-import com.intellij.icons.AllIcons
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
 fun createBookmarkAction(logEntry: LogEntry?) =
-    nullAndDumbAwareAction(logEntry, "action.bookmark.create", AllIcons.General.Add) {
+    nullAndDumbAwareAction(logEntry, "action.bookmark.create", JujutsuIcons.BookmarkAdd) {
         CreateBookmarkDialog(target).show()
     }
 

@@ -36,6 +36,9 @@ object JujutsuIcons {
     val Tag: Icon = load("/icons/tag.svg").accented(GREY)
 
     @JvmField
+    val TagAdd: Icon = load("/icons/tagAdd.svg").accented(GREY)
+
+    @JvmField
     val BookmarkTracked: Icon = load("/icons/bookmarkTracked.svg").accented(GREY)
 
     @JvmField
@@ -46,6 +49,21 @@ object JujutsuIcons {
 
     @JvmField
     val Conflict: Icon = fillIcon("/icons/conflict.svg", RED)
+
+    @JvmField
+    val BookmarkAdd: Icon = load("/icons/bookmarkAdd.svg").accented(GREY)
+
+    @JvmField
+    val BookmarkDelete: Icon = load("/icons/bookmarkDelete.svg").accented(GREY)
+
+    @JvmField
+    val BookmarkForget: Icon = load("/icons/bookmarkForget.svg").accented(GREY)
+
+    @JvmField
+    val BookmarkDeleted: Icon = load("/icons/bookmarkDeleted.svg").accented(GREY)
+
+    @JvmField
+    val BookmarkConflict: Icon = strokeIcon("/icons/bookmarkConflict.svg", RED)
 
     @JvmField
     val Describe: Icon = strokeIcon("/icons/describe.svg", GREY)

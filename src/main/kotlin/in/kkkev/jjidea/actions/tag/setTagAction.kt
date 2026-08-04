@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.actions.tag
 
-import com.intellij.icons.AllIcons
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
@@ -9,10 +8,11 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.util.runLater
 
 fun setTagAction(entry: LogEntry?) =
-    nullAndDumbAwareAction(entry, "action.tag.set", AllIcons.General.Add) {
+    nullAndDumbAwareAction(entry, "action.tag.set", JujutsuIcons.TagAdd) {
         TagNameDialog(target.repo) { tag ->
             executeSetTag(target.repo, tag, target.id, allowMove = false)
         }.show()
