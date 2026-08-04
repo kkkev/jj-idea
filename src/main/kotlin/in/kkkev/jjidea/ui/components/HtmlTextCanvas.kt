@@ -1,11 +1,9 @@
 package `in`.kkkev.jjidea.ui.components
 
-import com.intellij.ui.ColorUtil
 import com.intellij.ui.SimpleTextAttributes
 import java.awt.Color
 import java.awt.Font
 import java.net.URI
-import java.net.URLEncoder
 
 /**
  * Create a full HTML document including wrapping `<html>` tag. [linkifier] linkifies any
@@ -37,84 +35,31 @@ private class HtmlTextCanvas(
 
     override fun append(icon: IconSpec) {
         val src = applyCurrentColor(icon).qualified
-        control("<icon src='${if (style.isSmaller) "$src@$SMALLER_SCALE" else src}'/>")
+        control("<img src='$ICON_IMG_PREFIX${if (style.isSmaller) "$src@$SMALLER_SCALE" else src}'/>")
     }
 
     /**
-     * Encode the whole chip into a single `<icon>` element's `src` attribute, resolved by [ChipIconExtension] into
-     * one atomic [ChipView]. A plain sequence of `<icon>` + text elements would let the surrounding HTML layout
-     * split the icon from its label, or the label across lines, when the row needs to wrap (jj-idea-kds1) — folding
-     * everything into a single leaf view makes that impossible.
-     *
-     * [label] is split into runs via [TextCanvas.linkifier] (jj-idea-vrmv follow-up), the same as
-     * [appendLinkified] does for plain text - [ChipView] paints each run individually so a linkified
-     * substring within an otherwise-atomic chip still gets its own color/hover cue, without breaking
-     * the wrap/word-split guarantee this atomic encoding exists for.
+     * Build [html] with [builder] (inheriting the current style/linkifier context, since it runs
+     * on `this` canvas exactly as any other nested call would) and re-emit whatever it wrote as a
+     * single atomic unit, resolved by `AtomicHtmlExtension` into an [AtomicHtmlView]. A plain
+     * sequence of elements would let the surrounding HTML layout split them apart when the row
+     * needs to wrap (jj-idea-kds1) — folding everything into one leaf view makes that impossible.
+     * [builder] can write *any* combination of ordinary `TextCanvas` calls, including icons
+     * (see [append]) - nothing here is chip-specific, and nothing needs rewriting: [append] already
+     * emits the same `<img src='icon:...'/>` form [AtomicHtmlView]'s inner document resolves
+     * directly, so the captured [html] is used as-is.
      */
-    override fun appendChip(
-        icon: IconSpec,
-        label: String,
-        prefixIcon: IconSpec?,
-        strikethrough: Boolean,
-        suffix: String?,
-        suffixColor: Color?
-    ) {
-        fun key(spec: IconSpec): String {
-            val src = applyCurrentColor(spec).qualified
-            return if (style.isSmaller) "$src@$SMALLER_SCALE" else src
-        }
-        appendChipHtml(
-            key(icon),
-            prefixIcon?.let(::key) ?: "",
-            linkifier.linkify(label),
-            strikethrough,
-            suffix,
-            suffixColor
-        )
-    }
-
-    /** Same atomic-leaf mechanism as [appendChip], but with no icon — just a plain unbreakable text run. */
-    override fun appendUnbreakable(text: String) =
-        appendChipHtml(
-            "",
-            "",
-            listOf(TextRun.Plain(text)),
-            strikethrough = false,
-            suffix = null,
-            suffixColor = null
-        )
-
-    private fun appendChipHtml(
-        iconKey: String,
-        prefixIconKey: String,
-        label: List<TextRun>,
-        strikethrough: Boolean,
-        suffix: String?,
-        suffixColor: Color?
-    ) {
-        // `~`/`,` are safe run/field delimiters: URLEncoder always escapes both, so neither can
-        // appear literally in an encoded run's text or URI.
-        val encodedLabel = label.joinToString(",") { run ->
-            val encodedUri = run.target?.let { URLEncoder.encode(it.toString(), "UTF-8") } ?: ""
-            "${URLEncoder.encode(run.text, "UTF-8")}~$encodedUri"
-        }
-        val encodedSuffix = suffix?.let { URLEncoder.encode(it, "UTF-8") } ?: ""
-        val suffixColorHex = suffixColor?.let { ColorUtil.toHex(it) } ?: ""
-        val encoded = listOf(
-            iconKey,
-            prefixIconKey,
-            encodedLabel,
-            if (strikethrough) "1" else "0",
-            encodedSuffix,
-            suffixColorHex
-        ).joinToString(";")
+    override fun appendUnbreakable(builder: TextCanvas.() -> Unit) {
+        val start = sb.length
+        this.builder()
+        val html = sb.substring(start)
+        sb.setLength(start)
         // A genuinely void/self-closing element (unlike <icon>, jj-idea-vll4/jj-idea-m2wr): JBHtmlPane's Jsoup
         // transpiler marks the custom <icon> tag SelfClose but not Void, so on IntelliJ 2026.2 it round-trips
-        // through Jsoup's serializer as an explicit <icon ...></icon> pair, which Swing's parser (not knowing
-        // <icon> is empty) then splits into two sibling Elements per chip instead of one. <img> is a real HTML
-        // void element that both Jsoup and Swing's parser already know never has a closing tag, so it survives
-        // the round-trip as a single Element. ChipIconExtension intercepts it before any real image loading.
-        control("<img src='$CHIP_ICON_PREFIX$encoded'/>")
+        // through Jsoup's serializer as an explicit <icon ...></icon> pair, which Swing's parser then splits into
+        // two sibling Elements instead of one. <img> is a real HTML void element, so it survives as a single
+        // Element; `AtomicHtmlExtension` intercepts it before any real image loading.
+        control("<img src='$UNBREAKABLE_PREFIX${UnbreakableContent.encode(html)}'/>")
     }
 
     // TODO Optimise nested styles so that they collapse into one if they start and end at the same point

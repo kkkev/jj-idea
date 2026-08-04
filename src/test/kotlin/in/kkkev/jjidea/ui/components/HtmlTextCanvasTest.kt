@@ -18,7 +18,6 @@ import io.kotest.matchers.string.shouldNotContain
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
-import java.net.URLDecoder
 import java.net.URLEncoder
 
 // <img>, not <icon>: see jj-idea-vll4/jj-idea-m2wr — <icon> isn't a genuine HTML void element, so on IntelliJ
@@ -28,9 +27,9 @@ private val ICON_TAG = Regex("<img[^>]*>")
 private val HREF = Regex("href='([^']*)'")
 
 /**
- * Regression tests for jj-idea-kds1: bookmark/tag chips must render as a single atomic `<img>` element (resolved by
- * [ChipIconExtension] into one [ChipView]) so HTML line-wrapping can never split the icon from its label, nor break
- * the label mid-word.
+ * Regression tests for jj-idea-kds1: bookmark/tag chips must render as a single atomic `<img>` element (resolved
+ * by [AtomicHtmlExtension] into one [AtomicHtmlView]) so HTML line-wrapping can never split the icon from its
+ * label, nor break the label mid-word.
  */
 class HtmlTextCanvasTest {
     @Test
@@ -39,7 +38,7 @@ class HtmlTextCanvasTest {
 
         val iconTags = ICON_TAG.findAll(html).toList()
         iconTags shouldHaveSize 1
-        iconTags[0].value shouldContain CHIP_ICON_PREFIX
+        iconTags[0].value shouldContain UNBREAKABLE_PREFIX
         iconTags[0].value shouldContain URLEncoder.encode("hotfix/issue-123", "UTF-8")
     }
 
@@ -49,7 +48,7 @@ class HtmlTextCanvasTest {
 
         val iconTags = ICON_TAG.findAll(html).toList()
         iconTags shouldHaveSize 1
-        iconTags[0].value shouldContain CHIP_ICON_PREFIX
+        iconTags[0].value shouldContain UNBREAKABLE_PREFIX
         iconTags[0].value shouldContain URLEncoder.encode("v1.0", "UTF-8")
     }
 
@@ -59,7 +58,7 @@ class HtmlTextCanvasTest {
 
         val iconTags = ICON_TAG.findAll(html).toList()
         iconTags shouldHaveSize 1
-        iconTags[0].value shouldContain CHIP_ICON_PREFIX
+        iconTags[0].value shouldContain UNBREAKABLE_PREFIX
         iconTags[0].value shouldContain "main"
     }
 
@@ -70,8 +69,7 @@ class HtmlTextCanvasTest {
         val iconTags = ICON_TAG.findAll(html).toList()
         iconTags shouldHaveSize 1
         val src = Regex("src='([^']*)'").find(iconTags[0].value)!!.groupValues[1]
-        val fields = src.removePrefix(CHIP_ICON_PREFIX).split(";")
-        URLDecoder.decode(fields[4], "UTF-8") shouldBe "↑2↓1"
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "↑2↓1"
     }
 
     @Test
@@ -143,8 +141,10 @@ class HtmlTextCanvasTest {
         html shouldContain "mailto:alice@example.com"
         val iconTags = ICON_TAG.findAll(html).toList()
         iconTags shouldHaveSize 1
-        iconTags[0].value shouldContain CHIP_ICON_PREFIX
-        iconTags[0].value shouldContain URLEncoder.encode("Alice <alice@example.com>", "UTF-8")
+        val src = Regex("src='([^']*)'").find(iconTags[0].value)!!.groupValues[1]
+        src shouldContain UNBREAKABLE_PREFIX
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "Alice"
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "alice@example.com"
     }
 
     @Test
@@ -159,8 +159,8 @@ class HtmlTextCanvasTest {
     /**
      * Regression test for jj-idea-c6f5: a `white-space: nowrap` CSS span does not stop Swing's HTMLEditorKit from
      * force-breaking text mid-word when it doesn't fit the line. [TextCanvas.appendUnbreakable] must instead render
-     * as a single atomic leaf (the same [ChipIconExtension] mechanism as [TextCanvas.appendChip], jj-idea-kds1) with
-     * no separate breakable text run for the surrounding layout to split.
+     * as a single atomic leaf (the [AtomicHtmlExtension] mechanism, jj-idea-kds1) with no separate breakable text
+     * run for the surrounding layout to split.
      */
     @Test
     fun `appendUnbreakable renders as a single atomic icon element with no icon`() {
@@ -168,7 +168,8 @@ class HtmlTextCanvasTest {
 
         val iconTags = ICON_TAG.findAll(html).toList()
         iconTags shouldHaveSize 1
-        iconTags[0].value shouldContain CHIP_ICON_PREFIX
-        iconTags[0].value shouldContain URLEncoder.encode("· 12/07/2026, 04:07", "UTF-8")
+        val src = Regex("src='([^']*)'").find(iconTags[0].value)!!.groupValues[1]
+        src shouldContain UNBREAKABLE_PREFIX
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "12/07/2026"
     }
 }

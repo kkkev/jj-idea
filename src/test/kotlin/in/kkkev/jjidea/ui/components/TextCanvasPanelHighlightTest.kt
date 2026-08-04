@@ -23,9 +23,19 @@ class TextCanvasPanelHighlightTest {
         val targetA = URI("jjref://repo?a&kind=bookmark&name=main")
         val targetB = URI("jjref://repo?a&kind=bookmark&name=other")
         val canvas = FragmentRecordingCanvas().apply {
-            linked(targetA) { appendChip(icon(JujutsuIcons::Bookmark), "main") }
+            linked(targetA) {
+                appendUnbreakable {
+                    append(icon(JujutsuIcons::Bookmark))
+                    appendLinkified("main")
+                }
+            }
             append(" ")
-            linked(targetB) { appendChip(icon(JujutsuIcons::Bookmark), "other") }
+            linked(targetB) {
+                appendUnbreakable {
+                    append(icon(JujutsuIcons::Bookmark))
+                    appendLinkified("other")
+                }
+            }
         }
 
         val panel = TextCanvasPanel()
@@ -41,7 +51,12 @@ class TextCanvasPanelHighlightTest {
     fun `a plain separator between chips does not inherit either chip's link target`() {
         val target = URI("jjref://repo?a&kind=bookmark&name=main")
         val canvas = FragmentRecordingCanvas().apply {
-            linked(target) { appendChip(icon(JujutsuIcons::Bookmark), "main") }
+            linked(target) {
+                appendUnbreakable {
+                    append(icon(JujutsuIcons::Bookmark))
+                    appendLinkified("main")
+                }
+            }
             append(" ")
             append("plain trailing text")
         }
@@ -62,9 +77,19 @@ class TextCanvasPanelHighlightTest {
         val targetA = URI("jjref://repo?a&kind=bookmark&name=main")
         val targetB = URI("jjref://repo?a&kind=bookmark&name=other")
         val canvas = FragmentRecordingCanvas().apply {
-            linked(targetA) { appendChip(icon(JujutsuIcons::Bookmark), "main") }
+            linked(targetA) {
+                appendUnbreakable {
+                    append(icon(JujutsuIcons::Bookmark))
+                    appendLinkified("main")
+                }
+            }
             append(" ")
-            linked(targetB) { appendChip(icon(JujutsuIcons::Bookmark), "other") }
+            linked(targetB) {
+                appendUnbreakable {
+                    append(icon(JujutsuIcons::Bookmark))
+                    appendLinkified("other")
+                }
+            }
         }
 
         val panel = TextCanvasPanel()

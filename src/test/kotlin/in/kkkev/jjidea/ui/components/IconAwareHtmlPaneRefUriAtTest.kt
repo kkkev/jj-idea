@@ -21,7 +21,7 @@ import javax.swing.text.Element
  * `elem.attributes.getAttribute(HTML.Attribute.HREF)` assumed - discovered while adding chip
  * hover tracking, which hit the identical lookup bug (see `hrefAncestorOf`/`hrefOf`). Also covers
  * that hovering a bookmark chip *does* set a hovered link element (jj-idea-a52h) - it just paints
- * a background highlight instead of an underline (ChipView.isRefOnly vs isRealLink), since the chip
+ * a background highlight instead of an underline (AtomicHtmlView.isRefOnly vs isRealLink), since the chip
  * has no left-click action but does have a right-click menu.
  */
 @Tag("platform")
@@ -45,7 +45,12 @@ class IconAwareHtmlPaneRefUriAtTest {
         val refUri = URI("jjref://repo?abc123&kind=bookmark&name=main")
         val html = htmlString {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
-                linked(refUri) { appendChip(icon(JujutsuIcons::Bookmark), "main") }
+                linked(refUri) {
+                    appendUnbreakable {
+                        append(icon(JujutsuIcons::Bookmark))
+                        append("main")
+                    }
+                }
             }
         }
 
@@ -62,7 +67,7 @@ class IconAwareHtmlPaneRefUriAtTest {
 
     @Test
     fun `refUriAt resolves the jjref href from a point over the right half of the chip`() {
-        // Regression for a real bug report: ChipView.viewToModel (needed for caret placement)
+        // Regression for a real bug report: AtomicHtmlView.viewToModel (needed for caret placement)
         // returns the chip's own endOffset for its right half, but a leaf's range is
         // [startOffset, endOffset) - exclusive of endOffset - so getCharacterElement(endOffset)
         // used to resolve the *next* sibling instead of the chip, silently breaking hover/
@@ -70,7 +75,12 @@ class IconAwareHtmlPaneRefUriAtTest {
         val refUri = URI("jjref://repo?abc123&kind=bookmark&name=main")
         val html = htmlString {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
-                linked(refUri) { appendChip(icon(JujutsuIcons::Bookmark), "main") }
+                linked(refUri) {
+                    appendUnbreakable {
+                        append(icon(JujutsuIcons::Bookmark))
+                        append("main")
+                    }
+                }
             }
         }
 
@@ -80,7 +90,7 @@ class IconAwareHtmlPaneRefUriAtTest {
         pane.doLayout()
 
         val chip = collectImgElements(pane.document.defaultRootElement).single()
-        // ChipView.modelToView reports the chip's real right edge for its own endOffset (unlike a
+        // AtomicHtmlView.modelToView reports the chip's real right edge for its own endOffset (unlike a
         // regular text run, where end-of-run x wouldn't necessarily coincide with this element).
         val rightEdge = pane.modelToView2D(chip.endOffset).bounds
         val point = java.awt.Point(rightEdge.x - 2, rightEdge.centerY.toInt())
@@ -130,11 +140,16 @@ class IconAwareHtmlPaneRefUriAtTest {
     @Test
     fun `hovering a bookmark chip sets a hovered link element (jj-idea-a52h)`() {
         // Bookmark/tag chips have no left-click action, but they do get a hover cue - a background
-        // highlight rather than an underline (ChipView paints based on isRefOnly vs isRealLink).
+        // highlight rather than an underline (AtomicHtmlView paints based on isRefOnly vs isRealLink).
         val refUri = URI("jjref://repo?abc123&kind=bookmark&name=main")
         val html = htmlString {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
-                linked(refUri) { appendChip(icon(JujutsuIcons::Bookmark), "main") }
+                linked(refUri) {
+                    appendUnbreakable {
+                        append(icon(JujutsuIcons::Bookmark))
+                        append("main")
+                    }
+                }
             }
         }
 

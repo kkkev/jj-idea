@@ -13,8 +13,7 @@ import org.junit.jupiter.api.Test
 /**
  * Tests for jj-idea-rskx: the bookmark chip's icon reflects its state (plain/tracked/deleted/
  * conflict) via [JujutsuIcons], with conflict taking precedence over deletion (deletion is still
- * conveyed by strikethrough on the label) - see [TextCanvas.appendChip] and the private
- * `appendBookmarkChip` in TextCanvas.kt.
+ * conveyed by strikethrough on the label) - see the private `appendBookmarkChip` in TextCanvas.kt.
  */
 class BookmarkChipIconTest {
     private val repo = mockk<JujutsuRepository>(relaxed = true)

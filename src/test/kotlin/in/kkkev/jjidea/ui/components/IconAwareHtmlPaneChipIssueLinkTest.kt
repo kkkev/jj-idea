@@ -65,8 +65,8 @@ class IconAwareHtmlPaneChipIssueLinkTest {
     }
 
     /**
-     * [ChipView.modelToView] returns a zero-width rectangle at [Element.getStartOffset]/
-     * [Element.getEndOffset] (by design - it's a single atomic leaf, see [ChipView]'s own
+     * [AtomicHtmlView.modelToView] returns a zero-width rectangle at [Element.getStartOffset]/
+     * [Element.getEndOffset] (by design - it's a single atomic leaf, see [AtomicHtmlView]'s own
      * `modelToView` doc), so the chip's real pixel span has to be read from those two positions'
      * x-coordinates rather than from either rectangle's `width` alone.
      */

@@ -108,7 +108,7 @@ data class CappedDecorations(val canvas: FragmentRecordingCanvas, val hidden: Li
  *
  * [linkifier] linkifies issue-tracker references inside a chip's own name (e.g. a bookmark named
  * `jira-123-fix-thing`), underlining the fragment matching [hoveredTarget] (jj-idea-vrmv) - see
- * [in.kkkev.jjidea.ui.components.appendChip].
+ * [in.kkkev.jjidea.ui.components.appendUnbreakable].
  */
 fun cappedDecorations(
     entry: LogEntry,
@@ -119,7 +119,7 @@ fun cappedDecorations(
     linkifier: Linkifier = Linkifier.None,
     hoveredTarget: URI? = null
 ): CappedDecorations {
-    val units = bookmarkDecorationUnits(entry) + tagDecorationUnits(entry)
+    val units = bookmarkRefChips(entry) + tagRefChips(entry)
 
     fun widthOf(builder: TextCanvas.() -> Unit) =
         FragmentRecordingCanvas().apply(builder).fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }

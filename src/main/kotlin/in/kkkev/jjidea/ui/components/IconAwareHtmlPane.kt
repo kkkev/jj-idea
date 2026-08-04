@@ -5,13 +5,10 @@ import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.project.Project
 import com.intellij.ui.BrowserHyperlinkListener
 import com.intellij.ui.ColorUtil
-import com.intellij.ui.SimpleTextAttributes
 import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
 import com.intellij.ui.scale.JBUIScale
-import com.intellij.util.ui.ExtendableHTMLViewFactory
-import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.common.ScaledIcon
 import `in`.kkkev.jjidea.ui.common.accented
@@ -21,32 +18,23 @@ import java.awt.Component
 import java.awt.Cursor
 import java.awt.Graphics
 import java.awt.Point
-import java.awt.Rectangle
-import java.awt.Shape
-import java.awt.Toolkit
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import java.net.URI
-import java.net.URLDecoder
 import java.util.regex.Pattern
 import javax.swing.Icon
 import javax.swing.event.HyperlinkEvent
 import javax.swing.text.AttributeSet
-import javax.swing.text.BadLocationException
 import javax.swing.text.Element
 import javax.swing.text.Position
 import javax.swing.text.View
 import javax.swing.text.html.HTML
 import javax.swing.text.html.HTMLDocument
-import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.reflect.KClass
 
 private val REF_URL_PARSER = Pattern.compile("^jjref://([^?]+)\\?([^&]+)&kind=([^&]+)&name=(.+)$")
-
-/** Marker prefix on an `<icon>` element's `src`, recognized by [ChipIconExtension], identifying a [TextCanvas.appendChip]. */
-internal const val CHIP_ICON_PREFIX = "chip:"
 
 /**
  * An HTML pane that can resolve icons from a set of icon libraries, including IDEA's icons
@@ -59,26 +47,24 @@ internal const val CHIP_ICON_PREFIX = "chip:"
 class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     JBHtmlPaneStyleConfiguration(),
     JBHtmlPaneConfiguration {
-        iconResolver = { IconResolver.resolveIcon(it)?.let(::HtmlIcon) }
-        extensions(ChipIconExtension)
+        extensions(AtomicHtmlExtension, IconImgExtension)
     }
 ) {
     /**
-     * The chip `<img>` [Element] currently under the pointer, if it's inside a link (jj-idea-iesq)
-     * - read by [ChipView.paint] to underline only that one chip while hovered, matching the
-     * "colored always, underlined on hover" convention already applied to real (non-chip) links
-     * here via native `<a>` hover rendering, and to the log table via `JujutsuLogTable
-     * .hoveredLinkRow`/`hoveredLinkCol`.
+     * The atomic-content `<img>` [Element] currently under the pointer, if it's inside a link
+     * (jj-idea-iesq) - read by [AtomicHtmlView.paint] to underline/highlight only that one unit
+     * while hovered, matching the "colored always, underlined on hover" convention already applied
+     * to real (non-chip) links here via native `<a>` hover rendering, and to the log table via
+     * `JujutsuLogTable.hoveredLinkRow`/`hoveredLinkCol`.
      */
     internal var hoveredChipElement: Element? = null
         private set
 
     /**
      * The URI of the linkified issue-tracker reference inside a bookmark/tag chip's own name
-     * currently under the pointer, if any (jj-idea-vrmv follow-up) - read by [ChipView.paint] to
-     * underline just that inner run, and to gate the whole-chip [ChipView.isRefOnly] background
-     * highlight off while it's non-null (the two cues are mutually exclusive, matching the
-     * fragment backend's `hoveredBookmarkOrTagUri`/`hoveredChipIssueLinkUri`).
+     * currently under the pointer, if any (jj-idea-vrmv follow-up) - read by
+     * [AtomicHtmlView.paint] to underline just that inner run, and to gate the whole-chip
+     * ref-only background highlight off while it's non-null (the two cues are mutually exclusive).
      */
     internal var hoveredIssueLinkUri: URI? = null
         private set
@@ -95,7 +81,7 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                         hoveredIssueLinkUri = newIssueLinkUri
                         // Chips are small and this pane's content is short (commit metadata), so a
                         // full repaint on hover change is cheap - no need to compute exact chip
-                        // bounds (ChipView.modelToView reports a zero-width point, not its real
+                        // bounds (AtomicHtmlView.modelToView reports a zero-width point, not its real
                         // painted extent, so precise invalidation isn't straightforward here).
                         repaint()
                     }
@@ -135,7 +121,7 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
                 // own path) and issue-tracker http(s) links ever actually resolve here. Right-click
                 // resolution against the *right* entry happens separately in
                 // JujutsuCommitDetailsPanel, which does have one.
-                val uri = e.description?.let { runCatching { java.net.URI(it) }.getOrNull() }
+                val uri = e.description?.let { runCatching { URI(it) }.getOrNull() }
                 val target = uri?.let { LogClickTarget.resolve(it, project, emptyList()) }
                 when {
                     target != null -> target.performDefaultAction(project)
@@ -155,24 +141,28 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     /**
      * The URI of a linkified issue-tracker reference inside a bookmark/tag chip's own name at
      * [point], if any (jj-idea-vrmv follow-up) - the HTML-backend counterpart to the log table's
-     * `findInlinedRefUri`. Needs pixel-level hit-testing within the chip's painted label (see
-     * [ChipView.uriAtContentX]), since Swing's hyperlink activation only ever reports the whole
-     * anchor's href regardless of exactly where inside it was clicked.
+     * `LaidOutCell.linkTargetAt`. Needs pixel-level hit-testing within the atomic unit's inner
+     * document (see [AtomicHtmlView.hrefAtContentX]), since Swing's hyperlink activation only ever
+     * reports the whole outer anchor's href regardless of exactly where inside it was clicked.
      */
     fun issueLinkUriAt(point: Point): URI? {
         val doc = document as? HTMLDocument ?: return null
         val offset = characterOffsetAt(point)
         val elem = doc.getCharacterElement(offset)
         if (elem.name != "img") return null
-        val chipView = leafViewAt(elem.startOffset) as? ChipView ?: return null
+        val atomicView = leafViewAt(elem.startOffset) as? AtomicHtmlView ?: return null
         val leftEdge = runCatching { modelToView2D(elem.startOffset) }.getOrNull() ?: return null
-        return chipView.uriAtContentX((point.x - leftEdge.x).roundToInt())
+        val href = atomicView.hrefAtContentX(
+            (point.x - leftEdge.x).roundToInt(),
+            (point.y - leftEdge.y).roundToInt()
+        )
+        return href?.let { runCatching { URI(it) }.getOrNull() }
     }
 
     /**
      * The leaf [View] rendering document position [pos] - standard Swing idiom for resolving the
-     * concrete `View` (here, a [ChipView]) backing a given offset, since [javax.swing.text.Element]
-     * alone doesn't expose which View class was created for it.
+     * concrete `View` (here, an [AtomicHtmlView]) backing a given offset, since
+     * [javax.swing.text.Element] alone doesn't expose which View class was created for it.
      */
     private fun leafViewAt(pos: Int): View? {
         var view: View = getUI().getRootView(this)
@@ -190,37 +180,37 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
      * ([in.kkkev.jjidea.ui.log.JujutsuCommitDetailsPanel] builds a context menu per scheme) -
      * [refUriAt] is the `jjref://`-only convenience wrapper most callers actually want.
      */
-    fun hrefAt(point: java.awt.Point): String? {
+    fun hrefAt(point: Point): String? {
         val doc = document as? HTMLDocument ?: return null
         return hrefAncestorOf(doc.getCharacterElement(characterOffsetAt(point)))
     }
 
     /** Parse a `jjref://` href from the HTML element under [point], or null if not a ref link. */
-    fun refUriAt(point: java.awt.Point): java.net.URI? =
+    fun refUriAt(point: Point): URI? =
         hrefAt(point)?.takeIf { REF_URL_PARSER.matcher(it).matches() }?.let { href ->
-            runCatching { java.net.URI(href) }.getOrNull()
+            runCatching { URI(href) }.getOrNull()
         }
 
     /**
-     * The chip `<img>` element at [point], if any, and only if it's inside a link (jj-idea-iesq) -
-     * a real hyperlink (e.g. mailto) or a `jjref://` (bookmark/tag) ref, either of which [ChipView]
-     * paints its own hover cue for (underline vs. a hover-highlight background respectively,
-     * jj-idea-a52h).
+     * The atomic-content `<img>` element at [point], if any, and only if it's inside a link
+     * (jj-idea-iesq) - a real hyperlink (e.g. mailto) or a `jjref://` (bookmark/tag) ref, either of
+     * which [AtomicHtmlView] paints its own hover cue for (underline vs. a hover-highlight
+     * background respectively, jj-idea-a52h).
      */
-    private fun linkedChipElementAt(point: java.awt.Point): Element? {
+    private fun linkedChipElementAt(point: Point): Element? {
         val doc = document as? HTMLDocument ?: return null
         val elem = doc.getCharacterElement(characterOffsetAt(point))
         if (elem.name != "img") return null
         val src = elem.attributes.getAttribute(HTML.Attribute.SRC) as? String ?: return null
-        if (!src.startsWith(CHIP_ICON_PREFIX)) return null
+        if (!src.startsWith(UNBREAKABLE_PREFIX)) return null
         return if (hrefAncestorOf(elem) != null) elem else null
     }
 
     /**
      * The document offset of the character under [point], correctly attributing the *whole* visual
-     * width of an atomic one-position-wide chip ([ChipView]) to itself (jj-idea-wkcz follow-up).
+     * width of an atomic one-position-wide unit ([AtomicHtmlView]) to itself (jj-idea-wkcz follow-up).
      *
-     * [javax.swing.text.JTextComponent.viewToModel2D] alone isn't enough: `ChipView.viewToModel`
+     * [javax.swing.text.JTextComponent.viewToModel2D] alone isn't enough: `AtomicHtmlView.viewToModel`
      * (needed for caret placement) returns its own `startOffset` for the left half of the chip and
      * `endOffset` for the right half - but a leaf element's range is `[startOffset, endOffset)`,
      * *exclusive* of `endOffset`, so [HTMLDocument.getCharacterElement] at exactly `endOffset`
@@ -234,7 +224,7 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
      * means "the character *before* this offset", i.e. still inside the chip that ends here - and
      * shifts back by one in that case, rather than guessing from pixel position ourselves.
      */
-    private fun characterOffsetAt(point: java.awt.Point): Int {
+    private fun characterOffsetAt(point: Point): Int {
         val biasReturn = arrayOf(Position.Bias.Forward)
         val offset = getUI().viewToModel2D(this, point, biasReturn)
         return if (biasReturn[0] == Position.Bias.Backward) (offset - 1).coerceAtLeast(0) else offset
@@ -249,7 +239,7 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
  * they're never represented as separate ancestor `Element`s to find `HTML.Attribute.HREF` on
  * directly. This checks both the (rare) direct case and the actual nested-under-`<a>` case.
  */
-private fun hrefOf(element: Element): String? {
+internal fun hrefOf(element: Element): String? {
     val attrs = element.attributes
     (attrs.getAttribute(HTML.Attribute.HREF) as? String)?.let { return it }
     val anchorAttrs = attrs.getAttribute(HTML.Tag.A) as? AttributeSet
@@ -260,9 +250,9 @@ private fun hrefOf(element: Element): String? {
  * The `href` on [element] or its nearest ancestor carrying one, if any (jj-idea-iesq). Used to
  * decide whether a chip gets a hover cue at all ([IconAwareHtmlPane.linkedChipElementAt]); which
  * *kind* of cue - underline for a real link, background highlight for a `jjref://` ref
- * (jj-idea-wkcz, jj-idea-a52h) - is then decided in [ChipView] itself.
+ * (jj-idea-wkcz, jj-idea-a52h) - is then decided in [AtomicHtmlView] itself.
  */
-private fun hrefAncestorOf(element: Element): String? {
+internal fun hrefAncestorOf(element: Element): String? {
     var elem: Element? = element
     while (elem != null) {
         hrefOf(elem)?.let { return it }
@@ -271,6 +261,11 @@ private fun hrefAncestorOf(element: Element): String? {
     return null
 }
 
+/**
+ * Resolves an [IconSpec.qualified] key (from either icon library) back to a real [Icon] - the single
+ * lookup both the outer document and [AtomicHtmlView]'s inner document use to resolve an
+ * `<img src='icon:...'/>` element, via the shared `iconViewOrNull` in `AtomicHtmlView.kt`.
+ */
 object IconResolver {
     val icons = listOf(JujutsuIcons::class, AllIcons::class)
         .flatMap { it.allIcons.toList() }
@@ -297,273 +292,13 @@ object IconResolver {
 }
 
 /**
- * Wraps icons for JBHtmlPane to fix High-DPI "Double Scaling" and baseline alignment.
+ * Corrects High-DPI "Double Scaling", reporting the icon's real (unscaled) width/height so
+ * [in.kkkev.jjidea.ui.components.IconLeafView] can position it against real font metrics itself -
+ * used for every `<img src='icon:...'/>` element, in both the outer document and an
+ * [AtomicHtmlView]'s inner document.
  */
-private class HtmlIcon(private val source: Icon) : Icon {
-    // Report 0 height. This is the only way to stop JBIconView from adding whitespace above text lines with icons.
-    override fun getIconWidth() = (source.iconWidth / JBUIScale.scale(1f)).roundToInt()
-    override fun getIconHeight() = 0
-
-    override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-        source.paintIcon(c, g, x, y - source.iconHeight + g.fontMetrics.descent)
-    }
-}
-
-/**
- * Corrects High-DPI "Double Scaling" like [HtmlIcon], but reports its real height. Used by [ChipView], which (unlike
- * plain `<icon>` elements rendered by IntelliJ's built-in `JBIconView`) positions icons itself against real font
- * metrics rather than relying on the zero-height/row-alignment trick [HtmlIcon] exists for.
- */
-private class ScaleCorrectedIcon(private val source: Icon) : Icon {
+internal class ScaleCorrectedIcon(private val source: Icon) : Icon {
     override fun getIconWidth() = (source.iconWidth / JBUIScale.scale(1f)).roundToInt()
     override fun getIconHeight() = (source.iconHeight / JBUIScale.scale(1f)).roundToInt()
     override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) = source.paintIcon(c, g, x, y)
-}
-
-/**
- * Resolves `<img>` elements whose `src` starts with [CHIP_ICON_PREFIX] into a single atomic [ChipView], so that an
- * icon is never separated from its label, nor a label split mid-word, by HTML line wrapping (jj-idea-kds1).
- *
- * `<img>` (rather than `<icon>`) is used for chips specifically because it's a genuine HTML void element: on
- * IntelliJ 2026.2, JBHtmlPane's Jsoup transpiler round-trips a self-closed `<icon .../>` into an explicit
- * `<icon ...></icon>` open/close pair (it marks the custom `<icon>` tag `SelfClose` but not `Void`), which Swing's
- * parser then turns into two sibling Elements instead of one, breaking the atomic-chip invariant this class exists
- * for (jj-idea-vll4, jj-idea-m2wr). `<img>` is already void to both Jsoup and Swing's parser, so it always survives
- * as a single Element; this extension intercepts it (running before any built-in image-loading extension) so no
- * real image is ever fetched or rendered for it. Non-chip elements (real `<img>` or plain `<icon>`) fall through to
- * IntelliJ's built-in rendering by returning `null`.
- */
-internal object ChipIconExtension : ExtendableHTMLViewFactory.Extension {
-    override fun invoke(element: Element, defaultView: View): View? {
-        if (element.name != "img") return null
-        val src = element.attributes.getAttribute(HTML.Attribute.SRC) as? String ?: return null
-        if (!src.startsWith(CHIP_ICON_PREFIX)) return null
-        val spec = ChipSpec.parse(src.removePrefix(CHIP_ICON_PREFIX)) ?: return null
-        return ChipView(element, spec)
-    }
-}
-
-/**
- * Parsed contents of a [TextCanvas.appendChip] (or [TextCanvas.appendUnbreakable]) call, encoded by `HtmlTextCanvas`
- * into a single `src` attribute. [icon] is null for a plain unbreakable text label with no icon. [label] is a list
- * of runs rather than one string: the [Linkifier] may have split it around a linkified issue-tracker reference
- * (jj-idea-vrmv follow-up) - [ChipView] paints (and hit-tests) them individually.
- */
-private class ChipSpec(
-    val icon: Icon?,
-    val prefixIcon: Icon?,
-    val label: List<TextRun>,
-    val strikethrough: Boolean,
-    val suffix: String?,
-    val suffixColor: java.awt.Color?
-) {
-    companion object {
-        fun parse(encoded: String): ChipSpec? {
-            val parts = encoded.split(";")
-            if (parts.size != 6) return null
-            val icon = parts[0].takeIf { it.isNotEmpty() }?.let { resolveChipIcon(it) ?: return null }
-            val prefixIcon = parts[1].takeIf { it.isNotEmpty() }?.let(::resolveChipIcon)
-            val label = parts[2].split(",").map(::parseRun)
-            val strikethrough = parts[3] == "1"
-            val suffix = parts[4].takeIf { it.isNotEmpty() }?.let { URLDecoder.decode(it, "UTF-8") }
-            val suffixColor = parts[5].takeIf { it.isNotEmpty() }?.let { ColorUtil.fromHex(it) }
-            return ChipSpec(icon, prefixIcon, label, strikethrough, suffix, suffixColor)
-        }
-
-        private fun resolveChipIcon(key: String): Icon? = IconResolver.resolveIcon(key)?.let(::ScaleCorrectedIcon)
-
-        /** Decode one `text~uri` run encoded by `HtmlTextCanvas.appendChipHtml` - `uri` is empty for a plain run. */
-        private fun parseRun(encoded: String): TextRun {
-            val tilde = encoded.indexOf('~')
-            val textPart = if (tilde >= 0) encoded.substring(0, tilde) else encoded
-            val uriPart = if (tilde >= 0) encoded.substring(tilde + 1) else ""
-            val text = URLDecoder.decode(textPart, "UTF-8")
-            val uri = uriPart.takeIf { it.isNotEmpty() }
-                ?.let { runCatching { URI(URLDecoder.decode(it, "UTF-8")) }.getOrNull() }
-            return if (uri != null) TextRun.Link(text, uri) else TextRun.Plain(text)
-        }
-    }
-}
-
-/**
- * A leaf view painting an optional icon (itself optionally preceded by a second "prefix" icon, e.g. a conflict
- * marker), immediately followed by a text label and an optional colored suffix, as a single unbreakable unit. Unlike
- * a plain `<icon>` followed by separate text elements, there is no view boundary between the icon and the label for
- * the surrounding flow layout to break at (jj-idea-kds1). With no icon at all, this is a plain unbreakable text run
- * (used by [TextCanvas.appendUnbreakable] for short strings, like a date/time, that must never split mid-word).
- *
- * Font and foreground color are resolved from the element's CSS attributes (the same `colored`/`smaller` ancestor
- * spans that would otherwise wrap separate icon/text elements), so chips still inherit ambient styling correctly.
- */
-private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
-    companion object {
-        // Extra fixed-pixel gap painted before every chip's icon/label, on top of whatever
-        // ordinary text (e.g. a space escaped to non-collapsing U+00A0 by append()) already
-        // precedes it. A bare U+00A0 between two chips measures mathematically exact against
-        // fontMetrics (matches how IntelliJ 2026.1 renders the same content pixel-for-pixel), but
-        // on 2026.2 specifically it reads as visually tighter than that -- a residual, milder
-        // cousin of the same "text rendered adjacent to an <img> element behaves oddly" class of
-        // platform bug this whole chip mechanism already works around once (jj-idea-vll4,
-        // jj-idea-m2wr: <icon> vs <img> round-tripping through Jsoup). Applied unconditionally
-        // (not keyed to any specific chip's content) since the underlying rendering difference is
-        // about the *gap*, not about what any particular chip says -- every chip type (bookmark,
-        // tag, name+email, date) can appear adjacent to another one this way. Tuning this via
-        // additional Unicode space characters in the *surrounding text* (e.g. a second U+00A0, or
-        // narrower codepoints like U+2009) doesn't give fine-enough control, since they either
-        // match a full space's width or (in fonts without a distinct narrow-space glyph, like
-        // Inter here) fall back to it anyway; this gives genuine sub-glyph pixel control instead,
-        // tuned empirically against real 2026.2 rendering.
-        private const val CHIP_LEADING_GAP = 2
-    }
-
-    private val styleSheet get() = (document as HTMLDocument).styleSheet
-    private val attr: AttributeSet by lazy { styleSheet.getViewAttributes(this) }
-    private val font by lazy { styleSheet.getFont(attr) }
-    private val foreground by lazy { styleSheet.getForeground(attr) }
-    private val fontMetrics by lazy {
-        container?.getFontMetrics(font) ?: Toolkit.getDefaultToolkit().getFontMetrics(font)
-    }
-
-    // Underline the label only while hovered (jj-idea-iesq), matching the "colored always,
-    // underlined on hover" convention used for real (non-chip) links and the log table. A
-    // `jjref://` (bookmark/tag) ref gets a background highlight instead (jj-idea-a52h): it has no
-    // left-click action, so an underline would misleadingly suggest one - but it does have a
-    // right-click menu, and needs *some* visual cue that it's interactive at all. ancestorHref is
-    // fixed for this element's lifetime (its href-ness doesn't change), so only re-derived lazily
-    // once; hovered is re-read on every paint since IconAwareHtmlPane repaints on change.
-    private val ancestorHref: String? by lazy { hrefAncestorOf(element) }
-    private val isRealLink: Boolean by lazy { ancestorHref?.startsWith("jjref://") == false }
-    private val isRefOnly: Boolean by lazy { ancestorHref?.startsWith("jjref://") == true }
-    private val isHovered: Boolean
-        get() = (isRealLink || isRefOnly) && (container as? IconAwareHtmlPane)?.hoveredChipElement === element
-
-    private val iconsWidth get() = (spec.prefixIcon?.iconWidth ?: 0) + (spec.icon?.iconWidth ?: 0)
-    private val leadingGap: Int
-        get() = (CHIP_LEADING_GAP * JBUIScale.scale(1f)).roundToInt()
-
-    private val labelWidth get() = fontMetrics.let { fm -> spec.label.sumOf { fm.stringWidth(it.text) } }
-
-    override fun getPreferredSpan(axis: Int): Float {
-        val fm = fontMetrics
-        return when (axis) {
-            X_AXIS -> (leadingGap + iconsWidth + labelWidth + fm.stringWidth(spec.suffix ?: "")).toFloat()
-            Y_AXIS -> max(fm.height, max(spec.icon?.iconHeight ?: 0, spec.prefixIcon?.iconHeight ?: 0)).toFloat()
-            else -> throw IllegalArgumentException("Invalid axis: $axis")
-        }
-    }
-
-    /**
-     * The link target of whichever label run contains pixel offset [contentX], measured from this
-     * view's [modelToView]-adjusted left edge (i.e. already past [leadingGap], matching
-     * [IconAwareHtmlPane.issueLinkUriAt]'s coordinate space) - or null if [contentX] falls before/after
-     * the label or lands in a run with no link (jj-idea-vrmv follow-up: a chip label can contain a
-     * linkified issue-tracker reference alongside plain text).
-     */
-    fun uriAtContentX(contentX: Int): URI? {
-        val fm = fontMetrics
-        var x = iconsWidth
-        for (run in spec.label) {
-            val width = fm.stringWidth(run.text)
-            if (contentX in x until (x + width)) return run.target
-            x += width
-        }
-        return null
-    }
-
-    override fun getAlignment(axis: Int): Float =
-        if (axis == Y_AXIS) fontMetrics.ascent.toFloat() / fontMetrics.height else super.getAlignment(axis)
-
-    override fun paint(g: Graphics, allocation: Shape) {
-        val rect = allocation.bounds
-        val fm = fontMetrics
-        val baseline = rect.y + fm.ascent
-        var x = rect.x + leadingGap
-
-        val hoveredIssueLinkUri = (container as? IconAwareHtmlPane)?.hoveredIssueLinkUri
-
-        if (isHovered && isRefOnly && hoveredIssueLinkUri == null) {
-            // Hover-highlight background for a right-click-only ref chip (jj-idea-a52h) - the same
-            // greyish "list hover" tint used for the log table's equivalent chips
-            // (TextCanvasPanel.highlightTarget), painted behind the whole chip (icon(s) + label +
-            // suffix), before any of that content is drawn. Suppressed while a linkified issue-tracker
-            // substring inside the label is itself hovered (jj-idea-vrmv follow-up) - the two hover
-            // cues are mutually exclusive, since a left-click there opens the issue link, not the ref's
-            // right-click menu.
-            g.color = UIUtil.getListBackground(true, false)
-            g.fillRoundRect(rect.x, rect.y, rect.width, rect.height, 4, 4)
-        }
-
-        // Bottom-align each icon to the text's descent line (baseline + descent), matching
-        // HtmlIcon's "- iconHeight + descent" convention for plain <icon> tags (jj-idea-fmrj) --
-        // aligning to the baseline itself (dropping the descent term) makes the icon float
-        // visibly above the text's vertical center instead of sitting level with it.
-        spec.prefixIcon?.let { icon ->
-            icon.paintIcon(null, g, x, baseline - icon.iconHeight + fm.descent)
-            x += icon.iconWidth
-        }
-        spec.icon?.let { icon ->
-            icon.paintIcon(null, g, x, baseline - icon.iconHeight + fm.descent)
-            x += icon.iconWidth
-        }
-
-        g.font = font
-        val labelStartX = x
-        for (run in spec.label) {
-            val runWidth = fm.stringWidth(run.text)
-            val linked = run.target != null
-            g.color = if (linked) SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES.fgColor else foreground
-            g.drawString(run.text, x, baseline)
-            if (linked && run.target == hoveredIssueLinkUri) {
-                // Underline just this run while its issue-tracker link is hovered (jj-idea-vrmv
-                // follow-up), matching the "colored always, underlined on hover" convention used for
-                // real links elsewhere - the surrounding plain-text runs of the same chip label stay
-                // un-underlined.
-                val underlineY = baseline + (fm.descent / 2).coerceAtLeast(1)
-                g.drawLine(x, underlineY, x + runWidth, underlineY)
-            }
-            x += runWidth
-        }
-        if (spec.strikethrough) {
-            val lineY = baseline - fm.ascent / 3
-            g.drawLine(labelStartX, lineY, x, lineY)
-        }
-        if (isHovered && isRealLink) {
-            // Underline the whole label (not any suffix) while hovered, matching a plain <a>'s
-            // native hover-underline extent (jj-idea-iesq).
-            val underlineY = baseline + (fm.descent / 2).coerceAtLeast(1)
-            g.drawLine(labelStartX, underlineY, x, underlineY)
-        }
-
-        spec.suffix?.let { suffix ->
-            g.color = spec.suffixColor ?: foreground
-            g.drawString(suffix, x, baseline)
-        }
-    }
-
-    override fun modelToView(pos: Int, a: Shape, b: Position.Bias): Shape {
-        if (pos !in startOffset..endOffset) {
-            throw BadLocationException("$pos not in range $startOffset,$endOffset", pos)
-        }
-        val r = a.bounds
-        when (pos) {
-            // a.bounds.x is the left edge of the full allocation, which includes leadingGap's blank
-            // space before any visible content is actually painted -- shift past it so callers (e.g.
-            // click hit-testing, or a test measuring the visible gap before this chip) see where the
-            // chip's content really starts, matching paint()'s own starting x.
-            startOffset -> r.x += leadingGap
-            endOffset -> r.x += r.width
-        }
-        r.width = 0
-        return r
-    }
-
-    override fun viewToModel(x: Float, y: Float, a: Shape, bias: Array<Position.Bias>): Int {
-        val alloc = a as Rectangle
-        if (x < alloc.x + alloc.width / 2f) {
-            bias[0] = Position.Bias.Forward
-            return startOffset
-        }
-        bias[0] = Position.Bias.Backward
-        return endOffset
-    }
 }

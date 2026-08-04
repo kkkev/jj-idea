@@ -10,21 +10,21 @@ import org.junit.jupiter.api.Test
 
 /**
  * Regression test for jj-idea-fmrj: [revisionChoiceTooltip] renders bookmark/tag chips as an
- * atomic `<img src='chip:…'>` element (see [HtmlTextCanvasTest]), so it must only ever be shown
- * via a chip-aware pane (installed on [RevisionChoicePanel]'s list by [installIconAwareTooltip]).
- * A plain Swing tooltip doesn't know the `chip:` URL scheme and paints a broken-image glyph
- * instead.
+ * atomic `<img src='unbreakable:…'>` element (see [HtmlTextCanvasTest]), so it must only ever be
+ * shown via a chip-aware pane (installed on [RevisionChoicePanel]'s list by
+ * [installIconAwareTooltip]). A plain Swing tooltip doesn't know the `unbreakable:` URL scheme and
+ * paints a broken-image glyph instead.
  */
 class RevisionChoiceTooltipTest {
     @Test
-    fun `Ref tooltip for a bookmark carries a chip img element`() {
+    fun `Ref tooltip for a bookmark carries an unbreakable img element`() {
         val item = RevisionChoice.Ref(BookmarkItem(Bookmark("main"), ChangeId("aalong", "aa", 0)))
 
         val html = revisionChoiceTooltip(item)
 
         html.shouldNotBeNull()
         html shouldContain "<img"
-        html shouldContain CHIP_ICON_PREFIX
+        html shouldContain UNBREAKABLE_PREFIX
     }
 
     @Test

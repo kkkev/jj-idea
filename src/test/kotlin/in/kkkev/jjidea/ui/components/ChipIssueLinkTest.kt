@@ -17,7 +17,7 @@ import java.net.URI
 /**
  * Tests for jj-idea-vrmv: an issue-tracker reference inside a bookmark/tag chip's own name (e.g. a
  * bookmark named `JIRA-123-fix-thing`) linkifies to the tracker URL, distinct from the chip's own
- * `jjref://` target used for right-click resolution - see [TextCanvas.appendChip].
+ * `jjref://` target used for right-click resolution - see [TextCanvas.appendUnbreakable].
  */
 class ChipIssueLinkTest {
     private val repo = mockk<JujutsuRepository>(relaxed = true)
@@ -117,10 +117,10 @@ class ChipIssueLinkTest {
     }
 
     @Test
-    fun `tagDecorationUnits linkifies an issue reference inside a tag name when built on an injected canvas`() {
+    fun `tagRefChips linkifies an issue reference inside a tag name when built on an injected canvas`() {
         val e = entry(tags = listOf(Tag("JIRA-123-fix-thing")))
 
-        val units = tagDecorationUnits(e)
+        val units = tagRefChips(e)
         val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig)).apply {
             units.single().build(this)
         }
