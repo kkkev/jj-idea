@@ -29,8 +29,8 @@ Components whose blast radius exceeds their own package:
 
 | Component | Feeds |
 |---|---|
-| `ui/components/TextCanvas.kt`, `HtmlTextCanvas.kt` | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-BOOKMARK](#mt-bookmark) |
-| Renderer trio: `ui/log/JujutsuLogTableRenderers.kt` (`SeparateDecorationsCellRenderer`), `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `HtmlTextCanvas.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details) |
+| `ui/components/TextCanvas.kt`, `LogEntryText.kt`, `HtmlTextCanvas.kt`, `UnbreakableContent.kt`, `AtomicHtmlView.kt`, `HtmlIcons.kt`, `Linkifier.kt` | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-BOOKMARK](#mt-bookmark) |
+| Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details) |
 | `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff) |
 | Shared commit picker (used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
