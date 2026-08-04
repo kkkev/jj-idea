@@ -104,6 +104,28 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 - [ ] In Settings → Keymap, rebind "Show Diff" off Enter onto a different jj action (or clear
       it) → both Enter and double-click on a log row now follow the new binding
 
+#### Hover tooltip behaviour (jj-idea-wp12)
+
+**Code:** `ui/components/IconAwareTooltip.kt`
+
+- [ ] In Settings → Version Control → Issue Navigation, add a pattern (as above) so a commit's
+      row tooltip contains a clickable issue-tracker link; hover that row until the tooltip
+      appears, then move the pointer up into the tooltip — it stays open (does not disappear)
+- [ ] With the tooltip open, click the issue-tracker link inside it → opens in your browser;
+      click the author's name (a `mailto:` link) → opens your mail client
+- [ ] With the tooltip open, select some of its text with the mouse (click-drag) — the text
+      highlights instead of the tooltip disappearing on the first move
+- [ ] With the tooltip open, move the pointer sideways or away from it (not towards it) → it
+      dismisses normally
+- [ ] Hover a row so the tooltip appears, then scroll the log (mouse wheel, scrollbar drag, or
+      Page Up/Down) without moving the pointer — the tooltip disappears immediately and does
+      **not** reappear while the pointer stays still; move the pointer afterwards — the tooltip
+      reappears with the *new* row under the pointer (not stale content from before the scroll)
+- [ ] Move the pointer between adjacent rows without ever entering the tooltip — content still
+      updates to match each row as before
+- [ ] Move the pointer off the log table onto another tool window or editor — the tooltip
+      dismisses
+
 #### Column management
 
 - [ ] Column visibility toggle, reordering (drag-and-drop), resizing (drag separator), and
@@ -776,6 +798,9 @@ state/routing logic, not rendering)
   timestamp and description, each on its own line
 - [ ] Move the pointer between rows without leaving the list — tooltip content updates to the
   newly hovered row
+- [ ] jj-idea-wp12: hover a row with enough entries that the list scrolls, then scroll it
+  (mouse wheel or scrollbar) without moving the pointer — the tooltip disappears and does not
+  reappear until the pointer moves
 - [ ] Regression: hover a commit row in the Jujutsu log — its tooltip still renders bookmark/tag
   chips correctly and still reflows/scrolls for a commit with many bookmarks (jj-idea-szn8)
 
