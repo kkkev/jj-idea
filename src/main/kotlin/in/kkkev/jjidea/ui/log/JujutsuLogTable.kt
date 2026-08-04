@@ -29,11 +29,9 @@ import kotlinx.datetime.Instant
 import java.awt.Color
 import java.awt.Component
 import java.awt.Cursor
-import java.awt.Font
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.event.*
-import java.net.URI
 import javax.swing.JComponent
 import javax.swing.JViewport
 import javax.swing.KeyStroke
@@ -443,51 +441,25 @@ class JujutsuLogTable(
             val frc = getFontMetrics(font).fontRenderContext
             return findPersonClickTarget(entry, modelCol, localX, font, frc)
         }
-        val uri = when (modelCol) {
-            JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
-                val frc = getFontMetrics(font).fontRenderContext
-                val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
-                findInlinedRefUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations, linkifier)
-                    ?: descriptionLinkUriAt(modelRow, entry, localX, cellRect.width, font, frc)
-            }
-            else -> null
-        } ?: return null
-        if (uri.toString().contains("&kind=overflow&")) {
-            val frc = getFontMetrics(font).fontRenderContext
-            val budget = cellRect.width * DECORATION_WIDTH_FRACTION
-            val hidden = cappedDecorations(entry, Color.BLACK, budget, font, frc).hidden
-            return MoreRefsClick(entry.repo, entry, hidden)
-        }
-        return LogClickTarget.resolve(uri, project, listOf(entry))
-    }
-
-    /**
-     * The URI of a linkified issue-tracker reference (e.g. `JIRA-123`) at [localX] within the
-     * description text of the graph+description column, or null (jj-idea-91qf) - the counterpart
-     * to `findInlinedRefUri` for the description itself, which [clickTargetAt] falls back to when
-     * that returns null (i.e. [localX] isn't over a decoration chip). [localX] and [cellWidth] are
-     * relative to the whole cell, matching `findInlinedRefUri`'s convention; [graphTextStartX]
-     * (uncached, safe for a one-off click) locates where the text area actually begins.
-     */
-    private fun descriptionLinkUriAt(
-        modelRow: Int,
-        entry: LogEntry,
-        localX: Int,
-        cellWidth: Int,
-        font: Font,
-        frc: java.awt.font.FontRenderContext
-    ): URI? {
+        if (modelCol != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) return null
+        val frc = getFontMetrics(font).fontRenderContext
+        val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
         val textStart = graphTextStartX(modelRow, logModel, graphNodes)
-        if (localX < textStart) return null
-        return findDescriptionLinkUri(
+        val laidOut = LaidOutCell.forRow(
             entry,
-            localX - textStart,
-            cellWidth - textStart,
+            cellRect.width,
+            textStart,
             columnManager,
-            IssueLinkifier(IssueNavigationConfiguration.getInstance(project)),
+            linkifier,
+            Color.BLACK,
             font,
             frc
         )
+        val uri = laidOut.linkTargetAt(localX) ?: return null
+        if (uri.toString().contains("&kind=overflow&")) {
+            return MoreRefsClick(entry.repo, entry, laidOut.hidden)
+        }
+        return LogClickTarget.resolve(uri, project, listOf(entry))
     }
 
     /** Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref action menu. */

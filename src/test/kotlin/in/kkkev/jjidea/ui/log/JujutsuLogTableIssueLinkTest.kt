@@ -80,11 +80,17 @@ class JujutsuLogTableIssueLinkTest {
         val frc = table.getFontMetrics(table.font).fontRenderContext
         val textStart = graphTextStartX(row, table.logModel, table.graphNodes)
         val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
-        val availableWidth = cellRect.width - textStart
-        val hitX = (0 until availableWidth).first { x ->
-            findDescriptionLinkUri(entry, x, availableWidth, table.columnManager, linkifier, table.font, frc) != null
-        }
-        return textStart + hitX
+        val laidOut = LaidOutCell.forRow(
+            entry,
+            cellRect.width,
+            textStart,
+            table.columnManager,
+            linkifier,
+            java.awt.Color.BLACK,
+            table.font,
+            frc
+        )
+        return (textStart until cellRect.width).first { x -> laidOut.linkTargetAt(x) != null }
     }
 
     private fun moveMouseTo(table: JujutsuLogTable, point: Point) {

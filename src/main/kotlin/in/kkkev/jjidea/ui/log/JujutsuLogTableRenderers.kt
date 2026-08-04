@@ -183,93 +183,10 @@ private fun TextCanvas.overflowChip(entry: LogEntry, hiddenCount: Int) {
     }
 }
 
-/**
- * Compute the ref chip hit at [localX] within the inlined decorations of the graph-description column.
- *
- * The decorations are rendered on the right side of the cell, starting at `colWidth - rightWidth`,
- * capped to [DECORATION_WIDTH_FRACTION] of [colWidth] (jj-idea-w61m). We measure fragment widths from
- * the canvas to locate the target without Swing layout.
- *
- * @param entry   the log entry for the row being hit-tested
- * @param localX  x position relative to the left edge of the full cell
- * @param colWidth full column width in pixels
- * @param font    base font of the table
- * @param frc     font render context from the table
- * @param showDecorations whether the decoration inlining is enabled
- * @param linkifier also hit-tests an issue-tracker reference linkified inside a chip's own name
- *   (e.g. a bookmark named `JIRA-123-fix-thing`) - jj-idea-vrmv.
- */
-internal fun findInlinedRefUri(
-    entry: LogEntry,
-    localX: Int,
-    colWidth: Int,
-    font: Font,
-    frc: FontRenderContext,
-    showDecorations: Boolean,
-    linkifier: Linkifier = Linkifier.None
-): URI? {
-    if (!showDecorations) return null
-    val rightCanvas =
-        cappedDecorations(entry, Color.BLACK, colWidth * DECORATION_WIDTH_FRACTION, font, frc, linkifier).canvas
-    val rightWidth = rightCanvas.fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
-    val rightStart = colWidth - rightWidth
-    if (localX < rightStart) return null
-    var xAccum = 0.0
-    val xInRight = localX - rightStart
-    for (fragment in rightCanvas.fragments) {
-        val w = FragmentLayout.fragmentWidth(fragment, font, frc)
-        if (xAccum + w > xInRight) return fragment.linkTarget as? URI
-        xAccum += w
-    }
-    return null
-}
-
-/**
- * Compute the link hit at [localX] within the truncated description/left text region of the
- * graph-description column - the counterpart to [findInlinedRefUri] for a linkified issue
- * reference (e.g. `JIRA-123`) inside the description itself, rather than the right-aligned
- * decoration chips (jj-idea-91qf). [localX] is relative to the start of the text area, i.e.
- * already offset past the graph indent (see [graphTextStartX]).
- *
- * Mirrors the canvas construction/truncation in [JujutsuGraphAndDescriptionRenderer]'s
- * `configureTextPanel` and [in.kkkev.jjidea.ui.components.TruncatingLeftRightLayout.configure]
- * exactly, so the hit test lines up with what's actually painted.
- */
-internal fun findDescriptionLinkUri(
-    entry: LogEntry,
-    localX: Int,
-    cellWidth: Int,
-    columnManager: JujutsuColumnManager,
-    linkifier: Linkifier,
-    font: Font,
-    frc: FontRenderContext
-): URI? {
-    if (!columnManager.showDescription) return null
-    val leftCanvas = entryCanvas(entry, Color.BLACK, linkifier) {
-        if (columnManager.showStatus) appendStatusIndicators(entry)
-        if (columnManager.showChangeId) {
-            append(entry.id)
-            append(" ")
-        }
-        appendDescriptionAndEmptyIndicator(entry)
-    }
-    val rightWidth = if (columnManager.showDecorations) {
-        cappedDecorations(entry, Color.BLACK, cellWidth * DECORATION_WIDTH_FRACTION, font, frc)
-            .canvas.fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
-    } else {
-        0.0
-    }
-    val availableForLeft = cellWidth - rightWidth
-    val truncated =
-        FragmentLayout.truncateToFit(leftCanvas.fragments, leftCanvas.truncateRange, availableForLeft, font, frc)
-    var xAccum = 0.0
-    for (fragment in truncated) {
-        val w = FragmentLayout.fragmentWidth(fragment, font, frc)
-        if (xAccum + w > localX) return fragment.linkTarget as? URI
-        xAccum += w
-    }
-    return null
-}
+// Ref-chip and description-text hit-testing used to live here as findInlinedRefUri/
+// findDescriptionLinkUri, each rebuilding its own entryCanvas/cappedDecorations independently of
+// what JujutsuGraphAndDescriptionRenderer actually painted. Both are now LaidOutCell.linkTargetAt
+// (jj-idea-alew), built once per row and shared by painting and hit-testing alike.
 
 /**
  * Compute the x-offset where the description text area begins for [row], mirroring

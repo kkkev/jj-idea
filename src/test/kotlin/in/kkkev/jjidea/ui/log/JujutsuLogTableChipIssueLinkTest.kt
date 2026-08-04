@@ -74,30 +74,44 @@ class JujutsuLogTableChipIssueLinkTest {
     private fun cellRect(table: JujutsuLogTable, row: Int) =
         table.getCellRect(row, table.convertColumnIndexToView(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION), false)
 
-    /** The x-offset (relative to the cell) of the linkified "JIRA-123" reference in row 0's sole bookmark chip. */
-    private fun issueLinkLocalX(table: JujutsuLogTable, row: Int): Int {
+    private fun laidOutRow(table: JujutsuLogTable, row: Int): LaidOutCell {
         val cellRect = cellRect(table, row)
         val entry = table.logModel.getEntry(row)!!
         val frc = table.getFontMetrics(table.font).fontRenderContext
         val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
-        val hitX = (0 until cellRect.width).first { x ->
-            val uri = findInlinedRefUri(entry, x, cellRect.width, table.font, frc, true, linkifier)
+        val textStart = graphTextStartX(row, table.logModel, table.graphNodes)
+        return LaidOutCell.forRow(
+            entry,
+            cellRect.width,
+            textStart,
+            table.columnManager,
+            linkifier,
+            java.awt.Color.BLACK,
+            table.font,
+            frc
+        )
+    }
+
+    /** The x-offset (relative to the cell) of the linkified "JIRA-123" reference in row 0's sole bookmark chip. */
+    private fun issueLinkLocalX(table: JujutsuLogTable, row: Int): Int {
+        val cellRect = cellRect(table, row)
+        val entry = table.logModel.getEntry(row)!!
+        val laidOut = laidOutRow(table, row)
+        return (0 until cellRect.width).first { x ->
+            val uri = laidOut.linkTargetAt(x)
             uri != null && LogClickTarget.resolve(uri, table.project, listOf(entry)) is IssueLinkClick
         }
-        return hitX
     }
 
     /** The x-offset of a point elsewhere in the chip (the icon), which should resolve to the bookmark, not the issue link. */
     private fun chipIconLocalX(table: JujutsuLogTable, row: Int): Int {
         val cellRect = cellRect(table, row)
         val entry = table.logModel.getEntry(row)!!
-        val frc = table.getFontMetrics(table.font).fontRenderContext
-        val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
-        val hitX = (0 until cellRect.width).first { x ->
-            val uri = findInlinedRefUri(entry, x, cellRect.width, table.font, frc, true, linkifier)
+        val laidOut = laidOutRow(table, row)
+        return (0 until cellRect.width).first { x ->
+            val uri = laidOut.linkTargetAt(x)
             uri != null && LogClickTarget.resolve(uri, table.project, listOf(entry)) is BookmarkClick
         }
-        return hitX
     }
 
     private fun moveMouseTo(table: JujutsuLogTable, point: Point) {

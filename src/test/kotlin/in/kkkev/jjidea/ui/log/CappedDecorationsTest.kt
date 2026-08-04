@@ -1,7 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.vcs.IssueNavigationConfiguration
-import com.intellij.openapi.vcs.IssueNavigationLink
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
@@ -10,13 +8,9 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.ui.components.FragmentLayout
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
-import `in`.kkkev.jjidea.ui.components.IssueLinkifier
-import `in`.kkkev.jjidea.ui.components.Linkifier
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.doubles.shouldBeLessThanOrEqual
-import io.kotest.matchers.nulls.shouldBeNull
-import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.string.shouldNotContain
@@ -27,13 +21,12 @@ import java.awt.Color
 import java.awt.Font
 import java.awt.font.FontRenderContext
 import java.awt.geom.AffineTransform
-import java.net.URI
 
 /**
- * Tests for [cappedDecorations] and [findInlinedRefUri] — width-budgeted bookmark/tag rendering
- * in the log table's graph+description column (jj-idea-w61m). A commit with many bookmarks must
- * never push the description out of the cell: decorations are capped to a width budget, with the
- * rest collapsed behind a clickable "+N more" chip.
+ * Tests for [cappedDecorations] — width-budgeted bookmark/tag rendering in the log table's
+ * graph+description column (jj-idea-w61m). A commit with many bookmarks must never push the
+ * description out of the cell: decorations are capped to a width budget, with the rest collapsed
+ * behind a clickable "+N more" chip. Hit-testing this output is covered by [LaidOutCellTest].
  */
 class CappedDecorationsTest {
     private val font = Font(Font.MONOSPACED, Font.PLAIN, 12)
@@ -110,89 +103,6 @@ class CappedDecorationsTest {
 
             result.hidden.shouldNotBeEmpty()
             (result.hidden.last() is TagClick) shouldBe true
-        }
-    }
-
-    @Nested
-    inner class `findInlinedRefUri` {
-        @Test
-        fun `clicking the overflow chip resolves to an overflow URI`() {
-            val e = entry((1..30).map { Bookmark("bookmark-$it") })
-            val colWidth = 200
-
-            // The overflow chip is rightmost; click near the right edge of the cell.
-            val uri = findInlinedRefUri(e, colWidth - 2, colWidth, font, frc, showDecorations = true)
-
-            uri.shouldNotBeNull()
-            uri.toString() shouldContain "kind=overflow"
-        }
-
-        @Test
-        fun `disabled decorations never resolve a target`() {
-            val e = entry((1..30).map { Bookmark("bookmark-$it") })
-            findInlinedRefUri(e, 50, 200, font, frc, showDecorations = false).shouldBeNull()
-        }
-    }
-
-    @Nested
-    inner class `findDescriptionLinkUri` {
-        private val jiraConfig = IssueNavigationConfiguration().apply {
-            links = listOf(IssueNavigationLink("[A-Z]+-\\d+", "https://tracker/\$0"))
-        }
-
-        // Isolate the description text itself - showStatus/showChangeId would otherwise prepend
-        // status icons and the change ID before it, complicating the x-offset math below.
-        private val descriptionOnly = JujutsuColumnManager().apply {
-            showStatus = false
-            showChangeId = false
-        }
-
-        private val regular = com.intellij.ui.SimpleTextAttributes.REGULAR_ATTRIBUTES
-
-        private fun textWidth(text: String) =
-            FragmentLayout.fragmentWidth(Fragment.Text(text, regular, false), font, frc)
-
-        @Test
-        fun `clicking the linkified issue reference resolves to its tracker URI`() {
-            val e = entry(description = "Fixes JIRA-123 now")
-            val prefixWidth = textWidth("Fixes ")
-            val linkWidth = textWidth("JIRA-123")
-
-            val uri = findDescriptionLinkUri(
-                e,
-                (prefixWidth + linkWidth / 2).toInt(),
-                2_000,
-                descriptionOnly,
-                IssueLinkifier(jiraConfig),
-                font,
-                frc
-            )
-
-            uri shouldBe URI("https://tracker/JIRA-123")
-        }
-
-        @Test
-        fun `clicking plain description text resolves to no link`() {
-            val e = entry(description = "Fixes JIRA-123 now")
-
-            findDescriptionLinkUri(e, 0, 2_000, descriptionOnly, IssueLinkifier(jiraConfig), font, frc).shouldBeNull()
-        }
-
-        @Test
-        fun `no linkifier never resolves a target even over the reference text`() {
-            val e = entry(description = "Fixes JIRA-123 now")
-            val prefixWidth = textWidth("Fixes ")
-
-            findDescriptionLinkUri(e, prefixWidth.toInt() + 2, 2_000, descriptionOnly, Linkifier.None, font, frc)
-                .shouldBeNull()
-        }
-
-        @Test
-        fun `description column disabled never resolves a target`() {
-            val e = entry(description = "Fixes JIRA-123 now")
-            val columnManager = JujutsuColumnManager().apply { showDescription = false }
-
-            findDescriptionLinkUri(e, 0, 2_000, columnManager, IssueLinkifier(jiraConfig), font, frc).shouldBeNull()
         }
     }
 }

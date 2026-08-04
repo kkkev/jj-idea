@@ -2,9 +2,11 @@ package `in`.kkkev.jjidea.ui.log
 
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.ui.components.refUri
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.nulls.shouldBeNull
@@ -12,6 +14,7 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import java.net.URI
 
@@ -146,5 +149,42 @@ class LogClickTargetTest {
         val e = entry(changeId = "aaa111", author = VcsUserImpl("Alice", "alice@example.com"))
 
         resolve(URI("mailto", "nobody@example.com", null), e).shouldBeNull()
+    }
+
+    @Nested
+    inner class `hoverCue` {
+        private val e = entry()
+
+        @Test
+        fun `an issue link underlines`() {
+            IssueLinkClick(URI("https://tracker/JIRA-123")).hoverCue shouldBe HoverCue.ISSUE_LINK_UNDERLINE
+        }
+
+        @Test
+        fun `a bookmark chip gets the ref background`() {
+            BookmarkClick(repo, e, Bookmark("main")).hoverCue shouldBe HoverCue.REF_BACKGROUND
+        }
+
+        @Test
+        fun `a tag chip gets the ref background`() {
+            TagClick(repo, e, Tag("v1.0")).hoverCue shouldBe HoverCue.REF_BACKGROUND
+        }
+
+        @Test
+        fun `a person click underlines as a real link`() {
+            val target = PersonClick(repo, e, VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
+            target.hoverCue shouldBe HoverCue.REAL_LINK_UNDERLINE
+        }
+
+        @Test
+        fun `a change navigation click underlines as a real link`() {
+            ChangeNavigationClick(repo, ChangeKey(repo, ChangeId("qpvuntsm", "qp"))).hoverCue shouldBe
+                HoverCue.REAL_LINK_UNDERLINE
+        }
+
+        @Test
+        fun `the overflow chip has no underline or background cue of its own`() {
+            MoreRefsClick(repo, e, emptyList()).hoverCue shouldBe HoverCue.NONE
+        }
     }
 }

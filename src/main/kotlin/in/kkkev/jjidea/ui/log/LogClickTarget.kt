@@ -78,7 +78,7 @@ sealed interface LogClickTarget {
          * Find the [PersonClick] matching [email] among [entries]' authors/committers - a `mailto:`
          * href only carries the email, not which entry or role (author vs. committer) it came from, so
          * this recovers both by matching. Author matches take priority over committer matches
-         * (mirroring [JujutsuLogTableRenderers.findPersonClickTarget]'s per-column precedence), since
+         * (mirroring [findPersonClickTarget]'s per-column precedence), since
          * `canFilter` is only meaningful for the author role.
          */
         private fun personClickForEmail(email: String, entries: List<LogEntry>): PersonClick? {
@@ -147,6 +147,24 @@ data class ChangeNavigationClick(val repo: JujutsuRepository, val changeKey: Cha
  */
 val LogClickTarget.hasHoverCue: Boolean
     get() = this !is BookmarkClick && this !is TagClick
+
+/**
+ * The *kind* of visual hover cue [this] gets, once [hasHoverCue]/the pointer position has already
+ * decided something is hovered - the classifier the fragment-backend log table (via
+ * `JujutsuGraphAndDescriptionRenderer`) uses instead of re-deriving "is this an issue link vs. a ref
+ * chip" from a `.resolve(...) is X` check at each of its several call sites. [MoreRefsClick] gets
+ * [NONE] here since its hand cursor (from [hasHoverCue]) is its only cue - it has no underline or
+ * background of its own.
+ */
+enum class HoverCue { ISSUE_LINK_UNDERLINE, REF_BACKGROUND, REAL_LINK_UNDERLINE, NONE }
+
+val LogClickTarget.hoverCue: HoverCue
+    get() = when (this) {
+        is IssueLinkClick -> HoverCue.ISSUE_LINK_UNDERLINE
+        is BookmarkClick, is TagClick -> HoverCue.REF_BACKGROUND
+        is PersonClick, is ChangeNavigationClick -> HoverCue.REAL_LINK_UNDERLINE
+        is MoreRefsClick -> HoverCue.NONE
+    }
 
 /** A short human-readable label for [this], e.g. for [JujutsuLogTable.showMoreRefsPopup]'s per-item submenu title. */
 val LogClickTarget.displayName: String

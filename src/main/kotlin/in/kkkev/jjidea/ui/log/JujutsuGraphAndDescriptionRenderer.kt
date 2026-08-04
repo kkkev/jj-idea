@@ -143,115 +143,49 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
+        /**
+         * Build this row's [LaidOutCell] once and paint from it, applying the two hover cues its
+         * content can carry: [HoverCue.ISSUE_LINK_UNDERLINE] underlines the hovered fragment
+         * (jj-idea-91qf, jj-idea-vrmv - matching author/committer names, jj-idea-iesq);
+         * [HoverCue.REF_BACKGROUND] paints a highlight behind the hovered bookmark/tag chip instead
+         * (jj-idea-a52h), since those have no left-click action of their own (jj-idea-wkcz). The two
+         * are mutually exclusive - only one fragment/chip is ever hovered at a time.
+         */
         private fun configureTextPanel(entry: LogEntry) {
             val fg = if (isSelected) table.selectionForeground else table.foreground
             val columnWidth = table.columnModel.getColumn(column).width
             val frc = table.getFontMetrics(table.font).fontRenderContext
-            val hoveredDescriptionUri = hoveredDescriptionLinkUri(entry, columnWidth, frc)
-
-            val leftCanvas = entryCanvas(entry, fg, linkifier, hoveredDescriptionUri) {
-                if (columnManager.showStatus) appendStatusIndicators(entry)
-                if (columnManager.showChangeId) {
-                    append(entry.id)
-                    append(" ")
-                }
-                if (columnManager.showDescription) {
-                    appendDescriptionAndEmptyIndicator(entry)
-                }
-            }
-
-            val rightCanvas = if (columnManager.showDecorations) {
-                cappedDecorations(
-                    entry,
-                    fg,
-                    columnWidth * DECORATION_WIDTH_FRACTION,
-                    table.font,
-                    frc,
-                    linkifier,
-                    hoveredChipIssueLinkUri(entry, columnWidth, frc)
-                ).canvas
-            } else {
-                FragmentRecordingCanvas()
-            }
-
-            textPanel.configure(
-                leftCanvas = leftCanvas,
-                rightCanvas = rightCanvas,
-                cellWidth = columnWidth - textStartX(),
-                background = background,
-                rightHighlightTarget = hoveredBookmarkOrTagUri(entry, frc)
-            )
-        }
-
-        /**
-         * The URI of the linkified issue-tracker reference (e.g. `JIRA-123`) in the description
-         * under [mousePos], if any (jj-idea-91qf) - underlines just that fragment while hovered,
-         * matching the "colored always, underlined on hover" convention used for author/committer
-         * links (jj-idea-iesq). Null when [linkifier] is [Linkifier.None], since there's then nothing
-         * in the description that [findDescriptionLinkUri] could ever match.
-         */
-        private fun hoveredDescriptionLinkUri(
-            entry: LogEntry,
-            columnWidth: Int,
-            frc: java.awt.font.FontRenderContext
-        ): URI? {
-            if (linkifier === Linkifier.None || !columnManager.showDescription) return null
-            val point = mousePos ?: return null
-            val cellRect = table.getCellRect(row, column, false)
-            if (!cellRect.contains(point)) return null
             val textStart = textStartX()
-            val localX = point.x - cellRect.x
-            if (localX < textStart) return null
-            return findDescriptionLinkUri(
+            val laidOut = LaidOutCell.forRow(
                 entry,
-                localX - textStart,
-                cellRect.width - textStart,
+                columnWidth,
+                textStart,
                 columnManager,
                 linkifier,
+                fg,
                 table.font,
                 frc
             )
+
+            val hovered = hoveredLinkTarget(laidOut)
+            val hoveredCue = hovered?.let { LogClickTarget.resolve(it, project = null, listOf(entry))?.hoverCue }
+            val underlineTarget = hovered.takeIf { hoveredCue == HoverCue.ISSUE_LINK_UNDERLINE }
+
+            textPanel.configure(
+                leftCanvas = FragmentRecordingCanvas(laidOut.leftFragments.underlining(underlineTarget)),
+                rightCanvas = FragmentRecordingCanvas(laidOut.rightFragments.underlining(underlineTarget)),
+                cellWidth = columnWidth - textStart,
+                background = background,
+                rightHighlightTarget = hovered.takeIf { hoveredCue == HoverCue.REF_BACKGROUND }
+            )
         }
 
-        /**
-         * The `jjref://` URI of the bookmark/tag chip under [mousePos], if any (jj-idea-a52h) - used
-         * to paint a hover-highlight background behind it, since these chips have no left-click
-         * action or cursor cue of their own (jj-idea-wkcz) and would otherwise look completely
-         * inert despite having a right-click menu. Excludes the "+N more" overflow chip, which
-         * already has its own hand-cursor/left-click affordance.
-         */
-        private fun hoveredBookmarkOrTagUri(entry: LogEntry, frc: java.awt.font.FontRenderContext): URI? {
-            if (!columnManager.showDecorations) return null
+        /** The link target under [mousePos] within this cell, if any. */
+        private fun hoveredLinkTarget(laidOut: LaidOutCell): URI? {
             val point = mousePos ?: return null
             val cellRect = table.getCellRect(row, column, false)
             if (!cellRect.contains(point)) return null
-            val columnWidth = table.columnModel.getColumn(column).width
-            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, linkifier)
-                ?: return null
-            val target = LogClickTarget.resolve(uri, project = null, listOf(entry))
-            return uri.takeIf { target is BookmarkClick || target is TagClick }
-        }
-
-        /**
-         * The URI of a linkified issue-tracker reference (e.g. `JIRA-123`) inside a bookmark/tag
-         * chip's own name under [mousePos], if any (jj-idea-vrmv) - underlines just that inner
-         * fragment while hovered, distinct from [hoveredBookmarkOrTagUri]'s whole-chip background
-         * highlight (the two are mutually exclusive: a hit inside the linkified substring resolves
-         * to [IssueLinkClick], not [BookmarkClick]/[TagClick], so only one cue is ever active).
-         */
-        private fun hoveredChipIssueLinkUri(
-            entry: LogEntry,
-            columnWidth: Int,
-            frc: java.awt.font.FontRenderContext
-        ): URI? {
-            if (linkifier === Linkifier.None || !columnManager.showDecorations) return null
-            val point = mousePos ?: return null
-            val cellRect = table.getCellRect(row, column, false)
-            if (!cellRect.contains(point)) return null
-            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, linkifier)
-                ?: return null
-            val target = LogClickTarget.resolve(uri, project = null, listOf(entry))
-            return uri.takeIf { target is IssueLinkClick }
+            return laidOut.linkTargetAt(point.x - cellRect.x)
         }
 
         private fun textStartX(): Int {
