@@ -346,14 +346,13 @@ internal object ChipIconExtension : ExtendableHTMLViewFactory.Extension {
 /**
  * Parsed contents of a [TextCanvas.appendChip] (or [TextCanvas.appendUnbreakable]) call, encoded by `HtmlTextCanvas`
  * into a single `src` attribute. [icon] is null for a plain unbreakable text label with no icon. [label] is a list
- * of runs rather than one string: [linkifyText] may have split it around a linkified issue-tracker reference
- * (jj-idea-vrmv follow-up), each run with its own optional target URI - [ChipView] paints (and hit-tests) them
- * individually.
+ * of runs rather than one string: the [Linkifier] may have split it around a linkified issue-tracker reference
+ * (jj-idea-vrmv follow-up) - [ChipView] paints (and hit-tests) them individually.
  */
 private class ChipSpec(
     val icon: Icon?,
     val prefixIcon: Icon?,
-    val label: List<LinkifiedRun>,
+    val label: List<TextRun>,
     val strikethrough: Boolean,
     val suffix: String?,
     val suffixColor: java.awt.Color?
@@ -374,14 +373,14 @@ private class ChipSpec(
         private fun resolveChipIcon(key: String): Icon? = IconResolver.resolveIcon(key)?.let(::ScaleCorrectedIcon)
 
         /** Decode one `text~uri` run encoded by `HtmlTextCanvas.appendChipHtml` - `uri` is empty for a plain run. */
-        private fun parseRun(encoded: String): LinkifiedRun {
+        private fun parseRun(encoded: String): TextRun {
             val tilde = encoded.indexOf('~')
             val textPart = if (tilde >= 0) encoded.substring(0, tilde) else encoded
             val uriPart = if (tilde >= 0) encoded.substring(tilde + 1) else ""
             val text = URLDecoder.decode(textPart, "UTF-8")
             val uri = uriPart.takeIf { it.isNotEmpty() }
                 ?.let { runCatching { URI(URLDecoder.decode(it, "UTF-8")) }.getOrNull() }
-            return LinkifiedRun(text, uri)
+            return if (uri != null) TextRun.Link(text, uri) else TextRun.Plain(text)
         }
     }
 }
@@ -454,8 +453,8 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
     }
 
     /**
-     * The [LinkifiedRun.uri] of whichever label run contains pixel offset [contentX], measured from
-     * this view's [modelToView]-adjusted left edge (i.e. already past [leadingGap], matching
+     * The link target of whichever label run contains pixel offset [contentX], measured from this
+     * view's [modelToView]-adjusted left edge (i.e. already past [leadingGap], matching
      * [IconAwareHtmlPane.issueLinkUriAt]'s coordinate space) - or null if [contentX] falls before/after
      * the label or lands in a run with no link (jj-idea-vrmv follow-up: a chip label can contain a
      * linkified issue-tracker reference alongside plain text).
@@ -465,7 +464,7 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         var x = iconsWidth
         for (run in spec.label) {
             val width = fm.stringWidth(run.text)
-            if (contentX in x until (x + width)) return run.uri
+            if (contentX in x until (x + width)) return run.target
             x += width
         }
         return null
@@ -511,10 +510,10 @@ private class ChipView(elem: Element, private val spec: ChipSpec) : View(elem) {
         val labelStartX = x
         for (run in spec.label) {
             val runWidth = fm.stringWidth(run.text)
-            val linked = run.uri != null
+            val linked = run.target != null
             g.color = if (linked) SimpleTextAttributes.LINK_PLAIN_ATTRIBUTES.fgColor else foreground
             g.drawString(run.text, x, baseline)
-            if (linked && run.uri == hoveredIssueLinkUri) {
+            if (linked && run.target == hoveredIssueLinkUri) {
                 // Underline just this run while its issue-tracker link is hovered (jj-idea-vrmv
                 // follow-up), matching the "colored always, underlined on hover" convention used for
                 // real links elsewhere - the surrounding plain-text runs of the same chip label stay

@@ -10,6 +10,8 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.ui.components.FragmentLayout
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
+import `in`.kkkev.jjidea.ui.components.IssueLinkifier
+import `in`.kkkev.jjidea.ui.components.Linkifier
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.doubles.shouldBeLessThanOrEqual
@@ -161,7 +163,7 @@ class CappedDecorationsTest {
                 (prefixWidth + linkWidth / 2).toInt(),
                 2_000,
                 descriptionOnly,
-                jiraConfig,
+                IssueLinkifier(jiraConfig),
                 font,
                 frc
             )
@@ -173,15 +175,16 @@ class CappedDecorationsTest {
         fun `clicking plain description text resolves to no link`() {
             val e = entry(description = "Fixes JIRA-123 now")
 
-            findDescriptionLinkUri(e, 0, 2_000, descriptionOnly, jiraConfig, font, frc).shouldBeNull()
+            findDescriptionLinkUri(e, 0, 2_000, descriptionOnly, IssueLinkifier(jiraConfig), font, frc).shouldBeNull()
         }
 
         @Test
-        fun `no issueLinks config never resolves a target even over the reference text`() {
+        fun `no linkifier never resolves a target even over the reference text`() {
             val e = entry(description = "Fixes JIRA-123 now")
             val prefixWidth = textWidth("Fixes ")
 
-            findDescriptionLinkUri(e, prefixWidth.toInt() + 2, 2_000, descriptionOnly, null, font, frc).shouldBeNull()
+            findDescriptionLinkUri(e, prefixWidth.toInt() + 2, 2_000, descriptionOnly, Linkifier.None, font, frc)
+                .shouldBeNull()
         }
 
         @Test
@@ -189,7 +192,7 @@ class CappedDecorationsTest {
             val e = entry(description = "Fixes JIRA-123 now")
             val columnManager = JujutsuColumnManager().apply { showDescription = false }
 
-            findDescriptionLinkUri(e, 0, 2_000, columnManager, jiraConfig, font, frc).shouldBeNull()
+            findDescriptionLinkUri(e, 0, 2_000, columnManager, IssueLinkifier(jiraConfig), font, frc).shouldBeNull()
         }
     }
 }

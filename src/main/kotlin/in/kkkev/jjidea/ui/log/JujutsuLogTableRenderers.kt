@@ -47,17 +47,17 @@ class DateCellRenderer : TextTableCellRenderer<Instant>() {
 
 /**
  * Build a [FragmentRecordingCanvas] with the standard row styling (bold for working copy,
- * foreground color for selection state) applied around [builder]. [issueLinks]/[hoveredTarget] are
+ * foreground color for selection state) applied around [builder]. [linkifier]/[hoveredTarget] are
  * injected into the canvas itself (jj-idea-91qf, jj-idea-vrmv) rather than threaded through every
- * append call inside [builder] - see [TextCanvas.issueLinks]/[TextCanvas.hoveredTarget].
+ * append call inside [builder] - see [TextCanvas.linkifier]/[TextCanvas.hoveredTarget].
  */
 fun entryCanvas(
     entry: LogEntry,
     fg: Color,
-    issueLinks: IssueNavigationConfiguration? = null,
+    linkifier: Linkifier = Linkifier.None,
     hoveredTarget: URI? = null,
     builder: TextCanvas.() -> Unit
-) = FragmentRecordingCanvas(issueLinks = issueLinks, hoveredTarget = hoveredTarget).apply {
+) = FragmentRecordingCanvas(linkifier = linkifier, hoveredTarget = hoveredTarget).apply {
     foreground(fg) {
         styled(if (entry.isWorkingCopy) Font.BOLD else 0, builder)
     }
@@ -106,9 +106,9 @@ data class CappedDecorations(val canvas: FragmentRecordingCanvas, val hidden: Li
  * ([appendSummaryAndStatuses]/[appendDecorations]), so capping only narrows what's painted, never
  * what's discoverable.
  *
- * [issueLinks], when non-null, linkifies issue-tracker references inside a chip's own name (e.g.
- * a bookmark named `jira-123-fix-thing`), underlining the fragment matching [hoveredTarget]
- * (jj-idea-vrmv) - see [in.kkkev.jjidea.ui.components.appendChip].
+ * [linkifier] linkifies issue-tracker references inside a chip's own name (e.g. a bookmark named
+ * `jira-123-fix-thing`), underlining the fragment matching [hoveredTarget] (jj-idea-vrmv) - see
+ * [in.kkkev.jjidea.ui.components.appendChip].
  */
 fun cappedDecorations(
     entry: LogEntry,
@@ -116,7 +116,7 @@ fun cappedDecorations(
     maxWidth: Double,
     font: Font,
     frc: FontRenderContext,
-    issueLinks: IssueNavigationConfiguration? = null,
+    linkifier: Linkifier = Linkifier.None,
     hoveredTarget: URI? = null
 ): CappedDecorations {
     val units = bookmarkDecorationUnits(entry) + tagDecorationUnits(entry)
@@ -147,7 +147,7 @@ fun cappedDecorations(
     }
 
     val hiddenUnits = units.drop(kept)
-    val canvas = entryCanvas(entry, fg, issueLinks, hoveredTarget) {
+    val canvas = entryCanvas(entry, fg, linkifier, hoveredTarget) {
         units.take(kept).forEachIndexed { i, unit ->
             if (i > 0) append(" ")
             unit.build(this)
@@ -192,8 +192,8 @@ private fun TextCanvas.overflowChip(entry: LogEntry, hiddenCount: Int) {
  * @param font    base font of the table
  * @param frc     font render context from the table
  * @param showDecorations whether the decoration inlining is enabled
- * @param issueLinks when non-null, also hit-tests an issue-tracker reference linkified inside a
- *   chip's own name (e.g. a bookmark named `JIRA-123-fix-thing`) - jj-idea-vrmv.
+ * @param linkifier also hit-tests an issue-tracker reference linkified inside a chip's own name
+ *   (e.g. a bookmark named `JIRA-123-fix-thing`) - jj-idea-vrmv.
  */
 internal fun findInlinedRefUri(
     entry: LogEntry,
@@ -202,11 +202,11 @@ internal fun findInlinedRefUri(
     font: Font,
     frc: FontRenderContext,
     showDecorations: Boolean,
-    issueLinks: IssueNavigationConfiguration? = null
+    linkifier: Linkifier = Linkifier.None
 ): URI? {
     if (!showDecorations) return null
     val rightCanvas =
-        cappedDecorations(entry, Color.BLACK, colWidth * DECORATION_WIDTH_FRACTION, font, frc, issueLinks).canvas
+        cappedDecorations(entry, Color.BLACK, colWidth * DECORATION_WIDTH_FRACTION, font, frc, linkifier).canvas
     val rightWidth = rightCanvas.fragments.sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
     val rightStart = colWidth - rightWidth
     if (localX < rightStart) return null
@@ -236,12 +236,12 @@ internal fun findDescriptionLinkUri(
     localX: Int,
     cellWidth: Int,
     columnManager: JujutsuColumnManager,
-    issueLinks: IssueNavigationConfiguration?,
+    linkifier: Linkifier,
     font: Font,
     frc: FontRenderContext
 ): URI? {
     if (!columnManager.showDescription) return null
-    val leftCanvas = entryCanvas(entry, Color.BLACK, issueLinks) {
+    val leftCanvas = entryCanvas(entry, Color.BLACK, linkifier) {
         if (columnManager.showStatus) appendStatusIndicators(entry)
         if (columnManager.showChangeId) {
             append(entry.id)
@@ -386,7 +386,7 @@ fun JujutsuLogTable.installRenderers() {
                 column.cellRenderer = JujutsuGraphAndDescriptionRenderer(
                     graphNodes,
                     columnManager,
-                    IssueNavigationConfiguration.getInstance(project)
+                    IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
                 )
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth

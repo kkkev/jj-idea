@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.io.URLUtil
@@ -69,13 +68,12 @@ interface TextCanvas {
     fun linked(target: URI, builder: TextCanvas.() -> Unit)
 
     /**
-     * Issue-tracker link config for [appendChip]/[appendLinkified]-based linkification of a
-     * description or a bookmark/tag chip's own name (jj-idea-91qf, jj-idea-vrmv), injected once per
-     * canvas at construction time instead of threaded through every append call along the way.
-     * Null (the default, inherited by any canvas that doesn't override it - e.g. every
-     * [HtmlTextCanvas] except the details pane's) means "don't linkify".
+     * The [Linkifier] used by [appendChip]/[appendLinkified] to linkify a description or a
+     * bookmark/tag chip's own name (jj-idea-91qf, jj-idea-vrmv), injected once per canvas at
+     * construction time instead of threaded through every append call along the way. Defaults to
+     * [Linkifier.None].
      */
-    val issueLinks: IssueNavigationConfiguration? get() = null
+    val linkifier: Linkifier get() = Linkifier.None
 
     /**
      * The linked target to underline while "hovered" (jj-idea-91qf) - see [appendLinkified]. Only
@@ -93,7 +91,7 @@ interface TextCanvas {
      * unbreakable unit, so a bookmark/tag chip's icon is never separated from its name, and the name never wraps
      * mid-word, when the surrounding layout needs to wrap (jj-idea-kds1).
      *
-     * [label] is linkified via [appendLinkified] using [issueLinks] the same as description text is (jj-idea-vrmv).
+     * [label] is linkified via [appendLinkified] using [linkifier] the same as description text is (jj-idea-vrmv).
      * The surrounding chip keeps its own [linked] target (set by the caller) for right-click resolution; only the
      * matching substring gets the inner issue-link target, underlined while it equals [hoveredTarget].
      */
@@ -199,9 +197,8 @@ fun TextCanvas.append(changeKey: ChangeKey) {
 }
 
 /**
- * Append [description], optionally linkifying issue-tracker references (e.g. `JIRA-123`) and bare URLs found by
- * [TextCanvas.issueLinks] as clickable links (jj-idea-10fo). When null (the default for most canvases), or it
- * finds no matches, this renders exactly as before. [TextCanvas.hoveredTarget] underlines the one matching link
+ * Append [description], linkifying issue-tracker references and bare URLs via [TextCanvas.linkifier]
+ * as clickable links (jj-idea-10fo). [TextCanvas.hoveredTarget] underlines the one matching link
  * fragment, e.g. while the pointer is over it (jj-idea-91qf) - see [appendLinkified].
  */
 fun TextCanvas.append(description: Description) {
@@ -221,49 +218,23 @@ fun TextCanvas.appendSummary(description: Description) = truncate {
     }
 }
 
-/** One run of text produced by [linkifyText] - [uri] is null for a plain (non-matching) run. */
-internal data class LinkifiedRun(val text: String, val uri: URI?)
-
 /**
- * Split [text] into plain and issue-tracker/URL link runs found by [config] (an
- * [IssueNavigationConfiguration], resolved from a `Project`) - the single place both
- * [appendLinkified] (plain text, e.g. a description) and [in.kkkev.jjidea.ui.components.HtmlTextCanvas]'s
- * chip-label rendering (jj-idea-vrmv follow-up: a chip's own name can itself contain a reference)
- * derive their runs from, so the two backends can't drift on what counts as a match. A malformed
- * link target (an invalid URI) falls back to a plain run for that piece rather than throwing.
- */
-internal fun linkifyText(text: String, config: IssueNavigationConfiguration?): List<LinkifiedRun> {
-    val matches = config?.findIssueLinks(text).orEmpty()
-    if (matches.isEmpty()) return listOf(LinkifiedRun(text, null))
-    val runs = mutableListOf<LinkifiedRun>()
-    IssueNavigationConfiguration.processTextWithLinks(
-        text,
-        matches,
-        { plain -> runs += LinkifiedRun(plain, null) },
-        { linkText, target -> runs += LinkifiedRun(linkText, runCatching { URI(target) }.getOrNull()) }
-    )
-    return runs
-}
-
-/**
- * Append [text], linkifying issue-tracker references/URLs found by [TextCanvas.issueLinks] via
- * [TextCanvas.linked] (rather than raw HTML), so they carry over into any backend — including
- * [FragmentRecordingCanvas], where the URI becomes a [FragmentRecordingCanvas.Fragment.linkTarget]
- * usable for hit-testing (jj-idea-iesq) — not just the HTML details pane.
+ * Append [text], linkifying via [TextCanvas.linkifier] and [TextCanvas.linked] (rather than raw HTML),
+ * so links carry over into any backend — including [FragmentRecordingCanvas], where the target becomes
+ * a [FragmentRecordingCanvas.Fragment.linkTarget] usable for hit-testing (jj-idea-iesq) — not just the
+ * HTML details pane.
  *
- * The link fragment whose URI equals [TextCanvas.hoveredTarget] is wrapped in [TextCanvas.underlined], matching the
+ * The link matching [TextCanvas.hoveredTarget] is wrapped in [TextCanvas.underlined], matching the
  * "colored always, underlined on hover" convention used elsewhere (jj-idea-iesq) - the HTML backend gets
- * hover-underline for free from the platform's native `<a>` rendering instead, so `hoveredTarget` only matters for
- * interactive column rendering (jj-idea-91qf).
+ * hover-underline for free from the platform's native `<a>` rendering instead, so `hoveredTarget` only
+ * matters for interactive column rendering (jj-idea-91qf).
  */
 internal fun TextCanvas.appendLinkified(text: String) {
-    for (run in linkifyText(text, issueLinks)) {
-        val uri = run.uri
-        if (uri == null) {
-            append(run.text)
-        } else {
-            linked(uri) {
-                if (uri == hoveredTarget) underlined { append(run.text) } else append(run.text)
+    for (run in linkifier.linkify(text)) {
+        when (run) {
+            is TextRun.Plain -> append(run.text)
+            is TextRun.Link -> linked(run.target) {
+                if (run.target == hoveredTarget) underlined { append(run.text) } else append(run.text)
             }
         }
     }
@@ -396,9 +367,9 @@ fun TextCanvas.appendSummary(entry: LogEntry) {
 }
 
 /**
- * Append the description summary and "(empty)" indicator for a log entry, optionally linkifying
- * issue-tracker references via [TextCanvas.issueLinks] and underlining the fragment matching
- * [TextCanvas.hoveredTarget] (jj-idea-91qf) - see [appendLinkified].
+ * Append the description summary and "(empty)" indicator for a log entry, linkifying via
+ * [TextCanvas.linkifier] and underlining the fragment matching [TextCanvas.hoveredTarget]
+ * (jj-idea-91qf) - see [appendLinkified].
  */
 fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
     appendSummary(entry.description)
@@ -413,9 +384,9 @@ fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
 }
 
 /**
- * Append every bookmark chip for [entry]. [TextCanvas.issueLinks], when non-null, linkifies any
- * issue-tracker reference within a bookmark's own name (e.g. `jira-123-fix-thing`), underlining
- * the fragment matching [TextCanvas.hoveredTarget] (jj-idea-vrmv) - see [appendChip].
+ * Append every bookmark chip for [entry]. [TextCanvas.linkifier] linkifies any issue-tracker
+ * reference within a bookmark's own name (e.g. `jira-123-fix-thing`), underlining the fragment
+ * matching [TextCanvas.hoveredTarget] (jj-idea-vrmv) - see [appendChip].
  */
 fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
     val groups = entry.bookmarks.grouped()
@@ -475,9 +446,8 @@ internal fun tagDecorationUnits(entry: LogEntry): List<DecorationUnit> =
     entry.tags.map { tag -> DecorationUnit(tag) { linked(refUri(entry, "tag", tag.name)) { append(tag) } } }
 
 /**
- * [TextCanvas.issueLinks], when non-null, linkifies any issue-tracker reference within the tag's
- * own name (jj-idea-vrmv), underlining the fragment matching [TextCanvas.hoveredTarget] - see
- * [appendChip].
+ * [TextCanvas.linkifier] linkifies any issue-tracker reference within the tag's own name
+ * (jj-idea-vrmv), underlining the fragment matching [TextCanvas.hoveredTarget] - see [appendChip].
  */
 fun TextCanvas.append(tag: Tag) = colored(JujutsuColors.TAG) {
     smaller {

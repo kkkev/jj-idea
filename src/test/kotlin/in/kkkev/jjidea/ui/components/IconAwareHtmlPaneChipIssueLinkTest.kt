@@ -54,7 +54,7 @@ class IconAwareHtmlPaneChipIssueLinkTest {
 
     private fun renderBookmarkChip(): IconAwareHtmlPane {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
-        val html = htmlString(issueLinks = jiraConfig) {
+        val html = htmlString(linkifier = IssueLinkifier(jiraConfig)) {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") { appendBookmarks(e) }
         }
         val pane = IconAwareHtmlPane(project.get())
@@ -106,7 +106,7 @@ class IconAwareHtmlPaneChipIssueLinkTest {
     @Test
     fun `a bookmark chip with no matching issue reference resolves no issue link anywhere`() {
         val e = entry(listOf(Bookmark("plain-bookmark")))
-        val html = htmlString(issueLinks = jiraConfig) {
+        val html = htmlString(linkifier = IssueLinkifier(jiraConfig)) {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") { appendBookmarks(e) }
         }
         val pane = IconAwareHtmlPane(project.get())

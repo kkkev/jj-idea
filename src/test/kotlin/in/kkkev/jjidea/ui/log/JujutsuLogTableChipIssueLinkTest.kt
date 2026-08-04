@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -78,9 +79,9 @@ class JujutsuLogTableChipIssueLinkTest {
         val cellRect = cellRect(table, row)
         val entry = table.logModel.getEntry(row)!!
         val frc = table.getFontMetrics(table.font).fontRenderContext
-        val issueLinks = IssueNavigationConfiguration.getInstance(table.project)
+        val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
         val hitX = (0 until cellRect.width).first { x ->
-            val uri = findInlinedRefUri(entry, x, cellRect.width, table.font, frc, true, issueLinks)
+            val uri = findInlinedRefUri(entry, x, cellRect.width, table.font, frc, true, linkifier)
             uri != null && LogClickTarget.resolve(uri, table.project, listOf(entry)) is IssueLinkClick
         }
         return hitX
@@ -91,9 +92,9 @@ class JujutsuLogTableChipIssueLinkTest {
         val cellRect = cellRect(table, row)
         val entry = table.logModel.getEntry(row)!!
         val frc = table.getFontMetrics(table.font).fontRenderContext
-        val issueLinks = IssueNavigationConfiguration.getInstance(table.project)
+        val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
         val hitX = (0 until cellRect.width).first { x ->
-            val uri = findInlinedRefUri(entry, x, cellRect.width, table.font, frc, true, issueLinks)
+            val uri = findInlinedRefUri(entry, x, cellRect.width, table.font, frc, true, linkifier)
             uri != null && LogClickTarget.resolve(uri, table.project, listOf(entry)) is BookmarkClick
         }
         return hitX

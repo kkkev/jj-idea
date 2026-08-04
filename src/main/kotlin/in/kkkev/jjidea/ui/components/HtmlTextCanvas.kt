@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.components
 
-import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.SimpleTextAttributes
 import java.awt.Color
@@ -9,23 +8,22 @@ import java.net.URI
 import java.net.URLEncoder
 
 /**
- * Create a full HTML document including wrapping `<html>` tag. [issueLinks], when non-null,
- * linkifies issue-tracker references in any [appendLinkified]-based content (e.g. a description)
- * for the whole document - injected once here rather than threaded through every append call
- * (jj-idea-91qf).
+ * Create a full HTML document including wrapping `<html>` tag. [linkifier] linkifies any
+ * [appendLinkified]-based content (e.g. a description) for the whole document - injected once here
+ * rather than threaded through every append call (jj-idea-91qf).
  */
-fun htmlString(issueLinks: IssueNavigationConfiguration? = null, builder: (TextCanvas.() -> Unit)) =
-    htmlText(issueLinks) { control("<html>", "</html>", builder) }
+fun htmlString(linkifier: Linkifier = Linkifier.None, builder: (TextCanvas.() -> Unit)) =
+    htmlText(linkifier) { control("<html>", "</html>", builder) }
 
 /**
  * Create some inline HTML text, to be used inside an existing HTML document.
  */
-private fun htmlText(issueLinks: IssueNavigationConfiguration? = null, builder: (TextCanvas.() -> Unit)) =
-    HtmlTextCanvas(StringBuilder(), issueLinks).apply(builder).sb.toString()
+private fun htmlText(linkifier: Linkifier = Linkifier.None, builder: (TextCanvas.() -> Unit)) =
+    HtmlTextCanvas(StringBuilder(), linkifier).apply(builder).sb.toString()
 
 private class HtmlTextCanvas(
     val sb: StringBuilder,
-    override val issueLinks: IssueNavigationConfiguration? = null
+    override val linkifier: Linkifier = Linkifier.None
 ) : StyledTextCanvas() {
     override fun control(open: String, close: String, builder: TextCanvas.() -> Unit) {
         sb.append(open)
@@ -48,10 +46,10 @@ private class HtmlTextCanvas(
      * split the icon from its label, or the label across lines, when the row needs to wrap (jj-idea-kds1) — folding
      * everything into a single leaf view makes that impossible.
      *
-     * [label] is split into runs via [linkifyText] using [TextCanvas.issueLinks] (jj-idea-vrmv follow-up), the same
-     * as [appendLinkified] does for plain text - [ChipView] paints each run individually so a linkified substring
-     * within an otherwise-atomic chip still gets its own color/hover cue, without breaking the wrap/word-split
-     * guarantee this atomic encoding exists for.
+     * [label] is split into runs via [TextCanvas.linkifier] (jj-idea-vrmv follow-up), the same as
+     * [appendLinkified] does for plain text - [ChipView] paints each run individually so a linkified
+     * substring within an otherwise-atomic chip still gets its own color/hover cue, without breaking
+     * the wrap/word-split guarantee this atomic encoding exists for.
      */
     override fun appendChip(
         icon: IconSpec,
@@ -68,7 +66,7 @@ private class HtmlTextCanvas(
         appendChipHtml(
             key(icon),
             prefixIcon?.let(::key) ?: "",
-            linkifyText(label, issueLinks),
+            linkifier.linkify(label),
             strikethrough,
             suffix,
             suffixColor
@@ -80,7 +78,7 @@ private class HtmlTextCanvas(
         appendChipHtml(
             "",
             "",
-            listOf(LinkifiedRun(text, null)),
+            listOf(TextRun.Plain(text)),
             strikethrough = false,
             suffix = null,
             suffixColor = null
@@ -89,7 +87,7 @@ private class HtmlTextCanvas(
     private fun appendChipHtml(
         iconKey: String,
         prefixIconKey: String,
-        label: List<LinkifiedRun>,
+        label: List<TextRun>,
         strikethrough: Boolean,
         suffix: String?,
         suffixColor: Color?
@@ -97,7 +95,7 @@ private class HtmlTextCanvas(
         // `~`/`,` are safe run/field delimiters: URLEncoder always escapes both, so neither can
         // appear literally in an encoded run's text or URI.
         val encodedLabel = label.joinToString(",") { run ->
-            val encodedUri = run.uri?.let { URLEncoder.encode(it.toString(), "UTF-8") } ?: ""
+            val encodedUri = run.target?.let { URLEncoder.encode(it.toString(), "UTF-8") } ?: ""
             "${URLEncoder.encode(run.text, "UTF-8")}~$encodedUri"
         }
         val encodedSuffix = suffix?.let { URLEncoder.encode(it, "UTF-8") } ?: ""

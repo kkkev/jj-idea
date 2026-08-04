@@ -237,7 +237,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
      * Multiple entries are separated by <hr> dividers, capped at MAX_DISPLAYED_COMMITS.
      */
     private fun buildCommitHtml(entries: List<LogEntry>) = htmlString(
-        issueLinks = IssueNavigationConfiguration.getInstance(project)
+        linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
     ) {
         val displayed = entries.take(MAX_DISPLAYED_COMMITS)
         control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {

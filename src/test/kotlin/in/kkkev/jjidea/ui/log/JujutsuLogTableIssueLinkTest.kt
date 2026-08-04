@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -78,10 +79,10 @@ class JujutsuLogTableIssueLinkTest {
         val entry = table.logModel.getEntry(row)!!
         val frc = table.getFontMetrics(table.font).fontRenderContext
         val textStart = graphTextStartX(row, table.logModel, table.graphNodes)
-        val issueLinks = IssueNavigationConfiguration.getInstance(table.project)
+        val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
         val availableWidth = cellRect.width - textStart
         val hitX = (0 until availableWidth).first { x ->
-            findDescriptionLinkUri(entry, x, availableWidth, table.columnManager, issueLinks, table.font, frc) != null
+            findDescriptionLinkUri(entry, x, availableWidth, table.columnManager, linkifier, table.font, frc) != null
         }
         return textStart + hitX
     }

@@ -37,7 +37,7 @@ class ChipIssueLinkTest {
     @Test
     fun `a bookmark name containing an issue reference linkifies just that substring`() {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
-        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig))
 
         canvas.appendBookmarks(e)
 
@@ -50,7 +50,7 @@ class ChipIssueLinkTest {
     @Test
     fun `the rest of the chip keeps the bookmark's jjref target, not the inner issue link`() {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
-        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig))
 
         canvas.appendBookmarks(e)
 
@@ -66,7 +66,7 @@ class ChipIssueLinkTest {
     @Test
     fun `a bookmark name with no matching reference renders unaffected`() {
         val e = entry(listOf(Bookmark("plain-bookmark")))
-        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig))
 
         canvas.appendBookmarks(e)
 
@@ -79,7 +79,7 @@ class ChipIssueLinkTest {
     fun `the linkified chip substring underlines only while its URI matches hoveredTarget`() {
         val e = entry(listOf(Bookmark("JIRA-123-fix-thing")))
         val trackerUri = URI("https://tracker/JIRA-123")
-        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig, hoveredTarget = trackerUri)
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig), hoveredTarget = trackerUri)
 
         canvas.appendBookmarks(e)
 
@@ -95,7 +95,7 @@ class ChipIssueLinkTest {
     @Test
     fun `a tag name containing an issue reference linkifies via the injected canvas config`() {
         val e = entry(tags = listOf(Tag("JIRA-123-fix-thing")))
-        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig)
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig))
 
         canvas.appendTags(e)
 
@@ -105,7 +105,7 @@ class ChipIssueLinkTest {
     }
 
     @Test
-    fun `a tag name renders unaffected when the canvas has no issueLinks injected`() {
+    fun `a tag name renders unaffected when the canvas has no linkifier injected`() {
         val e = entry(tags = listOf(Tag("JIRA-123-fix-thing")))
         val canvas = FragmentRecordingCanvas()
 
@@ -121,7 +121,9 @@ class ChipIssueLinkTest {
         val e = entry(tags = listOf(Tag("JIRA-123-fix-thing")))
 
         val units = tagDecorationUnits(e)
-        val canvas = FragmentRecordingCanvas(issueLinks = jiraConfig).apply { units.single().build(this) }
+        val canvas = FragmentRecordingCanvas(linkifier = IssueLinkifier(jiraConfig)).apply {
+            units.single().build(this)
+        }
 
         val issueFragment = canvas.fragments.filterIsInstance<FragmentRecordingCanvas.Fragment.Text>()
             .single { it.text == "JIRA-123" }

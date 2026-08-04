@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
@@ -22,14 +21,14 @@ import javax.swing.table.TableCellRenderer
  *    - Left: status indicators, optional change ID, description (truncatable)
  *    - Right: optional decorations (bookmarks, working copy indicator)
  *
- * [issueLinks], when non-null, linkifies issue-tracker references (e.g. `JIRA-123`) in the
- * description (jj-idea-91qf) - null for the Split/Squash/Rebase/Duplicate picker tables, which
- * construct this renderer without it.
+ * [linkifier] linkifies issue-tracker references (e.g. `JIRA-123`) in the description (jj-idea-91qf)
+ * - left at [Linkifier.None] for the Split/Squash/Rebase/Duplicate picker tables, which construct
+ * this renderer without one.
  */
 class JujutsuGraphAndDescriptionRenderer(
     private val graphNodes: Map<ChangeId, GraphNode>,
     private val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT,
-    private val issueLinks: IssueNavigationConfiguration? = null
+    private val linkifier: Linkifier = Linkifier.None
 ) : TableCellRenderer {
     companion object {
         // HiDPI-aware dimensions using JBValue for proper scaling. LANE_WIDTH/HORIZONTAL_PADDING
@@ -129,7 +128,7 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
-        private fun buildTooltip(entry: LogEntry) = htmlString(issueLinks = issueLinks) {
+        private fun buildTooltip(entry: LogEntry) = htmlString(linkifier = linkifier) {
             appendSummaryAndStatuses(entry)
             entry.author?.let { author ->
                 append(author)
@@ -150,7 +149,7 @@ class JujutsuGraphAndDescriptionRenderer(
             val frc = table.getFontMetrics(table.font).fontRenderContext
             val hoveredDescriptionUri = hoveredDescriptionLinkUri(entry, columnWidth, frc)
 
-            val leftCanvas = entryCanvas(entry, fg, issueLinks, hoveredDescriptionUri) {
+            val leftCanvas = entryCanvas(entry, fg, linkifier, hoveredDescriptionUri) {
                 if (columnManager.showStatus) appendStatusIndicators(entry)
                 if (columnManager.showChangeId) {
                     append(entry.id)
@@ -168,7 +167,7 @@ class JujutsuGraphAndDescriptionRenderer(
                     columnWidth * DECORATION_WIDTH_FRACTION,
                     table.font,
                     frc,
-                    issueLinks,
+                    linkifier,
                     hoveredChipIssueLinkUri(entry, columnWidth, frc)
                 ).canvas
             } else {
@@ -188,7 +187,7 @@ class JujutsuGraphAndDescriptionRenderer(
          * The URI of the linkified issue-tracker reference (e.g. `JIRA-123`) in the description
          * under [mousePos], if any (jj-idea-91qf) - underlines just that fragment while hovered,
          * matching the "colored always, underlined on hover" convention used for author/committer
-         * links (jj-idea-iesq). Null when [issueLinks] isn't configured, since there's then nothing
+         * links (jj-idea-iesq). Null when [linkifier] is [Linkifier.None], since there's then nothing
          * in the description that [findDescriptionLinkUri] could ever match.
          */
         private fun hoveredDescriptionLinkUri(
@@ -196,7 +195,7 @@ class JujutsuGraphAndDescriptionRenderer(
             columnWidth: Int,
             frc: java.awt.font.FontRenderContext
         ): URI? {
-            if (issueLinks == null || !columnManager.showDescription) return null
+            if (linkifier === Linkifier.None || !columnManager.showDescription) return null
             val point = mousePos ?: return null
             val cellRect = table.getCellRect(row, column, false)
             if (!cellRect.contains(point)) return null
@@ -208,7 +207,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 localX - textStart,
                 cellRect.width - textStart,
                 columnManager,
-                issueLinks,
+                linkifier,
                 table.font,
                 frc
             )
@@ -227,7 +226,7 @@ class JujutsuGraphAndDescriptionRenderer(
             val cellRect = table.getCellRect(row, column, false)
             if (!cellRect.contains(point)) return null
             val columnWidth = table.columnModel.getColumn(column).width
-            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, issueLinks)
+            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, linkifier)
                 ?: return null
             val target = LogClickTarget.resolve(uri, project = null, listOf(entry))
             return uri.takeIf { target is BookmarkClick || target is TagClick }
@@ -245,11 +244,11 @@ class JujutsuGraphAndDescriptionRenderer(
             columnWidth: Int,
             frc: java.awt.font.FontRenderContext
         ): URI? {
-            if (issueLinks == null || !columnManager.showDecorations) return null
+            if (linkifier === Linkifier.None || !columnManager.showDecorations) return null
             val point = mousePos ?: return null
             val cellRect = table.getCellRect(row, column, false)
             if (!cellRect.contains(point)) return null
-            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, issueLinks)
+            val uri = findInlinedRefUri(entry, point.x - cellRect.x, columnWidth, table.font, frc, true, linkifier)
                 ?: return null
             val target = LogClickTarget.resolve(uri, project = null, listOf(entry))
             return uri.takeIf { target is IssueLinkClick }

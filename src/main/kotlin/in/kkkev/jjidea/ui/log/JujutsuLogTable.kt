@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.ui.components.installIconAwareTooltip
 import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
 import kotlinx.datetime.Instant
@@ -445,8 +446,8 @@ class JujutsuLogTable(
         val uri = when (modelCol) {
             JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION -> {
                 val frc = getFontMetrics(font).fontRenderContext
-                val issueLinks = IssueNavigationConfiguration.getInstance(project)
-                findInlinedRefUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations, issueLinks)
+                val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
+                findInlinedRefUri(entry, localX, cellRect.width, font, frc, columnManager.showDecorations, linkifier)
                     ?: descriptionLinkUriAt(modelRow, entry, localX, cellRect.width, font, frc)
             }
             else -> null
@@ -483,7 +484,7 @@ class JujutsuLogTable(
             localX - textStart,
             cellWidth - textStart,
             columnManager,
-            IssueNavigationConfiguration.getInstance(project),
+            IssueLinkifier(IssueNavigationConfiguration.getInstance(project)),
             font,
             frc
         )
@@ -650,7 +651,7 @@ class JujutsuLogTable(
                 column.cellRenderer = JujutsuGraphAndDescriptionRenderer(
                     graphNodes,
                     columnManager,
-                    IssueNavigationConfiguration.getInstance(project)
+                    IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
                 )
                 break
             }
