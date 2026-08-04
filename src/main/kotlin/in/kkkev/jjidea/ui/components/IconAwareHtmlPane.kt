@@ -1,29 +1,20 @@
 package `in`.kkkev.jjidea.ui.components
 
-import com.intellij.icons.AllIcons
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.project.Project
 import com.intellij.ui.BrowserHyperlinkListener
-import com.intellij.ui.ColorUtil
 import com.intellij.ui.components.JBHtmlPane
 import com.intellij.ui.components.JBHtmlPaneConfiguration
 import com.intellij.ui.components.JBHtmlPaneStyleConfiguration
-import com.intellij.ui.scale.JBUIScale
-import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.ui.common.ScaledIcon
-import `in`.kkkev.jjidea.ui.common.accented
 import `in`.kkkev.jjidea.ui.log.LogClickTarget
 import `in`.kkkev.jjidea.ui.log.performDefaultAction
-import java.awt.Component
 import java.awt.Cursor
-import java.awt.Graphics
 import java.awt.Point
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import java.net.URI
 import java.util.regex.Pattern
-import javax.swing.Icon
 import javax.swing.event.HyperlinkEvent
 import javax.swing.text.AttributeSet
 import javax.swing.text.Element
@@ -32,7 +23,6 @@ import javax.swing.text.View
 import javax.swing.text.html.HTML
 import javax.swing.text.html.HTMLDocument
 import kotlin.math.roundToInt
-import kotlin.reflect.KClass
 
 private val REF_URL_PARSER = Pattern.compile("^jjref://([^?]+)\\?([^&]+)&kind=([^&]+)&name=(.+)$")
 
@@ -259,46 +249,4 @@ internal fun hrefAncestorOf(element: Element): String? {
         elem = elem.parentElement
     }
     return null
-}
-
-/**
- * Resolves an [IconSpec.qualified] key (from either icon library) back to a real [Icon] - the single
- * lookup both the outer document and [AtomicHtmlView]'s inner document use to resolve an
- * `<img src='icon:...'/>` element, via the shared `iconViewOrNull` in `AtomicHtmlView.kt`.
- */
-object IconResolver {
-    val icons = listOf(JujutsuIcons::class, AllIcons::class)
-        .flatMap { it.allIcons.toList() }
-        .toMap()
-
-    fun resolveIcon(key: String): Icon? {
-        val scaleParts = key.split("@", limit = 2)
-        val scale = scaleParts.getOrNull(1)?.toFloatOrNull()
-        val colorParts = scaleParts[0].split("#", limit = 2)
-        val baseIcon = icons[colorParts[0]] ?: return null
-        val colored = colorParts.getOrNull(1)?.let { baseIcon.accented(ColorUtil.fromHex(it)) } ?: baseIcon
-        return if (scale != null) ScaledIcon(colored, scale) else colored
-    }
-
-    private val KClass<*>.allIcons
-        get() = java
-            .nestMembers
-            .flatMap { it.fields.toList() }
-            .filter { it.type.isAssignableFrom(Icon::class.java) }
-            .associate {
-                "${it.declaringClass.name.replace(qualifiedName!!, simpleName!!).replace('$', '.')}.${it.name}" to
-                    (it.get(it.declaringClass) as Icon)
-            }
-}
-
-/**
- * Corrects High-DPI "Double Scaling", reporting the icon's real (unscaled) width/height so
- * [in.kkkev.jjidea.ui.components.IconLeafView] can position it against real font metrics itself -
- * used for every `<img src='icon:...'/>` element, in both the outer document and an
- * [AtomicHtmlView]'s inner document.
- */
-internal class ScaleCorrectedIcon(private val source: Icon) : Icon {
-    override fun getIconWidth() = (source.iconWidth / JBUIScale.scale(1f)).roundToInt()
-    override fun getIconHeight() = (source.iconHeight / JBUIScale.scale(1f)).roundToInt()
-    override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) = source.paintIcon(c, g, x, y)
 }

@@ -41,19 +41,9 @@ import javax.swing.JPanel
 private fun TextCanvas.appendUserWithTimestamp(user: VcsUser?, timestamp: Instant?) {
     user?.let { appendWithEmail(it) } ?: append("Unknown")
     timestamp?.also {
-        // append (not control): a raw space via control() bypasses HTML escaping and is
-        // vulnerable to whitespace collapsing next to the date chip's <img> element; append()'s
-        // escaping turns a plain space into a non-collapsing &nbsp; (U+00A0). This needs to stay
-        // ordinary, breakable text, not its own chip, so a line that's too long can still wrap
-        // here -- an earlier attempt at using appendUnbreakable(" ") for this gap removed the
-        // only valid break point in the whole run, so a long line stopped wrapping at all.
-        //
-        // The date chip's own label below embeds the identical "\u00A0" right after the mid-dot
-        // for the same reason: matching Unicode codepoints on both sides guarantees
-        // fontMetrics.stringWidth() measures the identical glyph, so the two gaps stay equal.
-        // ChipView also adds a small extra fixed-pixel leading gap before every chip (see
-        // CHIP_LEADING_GAP in IconAwareHtmlPane.kt) to compensate for a 2026.2-specific rendering
-        // difference; that's general to all chips, not specific to this one.
+        // append (not appendUnbreakable): stays a breakable wrap point on a long line, and its
+        // escaping turns the space into a non-collapsing &nbsp; matching the date chip's own
+        // leading \u00a0 below, so both gaps measure to the same width.
         append(" ")
         appendUnbreakable("\u00b7\u00a0${DateTimeFormatter.formatAbsolute(it)}")
     }
