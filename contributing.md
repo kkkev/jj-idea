@@ -461,6 +461,28 @@ under jj-idea-edjs.7). A WARN line in a user-submitted log — especially a larg
 count — is a strong scale-regression signal (GitHub #35 hit 1.8M entries). Grep for
 `perf:` in `idea.log` to find all instrumented operations.
 
+### Platform API compatibility
+
+The compile target (`gradle.properties`'s `platformVersion`) is the newest supported IDE;
+`sinceBuild` (`build.gradle.kts`'s `pluginConfiguration.ideaVersion`) is the oldest. Compiling
+against the newest platform surfaces that platform's deprecation warnings, but a deprecation's
+documented replacement is sometimes `@ApiStatus.Internal` on older builds still within
+`sinceBuild` — the replacement API simply wasn't made public yet on the floor. When that
+happens, **take the documented replacement anyway** and accept the resulting JetBrains
+Marketplace/Plugin Verifier internal-API-usage warning; do not revert to the deprecated call
+just to silence it. Marketplace treats internal-API usage as advisory, not a publish blocker.
+
+The real risk an internal API carries is that its *signature*, not just its visibility, can
+differ between IDE versions — surfacing as a `NoSuchMethodError` at runtime on a user's older
+IDE rather than a build failure. `pluginVerification` in `build.gradle.kts` guards against
+exactly that: it pins every supported IDE from `sinceBuild` up (currently 2025.1–2026.2) and
+sets `failureLevel` to only `COMPATIBILITY_PROBLEMS`, `MISSING_DEPENDENCIES`, and
+`INVALID_PLUGIN` — genuine breaks — leaving `INTERNAL_API_USAGES` (IJPGP's default failure
+level includes it) non-fatal. Never add `INTERNAL_API_USAGES` back to `failureLevel` and never
+suppress a `COMPATIBILITY_PROBLEMS` finding — a compatibility problem on any pinned IDE means the
+code will not run there. CI runs this as the `verify` job (`.github/workflows/build.yml`); run
+`./gradlew verifyPlugin` locally before believing a deprecation fix is safe on the floor.
+
 ## Performance & Scale
 
 ### Scale envelope

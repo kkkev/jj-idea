@@ -2,9 +2,9 @@ package `in`.kkkev.jjidea.actions.git
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.panel
-import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.layout.selected
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.git.GitFetchDialog.Companion.loadAllDialogData
@@ -88,11 +88,13 @@ class GitFetchDialog(project: Project, private val allData: Map<JujutsuRepositor
 
     override fun createCenterPanel(): JComponent = panel {
         if (allData.size > 1) {
-            val items: List<Displayable> = listOf(AllRepos) + allData.keys.toList()
+            val items = listOf(AllRepos) + allData.keys.toList()
             row(JujutsuBundle.message("dialog.git.fetch.repository.label")) {
                 comboBox(items)
                     .applyToComponent {
-                        renderer = textListCellRenderer("", Displayable::displayName)
+                        // Replacement (textListCellRenderer) unavailable until 2026.2
+                        @Suppress("removal")
+                        renderer = SimpleListCellRenderer.create("") { it.displayName }
                         selectedItem = AllRepos
                         addActionListener {
                             selectedRepoOrAll = selectedItem ?: AllRepos

@@ -1,5 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
 
 /**
  * Extracts changelog notes from CHANGELOG.md for the given version.
@@ -189,8 +190,23 @@ intellijPlatform {
     }
 
     pluginVerification {
+        // IJPGP's default failureLevel includes INTERNAL_API_USAGES, which would fail the build
+        // on this plugin's deliberate use of internal APIs that are the documented 2026.2
+        // replacement for calls deprecated on the newest platform (see the compileTarget comment
+        // on the `kotlin` block below, and contributing.md's Platform API compatibility section).
+        // Binary-compatibility breaks stay fatal — that's the actual runtime risk an internal API
+        // poses on an older IDE, and the thing this check exists to catch.
+        failureLevel = listOf(
+            VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
+            VerifyPluginTask.FailureLevel.MISSING_DEPENDENCIES,
+            VerifyPluginTask.FailureLevel.INVALID_PLUGIN
+        )
         ides {
-            recommended()
+            // Explicit versions rather than recommended(): recommended() is unbounded because
+            // untilBuild = null above, and 2025.1 is the sinceBuild floor that must be checked.
+            create(IntelliJPlatformType.IntellijIdea, "2025.1")
+            create(IntelliJPlatformType.IntellijIdea, "2025.2")
+            create(IntelliJPlatformType.IntellijIdea, "2025.3")
             create(IntelliJPlatformType.IntellijIdea, "2026.2")
         }
     }

@@ -3,9 +3,9 @@ package `in`.kkkev.jjidea.actions.git
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.panel
-import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.layout.selected
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.git.GitPushDialog.Companion.loadAllDialogData
@@ -141,7 +141,9 @@ class GitPushDialog(
             row(JujutsuBundle.message("dialog.git.push.repository.label")) {
                 comboBox(allData.keys.toList())
                     .applyToComponent {
-                        renderer = textListCellRenderer("") { it.displayName }
+                        // Replacement (textListCellRenderer) unavailable until 2026.2
+                        @Suppress("removal")
+                        renderer = SimpleListCellRenderer.create("") { it.displayName }
                         selectedItem = selectedRepo
                         addActionListener {
                             if (updatingModels) return@addActionListener

@@ -89,7 +89,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ '2025.2', '2026.2' ]
+        platform: [ '2025.1', '2025.2', '2026.2' ]
 
     steps:
       - name: Checkout code
@@ -125,6 +125,44 @@ jobs:
         with:
           name: test-reports-${{ matrix.platform }}
           path: build/reports/tests/
+          retention-days: 14
+
+  verify:
+    # Runs the IntelliJ Plugin Verifier CLI against every IDE listed in the
+    # pluginVerification block (build.gradle.kts), including the sinceBuild floor. Only
+    # failureLevel-listed problem categories (compatibility, missing dependencies, invalid
+    # plugin) fail this job — internal/experimental API usage is deliberately excluded, see
+    # the comment on that block.
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Cache Plugin Verifier IDEs
+        uses: actions/cache@v4
+        with:
+          path: ~/.pluginVerifier/ides
+          key: plugin-verifier-ides-${{ hashFiles('build.gradle.kts') }}
+
+      - name: Verify plugin
+        run: ./gradlew verifyPlugin
+
+      - name: Upload verifier reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-verifier-reports
+          path: build/reports/pluginVerifier/
           retention-days: 14
 
   build:

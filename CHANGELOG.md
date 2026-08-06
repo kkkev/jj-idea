@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Saving a file no longer switches the editor to the diff preview tab (opened by double-clicking a file in the Working Copy panel or commit details pane). ([#67](https://github.com/kkkev/jj-idea/issues/67))
 - Fixed the Push button sometimes doing nothing: switching the remote (or, in a multi-repository project, the repository) in the push dialog before clicking Push could silently reset your bookmark selection and leave the button unresponsive. Also, pushing a bookmark that was already up to date no longer shows a generic "Push complete" message — it now shows jj's own "Nothing changed" notice.
 - In a repository containing any divergent change, "Move Bookmark Here…" and "Move '\<bookmark\>' to Change…" showed every destination as a backward/sideways move, requiring you to tick "Allow backward or sideways move" even for a genuine forward move onto a descendant.
+- Fixed a potential crash showing repository icons for folders in VCS dialogs (e.g. the Commit tool window) on IntelliJ IDEA 2025.1.
 
 ## [0.8.5] - 2026-08-02
 
