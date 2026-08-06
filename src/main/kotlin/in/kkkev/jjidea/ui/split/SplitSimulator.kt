@@ -37,7 +37,6 @@ object SplitSimulator {
 
         val sourceParentIds = sourceEntry.parentIdentifiers
 
-        val parentIdentifiers = sourceParentIds
         val childIdentifiers: List<LogEntry.Identifiers>
         val parentEntry: LogEntry
         val childEntry: LogEntry
@@ -50,7 +49,7 @@ object SplitSimulator {
                 id = parentId,
                 commitId = SYNTHETIC_COMMIT,
                 underlyingDescription = parentDescription ?: sourceEntry.description.actual,
-                parentIdentifiers = parentIdentifiers,
+                parentIdentifiers = sourceParentIds,
                 isWorkingCopy = false
             )
             childEntry = sourceEntry.copy(
@@ -68,7 +67,7 @@ object SplitSimulator {
                 id = parentId,
                 commitId = SYNTHETIC_COMMIT,
                 underlyingDescription = parentDescription ?: sourceEntry.description.actual,
-                parentIdentifiers = parentIdentifiers,
+                parentIdentifiers = sourceParentIds,
                 isWorkingCopy = false
             )
             childEntry = sourceEntry.copy(

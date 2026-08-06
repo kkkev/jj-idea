@@ -27,7 +27,10 @@ import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
-import `in`.kkkev.jjidea.ui.components.*
+import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
+import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.appendDescriptionAndEmptyIndicator
+import `in`.kkkev.jjidea.ui.components.htmlString
 import `in`.kkkev.jjidea.ui.log.appendDecorations
 import `in`.kkkev.jjidea.ui.log.appendStatusIndicators
 import `in`.kkkev.jjidea.util.GitDiffReverseApplier
@@ -38,15 +41,7 @@ import `in`.kkkev.jjidea.vcs.relativeTo
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Font
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.JButton
-import javax.swing.JComponent
-import javax.swing.JLabel
-import javax.swing.JPanel
-import javax.swing.event.DocumentEvent
-import javax.swing.event.DocumentListener
-import javax.swing.event.TreeSelectionListener
+import javax.swing.*
 
 /**
  * Result of the split dialog.
@@ -99,6 +94,7 @@ class SplitDialog(
         val baseContent: String, // null-safe: reverseApply result; empty string for added files
         val fileType: FileType
     )
+
     private val fileDataCache: MutableMap<FilePath, FileData> = LinkedHashMap()
 
     // --- Partial-file overrides: merge-picked first-commit content for partially-split files ---
@@ -145,16 +141,10 @@ class SplitDialog(
     // Preview panel header.
     private val previewHeader = JBLabel(
         JujutsuBundle.message("dialog.split.preview.select"),
-        javax.swing.SwingConstants.CENTER
+        SwingConstants.CENTER
     ).apply {
         foreground = JBUI.CurrentTheme.Label.disabledForeground()
         font = font.deriveFont(Font.BOLD)
-    }
-
-    private val descriptionChangeListener = object : DocumentListener {
-        override fun insertUpdate(e: DocumentEvent?) = Unit
-        override fun removeUpdate(e: DocumentEvent?) = Unit
-        override fun changedUpdate(e: DocumentEvent?) = Unit
     }
 
     // --- Test seam: injectable merge picker (avoids modal merge under tests) ---
@@ -181,12 +171,10 @@ class SplitDialog(
         fileSelection.addInclusionListener { onFileInclusionChanged() }
 
         // Listen for file selection changes (to show diff preview for selected file).
-        fileSelection.changesTree.addTreeSelectionListener(
-            TreeSelectionListener {
-                val selected = fileSelection.changesTree.selectedChanges.firstOrNull()
-                if (selected != null) showPreviewForChange(selected)
-            }
-        )
+        fileSelection.changesTree.addTreeSelectionListener {
+            val selected = fileSelection.changesTree.selectedChanges.firstOrNull()
+            if (selected != null) showPreviewForChange(selected)
+        }
 
         updateSummary()
         init()
@@ -195,7 +183,7 @@ class SplitDialog(
     // ---- File inclusion sync ----
 
     private fun onFileInclusionChanged() {
-        val nowIncluded = fileSelection.includedChanges.mapNotNull { it.filePath }.toSet()
+        val nowIncluded = fileSelection.includedChanges.map { it.filePath }.toSet()
 
         // Files newly unticked → clear any partial override (file is fully in the parent).
         for (fp in (previousIncluded - nowIncluded)) {
@@ -222,7 +210,7 @@ class SplitDialog(
      * Show the diff preview for [change], loading the diff lazily.
      */
     private fun showPreviewForChange(change: Change) {
-        val fp = change.filePath ?: return
+        val fp = change.filePath
         currentPreviewFile = fp
 
         // Update header.
@@ -240,8 +228,6 @@ class SplitDialog(
         diffPreviewPanel.setRequest(null)
         pickHunksButton.isEnabled = false
 
-        val root = sourceEntry.repo.directory
-        val relPath = fp.relativeTo(root)
         val revision = sourceEntry.id
         val executor = sourceEntry.repo.commandExecutor
 
@@ -399,11 +385,13 @@ class SplitDialog(
                 firstCommitOverrides.remove(fp)
                 ensureFileIncluded(fp)
             }
+
             afterContent -> {
                 // Parent keeps everything → nothing moved to child, untick it.
                 firstCommitOverrides.remove(fp)
                 ensureFileExcluded(fp)
             }
+
             else -> {
                 firstCommitOverrides[fp] = pickedContent
             }
@@ -416,7 +404,7 @@ class SplitDialog(
         if (change !in current) {
             current.add(change)
             fileSelection.changesTree.setIncludedChanges(current)
-            previousIncluded = current.mapNotNull { it.filePath }.toSet()
+            previousIncluded = current.map { it.filePath }.toSet()
         }
     }
 
@@ -426,7 +414,7 @@ class SplitDialog(
         if (change in current) {
             current.remove(change)
             fileSelection.changesTree.setIncludedChanges(current)
-            previousIncluded = current.mapNotNull { it.filePath }.toSet()
+            previousIncluded = current.map { it.filePath }.toSet()
         }
     }
 
@@ -518,7 +506,7 @@ class SplitDialog(
 
     private fun createPickHunksBar(): JPanel = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.X_AXIS)
-        border = JBUI.Borders.empty(4, 0, 0, 0)
+        border = JBUI.Borders.emptyTop(4)
         add(pickHunksButton)
         add(Box.createHorizontalGlue())
     }
@@ -633,13 +621,13 @@ class SplitDialog(
     override fun doOKAction() {
         // Ticked changes move to the child; everything else stays in the parent.
         val childChanges = fileSelection.includedChanges.toList()
-        val childFilePaths = childChanges.mapNotNull { it.filePath }.toSet()
-        val parentPaths = allChanges.mapNotNull { it.filePath }.filter { it !in childFilePaths }
+        val childFilePaths = childChanges.map { it.filePath }.toSet()
+        val parentPaths = allChanges.map { it.filePath }.filter { it !in childFilePaths }
 
         val hunkSelection: SplitHunkSelection? = if (firstCommitOverrides.isNotEmpty()) {
             // Build FileFirstCommit (parent-remainder content) for every changed file.
-            val files = allChanges.mapNotNull { change ->
-                val fp = change.filePath ?: return@mapNotNull null
+            val files = allChanges.map { change ->
+                val fp = change.filePath
                 val root = sourceEntry.repo.directory
                 val relPath = fp.relativeTo(root)
                 val override = firstCommitOverrides[fp]
@@ -721,10 +709,12 @@ internal fun describeSplitState(
         JujutsuBundle.message("dialog.split.hunks.parent.allChanges", parentLabel),
         JujutsuBundle.message("dialog.split.hunks.child.noChanges", childLabel)
     )
+
     baseContent -> Pair(
         JujutsuBundle.message("dialog.split.hunks.parent.unchanged", parentLabel),
         JujutsuBundle.message("dialog.split.hunks.child.allChanges", childLabel)
     )
+
     else -> Pair(
         JujutsuBundle.message("dialog.split.hunks.parent.partial", parentLabel),
         JujutsuBundle.message("dialog.split.hunks.child.partial", childLabel)
