@@ -881,6 +881,7 @@ verify it once per surface it's referenced from, not three times independently:
 - [ ] Escape inside the diff tab closes it
 - [ ] Cmd/Ctrl+D opens the same diff preview tab (routes through preview when available)
 - [ ] F4 still opens the file in a regular editor tab (no "Synchronous execution on EDT" error in IDE log)
+- [ ] With the diff tab open and a different (regular) editor tab focused, edit and save that file — the editor stays on it; it does not switch to the diff tab (GitHub #67)
 
 ### MT-CONFLICT
 
