@@ -10,7 +10,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.resume
-import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.datetime.Duration.Companion.milliseconds
 
 inline fun <reified L> topic(displayName: String) = Topic.create(displayName, L::class.java)
 

@@ -11,7 +11,7 @@ import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Tests for JujutsuLogTableModel filtering functionality.

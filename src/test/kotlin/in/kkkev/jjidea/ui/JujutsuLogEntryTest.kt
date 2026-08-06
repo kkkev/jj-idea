@@ -6,7 +6,7 @@ import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Tests for parsing and representing jj log entries

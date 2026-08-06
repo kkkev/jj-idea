@@ -30,7 +30,7 @@ import java.awt.BorderLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JPanel
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Renders [user] as `Name <email>` (or "Unknown" if absent), followed by a non-breaking gap and

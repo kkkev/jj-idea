@@ -24,7 +24,7 @@ import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.filePath
 import java.util.*
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * File annotation for Jujutsu, showing line-by-line change information

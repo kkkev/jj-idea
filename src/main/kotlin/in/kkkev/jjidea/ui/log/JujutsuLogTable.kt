@@ -34,7 +34,7 @@ import javax.swing.event.ListSelectionEvent
 import javax.swing.event.TableColumnModelEvent
 import javax.swing.event.TableColumnModelListener
 import javax.swing.table.AbstractTableModel
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Custom table for displaying Jujutsu commit log.

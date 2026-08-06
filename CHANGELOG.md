@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.8.6] - 2026-08-06
-
 ### Changed
 - Conflicted files in the "Working copy" tool window are now grouped under a "Merge Conflicts" node at the top of the tree with a one-click "Resolve" link, and the toolbar gained a "Resolve All Conflicts" button — matching the grouped resolve affordance the standard Commit tool window used to provide, before it was hidden. ([#56](https://github.com/kkkev/jj-idea/issues/56))
 - Opening a conflicted file now shows a banner at the top of the editor with a one-click "Resolve" link, so you don't need to already know about the Jujutsu submenu to find conflict resolution. ([#56](https://github.com/kkkev/jj-idea/issues/56))

@@ -5,7 +5,7 @@ import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Tests for LogTemplate integration and parsing

@@ -9,7 +9,7 @@ import `in`.kkkev.jjidea.vcs.getChildPath
 import org.jetbrains.annotations.TestOnly
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 interface LogSpec<T> {
     val spec: String

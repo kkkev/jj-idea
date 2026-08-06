@@ -5,7 +5,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Parses jj file annotate output into structured annotation lines.

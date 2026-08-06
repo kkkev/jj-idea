@@ -3,9 +3,9 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.actionSystem.*
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
-import kotlin.time.Clock
-import kotlin.time.Duration.Companion.days
-import kotlin.time.Instant
+import kotlinx.datetime.Clock
+import kotlinx.datetime.Duration.Companion.days
+import kotlinx.datetime.Instant
 
 /**
  * Filter component for dates.

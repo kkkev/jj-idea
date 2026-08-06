@@ -16,7 +16,7 @@ import java.awt.Color
 import java.awt.Font
 import java.awt.font.FontRenderContext
 import java.net.URI
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Renderer for the Author and Committer columns.

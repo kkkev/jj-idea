@@ -10,7 +10,7 @@ import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import java.awt.Rectangle
-import kotlin.time.Instant
+import kotlinx.datetime.Instant
 
 /**
  * Tests for column functionality in JujutsuLogTable.
