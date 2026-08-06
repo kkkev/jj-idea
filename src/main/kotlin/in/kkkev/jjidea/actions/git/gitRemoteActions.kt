@@ -173,19 +173,25 @@ private fun trackAndPush(
 private fun performPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Revision?) {
     spec.repo.commandExecutor
         .createCommand { gitPush(spec.remote, spec.bookmark, spec.allBookmarks, revision = revision) }
-        .onSuccess { stdout ->
+        .onSuccessResult {
             spec.repo.invalidate()
             log.info("Pushed for ${spec.repo.displayName}")
             JujutsuNotifications.notify(
                 project,
                 JujutsuBundle.message("action.git.push.success.title"),
-                stdout.ifBlank { JujutsuBundle.message("action.git.push.success.message.default") },
+                pushSuccessMessage(stdout, stderr),
                 NotificationType.INFORMATION
             )
         }
         .onFailure { tellUser(project, "action.git.push.error") }
         .executeWithProgress(project, JujutsuBundle.message("progress.git.push"))
 }
+
+// jj writes "Nothing changed." (and similar no-op notices) to stderr even on a successful
+// (exit 0) push, so a blank-stdout success must fall back to stderr before the generic default -
+// otherwise a no-op push reports "Push complete" (jj-idea-idm0).
+internal fun pushSuccessMessage(stdout: String, stderr: String): String =
+    stdout.ifBlank { stderr }.ifBlank { JujutsuBundle.message("action.git.push.success.message.default") }
 
 // jj outputs "Error: Refusing to create new remote bookmark X@Y" (specific bookmark, exit 1) or
 // "Warning: Refusing to create new remote bookmark X@Y" (default scope, exit 0, bookmark silently

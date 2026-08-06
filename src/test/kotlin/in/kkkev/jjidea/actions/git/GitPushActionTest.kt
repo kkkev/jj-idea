@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.actions.git
 
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.BookmarkName
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
@@ -180,6 +181,30 @@ class GitPushActionTest {
                 Dry-run requested, not pushing.
                 """.trimIndent()
             parseDeletedBookmarks(stderr) shouldBe listOf("stale")
+        }
+    }
+
+    @Nested
+    inner class `pushSuccessMessage` {
+        @Test
+        fun `prefers stdout when present`() {
+            pushSuccessMessage("Changes pushed to origin", "") shouldBe "Changes pushed to origin"
+        }
+
+        @Test
+        fun `falls back to stderr when stdout is blank so a no-op push isn't reported as success`() {
+            // jj writes "Nothing changed." to stderr, not stdout, on a no-op push (jj-idea-idm0)
+            pushSuccessMessage("", "Nothing changed.") shouldBe "Nothing changed."
+        }
+
+        @Test
+        fun `falls back to the generic default when both are blank`() {
+            pushSuccessMessage("", "") shouldBe JujutsuBundle.message("action.git.push.success.message.default")
+        }
+
+        @Test
+        fun `blank stdout with whitespace-only stderr still falls through to the default`() {
+            pushSuccessMessage("  \n", "  ") shouldBe JujutsuBundle.message("action.git.push.success.message.default")
         }
     }
 }

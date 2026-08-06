@@ -4,7 +4,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.panel
-import com.intellij.ui.dsl.builder.toNullableProperty
 import com.intellij.ui.dsl.listCellRenderer.textListCellRenderer
 import com.intellij.ui.layout.selected
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -14,6 +13,7 @@ import `in`.kkkev.jjidea.jj.Displayable
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Remote
 import javax.swing.DefaultComboBoxModel
+import javax.swing.JComboBox
 import javax.swing.JComponent
 
 /**
@@ -50,6 +50,11 @@ class GitFetchDialog(project: Project, private val allData: Map<JujutsuRepositor
     private var selectedRemote: Remote? = currentRemotes().firstOrNull()
     private val remoteModel = DefaultComboBoxModel(currentRemotes().toTypedArray())
 
+    // Exposed for tests (see SplitDialog for the same pattern) so a test can drive the real
+    // addActionListener callback below rather than reimplementing it.
+    internal var repoComboBox: JComboBox<*>? = null
+        private set
+
     private fun currentRepos(): List<JujutsuRepository> =
         if (selectedRepoOrAll is AllRepos) {
             allData.keys.toList()
@@ -77,9 +82,8 @@ class GitFetchDialog(project: Project, private val allData: Map<JujutsuRepositor
     private fun updateForRepoChange() {
         val remotes = currentRemotes()
         val previousName = selectedRemote?.name
-        remoteModel.removeAllElements()
-        remoteModel.addAll(remotes)
         selectedRemote = remotes.firstOrNull { it.name == previousName } ?: remotes.firstOrNull()
+        remoteModel.replaceContents(remotes, selectedRemote)
     }
 
     override fun createCenterPanel(): JComponent = panel {
@@ -94,6 +98,7 @@ class GitFetchDialog(project: Project, private val allData: Map<JujutsuRepositor
                             selectedRepoOrAll = selectedItem ?: AllRepos
                             updateForRepoChange()
                         }
+                        repoComboBox = this
                     }
             }
         }
@@ -104,7 +109,10 @@ class GitFetchDialog(project: Project, private val allData: Map<JujutsuRepositor
                     val rb = radioButton(JujutsuBundle.message("dialog.git.fetch.scope.specific"))
                         .bindScope(::fetchScope, FetchScope.SPECIFIC)
                     comboBox(remoteModel)
-                        .bindItem(::selectedRemote.toNullableProperty())
+                        // Deliberately not `.toNullableProperty()`: its `!!` NPEs whenever the
+                        // combo's selection is transiently null, e.g. mid-repopulate (jj-idea-idm0).
+                        // `bindItem(KMutableProperty0<T?>)` handles a null selection safely.
+                        .bindItem(::selectedRemote)
                         .enabledIf(rb.component.selected)
                 }
                 row {
@@ -115,7 +123,7 @@ class GitFetchDialog(project: Project, private val allData: Map<JujutsuRepositor
         } else {
             row(JujutsuBundle.message("dialog.git.fetch.remote.label")) {
                 comboBox(remoteModel)
-                    .bindItem(::selectedRemote.toNullableProperty())
+                    .bindItem(::selectedRemote)
             }
         }
     }

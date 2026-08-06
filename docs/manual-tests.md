@@ -1189,6 +1189,14 @@ Setup: have a local bookmark that has never been pushed to the remote.
   OK always pushes according to the last-selected option (scope selection is hand-wired via
   action listeners, not the platform's declarative binding, as of the 2026.2 platform-compat
   work — jj-idea-gu9q)
+- [ ] (jj-idea-idm0) With a repository that has 2+ Git remotes: open the push dialog, switch the
+  **Remote** combo to a different remote — the bookmark combo must immediately show a real
+  bookmark (never blank), select "Specific bookmark" → OK → dialog closes and pushes to the
+  newly selected remote/bookmark. Repeat switching remotes several times before pressing OK.
+  Check Help → Show Log afterwards for any `NullPointerException` from `GitPushDialog` — there
+  must be none (previously the Push button appeared completely inert after a remote switch)
+- [ ] Push a bookmark that's already up to date with the remote → the notification shows jj's
+  own "Nothing changed." message rather than a bare "Push complete"
 
 #### Git Fetch Dialog
 
@@ -1200,6 +1208,9 @@ Setup: a repository with 2+ remotes (the scope radio group only appears in this 
 - [ ] Switch back to "Specific remote" → combo box re-enables with the previously selected remote
   → OK → fetches just that one
 - [ ] Cancel fetch dialog → no fetch occurs
+- [ ] (jj-idea-idm0) With 2+ repositories mapped, and the repository selector visible: switch the
+  **Repository** combo to a different repo — the remote combo must immediately show a real
+  remote for that repo (never blank) → OK → fetches from the newly selected repo/remote
 
 #### New/untracked bookmark push (jj-idea-dt2k, GitHub #53)
 

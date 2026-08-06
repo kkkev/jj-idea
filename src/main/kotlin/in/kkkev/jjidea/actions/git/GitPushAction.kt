@@ -40,6 +40,10 @@ class GitPushAction : DumbAwareAction(
 
         runInBackground {
             val allData = GitPushDialog.loadAllDialogData(repos)
+            if (allData.values.all { it.remotes.isEmpty() }) {
+                runLater { noRemoteNotification(project) }
+                return@runInBackground
+            }
 
             runLater {
                 val dialog = GitPushDialog(project, allData, initialRepo)
