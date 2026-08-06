@@ -9,10 +9,44 @@ import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
 class AnnotationParserTest {
+    /**
+     * Builds one annotate record: 11 fields joined by "\0", terminated by "\n" (mirroring how
+     * jj's `content` field always ends with the source line's own trailing newline, which the
+     * parser now uses as the record separator).
+     */
+    @Suppress("LongParameterList")
+    private fun record(
+        fullChangeId: String = "mnopqrst",
+        shortChangeId: String = "mnop",
+        changeOffset: String = "",
+        fullCommitId: String = "abc123",
+        shortCommitId: String = "ab",
+        authorName: String = "John Doe",
+        authorEmail: String = "john@example.com",
+        authorTimestamp: String = "1768575623",
+        description: String = "Initial commit",
+        parentIds: String = "",
+        content: String = "println(\"Hello\")"
+    ): String {
+        val fields = listOf(
+            fullChangeId,
+            shortChangeId,
+            changeOffset,
+            fullCommitId,
+            shortCommitId,
+            authorName,
+            authorEmail,
+            authorTimestamp,
+            "\"$description\"",
+            parentIds,
+            content
+        )
+        return fields.joinToString("\u0000") + "\n"
+    }
+
     @Test
     fun `parse single line annotation`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
+        val output = record()
 
         val result = AnnotationParser.parse(output)
 
@@ -25,17 +59,24 @@ class AnnotationParserTest {
         result[0].author.email shouldBe "john@example.com"
         result[0].description.summary shouldBe "Initial commit"
         result[0].parentIds.shouldBeEmpty()
-        result[0].lineContent shouldBe "println(\"Hello\")"
+        result[0].lineContent shouldBe "println(\"Hello\")\n"
         result[0].lineNumber shouldBe 1
     }
 
     @Test
     fun `parse multiple lines`() {
-        val line1 = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
-        val line2 = "uvwxyzab\u0000uvwx\u00005\u0000def456\u0000d\u0000Jane Smith\u0000jane@example.com\u0000" +
-            "1768575623\u0000Add feature\u0000\u0000return 42"
-        val output = "$line1\u0000$line2"
+        val output = record() +
+            record(
+                fullChangeId = "uvwxyzab",
+                shortChangeId = "uvwx",
+                changeOffset = "5",
+                fullCommitId = "def456",
+                shortCommitId = "d",
+                authorName = "Jane Smith",
+                authorEmail = "jane@example.com",
+                description = "Add feature",
+                content = "return 42"
+            )
 
         val result = AnnotationParser.parse(output)
 
@@ -45,33 +86,31 @@ class AnnotationParserTest {
         result[0].commitId.full shouldBe "abc123"
         result[0].commitId.short shouldBe "ab"
         result[0].author.name shouldBe "John Doe"
-        result[0].lineContent shouldBe "println(\"Hello\")"
+        result[0].lineContent shouldBe "println(\"Hello\")\n"
         result[0].lineNumber shouldBe 1
 
         result[1].id.short shouldBe "uvwx/5"
         result[1].commitId.full shouldBe "def456"
         result[1].commitId.short shouldBe "d"
         result[1].author.name shouldBe "Jane Smith"
-        result[1].lineContent shouldBe "return 42"
+        result[1].lineContent shouldBe "return 42\n"
         result[1].lineNumber shouldBe 2
     }
 
     @Test
     fun `parse annotation with empty description`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000\u0000\u0000println(\"Hello\")"
+        val output = record(description = "")
 
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 1
         result[0].description.summary shouldBe "(no description)"
-        result[0].lineContent shouldBe "println(\"Hello\")"
+        result[0].lineContent shouldBe "println(\"Hello\")\n"
     }
 
     @Test
     fun `parse annotation with empty author email`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
+        val output = record(authorEmail = "")
 
         val result = AnnotationParser.parse(output)
 
@@ -82,8 +121,7 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with empty author name`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000\u0000john@example.com\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
+        val output = record(authorName = "")
 
         val result = AnnotationParser.parse(output)
 
@@ -94,19 +132,17 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with special characters in line content`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Fix bug\u0000\u0000val x = \"hello|world\""
+        val output = record(description = "Fix bug", content = "val x = \"hello|world\"")
 
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 1
-        result[0].lineContent shouldBe "val x = \"hello|world\""
+        result[0].lineContent shouldBe "val x = \"hello|world\"\n"
     }
 
     @Test
     fun `parse annotation with special characters in description`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Fix: use grep | sort\u0000\u0000println(\"Hello\")"
+        val output = record(description = "Fix: use grep | sort")
 
         val result = AnnotationParser.parse(output)
 
@@ -130,8 +166,12 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with whitespace in fields`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000  John Doe  \u0000  john@example.com  \u0000" +
-            "  1768575623  \u0000  Initial commit  \u0000\u0000  println(\"Hello\")  "
+        val output = record(
+            authorName = "  John Doe  ",
+            authorEmail = "  john@example.com  ",
+            description = "  Initial commit  ",
+            content = "  println(\"Hello\")  "
+        )
 
         val result = AnnotationParser.parse(output)
 
@@ -143,8 +183,7 @@ class AnnotationParserTest {
 
     @Test
     fun `annotation line tooltip contains key information`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123def456\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
+        val output = record(fullCommitId = "abc123def456")
 
         val result = AnnotationParser.parse(output)
         val tooltip = result[0].getHtmlTooltip()
@@ -158,8 +197,7 @@ class AnnotationParserTest {
 
     @Test
     fun `annotation line tooltip handles empty description`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000\u0000\u0000println(\"Hello\")"
+        val output = record(description = "")
 
         val result = AnnotationParser.parse(output)
         val tooltip = result[0].getHtmlTooltip()
@@ -169,8 +207,7 @@ class AnnotationParserTest {
 
     @Test
     fun `annotation line tooltip handles missing email`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
+        val output = record(authorEmail = "")
 
         val result = AnnotationParser.parse(output)
         val tooltip = result[0].getHtmlTooltip()
@@ -181,15 +218,19 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with unicode characters`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000José García\u0000jose@example.com\u0000" +
-            "1768575623\u0000Añadir función\u0000\u0000println(\"¡Hola!\")"
+        val output = record(
+            authorName = "José García",
+            authorEmail = "jose@example.com",
+            description = "Añadir función",
+            content = "println(\"¡Hola!\")"
+        )
 
         val result = AnnotationParser.parse(output)
 
         result shouldHaveSize 1
         result[0].author.name shouldBe "José García"
         result[0].description.summary shouldBe "Añadir función"
-        result[0].lineContent shouldBe "println(\"¡Hola!\")"
+        result[0].lineContent shouldBe "println(\"¡Hola!\")\n"
     }
 
     @Test
@@ -203,12 +244,16 @@ class AnnotationParserTest {
         template shouldContain "commit_id().shortest()"
         template shouldContain "author().name()"
         template shouldContain "author().email()"
-        template shouldContain "description()"
+        template shouldContain "description().escape_json()"
         template shouldContain "parents()"
         template shouldContain "content"
 
-        // Should use null byte separator
+        // Should use null byte separator between fields
         template shouldContain "\"\\0\""
+
+        // Should NOT append an extra separator after content: content's own trailing newline is
+        // the record separator (jj-idea-3191 — content may itself contain a \0 byte).
+        template shouldNotContain "content ++"
 
         // Should use ++ for concatenation
         template shouldContain "++"
@@ -216,13 +261,27 @@ class AnnotationParserTest {
 
     @Test
     fun `line numbers are sequential starting from 1`() {
-        val line1 = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000First\u0000\u0000line 1"
-        val line2 = "uvwxyzab\u0000uvwx\u0000\u0000def456\u0000de\u0000Jane Smith\u0000jane@example.com\u0000" +
-            "1768575623\u0000Second\u0000\u0000line 2"
-        val line3 = "cdefghij\u0000cdef\u0000\u0000f001a4\u0000f\u0000Bob Jones\u0000bob@example.com\u0000" +
-            "1768575623\u0000Third\u0000\u0000line 3"
-        val output = "$line1\u0000$line2\u0000$line3"
+        val output = record(description = "First", content = "line 1") +
+            record(
+                fullChangeId = "uvwxyzab",
+                shortChangeId = "uvwx",
+                fullCommitId = "def456",
+                shortCommitId = "de",
+                authorName = "Jane Smith",
+                authorEmail = "jane@example.com",
+                description = "Second",
+                content = "line 2"
+            ) +
+            record(
+                fullChangeId = "cdefghij",
+                shortChangeId = "cdef",
+                fullCommitId = "f001a4",
+                shortCommitId = "f",
+                authorName = "Bob Jones",
+                authorEmail = "bob@example.com",
+                description = "Third",
+                content = "line 3"
+            )
 
         val result = AnnotationParser.parse(output)
 
@@ -235,8 +294,7 @@ class AnnotationParserTest {
     @Test
     fun `parse annotation with very long change ID`() {
         val longChangeId = "mnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
-        val output = "$longChangeId\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
+        val output = record(fullChangeId = longChangeId)
 
         val result = AnnotationParser.parse(output)
 
@@ -247,8 +305,7 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with no parents (root commit)`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Initial commit\u0000\u0000println(\"Hello\")"
+        val output = record()
 
         val result = AnnotationParser.parse(output)
 
@@ -257,8 +314,7 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with a single parent`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Fix bug\u0000parentid1\u0000println(\"Hello\")"
+        val output = record(description = "Fix bug", parentIds = "parentid1")
 
         val result = AnnotationParser.parse(output)
 
@@ -267,11 +323,79 @@ class AnnotationParserTest {
 
     @Test
     fun `parse annotation with multiple parents (merge commit)`() {
-        val output = "mnopqrst\u0000mnop\u0000\u0000abc123\u0000ab\u0000John Doe\u0000john@example.com\u0000" +
-            "1768575623\u0000Merge\u0000parentid1,parentid2\u0000println(\"Hello\")"
+        val output = record(description = "Merge", parentIds = "parentid1,parentid2")
 
         val result = AnnotationParser.parse(output)
 
         result[0].parentIds.map { it.full } shouldContainExactly listOf("parentid1", "parentid2")
+    }
+
+    // --- jj-idea-3191 regression: content containing a null byte must not desynchronize fields ---
+
+    @Test
+    fun `parse annotation where content contains a null byte`() {
+        // Simulates a source line like `stdout.split('\0')` (a literal null byte in the file
+        // being annotated), followed by a normal line. Before the fix, the embedded \0 was
+        // consumed as a field separator, shifting every later field of the *next* record.
+        val badContent = "            stdout.split('\u0000')"
+        val output = record(description = "Split", content = badContent) +
+            record(
+                fullChangeId = "uvwxyzab",
+                shortChangeId = "uvwx",
+                fullCommitId = "def456",
+                shortCommitId = "d",
+                authorName = "Jane Smith",
+                authorEmail = "jane@example.com",
+                description = "Next",
+                content = "                .map { it.trim() }"
+            )
+
+        val result = AnnotationParser.parse(output)
+
+        result shouldHaveSize 2
+        result[0].id.full shouldBe "mnopqrst"
+        result[0].id.divergent shouldBe false
+        result[0].lineContent shouldBe "$badContent\n"
+        // The following record must parse unaffected by the embedded null byte.
+        result[1].id.full shouldBe "uvwxyzab"
+        result[1].id.short shouldBe "uvwx"
+        result[1].lineContent shouldBe "                .map { it.trim() }\n"
+    }
+
+    @Test
+    fun `parse annotation with blank source line`() {
+        val output = record(content = "")
+
+        val result = AnnotationParser.parse(output)
+
+        result shouldHaveSize 1
+        // A blank source line's content is just its terminating newline (matching jj's own
+        // `content` field convention), not the empty string.
+        result[0].lineContent shouldBe "\n"
+    }
+
+    @Test
+    fun `parse annotation with multi-line description round-trips through escape_json`() {
+        // "escape_json()" flattens a real multi-line description to a single-line JSON string
+        // like "line1\nline2" (literal backslash-n, not a raw newline) before the record's
+        // trailing newline separator.
+        val output = record(description = "line1\\nline2")
+
+        val result = AnnotationParser.parse(output)
+
+        result shouldHaveSize 1
+        result[0].description.display shouldBe "line1\nline2"
+        result[0].description.summary shouldBe "line1"
+    }
+
+    @Test
+    fun `unescapeJson decodes standard JSON escapes`() {
+        AnnotationParser.unescapeJson("\"\"") shouldBe ""
+        AnnotationParser.unescapeJson("\"hello\"") shouldBe "hello"
+        AnnotationParser.unescapeJson("\"a\\\"b\"") shouldBe "a\"b"
+        AnnotationParser.unescapeJson("\"a\\\\b\"") shouldBe "a\\b"
+        AnnotationParser.unescapeJson("\"a\\nb\"") shouldBe "a\nb"
+        AnnotationParser.unescapeJson("\"a\\tb\"") shouldBe "a\tb"
+        AnnotationParser.unescapeJson("\"\\u0041\"") shouldBe "A"
     }
 }

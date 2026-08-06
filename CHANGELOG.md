@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bookmark and tag creation, bookmark deletion, and bookmark forgetting now show distinctive icons instead of generic ones. A bookmark pending deletion shows a dashed outline in the log instead of just strikethrough text, and a conflicted bookmark shows a distinct red icon instead of a generic warning triangle.
 
 ### Fixed
+- Annotating (blaming) a file that contains a null byte anywhere in its content no longer fails with an error; a null byte in a Kotlin source file was previously enough to break annotation for that entire file.
 - Resolving a conflict where one side deleted the file (a "modify/delete" conflict) by accepting the deleted side now actually removes the file, instead of leaving behind an empty file. Failures while resolving a conflict now show an error notification instead of failing silently.
 - Annotating (blaming) a file in a very large repository no longer fails with a blank error message. Annotation now gets a longer time limit before giving up, and if it does still run out of time you'll see a clear message explaining why instead of an empty one. ([#64](https://github.com/kkkev/jj-idea/issues/64))
 - Saving a file no longer switches the editor to the diff preview tab (opened by double-clicking a file in the Working Copy panel or commit details pane). ([#67](https://github.com/kkkev/jj-idea/issues/67))

@@ -412,15 +412,36 @@ class JjStub(override val workDir: Path) : JjBackend {
                 field(change.authorName)
                 field(change.authorEmail)
                 field(change.timestamp.toString())
-                field(desc)
+                // Matches `description().escape_json()` in AnnotationParser.TEMPLATE: a single-line
+                // JSON string literal, so an embedded newline in the description can't be mistaken
+                // for the record separator (jj-idea-3191).
+                field(escapeJson(desc))
                 val parentChangeIds = change.parentIds.mapNotNull { pid ->
                     changes.firstOrNull { it.commitId == pid }?.changeId
                 }
                 field(parentChangeIds.joinToString(","))
-                field(line + "\n")
+                // No trailing field separator after content: content's own trailing "\n" (from
+                // `line + "\n"`) is the record separator, matching the real template.
+                append(line + "\n")
             }
         }
         return ok(output)
+    }
+
+    /** Encodes [value] as a JSON string literal, matching jj template's `escape_json()`. */
+    private fun escapeJson(value: String) = buildString {
+        append('"')
+        for (c in value) {
+            when (c) {
+                '"' -> append("\\\"")
+                '\\' -> append("\\\\")
+                '\n' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (c.code < 0x20) append("\\u%04x".format(c.code)) else append(c)
+            }
+        }
+        append('"')
     }
 
     private fun cmdBookmarkCreate(args: List<String>): JjBackend.Result {
