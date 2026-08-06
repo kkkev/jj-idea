@@ -1,7 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Common fields shared between LogEntry and AnnotationLine.

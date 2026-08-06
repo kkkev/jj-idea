@@ -317,7 +317,7 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
     private class DynamicLabel(private val textSupplier: () -> String) : JBLabel("") {
         override fun getText(): String {
             // Check for null - can be called during superclass initialization
-            @Suppress("SENSELESS_COMPARISON")
+            @Suppress("SENSELESS_COMPARISON", "UNNECESSARY_SAFE_CALL")
             return textSupplier?.invoke() ?: ""
         }
 
@@ -358,8 +358,7 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
     /**
      * Inline icon button for dropdown/close icon.
      */
-    private class InlineIconButton(icon: Icon) : JComponent() {
-        private var icon: Icon = icon
+    private class InlineIconButton(private var icon: Icon) : JComponent() {
         private var hoveredIcon: Icon? = null
         private var isHovered = false
         private var actionListener: ActionListener? = null

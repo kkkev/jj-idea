@@ -2,7 +2,7 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.ui.log.GraphableEntry
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Represents a single entry in the jj log.

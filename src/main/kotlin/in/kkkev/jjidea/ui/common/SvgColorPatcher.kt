@@ -9,6 +9,7 @@ import java.awt.Graphics2D
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.net.URI
 import java.net.URL
 import java.net.URLConnection
 import java.net.URLStreamHandler
@@ -107,11 +108,7 @@ private class SvgBytesClassLoader(
     override fun getResource(name: String): URL? {
         if (name != resourceName) return null
         val encoded = Base64.getEncoder().encodeToString(bytes)
-        return URL(
-            null,
-            "data:image/svg+xml;base64,$encoded",
-            DataHandler
-        )
+        return URL.of(URI("data:image/svg+xml;base64,$encoded"), DataHandler)
     }
 
     override fun getResourceAsStream(name: String): InputStream? =

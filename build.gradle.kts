@@ -213,6 +213,7 @@ kotlin {
     // languageVersion is left at the compiler default so newer language syntax stays available.
     compilerOptions {
         apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_1)
+        freeCompilerArgs.add("-opt-in=kotlin.time.ExperimentalTime")
     }
 }
 

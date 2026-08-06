@@ -1,17 +1,11 @@
 package `in`.kkkev.jjidea.jj.cli
 
-import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.BookmarkName
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.Description
-import `in`.kkkev.jjidea.jj.Tag
-import `in`.kkkev.jjidea.jj.mockRepo
+import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
+import kotlin.time.Instant
 
 /**
  * Tests for LogTemplate integration and parsing

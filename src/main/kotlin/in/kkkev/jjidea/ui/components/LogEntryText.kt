@@ -10,9 +10,9 @@ import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.log.RepositoryColors
-import kotlinx.datetime.Instant
 import java.net.URI
 import java.net.URLEncoder
+import kotlin.time.Instant
 
 /**
  * The jj-domain rendering vocabulary built on the generic [TextCanvas] DSL - `append(Bookmark)`,

@@ -2,11 +2,7 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.ide.DataManager
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionPlaces
-import com.intellij.openapi.actionSystem.DataSink
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.UiDataProvider
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
@@ -14,6 +10,7 @@ import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Condition
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.DoubleClickListener
+import com.intellij.ui.JBColor
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.awt.RelativePoint
 import com.intellij.ui.table.JBTable
@@ -25,12 +22,8 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.ui.components.installIconAwareTooltip
 import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
-import kotlinx.datetime.Instant
-import java.awt.Color
-import java.awt.Component
-import java.awt.Cursor
-import java.awt.Point
-import java.awt.Rectangle
+import org.apache.commons.lang3.ArrayUtils.addAll
+import java.awt.*
 import java.awt.event.*
 import javax.swing.JComponent
 import javax.swing.JViewport
@@ -41,6 +34,7 @@ import javax.swing.event.ListSelectionEvent
 import javax.swing.event.TableColumnModelEvent
 import javax.swing.event.TableColumnModelListener
 import javax.swing.table.AbstractTableModel
+import kotlin.time.Instant
 
 /**
  * Custom table for displaying Jujutsu commit log.
@@ -173,7 +167,7 @@ class JujutsuLogTable(
         tableHeader.resizingAllowed = true
 
         // Ensure header is visible even with empty column names
-        tableHeader.preferredSize = java.awt.Dimension(tableHeader.preferredSize.width, 24)
+        tableHeader.preferredSize = Dimension(tableHeader.preferredSize.width, 24)
 
         // Disable auto-resize to allow manual column sizing
         autoResizeMode = AUTO_RESIZE_OFF
@@ -451,7 +445,7 @@ class JujutsuLogTable(
             textStart,
             columnManager,
             linkifier,
-            Color.BLACK,
+            JBColor.BLACK,
             font,
             frc
         )
@@ -468,7 +462,7 @@ class JujutsuLogTable(
             target.hidden.forEach { hiddenTarget ->
                 add(
                     DefaultActionGroup(hiddenTarget.displayName, true)
-                        .apply { addAll(clickActionGroup(project, hiddenTarget)) }
+                        .apply { addAll(clickActionGroup(project, hiddenTarget).childActionsOrStubs) }
                 )
             }
         }
@@ -646,12 +640,12 @@ class JujutsuLogTable(
     /**
      * Save current column widths.
      *
-     * Saves [TableColumn.getPreferredWidth], the user's *desired* size, not
-     * [TableColumn.getWidth] which may be transiently squeezed by [applyColumnWidthPolicy] on a
+     * Saves [javax.swing.table.TableColumn.getPreferredWidth], the user's *desired* size, not
+     * [javax.swing.table.TableColumn.getWidth] which may be transiently squeezed by [applyColumnWidthPolicy] on a
      * narrow window - so a saved width always reflects what the user actually chose (jj-idea-lzq7).
      *
      * If [columnWidthsStorage] is set, writes there and calls [onColumnWidthsSaved].
-     * Otherwise falls back to the global [JujutsuSettings.state.columnWidths].
+     * Otherwise, falls back to the global `JujutsuSettings.state.columnWidths`.
      */
     private fun saveColumnWidths() {
         val storage = columnWidthsStorage
@@ -675,7 +669,7 @@ class JujutsuLogTable(
     /**
      * Load saved column widths and apply them to the current columns.
      *
-     * Reads from [columnWidthsStorage] when set, otherwise from [JujutsuSettings.state.columnWidths].
+     * Reads from [columnWidthsStorage] when set, otherwise from `JujutsuSettings.state.columnWidths`.
      * Should be called after columns are set up.
      */
     fun loadColumnWidths() {
@@ -703,7 +697,7 @@ class JujutsuLogTable(
     /**
      * Apply the current column-width policy: fit columns to the viewport (shrinking the
      * description, then the fixed columns) when [JujutsuColumnManager.fitColumnsToWidth] is on,
-     * or restore each column to its desired ([TableColumn.getPreferredWidth]) size when off.
+     * or restore each column to its desired ([javax.swing.table.TableColumn.getPreferredWidth]) size when off.
      * Runs on viewport/table resize, column-visibility changes, and width restore.
      */
     fun applyColumnWidthPolicy() {

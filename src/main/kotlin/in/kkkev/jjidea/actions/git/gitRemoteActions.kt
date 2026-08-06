@@ -61,7 +61,7 @@ fun gitFetchAction(project: Project, repo: JujutsuRepository?) =
                 return@runInBackground
             }
             runLater {
-                val dialog = GitFetchDialog(project, mapOf(target to data), target)
+                val dialog = GitFetchDialog(project, mapOf(target to data))
                 if (!dialog.showAndGet()) return@runLater
                 performFetch(dialog.result ?: return@runLater, project)
             }

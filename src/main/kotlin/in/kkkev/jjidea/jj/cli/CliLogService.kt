@@ -6,10 +6,10 @@ import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.vcs.getChildPath
-import kotlinx.datetime.Instant
 import org.jetbrains.annotations.TestOnly
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Instant
 
 interface LogSpec<T> {
     val spec: String

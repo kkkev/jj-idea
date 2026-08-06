@@ -25,10 +25,9 @@ import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
  * A (possible) JJ repository. "Possible" because the directory could be uninitialised, as this class allows
  * repository initialisation as well as access to all JJ actions.
  */
-interface JujutsuRepository {
+interface JujutsuRepository : Displayable {
     val project: Project
     val directory: VirtualFile
-    val displayName: String
     val commandExecutor: CommandExecutor
     val logService: LogService
     val logCache: LogCache
@@ -78,9 +77,9 @@ data class JujutsuRepositoryImpl(
 
     /**
      * Git remotes for this repository. Delegates to [JujutsuStateModel.gitRemotes] via
-     * [NotifiableState.immediateValue] — call from BGT only. For non-blocking access (accepting a
-     * possible empty result before the first load completes), read [project.stateModel.gitRemotes]
-     * directly. For notification-driven updates, connect to that state.
+     * [in.kkkev.jjidea.util.NotifiableState.immediateValue] — call from BGT only. For non-blocking access (accepting a
+     * possible empty result before the first load completes), read `project.stateModel.gitRemotes` directly. For
+     * notification-driven updates, connect to that state.
      */
     override val gitRemotes: List<GitRemote>
         get() = project.stateModel.gitRemotes.immediateValue[directory.path].orEmpty()

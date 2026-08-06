@@ -8,9 +8,9 @@ import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
-import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
 import java.awt.Rectangle
+import kotlin.time.Instant
 
 /**
  * Tests for column functionality in JujutsuLogTable.

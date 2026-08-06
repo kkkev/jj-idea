@@ -484,7 +484,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             val results = repos.map { repo ->
                 val panel = repoSettingsPanels.find { it.repo == repo }
                 val hasOverride = panel?.revsetCb?.isSelected == true
-                val effectiveRevset = if (hasOverride) panel!!.revsetField.text.trim() else expression
+                val effectiveRevset = if (hasOverride) panel.revsetField.text.trim() else expression
                 val result = runRevsetTest(repo, effectiveRevset)
                 Triple(repo, result, hasOverride)
             }

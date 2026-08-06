@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
@@ -33,7 +32,6 @@ class GitFetchAction : DumbAwareAction(
         val project = e.project ?: return
         val repos = project.initialisedJujutsuRepositories
         if (repos.isEmpty()) return
-        val initialRepo = e.repoForFile ?: repos.first()
 
         runInBackground {
             val allData = GitFetchDialog.loadAllDialogData(repos)
@@ -50,7 +48,7 @@ class GitFetchAction : DumbAwareAction(
             }
 
             runLater {
-                val dialog = GitFetchDialog(project, allData, initialRepo)
+                val dialog = GitFetchDialog(project, allData)
                 if (!dialog.showAndGet()) return@runLater
                 val spec = dialog.result ?: return@runLater
                 performFetch(spec, project)

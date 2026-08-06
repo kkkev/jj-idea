@@ -8,11 +8,11 @@ import io.kotest.matchers.string.shouldStartWith
 import io.mockk.every
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
-import kotlinx.datetime.Instant
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.util.*
+import kotlin.time.Instant
 
 class JujutsuDateTimeFormatterTest {
     @BeforeEach

@@ -45,7 +45,7 @@ class GitScopeDialogPanelTest {
         val repo = mockk<JujutsuRepository>(relaxed = true)
         val data = GitFetchDialog.FetchDialogData(remotes = listOf(Remote("origin"), Remote("github")))
 
-        val dialog = GitFetchDialog(project.get(), mapOf(repo to data), repo)
+        val dialog = GitFetchDialog(project.get(), mapOf(repo to data))
         disposeDialog(dialog)
     }
 

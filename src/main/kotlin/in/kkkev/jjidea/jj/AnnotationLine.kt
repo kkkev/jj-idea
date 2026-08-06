@@ -3,7 +3,7 @@ package `in`.kkkev.jjidea.jj
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.ui.components.appendChangeTooltip
 import `in`.kkkev.jjidea.ui.components.htmlString
-import kotlinx.datetime.Instant
+import kotlin.time.Instant
 
 /**
  * Represents a single line of annotation (blame) information from jj file annotate
