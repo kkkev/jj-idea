@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.6/jj-idea-0.8.6.zip" version="0.8.6">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.7/jj-idea-0.8.7.zip" version="0.8.7">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,7 +23,7 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.8.6</h3>
+      <h3>0.8.7</h3>
       
 <h4>Changed</h4>
 <li>Conflicted files in the "Working copy" tool window are now grouped under a "Merge Conflicts" node at the top of the tree with a one-click "Resolve" link, and the toolbar gained a "Resolve All Conflicts" button — matching the grouped resolve affordance the standard Commit tool window used to provide, before it was hidden. ([#56](https://github.com/kkkev/jj-idea/issues/56))</li>
@@ -40,7 +40,7 @@
 <li>Saving a file no longer switches the editor to the diff preview tab (opened by double-clicking a file in the Working Copy panel or commit details pane). ([#67](https://github.com/kkkev/jj-idea/issues/67))</li>
 <li>Fixed the Push button sometimes doing nothing: switching the remote (or, in a multi-repository project, the repository) in the push dialog before clicking Push could silently reset your bookmark selection and leave the button unresponsive. Also, pushing a bookmark that was already up to date no longer shows a generic "Push complete" message — it now shows jj's own "Nothing changed" notice.</li>
 <li>In a repository containing any divergent change, "Move Bookmark Here…" and "Move '\<bookmark\>' to Change…" showed every destination as a backward/sideways move, requiring you to tick "Allow backward or sideways move" even for a genuine forward move onto a descendant.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.6">full release notes</a> for details.</p>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.7">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
