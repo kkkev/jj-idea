@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.ui.components.installIconAwareTooltip
 import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
+import kotlinx.datetime.Instant
 import org.apache.commons.lang3.ArrayUtils.addAll
 import java.awt.*
 import java.awt.event.*
@@ -34,7 +35,6 @@ import javax.swing.event.ListSelectionEvent
 import javax.swing.event.TableColumnModelEvent
 import javax.swing.event.TableColumnModelListener
 import javax.swing.table.AbstractTableModel
-import kotlinx.datetime.Instant
 
 /**
  * Custom table for displaying Jujutsu commit log.

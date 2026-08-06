@@ -1,8 +1,8 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.util.text.DateFormatUtil
-import java.util.Calendar
 import kotlinx.datetime.Instant
+import java.util.Calendar
 
 /**
  * Formats date/times consistently across the plugin, matching Git plugin style.

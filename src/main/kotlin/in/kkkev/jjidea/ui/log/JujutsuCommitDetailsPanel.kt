@@ -26,11 +26,11 @@ import `in`.kkkev.jjidea.ui.common.changesTreeToolbar
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import kotlinx.datetime.Instant
 import java.awt.BorderLayout
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JPanel
-import kotlinx.datetime.Instant
 
 /**
  * Renders [user] as `Name <email>` (or "Unknown" if absent), followed by a non-breaking gap and

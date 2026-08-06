@@ -5,8 +5,8 @@ import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
-import org.junit.jupiter.api.Test
 import kotlinx.datetime.Instant
+import org.junit.jupiter.api.Test
 
 /**
  * Tests for parsing and representing jj log entries

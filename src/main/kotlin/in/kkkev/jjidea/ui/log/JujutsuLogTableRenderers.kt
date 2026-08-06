@@ -12,11 +12,11 @@ import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.*
+import kotlinx.datetime.Instant
 import java.awt.Color
 import java.awt.Font
 import java.awt.font.FontRenderContext
 import java.net.URI
-import kotlinx.datetime.Instant
 
 /**
  * Renderer for the Author and Committer columns.

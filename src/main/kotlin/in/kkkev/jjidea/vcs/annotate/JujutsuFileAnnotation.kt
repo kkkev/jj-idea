@@ -23,8 +23,8 @@ import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.filePath
-import java.util.*
 import kotlinx.datetime.Instant
+import java.util.*
 
 /**
  * File annotation for Jujutsu, showing line-by-line change information

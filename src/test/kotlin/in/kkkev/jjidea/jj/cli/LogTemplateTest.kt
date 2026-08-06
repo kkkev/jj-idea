@@ -4,8 +4,8 @@ import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import org.junit.jupiter.api.Test
 import kotlinx.datetime.Instant
+import org.junit.jupiter.api.Test
 
 /**
  * Tests for LogTemplate integration and parsing

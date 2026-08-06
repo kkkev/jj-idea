@@ -15,8 +15,8 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
-import org.junit.jupiter.api.Test
 import kotlinx.datetime.Instant
+import org.junit.jupiter.api.Test
 
 /**
  * Tests for JujutsuFileAnnotation.
