@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.5/jj-idea-0.8.5.zip" version="0.8.5">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.6/jj-idea-0.8.6.zip" version="0.8.6">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,23 +23,24 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.8.5</h3>
+      <h3>0.8.6</h3>
       
 <h4>Changed</h4>
-<li>In a jj-only project, the standard IDE "Commit" tool window and its "Local Changes" tab are now hidden — they only ever showed a half-working commit dialog and a look-alike changes list that lacked jj's actions, which confused people into using it instead of the "Working copy" tool window. This also removes the "Resolve" link on the Commit tool window's conflict node, which never worked for jj conflicts. A new "Hide the standard Commit tool window" setting (Settings → Version Control → Jujutsu) lets you turn it back on; projects that also use Git alongside jj are unaffected either way. ([#56](https://github.com/kkkev/jj-idea/issues/56))</li>
-<li>The "Working copy" tool window now opens automatically (without stealing focus) the first time you open a jj project, and a one-time tip explains what it's for and how it replaces the standard Commit panel. ([#56](https://github.com/kkkev/jj-idea/issues/56))</li>
-<li>"Compare with Working Copy" and "Show Diff in New Tab" (for multiple files) now open a Changes pane listing every differing file, with the current one highlighted, instead of a bare diff with only a file-selector dropdown. Selecting a file in the list updates the diff in place. ([#52](https://github.com/kkkev/jj-idea/issues/52))</li>
-<li>Author/committer names in the log and commit details pane are now real hyperlinks, link-colored at rest and underlining only while hovered: click a name to email them, right-click for more options including filtering by author, with a checkmark on whichever author filter is currently active (clicking the same one again toggles it off). ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
-<li>Bookmark/tag chips in the log and commit details pane are right-click only — filter the log to that reference, rename/delete/etc., with a checkmark on whichever reference filter is active. Hovering one shows a subtle grey background highlight instead of a hand cursor, since there's no left-click action to imply — a prerequisite for a future release that turns issue-tracker references *inside* a bookmark/tag name into their own links, which would otherwise be confusing nested inside a whole-chip hyperlink.</li>
-<li>"Resolve Conflicts…" now opens conflicted files one at a time in the three-way merge tool instead of a single dialog listing all of them together, as part of the fix below.</li>
-<li>The log's References filter dropdown now shows a disabled "Loading bookmarks and tags…" placeholder instead of looking empty right after opening the project/log, while bookmarks and tags are still loading in the background.</li>
+<li>Conflicted files in the "Working copy" tool window are now grouped under a "Merge Conflicts" node at the top of the tree with a one-click "Resolve" link, and the toolbar gained a "Resolve All Conflicts" button — matching the grouped resolve affordance the standard Commit tool window used to provide, before it was hidden. ([#56](https://github.com/kkkev/jj-idea/issues/56))</li>
+<li>Opening a conflicted file now shows a banner at the top of the editor with a one-click "Resolve" link, so you don't need to already know about the Jujutsu submenu to find conflict resolution. ([#56](https://github.com/kkkev/jj-idea/issues/56))</li>
+<li>Issue-tracker references (e.g. `JIRA-123`) in a commit's description now render as clickable links in the log table itself, not just the commit details pane — link-colored, underlining only the exact reference while hovered, with the same left-click-to-open/right-click "Open" menu as elsewhere. Requires an Issue Navigation pattern configured under Settings → Version Control. ([#15](https://github.com/kkkev/jj-idea/issues/15))</li>
+<li>Issue-tracker references (e.g. `JIRA-123`) *inside* a bookmark or tag name (e.g. a bookmark named `jira-123-fix-thing`) are now their own clickable link within the chip, separate from the chip's own right-click menu — link-colored, hand cursor and underline only on that exact reference, opening the same as elsewhere on left-click, in both the log table and the commit details pane. ([#15](https://github.com/kkkev/jj-idea/issues/15))</li>
+<li>The log's hover tooltip now stays open when you move the pointer into it, so you can click its links or select and copy its text, and it now disappears as soon as you scroll instead of lingering over the view. ([#51](https://github.com/kkkev/jj-idea/issues/51))</li>
+<li>Bookmark and tag creation, bookmark deletion, and bookmark forgetting now show distinctive icons instead of generic ones. A bookmark pending deletion shows a dashed outline in the log instead of just strikethrough text, and a conflicted bookmark shows a distinct red icon instead of a generic warning triangle.</li>
 
 <h4>Fixed</h4>
-<li>Closing the conflict resolution window without resolving (or after resolving only some conflicts) no longer discards a side of the conflict, for every "Resolve Conflicts…" entry point jj-idea provides (Working Copy panel, commit details pane, log context menu, editor/Project view). Each conflicted file is now resolved through its own merge window; cancelling leaves the file's conflict untouched. ([#63](https://github.com/kkkev/jj-idea/issues/63)) **Known gap:** the native IntelliJ Commit tool window's own "Resolve" link (on the "Merge Conflicts" node) is separate platform UI that jj-idea cannot intercept, and is still affected — see docs/manual-tests.md for details; avoid it for jj conflicts for now.</li>
-<li>"Resolve Conflicts…" no longer appears on a non-conflicted file just because some other, unrelated file in the repository has a conflict.</li>
-<li>Hovering a bookmark or tag in the "Switch Working Copy" popup (opened from the status bar widget) no longer shows a broken-image icon in the tooltip.</li>
-<li>Bookmark/tag chip icons in tooltips (and the commit details pane) are now vertically aligned with the surrounding text instead of floating above it.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.5">full release notes</a> for details.</p>
+<li>Annotating (blaming) a file that contains a null byte anywhere in its content no longer fails with an error; a null byte in a Kotlin source file was previously enough to break annotation for that entire file.</li>
+<li>Resolving a conflict where one side deleted the file (a "modify/delete" conflict) by accepting the deleted side now actually removes the file, instead of leaving behind an empty file. Failures while resolving a conflict now show an error notification instead of failing silently.</li>
+<li>Annotating (blaming) a file in a very large repository no longer fails with a blank error message. Annotation now gets a longer time limit before giving up, and if it does still run out of time you'll see a clear message explaining why instead of an empty one. ([#64](https://github.com/kkkev/jj-idea/issues/64))</li>
+<li>Saving a file no longer switches the editor to the diff preview tab (opened by double-clicking a file in the Working Copy panel or commit details pane). ([#67](https://github.com/kkkev/jj-idea/issues/67))</li>
+<li>Fixed the Push button sometimes doing nothing: switching the remote (or, in a multi-repository project, the repository) in the push dialog before clicking Push could silently reset your bookmark selection and leave the button unresponsive. Also, pushing a bookmark that was already up to date no longer shows a generic "Push complete" message — it now shows jj's own "Nothing changed" notice.</li>
+<li>In a repository containing any divergent change, "Move Bookmark Here…" and "Move '\<bookmark\>' to Change…" showed every destination as a backward/sideways move, requiring you to tick "Allow backward or sideways move" even for a genuine forward move onto a descendant.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.6">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>
