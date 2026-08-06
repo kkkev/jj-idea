@@ -18,19 +18,29 @@ object BookmarkClassifier {
         val bm = item.bookmark
         !bm.deleted &&
             !bm.isRemote &&
-            item.id?.shortenable?.full != targetId.shortenable.full
+            item.id?.full != targetId.full
     }
 
     /**
      * Revset that resolves to the subset of [candidates] whose current targets are ancestors of [target]
      * (forward moves). Returns null when there are no candidates with known IDs.
+     *
+     * IDs are offset-qualified (via [ChangeId.full]) rather than the bare [ChangeId.shortenable.full], because a
+     * single divergent change id in an unqualified union makes the whole `jj log` query fail (jj refuses to resolve
+     * an ambiguous change id even inside a larger expression).
      */
     fun ancestorRevset(candidates: List<BookmarkItem>, target: ChangeId): Expression? {
         val withIds = candidates.filter { it.id != null }
         if (withIds.isEmpty()) return null
-        val ids = withIds.joinToString(" | ") { it.id!!.shortenable.full }
-        return Expression("($ids) & ::${target.shortenable.full}")
+        val ids = withIds.joinToString(" | ") { it.id!!.full }
+        return Expression("($ids) & ::${target.full}")
     }
+
+    /**
+     * Revset that resolves to the descendants of [from] (inclusive) — used to classify candidate destinations for
+     * a fixed bookmark as forward (descendant) vs backward/sideways (not a descendant).
+     */
+    fun descendantRevset(from: ChangeId): Expression = Expression("${from.full}::")
 
     /**
      * Partition [candidates] into FORWARD or BACKWARD_OR_SIDEWAYS.
@@ -40,7 +50,7 @@ object BookmarkClassifier {
         candidates.map { item ->
             val direction = when {
                 item.bookmark.conflict -> MoveDirection.BACKWARD_OR_SIDEWAYS
-                item.id?.shortenable?.full in forwardIds -> MoveDirection.FORWARD
+                item.id?.full in forwardIds -> MoveDirection.FORWARD
                 else -> MoveDirection.BACKWARD_OR_SIDEWAYS
             }
             ClassifiedBookmark(item, direction)

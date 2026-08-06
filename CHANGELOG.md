@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Annotating (blaming) a file in a very large repository no longer fails with a blank error message. Annotation now gets a longer time limit before giving up, and if it does still run out of time you'll see a clear message explaining why instead of an empty one. ([#64](https://github.com/kkkev/jj-idea/issues/64))
 - Saving a file no longer switches the editor to the diff preview tab (opened by double-clicking a file in the Working Copy panel or commit details pane). ([#67](https://github.com/kkkev/jj-idea/issues/67))
 - Fixed the Push button sometimes doing nothing: switching the remote (or, in a multi-repository project, the repository) in the push dialog before clicking Push could silently reset your bookmark selection and leave the button unresponsive. Also, pushing a bookmark that was already up to date no longer shows a generic "Push complete" message — it now shows jj's own "Nothing changed" notice.
+- In a repository containing any divergent change, "Move Bookmark Here…" and "Move '\<bookmark\>' to Change…" showed every destination as a backward/sideways move, requiring you to tick "Allow backward or sideways move" even for a genuine forward move onto a descendant.
 
 ## [0.8.5] - 2026-08-02
 

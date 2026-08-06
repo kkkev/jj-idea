@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.cli.TemplateParts
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.append
@@ -377,11 +378,14 @@ class MoveBookmarkDialog(
             val revset = BookmarkClassifier.ancestorRevset(candidates, targetId)
                 ?: return candidates.map { ClassifiedBookmark(it, MoveDirection.BACKWARD_OR_SIDEWAYS) }
 
-            val result = repo.commandExecutor.log(revset = revset, template = "change_id ++ \"\\n\"")
+            val result = repo.commandExecutor.log(
+                revset = revset,
+                template = "${TemplateParts.changeIdWithOffset()} ++ \"\\n\""
+            )
             val forwardIds = if (result.isSuccess) {
                 result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             } else {
-                log.warn("Ancestor revset query failed: ${result.stderr}")
+                log.warn("Ancestor revset query '$revset' failed: ${result.stderr}")
                 emptySet()
             }
             return BookmarkClassifier.classify(candidates, forwardIds)

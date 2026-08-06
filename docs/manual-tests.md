@@ -738,6 +738,28 @@ state/routing logic, not rendering)
 - [ ] "Create Bookmark Here…" inside repo-a's sub-menu creates a bookmark at **repo-a's** working copy, not repo-b's (check via `jj bookmark list` in each repo)
 - [ ] Rename/Delete/Forget in repo-b's sub-menu affects only repo-b
 
+#### Move direction (forward vs. backward/sideways)
+
+Covers `actions/bookmark/MoveBookmarkDialog.kt`, `MoveBookmarkToChangeDialog.kt`,
+`BookmarkClassifier.kt`. jj-idea-tvch: in a repo with any divergent change, every move used to
+be misclassified as backward/sideways.
+
+- [ ] Right-click a commit that is a **descendant** of an existing bookmark → "Move Bookmark
+      Here…" → the bookmark row shows the forward (move-up) icon at full opacity, is selectable,
+      and OK enables **without** ticking "Allow backward or sideways move"
+- [ ] Right-click an **ancestor** of the bookmark instead → the bookmark row is greyed out with
+      the warning icon and is only selectable after ticking the checkbox; confirming without the
+      checkbox is impossible (OK stays disabled)
+- [ ] Right-click a bookmark → "Move '\<bookmark\>' to Change…" → descendants of the bookmark's
+      current position show as forward/selectable; ancestors are greyed with the warning icon
+      until the checkbox is ticked
+- [ ] In a repo containing a divergent change (`jj log` shows `(divergent)` on some commit): the
+      forward/backward classification above still works for bookmarks unrelated to the divergent
+      change — it doesn't blank out to "everything backward" the way it did before jj-idea-tvch
+- [ ] Confirming a forward move without ticking the checkbox actually runs `jj bookmark set`
+      without `-B` (check via `jj op log` or that the bookmark moved) — no unexpected
+      "backwards or sideways" retry prompt
+
 ### MT-WORKINGCOPY
 
 **Working copy panel, status bar widget, and tool window behavior**

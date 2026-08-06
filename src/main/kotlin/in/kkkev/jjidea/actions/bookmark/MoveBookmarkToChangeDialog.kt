@@ -14,9 +14,9 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.cli.TemplateParts
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.icon
@@ -359,18 +359,23 @@ class MoveBookmarkToChangeDialog(
                 return candidates.map { it to MoveDirection.BACKWARD_OR_SIDEWAYS }
             }
 
-            val ids = candidates.joinToString(" | ") { it.id.shortenable.full }
-            val revset = Expression("($ids) & ${currentId.shortenable.full}::")
-            val result = repo.commandExecutor.log(revset = revset, template = "change_id ++ \"\\n\"")
+            // Query descendants of the bookmark's current target only — candidate ids are never put on the
+            // command line, so this is O(1) in the number of candidates and immune to any one candidate being an
+            // unresolvable/divergent id.
+            val revset = BookmarkClassifier.descendantRevset(currentId)
+            val result = repo.commandExecutor.log(
+                revset = revset,
+                template = "${TemplateParts.changeIdWithOffset()} ++ \"\\n\""
+            )
             val forwardIds = if (result.isSuccess) {
                 result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             } else {
-                log.warn("Descendant revset query failed: ${result.stderr}")
+                log.warn("Descendant revset query '$revset' failed: ${result.stderr}")
                 emptySet()
             }
 
             return candidates.map { entry ->
-                val direction = if (entry.id.shortenable.full in forwardIds) {
+                val direction = if (entry.id.full in forwardIds) {
                     MoveDirection.FORWARD
                 } else {
                     MoveDirection.BACKWARD_OR_SIDEWAYS

@@ -23,7 +23,12 @@ class BookmarkClassifierTest {
         return BookmarkItem(bookmark, if (deleted) null else ChangeId(id, id.take(4), null))
     }
 
+    private fun itemWithId(name: String, id: ChangeId, conflict: Boolean = false): BookmarkItem =
+        BookmarkItem(Bookmark(name, conflict = conflict), id)
+
     private fun id(full: String) = ChangeId(full, full.take(4), null)
+
+    private fun divergentId(full: String, offset: Int) = ChangeId(full, full.take(4), offset)
 
     @Nested
     inner class `eligible` {
@@ -58,6 +63,21 @@ class BookmarkClassifierTest {
             val items = listOf(item("main", "aaa", conflict = true))
             BookmarkClassifier.eligible(items, id("zzz")) shouldHaveSize 1
         }
+
+        @Test
+        fun `keeps a bookmark on a divergent sibling of the target`() {
+            // Same base change id, different offsets: not the same commit, so must not be filtered out.
+            val items = listOf(itemWithId("main", divergentId("shared", offset = 3)))
+            val target = divergentId("shared", offset = 0)
+            BookmarkClassifier.eligible(items, target) shouldHaveSize 1
+        }
+
+        @Test
+        fun `excludes bookmark on the exact same divergent offset as target`() {
+            val target = divergentId("shared", offset = 0)
+            val items = listOf(itemWithId("main", divergentId("shared", offset = 0)))
+            BookmarkClassifier.eligible(items, target).shouldBeEmpty()
+        }
     }
 
     @Nested
@@ -79,6 +99,26 @@ class BookmarkClassifierTest {
             val items = listOf(item("a", "aaa"), item("b", "bbb"))
             val revset = BookmarkClassifier.ancestorRevset(items, id("ttt"))
             revset?.value shouldBe "(aaa | bbb) & ::ttt"
+        }
+
+        @Test
+        fun `offset-qualifies divergent candidate and target ids`() {
+            val items = listOf(itemWithId("main", divergentId("shared", offset = 3)))
+            val revset = BookmarkClassifier.ancestorRevset(items, divergentId("targetfull", offset = 0))
+            revset?.value shouldBe "(shared/3) & ::targetfull/0"
+        }
+    }
+
+    @Nested
+    inner class `descendantRevset` {
+        @Test
+        fun `builds descendants-of expression`() {
+            BookmarkClassifier.descendantRevset(id("aaa")).value shouldBe "aaa::"
+        }
+
+        @Test
+        fun `offset-qualifies a divergent id`() {
+            BookmarkClassifier.descendantRevset(divergentId("aaa", offset = 2)).value shouldBe "aaa/2::"
         }
     }
 
@@ -112,6 +152,20 @@ class BookmarkClassifierTest {
         @Test
         fun `empty candidates produces empty result`() {
             BookmarkClassifier.classify(emptyList(), setOf("aaa")).shouldBeEmpty()
+        }
+
+        @Test
+        fun `matches forwardIds on the offset-qualified id`() {
+            val items = listOf(itemWithId("main", divergentId("shared", offset = 3)))
+            val result = BookmarkClassifier.classify(items, setOf("shared/3"))
+            result.single().direction shouldBe MoveDirection.FORWARD
+        }
+
+        @Test
+        fun `does not match a different offset of the same base id`() {
+            val items = listOf(itemWithId("main", divergentId("shared", offset = 3)))
+            val result = BookmarkClassifier.classify(items, setOf("shared/0"))
+            result.single().direction shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
         }
     }
 }
