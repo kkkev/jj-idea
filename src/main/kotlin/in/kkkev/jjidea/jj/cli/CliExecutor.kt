@@ -68,6 +68,16 @@ internal fun bookmarkSetArgs(name: BookmarkName, revision: Revision = WorkingCop
         if (allowBackwards) add("-B")
     }
 
+/**
+ * Build `jj bookmark advance --to`, moving bookmarks forward to [to]. With an empty [names], jj
+ * advances every bookmark eligible per `revsets.bookmark-advance-from`; a non-empty [names]
+ * restricts it to those bookmarks (jj then ignores the `bookmark-advance-from` revset for them).
+ * Requires jj 0.39+ ([in.kkkev.jjidea.jj.JjFeature.BOOKMARK_ADVANCE]) — callers must gate on that
+ * before invoking.
+ */
+internal fun bookmarkAdvanceArgs(names: List<BookmarkName> = emptyList(), to: Revision = WorkingCopy) =
+    listOf("bookmark", "advance", "--to", to.toString()) + names.map { it.toString() }
+
 internal fun tagSetArgs(tag: Tag, revision: Revision = WorkingCopy, allowMove: Boolean = false) =
     buildList {
         addAll(listOf("tag", "set", tag.name, "-r", revision.toString()))
@@ -459,6 +469,9 @@ class CliExecutor(
 
     override fun bookmarkSet(name: BookmarkName, revision: Revision, allowBackwards: Boolean) =
         execute(root, bookmarkSetArgs(name, revision, allowBackwards))
+
+    override fun bookmarkAdvance(names: List<BookmarkName>, to: Revision) =
+        execute(root, bookmarkAdvanceArgs(names, to))
 
     override fun bookmarkTrack(names: List<BookmarkName>) = execute(root, bookmarkTrackArgs(names))
 

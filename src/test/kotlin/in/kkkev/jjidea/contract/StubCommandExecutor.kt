@@ -171,6 +171,9 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         allowBackwards: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun bookmarkAdvance(names: List<BookmarkName>, to: Revision): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
     override fun bookmarkTrack(names: List<BookmarkName>): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 

@@ -12,13 +12,11 @@ import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.addPopup
+import `in`.kkkev.jjidea.actions.bookmark.advanceClosestBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.deleteBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.forgetBookmarkAction
+import `in`.kkkev.jjidea.actions.bookmark.localBookmarkActions
 import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkToChangeAction
-import `in`.kkkev.jjidea.actions.bookmark.renameBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.toggleTrackBookmarkAction
+import `in`.kkkev.jjidea.actions.bookmark.remoteBookmarkActions
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
 import `in`.kkkev.jjidea.actions.change.compareWithWorkingCopyAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
@@ -115,20 +113,20 @@ object JujutsuLogContextMenuActions {
 
         addSeparator()
         add(createBookmarkAction(entry))
+        add(advanceClosestBookmarkAction(uniqueRepo, uniqueRepo?.let { project.stateModel.closestBookmarks.value[it] }))
         entry?.takeIf { it.bookmarks.isNotEmpty() }?.let { entry ->
             addPopup("action.bookmark.submenu", JujutsuIcons.BookmarkAction) {
                 entry.bookmarks.forEachIndexed { i, bookmark ->
                     if (i > 0) {
                         addSeparator()
                     }
-                    if (!bookmark.isRemote) {
-                        add(deleteBookmarkAction(entry.repo, bookmark))
-                        add(forgetBookmarkAction(entry.repo, bookmark))
-                        add(renameBookmarkAction(entry.repo, bookmark))
+                    val actions = if (bookmark.isRemote) {
+                        remoteBookmarkActions(entry.repo, bookmark)
+                    } else {
+                        // Already on entry, so "Move to Change..." here would be a no-op.
+                        localBookmarkActions(entry.repo, bookmark, includeMoveToChange = false)
                     }
-                    if (bookmark.isRemote) {
-                        add(toggleTrackBookmarkAction(entry.repo, bookmark))
-                    }
+                    actions.forEach(::add)
                 }
             }
         }
@@ -174,14 +172,12 @@ object JujutsuLogContextMenuActions {
                     add(FilterToReferenceAction(project, name))
                     addSeparator()
                     val bookmark = target.bookmark
-                    if (bookmark.isRemote) {
-                        add(toggleTrackBookmarkAction(target.repo, bookmark))
+                    val actions = if (bookmark.isRemote) {
+                        remoteBookmarkActions(target.repo, bookmark)
                     } else {
-                        add(renameBookmarkAction(target.repo, bookmark))
-                        add(deleteBookmarkAction(target.repo, bookmark))
-                        add(forgetBookmarkAction(target.repo, bookmark))
-                        add(moveBookmarkToChangeAction(target.repo, bookmark))
+                        localBookmarkActions(target.repo, bookmark, includeMoveToChange = true)
                     }
+                    actions.forEach(::add)
                 }
                 is TagClick -> {
                     add(FilterToReferenceAction(project, target.tag.name))

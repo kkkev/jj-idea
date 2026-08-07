@@ -113,4 +113,24 @@ class CliExecutorBookmarkTest {
                 listOf("bookmark", "set", "main", "-r", "@")
         }
     }
+
+    @Nested
+    inner class `bookmark advance` {
+        @Test
+        fun `advance with no names lets jj pick eligible bookmarks`() {
+            bookmarkAdvanceArgs() shouldBe listOf("bookmark", "advance", "--to", "@")
+        }
+
+        @Test
+        fun `advance restricted to specific names`() {
+            bookmarkAdvanceArgs(listOf(BookmarkName("main"), BookmarkName("feature"))) shouldBe
+                listOf("bookmark", "advance", "--to", "@", "main", "feature")
+        }
+
+        @Test
+        fun `advance to a specific revision`() {
+            bookmarkAdvanceArgs(listOf(BookmarkName("main")), ChangeId("abc123", "abc1", null)) shouldBe
+                listOf("bookmark", "advance", "--to", "abc123", "main")
+        }
+    }
 }

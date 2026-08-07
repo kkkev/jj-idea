@@ -7,6 +7,8 @@ package `in`.kkkev.jjidea.jj
  */
 @JvmInline
 value class JjVersion(private val components: Triple<Int, Int, Int>) : Comparable<JjVersion> {
+    constructor(major: Int, minor: Int, patch: Int) : this(Triple(major, minor, patch))
+
     val major: Int get() = components.first
     val minor: Int get() = components.second
     val patch: Int get() = components.third

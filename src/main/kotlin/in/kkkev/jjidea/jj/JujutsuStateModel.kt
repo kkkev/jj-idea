@@ -160,6 +160,23 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     }
 
     /**
+     * The bookmark(s) nearest each repo's working copy, and their distance — what
+     * [in.kkkev.jjidea.actions.bookmark.advanceBookmarkAction] would move and the
+     * [in.kkkev.jjidea.ui.log.JujutsuBookmarkWidget] "name +N" indicator reads. `null` per repo
+     * when the working copy has no ancestor bookmark at all. Invalidated together with
+     * [references] and [workingCopies] since either can change which bookmark is nearest.
+     */
+    val closestBookmarks = notifiableState<Map<JujutsuRepository, ClosestBookmarks?>>(
+        project,
+        "Jujutsu Closest Bookmarks",
+        emptyMap()
+    ) {
+        initialisedRepositories.immediateValue.values.associateWith { repo ->
+            repo.logService.closestBookmarks()
+        }
+    }
+
+    /**
      * Working copy log entries - one for each repo.
      */
     val workingCopies = notifiableState(
@@ -525,6 +542,7 @@ fun JujutsuRepository.invalidate(select: Revision? = null, vfsChanged: Boolean =
     val stateModel = project.stateModel
     stateModel.references.invalidate()
     stateModel.workingCopies.invalidate()
+    stateModel.closestBookmarks.invalidate()
     stateModel.logRefresh.notify(Unit)
     if (select != null) {
         stateModel.changeSelection.notify(ChangeKey(this, select))

@@ -195,6 +195,14 @@ interface CommandExecutor {
         allowBackwards: Boolean = false
     ): CommandResult
 
+    /**
+     * `jj bookmark advance`, moving bookmarks forward to [to]. With an empty [names], advances
+     * every bookmark eligible per `revsets.bookmark-advance-from`; a non-empty [names] restricts
+     * it to those bookmarks. Requires jj 0.39+ ([in.kkkev.jjidea.jj.JjFeature.BOOKMARK_ADVANCE])
+     * — callers must check that before invoking.
+     */
+    fun bookmarkAdvance(names: List<BookmarkName> = emptyList(), to: Revision = WorkingCopy): CommandResult
+
     fun bookmarkForget(name: BookmarkName): CommandResult
 
     /** Tracks one or more remote bookmarks in a single command; all must share the same remote. */

@@ -447,6 +447,33 @@ Settings live under **Version Control → Jujutsu**: JJ executable path, auto-re
 change ID format (short/long), log change limit. See Settings — three-tier model above
 for how these are stored and overridden.
 
+### Testing against multiple jj versions
+
+Version-gated features (`jj/JjFeature.kt`, `jj/JjVersion.MINIMUM`) need a way to exercise
+both sides of the gate — a jj new enough to support the feature, and one that isn't.
+`jj` on `PATH` should stay whatever's newest (upgrade it normally, e.g. `brew upgrade jj`
+on macOS); pin specific older/newer versions alongside it as separate, version-named
+binaries rather than juggling one `jj` install:
+
+```bash
+# Fetches a prebuilt release binary for the current platform from
+# https://github.com/jj-vcs/jj/releases and installs it as jj-<version> (plus a
+# jj-<major.minor> alias) into ~/.local/bin by default.
+scripts/jj-install-version.sh 0.39.0   # -> ~/.local/bin/jj-0.39.0, jj-0.39
+scripts/jj-install-version.sh 0.37.0   # -> ~/.local/bin/jj-0.37.0, jj-0.37
+```
+
+Put `~/.local/bin` on `PATH` once and every pinned version and its alias become directly
+runnable from anywhere (`jj-0.39`), without shadowing plain `jj`. Optionally symlink the
+script itself onto `PATH` too (e.g. `ln -s "$(pwd)/scripts/jj-install-version.sh"
+~/.local/bin/jj-install-version`) so it's callable without `cd`-ing into the repo first.
+
+To exercise the plugin against a specific pinned version: **Settings → Version Control →
+Jujutsu → JJ executable path**, point it at e.g. `~/.local/bin/jj-0.39`, then **Test**.
+Clear the field (or point it back at plain `jj`) to return to default resolution. See
+MT-BOOKMARK's "Version gating" checklist in `docs/manual-tests.md` for the Advance-action
+scenario this setup was built for.
+
 ### Performance Logging
 
 Hot paths emit structured perf lines to `idea.log` via `util/Perf.kt::measurePerf`:

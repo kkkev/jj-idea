@@ -53,6 +53,25 @@ Each script fails loudly (non-zero exit, explanatory message) if the jj version 
 produces a different topology than expected, rather than silently leaving a broken fixture —
 see each script's header comment for the specific invariant it checks.
 
+## Test Tooling
+
+**Multiple jj versions.** Version-gated features (`jj/JjFeature.kt`, `jj/JjVersion.MINIMUM`)
+need testing against both a jj new enough to support the feature and one that isn't. Keep
+`jj` on `PATH` at whatever's newest (e.g. `brew upgrade jj` on macOS); pin specific other
+versions alongside it with `scripts/jj-install-version.sh`:
+
+```bash
+scripts/jj-install-version.sh 0.39.0   # -> ~/.local/bin/jj-0.39.0, jj-0.39
+scripts/jj-install-version.sh 0.37.0   # -> ~/.local/bin/jj-0.37.0, jj-0.37
+```
+
+Downloads the matching prebuilt release binary for the current platform from
+[jj-vcs/jj releases](https://github.com/jj-vcs/jj/releases). To exercise the plugin against
+a pinned version: **Settings → Version Control → Jujutsu → JJ executable path**, point it at
+e.g. `~/.local/bin/jj-0.39`, then **Test**. Clear the field (or point it back at plain `jj`)
+to return to default resolution. See contributing.md § "Testing against multiple jj
+versions" and MT-BOOKMARK's "Version gating" checklist for the scenario this was built for.
+
 ## Known gaps
 
 Not checkboxes — just a reminder of what's known-missing so you don't file a duplicate bug:
@@ -209,7 +228,7 @@ here" without a hand cursor implying a left-click action that doesn't exist.
 - [ ] Hovering a bookmark or tag chip does **not** show a hand cursor, but does show a subtle grey background highlight (jj-idea-a52h) — its accent color (bookmark/tag color) stays visible on top of the highlight. Check across the whole width of the chip (left edge, middle, right edge), not just one spot
 - [ ] The highlight covers only the hovered chip's own icon+label(+suffix) — not the space before/after it, and not a neighboring chip
 - [ ] **Left-clicking** a bookmark/tag chip does nothing — no filter change, no navigation
-- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/track actions
+- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/advance/track actions (see MT-BOOKMARK for Advance)
 - [ ] Choosing **Filter Log to '...'** from the right-click menu applies the filter and closes the menu; choosing it again while already active clears the filter and closes the menu
 - [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
 - [ ] The "+N more" overflow chip still shows a hand cursor on hover (not the grey background highlight), and **left-clicking** it still opens its popup of hidden refs (jj-idea-w61m unaffected — only bookmark/tag chips lost their hand-cursor/left-click), each still openable via their own submenu
@@ -705,18 +724,19 @@ state/routing logic, not rendering)
 
 **Bookmark widget**
 
-**Code:** `ui/log/JujutsuBookmarkWidget.kt`, `actions/bookmark/`
+**Code:** `ui/log/JujutsuBookmarkWidget.kt`, `actions/bookmark/`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`
 **Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure)
 
 #### Single-repo project
 
 - [ ] "Bookmark: \<name\>" label appears in the log toolbar to the left of the Reference filter when @ has a local bookmark
-- [ ] Label shows "Bookmark:" with nothing after it when @ has no local bookmarks (no placeholder text)
-- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "Bookmark: foo" within ~300 ms, without saving a file or restarting (see MT-LOG-REFRESH)
-- [ ] Click the widget — dropdown opens with "Create Bookmark Here…" at the top
+- [ ] `jj new` off a bookmarked change with nothing left ahead of it — label shows "Bookmark: \<name\> +1" (jj-idea-l7wd, GitHub #62), where `<name>` is the nearest ancestor bookmark and `+1` the number of changes since it; label reads "Bookmark:" with nothing after it only when @ has no bookmark anywhere in its ancestry
+- [ ] Two bookmarks equally close to @ (e.g. either side of a merge) — label lists both names, comma-separated, before the shared `+N`
+- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "Bookmark: foo" within ~300 ms, without saving a file or restarting (see MT-LOG-REFRESH); `jj new` afterwards updates it to "Bookmark: foo +1" the same way
+- [ ] Click the widget — dropdown opens with "Create Bookmark Here…", then "Advance Bookmark Here" at the top
 - [ ] Dropdown lists all local bookmarks in the repo (not just those on @, and including bookmarks beyond the log limit), each as a sub-menu
-- [ ] For a bookmark **on @**: sub-menu contains Rename…, Delete, Forget (no Move Here)
-- [ ] For a bookmark **not on @**: sub-menu contains Move…, Rename…, Delete, Forget
+- [ ] For a bookmark **on @**: sub-menu contains Advance, Rename…, Delete, Forget (no Move Here)
+- [ ] For a bookmark **not on @**: sub-menu contains Move…, Advance, Rename…, Delete, Forget
 - [ ] Remote bookmarks (e.g. `master@origin`) are folded into the corresponding local bookmark's sub-menu as Track/Untrack, not shown as separate top-level items
 - [ ] "Create Bookmark Here…" (enter name → confirm) creates the bookmark at @, label and log
       decorations update; Rename… renames it in log and label; Delete removes it (label
@@ -732,11 +752,22 @@ state/routing logic, not rendering)
 #### Multi-repo project
 
 - [ ] Bookmark widget is present in the toolbar (not hidden)
-- [ ] Label shows "Bookmark:" with nothing after it regardless of which bookmarks exist
+- [ ] Label shows "Bookmark:" with nothing after it regardless of which bookmarks exist (the "name +N" fallback only applies to a single-repo project — see jj-idea-1ra9 for the wrong-repo-ancestry bug this must not repeat)
 - [ ] Click the widget — dropdown shows one sub-menu **per repo**, named by repo display name
-- [ ] Each repo sub-menu contains the same structure as the single-repo dropdown: "Create Bookmark Here…" at the top, then the repo's bookmark sub-menus
+- [ ] Each repo sub-menu contains the same structure as the single-repo dropdown: "Create Bookmark Here…", then "Advance Bookmark Here", then the repo's bookmark sub-menus
 - [ ] "Create Bookmark Here…" inside repo-a's sub-menu creates a bookmark at **repo-a's** working copy, not repo-b's (check via `jj bookmark list` in each repo)
+- [ ] `jj new` past every bookmark in repo-a only (repo-b still has one on @) — repo-a's "Advance Bookmark Here" is enabled and targets repo-a's nearest bookmark; repo-b's advances repo-b's bookmark, unaffected by repo-a
 - [ ] Rename/Delete/Forget in repo-b's sub-menu affects only repo-b
+
+#### Advance Bookmark (jj-idea-l7wd, GitHub #61)
+
+- [ ] With exactly one bookmark closest to @: clicking "Advance Bookmark Here" moves it directly to @, no dialog — confirm via `jj bookmark list` or the updated log decoration
+- [ ] With two+ equidistant closest bookmarks (e.g. `jj new` off a merge of two bookmarked branches): clicking "Advance Bookmark Here" opens a picker dialog listing all of them, pre-checked; unchecking one and confirming advances only the checked ones
+- [ ] The per-bookmark "Advance … to Working Copy" action (in a bookmark's own sub-menu, or via right-click on its chip in the log) moves that specific bookmark to @ regardless of distance, without opening a picker
+- [ ] Advancing a bookmark that's already at @ is a no-op (no error)
+- [ ] With no bookmark anywhere in @'s ancestry: "Advance Bookmark Here" is visible but disabled, with a tooltip explaining there's nothing to advance
+- [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark Here" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one, and Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method
+- [ ] The disabled reason is also appended to the menu item's own text, not just its tooltip (menus don't reliably show tooltips) — e.g. "Advance Bookmark Here (needs jj 0.39+)" or "Advance 'main' to Working Copy (needs jj 0.39+)"; with no bookmark anywhere in @'s ancestry, "Advance Bookmark Here (nothing to advance)"
 
 #### Move direction (forward vs. backward/sideways)
 
