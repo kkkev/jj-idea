@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.refUri
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.nulls.shouldBeNull
@@ -183,8 +184,36 @@ class LogClickTargetTest {
         }
 
         @Test
-        fun `the overflow chip has no underline or background cue of its own`() {
-            MoreRefsClick(repo, e, emptyList()).hoverCue shouldBe HoverCue.NONE
+        fun `the overflow chip gets the same background cue as a bookmark or tag chip`() {
+            MoreRefsClick(repo, e, emptyList()).hoverCue shouldBe HoverCue.REF_BACKGROUND
+        }
+    }
+
+    /** [LogClickTarget.displayIcon] feeds the per-item icon in [JujutsuLogTable.showMoreRefsPopup] (jj-idea-lm3o). */
+    @Nested
+    inner class `displayIcon` {
+        private val e = entry()
+
+        @Test
+        fun `a local bookmark shows the tracked glyph`() {
+            BookmarkClick(repo, e, Bookmark("main")).displayIcon shouldBe JujutsuIcons::BookmarkTracked
+        }
+
+        @Test
+        fun `an untracked remote bookmark shows the plain glyph`() {
+            val bookmark = Bookmark("main@origin", tracked = false)
+            BookmarkClick(repo, e, bookmark).displayIcon shouldBe JujutsuIcons::Bookmark
+        }
+
+        @Test
+        fun `a tag shows the tag glyph`() {
+            TagClick(repo, e, Tag("v1.0")).displayIcon shouldBe JujutsuIcons::Tag
+        }
+
+        @Test
+        fun `a person click has no glyph`() {
+            val target = PersonClick(repo, e, VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
+            target.displayIcon.shouldBeNull()
         }
     }
 }

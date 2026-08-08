@@ -13,6 +13,8 @@ import `in`.kkkev.jjidea.ui.log.RepositoryColors
 import kotlinx.datetime.Instant
 import java.net.URI
 import java.net.URLEncoder
+import javax.swing.Icon
+import kotlin.reflect.KProperty0
 
 /**
  * The jj-domain rendering vocabulary built on the generic [TextCanvas] DSL - `append(Bookmark)`,
@@ -104,22 +106,28 @@ fun TextCanvas.append(name: BookmarkName) = colored(JujutsuColors.BOOKMARK) {
     }
 }
 
+/**
+ * The glyph for a single bookmark, by precedence: a conflicted bookmark always shows the conflict
+ * glyph, even if it's also pending deletion (still conveyed by strikethrough in
+ * [appendBookmarkChip]); otherwise deleted beats tracked/plain. Shared with the "+N more" overflow
+ * chip and its hidden-refs popup (jj-idea-lm3o), which pick a glyph for a bookmark without
+ * re-rendering its full chip.
+ */
+internal fun bookmarkIcon(bookmark: Bookmark): KProperty0<Icon> = when {
+    bookmark.conflict -> JujutsuIcons::BookmarkConflict
+    bookmark.deleted -> JujutsuIcons::BookmarkDeleted
+    !bookmark.isRemote || bookmark.tracked -> JujutsuIcons::BookmarkTracked
+    else -> JujutsuIcons::Bookmark
+}
+
 private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = colored(JujutsuColors.BOOKMARK) {
     smaller {
-        // Precedence: a conflicted bookmark always shows the conflict glyph, even if it's also pending
-        // deletion (still conveyed by strikethrough); otherwise deleted beats tracked/plain.
-        val iconRef = when {
-            bookmark.conflict -> JujutsuIcons::BookmarkConflict
-            bookmark.deleted -> JujutsuIcons::BookmarkDeleted
-            !bookmark.isRemote || bookmark.tracked -> JujutsuIcons::BookmarkTracked
-            else -> JujutsuIcons::Bookmark
-        }
         val divergence = buildString {
             if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
             if (bookmark.behindCount > 0) append("↓${bookmark.behindCount}")
         }
         appendUnbreakable {
-            append(icon(iconRef))
+            append(icon(bookmarkIcon(bookmark)))
             if (bookmark.deleted) strikethrough { appendLinkified(label) } else appendLinkified(label)
             if (divergence.isNotEmpty()) colored(JujutsuColors.DIVERGENT) { append(divergence) }
         }

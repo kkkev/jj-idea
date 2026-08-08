@@ -6,6 +6,8 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.FragmentLayout
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas.Fragment
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -56,6 +58,9 @@ class CappedDecorationsTest {
     private fun renderedText(decorations: CappedDecorations) =
         decorations.canvas.fragments.filterIsInstance<Fragment.Text>().joinToString("") { it.text }
 
+    private fun icons(decorations: CappedDecorations) =
+        decorations.canvas.fragments.filterIsInstance<Fragment.Icon>()
+
     @Nested
     inner class `cappedDecorations` {
         @Test
@@ -103,6 +108,59 @@ class CappedDecorationsTest {
 
             result.hidden.shouldNotBeEmpty()
             (result.hidden.last() is TagClick) shouldBe true
+        }
+
+        @Test
+        fun `overflow chip shows the tracked bookmark glyph when every hidden bookmark is tracked (jj-idea-lm3o)`() {
+            // Plain (local) bookmarks are always "tracked" by the same test appendBookmarkChip uses.
+            val bookmarks = (1..30).map { Bookmark("bookmark-$it") }
+            val result = cap(entry(bookmarks), 100.0)
+
+            val overflowIcon = icons(result).last()
+            overflowIcon.icon.icon shouldBe JujutsuIcons::BookmarkTracked
+            overflowIcon.icon.fillColor shouldBe JujutsuColors.BOOKMARK
+        }
+
+        @Test
+        fun `overflow chip shows the plain bookmark glyph when not every hidden bookmark is tracked`() {
+            val bookmarks = (1..29).map { Bookmark("bookmark-$it") } +
+                Bookmark("bookmark-30@origin", tracked = false)
+            val result = cap(entry(bookmarks), 100.0)
+
+            result.hidden.shouldNotBeEmpty()
+            val overflowIcon = icons(result).last()
+            overflowIcon.icon.icon shouldBe JujutsuIcons::Bookmark
+            overflowIcon.icon.fillColor shouldBe JujutsuColors.BOOKMARK
+        }
+
+        @Test
+        fun `overflow chip shows a tag glyph when only tags are hidden`() {
+            val tags = (1..30).map { Tag("tag-$it") }
+            val result = cap(entry(tags = tags), 100.0)
+
+            result.hidden.shouldNotBeEmpty()
+            val overflowIcon = icons(result).last()
+            overflowIcon.icon.icon shouldBe JujutsuIcons::Tag
+            overflowIcon.icon.fillColor shouldBe JujutsuColors.TAG
+        }
+
+        @Test
+        fun `overflow chip favors the bookmark glyph when both bookmarks and tags are hidden`() {
+            val bookmarks = (1..10).map { Bookmark("bookmark-$it") }
+            val tags = (1..10).map { Tag("tag-$it") }
+            val result = cap(entry(bookmarks, tags), 100.0)
+
+            val overflowIcon = icons(result).last()
+            overflowIcon.icon.icon shouldBe JujutsuIcons::BookmarkTracked
+            overflowIcon.icon.fillColor shouldBe JujutsuColors.BOOKMARK
+        }
+
+        @Test
+        fun `wide budget with no overflow has no extra overflow icon`() {
+            val bookmarks = (1..5).map { Bookmark("bookmark-$it") }
+            val result = cap(entry(bookmarks), 10_000.0)
+
+            icons(result).size shouldBe bookmarks.size
         }
     }
 }

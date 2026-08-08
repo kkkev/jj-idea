@@ -105,8 +105,10 @@ data class CappedDecorations(val canvas: FragmentRecordingCanvas, val hidden: Li
  *
  * Bookmark and tag chips are kept left-to-right while they fit; any that don't fit are collapsed
  * into a single clickable "+N more" chip (a `kind=overflow` [refUri]) whose hit target opens a
- * popup over [CappedDecorations.hidden] — see `JujutsuLogTable.clickTargetAt`. The working-copy
- * `@` marker is never collapsed. The full, uncapped list remains available via the row tooltip
+ * popup over [CappedDecorations.hidden] — see `JujutsuLogTable.clickTargetAt`. That chip keeps a
+ * coloured bookmark/tag glyph rather than plain grey text (jj-idea-lm3o) — see [overflowChip] — so a
+ * change is still recognisable as a branch head even once its chips collapse. The working-copy `@`
+ * marker is never collapsed. The full, uncapped list remains available via the row tooltip
  * ([appendSummaryAndStatuses]/[appendDecorations]), so capping only narrows what's painted, never
  * what's discoverable.
  *
@@ -146,7 +148,7 @@ fun cappedDecorations(
         // Reserve room for the "+N more" chip (sized from this provisional hidden count), then
         // refit — the final chip below always uses the post-refit count, so the label is accurate
         // even if refitting changes how many chips fit.
-        val overflowWidth = widthOf { overflowChip(entry, units.size - kept) }
+        val overflowWidth = widthOf { overflowChip(entry, units.drop(kept)) }
         kept = fitCount(maxWidth - separatorWidth - overflowWidth)
     }
 
@@ -158,7 +160,7 @@ fun cappedDecorations(
         }
         if (hiddenUnits.isNotEmpty()) {
             if (kept > 0) append(" ")
-            overflowChip(entry, hiddenUnits.size)
+            overflowChip(entry, hiddenUnits)
         }
         if (entry.isWorkingCopy) {
             if (kept > 0 || hiddenUnits.isNotEmpty()) append(" ")
@@ -176,10 +178,28 @@ fun cappedDecorations(
     return CappedDecorations(canvas, hidden)
 }
 
-/** Render the clickable "+N more" overflow chip for collapsed decorations (jj-idea-w61m). */
-private fun TextCanvas.overflowChip(entry: LogEntry, hiddenCount: Int) {
+/**
+ * Render the clickable "+N more" overflow chip for collapsed decorations (jj-idea-w61m). Keeps a
+ * colored bookmark (or tag) glyph rather than plain grey text, so a change with many/long bookmark
+ * names still reads as a branch head even once its chips collapse (jj-idea-lm3o); the "+N more"
+ * label itself stays grey. Favors the bookmark glyph over tag when both are hidden, and the tracked
+ * glyph only when every hidden bookmark is tracked (same test as [bookmarkIcon]).
+ */
+private fun TextCanvas.overflowChip(entry: LogEntry, hidden: List<RefChip>) {
+    val hiddenBookmarks = hidden.mapNotNull { it.ref as? Bookmark }
+    val iconRef = when {
+        hiddenBookmarks.isEmpty() -> JujutsuIcons::Tag
+        hiddenBookmarks.all { !it.isRemote || it.tracked } -> JujutsuIcons::BookmarkTracked
+        else -> JujutsuIcons::Bookmark
+    }
+    val color = if (hiddenBookmarks.isEmpty()) JujutsuColors.TAG else JujutsuColors.BOOKMARK
     linked(refUri(entry, "overflow", "overflow")) {
-        grey { smaller { append(JujutsuBundle.message("log.decorations.overflow", hiddenCount)) } }
+        smaller {
+            appendUnbreakable {
+                colored(color) { append(icon(iconRef)) }
+                grey { append(JujutsuBundle.message("log.decorations.overflow", hidden.size)) }
+            }
+        }
     }
 }
 

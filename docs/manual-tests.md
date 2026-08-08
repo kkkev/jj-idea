@@ -231,7 +231,7 @@ here" without a hand cursor implying a left-click action that doesn't exist.
 - [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/advance/track actions (see MT-BOOKMARK for Advance)
 - [ ] Choosing **Filter Log to '...'** from the right-click menu applies the filter and closes the menu; choosing it again while already active clears the filter and closes the menu
 - [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
-- [ ] The "+N more" overflow chip still shows a hand cursor on hover (not the grey background highlight), and **left-clicking** it still opens its popup of hidden refs (jj-idea-w61m unaffected — only bookmark/tag chips lost their hand-cursor/left-click), each still openable via their own submenu
+- [ ] The "+N more" overflow chip shows both a hand cursor and the same grey background highlight on hover (jj-idea-ttmp), and **left-clicking** it still opens its popup of hidden refs, each still openable via their own submenu
 
 ### MT-LOG-GRAPH
 
@@ -244,8 +244,13 @@ here" without a hand cursor implying a left-click action that doesn't exist.
       auto-sizes to content
 - [ ] On a commit with ~30 bookmarks (e.g. `for i in $(seq 1 30); do jj bookmark create
       bm-$i; done`), the log row still shows description text (not blank), and the
-      bookmarks collapse behind a grey "+N more" chip rather than overflowing the cell
-      (jj-idea-w61m)
+      bookmarks collapse behind a "+N more" chip rather than overflowing the cell
+      (jj-idea-w61m); the chip still shows a colored bookmark icon (not plain grey text),
+      so the row still reads as a branch head even fully collapsed (jj-idea-lm3o); the icon
+      is the tracked-bookmark glyph as long as every hidden bookmark is tracked (all local
+      bookmarks count as tracked), and falls back to the plain glyph if any hidden bookmark
+      is an untracked remote; on a commit whose overflow is tags only (no bookmarks
+      hidden), the chip's icon is the green tag glyph instead
 - [ ] Stress-test repo, many concurrent branches (`jj-idea-1ojh`, `jj-idea-5i6i`): run
       FX-STRESS; set Settings → Version Control → Jujutsu → Log Limit to 200 so several
       branches fall out of view; apply an author or date filter to shrink the visible set
@@ -259,7 +264,10 @@ here" without a hand cursor implying a left-click action that doesn't exist.
       content is taller than the screen it scrolls instead of clipping (jj-idea-szn8)
 - [ ] Left-clicking the "+N more" chip opens a popup listing the hidden bookmarks, each
       as a sub-menu with the usual bookmark actions (Rename…, Delete, Forget, etc.); right-
-      clicking it does the same (jj-idea-w61m)
+      clicking it does the same (jj-idea-w61m); with a large hidden count (~50+, e.g. via
+      FX-STRESS), every sub-menu's actions are enabled/clickable as normal, not greyed out
+      (jj-idea-lm3o); each sub-menu is labelled with the same colored bookmark
+      (tracked/plain) or tag glyph its own chip would show
 
 #### Graph layout under filtering (jj-idea-7jkr)
 

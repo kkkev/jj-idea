@@ -12,9 +12,13 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import `in`.kkkev.jjidea.ui.components.bookmarkIcon
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import java.net.URI
 import java.net.URLDecoder
+import javax.swing.Icon
+import kotlin.reflect.KProperty0
 
 /**
  * Something a link inside jj-idea's rendered content resolves to - the log table's fragment-based
@@ -152,18 +156,15 @@ val LogClickTarget.hasHoverCue: Boolean
  * The *kind* of visual hover cue [this] gets, once [hasHoverCue]/the pointer position has already
  * decided something is hovered - the classifier the fragment-backend log table (via
  * `JujutsuGraphAndDescriptionRenderer`) uses instead of re-deriving "is this an issue link vs. a ref
- * chip" from a `.resolve(...) is X` check at each of its several call sites. [MoreRefsClick] gets
- * [NONE] here since its hand cursor (from [hasHoverCue]) is its only cue - it has no underline or
- * background of its own.
+ * chip" from a `.resolve(...) is X` check at each of its several call sites.
  */
 enum class HoverCue { ISSUE_LINK_UNDERLINE, REF_BACKGROUND, REAL_LINK_UNDERLINE, NONE }
 
 val LogClickTarget.hoverCue: HoverCue
     get() = when (this) {
         is IssueLinkClick -> HoverCue.ISSUE_LINK_UNDERLINE
-        is BookmarkClick, is TagClick -> HoverCue.REF_BACKGROUND
+        is BookmarkClick, is TagClick, is MoreRefsClick -> HoverCue.REF_BACKGROUND
         is PersonClick, is ChangeNavigationClick -> HoverCue.REAL_LINK_UNDERLINE
-        is MoreRefsClick -> HoverCue.NONE
     }
 
 /** A short human-readable label for [this], e.g. for [JujutsuLogTable.showMoreRefsPopup]'s per-item submenu title. */
@@ -175,6 +176,18 @@ val LogClickTarget.displayName: String
         is IssueLinkClick -> uri.toString()
         is ChangeNavigationClick -> changeKey.revision.toString()
         is MoreRefsClick -> "+${hidden.size} more"
+    }
+
+/**
+ * The glyph for [this], e.g. for [JujutsuLogTable.showMoreRefsPopup]'s per-item submenu icon
+ * (jj-idea-lm3o) - null where there's no natural glyph (author/committer, issue links, etc.),
+ * which the popup only ever builds for [BookmarkClick]/[TagClick] targets anyway.
+ */
+val LogClickTarget.displayIcon: KProperty0<Icon>?
+    get() = when (this) {
+        is BookmarkClick -> bookmarkIcon(bookmark)
+        is TagClick -> JujutsuIcons::Tag
+        is PersonClick, is IssueLinkClick, is ChangeNavigationClick, is MoreRefsClick -> null
     }
 
 /**

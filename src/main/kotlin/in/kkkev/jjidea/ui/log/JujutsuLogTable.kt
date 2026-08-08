@@ -456,19 +456,42 @@ class JujutsuLogTable(
         return LogClickTarget.resolve(uri, project, listOf(entry))
     }
 
-    /** Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref action menu. */
+    /**
+     * Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref
+     * action menu, labelled with the same coloured bookmark/tag glyph its own chip would show
+     * (jj-idea-lm3o).
+     *
+     * `addAll` takes the `.toList()` of [clickActionGroup]'s children rather than the raw
+     * `AnAction[]` - passing the array directly resolves to a Kotlin/Java vararg overload that
+     * silently adds nothing. `isDisableGroupIfEmpty = false` is defensive: these submenus are never
+     * legitimately empty.
+     */
     private fun showMoreRefsPopup(component: Component, x: Int, y: Int, target: MoreRefsClick) {
         val group = BackgroundActionGroup().apply {
             target.hidden.forEach { hiddenTarget ->
                 add(
-                    DefaultActionGroup(hiddenTarget.displayName, true)
-                        .apply { addAll(clickActionGroup(project, hiddenTarget).childActionsOrStubs) }
+                    DefaultActionGroup(hiddenTarget.displayName, null, hiddenTarget.displayIcon?.get())
+                        .apply {
+                            isPopup = true
+                            templatePresentation.isDisableGroupIfEmpty = false
+                            addAll(clickActionGroup(project, hiddenTarget).childActionsOrStubs.toList())
+                        }
                 )
             }
         }
-        ActionManager.getInstance()
-            .createActionPopupMenu(ActionPlaces.UNKNOWN, group)
-            .component.show(component, x, y)
+        JBPopupFactory.getInstance()
+            .createActionGroupPopup(
+                null,
+                group,
+                DataManager.getInstance().getDataContext(component),
+                JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                true,
+                null,
+                -1,
+                null,
+                null
+            )
+            .show(RelativePoint(component, Point(x, y)))
     }
 
     /**
