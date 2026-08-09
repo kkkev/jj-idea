@@ -11,14 +11,14 @@ import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
  * roots.
  */
 class JujutsuFilePathIconProvider : FilePathIconProvider {
-    // The platform's getIcon(FilePath, Project) overload was abstract before 2025.2 and only
-    // became a default method (calling into the 3-arg overload) afterward — on the 2025.1 floor,
-    // overriding only the 3-arg method leaves this one unimplemented, causing AbstractMethodError
-    // when the platform calls it. Override both.
+    // On the 2025.1 floor this 2-arg overload is the interface's only (abstract) method; the 3-arg
+    // getIcon(FilePath, Boolean, Project?) doesn't exist until 2025.2, where it is a default that
+    // delegates here. Overriding only this one therefore compiles and behaves correctly across the
+    // whole supported range. The platform marks it @Deprecated(forRemoval = true) in favour of the
+    // 3-arg form; switch over once sinceBuild rises past 251. The isDirectory argument is
+    // irrelevant here — this provider only matches a repository root by exact FilePath equality.
     @Suppress("OVERRIDE_DEPRECATION")
-    override fun getIcon(filePath: FilePath, project: Project?) = getIcon(filePath, filePath.isDirectory, project)
-
-    override fun getIcon(filePath: FilePath, isDirectory: Boolean, project: Project?) = project
+    override fun getIcon(filePath: FilePath, project: Project?) = project
         ?.possibleJujutsuRepositoryFor(filePath)
         ?.takeIf { it.directory.filePath == filePath }
         ?.let { repo -> RepositoryIcons[repo] }

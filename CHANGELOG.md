@@ -12,9 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The bookmark widget in the log toolbar no longer goes blank once you move past every bookmark (e.g. after `jj new`) — it now shows the nearest bookmark behind the working copy and how many changes behind it is, e.g. `main +3`. ([#62](https://github.com/kkkev/jj-idea/issues/62))
 - The "+N more" indicator for collapsed bookmark/tag labels in the log now shows a coloured bookmark (or tag) icon instead of plain grey text, so a change with many bookmarks is still recognisable as a branch head even when its labels overflow; it shows the tracked-bookmark icon when every hidden bookmark is tracked, and the same hover background highlight as a bookmark/tag chip. Clicking it now also shows the correct tracked/untracked/tag icon next to each hidden bookmark or tag in the popup, and fixes all its menu items showing as disabled when there were many hidden bookmarks. ([#49](https://github.com/kkkev/jj-idea/issues/49))
 
-## [0.8.8] - 2026-08-07
+### Fixed
+- Fixed a build issue that could have prevented the plugin from being verified as compatible with IntelliJ IDEA 2025.1.
 
-## [0.8.7] - 2026-08-06
+## [0.8.8] - 2026-08-07
 
 ### Changed
 - Conflicted files in the "Working copy" tool window are now grouped under a "Merge Conflicts" node at the top of the tree with a one-click "Resolve" link, and the toolbar gained a "Resolve All Conflicts" button — matching the grouped resolve affordance the standard Commit tool window used to provide, before it was hidden. ([#56](https://github.com/kkkev/jj-idea/issues/56))
