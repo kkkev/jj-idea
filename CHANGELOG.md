@@ -13,10 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The "+N more" indicator for collapsed bookmark/tag labels in the log now shows a coloured bookmark (or tag) icon instead of plain grey text, so a change with many bookmarks is still recognisable as a branch head even when its labels overflow; it shows the tracked-bookmark icon when every hidden bookmark is tracked, and the same hover background highlight as a bookmark/tag chip. Clicking it now also shows the correct tracked/untracked/tag icon next to each hidden bookmark or tag in the popup, and fixes all its menu items showing as disabled when there were many hidden bookmarks. ([#49](https://github.com/kkkev/jj-idea/issues/49))
 
 ### Fixed
+- "Annotate Previous Revision" no longer shows a raw error when clicked on a line whose change added the file (so there's no earlier version to show) — the action is simply unavailable for that line instead, matching how it already behaves for merge-commit lines.
 - On repositories where computing blame is slow, the editor no longer eagerly re-computes it for every file you open — it now backs off automatically once blame has been consistently slow, and only computes it on demand when you actually open the annotation gutter. Cached blame is also now refreshed whenever the working copy changes, instead of potentially showing stale attribution. ([#64](https://github.com/kkkev/jj-idea/issues/64))
 - Fixed a build issue that could have prevented the plugin from being verified as compatible with IntelliJ IDEA 2025.1.
 - Viewing a file's diff no longer jumps back to the top whenever a background process (e.g. an AI coding assistant) edits a file elsewhere in the repository. Viewing the working copy's own diff also now shows live content instead of a stale snapshot if the file changes while its diff is open. ([#58](https://github.com/kkkev/jj-idea/issues/58))
-- Actions triggered internally by the plugin (e.g. the uninitialized-repo notification's "Initialize" action, and "Show History for Selection") now go through IntelliJ's supported action-invocation API instead of an internal-only method, avoiding a plugin compatibility warning.
+- Improved plugin compatibility by removing dependency on IntelliJ internal action API.
 - Bookmark, tag, working-copy (`@`), conflict and divergent-change colours in the log and annotation gutter are now readable on a light theme background — the bookmark gold in particular was nearly invisible. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 
 ## [0.8.8] - 2026-08-07

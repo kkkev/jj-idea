@@ -93,12 +93,22 @@ class JujutsuFileAnnotation(
     override fun getPreviousFileRevisionProvider() = object : PreviousFileRevisionProvider {
         override fun getPreviousRevision(lineNumber: Int): VcsFileRevision? {
             val parentIds = getAnnotationLine(lineNumber)?.parentIds ?: return null
-            return parentIds.singleOrNull()?.let { ParentFileRevision(it, file, repo) }
+            val parentId = parentIds.singleOrNull() ?: return null
+            return ParentFileRevision(parentId, file, repo).takeIf { fileExistsAt(parentId) }
         }
 
         override fun getLastRevision(): VcsFileRevision? =
             workingCopyChangeId?.let { ParentFileRevision(it, file, repo) } ?: getRevisions().firstOrNull()
     }
+
+    /**
+     * True if [file] has content at [revision]. Pre-empts "Annotate Previous Revision" on a line
+     * whose owning change added the file — that change's own parent(s) legitimately lack it, so
+     * [ParentFileRevision.loadContent] would otherwise throw a raw "No such path" VcsException
+     * instead of the action simply being unavailable (jj-idea-o95r), mirroring the existing
+     * multi-parent (merge-commit) decline above.
+     */
+    private fun fileExistsAt(revision: Revision) = repo.commandExecutor.show(file.filePath, revision).isSuccess
 
     /**
      * Override to prevent EDT slow operations.

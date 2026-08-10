@@ -119,15 +119,11 @@ class JujutsuFileAnnotationTest {
             workingCopyChangeId = workingCopyChangeId
         )
 
-    @Test
-    fun `previous revision for a single-parent line is that parent`() {
-        val parent = ChangeId("parent1", "parent1")
-        val annotation = annotationWith(line("child1", parentIds = listOf(parent)))
-
-        val previous = annotation.getPreviousFileRevisionProvider()?.getPreviousRevision(0)
-
-        previous?.revisionNumber shouldBe ChangeIdRevisionNumber(parent)
-    }
+    // Regression tests for the single-parent "previous revision" case now live in
+    // JujutsuFileAnnotationPreviousRevisionTest.kt: getPreviousRevision() calls
+    // repo.commandExecutor.show() to confirm the parent has the file (jj-idea-o95r), which
+    // needs a mocked CommandExecutor and platform bootstrap (VirtualFile.filePath →
+    // VcsUtil.getFilePath), unlike the purely in-memory decisions tested below.
 
     @Test
     fun `previous revision for a root (no-parent) line is null`() {
