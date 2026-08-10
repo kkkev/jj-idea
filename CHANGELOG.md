@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed a build issue that could have prevented the plugin from being verified as compatible with IntelliJ IDEA 2025.1.
+- Actions triggered internally by the plugin (e.g. the uninitialized-repo notification's "Initialize" action, and "Show History for Selection") now go through IntelliJ's supported action-invocation API instead of an internal-only method, avoiding a plugin compatibility warning.
 - Bookmark, tag, working-copy (`@`), conflict and divergent-change colours in the log and annotation gutter are now readable on a light theme background — the bookmark gold in particular was nearly invisible. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 
 ## [0.8.8] - 2026-08-07
