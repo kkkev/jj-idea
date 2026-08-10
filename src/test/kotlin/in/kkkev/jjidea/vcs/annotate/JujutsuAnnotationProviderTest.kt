@@ -4,20 +4,26 @@ import com.intellij.mock.MockVirtualFile
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
+import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.testFramework.LoggedErrorProcessor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.JujutsuStateModel
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.util.NotifiableState
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.mockk.Runs
 import io.mockk.every
+import io.mockk.just
 import io.mockk.mockk
+import io.mockk.slot
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CancellationException
 
@@ -102,6 +108,7 @@ class JujutsuAnnotationProviderTest {
     @Test
     fun `surfaces a real message instead of an empty string when annotate times out`() {
         every { repo.commandExecutor } returns commandExecutor
+        every { repo.directory } returns MockVirtualFile("repo")
         every { commandExecutor.annotate(any(), any(), any()) } returns
             CommandExecutor.CommandResult(exitCode = -1, stdout = "", stderr = "", timedOut = true)
 
@@ -111,5 +118,30 @@ class JujutsuAnnotationProviderTest {
 
         exception.message shouldNotBe null
         exception.message!!.isBlank() shouldBe false
+    }
+
+    // Regression test for jj-idea-a921: the cache used to be a plain, never-invalidated HashMap,
+    // so a stale annotation (computed against the old @-) would keep being served forever after
+    // a working-copy change. It must now be cleared when the working-copy state model notifies.
+    @Test
+    fun `working-copy change invalidates the annotation cache`() {
+        val listenerSlot = slot<NotifiableState.Listener<Map<String, LogEntry>>>()
+        val workingCopies = mockk<NotifiableState<Map<String, LogEntry>>> {
+            every { connect(any(), capture(listenerSlot)) } just Runs
+        }
+        val stateModel = mockk<JujutsuStateModel> {
+            every { this@mockk.workingCopies } returns workingCopies
+        }
+        every { project.getService(JujutsuStateModel::class.java) } returns stateModel
+
+        val fakeAnnotation = mockk<FileAnnotation>()
+        // First cache access subscribes to working-copy-change invalidation as a side effect.
+        provider.getFromCache(file) shouldBe null
+        provider.cacheForTest()[file] = fakeAnnotation
+        provider.getFromCache(file) shouldBe fakeAnnotation
+
+        listenerSlot.captured.changed(emptyMap())
+
+        provider.getFromCache(file) shouldBe null
     }
 }

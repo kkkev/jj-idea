@@ -21,6 +21,7 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.jj.reconstructMergeParentContent
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.contentLocator
@@ -28,15 +29,40 @@ import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import java.util.concurrent.CancellationException
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Provides file annotations (blame) for Jujutsu files
  */
-class JujutsuAnnotationProvider(private val project: Project, private val vcs: JujutsuVcsBase) :
-    AnnotationProvider,
+class JujutsuAnnotationProvider(
+    private val project: Project,
+    private val vcs: JujutsuVcsBase,
+    private val nowMs: () -> Long = System::currentTimeMillis
+) : AnnotationProvider,
     CacheableAnnotationProvider {
     private val log = Logger.getInstance(javaClass)
-    private val cache = mutableMapOf<VirtualFile, FileAnnotation>()
+
+    // Written from background preloader threads (jj-idea-a921): must be a thread-safe map, not a
+    // plain HashMap. Cleared wholesale on any working-copy change below, since every cached
+    // FileAnnotation is computed against @- (the working-copy parent) and would otherwise go
+    // stale silently.
+    private val cache = ConcurrentHashMap<VirtualFile, FileAnnotation>()
+
+    // Per-repository rolling average of annotate durations (jj-idea-1sza), keyed by
+    // repo.directory.path. Also thread-safe: populated from background preloader threads.
+    private val annotateTimings = ConcurrentHashMap<String, AnnotateTiming>()
+
+    // Subscribed lazily (on first actual cache use, not in the constructor) so unit tests can
+    // build a provider around a bare mock Project without stubbing the whole state-model service
+    // lookup chain. AtomicBoolean.compareAndSet makes the one-time subscription thread-safe.
+    private val invalidationSubscribed = AtomicBoolean(false)
+
+    private fun ensureCacheInvalidationSubscribed() {
+        if (invalidationSubscribed.compareAndSet(false, true)) {
+            project.stateModel.workingCopies.connect(project) { _ -> cache.clear() }
+        }
+    }
 
     override fun populateCache(file: VirtualFile) {
         if (project.isDisposed) return
@@ -44,7 +70,17 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
         // a parent-revision entry, so jj annotate fails with "No such path".
         val status = ChangeListManager.getInstance(project).getStatus(file)
         if (status == FileStatus.IGNORED || status == FileStatus.UNKNOWN) return
+        ensureCacheInvalidationSubscribed()
         try {
+            // jj-idea-1sza: on a repo where annotate is consistently slow, eagerly preloading
+            // every opened file burns a long-running jj process the user may never need (the
+            // gutter is opened on demand via annotate(file) below, which is never gated by this
+            // check).
+            val repo = project.jujutsuRepositoryFor(file)
+            if (isPreloadBackedOff(repo)) {
+                log.debug("Skipping annotation preload for ${file.path}: annotate has been slow on this repository")
+                return
+            }
             cache[file] = annotate(file)
         } catch (e: ProcessCanceledException) {
             throw e
@@ -53,7 +89,17 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
         }
     }
 
-    override fun getFromCache(file: VirtualFile) = cache[file]
+    override fun getFromCache(file: VirtualFile): FileAnnotation? {
+        ensureCacheInvalidationSubscribed()
+        return cache[file]
+    }
+
+    /**
+     * Test seam (jj-idea-a921): lets regression tests observe/populate the annotation cache
+     * directly, without driving the full [annotate] resolution path (content locator, log
+     * service, working-copy lookup, etc.).
+     */
+    internal fun cacheForTest(): MutableMap<VirtualFile, FileAnnotation> = cache
 
     /**
      * Annotate a file at the working copy parent (@-), matching the LineStatusTracker base.
@@ -185,7 +231,12 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
         revision: Revision,
         repo: JujutsuRepository
     ): List<AnnotationLine> {
+        val startMs = nowMs()
         val result = repo.commandExecutor.annotate(file, revision, AnnotationParser.TEMPLATE)
+        // Record even on failure/timeout (but not if the call above threw, e.g. cancellation): a
+        // timed-out annotate's CommandResult is the honest ~120s cost and should count toward the
+        // preload backoff decision (jj-idea-1sza) just as much as a slow success would.
+        annotateTimings.computeIfAbsent(repo.directory.path) { AnnotateTiming() }.record(nowMs() - startMs)
         if (!result.isSuccess) {
             val message = if (result.timedOut) {
                 JujutsuBundle.message("annotation.error.timeout", file.name)
@@ -196,6 +247,50 @@ class JujutsuAnnotationProvider(private val project: Project, private val vcs: J
             throw VcsException(message)
         }
         return AnnotationParser.parse(result.stdout)
+    }
+
+    /**
+     * True once [repo]'s rolling average `jj file annotate` duration has crossed the preload
+     * backoff threshold (jj-idea-1sza). Narrow seam so the scale test can assert on the preload
+     * decision without driving the full [annotate] resolution path (content locator, log
+     * service, etc.) — see contributing.md's "Writing a scale test".
+     */
+    internal fun isPreloadBackedOff(repo: JujutsuRepository) = annotateTimings[repo.directory.path]?.isSlow == true
+
+    /**
+     * Tracks a rolling (exponential moving) average of `jj file annotate` durations for one
+     * repository, so [populateCache] can back off eager preloading once annotate is consistently
+     * slow (jj-idea-1sza). An EMA (rather than a cumulative mean) lets the tracker recover and
+     * resume preloading if annotate later speeds up. Thread-safe: recorded from background
+     * preloader threads.
+     */
+    private class AnnotateTiming {
+        @Volatile private var averageMs = 0.0
+
+        @Volatile private var samples = 0
+
+        @Synchronized
+        fun record(durationMs: Long) {
+            averageMs = if (samples == 0) {
+                durationMs.toDouble()
+            } else {
+                EMA_ALPHA * durationMs + (1 - EMA_ALPHA) * averageMs
+            }
+            samples++
+        }
+
+        val isSlow: Boolean get() = samples > 0 && averageMs >= PRELOAD_BACKOFF_THRESHOLD_MS
+    }
+
+    companion object {
+        // A healthy `jj file annotate` is ~1s; 5s sustained means each opened file costs 5s+ of a
+        // jj process, not worth eager preloading when the gutter may never be opened. Well below
+        // the 120s annotateTimeout (CliExecutor.kt), so any timeout trivially trips backoff.
+        private const val PRELOAD_BACKOFF_THRESHOLD_MS = 5_000.0
+
+        // Weight new samples equally with history so backoff engages/recovers within a couple of
+        // file opens rather than being dragged out by a long history of fast samples.
+        private const val EMA_ALPHA = 0.5
     }
 
     internal fun annotateInternal(

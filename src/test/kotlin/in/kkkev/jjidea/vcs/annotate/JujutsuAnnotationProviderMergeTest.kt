@@ -37,7 +37,11 @@ import org.junit.jupiter.api.Test
 class JujutsuAnnotationProviderMergeTest {
     private val project = mockk<Project>()
     private val vcs = JujutsuVcs(project)
-    private val repo = mockk<JujutsuRepository>()
+    private val repo = mockk<JujutsuRepository> {
+        // Stubbed for every test: getAnnotationLines records per-repo annotate timing
+        // (jj-idea-1sza) keyed by repo.directory.path on every real annotate call.
+        every { directory } returns MockVirtualFile("repo")
+    }
     private val commandExecutor = mockk<CommandExecutor>()
     private val file = MockVirtualFile("test.txt")
     private val provider = JujutsuAnnotationProvider(project, vcs)
