@@ -1,24 +1,17 @@
 package `in`.kkkev.jjidea.actions.file
 
 import com.intellij.diff.fragments.LineFragment
+import com.intellij.diff.fragments.LineFragmentImpl
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 class TranslateRangeTest {
-    /** Minimal [LineFragment] with only the line range fields set. */
+    // LineFragment changed from a Java interface (getters) to a Kotlin interface (val
+    // properties) in 2025.2, so an anonymous implementation can't compile against the whole
+    // supported range — use the platform's own impl class, whose ctor is stable.
     private fun fragment(sl1: Int, el1: Int, sl2: Int, el2: Int): LineFragment =
-        object : LineFragment {
-            override val startLine1 = sl1
-            override val endLine1 = el1
-            override val startLine2 = sl2
-            override val endLine2 = el2
-            override val startOffset1 = -1
-            override val endOffset1 = -1
-            override val startOffset2 = -1
-            override val endOffset2 = -1
-            override val innerFragments = null
-        }
+        LineFragmentImpl(sl1, el1, sl2, el2, 0, 0, 0, 0)
 
     @Nested
     inner class `no fragments` {

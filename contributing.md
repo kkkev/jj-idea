@@ -509,6 +509,11 @@ level includes it) non-fatal. Never add `INTERNAL_API_USAGES` back to `failureLe
 suppress a `COMPATIBILITY_PROBLEMS` finding — a compatibility problem on any pinned IDE means the
 code will not run there. CI runs this as the `verify` job (`.github/workflows/build.yml`); run
 `./gradlew verifyPlugin` locally before believing a deprecation fix is safe on the floor.
+`verifyPlugin` only checks the packaged plugin's bytecode, not whether sources compile against
+the floor — a platform-API shape change (e.g. a Java interface becoming Kotlin) can break
+`compileKotlin`/`compileTestKotlin` without tripping it. Before pushing a change that touches
+platform APIs, also run the floor compat leg locally: `./gradlew compileKotlin test platformTest
+-PplatformVersion=2025.1`.
 
 ## Performance & Scale
 

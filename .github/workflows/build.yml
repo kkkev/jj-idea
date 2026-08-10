@@ -77,9 +77,10 @@ jobs:
           fi
 
   # Cross-version compatibility gate: compiles, unit-tests, and platform-tests against
-  # both ends of the supported platform range — the sinceBuild=251 baseline (2025.2) and
-  # the newest supported platform (2026.2, build 262) — separately from the release
-  # `build` job (which only builds/publishes on the default platformVersion). Platform
+  # the full supported platform range — the sinceBuild=251 floor (2025.1), the previous
+  # release (2025.2), and the newest supported platform (2026.2, build 262) — separately
+  # from the release `build` job (which only builds/publishes on the default
+  # platformVersion). Platform
   # releases have broken plugin-visible behavior without any binary-incompatible signature
   # change (jj-idea-qfgl / GitHub #55), so this only catches compile- and test-time
   # breaks; it does not replace a manual runIde smoke test against a new platform version.
