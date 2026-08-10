@@ -52,7 +52,7 @@ class JujutsuLogTable(
     private val log = Logger.getInstance(javaClass)
 
     // Graph nodes for rendering (populated when data is loaded)
-    var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
+    var graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
         private set
 
     // Currently hovered row for targeted repaint
@@ -630,7 +630,7 @@ class JujutsuLogTable(
         repaint(rect)
     }
 
-    fun updateGraph(nodes: Map<ChangeId, GraphNode>) {
+    fun updateGraph(nodes: Map<ChangeKey, GraphNode>) {
         graphNodes = nodes
         // Refresh combined graph+description column rendering with column manager
         // Find the column by model index, not view index
@@ -841,8 +841,8 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var matchCase: Boolean = false
     private var matchWholeWords: Boolean = false
     private var authorFilter: Set<String> = emptySet() // Filter by author email
-    private var bookmarkFilter: Set<ChangeId> =
-        emptySet() // Filter by bookmark change IDs (includes ancestors)
+    private var bookmarkFilter: Set<ChangeKey> =
+        emptySet() // Filter by repo-scoped bookmark change keys (includes ancestors)
     private var dateFilterCutoff: Instant? = null // Filter by date (show commits after cutoff)
     private var pathsFilter: Set<String> = emptySet() // Filter by paths
     private var rootFilter: Set<JujutsuRepository> = emptySet() // Filter by repository root
@@ -960,12 +960,15 @@ class JujutsuLogTableModel : AbstractTableModel() {
     }
 
     /**
-     * Set the bookmark filter (by change IDs that should be included).
+     * Set the bookmark filter (by repo-scoped change keys that should be included).
      * Empty set means no bookmark filtering.
      * The set should include all ancestors of the selected bookmark.
+     * Keyed by [ChangeKey] rather than a bare [ChangeId] so entries from different repos that
+     * happen to share an id (e.g. the synthetic root commit id) can't slip through the filter for
+     * the wrong repo (jj-idea-1ra9).
      */
-    fun setBookmarkFilter(ids: Set<ChangeId>) {
-        bookmarkFilter = ids
+    fun setBookmarkFilter(keys: Set<ChangeKey>) {
+        bookmarkFilter = keys
         applyFilter()
     }
 
@@ -1057,9 +1060,9 @@ class JujutsuLogTableModel : AbstractTableModel() {
                     true
                 }
 
-                // Bookmark filter (if active) - filter by change ID
+                // Bookmark filter (if active) - filter by repo-scoped change key
                 val matchesBookmark = if (bookmarkFilter.isNotEmpty()) {
-                    bookmarkFilter.contains(entry.id)
+                    bookmarkFilter.contains(entry.key)
                 } else {
                     true
                 }

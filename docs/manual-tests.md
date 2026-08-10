@@ -454,6 +454,18 @@ push a bookmark from another clone without running `jj bookmark track` in this o
 - [ ] Arrow up/down moves the highlight; Enter applies the highlighted reference and closes the dropdown
 - [ ] Clearing the filter restores the full (limited) log
 
+#### Multi-repo scoping (jj-idea-1ra9, jj-idea-2xf3)
+
+Open a multi-root project with at least two independent (non-colocated) jj repos — FX-STRESS
+alongside one other repo works.
+
+- [ ] Filtering to a bookmark that exists in only one repo shows **only** that repo's ancestry —
+      no other repo's root commit ("zzzzzzzz", "no description", empty) appears
+- [ ] The graph draws **no** connector line between rows from different repos, even though every
+      repo's root shares the same underlying change id
+- [ ] Filtering to "@" (working copy) shows **every** repo's working copy, each with its own
+      ancestry — not just the first repo's
+
 ### MT-LOG-REFRESH
 
 **Auto-refresh**
@@ -1331,6 +1343,9 @@ tracked in MT-LOG-TABLE, are state-serialization logic)
 - [ ] Root filter appears for multi-root projects and hides for single-root projects
 - [ ] Root gutter column shows repo names; filtering by root works correctly
 - [ ] Entries from different roots sort by timestamp
+- [ ] Reference filter and graph repo scoping: see MT-LOG-FILTER's "Multi-repo scoping" subsection
+      (jj-idea-1ra9) — no cross-repo ancestry or graph lines, even when repos' root commits share
+      a change id
 
 #### Visual Consistency
 

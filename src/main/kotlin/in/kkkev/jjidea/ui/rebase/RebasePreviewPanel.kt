@@ -37,7 +37,7 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
         border = JBUI.Borders.empty(4, 8)
     }
 
-    private var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
+    private var graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
     private var allEntries: List<LogEntry> = emptyList()
 
     init {
@@ -76,8 +76,8 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
         tableModel.setEntries(simulation.entries)
 
         val baseNodes = CommitGraphBuilder().buildGraph(simulation.entries)
-        graphNodes = baseNodes.mapValues { (id, node) ->
-            when (id) {
+        graphNodes = baseNodes.mapValues { (key, node) ->
+            when (key.revision) {
                 in simulation.sourceIds -> node.copy(highlightColor = JujutsuColors.SOURCE_HIGHLIGHT)
                 in simulation.destinationIds -> node.copy(highlightColor = JujutsuColors.DESTINATION_HIGHLIGHT)
                 else -> node

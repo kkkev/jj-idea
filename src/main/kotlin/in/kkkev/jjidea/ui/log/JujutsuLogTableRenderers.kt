@@ -5,7 +5,7 @@ import com.intellij.util.ui.JBUI
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.WorkingCopy
@@ -215,25 +215,25 @@ private fun TextCanvas.overflowChip(entry: LogEntry, hidden: List<RefChip>) {
  * click (via `JujutsuLogTable.clickTargetAt`), not on every cell repaint, so recomputing row
  * passthroughs here (O(rows)) doesn't hit the same hot path the render-time cache protects.
  */
-internal fun graphTextStartX(row: Int, model: JujutsuLogTableModel, graphNodes: Map<ChangeId, GraphNode>): Int {
+internal fun graphTextStartX(row: Int, model: JujutsuLogTableModel, graphNodes: Map<ChangeKey, GraphNode>): Int {
     val entry = model.getEntry(row) ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
-    val graphNode = graphNodes[entry.id] ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
+    val graphNode = graphNodes[entry.key] ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
     val laneWidth = JujutsuGraphAndDescriptionRenderer.LANE_WIDTH.get()
     val horizontalPadding = JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
 
-    val rowByChangeId = HashMap<ChangeId, Int>()
+    val rowByKey = HashMap<ChangeKey, Int>()
     for (r in 0 until model.rowCount) {
-        model.getEntry(r)?.let { rowByChangeId[it.id] = r }
+        model.getEntry(r)?.let { rowByKey[it.key] = r }
     }
     val activeLanes = mutableSetOf(graphNode.lane)
     for (r in 0 until row) {
         val prevEntry = model.getEntry(r) ?: continue
-        val prevNode = graphNodes[prevEntry.id] ?: continue
-        for ((parentId, lane) in prevNode.passthroughLanes) {
-            val parentRow = rowByChangeId[parentId] ?: continue
+        val prevNode = graphNodes[prevEntry.key] ?: continue
+        for ((parentKey, lane) in prevNode.passthroughLanes) {
+            val parentRow = rowByKey[parentKey] ?: continue
             if (row in (r + 1) until parentRow) activeLanes.add(lane)
         }
-        if (prevEntry.parentIds.contains(entry.id)) activeLanes.add(prevNode.lane)
+        if (prevEntry.parentKeys.contains(entry.key)) activeLanes.add(prevNode.lane)
     }
     for (parentLane in graphNode.parentLanes) {
         if (parentLane != graphNode.lane) activeLanes.add(parentLane)

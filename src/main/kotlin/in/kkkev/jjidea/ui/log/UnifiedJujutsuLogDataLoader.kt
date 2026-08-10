@@ -28,7 +28,7 @@ class UnifiedJujutsuLogDataLoader(
 ) : BackgroundDataLoader(project, "Loading Jujutsu Commits") {
     private val graphBuilder = CommitGraphBuilder()
 
-    data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeId, GraphNode>, val limit: Int)
+    data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeKey, GraphNode>, val limit: Int)
 
     @Volatile private var lastLimit: Int = 0
 
@@ -61,7 +61,7 @@ class UnifiedJujutsuLogDataLoader(
         val entriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
         val errors = ConcurrentHashMap<JujutsuRepository, Throwable>()
         var allEntries: List<LogEntry> = emptyList()
-        var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
+        var graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
 
         executeInBackground(
             run = { indicator ->
@@ -129,7 +129,7 @@ class UnifiedJujutsuLogDataLoader(
                     val expanded = expansionEntriesByRepo[r] ?: emptyList()
                     regular + expanded
                 }
-                val merged = topologicalSort(allEntries.distinctBy { it.id })
+                val merged = topologicalSort(allEntries.distinctBy { it.key })
                 val data = Data(merged, graphBuilder.buildGraph(merged), limit)
                 runLater { notify(data) }
             }
@@ -176,26 +176,17 @@ internal fun enrichWithDeletedBookmarks(entry: LogEntry, deletedNames: Set<Strin
 internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
     if (entries.isEmpty()) return emptyList()
 
-    // Key by (repo, changeId), not changeId alone: jj's root commit has the identical
-    // change ID ("zzzz...z") in every repository since it's synthetic rather than
-    // content-derived, so a bare ChangeId key would conflate different repos' root commits
-    // (and in principle any other colliding ID) when entries from multiple repos are merged
-    // here, corrupting the child-count computation below for whichever repo loses the
-    // collision.
-    fun keyOf(entry: LogEntry) = ChangeKey(entry.repo, entry.id)
-
     // Build lookup maps
-    val entryByKey = entries.associateBy(::keyOf)
+    val entryByKey = entries.associateBy(LogEntry::key)
     val entryKeys = entryByKey.keys
 
     // Count children for each entry (only counting children that are in our set)
     val childCount = mutableMapOf<ChangeKey, Int>()
     for (entry in entries) {
-        childCount[keyOf(entry)] = 0
+        childCount[entry.key] = 0
     }
     for (entry in entries) {
-        for (parentId in entry.parentIds) {
-            val parentKey = ChangeKey(entry.repo, parentId)
+        for (parentKey in entry.parentKeys) {
             if (parentKey in entryKeys) {
                 childCount[parentKey] = childCount.getValue(parentKey) + 1
             }
@@ -207,7 +198,7 @@ internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
 
     // Start with entries that have no children in the set
     for (entry in entries) {
-        if (childCount[keyOf(entry)] == 0) {
+        if (childCount[entry.key] == 0) {
             ready.add(entry)
         }
     }
@@ -219,8 +210,7 @@ internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
         result.add(entry)
 
         // Decrement child count for each parent
-        for (parentId in entry.parentIds) {
-            val parentKey = ChangeKey(entry.repo, parentId)
+        for (parentKey in entry.parentKeys) {
             if (parentKey in entryKeys) {
                 val newCount = childCount.getValue(parentKey) - 1
                 childCount[parentKey] = newCount

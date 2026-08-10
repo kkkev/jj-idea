@@ -253,7 +253,11 @@ tasks.test {
     useJUnitPlatform {
         excludeTags("platform", "contract")
     }
-    maxHeapSize = "1g"
+    // 1g was no longer enough headroom for a single JVM to run the whole suite (~600+ classes,
+    // 70+ files using mockk<>() - each first mock of a distinct type generates and retains a new
+    // ByteBuddy proxy class for the JVM's lifetime, so heap/classloader pressure grows
+    // monotonically over the run with no forkEvery to recycle it).
+    maxHeapSize = "2g"
     testClassesDirs = sourceSets["test"].output.classesDirs
 
     // Clear whatever IJPGP configured directly on the shared, default test task object before

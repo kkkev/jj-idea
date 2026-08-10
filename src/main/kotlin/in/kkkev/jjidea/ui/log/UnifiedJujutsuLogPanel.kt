@@ -5,6 +5,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.LogWindowConfig
@@ -47,7 +48,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
      * The full-set graph nodes produced by the background data loader.
      * Reused unchanged when no filter is active (visible set == full set).
      */
-    private var fullGraphNodes: Map<ChangeId, GraphNode> = emptyMap()
+    private var fullGraphNodes: Map<ChangeKey, GraphNode> = emptyMap()
 
     /**
      * Called by the tab manager when this window's name changes (via the configure dialog) so the

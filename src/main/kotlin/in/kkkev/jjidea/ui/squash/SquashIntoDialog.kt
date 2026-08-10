@@ -108,7 +108,7 @@ class SquashIntoDialog(
         )
     }
     private val pickerTableModel = JujutsuLogTableModel()
-    private var pickerGraphNodes: Map<ChangeId, GraphNode> = emptyMap()
+    private var pickerGraphNodes: Map<ChangeKey, GraphNode> = emptyMap()
     private val pickerTable = JBTable(pickerTableModel).apply {
         setSelectionMode(
             if (pickingSources) {

@@ -3,7 +3,7 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
-import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.components.*
 import java.awt.*
@@ -26,7 +26,7 @@ import javax.swing.table.TableCellRenderer
  * this renderer without one.
  */
 class JujutsuGraphAndDescriptionRenderer(
-    private val graphNodes: Map<ChangeId, GraphNode>,
+    private val graphNodes: Map<ChangeKey, GraphNode>,
     private val columnManager: JujutsuColumnManager = JujutsuColumnManager.DEFAULT,
     private val linkifier: Linkifier = Linkifier.None
 ) : TableCellRenderer {
@@ -62,18 +62,18 @@ class JujutsuGraphAndDescriptionRenderer(
     private fun getRowPassthroughs(model: JujutsuLogTableModel): Map<Int, Set<Int>> {
         rowPassthroughCache?.let { return it }
 
-        val rowByChangeId = mutableMapOf<ChangeId, Int>()
+        val rowByKey = mutableMapOf<ChangeKey, Int>()
         for (row in 0 until model.rowCount) {
             val entry = model.getEntry(row) ?: continue
-            rowByChangeId[entry.id] = row
+            rowByKey[entry.key] = row
         }
 
         val result = mutableMapOf<Int, MutableSet<Int>>()
         for (row in 0 until model.rowCount) {
             val entry = model.getEntry(row) ?: continue
-            val node = graphNodes[entry.id] ?: continue
-            for ((parentId, lane) in node.passthroughLanes) {
-                val parentRow = rowByChangeId[parentId] ?: continue
+            val node = graphNodes[entry.key] ?: continue
+            for ((parentKey, lane) in node.passthroughLanes) {
+                val parentRow = rowByKey[parentKey] ?: continue
                 for (r in (row + 1) until parentRow) {
                     result.getOrPut(r) { mutableSetOf() }.add(lane)
                 }
@@ -106,7 +106,7 @@ class JujutsuGraphAndDescriptionRenderer(
         private val mousePos: Point?
     ) : JPanel(null) {
         private val entry = (table.model as? JujutsuLogTableModel)?.getEntry(row)
-        private val graphNode = entry?.let { graphNodes[it.id] }
+        private val graphNode = entry?.let { graphNodes[it.key] }
         private val textPanel = TruncatingLeftRightLayout().apply {
             isOpaque = false
         }
@@ -201,8 +201,8 @@ class JujutsuGraphAndDescriptionRenderer(
                 getRowPassthroughs(m)[row]?.let { activeLanes.addAll(it) }
                 for (prevRow in 0 until row) {
                     val prevEntry = m.getEntry(prevRow) ?: continue
-                    val prevNode = graphNodes[prevEntry.id] ?: continue
-                    if (prevEntry.parentIds.contains(entry.id)) activeLanes.add(prevNode.lane)
+                    val prevNode = graphNodes[prevEntry.key] ?: continue
+                    if (prevEntry.parentKeys.contains(entry.key)) activeLanes.add(prevNode.lane)
                 }
                 for (parentLane in graphNode.parentLanes) {
                     if (parentLane != graphNode.lane) activeLanes.add(parentLane)
@@ -294,14 +294,14 @@ class JujutsuGraphAndDescriptionRenderer(
 
             for (prevRow in 0 until currentRow) {
                 val prevEntry = model.getEntry(prevRow) ?: continue
-                val prevNode = graphNodes[prevEntry.id] ?: continue
+                val prevNode = graphNodes[prevEntry.key] ?: continue
 
-                val parentIndex = prevEntry.parentIds.indexOf(currentEntry.id)
+                val parentIndex = prevEntry.parentKeys.indexOf(currentEntry.key)
                 if (parentIndex >= 0) {
                     val childLane = prevNode.lane
                     val childHasMultipleParents = prevNode.parentLanes.size > 1
 
-                    val passThroughLane = prevNode.passthroughLanes[currentEntry.id]
+                    val passThroughLane = prevNode.passthroughLanes[currentEntry.key]
                     val connectionLane = passThroughLane
                         ?: if (childHasMultipleParents) node.lane else childLane
                     val connectionX = graphStartX + laneWidth / 2 + connectionLane * laneWidth
@@ -312,10 +312,10 @@ class JujutsuGraphAndDescriptionRenderer(
 
             val childHasMultipleParents = node.parentLanes.size > 1
 
-            for (parentId in currentEntry.parentIds) {
-                val parentLane = graphNodes[parentId]?.lane ?: continue
+            for (parentKey in currentEntry.parentKeys) {
+                val parentLane = graphNodes[parentKey]?.lane ?: continue
 
-                val passThroughLane = node.passthroughLanes[parentId]
+                val passThroughLane = node.passthroughLanes[parentKey]
                 val targetLane = passThroughLane
                     ?: if (childHasMultipleParents && parentLane != node.lane) parentLane else node.lane
                 val targetX = graphStartX + laneWidth / 2 + targetLane * laneWidth

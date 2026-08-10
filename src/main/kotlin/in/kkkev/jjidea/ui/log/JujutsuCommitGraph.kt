@@ -3,6 +3,8 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.ui.JBColor
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
 import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
 import `in`.kkkev.jjidea.util.measurePerf
@@ -22,14 +24,14 @@ import java.awt.Color
  * @property color Color for this commit's line
  * @property parentLanes Lanes where parent commits are located
  * @property childLanes Lanes where child commits are located (for fork detection)
- * @property passthroughLanes For each non-adjacent parent, the passthrough lane used (parent ChangeId → lane)
+ * @property passthroughLanes For each non-adjacent parent, the passthrough lane used (parent ChangeKey → lane)
  */
 data class GraphNode(
     val lane: Int,
     val color: Color,
     val parentLanes: List<Int> = emptyList(),
     val childLanes: List<Int> = emptyList(),
-    val passthroughLanes: Map<ChangeId, Int> = emptyMap(),
+    val passthroughLanes: Map<ChangeKey, Int> = emptyMap(),
     /** Optional row highlight for preview (e.g., source/destination highlighting in rebase dialog). */
     val highlightColor: Color? = null
 )
@@ -37,10 +39,14 @@ data class GraphNode(
 /**
  * Interface for entries that can be laid out in a commit graph.
  * This allows testing without depending on full LogEntry with IntelliJ Platform classes.
+ * Includes repo so that entries are unique, even across multiple repos.
  */
 interface GraphableEntry {
+    val repo: JujutsuRepository
     val id: ChangeId
     val parentIds: List<ChangeId>
+    val key: ChangeKey get() = ChangeKey(repo, id)
+    val parentKeys: List<ChangeKey> get() = parentIds.map { ChangeKey(repo, it) }
 }
 
 /**
@@ -64,7 +70,7 @@ class CommitGraphBuilder {
         JBColor(0x689F38, 0x8BC34A) // Light green (darker for light theme)
     )
 
-    private val layoutCalculator = LayoutCalculatorImpl<ChangeId>()
+    private val layoutCalculator = LayoutCalculatorImpl<ChangeKey>()
 
     private fun colorForLane(lane: Int): Color = colors[lane % colors.size]
 
@@ -72,12 +78,14 @@ class CommitGraphBuilder {
      * Build graph layout for commits.
      *
      * @param entries List of commits (newest first, as returned by jj log)
-     * @return Map of changeId -> GraphNode
+     * @return Map of ChangeKey -> GraphNode. Keyed by repo-scoped [ChangeKey], not bare [ChangeId],
+     *   so entries from different repos whose ids coincidentally collide (e.g. the root commit's
+     *   id) are never treated as the same graph node (jj-idea-1ra9).
      */
-    fun buildGraph(entries: List<GraphableEntry>): Map<ChangeId, GraphNode> =
+    fun buildGraph(entries: List<GraphableEntry>): Map<ChangeKey, GraphNode> =
         log.measurePerf("graph-layout") { report ->
             report.count("rows", entries.size.toLong())
-            val graphEntries = entries.map { GraphEntry(it.id, it.parentIds) }
+            val graphEntries = entries.map { GraphEntry(it.key, it.parentKeys) }
             val layout = layoutCalculator.calculate(graphEntries)
             report.count("operations", layoutCalculator.operationCount)
             layout.rows.associate { row ->

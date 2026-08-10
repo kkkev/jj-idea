@@ -4,7 +4,7 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
-import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
@@ -38,7 +38,7 @@ class SplitPreviewPanel : JPanel(BorderLayout()) {
         border = JBUI.Borders.empty(4, 8)
     }
 
-    private var graphNodes: Map<ChangeId, GraphNode> = emptyMap()
+    private var graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
     private var allEntries: List<LogEntry> = emptyList()
 
     init {
@@ -78,8 +78,8 @@ class SplitPreviewPanel : JPanel(BorderLayout()) {
         tableModel.setEntries(simulation.entries)
 
         val baseNodes = CommitGraphBuilder().buildGraph(simulation.entries)
-        graphNodes = baseNodes.mapValues { (id, node) ->
-            when (id) {
+        graphNodes = baseNodes.mapValues { (key, node) ->
+            when (key.revision) {
                 simulation.parentId -> node.copy(highlightColor = JujutsuColors.SOURCE_HIGHLIGHT)
                 simulation.childId -> node.copy(highlightColor = JujutsuColors.DESTINATION_HIGHLIGHT)
                 else -> node

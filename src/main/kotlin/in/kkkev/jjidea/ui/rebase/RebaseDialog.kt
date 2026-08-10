@@ -77,7 +77,7 @@ class RebaseDialog(
         textEditor.emptyText.text = JujutsuBundle.message("dialog.rebase.destination.search")
     }
     private val destTableModel = JujutsuLogTableModel()
-    private var destGraphNodes: Map<ChangeId, GraphNode> = emptyMap()
+    private var destGraphNodes: Map<ChangeKey, GraphNode> = emptyMap()
     private val destinationTable = JBTable(destTableModel).apply {
         setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
         tableHeader.isVisible = false

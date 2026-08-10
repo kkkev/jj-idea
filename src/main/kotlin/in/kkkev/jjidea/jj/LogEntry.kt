@@ -9,7 +9,7 @@ import kotlinx.datetime.Instant
  * This is a pure data class / DTO representing parsed JJ log output.
  */
 data class LogEntry(
-    val repo: JujutsuRepository,
+    override val repo: JujutsuRepository,
     override val id: ChangeId,
     override val commitId: CommitId,
     private val underlyingDescription: String,

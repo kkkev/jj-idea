@@ -28,6 +28,11 @@ class JujutsuLogTableModelFilterTest {
     private val bob = VcsUserImpl("Bob", "bob@example.com")
     private val charlie = VcsUserImpl("Charlie", "charlie@example.com")
 
+    // Shared across createEntry() calls by default so entries in the same test are the same
+    // repo (mockk() instances are distinct by identity) - tests that need cross-repo behavior
+    // pass an explicit repo instead.
+    private val repo = mockk<JujutsuRepository>()
+
     @BeforeEach
     fun setup() {
         model = JujutsuLogTableModel()
@@ -39,9 +44,10 @@ class JujutsuLogTableModelFilterTest {
         author: VcsUser? = alice,
         timestamp: Instant? = Instant.fromEpochMilliseconds(1000000000L),
         bookmarks: List<Bookmark> = emptyList(),
-        commitId: String = "0000000000000000000000000000000000000000"
+        commitId: String = "0000000000000000000000000000000000000000",
+        repo: JujutsuRepository = this.repo
     ) = LogEntry(
-        repo = mockk<JujutsuRepository>(),
+        repo = repo,
         id = ChangeId(changeId, changeId, null),
         commitId = CommitId(commitId),
         underlyingDescription = description,
@@ -438,7 +444,7 @@ class JujutsuLogTableModelFilterTest {
             model.setEntries(listOf(entry1, entry2, entry3))
 
             // Filter to show only the main bookmark and its ancestors
-            model.setBookmarkFilter(setOf(ChangeId("abc123", "ab", null)))
+            model.setBookmarkFilter(setOf(ChangeKey(repo, ChangeId("abc123", "ab", null))))
 
             model.rowCount shouldBe 1
             model.getEntry(0)?.id?.short shouldBe "abc123"
@@ -454,8 +460,8 @@ class JujutsuLogTableModelFilterTest {
 
             model.setBookmarkFilter(
                 setOf(
-                    ChangeId("abc123", "ab", null),
-                    ChangeId("def456", "de", null)
+                    ChangeKey(repo, ChangeId("abc123", "ab", null)),
+                    ChangeKey(repo, ChangeId("def456", "de", null))
                 )
             )
 
@@ -474,6 +480,23 @@ class JujutsuLogTableModelFilterTest {
             model.setBookmarkFilter(emptySet())
 
             model.rowCount shouldBe 2
+        }
+
+        @Test
+        fun `filter keyed to one repo's entry does not match another repo's entry with the same change id`() {
+            val repoA = mockk<JujutsuRepository>()
+            val repoB = mockk<JujutsuRepository>()
+            // Both repos' roots share the same (synthetic) change id, mirroring jj's real root
+            // commit id "zzzzzzzz..." across repos (jj-idea-1ra9).
+            val rootA = createEntry("zzzzzzzz", "Root A", repo = repoA)
+            val rootB = createEntry("zzzzzzzz", "Root B", repo = repoB)
+
+            model.setEntries(listOf(rootA, rootB))
+
+            model.setBookmarkFilter(setOf(ChangeKey(repoA, rootA.id)))
+
+            model.rowCount shouldBe 1
+            model.getEntry(0)?.repo shouldBe repoA
         }
     }
 
@@ -914,7 +937,7 @@ class JujutsuLogTableModelFilterTest {
             model.setEntries(listOf(createEntry("aaa111")))
             callCount = 0
 
-            model.setBookmarkFilter(setOf(ChangeId("aaa111", "aaa111", null)))
+            model.setBookmarkFilter(setOf(ChangeKey(repo, ChangeId("aaa111", "aaa111", null))))
 
             callCount shouldBe 1
         }

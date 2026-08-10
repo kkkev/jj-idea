@@ -40,6 +40,34 @@ internal fun selectableBookmarkNames(bookmarks: List<Bookmark>): Map<String, Boo
     }.toMap()
 
 /**
+ * Walks the ancestry of every entry in [entries] satisfying [matches], returning the repo-scoped
+ * keys of the matched entries and all their ancestors, or `null` if nothing matched (the caller
+ * treats `null` as "not loaded yet, trigger an expansion").
+ *
+ * Scoped to [ChangeKey] (not a bare [ChangeId]) throughout: jj's root commit has the identical
+ * change ID ("zzzzzzzz...") in every repository since it's synthetic rather than
+ * content-derived, so a bare-id walk would cross into another repo's ancestry once it reaches a
+ * root (jj-idea-1ra9). Seeding from *every* match, not just the first, also means the same
+ * bookmark/tag name in two repos - or `@` in a multi-repo project - returns both repos' ancestries
+ * instead of only the first repo's (jj-idea-2xf3).
+ */
+internal fun ancestorKeys(entries: List<LogEntry>, matches: (LogEntry) -> Boolean): Set<ChangeKey>? {
+    val entryByKey = entries.associateBy { it.key }
+    val seeds = entries.filter(matches).map { it.key }
+    if (seeds.isEmpty()) return null
+
+    val result = mutableSetOf<ChangeKey>()
+    val toVisit = ArrayDeque(seeds)
+    while (toVisit.isNotEmpty()) {
+        val current = toVisit.removeFirst()
+        if (result.add(current)) {
+            entryByKey[current]?.let { toVisit.addAll(it.parentKeys) }
+        }
+    }
+    return result
+}
+
+/**
  * Filter component for references (bookmarks, tags, and @).
  * When a reference is selected, includes all parent commits of that reference.
  * Out-of-limit references trigger a context-window expansion (same as navigate-to-out-of-limit).
@@ -187,11 +215,11 @@ class JujutsuReferenceFilterComponent(
             tableModel.setBookmarkFilter(emptySet())
             return
         }
-        val ancestorIds = getAncestorIds(ref)
+        val ancestorKeys = getAncestorKeys(ref)
         when {
-            ancestorIds != null -> {
+            ancestorKeys != null -> {
                 expansionInFlight = false
-                tableModel.setBookmarkFilter(ancestorIds)
+                tableModel.setBookmarkFilter(ancestorKeys)
             }
 
             !expansionInFlight -> {
@@ -214,31 +242,15 @@ class JujutsuReferenceFilterComponent(
         )
     }
 
-    private fun getAncestorIds(ref: SelectedRef): Set<ChangeId>? {
-        val allEntries = tableModel.getAllEntries()
-        val result = mutableSetOf<ChangeId>()
-        val toVisit = mutableSetOf<ChangeId>()
-
-        val referencedEntry = allEntries.find { entry ->
+    private fun getAncestorKeys(ref: SelectedRef): Set<ChangeKey>? =
+        ancestorKeys(tableModel.getAllEntries()) { entry ->
             when (ref.type) {
                 ReferenceType.WORKING_COPY -> entry.isWorkingCopy
                 ReferenceType.BOOKMARK, ReferenceType.REMOTE_BOOKMARK ->
                     entry.bookmarks.any { it.name.name == ref.name }
                 ReferenceType.TAG -> entry.tags.any { it.name == ref.name }
             }
-        } ?: return null
-
-        toVisit.add(referencedEntry.id)
-        while (toVisit.isNotEmpty()) {
-            val current = toVisit.first()
-            toVisit.remove(current)
-            if (current !in result) {
-                result.add(current)
-                allEntries.find { it.id == current }?.let { toVisit.addAll(it.parentIds) }
-            }
         }
-        return result
-    }
 
     private inner class SelectReferenceAction(private val reference: String, private val type: ReferenceType) :
         ToggleAction(reference) {

@@ -5,6 +5,7 @@ import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -81,7 +82,7 @@ class JujutsuLogTableSelectionFilterTest {
         val table = tableWith(listOf(a, b))
         table.setRowSelectionInterval(0, 0)
 
-        table.logModel.setBookmarkFilter(setOf(a.id))
+        table.logModel.setBookmarkFilter(setOf(ChangeKey(repo, a.id)))
         table.selectedEntry?.id shouldBe a.id
 
         table.logModel.setBookmarkFilter(emptySet())
