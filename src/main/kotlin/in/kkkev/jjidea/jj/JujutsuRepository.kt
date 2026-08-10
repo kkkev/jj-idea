@@ -122,8 +122,18 @@ data class JujutsuRepositoryImpl(
     override fun createContentRevision(filePath: FilePath, contentLocator: ContentLocator): ContentRevision =
         when (contentLocator) {
             is WorkingCopy -> CurrentContentRevision(filePath)
-            is MergeParentOf -> MergeParentContentRevision(filePath, contentLocator)
-            is ChangeId -> ContentLogEntryImpl(filePath, contentLocator)
+            is MergeParentOf -> MergeParentContentRevision(this, filePath, contentLocator)
+            // The working copy's own change id is used as the "after" locator for @ (see
+            // CliLogService.getFileChanges), but its content is live, not a fixed `jj file show`
+            // snapshot — use CurrentContentRevision so the diff viewer sees background edits and
+            // its cached DiffRequest stays valid (jj-idea-q6vn). Compare against the cached
+            // working-copy map, not getLogEntry/logCache, which can shell out to jj on a miss.
+            is ChangeId ->
+                if (contentLocator == project.stateModel.workingCopies.value[directory.path]?.id) {
+                    CurrentContentRevision(filePath)
+                } else {
+                    ContentLogEntryImpl(this, filePath, contentLocator)
+                }
             is ContentLocator.Empty -> EmptyContentRevisionImpl(filePath)
         }
 
@@ -131,7 +141,7 @@ data class JujutsuRepositoryImpl(
         if (logEntry.isWorkingCopy) {
             CurrentContentRevision(filePath)
         } else {
-            ContentLogEntryImpl(filePath, logEntry.id)
+            ContentLogEntryImpl(this, filePath, logEntry.id)
         }
 
     override fun createContentRevision(fileAtVersion: FileAtVersion) =
@@ -154,32 +164,6 @@ data class JujutsuRepositoryImpl(
         } else {
             JujutsuVirtualFile(fileAtVersion, this)
         }
-
-    /**
-     * Represents the content of a file prior to a merge.
-     */
-    private inner class MergeParentContentRevision(
-        private val filePath: FilePath,
-        private val mergeParentOf: MergeParentOf
-    ) : ContentRevision {
-        override fun getContent() = reconstructMergeParentContent(mergeParentOf.childRevision, filePath)
-
-        override fun getFile() = filePath
-
-        override fun getRevisionNumber() = MergeParentRevisionNumber(mergeParentOf.childRevision)
-    }
-
-    private inner class ContentLogEntryImpl(private val filePath: FilePath, private val changeId: ChangeId) :
-        ContentRevision {
-        override fun getFile() = filePath
-
-        override fun getRevisionNumber() = ChangeIdRevisionNumber(changeId)
-
-        override fun getContent(): String? {
-            val result = commandExecutor.show(filePath, changeId)
-            return result.stdout.takeIf { result.isSuccess }
-        }
-    }
 
     private inner class DiffSideImpl(val file: VirtualFile?) : DiffSide {
         init {
@@ -219,12 +203,6 @@ data class JujutsuRepositoryImpl(
             }
         }
     }
-
-    private class EmptyContentRevisionImpl(private val filePath: FilePath) : ContentRevision {
-        override fun getFile() = filePath
-        override fun getContent() = null
-        override fun getRevisionNumber() = dummyRevisionNumber(ContentLocator.Empty.title)
-    }
 }
 
 /**
@@ -240,14 +218,4 @@ fun JujutsuRepository.reconstructMergeParentContent(childRevision: Revision, fil
     val diffResult = commandExecutor.diffGitFile(childRevision, filePath)
     if (!diffResult.isSuccess || diffResult.stdout.isBlank()) return afterContent
     return GitDiffReverseApplier.reverseApply(afterContent, diffResult.stdout) ?: afterContent
-}
-
-private fun dummyRevisionNumber(title: String) = object : VcsRevisionNumber {
-    override fun asString() = title
-    override fun toString() = title
-
-    override fun compareTo(other: VcsRevisionNumber?) = when {
-        other === this -> 0
-        else -> this.toString().compareTo(other.toString())
-    }
 }

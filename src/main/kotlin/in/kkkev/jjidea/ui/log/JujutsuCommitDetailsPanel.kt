@@ -23,6 +23,7 @@ import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
 import `in`.kkkev.jjidea.ui.common.changesTreeToolbar
+import `in`.kkkev.jjidea.ui.common.sameChangesAndStatuses
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -201,7 +202,12 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
             try {
                 val changes = ChangeService.loadChanges(entries)
                 runLater {
-                    if (currentEntries == entries) {
+                    // currentEntries can churn on every refresh for the working-copy entry (its
+                    // commitId/timestamps change on every jj snapshot, defeating the showCommits
+                    // equality guard above), so re-check the actual changes here too: skipping a
+                    // no-op rebuild preserves tree expansion state and lets the diff preview's
+                    // request cache hit, keeping its scroll position (jj-idea-q6vn).
+                    if (currentEntries == entries && !sameChangesAndStatuses(changes, changesTree.changes)) {
                         changesTree.setChangesToDisplay(changes)
                         changesTree.invokeAfterRefresh { changesTree.treeExpander.expandAll() }
                     }

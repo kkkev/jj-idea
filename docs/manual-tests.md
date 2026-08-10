@@ -955,6 +955,8 @@ verify it once per surface it's referenced from, not three times independently:
 - [ ] Cmd/Ctrl+D opens the same diff preview tab (routes through preview when available)
 - [ ] F4 still opens the file in a regular editor tab (no "Synchronous execution on EDT" error in IDE log)
 - [ ] With the diff tab open and a different (regular) editor tab focused, edit and save that file — the editor stays on it; it does not switch to the diff tab (GitHub #67)
+- [ ] jj-idea-q6vn: with the diff tab open on a long file, scrolled away from the top, edit and save a *different* tracked file from outside the IDE (e.g. a terminal) — once the background refresh lands, the diff stays scrolled where it was, it does not jump to the top
+- [ ] jj-idea-q6vn: with `@` selected and its diff tab open on the working-copy side, the right-hand pane title reads "Current" (not the change id) and is editable; editing and saving the file *shown in the diff* updates its content in place without resetting scroll
 
 ### MT-CONFLICT
 

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed a build issue that could have prevented the plugin from being verified as compatible with IntelliJ IDEA 2025.1.
+- Viewing a file's diff no longer jumps back to the top whenever a background process (e.g. an AI coding assistant) edits a file elsewhere in the repository. Viewing the working copy's own diff also now shows live content instead of a stale snapshot if the file changes while its diff is open. ([#58](https://github.com/kkkev/jj-idea/issues/58))
 - Actions triggered internally by the plugin (e.g. the uninitialized-repo notification's "Initialize" action, and "Show History for Selection") now go through IntelliJ's supported action-invocation API instead of an internal-only method, avoiding a plugin compatibility warning.
 - Bookmark, tag, working-copy (`@`), conflict and divergent-change colours in the log and annotation gutter are now readable on a light theme background — the bookmark gold in particular was nearly invisible. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 

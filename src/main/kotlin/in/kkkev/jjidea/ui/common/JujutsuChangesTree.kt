@@ -112,3 +112,17 @@ class JujutsuChangesTree(
         installPopupHandler(fileChangeActionGroup())
     }
 }
+
+/**
+ * True if [a] and [b] represent the same set of changes, comparing each pair's
+ * [Change.equals] (which only compares before/after [com.intellij.openapi.vcs.FilePath]s) *and*
+ * [Change.getFileStatus]. A plain list comparison would treat e.g. a file that transitioned
+ * MERGED_WITH_CONFLICTS -> MODIFIED (same paths, resolved conflict) as unchanged, leaving stale
+ * conflict decoration in the tree (jj-idea-3cvb).
+ *
+ * Callers that rebuild a [JujutsuChangesTree]'s contents from a background refresh should skip
+ * the rebuild when this returns true, to avoid discarding UI state such as tree expansion or the
+ * diff preview's scroll position (jj-idea-q6vn).
+ */
+fun sameChangesAndStatuses(a: List<Change>, b: List<Change>): Boolean =
+    a.size == b.size && a.indices.all { i -> a[i] == b[i] && a[i].fileStatus == b[i].fileStatus }
