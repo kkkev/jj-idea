@@ -233,6 +233,16 @@ here" without a hand cursor implying a left-click action that doesn't exist.
 - [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
 - [ ] The "+N more" overflow chip shows both a hand cursor and the same grey background highlight on hover (jj-idea-ttmp), and **left-clicking** it still opens its popup of hidden refs, each still openable via their own submenu
 
+#### Palette readability (jj-idea-mn1a)
+
+- [ ] Switch the IDE to a **light** theme (e.g. IntelliJ Light). Bookmark chips, tag chips, the
+      `@` working-copy marker, a conflicted change's marker, and a divergent change's marker are
+      all comfortably readable against the row background — none reads as washed-out or
+      near-invisible (was reported for bookmark gold, GitHub #51)
+- [ ] Repeat with a row **selected** (chips keep their accent color per the hover-highlight item
+      above; confirm it's still readable against the selection background too)
+- [ ] Switch back to a **dark** theme (e.g. Darcula) and confirm nothing regressed there
+
 ### MT-LOG-GRAPH
 
 **Graph rendering**
@@ -914,6 +924,8 @@ be misclassified as backward/sideways.
 - [ ] Annotate on a file whose working copy is a merge commit succeeds (no "resolved to more than one revision" error)
 - [ ] Annotate on a merge commit with a resolved conflict shows no "line count" warning, and correctly attributes lines inherited from each parent plus the conflict-resolution line(s) to the merge commit itself
 - [ ] Annotate on a merge commit where the file exists in only some parents (e.g. a criss-cross merge) succeeds (no "No such path" error), attributing blame from whichever parents have the file
+- [ ] jj-idea-mn1a: with the IDE on a **light** theme, the change-id column in the annotation
+      gutter is readable, not washed-out
 - [ ] Has open in -> remote (see Diffs above)
 
 #### Editors for Historical Versions

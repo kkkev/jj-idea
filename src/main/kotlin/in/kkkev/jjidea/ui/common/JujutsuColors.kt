@@ -9,25 +9,36 @@ import com.intellij.ui.JBColor
 object JujutsuColors {
     /**
      * Working copy indicator color (@).
+     *
+     * Contrast-checked against panel backgrounds (>=4.5:1) — see [JujutsuColorsContrastTest].
      */
-    val WORKING_COPY = JBColor(0x6494ED, 0x5C84D6)
+    val WORKING_COPY = JBColor(0x2A5AAE, 0x7EA6F0)
 
     /**
      * Bookmark/reference color.
+     *
+     * Contrast-checked against panel backgrounds (>=4.5:1) — see [JujutsuColorsContrastTest].
      */
-    val BOOKMARK = JBColor(0xF0C674, 0xD4A574)
+    val BOOKMARK = JBColor(0x7A5D00, 0xD4A574)
 
     /**
      * Tag color (distinct from bookmark gold).
+     *
+     * Contrast-checked against panel backgrounds (>=4.5:1) — see [JujutsuColorsContrastTest].
      */
-    val TAG = JBColor(0x6FAF6F, 0x5FA85F)
+    val TAG = JBColor(0x256B29, 0x5FA85F)
 
     /**
      * Conflict indicator color.
+     *
+     * Contrast-checked against panel backgrounds (>=4.5:1) — see [JujutsuColorsContrastTest].
      */
-    val CONFLICT = JBColor.RED
+    val CONFLICT = JBColor(0xC00000, 0xFF6464)
 
-    val DIVERGENT = JBColor.PINK
+    /**
+     * Contrast-checked against panel backgrounds (>=4.5:1) — see [JujutsuColorsContrastTest].
+     */
+    val DIVERGENT = JBColor(0xB0006E, 0xFFAFAF)
 
     /**
      * Highlight for source changes for a rebase operation.
