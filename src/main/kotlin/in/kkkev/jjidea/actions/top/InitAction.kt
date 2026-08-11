@@ -64,7 +64,7 @@ class InitAction : DumbAwareAction(
             // exists. Force the platform to re-check root validity so it recognizes this
             // directory as an active VCS root (otherwise ChangeListManager/JujutsuChangeProvider
             // keep ignoring it and file statuses never update) (jj-idea-uw11).
-            ProjectLevelVcsManagerEx.getInstanceEx(project).scheduleMappedRootsUpdate()
+            (manager as ProjectLevelVcsManagerEx).scheduleMappedRootsUpdate()
 
             result
         }.onSuccess {
