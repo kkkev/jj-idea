@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.10] - 2026-08-11
+
 ### Fixed
 - Fixed a bug that could have crashed "Init" (create a new Jujutsu repository) on IntelliJ IDEA 2025.1 and 2025.2.
 
@@ -770,7 +772,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.9...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.10...HEAD
+[0.8.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.10
 [0.8.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.9
 [0.8.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.8
 [0.8.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.7
