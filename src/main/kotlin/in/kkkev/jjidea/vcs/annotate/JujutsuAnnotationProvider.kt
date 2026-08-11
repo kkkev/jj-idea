@@ -3,13 +3,16 @@ package `in`.kkkev.jjidea.vcs.annotate
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.annotate.AnnotationProvider
 import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.history.VcsFileRevision
+import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.vcs.AnnotationProviderEx
 import com.intellij.vcs.CacheableAnnotationProvider
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
@@ -24,6 +27,7 @@ import `in`.kkkev.jjidea.jj.reconstructMergeParentContent
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.contentLocator
 import `in`.kkkev.jjidea.vcs.contentLocator
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
@@ -40,6 +44,7 @@ class JujutsuAnnotationProvider(
     private val vcs: JujutsuVcsBase,
     private val nowMs: () -> Long = System::currentTimeMillis
 ) : AnnotationProvider,
+    AnnotationProviderEx,
     CacheableAnnotationProvider {
     private val log = Logger.getInstance(javaClass)
 
@@ -224,6 +229,25 @@ class JujutsuAnnotationProvider(
     }
 
     override fun isAnnotationValid(rev: VcsFileRevision) = true
+
+    /**
+     * Entry point for the platform's built-in Annotate action on a [com.intellij.openapi.vcs.vfs.VcsVirtualFile]
+     * (e.g. a file opened from the log or the File History panel) — see [com.intellij.vcs.AnnotationProviderEx].
+     * Unlike [annotate], which deliberately annotates at `@-` to match the LineStatusTracker base, this
+     * annotates *at* the given revision, matching [annotate]'s revision-argument overload above.
+     */
+    override fun annotate(path: FilePath, revision: VcsRevisionNumber): FileAnnotation {
+        val repo = project.jujutsuRepositoryFor(path)
+        val locator = revision.contentLocator
+        val file = repo.getVirtualFile(FileAtVersion(path, locator))
+            ?: throw VcsException("Cannot find virtual file for $path at $locator")
+
+        (locator as? MergeParentOf)?.let { mergeParentOf ->
+            annotateMerge(file, mergeParentOf, repo)?.let { return it }
+        }
+
+        return annotateInternal(file, (locator as? Revision) ?: repo.workingCopy.id, repo)
+    }
 
     /** Runs `jj file annotate` for a single revision and parses the result. */
     private fun getAnnotationLines(

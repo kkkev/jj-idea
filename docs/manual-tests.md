@@ -79,7 +79,6 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 - **jj-idea-lo7u** — "Compare Before with Another Commit…" missing from every file-menu surface.
 - **jj-idea-7d9p** — "Compare with Another Commit" missing from Details Changes Panel / Working Copy Panel.
 - **jj-idea-zvzk** — "Compare with local" missing from editors for historical versions.
-- **jj-idea-3jo** — "Annotate" missing from editors for historical versions.
 - **jj-idea-ddcd** — native Commit tool window's "Resolve" link discards a side on cancel; use jj-idea's own "Resolve Conflicts…" entries instead, never this one.
 
 ## Test Sections
@@ -901,7 +900,7 @@ be misclassified as backward/sideways.
 **Diff viewing across file surfaces**
 
 **Code:** `vcs/diff/JujutsuDiffProvider.kt`, `actions/filechange/`, `vcs/annotate/`, `vcs/history/JujutsuHistoryProvider.kt`, `actions/file/OpenInRemoteFromEditorGroup.kt`, `actions/filechange/OpenFileInRemoteGroup.kt`
-**Also re-run:** MT-DIFF-PREVIEW; see [Known gaps](#known-gaps) for jj-idea-lo7u/7d9p/zvzk/3jo, which recur across every surface in this section
+**Also re-run:** MT-DIFF-PREVIEW; see [Known gaps](#known-gaps) for jj-idea-lo7u/7d9p/zvzk, which recur across every surface in this section
 
 #### Diffs
 
@@ -914,6 +913,8 @@ be misclassified as backward/sideways.
       (before=parent, current=selected), deleted (before=parent, current=empty), added
       (before=empty, current=@), renamed (before=@- with previous filepath, current=@)
 - [ ] Diff from working copy shows before = parent, current from working copy
+- [ ] jj-idea-zmse: right-clicking inside a diff viewer's editor pane shows "Annotate" exactly
+      once (not once at top level and again under "Jujutsu")
 - [ ] Right-hand diff pane is editable when it contains the working copy, read-only when
       it contains a historical version
 - [ ] "Open in -> remote": for a single parent, opens that parent (resolves to pushed
@@ -933,6 +934,9 @@ be misclassified as backward/sideways.
 - [ ] Annotate fetches annotations for the correct revision
 - [ ] "Annotate Previous Revision" on a line owned by a single-parent commit re-annotates at that commit's parent
 - [ ] "Annotate Previous Revision" on a line owned by a merge commit is unavailable/no-op (no incorrect ancestor shown)
+- [ ] jj-idea-xssw: "Annotate Previous Revision" on a line whose own change added the file (no
+      earlier version exists) declines gracefully — no raw error, no logged ReadAction-violation
+      warning (`idea.log`/Help → Show Log)
 - [ ] Annotate on a file whose working copy is a merge commit succeeds (no "resolved to more than one revision" error)
 - [ ] Annotate on a merge commit with a resolved conflict shows no "line count" warning, and correctly attributes lines inherited from each parent plus the conflict-resolution line(s) to the merge commit itself
 - [ ] Annotate on a merge commit where the file exists in only some parents (e.g. a criss-cross merge) succeeds (no "No such path" error), attributing blame from whichever parents have the file
@@ -944,8 +948,16 @@ be misclassified as backward/sideways.
 
 - [ ] Has title including change id, and a Jujutsu menu with diff and "compare with another commit"
 - [ ] Compare with another commit opens that commit on LHS, editor's version on RHS
+- [ ] jj-idea-hq4d: "Annotate" is enabled (both via right-click and the Jujutsu menu) for a file
+      opened from a historical commit — it used to be greyed out
 - [ ] Annotate fetches annotations for the correct revision
 - [ ] Has open in -> remote (see Diffs above, including the unpushed-historical-version case)
+
+#### File History
+
+- [ ] jj-idea-hq4d: opening a file from the File History panel (right-click a file → "Show File
+      History", pick an older revision, open the file) enables "Annotate"; it produces a blame
+      gutter for that revision's content
 
 ### MT-DIFF-PREVIEW
 

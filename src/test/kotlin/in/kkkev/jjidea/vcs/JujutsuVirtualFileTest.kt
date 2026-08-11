@@ -3,12 +3,16 @@ package `in`.kkkev.jjidea.vcs
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.vfs.VcsVirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -155,5 +159,40 @@ class JujutsuVirtualFileTest {
         file.contentsToByteArray() shouldBe "a".toByteArray()
 
         verify(exactly = 1) { contentRevision.content } // still just 1 call
+    }
+
+    // jj-idea-hq4d: extending VcsVirtualFile (rather than AbstractVcsVirtualFile) is what lets the
+    // platform's built-in Annotate action recognize files opened from a historical commit — see
+    // AnnotationData.extractFrom, which only matches VcsVirtualFile/ContentRevisionVirtualFile.
+    @Test
+    fun `is a VcsVirtualFile so the platform's Annotate action recognizes it`() {
+        val logEntry = mockk<LogEntry>().also {
+            every { it.immutable } returns true
+            every { it.id } returns contentLocator
+        }
+        val (repo) = mockRepo(logEntry)
+
+        makeFile(repo).shouldBeInstanceOf<VcsVirtualFile>()
+    }
+
+    @Test
+    fun `fileRevision carries the locator's revision number when a log entry is present`() {
+        val logEntry = mockk<LogEntry>().also {
+            every { it.immutable } returns true
+            every { it.id } returns contentLocator
+        }
+        val (repo) = mockRepo(logEntry)
+
+        val revision = makeFile(repo).fileRevision
+
+        revision.shouldBeInstanceOf<JujutsuFileRevision>()
+        revision.revisionNumber shouldBe ChangeIdRevisionNumber(contentLocator)
+    }
+
+    @Test
+    fun `fileRevision is null when there is no log entry`() {
+        val (repo) = mockRepo(logEntry = null)
+
+        makeFile(repo).fileRevision shouldBe null
     }
 }

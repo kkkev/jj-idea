@@ -3,11 +3,13 @@ package `in`.kkkev.jjidea.vcs.annotate
 import com.intellij.mock.MockVirtualFile
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.annotate.FileAnnotation
 import com.intellij.testFramework.LoggedErrorProcessor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.JujutsuStateModel
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -16,6 +18,8 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.util.NotifiableState
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
+import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -23,7 +27,10 @@ import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CancellationException
 
@@ -143,5 +150,48 @@ class JujutsuAnnotationProviderTest {
         listenerSlot.captured.changed(emptyMap())
 
         provider.getFromCache(file) shouldBe null
+    }
+
+    // jj-idea-hq4d: annotate(FilePath, VcsRevisionNumber) is the AnnotationProviderEx entry point
+    // the platform's built-in Annotate action calls for a VcsVirtualFile (e.g. a file opened from
+    // the log or File History). Unlike annotate(VirtualFile), which deliberately annotates at @-
+    // to match the LineStatusTracker base, this must annotate *at* the requested revision.
+    @Test
+    fun `annotate(path, revision) annotates at the requested revision, not the working-copy parent`() {
+        mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        try {
+            val filePath = LocalFilePath("/repo/file.txt", false)
+            every { project.jujutsuRepositoryFor(filePath) } returns repo
+            val targetRevision = ChangeId("target", "target")
+            every { repo.getVirtualFile(FileAtVersion(filePath, targetRevision)) } returns file
+            every { repo.commandExecutor } returns commandExecutor
+            every { repo.directory } returns MockVirtualFile("repo")
+            every { repo.workingCopy } returns mockk { every { id } returns ChangeId("wc", "wc") }
+            every { commandExecutor.annotate(file, targetRevision, any()) } returns
+                CommandExecutor.CommandResult(exitCode = 0, stdout = "", stderr = "")
+
+            provider.annotate(filePath, ChangeIdRevisionNumber(targetRevision))
+
+            verify(exactly = 1) { commandExecutor.annotate(file, targetRevision, any()) }
+        } finally {
+            unmockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        }
+    }
+
+    @Test
+    fun `annotate(path, revision) throws VcsException when no virtual file can be resolved`() {
+        mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        try {
+            val filePath = LocalFilePath("/repo/file.txt", false)
+            every { project.jujutsuRepositoryFor(filePath) } returns repo
+            val targetRevision = ChangeId("target", "target")
+            every { repo.getVirtualFile(FileAtVersion(filePath, targetRevision)) } returns null
+
+            shouldThrow<VcsException> {
+                provider.annotate(filePath, ChangeIdRevisionNumber(targetRevision))
+            }
+        } finally {
+            unmockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        }
     }
 }

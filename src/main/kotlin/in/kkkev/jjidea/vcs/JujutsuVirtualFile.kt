@@ -2,11 +2,14 @@ package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.vcs.vfs.AbstractVcsVirtualFile
 import com.intellij.openapi.vcs.vfs.VcsFileSystem
+import com.intellij.openapi.vcs.vfs.VcsVirtualFile
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.FileAtVersion
+import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 
 private val log = Logger.getInstance(JujutsuVirtualFile::class.java)
 
@@ -26,14 +29,22 @@ private val log = Logger.getInstance(JujutsuVirtualFile::class.java)
 class JujutsuVirtualFile(
     private val fileAtVersion: FileAtVersion,
     private val repo: JujutsuRepository,
+    private val logEntry: LogEntry? = repo.getLogEntry(fileAtVersion.contentLocator),
     /** Seam for tests: override to simulate ReadAction being held (or not) without a real Application. */
     internal val isReadAccessAllowed: () -> Boolean = { ApplicationManager.getApplication().isReadAccessAllowed },
     /** Seam for tests: override to avoid launching real background threads from unit tests. */
     private val backgroundExecutor: (Runnable) -> Unit = { r ->
         ApplicationManager.getApplication().executeOnPooledThread(r)
     }
-) : AbstractVcsVirtualFile(fileAtVersion.filePath) {
-    private val logEntry = repo.getLogEntry(contentLocator)
+) : VcsVirtualFile(
+        fileAtVersion.filePath,
+        // Gives extractFrom (AnnotationData.kt) a VcsFileRevisionEx to recognize this file for the
+        // platform's built-in Annotate action (jj-idea-hq4d). null for locators with no log entry
+        // (e.g. MergeParentOf), which correctly leaves Annotate disabled for those pseudo-files.
+        // possibleRemotes is deliberately empty: it's only consumed by the history-panel "Open in
+        // remote" action, never via a VirtualFile, and repo.gitRemotes can shell out.
+        logEntry?.let { JujutsuFileRevision(it, fileAtVersion.filePath, FileChange.Status.MODIFIED, emptyList()) }
+    ) {
     private val isImmutable = logEntry?.immutable == true
 
     // Cache content so EDT reads are non-blocking (cacheContents() pre-populates on a background thread).

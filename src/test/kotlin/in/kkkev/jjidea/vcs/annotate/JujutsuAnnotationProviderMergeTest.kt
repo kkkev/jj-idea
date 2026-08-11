@@ -2,21 +2,27 @@ package `in`.kkkev.jjidea.vcs.annotate
 
 import com.intellij.mock.MockVirtualFile
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.testFramework.junit5.TestApplication
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
+import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -175,5 +181,38 @@ class JujutsuAnnotationProviderMergeTest {
         result.shouldNotBeNull()
         result.getLineCount() shouldBe 1
         result.getLineRevisionNumber(0) shouldBe ChangeIdRevisionNumber(parent2)
+    }
+
+    // jj-idea-hq4d: the platform's Annotate action on a merge commit's auto-merged-parent file
+    // reaches annotate(FilePath, VcsRevisionNumber) with a MergeParentRevisionNumber. That must
+    // route through the same multi-parent reconciliation as annotateMerge, not a plain
+    // single-revision annotate (which would crash: a MergeParentOf locator isn't a real revision).
+    @Test
+    fun `annotate(path, revision) routes a MergeParentRevisionNumber through annotateMerge`() {
+        mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        try {
+            val filePath = LocalFilePath("/repo/test.txt", false)
+            every { project.jujutsuRepositoryFor(filePath) } returns repo
+            every { repo.getVirtualFile(FileAtVersion(filePath, MergeParentOf(childRevision))) } returns file
+            every { repo.commandExecutor } returns commandExecutor
+            every { repo.getLogEntry(childRevision) } returns mergeCommit(listOf(parent1, parent2))
+            every { repo.workingCopy } returns mergeCommit(listOf(parent1, parent2))
+            every { commandExecutor.show(any(), childRevision) } returns
+                CommandExecutor.CommandResult(0, "line one\nline two\n", "")
+            every { commandExecutor.diffGitFile(childRevision, any()) } returns
+                CommandExecutor.CommandResult(0, "", "")
+            every { commandExecutor.annotate(file, parent1, any()) } returns
+                annotateResult(parent1, "line one\n")
+            every { commandExecutor.annotate(file, parent2, any()) } returns
+                annotateResult(parent2, "line two\n")
+
+            val result = provider.annotate(filePath, MergeParentRevisionNumber(childRevision))
+
+            result.getLineCount() shouldBe 2
+            result.getLineRevisionNumber(0) shouldBe ChangeIdRevisionNumber(parent1)
+            result.getLineRevisionNumber(1) shouldBe ChangeIdRevisionNumber(parent2)
+        } finally {
+            unmockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        }
     }
 }

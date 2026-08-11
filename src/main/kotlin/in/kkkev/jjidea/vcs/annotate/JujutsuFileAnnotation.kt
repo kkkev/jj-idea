@@ -107,8 +107,16 @@ class JujutsuFileAnnotation(
      * [ParentFileRevision.loadContent] would otherwise throw a raw "No such path" VcsException
      * instead of the action simply being unavailable (jj-idea-o95r), mirroring the existing
      * multi-parent (merge-commit) decline above.
+     *
+     * Called from [PreviousFileRevisionProvider.getPreviousRevision], which the platform invokes
+     * from [AnnotatePreviousRevisionAction]'s BGT `update()` — that runs under an implicit
+     * ReadAction, so the CLI call must run on a separate pooled thread rather than blocking this
+     * one directly (jj-idea-xssw), same as [AnnotationFileRevision.loadContent] below.
      */
-    private fun fileExistsAt(revision: Revision) = repo.commandExecutor.show(file.filePath, revision).isSuccess
+    private fun fileExistsAt(revision: Revision): Boolean {
+        val future = runInBackground { repo.commandExecutor.show(file.filePath, revision) }
+        return ProgressIndicatorUtils.awaitWithCheckCanceled(future).isSuccess
+    }
 
     /**
      * Override to prevent EDT slow operations.
