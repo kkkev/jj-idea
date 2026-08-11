@@ -824,7 +824,7 @@ be misclassified as backward/sideways.
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping)
 
 #### Working Copy Panel
@@ -850,6 +850,19 @@ be misclassified as backward/sideways.
   / open the context menu — no `VcsException: Not a Jujutsu revision` appears in the IDE
   log, and jj's file-change actions (Open, Compare, Restore, etc.) simply don't offer that
   change
+
+#### Repository Initialization (jj-idea-uw11)
+
+- [ ] With a directory that is VCS-mapped to Jujutsu but has no `.jj` (shows the
+  "uninitialized root" notification), click **Initialize** on the notification, pick the
+  directory, confirm → the Working copy tool window populates with the repo's changes
+  immediately, without needing any further unrelated action (e.g. no `jj split` first)
+- [ ] Same check using **VCS → Jujutsu → Initialize** (top-level menu action) directly on an
+  already-mapped-but-uninitialized directory, instead of the notification's button
+- [ ] The Log tool window also shows the initial commit(s) immediately after Initialize
+- [ ] After Initialize, add/edit a file in the new repo — the editor gutter and Project view
+  show the correct added/modified colour immediately, without needing to touch Settings,
+  restart, or trigger an unrelated VCS refresh first
 
 #### Standard Commit Tool Window Suppression (jj-idea-wb5l)
 

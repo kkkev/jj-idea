@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Improved plugin compatibility by removing dependency on IntelliJ internal action API.
 - Bookmark, tag, working-copy (`@`), conflict and divergent-change colours in the log and annotation gutter are now readable on a light theme background — the bookmark gold in particular was nearly invisible. ([#51](https://github.com/kkkev/jj-idea/issues/51))
 - Fixed a memory leak that kept every project you'd opened pinned in memory for the rest of the IDE session, once its repository icon had been drawn anywhere (e.g. a multi-root VCS changes tree or the bookmark widget).
+- After clicking "Initialize" on the uninitialized-repository notification (or via VCS → Jujutsu → Initialize), the Working Copy tool window now shows the repository's changes and file statuses/editor colours update immediately, instead of staying empty/stale until some unrelated later action.
 
 ## [0.8.8] - 2026-08-07
 

@@ -8,6 +8,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.vcs.ex.ProjectLevelVcsManagerEx
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
@@ -57,10 +58,17 @@ class InitAction : DumbAwareAction(
             val newMappings = VcsUtil.addMapping(manager.getDirectoryMappings(), newRoot.path, JujutsuVcsBase.VCS_NAME)
             manager.setDirectoryMappings(newMappings)
 
+            // newRoot was very likely already mapped (as an uninitialized root) before this
+            // action ran, so newMappings is often identical to the existing list and
+            // setDirectoryMappings() is a no-op that won't re-validate the root now that .jj
+            // exists. Force the platform to re-check root validity so it recognizes this
+            // directory as an active VCS root (otherwise ChangeListManager/JujutsuChangeProvider
+            // keep ignoring it and file statuses never update) (jj-idea-uw11).
+            ProjectLevelVcsManagerEx.getInstanceEx(project).scheduleMappedRootsUpdate()
+
             result
         }.onSuccess {
-            project.stateModel.workingCopies.invalidate()
-            project.stateModel.logRefresh.notify(Unit)
+            project.stateModel.initialisedRepositories.invalidate()
         }.onFailure { tellUser(project, "action.init.error") }
             .executeAsync()
     }
