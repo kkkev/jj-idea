@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Fixed a bug that could have crashed "Init" (create a new Jujutsu repository) on IntelliJ IDEA 2025.1 and 2025.2.
+
+## [0.8.9] - 2026-08-11
+
 ### Added
 - New "Advance Bookmark Here" action moves the bookmark nearest the working copy forward to it in one click (`jj bookmark advance`), instead of requiring a manual "Move Bookmark Here…"; if more than one bookmark is equally close, you're prompted to choose which to move. Available from the bookmark widget in the log toolbar and from the log's right-click menu. Also added a per-bookmark "Advance … to Working Copy" action alongside each bookmark's existing Rename/Delete/Forget actions. Requires jj 0.39 or later — on an older jj, these actions are shown disabled, with the reason (e.g. "needs jj 0.39+") shown right in the menu item's text as well as its tooltip, and a link to upgrade in Settings. ([#61](https://github.com/kkkev/jj-idea/issues/61))
 - The bookmark widget in the log toolbar no longer goes blank once you move past every bookmark (e.g. after `jj new`) — it now shows the nearest bookmark behind the working copy and how many changes behind it is, e.g. `main +3`. ([#62](https://github.com/kkkev/jj-idea/issues/62))
@@ -21,7 +26,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - "Annotate Previous Revision" no longer shows a raw error when clicked on a line whose change added the file (so there's no earlier version to show) — the action is simply unavailable for that line instead, matching how it already behaves for merge-commit lines.
 - On repositories where computing blame is slow, the editor no longer eagerly re-computes it for every file you open — it now backs off automatically once blame has been consistently slow, and only computes it on demand when you actually open the annotation gutter. Cached blame is also now refreshed whenever the working copy changes, instead of potentially showing stale attribution. ([#64](https://github.com/kkkev/jj-idea/issues/64))
 - Fixed a build issue that could have prevented the plugin from being verified as compatible with IntelliJ IDEA 2025.1.
-- Fixed a bug that could have crashed "Init" (create a new Jujutsu repository) on IntelliJ IDEA 2025.1 and 2025.2.
 - Viewing a file's diff no longer jumps back to the top whenever a background process (e.g. an AI coding assistant) edits a file elsewhere in the repository. Viewing the working copy's own diff also now shows live content instead of a stale snapshot if the file changes while its diff is open. ([#58](https://github.com/kkkev/jj-idea/issues/58))
 - Improved plugin compatibility by removing dependency on IntelliJ internal action API.
 - Bookmark, tag, working-copy (`@`), conflict and divergent-change colours in the log and annotation gutter are now readable on a light theme background — the bookmark gold in particular was nearly invisible. ([#51](https://github.com/kkkev/jj-idea/issues/51))
@@ -766,7 +770,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.8...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.9...HEAD
+[0.8.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.9
 [0.8.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.8
 [0.8.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.7
 [0.8.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.6
