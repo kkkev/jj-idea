@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.9] - 2026-08-11
+
 ### Added
 - New "Advance Bookmark Here" action moves the bookmark nearest the working copy forward to it in one click (`jj bookmark advance`), instead of requiring a manual "Move Bookmark Here…"; if more than one bookmark is equally close, you're prompted to choose which to move. Available from the bookmark widget in the log toolbar and from the log's right-click menu. Also added a per-bookmark "Advance … to Working Copy" action alongside each bookmark's existing Rename/Delete/Forget actions. Requires jj 0.39 or later — on an older jj, these actions are shown disabled, with the reason (e.g. "needs jj 0.39+") shown right in the menu item's text as well as its tooltip, and a link to upgrade in Settings. ([#61](https://github.com/kkkev/jj-idea/issues/61))
 - The bookmark widget in the log toolbar no longer goes blank once you move past every bookmark (e.g. after `jj new`) — it now shows the nearest bookmark behind the working copy and how many changes behind it is, e.g. `main +3`. ([#62](https://github.com/kkkev/jj-idea/issues/62))
@@ -765,7 +767,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.8...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.9...HEAD
+[0.8.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.9
 [0.8.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.8
 [0.8.7]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.7
 [0.8.6]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.6
