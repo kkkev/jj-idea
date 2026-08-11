@@ -28,6 +28,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareWithLocal",
             "Jujutsu.CompareBeforeWithLocal",
             "Jujutsu.CompareWithBranch",
+            "Jujutsu.CompareBeforeWithBranch",
             "Jujutsu.OpenFileInRemote",
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
@@ -49,6 +50,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareWithLocal",
             "Jujutsu.CompareBeforeWithLocal",
             "Jujutsu.CompareWithBranch",
+            "Jujutsu.CompareBeforeWithBranch",
             "Jujutsu.OpenFileInRemote",
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
@@ -76,6 +78,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareWithLocal",
             "Jujutsu.CompareBeforeWithLocal",
             "Jujutsu.CompareWithBranch",
+            "Jujutsu.CompareBeforeWithBranch",
             "Jujutsu.OpenFileInRemote"
         )
     }

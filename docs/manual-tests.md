@@ -76,7 +76,6 @@ versions" and MT-BOOKMARK's "Version gating" checklist for the scenario this was
 
 Not checkboxes — just a reminder of what's known-missing so you don't file a duplicate bug:
 
-- **jj-idea-lo7u** — "Compare Before with Another Commit…" missing from every file-menu surface.
 - **jj-idea-7d9p** — "Compare with Another Commit" missing from Details Changes Panel / Working Copy Panel.
 - **jj-idea-zvzk** — "Compare with local" missing from editors for historical versions.
 - **jj-idea-ddcd** — native Commit tool window's "Resolve" link discards a side on cancel; use jj-idea's own "Resolve Conflicts…" entries instead, never this one.
@@ -357,6 +356,8 @@ more lanes than the 3-4 needed here.
 - [ ] Preview-tab behavior (double-click, Enter, tab-swap, Escape, Cmd/Ctrl+D, F4): see MT-DIFF-PREVIEW
 - [ ] Open file for historical version opens correct version
 - [ ] Open file for working copy opens editable editor
+- [ ] jj-idea-lo7u: right-clicking a file for a historical commit shows "Compare Before with
+      Another Commit..."; hidden for the working-copy entry and for a root commit
 
 ### MT-LOG-FILTER
 
@@ -838,6 +839,8 @@ be misclassified as backward/sideways.
 - [ ] Preview-tab behavior (double-click, Enter, tab-swap, single-click-no-op-when-closed,
       single-click-swap-when-open, Escape, Cmd/Ctrl+D, F4): see MT-DIFF-PREVIEW
 - [ ] Right-click shows context menu with file actions
+- [ ] jj-idea-lo7u: "Compare Before with Another Commit..." is **not** in that menu (working
+      copy context — same as "Compare Before with Local")
 - [ ] Open shows working copy as editable
 - [ ] Open for multiple files opens multiple editors
 - [ ] Menu has Open in -> remote; see MT-DIFF for "Open in -> remote for single parent" and the hidden-when-no-pushed-ancestor case
@@ -913,7 +916,7 @@ be misclassified as backward/sideways.
 **Diff viewing across file surfaces**
 
 **Code:** `vcs/diff/JujutsuDiffProvider.kt`, `actions/filechange/`, `vcs/annotate/`, `vcs/history/JujutsuHistoryProvider.kt`, `actions/file/OpenInRemoteFromEditorGroup.kt`, `actions/filechange/OpenFileInRemoteGroup.kt`
-**Also re-run:** MT-DIFF-PREVIEW; see [Known gaps](#known-gaps) for jj-idea-lo7u/7d9p/zvzk, which recur across every surface in this section
+**Also re-run:** MT-DIFF-PREVIEW; see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, which recur across every surface in this section
 
 #### Diffs
 
@@ -938,6 +941,8 @@ be misclassified as backward/sideways.
 #### Project Tool Window
 
 - [ ] File in tool window has a Jujutsu menu with "Show Diff" and "Compare with Another Commit..."
+- [ ] jj-idea-lo7u: menu also has "Compare Before with Another Commit..." for a historical
+      selection; hidden for the working-copy entry and for a root commit
 - [ ] Show diff for multiple files opens multiple editors
 - [ ] Menu has Open in -> remote (see Diffs above for the single-parent/no-ancestor cases)
 
@@ -961,6 +966,9 @@ be misclassified as backward/sideways.
 
 - [ ] Has title including change id, and a Jujutsu menu with diff and "compare with another commit"
 - [ ] Compare with another commit opens that commit on LHS, editor's version on RHS
+- [ ] jj-idea-lo7u: Jujutsu menu also has "Compare Before with Another Commit..."; it opens the
+      parent of the editor's revision on LHS and the chosen commit on RHS; hidden for the
+      working-copy entry and for a root commit
 - [ ] jj-idea-hq4d: "Annotate" is enabled (both via right-click and the Jujutsu menu) for a file
       opened from a historical commit — it used to be greyed out
 - [ ] Annotate fetches annotations for the correct revision

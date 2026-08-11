@@ -184,6 +184,8 @@
     <action id="Jujutsu.CompareBeforeWithLocal"
             class="in.kkkev.jjidea.actions.filechange.CompareBeforeWithLocalAction"/>
     <action id="Jujutsu.CompareWithBranch" class="in.kkkev.jjidea.actions.file.CompareFileWithBranchAction"/>
+    <action id="Jujutsu.CompareBeforeWithBranch"
+            class="in.kkkev.jjidea.actions.filechange.CompareBeforeWithBranchAction"/>
     <group id="Jujutsu.OpenFileInRemote"
            class="in.kkkev.jjidea.actions.filechange.OpenFileInRemoteGroup"/>
 
@@ -199,6 +201,7 @@
       <reference ref="Jujutsu.CompareWithLocal"/>
       <reference ref="Jujutsu.CompareBeforeWithLocal"/>
       <reference ref="Jujutsu.CompareWithBranch"/>
+      <reference ref="Jujutsu.CompareBeforeWithBranch"/>
       <separator/>
       <reference ref="Annotate"/>
       <action id="Jujutsu.ShowFileHistory" class="in.kkkev.jjidea.actions.file.ShowFileHistoryAction"/>

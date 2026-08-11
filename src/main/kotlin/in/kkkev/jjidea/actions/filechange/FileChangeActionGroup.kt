@@ -13,6 +13,8 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * - Open Local File (Jujutsu.OpenLocalFile) - visible in historical context
  * - Compare with Local (Jujutsu.CompareWithLocal) - visible in historical context
  * - Compare Before with Local (Jujutsu.CompareBeforeWithLocal) - visible in historical context with parents
+ * - Compare with Another Commit (Jujutsu.CompareWithBranch) - visible in historical context
+ * - Compare Before with Another Commit (Jujutsu.CompareBeforeWithBranch) - visible in historical context with parents
  * - Open Repository Version (Jujutsu.OpenRepositoryVersion) - visible in historical context
  * - Separator
  * - Restore (Jujutsu.RestoreFile) - visible in working copy context
@@ -38,6 +40,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     actionManager.getAction("Jujutsu.CompareWithLocal")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareBeforeWithLocal")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareWithBranch")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.CompareBeforeWithBranch")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.OpenFileInRemote")?.let { group.add(it) }
 
     group.addSeparator()

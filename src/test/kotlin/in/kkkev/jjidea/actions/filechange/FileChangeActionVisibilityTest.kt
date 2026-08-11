@@ -235,6 +235,42 @@ class FileChangeActionVisibilityTest {
         }
     }
 
+    // ── CompareBeforeWithBranchAction ─────────────────────────────────────────
+
+    @Nested
+    inner class `CompareBeforeWithBranch` {
+        @Test
+        fun `hidden when no LOG_ENTRY`() {
+            withChanges(historicalChange("Main.kt"))
+            CompareBeforeWithBranchAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `hidden when LOG_ENTRY is working copy`() {
+            withLogEntry(workingCopyEntry())
+            withChanges(historicalChange("Main.kt"))
+            CompareBeforeWithBranchAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `hidden when entry has no parents (root commit)`() {
+            withLogEntry(historicalEntry(parentCount = 0))
+            withChanges(historicalChange("Main.kt"))
+            CompareBeforeWithBranchAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `visible when historical entry with parents and changes`() {
+            withLogEntry(historicalEntry(parentCount = 1))
+            withChanges(historicalChange("Main.kt"))
+            CompareBeforeWithBranchAction().update(event)
+            presentation.isVisible shouldBe true
+        }
+    }
+
     // ── RestoreToChangeAction ─────────────────────────────────────────────────
 
     @Nested
