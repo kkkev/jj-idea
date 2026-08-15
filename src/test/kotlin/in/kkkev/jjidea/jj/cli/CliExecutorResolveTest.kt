@@ -18,19 +18,20 @@ class CliExecutorResolveTest {
 
     @Test
     fun `resolveArgs - single path - working copy default`() {
-        resolveArgs(listOf("a.txt"), ":ours") shouldBe listOf("resolve", "-r", "@", "--tool", ":ours", "a.txt")
+        resolveArgs(listOf("a.txt"), ":ours") shouldBe
+            listOf("resolve", "-r", "@", "--tool", ":ours", "cwd:\"a.txt\"")
     }
 
     @Test
     fun `resolveArgs - multiple paths`() {
         resolveArgs(listOf("a.txt", "b.txt"), ":theirs") shouldBe
-            listOf("resolve", "-r", "@", "--tool", ":theirs", "a.txt", "b.txt")
+            listOf("resolve", "-r", "@", "--tool", ":theirs", "cwd:\"a.txt\"", "cwd:\"b.txt\"")
     }
 
     @Test
     fun `resolveArgs - explicit revision`() {
         val revision = ChangeId("abc123def456", "abc123de", null)
         resolveArgs(listOf("a.txt"), ":ours", revision) shouldBe
-            listOf("resolve", "-r", "abc123def456", "--tool", ":ours", "a.txt")
+            listOf("resolve", "-r", "abc123def456", "--tool", ":ours", "cwd:\"a.txt\"")
     }
 }

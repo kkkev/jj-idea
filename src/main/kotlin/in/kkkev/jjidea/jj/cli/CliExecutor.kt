@@ -94,16 +94,17 @@ internal fun tagDeleteArgs(tag: Tag) = listOf("tag", "delete", tag.name)
  * to always pass: confirmed no-op-but-successful on already-tracked, non-ignored, and even
  * nonexistent paths.
  */
-internal fun fileTrackArgs(paths: List<String>) = listOf("file", "track", "--include-ignored") + paths
+internal fun fileTrackArgs(paths: List<String>) =
+    listOf("file", "track", "--include-ignored") + paths.map { it.toFileset() }
 
 /** Build the argument list for `jj file untrack`. [paths] must already be relative to the repo root. */
-internal fun fileUntrackArgs(paths: List<String>) = listOf("file", "untrack") + paths
+internal fun fileUntrackArgs(paths: List<String>) = listOf("file", "untrack") + paths.map { it.toFileset() }
 
 /**
  * Build the argument list for `jj file list`. [paths] must already be relative to the repo root.
  * The only fully reliable way to determine tracked status - see docs/jj-track-untrack-model.md.
  */
-internal fun fileListArgs(paths: List<String>) = listOf("file", "list") + paths
+internal fun fileListArgs(paths: List<String>) = listOf("file", "list") + paths.map { it.toFileset() }
 
 /** Build the argument list for `jj git fetch`. */
 internal fun gitFetchArgs(remote: Remote? = null, allRemotes: Boolean = false): List<String> = buildList {
@@ -158,7 +159,7 @@ internal fun squashArgs(
         add("--message=${description.actual}")
     }
     if (keepEmptied) add("--keep-emptied")
-    addAll(filePaths)
+    addAll(filePaths.map { it.toFileset() })
 }
 
 internal fun resolveListArgs(revision: Revision = WorkingCopy): List<String> =
@@ -172,7 +173,7 @@ internal fun resolveArgs(paths: List<String>, tool: String, revision: Revision =
         add(revision.toString())
         add("--tool")
         add(tool)
-        addAll(paths)
+        addAll(paths.map { it.toFileset() })
     }
 
 /** Build the argument list for `jj split`. */
@@ -189,7 +190,7 @@ internal fun splitArgs(
         add("--message=${description.actual}")
     }
     if (parallel) add("--parallel")
-    addAll(filePaths)
+    addAll(filePaths.map { it.toFileset() })
 }
 
 /**
@@ -248,7 +249,7 @@ internal fun squashIntoArgs(
     if (keepEmptied) add("--keep-emptied")
     if (filePaths.isNotEmpty()) {
         add("--")
-        addAll(filePaths)
+        addAll(filePaths.map { it.toFileset() })
     }
 }
 
@@ -340,20 +341,20 @@ class CliExecutor(
     override fun resolve(paths: List<String>, tool: String, revision: Revision) =
         execute(root, resolveArgs(paths, tool, revision))
 
-    override fun diff(filePath: String) = execute(root, listOf("diff", filePath))
+    override fun diff(filePath: String) = execute(root, listOf("diff", filePath.toFileset()))
 
     override fun diffSummary(revision: Revision, filePath: FilePath?) = execute(
         root,
-        listOfNotNull("diff", "--summary", "-r", revision, filePath?.relativeTo(root!!))
+        listOfNotNull("diff", "--summary", "-r", revision, filePath?.relativeTo(root!!)?.toFileset())
     )
 
     override fun diffSummaryBetween(from: ContentLocator, to: ContentLocator, filePath: FilePath?) = execute(
         root,
-        listOfNotNull("diff", "--summary", "--from", from, "--to", to, filePath?.relativeTo(root!!))
+        listOfNotNull("diff", "--summary", "--from", from, "--to", to, filePath?.relativeTo(root!!)?.toFileset())
     )
 
     override fun show(filePath: FilePath, revision: Revision) =
-        execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root!!)))
+        execute(root, listOf("file", "show", "-r", revision, filePath.relativeTo(root!!).toFileset()))
 
     override fun isAvailable() = try {
         val result = execute(null, listOf("--version"))
@@ -422,7 +423,7 @@ class CliExecutor(
             args.add("--limit")
             args.add(limit)
         }
-        args.addAll(filePaths.map { it.relativeTo(root!!) })
+        args.addAll(filePaths.map { it.relativeTo(root!!).toFileset() })
         return execute(root, args, warnOnFailure = !quiet)
     }
 
@@ -432,6 +433,12 @@ class CliExecutor(
             args.add("-T")
             args.add(template)
         }
+        // Unlike the other file/diff/split/squash/restore/resolve commands, `jj file annotate`
+        // takes a single literal <PATH> argument, not a <FILESETS>... list - it is not parsed as
+        // a fileset expression, so wrapping it in `cwd:"..."` would be wrong (jj would look for
+        // a literal file named `cwd:"..."`). No escaping is needed here at all: this argument is
+        // passed straight through as one argv entry (no shell involved), so meta-characters like
+        // ()[] are already safe. Verified against jj 0.44 - see GitHub #73.
         args.add(file.pathRelativeTo(root!!))
         return execute(root, args, timeout = annotateTimeout, warnOnFailure = false)
     }
@@ -481,10 +488,10 @@ class CliExecutor(
         execute(root, listOf("diff", "--git", "-r", revision))
 
     override fun diffGitFile(revision: Revision, filePath: FilePath): CommandExecutor.CommandResult =
-        execute(root, listOf("diff", "--git", "-r", revision, "--", filePath.relativeTo(root!!)))
+        execute(root, listOf("diff", "--git", "-r", revision, "--", filePath.relativeTo(root!!).toFileset()))
 
     override fun restore(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
-        execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root!!) })
+        execute(root, listOf("restore", "-f", revision) + filePaths.map { it.relativeTo(root!!).toFileset() })
 
     override fun fileTrack(filePaths: List<FilePath>): CommandExecutor.CommandResult =
         execute(root, fileTrackArgs(filePaths.map { it.relativeTo(root!!) }))

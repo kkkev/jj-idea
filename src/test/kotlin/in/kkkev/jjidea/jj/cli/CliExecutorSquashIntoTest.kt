@@ -61,7 +61,7 @@ class CliExecutorSquashIntoTest {
                 "--from",
                 "abc123def456",
                 "--",
-                "src/main.kt"
+                "cwd:\"src/main.kt\""
             )
         }
 
@@ -80,8 +80,8 @@ class CliExecutorSquashIntoTest {
                 "--from",
                 "abc123def456",
                 "--",
-                "src/main.kt",
-                "README.md"
+                "cwd:\"src/main.kt\"",
+                "cwd:\"README.md\""
             )
         }
 
@@ -128,7 +128,7 @@ class CliExecutorSquashIntoTest {
                 "789abcdef012",
                 "--message=Two-source",
                 "--",
-                "a.kt"
+                "cwd:\"a.kt\""
             )
         }
     }
@@ -170,7 +170,7 @@ class CliExecutorSquashIntoTest {
                 "--message=All",
                 "--keep-emptied",
                 "--",
-                "a.kt"
+                "cwd:\"a.kt\""
             )
         }
     }

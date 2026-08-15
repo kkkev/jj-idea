@@ -34,7 +34,7 @@ class CliExecutorSquashTest {
         fun `squash with single file path`() {
             val result = squashArgs(revision, filePaths = listOf("src/main.kt"))
 
-            result shouldBe listOf("squash", "-r", "abc123def456", "src/main.kt")
+            result shouldBe listOf("squash", "-r", "abc123def456", "cwd:\"src/main.kt\"")
         }
 
         @Test
@@ -44,7 +44,14 @@ class CliExecutorSquashTest {
                 filePaths = listOf("src/main.kt", "src/utils.kt", "README.md")
             )
 
-            result shouldBe listOf("squash", "-r", "abc123def456", "src/main.kt", "src/utils.kt", "README.md")
+            result shouldBe listOf(
+                "squash",
+                "-r",
+                "abc123def456",
+                "cwd:\"src/main.kt\"",
+                "cwd:\"src/utils.kt\"",
+                "cwd:\"README.md\""
+            )
         }
     }
 
@@ -65,7 +72,13 @@ class CliExecutorSquashTest {
                 description = Description("Partial squash")
             )
 
-            result shouldBe listOf("squash", "-r", "abc123def456", "--message=Partial squash", "src/main.kt")
+            result shouldBe listOf(
+                "squash",
+                "-r",
+                "abc123def456",
+                "--message=Partial squash",
+                "cwd:\"src/main.kt\""
+            )
         }
     }
 
@@ -93,7 +106,7 @@ class CliExecutorSquashTest {
                 "abc123def456",
                 "--message=Combined",
                 "--keep-emptied",
-                "src/main.kt"
+                "cwd:\"src/main.kt\""
             )
         }
     }

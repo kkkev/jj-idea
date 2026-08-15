@@ -37,7 +37,7 @@ class CliExecutorSplitTest {
         fun `split with single file path`() {
             val result = splitArgs(revision, filePaths = listOf("src/main.kt"))
 
-            result shouldBe listOf("split", "-r", "abc123def456", "src/main.kt")
+            result shouldBe listOf("split", "-r", "abc123def456", "cwd:\"src/main.kt\"")
         }
 
         @Test
@@ -47,7 +47,14 @@ class CliExecutorSplitTest {
                 filePaths = listOf("src/main.kt", "src/utils.kt", "README.md")
             )
 
-            result shouldBe listOf("split", "-r", "abc123def456", "src/main.kt", "src/utils.kt", "README.md")
+            result shouldBe listOf(
+                "split",
+                "-r",
+                "abc123def456",
+                "cwd:\"src/main.kt\"",
+                "cwd:\"src/utils.kt\"",
+                "cwd:\"README.md\""
+            )
         }
     }
 
@@ -68,7 +75,7 @@ class CliExecutorSplitTest {
                 description = Description("Core changes")
             )
 
-            result shouldBe listOf("split", "-r", "abc123def456", "--message=Core changes", "src/main.kt")
+            result shouldBe listOf("split", "-r", "abc123def456", "--message=Core changes", "cwd:\"src/main.kt\"")
         }
     }
 
@@ -96,7 +103,7 @@ class CliExecutorSplitTest {
                 "abc123def456",
                 "--message=First commit",
                 "--parallel",
-                "src/main.kt"
+                "cwd:\"src/main.kt\""
             )
         }
     }

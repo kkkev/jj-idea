@@ -6,12 +6,13 @@ import org.junit.jupiter.api.Test
 class CliExecutorFileListTest {
     @Test
     fun `fileListArgs - single path`() {
-        fileListArgs(listOf("foo.txt")) shouldBe listOf("file", "list", "foo.txt")
+        fileListArgs(listOf("foo.txt")) shouldBe listOf("file", "list", "cwd:\"foo.txt\"")
     }
 
     @Test
     fun `fileListArgs - multiple paths`() {
-        fileListArgs(listOf("foo.txt", "bar/baz.txt")) shouldBe listOf("file", "list", "foo.txt", "bar/baz.txt")
+        fileListArgs(listOf("foo.txt", "bar/baz.txt")) shouldBe
+            listOf("file", "list", "cwd:\"foo.txt\"", "cwd:\"bar/baz.txt\"")
     }
 
     @Test

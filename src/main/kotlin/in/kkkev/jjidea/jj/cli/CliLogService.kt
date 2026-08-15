@@ -401,7 +401,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val fullLogTemplateWithoutPushedAncestor = buildFullTemplate(basicLogTemplateWithoutPushedAncestor)
 
         fun fileChangeStatusFor(filePath: FilePath) = singleField<FileChange.Status>(
-            "diff.files().filter(|e| e.path().display() == '$filePath').map(|e| e.status()).join(',')"
+            "diff.files().filter(|e| e.path().display() == \"${filePath.toString().escapeJjString()}\")" +
+                ".map(|e| e.status()).join(',')"
         ) {
             when (it) {
                 "added" -> FileChange.Status.ADDED
