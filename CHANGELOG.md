@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed diffs, file history, restore, split, squash, and conflict resolution failing on files whose path contains parentheses or square brackets (e.g. Next.js app-router routes like `app/(app)/users/[id]/page.tsx`) — the diff pane used to show "Cannot get content from this revision." ([#73](https://github.com/kkkev/jj-idea/issues/73))
+- Fixed the bookmark widget in the log toolbar showing no bookmark at all (just the empty "Bookmark:" label) most of the time, instead of the nearest-bookmark indicator added in 0.8.9 — it now shows correctly from the moment the log opens, and keeps up to date after commands run outside the IDE (e.g. `jj new` in a terminal).
 
 ## [0.8.10] - 2026-08-11
 

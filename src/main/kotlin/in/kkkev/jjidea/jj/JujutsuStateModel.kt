@@ -46,18 +46,19 @@ import java.util.concurrent.atomic.AtomicInteger
  * VFS (.jj created/deleted) ───────────┴─→ initialisedRepositories.invalidate()
  *                                                  │
  *                                                  ├─→ watchOpHeads()
- *                                                  ├─→ references / workingCopies / gitRemotes .invalidate()
+ *                                                  ├─→ references / workingCopies / closestBookmarks / gitRemotes
+ *                                                  │      .invalidate()
  *                                                  ├─→ logRefresh.notify()
  *                                                  └─→ ToolWindowEnabler (connects separately)
  *
  * VFS (working-copy file / .gitignore /  ─→ 300ms debounce ─→ scheduleRepositoryRefresh():
- *      external jj op via op_heads)                            references / workingCopies .invalidate()
+ *      external jj op via op_heads)                            invalidateRepositoryState()
  *                                                              + logRefresh.notify()
  *
- * jj became available ──────────────────→ references / workingCopies .invalidate() + logRefresh.notify()
+ * jj became available ──────────────────→ invalidateRepositoryState() + logRefresh.notify()
  *
  * repo.invalidate(select) ──────────────→ logCache.clear()
- *   (VCS operations)                       + references / workingCopies .invalidate()
+ *   (VCS operations)                       + invalidateRepositoryState()
  *                                          + logRefresh.notify()  (+ changeSelection.notify() if select)
  *
  * workingCopies changed ────────────────→ VcsDirtyScopeManager.dirDirtyRecursively() (changed repos only)
@@ -164,7 +165,8 @@ class JujutsuStateModel(private val project: Project) : Disposable {
      * [in.kkkev.jjidea.actions.bookmark.advanceBookmarkAction] would move and the
      * [in.kkkev.jjidea.ui.log.JujutsuBookmarkWidget] "name +N" indicator reads. `null` per repo
      * when the working copy has no ancestor bookmark at all. Invalidated together with
-     * [references] and [workingCopies] since either can change which bookmark is nearest.
+     * [references] and [workingCopies] via [invalidateRepositoryState] since either can change
+     * which bookmark is nearest.
      */
     val closestBookmarks = notifiableState<Map<JujutsuRepository, ClosestBookmarks?>>(
         project,
@@ -281,11 +283,21 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         }
     }
 
+    /**
+     * Refreshes every state derived from a repo's current operation: bookmarks/tags, the working
+     * copy, and which bookmark is nearest it ([closestBookmarks]). Kept together so a future
+     * derived state can't be added to one refresh path and forgotten on the others.
+     */
+    internal fun invalidateRepositoryState() {
+        references.invalidate()
+        workingCopies.invalidate()
+        closestBookmarks.invalidate()
+    }
+
     private fun scheduleRepositoryRefresh() {
         repositoryStateAlarm.cancelAllRequests()
         repositoryStateAlarm.addRequest({
-            references.invalidate()
-            workingCopies.invalidate()
+            invalidateRepositoryState()
             logRefresh.notify(Unit)
         }, 300)
     }
@@ -404,8 +416,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         JjAvailabilityChecker.getInstance(project).status.connect(this) { status ->
             if (status is JjAvailabilityStatus.Available) {
                 log.info("jj became available (${status.version}), refreshing state")
-                references.invalidate()
-                workingCopies.invalidate()
+                invalidateRepositoryState()
                 logRefresh.notify(Unit)
             }
         }
@@ -435,8 +446,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         initialisedRepositories.connect(this) { new ->
             log.info("Initialized roots changed to ${new.size} roots")
             watchOpHeads(new.values)
-            references.invalidate()
-            workingCopies.invalidate()
+            invalidateRepositoryState()
             gitRemotes.invalidate()
             logRefresh.notify(Unit)
             // Trigger a full ignored-file scan for each newly discovered repo
@@ -540,9 +550,7 @@ fun JujutsuRepository.invalidate(select: Revision? = null, vfsChanged: Boolean =
     }
     logCache.clear()
     val stateModel = project.stateModel
-    stateModel.references.invalidate()
-    stateModel.workingCopies.invalidate()
-    stateModel.closestBookmarks.invalidate()
+    stateModel.invalidateRepositoryState()
     stateModel.logRefresh.notify(Unit)
     if (select != null) {
         stateModel.changeSelection.notify(ChangeKey(this, select))

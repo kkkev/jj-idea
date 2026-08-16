@@ -33,17 +33,17 @@ class JujutsuBookmarkWidget(project: Project) : JujutsuFilterComponent("Bookmark
         wcEntries = project.stateModel.workingCopies.value.values.toList()
         project.stateModel.workingCopies.connect(this) { copies ->
             wcEntries = copies.values.toList()
-            repaint()
+            refreshPresentation()
         }
         bookmarksByRepo = project.stateModel.references.value.mapValues { it.value.bookmarks }
         project.stateModel.references.connect(this) { references ->
             bookmarksByRepo = references.mapValues { it.value.bookmarks }
-            repaint()
+            refreshPresentation()
         }
         closestByRepo = project.stateModel.closestBookmarks.value
         project.stateModel.closestBookmarks.connect(this) { closest ->
             closestByRepo = closest
-            repaint()
+            refreshPresentation()
         }
     }
 

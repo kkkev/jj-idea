@@ -105,6 +105,24 @@ class JujutsuStateModelPlatformTest {
     }
 
     @Test
+    fun `invalidateRepositoryState loads closestBookmarks`() {
+        // Regression for jj-idea-zjbp: closestBookmarks used to be invalidated only from
+        // repo.invalidate() (a plugin-initiated VCS operation), so the bookmark widget's
+        // "name +N" fallback never loaded on IDE start or after an external jj operation —
+        // it just showed a blank value. invalidateRepositoryState() is now the single place
+        // every repo-refresh path invalidates references/workingCopies/closestBookmarks
+        // together, so this must load them all.
+        val stateModel = project.get().stateModel
+
+        stateModel.closestBookmarks.hasLoaded shouldBe false
+
+        stateModel.invalidateRepositoryState()
+        drainBackgroundLoads()
+
+        stateModel.closestBookmarks.hasLoaded shouldBe true
+    }
+
+    @Test
     fun `filterByAuthor notifier fires connected listener with the author email`() {
         val stateModel = project.get().stateModel
         val disposable = Disposer.newDisposable()
