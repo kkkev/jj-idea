@@ -754,8 +754,8 @@ state/routing logic, not rendering)
 
 **Bookmark widget**
 
-**Code:** `ui/log/JujutsuBookmarkWidget.kt`, `actions/bookmark/`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`
-**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure)
+**Code:** `ui/log/JujutsuBookmarkWidget.kt`, `actions/bookmark/`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt` (Advance Bookmark toolbar button)
+**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button)
 
 #### Single-repo project
 
@@ -798,6 +798,32 @@ state/routing logic, not rendering)
 - [ ] With no bookmark anywhere in @'s ancestry: "Advance Bookmark Here" is visible but disabled, with a tooltip explaining there's nothing to advance
 - [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark Here" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one, and Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method
 - [ ] The disabled reason is also appended to the menu item's own text, not just its tooltip (menus don't reliably show tooltips) — e.g. "Advance Bookmark Here (needs jj 0.39+)" or "Advance 'main' to Working Copy (needs jj 0.39+)"; with no bookmark anywhere in @'s ancestry, "Advance Bookmark Here (nothing to advance)"
+- [ ] jj-idea-xsa8 (GitHub #61): the same "Advance Bookmark Here" action is also available as an
+      icon button in the Working Copy tool window's toolbar, alongside New Change/Split/Squash/
+      Abandon/Create Bookmark/Set Tag (see MT-WORKINGCOPY) — clicking it there behaves identically
+      to the bookmark widget's menu item, including the picker for equidistant bookmarks and
+      version gating; switching the bound repository via the panel's dropdown in a multi-root
+      project re-evaluates the button against the newly selected repo
+- [ ] jj-idea-xsa8 follow-up: the tooltip names the actual bookmark(s) it would move rather than
+      generic wording — "Move 'main' forward to the working copy (jj bookmark advance)" for one
+      candidate, "Move 'main', 'feature' forward…" (each name individually quoted) for two+
+      equidistant ones — both from the bookmark widget's menu item and the Working Copy toolbar
+      button
+- [ ] jj-idea-xsa8 follow-up: after a successful advance — **both** the direct single-bookmark
+      path and after confirming the equidistant-candidates picker — a balloon notification
+      appears: "Bookmark Advanced" / "Advanced '\<name\>' to \<shortid\>", where \<shortid\>
+      matches `jj log -r @`'s change id. This is deliberately the *only* one of the Working Copy
+      toolbar's actions with this treatment (see MT-WORKINGCOPY) — advancing is the only one with
+      no dialog on its common path and no other visible effect in that panel
+- [ ] jj-idea-xsa8 follow-up: clicking the Working Copy toolbar's Advance button with exactly one
+      nearest bookmark shows a "Advance Bookmark" Yes/No confirmation naming the bookmark before
+      moving it — Yes advances (and still shows the completion notification above), No/Escape
+      leaves the bookmark untouched. This confirmation is specific to the toolbar's icon button —
+      clicking the same "Advance Bookmark Here" entry from the bookmark widget's dropdown menu or
+      the log's right-click menu still advances immediately with **no** confirmation, since those
+      are more deliberate two-step clicks than an icon-only toolbar button. The equidistant-
+      candidates picker dialog (multiple close bookmarks) is unaffected either way — it already
+      served as its own confirmation before this change
 
 #### Move direction (forward vs. backward/sideways)
 
@@ -825,8 +851,8 @@ be misclassified as backward/sideways.
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`
-**Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
+**Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
 
@@ -835,6 +861,19 @@ be misclassified as backward/sideways.
   a newline (does not do nothing or trigger another action)
 - [ ] "Describe" button updates description via `jj describe`
 - [ ] "New Change" button creates new change via `jj new`
+- [ ] jj-idea-xsa8 (GitHub #61): the toolbar row also offers Split, Squash, Abandon, a separator,
+  then Create Bookmark, Advance Bookmark, and Set Tag — all acting on `@`, all icon-only
+  (tooltip-only labels) — **verify every one of them is actually visible in the row, not
+  collapsed behind an overflow `>>` chevron or silently missing**; each behaves identically to
+  its log context-menu counterpart (see MT-CTXMENU, MT-SQUASH, MT-SPLIT, MT-BOOKMARK) and greys
+  out (never disappears) when not applicable to the current `@` — e.g. Squash with no mutable
+  parent, Advance with no ancestor bookmark
+- [ ] Multi-root: switching the bound repository via the panel's dropdown re-evaluates every one
+  of these buttons against the newly selected repo
+- [ ] jj-idea-xsa8 follow-up: in a multi-root project, the repo selector dropdown sits in the same
+  row as this toolbar (top of the tool window), not ~60% down inside the description area where
+  it used to be — the two are visually adjacent, and choosing a different repo there immediately
+  updates both the toolbar buttons and the description/current-change area below
 - [ ] Changed files tree shows correct status colors and file type icons
 - [ ] Preview-tab behavior (double-click, Enter, tab-swap, single-click-no-op-when-closed,
       single-click-swap-when-open, Escape, Cmd/Ctrl+D, F4): see MT-DIFF-PREVIEW
@@ -853,6 +892,47 @@ be misclassified as backward/sideways.
   / open the context menu — no `VcsException: Not a Jujutsu revision` appears in the IDE
   log, and jj's file-change actions (Open, Compare, Restore, etc.) simply don't offer that
   change
+
+#### Changes tree repo-anchoring (jj-idea-xsa8 follow-up, multi-repo only)
+
+Covers `ui/common/JujutsuChangesTree.kt`'s `currentRepo`, `JujutsuOtherRepositoriesNode`,
+`JujutsuOtherRepositoryNode`, and `JujutsuNoChangesNode`: the changes tree spans every repo,
+unlike the toolbar/description above it (which only ever act on the bound repo), so changes
+belonging to any *other* repo are demoted into one collapsed node rather than getting an
+equally-weighted group of their own.
+
+- [ ] With a repo bound (via the relocated selector) that **has** changes: that repo's changed
+  files show directly at the top level of the tree (still grouped by directory as normal) — **not**
+  wrapped in their own repo-named node the way they were before this feature
+- [ ] With a repo bound that has **no** changes (e.g. a fresh/clean `@`): the tree still shows a
+  line for it — the repo's name followed by a grey "(no changes)" qualifier — rather than showing
+  nothing at all for the bound repo (easy to misread as broken, especially when "Other
+  Repositories" below it is populated)
+- [ ] Every *other* repo's changed files are collapsed under a single "Other Repositories" node,
+  sorted below the bound repo's own files/no-changes line, collapsed by default (not expanded) the
+  first time it appears
+- [ ] Expand "Other Repositories" with changes from **two or more** other repos present: each
+  other repo appears as its **own named sub-node**, with the same per-repo colored icon used
+  elsewhere (bookmark widget's multi-repo dropdown, the "(no changes)" line), directly followed
+  by its changed files — **no** extra node in between for a shared parent directory (e.g. the
+  folder containing several sibling repos on disk) or for the repo itself appearing twice nested
+- [ ] A file inside a subdirectory of an other-repo (e.g. `src/Main.kt`) shows as just its
+  filename ("Main.kt") directly under that repo's node, **not** nested under its own directory
+  sub-tree the way the bound repo's own files are, and **not** showing any path (relative or
+  absolute) as part of its label — this is a deliberate trade-off (see jj-idea-xsa8) for a
+  demoted, secondary area of the tree; only the bound repo's own top-level content gets full
+  directory grouping
+- [ ] Switch the bound repo via the selector — the split re-partitions immediately (files move
+  between the plain top level / "Other Repositories", the no-changes line appears or disappears as
+  appropriate), no need to touch Refresh
+- [ ] Single-repo project: no "Other Repositories" node ever appears, regardless of how many
+  changed files exist — behavior is unchanged from before this feature; the no-changes line is
+  also unaffected (single-repo behavior is untouched by `currentRepo`, since it was already the
+  only repo shown)
+- [ ] With conflicts present (`groupConflicts`): the Merge Conflicts node (top, bold) and the
+  Other Repositories node (bottom, sorted after the bound repo's own content) coexist correctly —
+  a conflicted file in another repo appears under Merge Conflicts, not duplicated under Other
+  Repositories
 
 #### Repository Initialization (jj-idea-uw11)
 

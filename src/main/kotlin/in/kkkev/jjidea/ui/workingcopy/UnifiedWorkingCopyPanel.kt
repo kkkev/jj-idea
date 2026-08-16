@@ -28,6 +28,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
@@ -105,7 +106,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         }
 
         // Handle dropdown selection
-        controlsPanel.onRepositorySelected = { controlsPanel.boundRepository = it }
+        controlsPanel.onRepositorySelected = { bindRepository(it) }
 
         Disposer.register(this, diffPreview)
         createUI()
@@ -120,9 +121,9 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         // Build the main content panel
         val mainPanel = JPanel(BorderLayout())
 
-        // Top: Working copy toolbar (New Change action)
-        val workingCopyToolbar = controlsPanel.createToolbar(mainPanel)
-        mainPanel.add(workingCopyToolbar.component, BorderLayout.NORTH)
+        // Top: repo selector + working copy toolbar (jj-idea-xsa8) together, so the selector sits
+        // next to the buttons whose target repo it controls instead of ~60% down the window.
+        mainPanel.add(controlsPanel.createTopBar(mainPanel), BorderLayout.NORTH)
 
         // Center: Splitter with changes tree on top, controls below
         // Using IntelliJ Splitter instead of JSplitPane for better theming
@@ -236,7 +237,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
                 // If no repo is bound, select the first one
                 if (currentRepo == null || new.none { it.value.repo == currentRepo }) {
-                    sortedRepos.firstOrNull()?.let { controlsPanel.boundRepository = it }
+                    sortedRepos.firstOrNull()?.let { bindRepository(it) }
                 }
                 // Sync changes tree — handles the case where the panel was created after
                 // changeListUpdateDone already fired (ChangeListManager already has the data).
@@ -245,7 +246,13 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         }
 
         // Subscribe to change selection for programmatic repo selection
-        project.stateModel.changeSelection.connect(this) { controlsPanel.boundRepository = it.repo }
+        project.stateModel.changeSelection.connect(this) { bindRepository(it.repo) }
+    }
+
+    /** Binds [repo] as active for both [controlsPanel] and [changesTree], so they can't drift apart. */
+    private fun bindRepository(repo: JujutsuRepository) {
+        controlsPanel.boundRepository = repo
+        changesTree.currentRepo = repo
     }
 
     private fun subscribeToAvailabilityStatus() {

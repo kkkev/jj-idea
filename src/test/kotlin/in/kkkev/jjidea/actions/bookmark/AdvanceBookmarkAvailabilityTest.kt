@@ -81,4 +81,32 @@ class AdvanceBookmarkAvailabilityTest {
                 ClosestAdvanceAvailability.HIDDEN
         }
     }
+
+    @Nested
+    inner class `closestAdvanceTooltip (names the target, jj-idea-xsa8 follow-up)` {
+        @Test
+        fun `one candidate names it`() {
+            closestAdvanceTooltip(
+                ClosestBookmarks(listOf(BookmarkName("main")), distance = 1, distanceCapped = false)
+            ) shouldBe
+                "Move 'main' forward to the working copy (jj bookmark advance)"
+        }
+
+        @Test
+        fun `several equidistant candidates are comma-joined, each individually quoted`() {
+            closestAdvanceTooltip(
+                ClosestBookmarks(
+                    listOf(BookmarkName("main"), BookmarkName("feature")),
+                    distance = 2,
+                    distanceCapped = false
+                )
+            ) shouldBe "Move 'main', 'feature' forward to the working copy (jj bookmark advance)"
+        }
+
+        @Test
+        fun `null falls back to the generic wording`() {
+            closestAdvanceTooltip(null) shouldBe
+                "Move the nearest bookmark forward to the working copy (jj bookmark advance)"
+        }
+    }
 }

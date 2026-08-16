@@ -3,7 +3,10 @@ package `in`.kkkev.jjidea.ui.workingcopy
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
@@ -12,8 +15,14 @@ import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.actions.bookmark.advanceClosestBookmarkAction
+import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
+import `in`.kkkev.jjidea.actions.change.abandonChangeAction
+import `in`.kkkev.jjidea.actions.change.splitAction
+import `in`.kkkev.jjidea.actions.change.squashAction
+import `in`.kkkev.jjidea.actions.change.squashableEntry
 import `in`.kkkev.jjidea.actions.requestDescription
+import `in`.kkkev.jjidea.actions.tag.setTagAction
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
@@ -145,15 +154,14 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             insets = JBUI.insets(2)
         }
 
-        // Repository selector (only visible in multi-root projects)
+        // Current change label (shows repo:changeId format). The repository selector used to sit
+        // above this (gridy=0) but moved up into createTopBar() (jj-idea-xsa8 follow-up) so it's
+        // adjacent to the action toolbar it also governs, rather than ~60% down the tool window
+        // from it.
         gbc.gridx = 0
         gbc.gridy = 0
         gbc.gridwidth = 2
         gbc.weightx = 1.0
-        topPanel.add(repoSelector, gbc)
-
-        // Current change label (shows repo:changeId format)
-        gbc.gridy = 1
         topPanel.add(currentChangeLabel, gbc)
 
         // Description label with inline action buttons
@@ -167,7 +175,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             add(Box.createHorizontalGlue())
         }
 
-        gbc.gridy = 2
+        gbc.gridy = 1
         topPanel.add(descriptionHeaderPanel, gbc)
 
         // Description text area with scroll pane
@@ -175,7 +183,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             minimumSize = JBUI.size(200, 70)
             preferredSize = JBUI.size(400, 90)
         }
-        gbc.gridy = 3
+        gbc.gridy = 2
         gbc.weighty = 1.0
         gbc.fill = GridBagConstraints.BOTH
         topPanel.add(scrollPane, gbc)
@@ -219,28 +227,133 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         }
     }
 
-    fun createToolbar(owner: JComponent): ActionToolbar {
-        val group = BackgroundActionGroup()
+    /** Toolbar row plus [repoSelector] (jj-idea-xsa8), so "which repo" sits next to the buttons acting on it. */
+    fun createTopBar(owner: JComponent): JComponent {
+        val toolbar = createActionToolbar(owner)
+        return JPanel(BorderLayout()).apply {
+            add(repoSelector, BorderLayout.WEST)
+            add(toolbar.component, BorderLayout.CENTER)
+        }
+    }
 
-        // New Change action - primary workflow operation
-        group.add(object : DumbAwareAction(
-            JujutsuBundle.message("button.newchange"),
-            JujutsuBundle.message("button.newchange.tooltip"),
-            JujutsuIcons.NewChange
-        ) {
-            override fun actionPerformed(e: AnActionEvent) {
-                createNewChange()
-            }
-
-            override fun update(e: AnActionEvent) {
-                e.presentation.isEnabled = boundRepository != null
-            }
-        })
+    /**
+     * The action-only half of [createTopBar] — actions anchored at `@` (New Change plus the
+     * working copy's share of the log context menu). Built once, each action added exactly once:
+     * `ActionToolbarImpl` requires stable action *instances* across refreshes to reuse each
+     * button's `JComponent`, so `update()` on each just flips `isEnabled` from live state, the
+     * same way New Change always has. Split out from [createTopBar] so tests can inspect the
+     * [ActionToolbar] directly.
+     */
+    internal fun createActionToolbar(owner: JComponent): ActionToolbar {
+        val group = object : DefaultActionGroup() {
+            override fun getActionUpdateThread() = ActionUpdateThread.EDT
+        }
+        group.add(newChangeAction())
+        group.add(
+            stableAction(
+                JujutsuBundle.message("log.action.split"),
+                JujutsuBundle.message("log.action.split.tooltip"),
+                JujutsuIcons.Split,
+                isEnabled = { currentWorkingCopy() != null },
+                delegate = { splitAction(project, currentWorkingCopy()) }
+            )
+        )
+        group.add(
+            stableAction(
+                JujutsuBundle.message("log.action.squash.into.parent"),
+                JujutsuBundle.message("log.action.squash.into.parent.tooltip"),
+                JujutsuIcons.Squash,
+                isEnabled = { squashableEntry(currentWorkingCopy()) != null },
+                delegate = { squashAction(project, squashableEntry(currentWorkingCopy())) }
+            )
+        )
+        group.add(
+            stableAction(
+                JujutsuBundle.message("log.action.abandon"),
+                JujutsuBundle.message("log.action.abandon.tooltip"),
+                AllIcons.General.Delete,
+                isEnabled = { currentWorkingCopy() != null },
+                delegate = { abandonChangeAction(project, currentWorkingCopy()) }
+            )
+        )
+        group.addSeparator()
+        group.add(
+            stableAction(
+                JujutsuBundle.message("action.bookmark.create"),
+                JujutsuBundle.message("action.bookmark.create.tooltip"),
+                JujutsuIcons.BookmarkAdd,
+                isEnabled = { currentWorkingCopy() != null },
+                delegate = { createBookmarkAction(currentWorkingCopy()) }
+            )
+        )
+        group.add(
+            advanceClosestBookmarkAction(
+                { boundRepository },
+                { boundRepository?.let { project.stateModel.closestBookmarks.value[it] } },
+                confirmSingle = true // icon-only button, easier misclick than a labelled menu item
+            )
+        )
+        group.add(
+            stableAction(
+                JujutsuBundle.message("action.tag.set"),
+                JujutsuBundle.message("action.tag.set.tooltip"),
+                JujutsuIcons.TagAdd,
+                isEnabled = { currentWorkingCopy() != null },
+                delegate = { setTagAction(currentWorkingCopy()) }
+            )
+        )
 
         return ActionManager.getInstance()
             .createActionToolbar("JujutsuWorkingCopyToolbar", group, true).apply {
                 targetComponent = owner
             }
+    }
+
+    /** New Change - primary workflow operation, first in the toolbar. */
+    private fun newChangeAction(): AnAction = object : DumbAwareAction(
+        JujutsuBundle.message("button.newchange"),
+        JujutsuBundle.message("button.newchange.tooltip"),
+        JujutsuIcons.NewChange
+    ) {
+        override fun actionPerformed(e: AnActionEvent) {
+            createNewChange()
+        }
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = boundRepository != null
+        }
+
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+    }
+
+    /**
+     * The working copy log entry for [boundRepository], or `null` if none is bound. Reads
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.workingCopies] directly rather than
+     * [JujutsuRepository.workingCopy], which throws when there's no entry yet. `@` is never
+     * immutable, so unlike the log context menu's versions of these actions, no immutable check.
+     */
+    private fun currentWorkingCopy(): LogEntry? =
+        boundRepository?.let { project.stateModel.workingCopies.value[it.directory.path] }
+
+    /**
+     * A stable toolbar [AnAction] whose [isEnabled] is recomputed from live state on every
+     * [update]; [delegate] is invoked only at click time, to run an existing by-value action
+     * factory (`splitAction`/`squashAction`/etc.) without duplicating its logic.
+     */
+    private fun stableAction(
+        text: String,
+        description: String,
+        icon: Icon,
+        isEnabled: () -> Boolean,
+        delegate: () -> AnAction
+    ): AnAction = object : DumbAwareAction(text, description, icon) {
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = isEnabled()
+        }
+
+        override fun actionPerformed(e: AnActionEvent) = delegate().actionPerformed(e)
+
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
     }
 
     private fun createDescribeButton(): JButton {

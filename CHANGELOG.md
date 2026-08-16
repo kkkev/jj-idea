@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The Working Copy tool window's toolbar now offers the common actions for the current change — Split, Squash into Parent, Abandon, Create Bookmark Here, Advance Bookmark Here, and Set Tag Here — alongside New Change, so you don't have to switch to the log to act on `@`. In a multi-root project, the repository selector now sits in that same row instead of further down the panel, and the changes tree collapses every other repository's changes into a single, per-repository-grouped "Other Repositories" group (and shows a "(no changes)" line for the selected repository when it's clean) so it's clear which repository the toolbar and description above are acting on. Advancing a bookmark from this toolbar now confirms with a Yes/No prompt before moving it, names the bookmark in its tooltip, and confirms with a notification once it moves, since — unlike the other actions here — it otherwise has no dialog and no other visible effect. ([#61](https://github.com/kkkev/jj-idea/issues/61))
+
 ### Fixed
 - Fixed diffs, file history, restore, split, squash, and conflict resolution failing on files whose path contains parentheses or square brackets (e.g. Next.js app-router routes like `app/(app)/users/[id]/page.tsx`) — the diff pane used to show "Cannot get content from this revision." ([#73](https://github.com/kkkev/jj-idea/issues/73))
 - Fixed the bookmark widget in the log toolbar showing no bookmark at all (just the empty "Bookmark:" label) most of the time, instead of the nearest-bookmark indicator added in 0.8.9 — it now shows correctly from the moment the log opens, and keeps up to date after commands run outside the IDE (e.g. `jj new` in a terminal).

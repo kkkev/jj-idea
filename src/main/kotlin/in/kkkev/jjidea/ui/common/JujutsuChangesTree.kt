@@ -14,6 +14,9 @@ import com.intellij.openapi.vcs.changes.ui.ChangesGroupingSupport.Companion.REPO
 import com.intellij.openapi.vcs.changes.ui.TreeModelBuilder
 import com.intellij.util.ui.ThreeStateCheckBox
 import `in`.kkkev.jjidea.actions.filechange.fileChangeActionGroup
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.vcs.filePath
+import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import javax.swing.tree.DefaultTreeModel
 
 /**
@@ -56,6 +59,21 @@ class JujutsuChangesTree(
             repaint()
         }
 
+    /**
+     * When set, every change belonging to a *different* repo is demoted into a collapsed
+     * [JujutsuOtherRepositoriesNode] (jj-idea-xsa8). `null` (default): every repo grouped equally.
+     *
+     * Unlike [partialChanges], this changes tree structure, so the setter calls [rebuildTree]
+     * directly — a pure repo-selection change doesn't change the underlying `changes` list, so
+     * `setChangesToDisplay`'s [sameChangesAndStatuses] early-out wouldn't otherwise pick it up.
+     */
+    var currentRepo: JujutsuRepository? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            rebuildTree()
+        }
+
     override fun getNodeStatus(node: ChangesBrowserNode<*>): ThreeStateCheckBox.State {
         // Note: partialChanges may be null during superclass construction (called before Kotlin
         // property initialization completes), so we capture it and guard explicitly.
@@ -74,19 +92,56 @@ class JujutsuChangesTree(
     }
 
     override fun buildTreeModel(grouping: ChangesGroupingPolicyFactory, changes: List<Change>): DefaultTreeModel {
-        // Note: groupConflicts may still read its JVM default (false) if this is invoked during
-        // superclass construction, before the constructor parameter is assigned - same hazard as
-        // partialChanges above. That is harmless here: it just means the very first (synthetic,
-        // empty) model build uses ungrouped behaviour, and every real rebuild after construction
-        // sees the correct value.
-        if (!groupConflicts) return TreeModelBuilder.buildFromChanges(myProject, grouping, changes, null)
+        // Note: groupConflicts/currentRepo may still read their JVM defaults if this is invoked
+        // during superclass construction, before Kotlin property initialization completes - same
+        // hazard as partialChanges above. Harmless here: it just means the very first (synthetic,
+        // empty) model build is ungrouped, and every real rebuild after construction sees the
+        // correct values.
+        if (!groupConflicts && currentRepo == null) {
+            return TreeModelBuilder.buildFromChanges(myProject, grouping, changes, null)
+        }
 
-        val (conflicted, rest) = changes.partition { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
+        val (conflicted, rest) = if (groupConflicts) {
+            changes.partition { it.fileStatus == FileStatus.MERGED_WITH_CONFLICTS }
+        } else {
+            emptyList<Change>() to changes
+        }
         val builder = TreeModelBuilder(myProject, grouping)
         if (conflicted.isNotEmpty()) {
             builder.insertChanges(conflicted, builder.insertTagNode(JujutsuConflictsNode(myProject)), null)
         }
-        builder.setChanges(rest, null)
+
+        val repo = currentRepo
+        val (current, other) = partitionByCurrentRepo(rest, repo) {
+            myProject.possibleJujutsuRepositoryFor(it.filePath)
+        }
+        if (repo != null && current.isEmpty()) {
+            // Otherwise the bound repo shows nothing, easy to misread as broken.
+            builder.insertSubtreeRoot(JujutsuNoChangesNode(repo))
+        } else {
+            builder.setChanges(current, null)
+        }
+        if (other.isNotEmpty()) {
+            val otherRoot = builder.insertTagNode(JujutsuOtherRepositoriesNode())
+            // Grouped by repo via insertSubtreeRoot (raw model insertion), not
+            // insertChanges/insertChangeNode - this tree's directory/repository grouping-policy
+            // chain nests directory *outside* repository, so letting it run here groups several
+            // repos under their shared parent directory instead of by repo. Files within each
+            // repo show flat (no directory sub-nesting) as the trade-off for bypassing it.
+            other.groupBy { myProject.possibleJujutsuRepositoryFor(it.filePath) }
+                .toList()
+                .sortedBy { (otherRepo, _) -> otherRepo?.displayName.orEmpty() }
+                .forEach { (otherRepo, repoChanges) ->
+                    val target = if (otherRepo == null) {
+                        otherRoot
+                    } else {
+                        JujutsuOtherRepositoryNode(otherRepo).also { builder.insertSubtreeRoot(it, otherRoot) }
+                    }
+                    repoChanges.sortedBy { it.filePath.path }.forEach { change ->
+                        builder.insertSubtreeRoot(builder.createChangeNode(change, null), target)
+                    }
+                }
+        }
         return builder.build()
     }
 
@@ -126,3 +181,16 @@ class JujutsuChangesTree(
  */
 fun sameChangesAndStatuses(a: List<Change>, b: List<Change>): Boolean =
     a.size == b.size && a.indices.all { i -> a[i] == b[i] && a[i].fileStatus == b[i].fileStatus }
+
+/**
+ * Splits [changes] into (belonging to [currentRepo], everything else). `currentRepo == null`
+ * means "don't split" — everything belongs. [repoFor] is injected so this stays pure and
+ * unit-testable, unlike the real [in.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor] resolution
+ * [JujutsuChangesTree.buildTreeModel] uses, which needs a live `Project`.
+ */
+internal fun <T> partitionByCurrentRepo(
+    changes: List<T>,
+    currentRepo: JujutsuRepository?,
+    repoFor: (T) -> JujutsuRepository?
+): Pair<List<T>, List<T>> =
+    if (currentRepo == null) changes to emptyList() else changes.partition { repoFor(it) == currentRepo }
