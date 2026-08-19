@@ -7,9 +7,11 @@ import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -76,12 +78,43 @@ class HtmlTextCanvasTest {
     fun `separators between bookmark chips remain non-breaking spaces`() {
         val html = htmlString {
             append(Bookmark("main"))
-            append(" ")
+            space()
             append(Bookmark("feature/long-name"))
         }
 
         html shouldContain "&nbsp;"
         ICON_TAG.findAll(html).toList() shouldHaveSize 2
+    }
+
+    /**
+     * Regression test for jj-idea-myje / GitHub #77: [TextCanvas.space] is the one place that's
+     * still allowed to produce a non-breaking space (it's for a deliberate gap next to an icon or
+     * chip, not real text), and it must still do so - guards against the gap silently
+     * re-collapsing if [Formatters.escapeHtml] or [HtmlTextCanvas.space] regresses.
+     */
+    @Test
+    fun `space() next to an icon still renders as a non-breaking space`() {
+        val html = htmlString {
+            append(icon(JujutsuIcons::Repo))
+            space()
+            append("main")
+        }
+
+        html shouldContain "&nbsp;"
+    }
+
+    /**
+     * Regression test for jj-idea-myje / GitHub #77: a description's own inter-word spaces must
+     * stay as ordinary breakable spaces, not become non-breaking `&nbsp;` (which broke line
+     * wrapping and corrupted copy/paste, since the selected text then contained literal U+00A0
+     * characters instead of the description as typed).
+     */
+    @Test
+    fun `description text keeps regular breakable spaces`() {
+        val html = htmlString { append(Description("fix the thing that was broken")) }
+
+        html shouldContain "fix the thing that was broken"
+        html shouldNotContain "&nbsp;"
     }
 
     /**

@@ -81,11 +81,11 @@ fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
 fun TextCanvas.appendDecorations(entry: LogEntry) {
     appendBookmarks(entry)
     if (entry.tags.isNotEmpty()) {
-        if (entry.bookmarks.isNotEmpty()) append(" ")
+        if (entry.bookmarks.isNotEmpty()) space()
         appendTags(entry)
     }
     if (entry.isWorkingCopy) {
-        append(" ")
+        space()
         colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
     }
 }

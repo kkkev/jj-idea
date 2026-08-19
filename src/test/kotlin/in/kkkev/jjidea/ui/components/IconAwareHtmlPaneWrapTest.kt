@@ -31,11 +31,12 @@ class IconAwareHtmlPaneWrapTest {
     fun `long committer line wraps between the name-email chip and the date chip, never inside either`() {
         val html = htmlString {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
-                append("committed by ")
+                append("committed by")
+                space()
                 appendWithEmail(
                     VcsUserImpl("GitHub", "49699333+dependabot[bot]@users.noreply.github.com")
                 )
-                append(" ")
+                space()
                 appendUnbreakable("· 12/07/2026, 04:07")
             }
         }
@@ -72,9 +73,10 @@ class IconAwareHtmlPaneWrapTest {
     fun `same committer line leaves a visible gap between the name-email chip and the date chip when both fit`() {
         val html = htmlString {
             control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
-                append("committed by ")
+                append("committed by")
+                space()
                 appendWithEmail(VcsUserImpl("GitHub", "noreply@github.com"))
-                append(" ")
+                space()
                 appendUnbreakable("· 12/07/2026, 04:07")
             }
         }

@@ -29,6 +29,17 @@ interface TextCanvas {
     fun append(text: String)
 
     /**
+     * A deliberate, non-collapsing gap between two elements (e.g. an icon and its label, or two
+     * chips) - as opposed to a space that's part of ordinary text. On backends that never
+     * collapse spaces this is just [append]`(" ")`; the HTML backend overrides it to emit a
+     * non-breaking space instead, since a plain space next to a chip/icon's `<img>` element
+     * collapses to near-zero there. Keeping this distinct from [append] is what lets [append]
+     * itself stay a faithful, un-mangled pass-through for real text like a description
+     * (jj-idea-myje / GitHub #77).
+     */
+    fun space() = append(" ")
+
+    /**
      * Apply context-specific controls to the canvas. For HTML, this is equivalent to surrounding with an HTML tag.
      * Strings are applied to the stream verbatim; crucially, they are not escaped, so this is the way to provide
      * further control on the HTML output.

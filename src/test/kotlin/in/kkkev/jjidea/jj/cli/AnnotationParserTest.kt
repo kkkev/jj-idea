@@ -202,7 +202,9 @@ class AnnotationParserTest {
         val result = AnnotationParser.parse(output)
         val tooltip = result[0].getHtmlTooltip()
 
-        tooltip shouldContain "(no&nbsp;description)"
+        // Plain text, not a deliberate icon/chip gap - renders with an ordinary space now that
+        // Formatters.escapeHtml no longer nbsp-ifies every space (jj-idea-myje / GitHub #77).
+        tooltip shouldContain "(no description)"
     }
 
     @Test

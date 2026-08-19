@@ -33,6 +33,13 @@ private class HtmlTextCanvas(
         sb.append(Formatters.escapeHtml(text))
     }
 
+    // A plain space next to a chip/icon's <img> element collapses to near-zero in Swing's HTML
+    // renderer, so a deliberate gap needs a non-breaking space instead - but NOT folded into an
+    // appendUnbreakable() atomic unit, which would remove the only wrap point between two chips
+    // (tried and reverted for exactly that reason - see bb180a0a7). A plain, breakable &nbsp; is
+    // both non-collapsing and still a valid line-wrap boundary against the adjacent <img>.
+    override fun space() = control("&nbsp;")
+
     override fun append(icon: IconSpec) {
         val src = applyCurrentColor(icon).qualified
         control("<img src='$ICON_IMG_PREFIX${if (style.isSmaller) "$src@$SMALLER_SCALE" else src}'/>")

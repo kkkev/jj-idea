@@ -42,10 +42,11 @@ import javax.swing.JPanel
 private fun TextCanvas.appendUserWithTimestamp(user: VcsUser?, timestamp: Instant?) {
     user?.let { appendWithEmail(it) } ?: append("Unknown")
     timestamp?.also {
-        // append (not appendUnbreakable): stays a breakable wrap point on a long line, and its
-        // escaping turns the space into a non-collapsing &nbsp; matching the date chip's own
-        // leading \u00a0 below, so both gaps measure to the same width.
-        append(" ")
+        // space() (not appendUnbreakable): stays a breakable wrap point on a long line - folding
+        // it into the chip would remove the only wrap point between the two chips (jj-idea-myje /
+        // bb180a0a7) - and its non-breaking &nbsp; matches the date chip's own leading U+00A0
+        // below, so both gaps measure to the same width.
+        space()
         appendUnbreakable("\u00b7\u00a0${DateTimeFormatter.formatAbsolute(it)}")
     }
 }
@@ -248,7 +249,11 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
                     appendUserWithTimestamp(entry.author, entry.authorTimestamp)
                     val committer = entry.committer
                     if (committer != null && committer != entry.author) {
-                        append("\ncommitted by ")
+                        // Trailing gap split out as space(): it sits right before the
+                        // name/email chip appendUserWithTimestamp starts with, and a plain space
+                        // there collapses against the chip's <img> element (jj-idea-myje).
+                        append("\ncommitted by")
+                        space()
                         appendUserWithTimestamp(committer, entry.committerTimestamp)
                     }
                 }

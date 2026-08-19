@@ -8,11 +8,15 @@ import com.intellij.util.ui.UIUtil
  */
 object Formatters {
     /**
-     * Escape HTML special characters.
+     * Escape HTML special characters. Does *not* touch regular spaces - a blanket
+     * space-to-`&nbsp;` substitution here once broke line-wrapping and copy/paste fidelity for
+     * ordinary text like a description (jj-idea-myje / GitHub #77), since this is the single
+     * escaping path for all HTML-rendered text. Deliberate non-collapsing gaps (e.g. between an
+     * icon and its label, or between two chips) are the caller's responsibility via
+     * [TextCanvas.space] instead.
      */
     fun escapeHtml(text: String): String = text
         .replace("&", "&amp;")
-        .replace(" ", "&nbsp;")
         .replace("<", "&lt;")
         .replace(">", "&gt;")
         .replace("\"", "&quot;")

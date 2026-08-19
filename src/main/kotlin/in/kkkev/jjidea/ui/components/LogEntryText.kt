@@ -145,7 +145,7 @@ fun TextCanvas.append(repo: JujutsuRepository) {
     val color = RepositoryColors.getColor(repo)
     colored(color) {
         append(icon(JujutsuIcons::Repo))
-        append(" ")
+        space()
         bold { append(repo.displayName) }
     }
 }
@@ -233,12 +233,12 @@ fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
     var first = true
     for (group in groups) {
         group.local?.let { local ->
-            if (!first) append(" ")
+            if (!first) space()
             first = false
             refChip(entry, "bookmark", local.name.name) { appendBookmarkChip(local, group.localName) }
         }
         for (remote in group.remotes) {
-            if (!first) append(" ")
+            if (!first) space()
             first = false
             val label = if (group.local != null) "@${remote.remote}" else remote.name.name
             refChip(entry, "bookmark", remote.name.name) { appendBookmarkChip(remote, label) }
@@ -293,7 +293,7 @@ fun TextCanvas.append(tag: Tag) = colored(JujutsuColors.TAG) {
 fun TextCanvas.appendTags(entry: LogEntry, suffix: String = "") {
     var first = true
     for (tag in entry.tags) {
-        if (!first) append(" ")
+        if (!first) space()
         first = false
         refChip(entry, "tag", tag.name) { append(tag) }
     }
@@ -321,7 +321,7 @@ fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyLis
             val entry = choice.item.id?.let { id -> entries.find { it.id == id } }
                 ?: (choice.item as? TagItem)?.let { t -> entries.find { e -> e.tags.any { it.name == t.tag.name } } }
             if (entry != null) {
-                append(" ")
+                space()
                 appendSummary(entry.description)
             }
         }
@@ -335,7 +335,7 @@ fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyLis
 
         is RevisionChoice.FreeForm -> grey {
             append(icon(AllIcons.Actions::Search))
-            append(" ")
+            space()
             append(JujutsuBundle.message("dialog.revisionselector.freeform", choice.text))
         }
     }
@@ -368,7 +368,7 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
         statusParts.add {
             colored(JujutsuColors.CONFLICT) {
                 append(icon(JujutsuIcons::Conflict))
-                append(" ")
+                space()
                 append(message("status.conflict"))
             }
         }
@@ -382,9 +382,22 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
     if (entry.immutable) {
         statusParts.add {
             append(icon(JujutsuIcons::Immutable))
-            append(" ")
+            space()
             append(message("status.immutable"))
         }
     }
-    append(statusParts, prefix = " [", suffix = "]\n")
+    // Not the generic append(parts, separator=", ", ...) helper: the conflict/immutable parts
+    // start with an icon, and a plain separator's trailing space would collapse against that
+    // icon's <img> element the same way any other icon-adjacent space would (jj-idea-myje).
+    if (statusParts.isNotEmpty()) {
+        append(" [")
+        statusParts.forEachIndexed { i, part ->
+            if (i > 0) {
+                append(",")
+                space()
+            }
+            part()
+        }
+        append("]\n")
+    }
 }

@@ -186,6 +186,18 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
       before the truncation point; one that would appear after it is dropped along with the rest
       of the truncated text, not left half-rendered
 
+#### Description word spacing and copy fidelity (jj-idea-myje / GitHub #77)
+
+- [ ] Describe a change with a long, multi-word description (long enough to wrap in the
+      description column and in the commit details panel/tooltip) — it wraps at word
+      boundaries like ordinary text, not only at the column edge
+- [ ] Select some of that description's text with the mouse (in the description column, the
+      details panel, or the row tooltip), copy it, and paste into a plain text editor — the
+      pasted text has ordinary spaces between words, matching what you typed (not literal
+      non-breaking spaces, which look identical on screen but paste/diff/search differently)
+- [ ] Right-click the row → Copy Description (or the equivalent toolbar/keyboard action) still
+      copies the description exactly as typed
+
 #### Issue-tracker links inside bookmark/tag chip names (jj-idea-vrmv)
 
 - [ ] With an Issue Navigation pattern configured (as above), create/rename a bookmark to include a
