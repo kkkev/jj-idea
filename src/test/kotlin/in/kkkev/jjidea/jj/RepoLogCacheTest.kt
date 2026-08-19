@@ -247,6 +247,24 @@ class RepoLogCacheTest {
         cache[e.id]?.commitId shouldBe updated.commitId
     }
 
+    // ─── loadContext ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `loadContext builds its revset from the full id, not the short prefix`() {
+        // short is a shortest-unique-prefix computed at fetch time; it can stop being unique by
+        // the time it's substituted into a later revset, which jj then rejects as ambiguous
+        // (GitHub #76). The revset passed to logService must always use the full id.
+        val id = ChangeId(full = "qpvuntsmwlrtwvpypxzvwprnnpnqrkukntxp", short = "q")
+        val expectedRevset = Expression(
+            "ancestors(${id.full}, 5) | ${id.full} | descendants(${id.full}, 5)"
+        )
+        every { logService.getLog(revset = expectedRevset, quiet = false) } returns Result.success(emptyList())
+
+        cache.loadContext(id, window = 5)
+
+        verify(exactly = 1) { logService.getLog(revset = expectedRevset, quiet = false) }
+    }
+
     // ─── reload ───────────────────────────────────────────────────────────────
 
     @Test

@@ -26,8 +26,10 @@ fun squashAction(project: Project, entry: LogEntry?) =
     nullAndDumbAwareAction(entry, "log.action.squash.into.parent", JujutsuIcons.Squash) {
         runInBackground {
             val changes = ChangeService.loadChanges(target)
+            // Full id, not short: a short prefix cached at an earlier fetch can become
+            // ambiguous by the time it's substituted into a revset here (GitHub #76).
             val candidateParents = target.repo.logService
-                .getLogBasic(Expression("parents(${target.id.short})"))
+                .getLogBasic(Expression("parents(${target.id.full})"))
                 .getOrNull().orEmpty()
                 .filter { !it.immutable }
 

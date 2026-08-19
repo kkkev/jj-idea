@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Freed up space in the log window's toolbar now that the bookmark widget has moved (see above), so more of the filter row stays visible before collapsing into the "»" overflow.
 
 ### Fixed
+- Fixed the log occasionally failing to load with an "ambiguous change ID prefix" error when jumping to a commit outside the loaded window (e.g. from file annotation, or navigating to a bookmark), or when squashing a change — a shortened change ID cached from an earlier moment could stop being unique by the time it was reused. ([#76](https://github.com/kkkev/jj-idea/issues/76))
 - Fixed diffs, file history, restore, split, squash, and conflict resolution failing on files whose path contains parentheses or square brackets (e.g. Next.js app-router routes like `app/(app)/users/[id]/page.tsx`) — the diff pane used to show "Cannot get content from this revision." ([#73](https://github.com/kkkev/jj-idea/issues/73))
 - Fixed the bookmark widget in the log toolbar showing no bookmark at all (just the empty "Bookmark:" label) most of the time, instead of the nearest-bookmark indicator added in 0.8.9 — it now shows correctly from the moment the log opens, and keeps up to date after commands run outside the IDE (e.g. `jj new` in a terminal).
 
