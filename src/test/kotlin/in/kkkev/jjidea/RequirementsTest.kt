@@ -201,23 +201,32 @@ class RequirementsTest {
 
     @Test
     @Disabled("UI test - requires IDE environment")
-    fun `Bookmark widget appears in log toolbar showing current working-copy bookmark`() {
-        // Implementation: JujutsuBookmarkWidget extends JujutsuFilterComponent,
-        //   subscribes to project.stateModel.workingCopies; added in UnifiedJujutsuLogPanel
+    fun `Bookmark widget appears in main IDE toolbar showing current working-copy bookmark`() {
+        // Implementation: JujutsuBookmarkToolbarWidget (ExpandableComboAction), registered under
+        //   MainToolbarLeft; update() reads project.stateModel.workingCopies/closestBookmarks directly
+    }
+
+    @Test
+    @Disabled("UI test - requires IDE environment")
+    fun `Bookmark status-bar widget takes over when the main toolbar is hidden or unavailable`() {
+        // Implementation: JujutsuBookmarkStatusBarWidgetFactory.isEnabledByDefault() mirrors
+        //   git4idea's GitBranchWidget.Factory; JujutsuBookmarkStatusBarSettingsListener toggles it
+        //   live on UISettingsListener
     }
 
     @Test
     @Disabled("UI test - requires IDE environment")
     fun `Bookmark widget dropdown shows Create and per-bookmark management actions`() {
-        // Implementation: JujutsuBookmarkWidget.repoActionGroup() + bookmarkSubGroup();
-        //   remotes folded into their local bookmark's sub-group via BookmarkGroup.grouped()
+        // Implementation: bookmarkActionGroup() -> repoActionGroup() + bookmarkSubGroup()
+        //   (actions/bookmark/BookmarkMenu.kt); remotes folded into their local bookmark's
+        //   sub-group via BookmarkGroup.grouped()
     }
 
     @Test
     @Disabled("UI test - requires IDE environment")
     fun `Bookmark widget groups bookmarks by repo sub-menu in multi-repo projects`() {
-        // Implementation: createActionGroup() wraps repoActionGroup() per repo when repos.size > 1;
-        //   label is blank in multi-repo (getCurrentText() returns "" when wcEntries.size != 1)
+        // Implementation: bookmarkActionGroup() wraps repoActionGroup() per repo when repos.size > 1;
+        //   label is blank in multi-repo (wcEntries.size != 1)
     }
 
     // ========== THREADING & PERFORMANCE ==========

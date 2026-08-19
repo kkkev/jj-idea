@@ -3,7 +3,6 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Disposer
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.stateModel
@@ -233,11 +232,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             }
         }
 
-        // Bookmark widget
-        val widget = JujutsuBookmarkWidget(project)
-        Disposer.register(this, widget)
-
-        return listOfNotNull(rootFilterComponent, widget)
+        return listOfNotNull(rootFilterComponent)
     }
 
     override fun updateTableStuff() {

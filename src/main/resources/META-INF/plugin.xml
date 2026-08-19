@@ -42,7 +42,7 @@
     </ol>
 
     <h3>Roadmap</h3>
-    <p>Coming soon: hunk-level squash &amp; split, a branches panel and bookmark toolbar widget, large repository support, issue tracker link rendering, operation log with undo/redo, and forge (PR/MR) integration. See the full <a href="https://github.com/kkkev/jj-idea/blob/master/ROADMAP.md">roadmap</a>.</p>
+    <p>Coming soon: hunk-level squash &amp; split, a branches panel, large repository support, issue tracker link rendering, operation log with undo/redo, and forge (PR/MR) integration. See the full <a href="https://github.com/kkkev/jj-idea/blob/master/ROADMAP.md">roadmap</a>.</p>
 
     <p><a href="https://github.com/kkkev/jj-idea">GitHub</a> · <a href="https://github.com/kkkev/jj-idea/issues">Issues</a></p>
     ]]></description>
@@ -91,6 +91,13 @@
         id="Jujutsu.StatusBarWidget"
         implementation="in.kkkev.jjidea.ui.statusbar.JujutsuStatusBarWidgetFactory"
         order="after CodeStyleStatusBarWidget,before ReadOnlyAttribute"/>
+
+    <!-- Fallback for the main-toolbar bookmark widget when the main toolbar is hidden/unavailable
+         (Classic UI, or New UI with "Show main toolbar" off) — see jj-idea-cpno -->
+    <statusBarWidgetFactory
+        id="Jujutsu.BookmarkStatusBarWidget"
+        implementation="in.kkkev.jjidea.ui.statusbar.JujutsuBookmarkStatusBarWidgetFactory"
+        order="after Jujutsu.StatusBarWidget"/>
 
     <!-- Clone dialog integration -->
     <openapi.vcs.ui.cloneDialog.VcsCloneDialogExtension
@@ -250,6 +257,19 @@
     <action id="Jujutsu.OpenChangeFile" class="in.kkkev.jjidea.actions.filechange.OpenChangeFileAction">
       <keyboard-shortcut first-keystroke="F4" keymap="$default"/>
     </action>
+
+    <!-- Main-toolbar bookmark widget, analogous to Git's branch widget (jj-idea-cpno, GitHub #62) -->
+    <action id="Jujutsu.MainToolbarBookmarks"
+            class="in.kkkev.jjidea.ui.toolbar.JujutsuBookmarkToolbarWidget">
+      <add-to-group group-id="MainToolbarLeft" anchor="last"/>
+    </action>
   </actions>
+
+  <projectListeners>
+    <!-- Toggles the bookmark status-bar fallback live when the main toolbar's visibility setting
+         changes — see JujutsuBookmarkStatusBarWidgetFactory -->
+    <listener class="in.kkkev.jjidea.ui.statusbar.JujutsuBookmarkStatusBarSettingsListener"
+              topic="com.intellij.ide.ui.UISettingsListener"/>
+  </projectListeners>
 
 </idea-plugin>

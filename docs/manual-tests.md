@@ -754,15 +754,20 @@ state/routing logic, not rendering)
 
 **Bookmark widget**
 
-**Code:** `ui/log/JujutsuBookmarkWidget.kt`, `actions/bookmark/`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt` (Advance Bookmark toolbar button)
+**Code:** `ui/toolbar/JujutsuBookmarkToolbarWidget.kt`, `ui/statusbar/JujutsuBookmarkStatusBarWidget.kt` + `JujutsuBookmarkStatusBarWidgetFactory.kt`, `actions/bookmark/BookmarkMenu.kt`, `actions/bookmark/`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt` (Advance Bookmark toolbar button)
 **Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button)
+
+As of jj-idea-cpno, the bookmark widget lives in the main IDE toolbar (next to where Git's
+branch widget would sit), not the log window's filter row — this is the location fix for
+GitHub #62. A status-bar fallback (MT-BOOKMARK-STATUSBAR below) takes over when the main
+toolbar itself is hidden or unavailable.
 
 #### Single-repo project
 
-- [ ] "Bookmark: \<name\>" label appears in the log toolbar to the left of the Reference filter when @ has a local bookmark
-- [ ] `jj new` off a bookmarked change with nothing left ahead of it — label shows "Bookmark: \<name\> +1" (jj-idea-l7wd, GitHub #62), where `<name>` is the nearest ancestor bookmark and `+1` the number of changes since it; label reads "Bookmark:" with nothing after it only when @ has no bookmark anywhere in its ancestry
+- [ ] "\<name\>" label appears in the **main IDE toolbar** (not the log toolbar) when @ has a local bookmark
+- [ ] `jj new` off a bookmarked change with nothing left ahead of it — label shows "\<name\> +1" (jj-idea-l7wd, GitHub #62), where `<name>` is the nearest ancestor bookmark and `+1` the number of changes since it; label is blank only when @ has no bookmark anywhere in its ancestry
 - [ ] Two bookmarks equally close to @ (e.g. either side of a merge) — label lists both names, comma-separated, before the shared `+N`
-- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "Bookmark: foo" within ~300 ms, without saving a file or restarting (see MT-LOG-REFRESH); `jj new` afterwards updates it to "Bookmark: foo +1" the same way
+- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "foo" within ~300 ms, without saving a file or restarting (see MT-LOG-REFRESH); `jj new` afterwards updates it to "foo +1" the same way
 - [ ] Click the widget — dropdown opens with "Create Bookmark Here…", then "Advance Bookmark Here" at the top
 - [ ] Dropdown lists all local bookmarks in the repo (not just those on @, and including bookmarks beyond the log limit), each as a sub-menu
 - [ ] For a bookmark **on @**: sub-menu contains Advance, Rename…, Delete, Forget (no Move Here)
@@ -778,16 +783,33 @@ state/routing logic, not rendering)
       conflicted bookmark (e.g. after a divergent fetch) shows a red forked-tail pennant
       instead of the generic red warning triangle. Both remain legible at 125%/150% IDE
       text size and in both Light and Dark themes
+- [ ] The log window's filter row (Root/Reference/Author/Date) no longer shows a Bookmark chip
 
 #### Multi-repo project
 
-- [ ] Bookmark widget is present in the toolbar (not hidden)
-- [ ] Label shows "Bookmark:" with nothing after it regardless of which bookmarks exist (the "name +N" fallback only applies to a single-repo project — see jj-idea-1ra9 for the wrong-repo-ancestry bug this must not repeat)
+- [ ] Bookmark widget is present in the main toolbar (not hidden)
+- [ ] Label is blank regardless of which bookmarks exist (the "name +N" fallback only applies to a single-repo project — see jj-idea-1ra9 for the wrong-repo-ancestry bug this must not repeat)
 - [ ] Click the widget — dropdown shows one sub-menu **per repo**, named by repo display name
 - [ ] Each repo sub-menu contains the same structure as the single-repo dropdown: "Create Bookmark Here…", then "Advance Bookmark Here", then the repo's bookmark sub-menus
 - [ ] "Create Bookmark Here…" inside repo-a's sub-menu creates a bookmark at **repo-a's** working copy, not repo-b's (check via `jj bookmark list` in each repo)
 - [ ] `jj new` past every bookmark in repo-a only (repo-b still has one on @) — repo-a's "Advance Bookmark Here" is enabled and targets repo-a's nearest bookmark; repo-b's advances repo-b's bookmark, unaffected by repo-a
 - [ ] Rename/Delete/Forget in repo-b's sub-menu affects only repo-b
+
+#### Status-bar fallback (jj-idea-cpno)
+
+**Code:** `ui/statusbar/JujutsuBookmarkStatusBarWidget.kt`, `JujutsuBookmarkStatusBarWidgetFactory.kt`
+
+- [ ] New UI, Settings → Appearance & Behavior → uncheck "Show main toolbar" → the main-toolbar
+      bookmark widget disappears and an equivalent bookmark widget appears in the status bar
+      (bottom of the IDE window), live, without restarting; re-check the setting → reverses
+- [ ] Switch to Classic UI (no main toolbar exists at all) → the bookmark status-bar widget is
+      present
+- [ ] The status-bar widget shows the same text as the main-toolbar widget would (bookmark on @,
+      or nearest-ancestor "name +N"), and clicking it opens the identical dropdown (Create,
+      Advance, per-bookmark Move/Rename/Delete/Forget/Track)
+- [ ] With the main toolbar visible (New UI default), the bookmark status-bar widget is **not**
+      shown — only the main-toolbar widget is
+- [ ] Non-jj project: neither the main-toolbar widget nor the status-bar fallback appears
 
 #### Advance Bookmark (jj-idea-l7wd, GitHub #61)
 

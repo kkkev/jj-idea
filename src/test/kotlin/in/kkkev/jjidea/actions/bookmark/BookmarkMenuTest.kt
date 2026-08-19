@@ -1,4 +1,4 @@
-package `in`.kkkev.jjidea.ui.log
+package `in`.kkkev.jjidea.actions.bookmark
 
 import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
@@ -6,11 +6,11 @@ import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
 /**
- * Tests for [bookmarkWidgetText] — the bookmark widget's toolbar label, covering both the
- * "bookmark(s) on the working copy" case and the "name +N" closest-ancestor fallback
- * (jj-idea-l7wd / GitHub #62).
+ * Tests for [bookmarkWidgetText] — the bookmark widget's toolbar label, shared by the main-toolbar
+ * widget and its status-bar fallback, covering both the "bookmark(s) on the working copy" case and
+ * the "name +N" closest-ancestor fallback (jj-idea-l7wd / GitHub #62).
  */
-class JujutsuBookmarkWidgetTextTest {
+class BookmarkMenuTest {
     @Test
     fun `no bookmarks anywhere is empty`() {
         bookmarkWidgetText(emptyList(), closest = null) shouldBe ""

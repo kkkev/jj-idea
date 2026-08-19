@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - The Working Copy tool window's toolbar now offers the common actions for the current change — Split, Squash into Parent, Abandon, Create Bookmark Here, Advance Bookmark Here, and Set Tag Here — alongside New Change, so you don't have to switch to the log to act on `@`. In a multi-root project, the repository selector now sits in that same row instead of further down the panel, and the changes tree collapses every other repository's changes into a single, per-repository-grouped "Other Repositories" group (and shows a "(no changes)" line for the selected repository when it's clean) so it's clear which repository the toolbar and description above are acting on. Advancing a bookmark from this toolbar now confirms with a Yes/No prompt before moving it, names the bookmark in its tooltip, and confirms with a notification once it moves, since — unlike the other actions here — it otherwise has no dialog and no other visible effect. ([#61](https://github.com/kkkev/jj-idea/issues/61))
+- The bookmark indicator has moved out of the Jujutsu log window and into the main IDE toolbar, next to where Git's branch widget sits — so you can see which bookmark you're on, and act on it, without opening the log. If the main toolbar is hidden (Classic UI, or New UI with "Show main toolbar" turned off), the same indicator now appears in the status bar instead. ([#62](https://github.com/kkkev/jj-idea/issues/62))
+
+### Changed
+- Freed up space in the log window's toolbar now that the bookmark widget has moved (see above), so more of the filter row stays visible before collapsing into the "»" overflow.
 
 ### Fixed
 - Fixed diffs, file history, restore, split, squash, and conflict resolution failing on files whose path contains parentheses or square brackets (e.g. Next.js app-router routes like `app/(app)/users/[id]/page.tsx`) — the diff pane used to show "Cannot get content from this revision." ([#73](https://github.com/kkkev/jj-idea/issues/73))
