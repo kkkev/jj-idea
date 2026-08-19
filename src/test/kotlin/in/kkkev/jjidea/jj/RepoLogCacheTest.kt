@@ -265,6 +265,19 @@ class RepoLogCacheTest {
         verify(exactly = 1) { logService.getLog(revset = expectedRevset, quiet = false) }
     }
 
+    @Test
+    fun `loadContext with window 0 fetches only the target revision`() {
+        // jj-idea-isnf: window 0 degenerates to the bare target id, skipping the
+        // ancestors()/descendants() clauses entirely rather than calling them with 0.
+        val id = ChangeId(full = "qpvuntsmwlrtwvpypxzvwprnnpnqrkukntxp", short = "q")
+        val expectedRevset = Expression(id.full)
+        every { logService.getLog(revset = expectedRevset, quiet = false) } returns Result.success(emptyList())
+
+        cache.loadContext(id, window = 0)
+
+        verify(exactly = 1) { logService.getLog(revset = expectedRevset, quiet = false) }
+    }
+
     // ─── reload ───────────────────────────────────────────────────────────────
 
     @Test

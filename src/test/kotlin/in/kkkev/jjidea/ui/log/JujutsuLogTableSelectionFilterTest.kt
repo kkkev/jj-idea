@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
@@ -57,6 +58,9 @@ class JujutsuLogTableSelectionFilterTest {
 
     private fun tableWith(entries: List<LogEntry>): JujutsuLogTable {
         val table = JujutsuLogTable(project.get())
+        // jj-idea-eyf1: the table now subscribes to logRefresh in init, so it must be disposed
+        // with the test project or the message bus connection leaks the project.
+        Disposer.register(project.get(), table)
         table.setEntries(entries)
         return table
     }

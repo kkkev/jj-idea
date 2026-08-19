@@ -35,5 +35,8 @@ data class JujutsuApplicationSettingsState(
     var jjExecutablePath: String = "jj",
     // jj-idea-jqpe: tracks whether the one-time "Working copy" tool window signpost balloon
     // has already been shown on this machine, across all projects.
-    var workingCopySignpostShown: Boolean = false
+    var workingCopySignpostShown: Boolean = false,
+    // jj-idea-ixju: global default for disableIgnoredFileScanning, applied to any repository
+    // that doesn't set its own per-repo override (see JujutsuSettings.disableIgnoredFileScanning).
+    var disableIgnoredFileScanning: Boolean = false
 )

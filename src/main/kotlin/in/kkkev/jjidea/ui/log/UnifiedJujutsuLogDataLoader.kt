@@ -118,8 +118,9 @@ class UnifiedJujutsuLogDataLoader(
 
     fun loadExpanding(repo: JujutsuRepository, changeId: ChangeId) {
         val limit = lastLimit
+        val window = JujutsuSettings.getInstance(project).logContextWindow(repo)
         runInBackground {
-            repo.logCache.loadContext(changeId).takeUnless { it.isEmpty() }?.let { expansion ->
+            repo.logCache.loadContext(changeId, window).takeUnless { it.isEmpty() }?.let { expansion ->
                 expansionEntriesByRepo[repo] = expansion
                 // For each repo: combine loadCommits entries (from cache) with the expansion
                 // entries accumulated through navigation. This keeps other repos' expansions

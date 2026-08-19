@@ -108,9 +108,23 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     fun logRevset(repo: JujutsuRepository): String =
         state.repositoryOverrides[repo.directory.path]?.logRevset ?: state.logRevset
 
+    /**
+     * Returns the ignored-file-scanning-disabled flag for a specific repository.
+     * A per-repo override always wins; otherwise falls back to the application-level default
+     * ([JujutsuApplicationSettings]), which itself defaults to `false`.
+     */
     fun disableIgnoredFileScanning(repo: JujutsuRepository) =
-        state.repositoryOverrides[repo.directory.path]?.disableIgnoredFileScanning ?: false
+        state.repositoryOverrides[repo.directory.path]?.disableIgnoredFileScanning
+            ?: JujutsuApplicationSettings.getInstance().state.disableIgnoredFileScanning
 
+    /**
+     * Convenience setter used by the "disable scanning for this repo" notification action —
+     * always called with `disabled = true`, so pruning the override on `false` (equivalent to
+     * "no override" back when the global default was always `false`) is still safe here.
+     * [JujutsuConfigurable]'s repo settings panel needs to express an explicit `false` override
+     * (to re-enable scanning in one repo despite a global default of `true`) and writes
+     * [RepositoryConfig] directly rather than going through this method.
+     */
     fun setDisableIgnoredFileScanning(repo: JujutsuRepository, disabled: Boolean) {
         val path = repo.directory.path
         val current = state.repositoryOverrides[path] ?: RepositoryConfig()
@@ -121,6 +135,9 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
             state.repositoryOverrides[path] = updated
         }
     }
+
+    fun logContextWindow(repo: JujutsuRepository) =
+        state.repositoryOverrides[repo.directory.path]?.logContextWindow ?: state.logContextWindow
 
     companion object {
         const val DEFAULT_LOG_WINDOW_ID = "default"

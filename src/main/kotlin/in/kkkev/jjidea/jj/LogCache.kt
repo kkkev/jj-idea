@@ -129,7 +129,14 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         // fetched/rendered, and jj's actual shortest-unique-prefix length shifts as the repo
         // changes - a short value cached from an earlier fetch can stop being unique by the time
         // it's substituted here, which jj then rejects as an ambiguous prefix (GitHub #76).
-        val revset = Expression("ancestors(${id.full}, $window) | ${id.full} | descendants(${id.full}, $window)")
+        // window <= 0 (jj-idea-isnf): skip the ancestors()/descendants() clauses entirely rather
+        // than calling them with 0 - a plainly-correct revset instead of relying on jj's
+        // edge-case handling of an explicit 0.
+        val revset = if (window <= 0) {
+            Expression(id.full)
+        } else {
+            Expression("ancestors(${id.full}, $window) | ${id.full} | descendants(${id.full}, $window)")
+        }
         fetch(revset)
     }
 

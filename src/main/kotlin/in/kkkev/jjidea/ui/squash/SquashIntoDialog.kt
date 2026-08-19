@@ -119,7 +119,7 @@ class SquashIntoDialog(
         )
         tableHeader.isVisible = false
         rowHeight = JBUI.scale(22)
-        setStriped(true)
+        setStriped(JujutsuSettings.getInstance(project).state.stripedLogRows)
     }
 
     internal val fileSelection = FileSelectionPanel(project)

@@ -111,14 +111,14 @@ class JujutsuSettingsTest {
         RepositoryConfig(disableIgnoredFileScanning = true).isEmpty() shouldBe false
     }
 
-    // ── disableIgnoredFileScanning resolver ────────────────────────────────────
-
     @Test
-    fun `disableIgnoredFileScanning returns false when no override`() {
-        val settings = JujutsuSettings()
-        settings.loadState(JujutsuSettingsState())
-        settings.disableIgnoredFileScanning(mockRepo("/repo")) shouldBe false
+    fun `RepositoryConfig isEmpty returns false when logContextWindow is set`() {
+        RepositoryConfig(logContextWindow = 0).isEmpty() shouldBe false
     }
+
+    // ── disableIgnoredFileScanning resolver (jj-idea-ixju) ──────────────────────
+    // The no-override case falls through to JujutsuApplicationSettings.getInstance(), which
+    // needs a real ApplicationManager - covered by JujutsuSettingsPlatformTest, not here.
 
     @Test
     fun `disableIgnoredFileScanning returns true when override is true`() {
@@ -131,15 +131,51 @@ class JujutsuSettingsTest {
         settings.disableIgnoredFileScanning(mockRepo("/repo")) shouldBe true
     }
 
+    // Global-default interaction (JujutsuApplicationSettings.getInstance() needs a real
+    // ApplicationManager) is covered by JujutsuSettingsPlatformTest, not here.
+
     @Test
-    fun `disableIgnoredFileScanning returns false when override is null`() {
+    fun `disableIgnoredFileScanning per-repo true wins regardless of global default`() {
         val settings = JujutsuSettings()
         settings.loadState(
             JujutsuSettingsState(
-                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(disableIgnoredFileScanning = null))
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(disableIgnoredFileScanning = true))
             )
         )
-        settings.disableIgnoredFileScanning(mockRepo("/repo")) shouldBe false
+        settings.disableIgnoredFileScanning(mockRepo("/repo")) shouldBe true
+    }
+
+    // ── logContextWindow resolver (jj-idea-isnf) ─────────────────────────────────
+
+    @Test
+    fun `logContextWindow returns project default when no repo override`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState(logContextWindow = 10))
+        settings.logContextWindow(mockRepo("/repo")) shouldBe 10
+    }
+
+    @Test
+    fun `logContextWindow returns repo override when present`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                logContextWindow = 10,
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(logContextWindow = 0))
+            )
+        )
+        settings.logContextWindow(mockRepo("/repo")) shouldBe 0
+    }
+
+    @Test
+    fun `logContextWindow falls back to project default when repo override is null`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                logContextWindow = 10,
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(logContextWindow = null))
+            )
+        )
+        settings.logContextWindow(mockRepo("/repo")) shouldBe 10
     }
 
     // ── setDisableIgnoredFileScanning ─────────────────────────────────────────
@@ -187,6 +223,28 @@ class JujutsuSettingsTest {
     @Test
     fun `workingCopyAutoOpened defaults to false`() {
         JujutsuSettingsState().workingCopyAutoOpened shouldBe false
+    }
+
+    // ── batch-2 setting defaults (jj-idea-tknb, eyf1, isnf) ──────────────────────
+
+    @Test
+    fun `showLogHoverTooltip defaults to true`() {
+        JujutsuSettingsState().showLogHoverTooltip shouldBe true
+    }
+
+    @Test
+    fun `stripedLogRows defaults to true`() {
+        JujutsuSettingsState().stripedLogRows shouldBe true
+    }
+
+    @Test
+    fun `logContextWindow defaults to 10`() {
+        JujutsuSettingsState().logContextWindow shouldBe 10
+    }
+
+    @Test
+    fun `disableIgnoredFileScanning application default is false`() {
+        JujutsuApplicationSettingsState().disableIgnoredFileScanning shouldBe false
     }
 
     private fun mockRepo(path: String): JujutsuRepository {

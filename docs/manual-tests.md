@@ -142,6 +142,7 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
       updates to match each row as before
 - [ ] Move the pointer off the log table onto another tool window or editor — the tooltip
       dismisses
+- [ ] jj-idea-tknb: off-switch for this tooltip — see the batch-2 checklist under MT-SETTINGS
 
 #### Column management
 
@@ -1307,6 +1308,8 @@ remains manually verifiable:
       notification once per repo per session, with "disable" and "report" actions still
       functioning; the IDE should not hang waiting for the scan to finish after the watchdog
       fires
+- [ ] jj-idea-ixju: global "disable ignored-file scanning (all repositories)" default and its
+      interaction with the per-repo override — see the batch-2 checklist under MT-SETTINGS
 
 #### Large ignored-file set cap (jj-idea-cvqz)
 
@@ -1460,6 +1463,30 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 
 → automate: jj-idea-ajd0 (settings persistence and column width/visibility persistence,
 tracked in MT-LOG-TABLE, are state-serialization logic)
+
+#### Settings — batch-2 escape hatches (jj-idea-tknb, eyf1, isnf, ixju)
+
+- [ ] **General** section: uncheck "Show commit details on log row hover", click Apply. Hover a
+      log row — no tooltip appears. Re-check it — hovering again shows the tooltip, no restart needed.
+      Repeat in the **Working copy** tool window (same table, same setting).
+- [ ] **General** section: check "Disable ignored-file scanning (all repositories)" with no
+      per-repo override set, click Apply. Confirm scanning stops in every repo. In a repo with
+      its own override explicitly set to "off" (see Repository Settings below), confirm it still
+      scans despite the global checkbox.
+- [ ] **Log Settings** section: uncheck "Alternate row background colors in log and picker
+      tables", click Apply. Log window rows become uniform, no restart needed. Open the
+      Duplicate, Squash-into, and Rebase dialogs — their destination/source picker tables are
+      also unstriped. Re-check and confirm striping returns everywhere.
+- [ ] **Log Settings** section: set "Context window when navigating outside the log" to 0, click
+      Apply. Navigate to a revision outside the loaded log (e.g. via file annotation, or jump to
+      a bookmark outside the current revset) — exactly one row (the target) appears, no
+      ancestors/descendants. Set it back to 10 and repeat — the ~19-revision window returns.
+- [ ] **Repository Settings** (multi-repo project): expand a repo's collapsible group. "Override
+      context window" checkbox + field lets that repo use a different window (e.g. 0) than the
+      project default — confirm only that repo's out-of-view navigation degenerates.
+      "Override ignored-file scanning default" checkbox + "Disable ignored-file scanning for this
+      repository" checkbox let a repo explicitly re-enable scanning even when the global default
+      (General section) is "disabled everywhere" — confirm the override wins in both directions.
 
 #### Settings — Support section
 

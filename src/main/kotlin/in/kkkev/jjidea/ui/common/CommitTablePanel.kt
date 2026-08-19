@@ -113,6 +113,9 @@ abstract class CommitTablePanel<D>(
 
     init {
         Disposer.register(this, detailsPanel)
+        // jj-idea-eyf1: logTable now subscribes to logRefresh (to pick up striping changes live),
+        // so it must be disposed with the panel or that subscription leaks the panel/project.
+        Disposer.register(this, logTable)
 
         // Create filter field with extension toolbar
         filterField = createFilterField()

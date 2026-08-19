@@ -175,8 +175,11 @@ class JujutsuLogTable(
         // Row height for better readability
         rowHeight = 22
 
-        // Striped rows for better readability
-        setStriped(true)
+        // Striped rows for better readability (jj-idea-eyf1: off-switch in settings).
+        setStriped(JujutsuSettings.getInstance(project).state.stripedLogRows)
+        project.stateModel.logRefresh.connect(this) {
+            setStriped(JujutsuSettings.getInstance(project).state.stripedLogRows)
+        }
 
         // Disable expandable items — we handle text truncation via TruncatingLeftRightLayout.
         // Without this, JBTable's ExpandableItemsHandler wraps our renderer in
@@ -236,7 +239,10 @@ class JujutsuLogTable(
             htmlAt = { point ->
                 val row = rowAtPoint(point)
                 val col = columnAtPoint(point)
-                if (row < 0 || col < 0) {
+                // jj-idea-tknb: off-switch, read live (not cached) so it applies without restart.
+                // beforeShow() already treats null as "show nothing" - no need to guard the
+                // installIconAwareTooltip call itself.
+                if (row < 0 || col < 0 || !JujutsuSettings.getInstance(project).state.showLogHoverTooltip) {
                     null
                 } else {
                     val renderer = getCellRenderer(row, col)

@@ -23,5 +23,12 @@ data class JujutsuSettingsState(
     var hideStandardCommitToolWindow: Boolean = true,
     // jj-idea-jqpe: tracks whether we've already auto-opened the Working copy tool window
     // once for this project, so it only happens on first discovery, not every startup.
-    var workingCopyAutoOpened: Boolean = false
+    var workingCopyAutoOpened: Boolean = false,
+    // jj-idea-tknb: off-switch for the log row hover tooltip.
+    var showLogHoverTooltip: Boolean = true,
+    // jj-idea-eyf1: off-switch for alternating-row striping in log/picker tables.
+    var stripedLogRows: Boolean = true,
+    // jj-idea-isnf: context window (ancestors/descendants) loaded when navigating to a
+    // revision outside the currently loaded log. 0 loads only the target revision.
+    var logContextWindow: Int = 10
 )

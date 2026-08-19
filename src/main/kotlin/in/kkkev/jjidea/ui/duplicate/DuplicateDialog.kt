@@ -11,6 +11,7 @@ import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runInBackground
@@ -72,7 +73,7 @@ class DuplicateDialog(
         setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
         tableHeader.isVisible = false
         rowHeight = JBUI.scale(22)
-        setStriped(true)
+        setStriped(JujutsuSettings.getInstance(project).state.stripedLogRows)
     }
 
     init {

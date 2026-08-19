@@ -9,7 +9,9 @@ package `in`.kkkev.jjidea.settings
 data class RepositoryConfig(
     var logChangeLimit: Int? = null,
     var logRevset: String? = null,
-    var disableIgnoredFileScanning: Boolean? = null
+    var disableIgnoredFileScanning: Boolean? = null,
+    var logContextWindow: Int? = null
 ) {
-    fun isEmpty() = logChangeLimit == null && logRevset == null && disableIgnoredFileScanning == null
+    fun isEmpty() =
+        logChangeLimit == null && logRevset == null && disableIgnoredFileScanning == null && logContextWindow == null
 }
