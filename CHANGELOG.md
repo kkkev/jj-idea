@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.11] - 2026-08-20
+
 ### Added
 - The Working Copy tool window's toolbar now offers the common actions for the current change — Split, Squash into Parent, Abandon, Create Bookmark Here, Advance Bookmark Here, and Set Tag Here — alongside New Change, so you don't have to switch to the log to act on `@`. In a multi-root project, the repository selector now sits in that same row instead of further down the panel, and the changes tree collapses every other repository's changes into a single, per-repository-grouped "Other Repositories" group (and shows a "(no changes)" line for the selected repository when it's clean) so it's clear which repository the toolbar and description above are acting on. Advancing a bookmark from this toolbar now confirms with a Yes/No prompt before moving it, names the bookmark in its tooltip, and confirms with a notification once it moves, since — unlike the other actions here — it otherwise has no dialog and no other visible effect. ([#61](https://github.com/kkkev/jj-idea/issues/61))
 - The bookmark indicator has moved out of the Jujutsu log window and into the main IDE toolbar, next to where Git's branch widget sits — so you can see which bookmark you're on, and act on it, without opening the log. If the main toolbar is hidden (Classic UI, or New UI with "Show main toolbar" turned off), the same indicator now appears in the status bar instead. ([#62](https://github.com/kkkev/jj-idea/issues/62))
@@ -789,7 +791,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.10...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.11...HEAD
+[0.8.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.11
 [0.8.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.10
 [0.8.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.9
 [0.8.8]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.8
