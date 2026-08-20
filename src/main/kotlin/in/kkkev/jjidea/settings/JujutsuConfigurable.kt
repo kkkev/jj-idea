@@ -186,11 +186,6 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     .comment(JujutsuBundle.message("settings.general.hide.commit.toolwindow.comment"))
             }
             row {
-                checkBox(JujutsuBundle.message("settings.general.show.hover.tooltip"))
-                    .bindSelected(settings.state::showLogHoverTooltip)
-                    .comment(JujutsuBundle.message("settings.general.show.hover.tooltip.comment"))
-            }
-            row {
                 checkBox(JujutsuBundle.message("settings.general.disable.ignore.scan"))
                     .bindSelected(appSettings.state::disableIgnoredFileScanning)
                     .comment(JujutsuBundle.message("settings.general.disable.ignore.scan.comment"))

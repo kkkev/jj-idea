@@ -142,7 +142,7 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
       updates to match each row as before
 - [ ] Move the pointer off the log table onto another tool window or editor — the tooltip
       dismisses
-- [ ] jj-idea-tknb: off-switch for this tooltip — see the batch-2 checklist under MT-SETTINGS
+- [ ] jj-idea-lgo4: off-switch for this tooltip — see "View options menu" below
 
 #### Column management
 
@@ -150,9 +150,27 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
       auto-fit (double-click separator) all work
 - [ ] Column widths and visibility both persist across IDE restarts
 
+#### View options menu (jj-idea-lgo4)
+
+The toolbar's eye-icon button opens a single flat "View Options" popup (replacing the old,
+separate "Columns" and "Details Position" submenus) with labeled section headers: **Columns**
+(the per-column toggles, then a plain separator, then "Fit Columns to Window Width" - a layout
+behavior rather than a column), **Details** (Right/Bottom), and an unlabeled trailing group with
+**Commit Tooltips**.
+
+- [ ] Toolbar shows one eye-icon **View Options** button (no separate Columns / Details Position
+      buttons). Opening it shows "Columns" and "Details" section headers with the expected items
+      grouped underneath, and "Commit Tooltips" at the bottom, checked by default
+- [ ] Uncheck **Commit Tooltips**, then hover a log row — no tooltip appears; re-check it —
+      hovering again shows the tooltip, no restart needed. Repeat in a file-history tab and in
+      the **Working copy** tool window (same table, same global setting) — toggling it in one
+      table's menu updates all of them immediately
+- [ ] Column visibility, Fit Columns to Window Width, and Details Right/Bottom toggles all still
+      work exactly as before from this flattened menu
+
 #### Responsive column sizing (jj-idea-lzq7)
 
-- [ ] Open a fresh log tab (or one where you've never dragged a column). The Columns menu's
+- [ ] Open a fresh log tab (or one where you've never dragged a column). The View Options menu's
       "Fit Columns to Window Width" is checked by default. Drag the tool window narrow: the
       description column shrinks and no horizontal scrollbar appears until the window is very
       narrow; author/date visibly narrow (and ellipsize) before any scrollbar appears
@@ -162,7 +180,7 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 - [ ] In a tab with a column you dragged before this change shipped (or drag one now, then
       reopen the tab), "Fit Columns to Window Width" defaults to unchecked and the layout/
       scrollbar behavior is exactly as before
-- [ ] Toggle "Fit Columns to Window Width" off and on in the Columns menu; behavior switches
+- [ ] Toggle "Fit Columns to Window Width" off and on in the View Options menu; behavior switches
       between responsive and manual immediately, and the choice persists across closing and
       reopening the tab
 - [ ] With fit-to-width on, manually widen the author column via drag, then narrow the window:
@@ -1476,11 +1494,8 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 → automate: jj-idea-ajd0 (settings persistence and column width/visibility persistence,
 tracked in MT-LOG-TABLE, are state-serialization logic)
 
-#### Settings — batch-2 escape hatches (jj-idea-tknb, eyf1, isnf, ixju)
+#### Settings — batch-2 escape hatches (jj-idea-eyf1, isnf, ixju)
 
-- [ ] **General** section: uncheck "Show commit details on log row hover", click Apply. Hover a
-      log row — no tooltip appears. Re-check it — hovering again shows the tooltip, no restart needed.
-      Repeat in the **Working copy** tool window (same table, same setting).
 - [ ] **General** section: check "Disable ignored-file scanning (all repositories)" with no
       per-repo override set, click Apply. Confirm scanning stops in every repo. In a repo with
       its own override explicitly set to "off" (see Repository Settings below), confirm it still

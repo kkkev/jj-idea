@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -329,8 +330,7 @@ abstract class CommitTablePanel<D>(
             ActionManager.getInstance().getAction("Jujutsu.GitFetch"),
             ActionManager.getInstance().getAction("Jujutsu.GitPush"),
             Separator.create(),
-            ColumnsAction(),
-            DetailsPositionAction()
+            ViewOptionsAction()
         )
     }
 
@@ -355,24 +355,17 @@ abstract class CommitTablePanel<D>(
     }
 
     /**
-     * Columns sub-menu - show column visibility options.
+     * View options popup - column visibility, details position, and other per-table display
+     * toggles, grouped under labeled separators rather than nested submenus (jj-idea-lgo4: fewer
+     * clicks than the old separate Columns / Details Position submenus).
      */
-    private inner class ColumnsAction : PopupActionGroup("log.action.columns", createColumnsActionGroup()) {
-        init {
-            templatePresentation.icon = AllIcons.Actions.Show
-        }
-    }
-
-    /**
-     * Details position sub-menu - toggle between right and bottom.
-     */
-    private inner class DetailsPositionAction : PopupActionGroup(
-        "log.action.details.position",
-        DetailsOnRightAction(),
-        DetailsOnBottomAction()
+    private inner class ViewOptionsAction : PopupActionGroup(
+        "log.action.view.options",
+        createViewOptionsActionGroup()
     ) {
         init {
-            templatePresentation.icon = AllIcons.Actions.SplitHorizontally
+            templatePresentation.icon = AllIcons.Actions.Show
+            templatePresentation.description = JujutsuBundle.message("log.action.view.options.tooltip")
         }
     }
 
@@ -499,17 +492,41 @@ abstract class CommitTablePanel<D>(
         }
     }
 
-    fun createColumnsActionGroup() = DefaultActionGroup().apply {
+    fun createViewOptionsActionGroup() = DefaultActionGroup().apply {
+        addSeparator(JujutsuBundle.message("log.view.group.columns"))
         addAction(ToggleColumnAction("status", JujutsuColumnManager::showStatus))
         addAction(ToggleColumnAction("changeid", JujutsuColumnManager::showChangeId))
         addAction(ToggleColumnAction("description", JujutsuColumnManager::showDescription))
         addAction(ToggleColumnAction("decorations", JujutsuColumnManager::showDecorations))
-        addSeparator()
         addAction(ToggleColumnAction("author", JujutsuColumnManager::showAuthorColumn))
         addAction(ToggleColumnAction("committer", JujutsuColumnManager::showCommitterColumn))
         addAction(ToggleColumnAction("date", JujutsuColumnManager::showDateColumn))
         addSeparator()
         addAction(FitColumnsToWidthAction())
+        addSeparator(JujutsuBundle.message("log.view.group.details"))
+        addAction(DetailsOnRightAction())
+        addAction(DetailsOnBottomAction())
+        addSeparator()
+        addAction(CommitTooltipsAction())
+    }
+
+    /**
+     * Toggle for showing the commit-details tooltip when hovering a log row (jj-idea-lgo4: moved
+     * here from a global Settings checkbox). The underlying state stays project-global -
+     * [JujutsuLogTable]'s hover-tooltip callback reads it live - but the control now lives on
+     * each table's toolbar, next to the other display toggles it affects.
+     */
+    private inner class CommitTooltipsAction : ToggleAction(
+        JujutsuBundle.message("log.action.tooltips"),
+        JujutsuBundle.message("log.action.tooltips.tooltip"),
+        null
+    ) {
+        override fun isSelected(e: AnActionEvent) =
+            JujutsuSettings.getInstance(project).state.showLogHoverTooltip
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            JujutsuSettings.getInstance(project).state.showLogHoverTooltip = state
+        }
     }
 
     /**
