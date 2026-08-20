@@ -150,21 +150,26 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
       auto-fit (double-click separator) all work
 - [ ] Column widths and visibility both persist across IDE restarts
 
-#### View options menu (jj-idea-lgo4)
+#### View options menu (jj-idea-lgo4, n22a)
 
 The toolbar's eye-icon button opens a single flat "View Options" popup (replacing the old,
 separate "Columns" and "Details Position" submenus) with labeled section headers: **Columns**
 (the per-column toggles, then a plain separator, then "Fit Columns to Window Width" - a layout
 behavior rather than a column), **Details** (Right/Bottom), and an unlabeled trailing group with
-**Commit Tooltips**.
+**Alternating Row Colors** and **Commit Tooltips**.
 
 - [ ] Toolbar shows one eye-icon **View Options** button (no separate Columns / Details Position
       buttons). Opening it shows "Columns" and "Details" section headers with the expected items
-      grouped underneath, and "Commit Tooltips" at the bottom, checked by default
+      grouped underneath, and "Alternating Row Colors" / "Commit Tooltips" at the bottom, both
+      checked by default
 - [ ] Uncheck **Commit Tooltips**, then hover a log row — no tooltip appears; re-check it —
       hovering again shows the tooltip, no restart needed. Repeat in a file-history tab and in
       the **Working copy** tool window (same table, same global setting) — toggling it in one
       table's menu updates all of them immediately
+- [ ] Uncheck **Alternating Row Colors** — log window rows become uniform, no restart needed;
+      open the Duplicate, Squash-into, and Rebase dialogs — their destination/source picker
+      tables are also unstriped (they read the same global setting when opened). Re-check and
+      confirm striping returns everywhere, including in tables/tabs opened while it was off
 - [ ] Column visibility, Fit Columns to Window Width, and Details Right/Bottom toggles all still
       work exactly as before from this flattened menu
 
@@ -1494,16 +1499,12 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 → automate: jj-idea-ajd0 (settings persistence and column width/visibility persistence,
 tracked in MT-LOG-TABLE, are state-serialization logic)
 
-#### Settings — batch-2 escape hatches (jj-idea-eyf1, isnf, ixju)
+#### Settings — batch-2 escape hatches (jj-idea-isnf, ixju)
 
 - [ ] **General** section: check "Disable ignored-file scanning (all repositories)" with no
       per-repo override set, click Apply. Confirm scanning stops in every repo. In a repo with
       its own override explicitly set to "off" (see Repository Settings below), confirm it still
       scans despite the global checkbox.
-- [ ] **Log Settings** section: uncheck "Alternate row background colors in log and picker
-      tables", click Apply. Log window rows become uniform, no restart needed. Open the
-      Duplicate, Squash-into, and Rebase dialogs — their destination/source picker tables are
-      also unstriped. Re-check and confirm striping returns everywhere.
 - [ ] **Log Settings** section: set "Context window when navigating outside the log" to 0, click
       Apply. Navigate to a revision outside the loaded log (e.g. via file annotation, or jump to
       a bookmark outside the current revset) — exactly one row (the target) appears, no

@@ -44,7 +44,6 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private var previousLogLimit = settings.state.logChangeLimit
     private var previousLogRevset = settings.state.logRevset
     private var previousHideStandardCommitToolWindow = settings.state.hideStandardCommitToolWindow
-    private var previousStripedLogRows = settings.state.stripedLogRows
     private var previousDisableIgnoredFileScanning = appSettings.state.disableIgnoredFileScanning
     private val finder = JjExecutableFinder()
 
@@ -204,10 +203,6 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     .bindIntText(settings.state::logContextWindow)
                     .columns(COLUMNS_TINY)
                     .comment(JujutsuBundle.message("settings.log.context.window.comment"))
-            }
-            row {
-                checkBox(JujutsuBundle.message("settings.log.striped.rows"))
-                    .bindSelected(settings.state::stripedLogRows)
             }
             row(JujutsuBundle.message("settings.log.revset.label")) {
                 revsetField = textField()
@@ -457,13 +452,6 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         if (settings.state.hideStandardCommitToolWindow != previousHideStandardCommitToolWindow) {
             previousHideStandardCommitToolWindow = settings.state.hideStandardCommitToolWindow
             project.messageBus.syncPublisher(ProjectLevelVcsManager.VCS_CONFIGURATION_CHANGED).directoryMappingChanged()
-        }
-
-        // jj-idea-eyf1: striping is read live by JujutsuLogTable's logRefresh subscription, so a
-        // refresh notify is enough to apply it without restart.
-        if (settings.state.stripedLogRows != previousStripedLogRows) {
-            previousStripedLogRows = settings.state.stripedLogRows
-            project.stateModel.logRefresh.notify(Unit)
         }
 
         // Save global identity — bindings were updated from the fields by super.apply()

@@ -507,7 +507,29 @@ abstract class CommitTablePanel<D>(
         addAction(DetailsOnRightAction())
         addAction(DetailsOnBottomAction())
         addSeparator()
+        addAction(StripedRowsAction())
         addAction(CommitTooltipsAction())
+    }
+
+    /**
+     * Toggle for alternating row background colors (jj-idea-n22a: moved here from a global
+     * Settings checkbox, same as [CommitTooltipsAction]). Unlike the tooltip toggle, striping is
+     * applied eagerly rather than read live, so this still needs to broadcast [stateModel]'s
+     * logRefresh - [JujutsuLogTable]'s existing subscription re-applies it to every open log and
+     * history table immediately, including this one.
+     */
+    private inner class StripedRowsAction : ToggleAction(
+        JujutsuBundle.message("log.action.striped.rows"),
+        JujutsuBundle.message("log.action.striped.rows.tooltip"),
+        null
+    ) {
+        override fun isSelected(e: AnActionEvent) =
+            JujutsuSettings.getInstance(project).state.stripedLogRows
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            JujutsuSettings.getInstance(project).state.stripedLogRows = state
+            project.stateModel.logRefresh.notify(Unit)
+        }
     }
 
     /**
