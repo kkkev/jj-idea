@@ -251,7 +251,8 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         revision: Revision,
         filePaths: List<FilePath>,
         description: Description?,
-        parallel: Boolean
+        parallel: Boolean,
+        insertBefore: Revision?
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun splitInteractive(
@@ -259,7 +260,8 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         description: Description?,
         parallel: Boolean,
         configArgs: List<String>,
-        tool: String
+        tool: String,
+        insertBefore: Revision?
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun gitRemoteList(): CommandExecutor.CommandResult =

@@ -228,22 +228,44 @@ class JjStub(override val workDir: Path) : JjBackend {
         return ok()
     }
 
+    /**
+     * `jj split`. Two roles regardless of mode: the *selected* fileset (the positional paths)
+     * always gets the `-m` description; the *remaining* fileset always keeps the source's
+     * original description (a follow-up `jj describe` handles re-describing it, same as real jj).
+     *
+     * Without `-B`: selected keeps the source's change ID and original parents; remaining becomes
+     * a **new** commit, child of selected. With `-B <revset>` (only ever invoked by the plugin
+     * with the same revision being split - a general arbitrary `-B` target is not modeled here):
+     * selected becomes a **new** commit inserted before the source, taking its original parents;
+     * remaining keeps the source's change ID, now parented on the new commit - the source's
+     * *change ID* survives in both modes, just on whichever side didn't move.
+     */
     private fun cmdSplit(args: List<String>): JjBackend.Result {
         val message = args.flagValue("-m") ?: ""
         val revset = args.flagValue("-r") ?: "@"
+        val insertBeforeRevset = args.flagValue("-B")
         // File paths are positional args after flags
         val filePaths = args.drop(1)
-            .filter { it != "-r" && it != revset && it != "-m" && it != message && !it.startsWith("-") }
+            .filter {
+                it != "-r" &&
+                    it != revset &&
+                    it != "-m" &&
+                    it != message &&
+                    it != "-B" &&
+                    it != insertBeforeRevset &&
+                    !it.startsWith("-")
+            }
 
         val isWc = revset == "@"
         if (isWc) snapshotWorkingCopy()
         val source = resolveOne(revset)
+        val sourceIndex = changes.indexOf(source)
 
         if (filePaths.isEmpty()) {
             throw StubError("split requires file paths (interactive mode not supported in stub)")
         }
 
-        // Partition files: selected go to first (parent), remaining go to second (child)
+        // Partition files: selected go to the fileset side, remaining go to the other side
         val sourceFiles = if (isWc) {
             // For WC, include both explicit files and filesystem diffs
             val allFiles = source.files.toMutableMap()
@@ -274,60 +296,78 @@ class JjStub(override val workDir: Path) : JjBackend {
             }
         }
 
-        // First change (selected): keeps source's parents, gets the -m description
-        val firstChange = newStubChange(description = message, parentIds = source.parentIds)
-        firstChange.files.putAll(selectedFiles)
-        changes.add(firstChange)
+        val originalCommitId = source.commitId
+        val originalDescription = source.description
 
-        // Second change (remaining): child of first, keeps original description
-        val secondChange = newStubChange(description = source.description, parentIds = listOf(firstChange.commitId))
-        secondChange.files.putAll(remainingFiles)
-        changes.add(secondChange)
+        fun replacementFor(
+            commitId: String,
+            description: String,
+            parentIds: List<String>,
+            files: Map<String, String?>
+        ) = StubChange(
+            changeId = source.changeId,
+            commitId = commitId,
+            description = description,
+            parentIds = parentIds,
+            files = files.toMutableMap(),
+            bookmarks = source.bookmarks,
+            renames = source.renames,
+            authorName = source.authorName,
+            authorEmail = source.authorEmail,
+            timestamp = source.timestamp,
+            immutable = source.immutable,
+            hasPushedAncestor = source.hasPushedAncestor
+        )
 
-        // Reparent children of source to point to second
-        val rebased = mutableListOf<StubChange>()
-        for (change in changes) {
-            if (change === source || change === firstChange || change === secondChange) continue
-            if (change.abandoned) continue
-            val idx = change.parentIds.indexOf(source.commitId)
-            if (idx >= 0) {
-                val newParentIds = change.parentIds.toMutableList()
-                newParentIds[idx] = secondChange.commitId
-                // StubChange parentIds is a val, so we need to create new one
-                rebased.add(change)
-            }
-        }
-        // Since parentIds is a val List, we need a workaround. Let me check...
-        // Actually parentIds is just List<String> on StubChange - it's a val.
-        // We need to handle this differently. Let me update working copy index.
+        val (selectedChange, remainingChange) = if (insertBeforeRevset != null) {
+            // -B: selected is a brand new commit, inserted before source with source's old
+            // parents; remaining keeps source's change ID, reparented onto the new commit.
+            val newChange = newStubChange(description = message, parentIds = source.parentIds)
+            newChange.files.putAll(selectedFiles)
+            changes.add(newChange)
 
-        // Remove source
-        source.abandoned = true
-
-        // Handle working copy: if splitting WC, move WC to second
-        if (isWc) {
-            workingCopyIndex = changes.indexOf(secondChange)
+            val kept = replacementFor(nextCommitId(), originalDescription, listOf(newChange.commitId), remainingFiles)
+            changes[sourceIndex] = kept
+            newChange to kept
         } else {
-            // Reparent working copy if it was a child of source
-            // We can't mutate parentIds directly, so create replacement changes
-            reparentChildren(source.commitId, secondChange.commitId)
+            // Default: selected keeps source's change ID and original parents; remaining is a
+            // brand new child commit.
+            val kept = replacementFor(nextCommitId(), message, source.parentIds, selectedFiles)
+            changes[sourceIndex] = kept
+
+            val newChange = newStubChange(description = originalDescription, parentIds = listOf(kept.commitId))
+            newChange.files.putAll(remainingFiles)
+            changes.add(newChange)
+            kept to newChange
+        }
+
+        // Descendants of the pre-split source always follow the "remaining" side - it occupies
+        // the original downstream position in both modes (unchanged in default mode's "kept"
+        // slot is upstream of it; in -B mode it *is* the (reparented) original).
+        val rebasedCount = changes.count { !it.abandoned && originalCommitId in it.parentIds }
+        reparentChildren(originalCommitId, remainingChange.commitId)
+
+        // Handle working copy: default mode moves @ onto the new "remaining" child; -B mode
+        // leaves @ on the source's change ID, which the in-place replacement above preserved at
+        // the same list index, so no reassignment is needed there.
+        if (isWc && insertBeforeRevset == null) {
+            workingCopyIndex = changes.indexOf(remainingChange)
         }
 
         // Build stderr matching jj's format
-        val rebasedCount = rebased.size
         val stderr = buildString {
             if (rebasedCount > 0) {
                 val suffix = if (rebasedCount == 1) "" else "s"
                 appendLine("Rebased $rebasedCount descendant commit$suffix")
             }
             appendLine(
-                "Selected changes : ${shortId(firstChange.changeId)} " +
-                    "${shortCommitId(firstChange.commitId)} $message"
+                "Selected changes : ${shortId(selectedChange.changeId)} " +
+                    "${shortCommitId(selectedChange.commitId)} $message"
             )
-            val remainingDesc = source.description.ifEmpty { "(no description set)" }
+            val remainingDesc = originalDescription.ifEmpty { "(no description set)" }
             appendLine(
-                "Remaining changes: ${shortId(secondChange.changeId)} " +
-                    "${shortCommitId(secondChange.commitId)} $remainingDesc"
+                "Remaining changes: ${shortId(remainingChange.changeId)} " +
+                    "${shortCommitId(remainingChange.commitId)} $remainingDesc"
             )
         }
 

@@ -18,7 +18,10 @@ import `in`.kkkev.jjidea.vcs.relativeTo
 private val splitLog = Logger.getInstance("in.kkkev.jjidea.actions.change.splitAction")
 
 /**
- * Parse the child (remaining) change ID from `jj split` stderr.
+ * Parse the remaining side's change ID from `jj split` stderr - only meaningful in the default
+ * (no `-B`) mode, where the remaining side is a genuinely new commit whose ID isn't known until
+ * `jj split` returns. In `insertBefore` (newParent) mode, the remaining side keeps the source's
+ * own change ID, which is already known - see [onSplitSuccess].
  *
  * Example output:
  * ```
@@ -83,8 +86,9 @@ private fun executeSplitFilePaths(project: Project, target: LogEntry, spec: Spli
         val result = target.repo.commandExecutor.split(
             spec.revision,
             spec.filePaths,
-            spec.description,
-            spec.parallel
+            spec.selectedDescription,
+            spec.parallel,
+            spec.insertBefore
         )
 
         runLater {
@@ -130,10 +134,11 @@ private fun executeSplitInteractive(
 
             val result = target.repo.commandExecutor.splitInteractive(
                 revision = spec.revision,
-                description = spec.description,
+                description = spec.selectedDescription,
                 parallel = spec.parallel,
                 configArgs = configArgs,
-                tool = DiffEditTool.TOOL_NAME
+                tool = DiffEditTool.TOOL_NAME,
+                insertBefore = spec.insertBefore
             )
 
             runLater {
@@ -151,24 +156,29 @@ private fun executeSplitInteractive(
 }
 
 private fun onSplitSuccess(project: Project, target: LogEntry, spec: SplitSpec, stderr: String) {
-    val childDesc = spec.childDescription
-    if (childDesc != null) {
-        val childId = parseRemainingChangeId(stderr)
-        if (childId != null) {
-            target.repo.commandExecutor
-                .createCommand { describe(childDesc, childId) }
-                .onSuccess {
-                    target.repo.invalidate(select = target.id, vfsChanged = true)
-                    splitLog.info("Split ${target.id} and described child $childId")
-                }
-                .onFailure { tellUser(project, "log.action.split.error") }
-                .executeAsync()
-        } else {
-            splitLog.warn("Could not parse child change ID from split output: $stderr")
-            target.repo.invalidate(select = target.id, vfsChanged = true)
-        }
-    } else {
+    val remainingDesc = spec.remainingDescription
+    if (remainingDesc == null) {
         target.repo.invalidate(select = target.id, vfsChanged = true)
         splitLog.info("Split ${target.id}")
+        return
+    }
+
+    // newParent (-B) mode: the remaining side never moves off target.id (verified against real
+    // jj - see jj-idea-tkog), so its ID is already known and doesn't need parsing from stderr.
+    // Default mode: the remaining side is a genuinely new commit whose ID only stderr reveals.
+    val remainingId = if (spec.insertBefore != null) target.id else parseRemainingChangeId(stderr)
+
+    if (remainingId != null) {
+        target.repo.commandExecutor
+            .createCommand { describe(remainingDesc, remainingId) }
+            .onSuccess {
+                target.repo.invalidate(select = target.id, vfsChanged = true)
+                splitLog.info("Split ${target.id} and described remaining $remainingId")
+            }
+            .onFailure { tellUser(project, "log.action.split.error") }
+            .executeAsync()
+    } else {
+        splitLog.warn("Could not parse remaining change ID from split output: $stderr")
+        target.repo.invalidate(select = target.id, vfsChanged = true)
     }
 }

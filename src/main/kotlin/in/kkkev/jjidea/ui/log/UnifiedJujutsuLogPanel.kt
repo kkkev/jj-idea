@@ -171,12 +171,16 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     }
 
     /**
-     * One-click New/Edit buttons ahead of Refresh, for the common change-creation/editing
-     * operations (GitHub #51 point 8 / VisualJJ parity). File history doesn't override this.
+     * One-click New/Edit/Rebase/Describe buttons ahead of Refresh, for the most-used log
+     * operations (GitHub #51 point 8 / VisualJJ parity; Rebase and Describe added for GitHub #78,
+     * the requester's most-used commands, previously only reachable via the right-click menu).
+     * File history doesn't override this.
      */
     override fun primaryActions() = listOfNotNull(
         ActionManager.getInstance().getAction("Jujutsu.NewChange"),
-        ActionManager.getInstance().getAction("Jujutsu.EditChange")
+        ActionManager.getInstance().getAction("Jujutsu.EditChange"),
+        ActionManager.getInstance().getAction("Jujutsu.RebaseChangeToolbar"),
+        ActionManager.getInstance().getAction("Jujutsu.DescribeChangeToolbar")
     )
 
     /**

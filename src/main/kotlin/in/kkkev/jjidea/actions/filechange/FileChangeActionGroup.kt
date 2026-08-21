@@ -16,6 +16,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * - Compare with Another Commit (Jujutsu.CompareWithBranch) - visible in historical context
  * - Compare Before with Another Commit (Jujutsu.CompareBeforeWithBranch) - visible in historical context with parents
  * - Open Repository Version (Jujutsu.OpenRepositoryVersion) - visible in historical context
+ * - Show History (Jujutsu.ShowFileHistory)
  * - Separator
  * - Restore (Jujutsu.RestoreFile) - visible in working copy context
  * - Restore to This (Jujutsu.RestoreToChange) - visible in historical context
@@ -42,6 +43,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     actionManager.getAction("Jujutsu.CompareWithBranch")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareBeforeWithBranch")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.OpenFileInRemote")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.ShowFileHistory")?.let { group.add(it) }
 
     group.addSeparator()
 
@@ -56,6 +58,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     actionManager.getAction("Jujutsu.SquashFiles")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.SquashIntoFiles")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.SplitFiles")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.SplitIntoNewParentFiles")?.let { group.add(it) }
 
     group.addSeparator()
 

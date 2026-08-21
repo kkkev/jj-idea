@@ -5,11 +5,13 @@ import `in`.kkkev.jjidea.jj.cli.CliLogService
 import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
+import io.kotest.matchers.string.shouldNotContain as shouldNotContainString
 
 abstract class MutatingCommandsContractTest {
     @TempDir
@@ -258,5 +260,72 @@ abstract class MutatingCommandsContractTest {
         // stderr should mention rebased descendants
         result.stderr shouldContain "Rebased"
         result.stderr shouldContain "descendant"
+    }
+
+    // -- `jj split -B` ("Split into New Parent", jj-idea-tkog) --
+
+    @Test
+    fun `split -B keeps the original change ID on the remaining side, at the original location`() {
+        jj.createFile("a.txt", "content a")
+        jj.createFile("b.txt", "content b")
+        jj.describe("Original commit")
+
+        val beforeLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val originalChangeId = beforeLog.stdout.trim().split(" ")[0].split("~")[0]
+
+        val result = jj.run("split", "-r", "@", "-B", "@", "-m", "New parent (a.txt)", "a.txt")
+        result.isSuccess shouldBe true
+
+        // The working copy itself keeps the original change ID unchanged.
+        val afterLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val afterFields = afterLog.stdout.trim().split(" ")
+        afterFields[0].split("~")[0] shouldBe originalChangeId
+        // Remaining side keeps the original description (not re-described by -m).
+        afterFields[2] shouldBe "Original commit\n"
+
+        // The new parent got a genuinely different change ID and the -m description.
+        val newParentLog = jj.run("log", "-r", "@-", "--no-graph", "-T", basicSpec)
+        val newParentFields = newParentLog.stdout.trim().split(" ")
+        newParentFields[0].split("~")[0] shouldNotBe originalChangeId
+        newParentFields[2] shouldBe "New parent (a.txt)\n"
+    }
+
+    @Test
+    fun `split -B places the new commit as the parent, containing only the selected files`() {
+        jj.createFile("a.txt", "content a")
+        jj.createFile("b.txt", "content b")
+        jj.describe("Original commit")
+
+        jj.run("split", "-r", "@", "-B", "@", "-m", "New parent (a.txt)", "a.txt")
+
+        val newParentDiff = jj.run("diff", "-r", "@-", "--summary")
+        newParentDiff.stdout shouldContain "a.txt"
+        newParentDiff.stdout shouldNotContainString "b.txt"
+
+        val remainingDiff = jj.run("diff", "-r", "@", "--summary")
+        remainingDiff.stdout shouldContain "b.txt"
+        remainingDiff.stdout shouldNotContainString "a.txt"
+    }
+
+    @Test
+    fun `split -B then describing the original change ID (no stderr parsing needed) redescribes the remaining side`() {
+        // Mirrors onSplitSuccess's newParent-mode chaining: since the remaining side keeps the
+        // source's own change ID, it can be re-described directly by that ID - no need to parse
+        // "Remaining changes" from split's stderr, unlike the default (no -B) mode.
+        jj.createFile("a.txt", "content a")
+        jj.createFile("b.txt", "content b")
+        jj.describe("Original commit")
+
+        val beforeLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val originalChangeId = beforeLog.stdout.trim().split(" ")[0].split("~")[0]
+
+        jj.run("split", "-r", "@", "-B", "@", "-m", "New parent", "a.txt")
+        val describeResult = jj.run("describe", "-r", originalChangeId, "-m", "Edited remaining desc")
+        describeResult.isSuccess shouldBe true
+
+        val afterLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val afterFields = afterLog.stdout.trim().split(" ")
+        afterFields[0].split("~")[0] shouldBe originalChangeId
+        afterFields[2] shouldBe "Edited remaining desc\n"
     }
 }

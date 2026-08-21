@@ -30,10 +30,12 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareWithBranch",
             "Jujutsu.CompareBeforeWithBranch",
             "Jujutsu.OpenFileInRemote",
+            "Jujutsu.ShowFileHistory",
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
             "Jujutsu.SquashFiles",
             "Jujutsu.SplitFiles",
+            "Jujutsu.SplitIntoNewParentFiles",
             "Jujutsu.TrackedToggle"
         )
         val missing = expected.filter { actionManager.getAction(it) == null }
@@ -52,10 +54,12 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareWithBranch",
             "Jujutsu.CompareBeforeWithBranch",
             "Jujutsu.OpenFileInRemote",
+            "Jujutsu.ShowFileHistory",
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
             "Jujutsu.SquashFiles",
             "Jujutsu.SplitFiles",
+            "Jujutsu.SplitIntoNewParentFiles",
             "Jujutsu.TrackedToggle"
         )
     }
@@ -79,7 +83,8 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareBeforeWithLocal",
             "Jujutsu.CompareWithBranch",
             "Jujutsu.CompareBeforeWithBranch",
-            "Jujutsu.OpenFileInRemote"
+            "Jujutsu.OpenFileInRemote",
+            "Jujutsu.ShowFileHistory"
         )
     }
 
@@ -96,7 +101,11 @@ class FileChangeActionGroupPlatformTest {
         val group = fileChangeActionGroup()
         val children = group.getChildren(null).toList()
         val blocks = splitBySeparators(children)
-        blocks[blocks.size - 2].actionIds() shouldContainAll listOf("Jujutsu.SquashFiles", "Jujutsu.SplitFiles")
+        blocks[blocks.size - 2].actionIds() shouldContainAll listOf(
+            "Jujutsu.SquashFiles",
+            "Jujutsu.SplitFiles",
+            "Jujutsu.SplitIntoNewParentFiles"
+        )
     }
 
     @Test

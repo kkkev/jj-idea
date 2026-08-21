@@ -35,6 +35,7 @@ Components whose blast radius exceeds their own package:
 | Shared commit picker (used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
+| `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
 
 ## Fixtures
 
@@ -330,8 +331,8 @@ more lanes than the 3-4 needed here.
 
 **Commit details panel**
 
-**Code:** `ui/log/JujutsuCommitDetailsPanel.kt`, `ui/components/HtmlTextCanvas.kt`, `ui/components/TextCanvas.kt`
-**Also re-run:** MT-DIFF-PREVIEW (details changes panel shares the preview-tab behavior)
+**Code:** `ui/log/JujutsuCommitDetailsPanel.kt`, `ui/components/HtmlTextCanvas.kt`, `ui/components/TextCanvas.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `actions/filechange/FileChangeActionGroup.kt`
+**Also re-run:** MT-DIFF-PREVIEW (details changes panel shares the preview-tab behavior); MT-LOG-TABLE (change-id link click handling and the file-change context menu are shared with the log table / working copy panel)
 
 - [ ] Details panel shows on row selection
 - [ ] Metadata displays correctly (author, date, change ID)
@@ -358,6 +359,13 @@ more lanes than the 3-4 needed here.
 - [ ] **Right-clicking** an author or committer email in the details panel opens the same menu as
       the log table (Send Email to ..., plus Filter Log by ... for the author) — this previously
       did nothing at all (jj-idea-a52h)
+- [ ] **Right-clicking** a parent/change-id link (e.g. a parent reference in a merge commit's
+      details) opens that commit's full log-row context menu (Show Diff, New/Edit, Describe,
+      Abandon, Rebase, etc.) — this previously showed an empty "Nothing Here" placeholder
+      (jj-idea-in2h). Left-click still navigates/selects that commit as before
+- [ ] Right-click a change-id link whose target has since become invalid (e.g. abandon that
+      commit via the CLI in another terminal, then right-click the now-stale link without
+      refreshing) — shows an empty menu rather than throwing or crashing
 
 #### Issue-tracker links in descriptions (jj-idea-10fo)
 
@@ -394,12 +402,22 @@ more lanes than the 3-4 needed here.
 - [ ] Open file for working copy opens editable editor
 - [ ] jj-idea-lo7u: right-clicking a file for a historical commit shows "Compare Before with
       Another Commit..."; hidden for the working-copy entry and for a root commit
+- [ ] Right-click a file in the details panel's change tree → **Show History** appears in the
+      menu (jj-idea-cb3r, fixed for real in jj-idea-v9g4 — the initial jj-idea-cb3r fix added it to
+      the menu-building code but the action stayed invisible there since it only read
+      `CommonDataKeys.VIRTUAL_FILE`, which this tree never supplies) and opens that file's custom
+      history tab, same as from the editor's Jujutsu submenu
+- [ ] Repeat from the **Working Copy** tool window's file tree and from a compare-changes panel
+      (e.g. "Compare with Another Commit…") — **Show History** works from all of them, not just
+      the commit details panel
+- [ ] Right-click a **deleted** file (e.g. in a historical commit's file list) → **Show History**
+      is still available (uses the file's last-known path, not just files with current content)
 
 ### MT-LOG-FILTER
 
 **Toolbar, filters, and reference filter**
 
-**Code:** `ui/log/JujutsuFilterComponent.kt`, `ui/log/JujutsuAuthorFilterComponent.kt`, `ui/log/JujutsuDateFilterComponent.kt`, `ui/log/JujutsuReferenceFilterComponent.kt`, `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/JujutsuPathsFilterComponent.kt`, `ui/log/LogFilterMatcher.kt`, `ui/common/FilterPriorityLayoutStrategy.kt`
+**Code:** `ui/log/JujutsuFilterComponent.kt`, `ui/log/JujutsuAuthorFilterComponent.kt`, `ui/log/JujutsuDateFilterComponent.kt`, `ui/log/JujutsuReferenceFilterComponent.kt`, `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/JujutsuPathsFilterComponent.kt`, `ui/log/LogFilterMatcher.kt`, `ui/common/FilterPriorityLayoutStrategy.kt`, `ui/common/CommitTablePanel.kt`, `ui/log/UnifiedJujutsuLogPanel.kt` (primaryActions), `actions/change/DescribeChangeAction.kt`, `actions/change/RebaseChangeAction.kt`
 
 #### Toolbar & filters
 
@@ -428,9 +446,28 @@ toggles are pure `LogFilterMatcher` logic, testable without rendering)
 - [ ] **New** and **Edit** icon buttons appear at the left of the main log toolbar, before Refresh, each with a tooltip
 - [ ] Selecting a mutable non-working-copy change and clicking **Edit** moves the working copy to it (it becomes `@`) and the log reselects it
 - [ ] Selecting the working-copy change or an immutable commit disables **Edit**
+- [ ] **Edit** has a default keyboard shortcut (Ctrl/Cmd+Shift+E, jj-idea-crt0) — check Settings → Keymap for "Jujutsu.EditChange"; with a log row selected, pressing it edits that row. (This shortcut soft-conflicts with IntelliJ's built-in "Recent Locations" outside the log table — Recent Locations still wins there since Edit is disabled without a log selection; a keymap conflict warning in Settings → Keymap is expected, not a bug)
 - [ ] Clicking **New** with a change selected creates a new empty change on top of the selection and it becomes `@`; with no selection it stacks on the working copy
 - [ ] Clearing the log selection entirely (e.g. Ctrl/Cmd-click the selected row to deselect) disables **New** (greyed out) rather than removing it from the toolbar — it stays in place, matching **Edit**'s behavior
 - [ ] Open a file's history (right-click a file > Show History) — confirm its toolbar shows only Refresh/search, with no New/Edit buttons
+
+#### Rebase/Describe toolbar buttons (jj-idea-ck64, GitHub #78)
+
+- [ ] **Rebase** and **Describe** icon buttons appear on the main log toolbar, after **Edit** and before Refresh, each with a tooltip and a default keyboard shortcut (check Settings → Keymap for "Jujutsu.RebaseChangeToolbar" / "Jujutsu.DescribeChangeToolbar")
+- [ ] Selecting a mutable change and clicking **Describe** opens the same description dialog as the right-click menu's Describe entry; editing and confirming updates the change
+- [ ] Selecting an immutable change disables **Describe**; selecting nothing also disables it (stays in place, greyed out)
+- [ ] Selecting one or more mutable changes (same repo) and clicking **Rebase** opens the same rebase dialog as the right-click menu's Rebase entry, pre-populated with the selection as source
+- [ ] Multi-selecting changes across two repos in a multi-root project disables **Rebase** (no arbitrary repo is picked), matching **New Change From These**'s cross-repo behavior
+- [ ] Selecting only immutable changes disables **Rebase**
+- [ ] Pressing the toolbar buttons' keyboard shortcuts while the log table has focus triggers the same actions as clicking them
+
+#### Context-menu shortcut hints (jj-idea-crt0)
+
+- [ ] Right-click a log row → the **Rebase** and **Describe** entries show their keyboard shortcut hint next to the label (e.g. "Ctrl+Shift+R"), matching the toolbar buttons — this previously showed no hint even though the toolbar shortcut existed
+- [ ] Right-click a change-id link (e.g. a parent reference in the commit details panel) → its menu's **Rebase**/**Describe** entries do **not** show a shortcut hint (this menu acts on the link's target, not the table's live selection, so it deliberately keeps using a non-registered action) and that menu has no **New**/**Edit** entries at all
+- [ ] Multi-select several mutable rows (same repo), right-click → **Rebase** is enabled and opens with all of them as source; multi-select spanning two repos → **Rebase** is disabled
+- [ ] Multi-select several rows, right-click → **Describe** is disabled (only meaningful for a single selection)
+- [ ] Open a file's history (right-click a file > Show History) — confirm its toolbar still shows only Refresh/search, with no Rebase/Describe buttons
 
 #### Narrow-width toolbar (jj-idea-kxx4)
 
@@ -720,7 +757,7 @@ string/state logic, no rendering dependency)
 
 **Split, hunk-level selection**
 
-**Code:** `ui/split/SplitDialog.kt`, `ui/split/HunkSelectionModel.kt`, `ui/split/SplitPreviewPanel.kt`, `ui/split/SplitSimulator.kt`, `diffedit/HunkDiffPicker.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt`
+**Code:** `ui/split/SplitDialog.kt`, `ui/split/HunkSelectionModel.kt`, `ui/split/SplitPreviewPanel.kt`, `ui/split/SplitSimulator.kt`, `diffedit/HunkDiffPicker.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
 **Also re-run:** MT-CTXMENU (shares the commit picker in some flows)
 
 Setup: create a scratch jj repo with a file that has at least **two separate** hunks of changes
@@ -746,6 +783,29 @@ as many times as needed before closing the dialog.
 #### Right-click file(s) → "Split into New Child"
 - [ ] Select one or more files in the working-copy / commit-details file list, right-click → **Split into New Child** → dialog opens with exactly those files **ticked** (moving to the child)
 - [ ] Split → the new child commit contains only the selected files; the parent keeps the rest
+
+#### Right-click file(s) → "Split into New Parent" (jj-idea-qswq / jj-idea-tkog, GitHub #74)
+
+Uses `jj split -B` (verified against jj 0.44: the ticked fileset becomes a **new** commit inserted
+before the source; everything else **stays on the source's own change ID and location** — the
+opposite polarity from "Split into New Child"'s plain `jj split`, where the ticked fileset becomes
+a new **child** and the unticked fileset keeps the original ID). Unlike the original jj-idea-qswq
+implementation (which just inverted the tick pre-selection through the same no-flag `jj split`),
+the right-clicked files now tick **directly**, same as "Split into New Child".
+
+- [ ] Select one or more files, right-click → **Split into New Parent…** appears alongside **Split into New Child…**
+- [ ] Invoking it opens the dialog with exactly the selected files **ticked** — the same starting tick state as "Split into New Child", not inverted
+- [ ] Dialog title reads "Split into New Parent"; the ticked pane's header reads **"New commit (will become parent of &lt;shortid&gt;)"** and the unticked pane's header reads **"Stays here (keeps change ID &lt;shortid&gt;)"** — not "Parent"/"Child" wording, which would say the opposite of what happens in this mode, and explicit enough that which side becomes whose parent doesn't require inference
+- [ ] The **"Stays here"** description field is on top, **"New commit"** below — the reverse of "Split into New Child"'s order (Child on top, Parent below) — matching each side's actual position in the log: "Stays here" keeps the more-recent position, "New commit" becomes the older parent one row further down
+- [ ] The "Create parallel commits" checkbox is **not shown** (mutually exclusive with `-B`)
+- [ ] "Pick Hunks…" is **not shown** (hunk-level partial selection isn't supported in this mode)
+- [ ] Split → via `jj log`/`jj show`: the ticked files land in a **new commit inserted as the parent** of the original; the original commit (unticked files) keeps its **own original change ID**, now with the new commit as its parent
+- [ ] Editing the "New commit" description field and splitting → the new commit gets that description (passed as `-m`); the "Stays here" field, if left unedited, leaves the original commit's description untouched
+- [ ] Editing the "Stays here" description field and splitting → after the split completes, the original commit's description updates to match (chained via a follow-up `jj describe` on the same, unchanged change ID)
+- [ ] **Splitting the working copy itself**: an info line under the source commit reads "The working copy (@) stays on <shortid>; the new commit becomes its parent" — after splitting, confirm `@` is still genuinely on the original change ID (not the new parent)
+- [ ] Compare: repeat "Split into New Child" on the working copy — its info line instead reads "The working copy (@) moves to the new commit", and after splitting `@` has genuinely moved
+- [ ] Selecting **every** changed file → dialog opens with every file ticked, which trips the "at least one file must stay here" validation (nothing would be left at the original change ID) — expected, not a bug
+- [ ] Selecting **no** files → ticking nothing trips "move at least one file to the new commit" — expected
 
 #### Hunk picking with the 3-way picker
 - [ ] Click **Pick Hunks…** → a merge-style dialog opens titled "Pick Hunks — <filename>", with **Before** (left), **Parent** (editable, middle), and **Child** (right) panes

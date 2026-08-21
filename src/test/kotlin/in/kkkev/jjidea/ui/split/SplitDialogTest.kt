@@ -178,8 +178,8 @@ class SplitDialogTest {
         result shouldNotBe null
         result!!.hunkSelection shouldBe null // no overrides → fast path
         result.filePaths shouldBe listOf(authChange.filePath) // Auth.kt stays in the parent
-        result.description shouldBe Description("initial desc")
-        result.childDescription shouldBe null // unchanged
+        result.selectedDescription shouldBe Description("initial desc")
+        result.remainingDescription shouldBe null // unchanged
         result.parallel shouldBe false
         disposeDialog(dialog)
     }
@@ -205,6 +205,112 @@ class SplitDialogTest {
         result shouldNotBe null
         // filePaths are the files that stay in the parent (`jj split` keeps them there).
         result!!.filePaths shouldBe listOf(loggerChange.filePath)
+        disposeDialog(dialog)
+    }
+
+    // ---- newParent mode (jj-idea-tkog, GitHub #74) ----
+
+    @Test
+    fun `newParent mode ticks preSelectedFiles directly, no complement inversion`() {
+        val authChange = change("src/Auth.kt")
+        val loggerChange = change("src/Logger.kt")
+        val changes = listOf(authChange, loggerChange)
+        val source = createEntry("src1", description = "desc")
+        val authPath = LocalFilePath("src/Auth.kt", false)
+
+        val dialog = SplitDialog(project.get(), source, changes, preSelectedFiles = setOf(authPath), newParent = true)
+        waitForRefresh(dialog.fileSelection)
+
+        // Unlike the old tick-inversion hack, the right-clicked file starts ticked directly.
+        dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent mode passes ticked files as the fileset, sets insertBefore to the source`() {
+        val authChange = change("src/Auth.kt")
+        val loggerChange = change("src/Logger.kt")
+        val changes = listOf(authChange, loggerChange)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes, newParent = true)
+        waitForRefresh(dialog.fileSelection)
+
+        // Tick Auth.kt: it should become the new commit's fileset.
+        dialog.fileSelection.changesTree.setIncludedChanges(listOf(authChange))
+        UIUtil.dispatchAllInvocationEvents()
+
+        dialog.performOKForTest()
+        val result = dialog.result
+        result shouldNotBe null
+        result!!.filePaths shouldBe listOf(authChange.filePath)
+        result.insertBefore shouldBe source.id
+        result.parallel shouldBe false
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent mode routes descriptions by role, not by pane`() {
+        val authChange = change("src/Auth.kt")
+        val changes = listOf(authChange)
+        val source = createEntry("src1", description = "original desc")
+        val dialog = SplitDialog(project.get(), source, changes, newParent = true)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.fileSelection.changesTree.setIncludedChanges(listOf(authChange))
+        UIUtil.dispatchAllInvocationEvents()
+
+        // childDescriptionField is the ticked pane's field, which in newParent mode is the
+        // *selected* (new-commit) side and gets -m; parentDescriptionField is the unticked
+        // pane's field, the *remaining* (stays-here) side.
+        dialog.childDescriptionText shouldBe "original desc"
+        dialog.performOKForTest()
+        val result = dialog.result
+        result shouldNotBe null
+        result!!.selectedDescription shouldBe Description("original desc")
+        result.remainingDescription shouldBe null // unedited, stays unchanged
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent mode hides the parallel checkbox (mutually exclusive with -B)`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+
+        dialog.parallelCheckBox.isVisible shouldBe false
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent mode hides Pick Hunks (unverified content polarity under -B)`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+
+        dialog.pickHunksButton.isVisible shouldBe false
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent mode headers spell out which side becomes parent of which`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+
+        // childHeaderLabel is the ticked pane ("New commit"); parentHeaderLabel is the unticked
+        // pane ("Stays here") - see updateDynamicLabels' newParent branch.
+        dialog.childHeaderLabel.text shouldContain "New commit"
+        dialog.childHeaderLabel.text shouldContain "will become parent of"
+        dialog.childHeaderLabel.text shouldContain source.id.short
+        dialog.parentHeaderLabel.text shouldContain "Stays here"
+        dialog.parentHeaderLabel.text shouldContain source.id.short
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `default mode still hides nothing (regression check)`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList())
+
+        dialog.parallelCheckBox.isVisible shouldBe true
+        dialog.pickHunksButton.isVisible shouldBe true
         disposeDialog(dialog)
     }
 

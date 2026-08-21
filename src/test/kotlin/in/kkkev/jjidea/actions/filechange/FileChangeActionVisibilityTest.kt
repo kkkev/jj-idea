@@ -10,10 +10,15 @@ import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.changes.CurrentContentRevision
+import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.file.CompareFileWithBranchAction
 import `in`.kkkev.jjidea.actions.file.RestoreSelectionAction
+import `in`.kkkev.jjidea.actions.file.ShowFileHistoryAction
 import `in`.kkkev.jjidea.actions.repoForFile
+import `in`.kkkev.jjidea.actions.restorePaths
+import `in`.kkkev.jjidea.actions.singleRepoForRestore
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.GitRemote
@@ -570,6 +575,72 @@ class FileChangeActionVisibilityTest {
         @Test
         fun `hidden when no file and no changes`() {
             CompareFileWithBranchAction().update(event)
+            presentation.isEnabledAndVisible shouldBe false
+        }
+    }
+
+    // ── ShowFileHistoryAction (jj-idea-v9g4) ─────────────────────────────────
+
+    @Nested
+    inner class `ShowFileHistory` {
+        @BeforeEach
+        fun setupStatics() = mockkStatic("in.kkkev.jjidea.actions.ActionEventExtensionsKt")
+
+        @AfterEach
+        fun teardown() = unmockkAll()
+
+        @Test
+        fun `disabled when neither a VIRTUAL_FILE nor a changes-tree selection resolve`() {
+            every { event.restorePaths } returns emptyList()
+            every { event.singleRepoForRestore } returns null
+            ShowFileHistoryAction().update(event)
+            presentation.isEnabledAndVisible shouldBe false
+        }
+
+        @Test
+        fun `enabled in a changes-tree context (commit details panel, working copy panel)`() {
+            // No VIRTUAL_FILE here - this is the bug: the action used to only ever read
+            // CommonDataKeys.VIRTUAL_FILE, which JujutsuChangesTree never supplies.
+            every { event.restorePaths } returns listOf(LocalFilePath("/project/Main.kt", false))
+            every { event.singleRepoForRestore } returns repo
+            ShowFileHistoryAction().update(event)
+            presentation.isEnabledAndVisible shouldBe true
+        }
+
+        @Test
+        fun `enabled for a deleted file (no after-revision, only reachable via restorePaths)`() {
+            every { event.restorePaths } returns listOf(LocalFilePath("/project/Deleted.kt", false))
+            every { event.singleRepoForRestore } returns repo
+            ShowFileHistoryAction().update(event)
+            presentation.isEnabledAndVisible shouldBe true
+        }
+
+        @Test
+        fun `disabled when the changes-tree selection spans multiple repos`() {
+            every { event.restorePaths } returns
+                listOf(LocalFilePath("/a/Main.kt", false), LocalFilePath("/b/Main.kt", false))
+            every { event.singleRepoForRestore } returns null
+            ShowFileHistoryAction().update(event)
+            presentation.isEnabledAndVisible shouldBe false
+        }
+
+        @Test
+        fun `enabled via VIRTUAL_FILE in the editor Project View context`() {
+            every { event.restorePaths } returns emptyList()
+            every { event.singleRepoForRestore } returns null
+            every { event.file } returns mockk<VirtualFile> { every { isDirectory } returns false }
+            every { event.repoForFile } returns repo
+            ShowFileHistoryAction().update(event)
+            presentation.isEnabledAndVisible shouldBe true
+        }
+
+        @Test
+        fun `disabled when VIRTUAL_FILE is a directory`() {
+            every { event.restorePaths } returns emptyList()
+            every { event.singleRepoForRestore } returns null
+            every { event.file } returns mockk<VirtualFile> { every { isDirectory } returns true }
+            every { event.repoForFile } returns repo
+            ShowFileHistoryAction().update(event)
             presentation.isEnabledAndVisible shouldBe false
         }
     }

@@ -46,22 +46,29 @@ import javax.swing.*
 /**
  * Result of the split dialog.
  *
- * [filePaths] are the files that **remain in the parent/first** commit when [hunkSelection]
- * is null (whole-file fast path) — i.e. everything *not* ticked to move to the child. When
- * [hunkSelection] is non-null, at least one file has partial hunk selection and the split
- * must go through the diff-editor path.
+ * The fileset that ends up in [filePaths] is always the ticked pane's files when [newParent] mode
+ * built this spec, and the *unticked* pane's files otherwise (`jj split`'s "selected" fileset
+ * argument) - see [SplitDialog] for why the tick-to-fileset mapping depends on mode.
  *
- * [childDescription] is applied via `jj describe` after split (null = keep original).
+ * [selectedDescription] is passed as `-m` and always describes whichever side [filePaths] ends up
+ * in (`jj split`'s "selected" side). [remainingDescription] is applied via a follow-up
+ * `jj describe` on whichever side is *not* [filePaths] (`jj split`'s "remaining" side; null = keep
+ * its original description). [insertBefore] is non-null only in [newParent] mode: it becomes
+ * `jj split`'s `-B` argument, extracting [filePaths] into a **new** commit inserted before
+ * [insertBefore], while the remaining changes keep [revision]'s original change ID and location.
+ * When null (the default, "Split into New Child" mode), [filePaths] stays on [revision]'s
+ * original change ID and everything else becomes a new child commit instead.
  */
 data class SplitSpec(
     val revision: Revision,
-    /** Whole-file fast path: files that stay in the parent (i.e. not ticked to move to the child). */
+    /** Whole-file fast path: see this class's KDoc for which side's files end up here. */
     val filePaths: List<FilePath>,
     /** Hunk-level selection. Non-null when at least one file is partially selected. */
     val hunkSelection: SplitHunkSelection?,
-    val description: Description,
-    val childDescription: Description?,
-    val parallel: Boolean
+    val selectedDescription: Description,
+    val remainingDescription: Description?,
+    val parallel: Boolean,
+    val insertBefore: Revision? = null
 )
 
 /**
@@ -76,12 +83,24 @@ data class SplitSpec(
  * **parent** (whole-file path). Nothing is ticked by default. "Pick Hunks…" opens IDEA's
  * merge window to move a subset of a file's hunks to the child, leaving the remainder in
  * the parent.
+ *
+ * [newParent] (jj-idea-tkog, GitHub #74) switches the whole-file fast path to `jj split -B`
+ * instead of the plain no-flag default: ticking a file now moves it to a **new commit inserted
+ * as [sourceEntry]'s parent**, while unticked files **stay on [sourceEntry]'s own change ID and
+ * location** - the polarity flip real jj applies once `-B`/`-A`/`-o` is given (verified against
+ * jj 0.44: the fileset passed to `jj split` becomes the *new* commit under `-B`, whereas without
+ * any placement flag it's the side that *keeps* the original identity). The "Parent"/"Child"
+ * header/legend wording from the default mode would be backwards here, so [updateDynamicLabels]
+ * switches to neutral "New commit"/"Stays here" wording instead when [newParent] is set. Hunk-level
+ * partial selection ("Pick Hunks…") is disabled in this mode - its content-polarity math is tied
+ * to the default mode's fileset-role assumption and hasn't been verified against `-B`.
  */
 class SplitDialog(
     private val project: Project,
     private val sourceEntry: LogEntry,
     changes: List<Change>,
-    preSelectedFiles: Set<FilePath>? = null
+    preSelectedFiles: Set<FilePath>? = null,
+    private val newParent: Boolean = false
 ) : DialogWrapper(project) {
     var result: SplitSpec? = null
         private set
@@ -111,8 +130,11 @@ class SplitDialog(
     private var currentPreviewFile: FilePath? = null
 
     // --- "Pick Hunks…" button ---
+    // Hidden entirely in newParent mode - see class KDoc for why partial hunk selection isn't
+    // supported there.
     internal val pickHunksButton = JButton(JujutsuBundle.message("dialog.split.pickHunks")).apply {
         isEnabled = false
+        isVisible = !newParent
         addActionListener { onPickHunks() }
     }
 
@@ -136,7 +158,25 @@ class SplitDialog(
     }
 
     // --- Options ---
-    internal val parallelCheckBox = JBCheckBox(JujutsuBundle.message("dialog.split.parallel"))
+    // `jj split` rejects -B combined with --parallel, so this is unavailable in newParent mode.
+    internal val parallelCheckBox = JBCheckBox(JujutsuBundle.message("dialog.split.parallel")).apply {
+        isVisible = !newParent
+    }
+
+    // --- Working-copy movement note (jj-idea-tkog) ---
+    // Only shown when splitting the working copy itself, where which side @ ends up on isn't
+    // obvious: it stays on the original change ID in newParent mode, but moves to the new child
+    // commit in the default mode.
+    private val workingCopyNoteLabel = JBLabel().apply {
+        foreground = JBUI.CurrentTheme.Label.disabledForeground()
+        isVisible = sourceEntry.isWorkingCopy
+        if (sourceEntry.isWorkingCopy) {
+            text = JujutsuBundle.message(
+                if (newParent) "dialog.split.wc.stays" else "dialog.split.wc.moves",
+                sourceEntry.id.short
+            )
+        }
+    }
 
     // Preview panel header.
     private val previewHeader = JBLabel(
@@ -152,7 +192,7 @@ class SplitDialog(
     internal var hunkPickerForTest: ((FilePath) -> String?)? = null
 
     init {
-        title = JujutsuBundle.message("dialog.split.title")
+        title = JujutsuBundle.message(if (newParent) "dialog.split.title.newParent" else "dialog.split.title")
         setOKButtonText(JujutsuBundle.message("dialog.split.button"))
 
         parallelCheckBox.addActionListener { updateDynamicLabels() }
@@ -421,6 +461,24 @@ class SplitDialog(
     // ---- Dynamic labels ----
 
     private fun updateDynamicLabels() {
+        if (newParent) {
+            // Neutral wording: the ticked pane always ends up as the new commit here, and the
+            // unticked pane always keeps sourceEntry's own change ID - "Parent"/"Child" from the
+            // default mode would say the opposite of what actually happens (see class KDoc).
+            firstCommitLabel = legendLabel("dialog.split.legend.stays")
+            secondCommitLabel = legendLabel("dialog.split.legend.new")
+
+            parentHeaderLabel.text = JujutsuBundle.message("dialog.split.stays.header", sourceEntry.id.short)
+            parentHeaderLabel.font = parentHeaderLabel.font.deriveFont(Font.BOLD)
+
+            childHeaderLabel.text = JujutsuBundle.message("dialog.split.new.header", sourceEntry.id.short)
+            childHeaderLabel.font = childHeaderLabel.font.deriveFont(Font.BOLD)
+
+            parentDescriptionLabel.text = JujutsuBundle.message("dialog.split.stays.description")
+            childDescriptionLabel.text = JujutsuBundle.message("dialog.split.new.description")
+            return
+        }
+
         val parallel = parallelCheckBox.isSelected
 
         firstCommitLabel = legendLabel(if (parallel) "dialog.split.legend.second" else "dialog.split.legend.parent")
@@ -515,6 +573,10 @@ class SplitDialog(
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         add(createSectionLabel(JujutsuBundle.message("dialog.split.source")))
         add(createEntryPane(sourceEntry))
+        if (workingCopyNoteLabel.isVisible) {
+            workingCopyNoteLabel.alignmentX = JLabel.LEFT_ALIGNMENT
+            add(workingCopyNoteLabel)
+        }
         add(Box.createVerticalStrut(JBUI.scale(8)))
         add(createSectionLabel(JujutsuBundle.message("dialog.split.files")))
     }
@@ -536,31 +598,24 @@ class SplitDialog(
             border = JBUI.Borders.empty(8)
         }
 
-        // Child description first — matches the child's position above the parent in the log.
-        childHeaderLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-        panel.add(childHeaderLabel)
-        childDescriptionLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-        panel.add(childDescriptionLabel)
-        val childScroll = JBScrollPane(childDescriptionField).apply {
-            alignmentX = JPanel.LEFT_ALIGNMENT
-            preferredSize = Dimension(0, JBUI.scale(46))
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(46))
-        }
-        panel.add(childScroll)
+        val childBlock = descriptionBlock(childHeaderLabel, childDescriptionLabel, childDescriptionField)
+        val parentBlock = descriptionBlock(parentHeaderLabel, parentDescriptionLabel, parentDescriptionField)
 
-        panel.add(Box.createVerticalStrut(JBUI.scale(6)))
-
-        // Parent description.
-        parentHeaderLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-        panel.add(parentHeaderLabel)
-        parentDescriptionLabel.alignmentX = JLabel.LEFT_ALIGNMENT
-        panel.add(parentDescriptionLabel)
-        val parentScroll = JBScrollPane(parentDescriptionField).apply {
-            alignmentX = JPanel.LEFT_ALIGNMENT
-            preferredSize = Dimension(0, JBUI.scale(46))
-            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(46))
+        if (newParent) {
+            // parentHeaderLabel/parentDescriptionField is the *unticked* pane here, i.e. the
+            // "Stays here" side - shown first (top) since it occupies the more-recent, unmoved
+            // position, matching where it already sits in the log; childHeaderLabel/
+            // childDescriptionField ("New commit") is the newly-inserted *older* parent, shown
+            // second (bottom) to match its position one row further down the log.
+            panel.add(parentBlock)
+            panel.add(Box.createVerticalStrut(JBUI.scale(6)))
+            panel.add(childBlock)
+        } else {
+            // Child description first — matches the child's position above the parent in the log.
+            panel.add(childBlock)
+            panel.add(Box.createVerticalStrut(JBUI.scale(6)))
+            panel.add(parentBlock)
         }
-        panel.add(parentScroll)
 
         panel.add(Box.createVerticalStrut(JBUI.scale(4)))
 
@@ -569,6 +624,23 @@ class SplitDialog(
         panel.add(parallelCheckBox)
 
         return panel
+    }
+
+    private fun descriptionBlock(header: JLabel, description: JLabel, field: JBTextArea): JPanel {
+        header.alignmentX = JLabel.LEFT_ALIGNMENT
+        description.alignmentX = JLabel.LEFT_ALIGNMENT
+        val scroll = JBScrollPane(field).apply {
+            alignmentX = JPanel.LEFT_ALIGNMENT
+            preferredSize = Dimension(0, JBUI.scale(46))
+            maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(46))
+        }
+        return JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            alignmentX = JPanel.LEFT_ALIGNMENT
+            add(header)
+            add(description)
+            add(scroll)
+        }
     }
 
     // ---- Helpers ----
@@ -594,22 +666,22 @@ class SplitDialog(
     // ---- Validation ----
 
     override fun doValidate(): ValidationInfo? {
-        val included = fileSelection.includedChanges // ticked = moving to child
+        val included = fileSelection.includedChanges // ticked = moving to the new commit
         val total = allChanges.size
 
         if (included.isEmpty()) {
-            val key = if (parallelCheckBox.isSelected) {
-                "dialog.split.validation.child.empty.parallel"
-            } else {
-                "dialog.split.validation.child.empty"
+            val key = when {
+                newParent -> "dialog.split.validation.new.empty"
+                parallelCheckBox.isSelected -> "dialog.split.validation.child.empty.parallel"
+                else -> "dialog.split.validation.child.empty"
             }
             return ValidationInfo(JujutsuBundle.message(key), fileSelection.changesTree)
         }
         if (included.size == total && firstCommitOverrides.isEmpty()) {
-            val key = if (parallelCheckBox.isSelected) {
-                "dialog.split.validation.parent.empty.parallel"
-            } else {
-                "dialog.split.validation.parent.empty"
+            val key = when {
+                newParent -> "dialog.split.validation.stays.empty"
+                parallelCheckBox.isSelected -> "dialog.split.validation.parent.empty.parallel"
+                else -> "dialog.split.validation.parent.empty"
             }
             return ValidationInfo(JujutsuBundle.message(key), fileSelection.changesTree)
         }
@@ -619,19 +691,28 @@ class SplitDialog(
     // ---- OK action ----
 
     override fun doOKAction() {
-        // Ticked changes move to the child; everything else stays in the parent.
-        val childChanges = fileSelection.includedChanges.toList()
-        val childFilePaths = childChanges.map { it.filePath }.toSet()
-        val parentPaths = allChanges.map { it.filePath }.filter { it !in childFilePaths }
+        val ticked = fileSelection.includedChanges.toList()
+        val tickedPaths = ticked.map { it.filePath }.toSet()
 
-        val hunkSelection: SplitHunkSelection? = if (firstCommitOverrides.isNotEmpty()) {
+        // Which pane's files become the fileset passed to `jj split` (its "selected" argument)
+        // depends on mode: in newParent mode, `-B` makes the ticked pane the new commit; in the
+        // default mode, the unticked pane keeps the original ID and is what gets passed instead
+        // (see SplitSpec's KDoc).
+        val selectedPaths = if (newParent) {
+            ticked.map { it.filePath }
+        } else {
+            allChanges.map { it.filePath }.filter { it !in tickedPaths }
+        }
+
+        val hunkSelection: SplitHunkSelection? = if (!newParent && firstCommitOverrides.isNotEmpty()) {
             // Build FileFirstCommit (parent-remainder content) for every changed file.
+            // newParent mode never reaches here - "Pick Hunks…" is hidden in that mode.
             val files = allChanges.map { change ->
                 val fp = change.filePath
                 val root = sourceEntry.repo.directory
                 val relPath = fp.relativeTo(root)
                 val override = firstCommitOverrides[fp]
-                val isChild = fp in childFilePaths
+                val isChild = fp in tickedPaths
                 val content: String? = when {
                     override != null -> override // partial via merge picker
                     isChild -> null // whole file moves to child → absent from first/parent commit
@@ -644,17 +725,23 @@ class SplitDialog(
             null
         }
 
-        val parentDesc = parentDescriptionField.text.trim()
-        val childDesc = childDescriptionField.text.trim()
+        val parentFieldText = parentDescriptionField.text.trim()
+        val childFieldText = childDescriptionField.text.trim()
         val originalDesc = sourceEntry.description.actual
+
+        // Route by role, not by pane: the selected side (see selectedPaths above) always gets
+        // -m; the remaining side always gets the follow-up describe.
+        val selectedFieldText = if (newParent) childFieldText else parentFieldText
+        val remainingFieldText = if (newParent) parentFieldText else childFieldText
 
         result = SplitSpec(
             revision = sourceEntry.id,
-            filePaths = parentPaths,
+            filePaths = selectedPaths,
             hunkSelection = hunkSelection,
-            description = Description(parentDesc),
-            childDescription = if (childDesc != originalDesc) Description(childDesc) else null,
-            parallel = parallelCheckBox.isSelected
+            selectedDescription = Description(selectedFieldText),
+            remainingDescription = if (remainingFieldText != originalDesc) Description(remainingFieldText) else null,
+            parallel = if (newParent) false else parallelCheckBox.isSelected,
+            insertBefore = if (newParent) sourceEntry.id else null
         )
         super.doOKAction()
     }
