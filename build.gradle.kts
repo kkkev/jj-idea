@@ -196,17 +196,36 @@ intellijPlatform {
         // on the `kotlin` block below, and contributing.md's Platform API compatibility section).
         // Binary-compatibility breaks stay fatal — that's the actual runtime risk an internal API
         // poses on an older IDE, and the thing this check exists to catch.
+        //
+        // OVERRIDE_ONLY_API_USAGES is included even though it's not a binary-compatibility risk:
+        // 0.8.11 shipped a direct call to AnAction.actionPerformed() (an @ApiStatus.OverrideOnly
+        // method meant to be called only by the platform's own action-invocation machinery, with
+        // its update-before-invoke/callback wrapping) and it was rejected by the JetBrains
+        // Marketplace's own automated check, which our verifyPlugin run hadn't been catching. The
+        // Marketplace enforces its own failure levels on every upload regardless of what this
+        // project excludes, so anything it treats as fatal needs to fail here too, or the gap
+        // just repeats on the next unrelated release. INTERNAL_API_USAGES could face the same
+        // Marketplace-vs-local mismatch in principle, but the one specific exemption above is
+        // still deliberate and narrow enough to keep as-is; regular (non-exempted) internal-API
+        // usage should be avoided in review even though it isn't a local build failure.
         failureLevel = listOf(
             VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
             VerifyPluginTask.FailureLevel.MISSING_DEPENDENCIES,
-            VerifyPluginTask.FailureLevel.INVALID_PLUGIN
+            VerifyPluginTask.FailureLevel.INVALID_PLUGIN,
+            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES
         )
         ides {
             // Explicit versions rather than recommended(): recommended() is unbounded because
             // untilBuild = null above, and 2025.1 is the sinceBuild floor that must be checked.
+            // Every minor platform release in the supported range is listed explicitly (not just
+            // a sample) — this project has already shipped a break specific to one untested
+            // in-range version once (2026.2-only conflict-resolution crash on build 262,
+            // jj-idea-qfgl). 2026.1/261 was missing from this list until now; add each new minor
+            // platform release here as it ships, not just the newest one.
             create(IntelliJPlatformType.IntellijIdea, "2025.1")
             create(IntelliJPlatformType.IntellijIdea, "2025.2")
             create(IntelliJPlatformType.IntellijIdea, "2025.3")
+            create(IntelliJPlatformType.IntellijIdea, "2026.1")
             create(IntelliJPlatformType.IntellijIdea, "2026.2")
         }
     }

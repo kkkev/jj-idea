@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Fixed right-clicking a change-id link (e.g. a parent reference in a merge commit's details) showing an empty "Nothing Here" menu instead of that commit's usual context menu.
+- Fixed 0.8.11 failing JetBrains Marketplace's compatibility check and never going out to users — the Working Copy toolbar's Rebase/Squash/Abandon/etc. buttons and the status-bar bookmark widget used a couple of platform APIs the Marketplace flags but our own build didn't catch.
 
 ## [0.8.11] - 2026-08-20
 

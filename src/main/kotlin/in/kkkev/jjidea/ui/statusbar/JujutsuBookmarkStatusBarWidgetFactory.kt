@@ -8,9 +8,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
-import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetSettings
 import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
-import com.intellij.ui.ExperimentalUI
+import com.intellij.ui.NewUI
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 
 /**
@@ -33,10 +32,10 @@ class JujutsuBookmarkStatusBarWidgetFactory : StatusBarWidgetFactory {
     override fun getDisplayName() = "Jujutsu Bookmark"
 
     override fun isAvailable(project: Project) =
-        (ExperimentalUI.isNewUI() || isEnabledByDefault()) && project.possibleJujutsuVcs != null
+        (NewUI.isEnabled() || isEnabledByDefault()) && project.possibleJujutsuVcs != null
 
     override fun isEnabledByDefault(): Boolean {
-        if (ExperimentalUI.isNewUI()) {
+        if (NewUI.isEnabled()) {
             // Show by default if the main toolbar is hidden via settings
             return !UISettings.getInstance().showNewMainToolbar
         }
@@ -56,10 +55,16 @@ class JujutsuBookmarkStatusBarWidgetFactory : StatusBarWidgetFactory {
  */
 class JujutsuBookmarkStatusBarSettingsListener(private val project: Project) : UISettingsListener {
     override fun uiSettingsChanged(uiSettings: UISettings) {
-        val statusBarSettings = StatusBarWidgetSettings.getInstance()
         val id = JujutsuBookmarkStatusBarWidgetFactory.ID
-        if (!ExperimentalUI.isNewUI() || statusBarSettings.isExplicitlyDisabled(id)) return
+        if (!NewUI.isEnabled()) return
 
+        // No pre-check against StatusBarWidgetSettings.isExplicitlyDisabled here: that class is
+        // @ApiStatus.Internal (flagged by the marketplace's compatibility checker, unlike our own
+        // verifyPlugin which deliberately excludes internal-API usage — see build.gradle.kts).
+        // StatusBarWidgetsManager.updateWidget already checks it internally before showing the
+        // widget, so skipping our own redundant check only costs an unnecessary updateWidget call
+        // when the user has explicitly disabled this widget.
+        //
         // Show/hide the bookmark widget if the main toolbar is hidden/shown via settings.
         // Deliberately calls the single-arg, no-default-parameters updateWidget(Class<...>)
         // overload rather than updateWidget(factory) — the latter has an optional

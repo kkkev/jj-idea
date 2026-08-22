@@ -351,7 +351,14 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             e.presentation.isEnabled = isEnabled()
         }
 
-        override fun actionPerformed(e: AnActionEvent) = delegate().actionPerformed(e)
+        // Must not call delegate().actionPerformed(e) directly: AnAction.actionPerformed is
+        // @ApiStatus.OverrideOnly (the platform's own contract, not one we impose) — the platform
+        // marketplace's compatibility checker flags direct calls as a violation even though our
+        // own verifyPlugin (which excludes that category) does not. ActionManager.tryToExecute is
+        // the long-standing public, non-deprecated way to invoke an AnAction programmatically.
+        override fun actionPerformed(e: AnActionEvent) {
+            ActionManager.getInstance().tryToExecute(delegate(), e.inputEvent, null, e.place, true)
+        }
 
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
     }
