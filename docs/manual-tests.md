@@ -438,8 +438,39 @@ toggles are pure `LogFilterMatcher` logic, testable without rendering)
 - [ ] Paste just an abbreviated prefix of that hash — it still matches
 - [ ] Paste the hash in a different case (e.g. uppercase) — it still matches (case-insensitive
       by default)
-- [ ] Paste a hash for a commit that isn't currently loaded in the log window — no results
-      (searching outside the loaded window is not yet supported)
+- [ ] Paste a hash for a commit that isn't currently loaded in the log window and press **Enter**
+      — see "Whole-repo search on Enter (jj-idea-lpbv)" below
+
+#### Whole-repo search on Enter (jj-idea-lpbv)
+
+**Code:** `jj/LogSearchRevset.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt` (`searchWholeRepo`,
+`fetchSearchResults`), `ui/log/UnifiedJujutsuLogPanel.kt` (`onSearchSubmitted`),
+`ui/common/CommitTablePanel.kt` (status bar), `ui/log/LogFilterMatcher.kt` (full-body matching)
+
+→ automate: `jj-idea-lpbv`'s own unit tests already cover revset construction
+(`LogSearchRevsetTest`) and per-repo fetch/merge logic (`UnifiedJujutsuLogDataLoaderTest`); this
+section is for the end-to-end wiring that only shows up when jj actually runs.
+
+Setup: lower "Number of changes to show" (Settings → Version Control → Jujutsu) to something
+small (e.g. 100) against `scripts/fixtures/fx-stress.sh`'s ~1084-commit repo (`jj-stress-test`,
+shared with MT-LOG-GRAPH/MT-LOG-FILTER's other stress fixtures) so most commits are off-window.
+
+- [ ] Find a commit hash/change-id well past the window (e.g. `jj log -r 'all()' -T commit_id
+      --no-graph --limit 2000`), paste it into the search field — typing alone shows no results;
+      pressing **Enter** fetches and shows it as the only visible row, and the status bar reports
+      it was found outside the current view
+- [ ] Type a word that appears only in an off-window commit's description **body** (not its first
+      line) — Enter finds it (full-body matching, not just the summary line)
+- [ ] Type gibberish that matches nothing — Enter leaves the table unchanged and the status bar
+      says no changes were found
+- [ ] Type free text containing punctuation (e.g. `fix: the . thing`) — Enter must not error (check
+      `idea.log`); it just searches description/author as usual
+- [ ] Click **Refresh** — the merged-in search results disappear and the log returns to the
+      configured revset/limit
+- [ ] In a multi-repo project, repeat with a hash from a second repo — results from both roots
+      merge and the root gutter stays correct
+- [ ] Open a file's history (right-click a file → Show History) — Enter in its search field
+      behaves exactly as before (whole-repo search is log-window only, not wired to file history)
 
 #### New/Edit toolbar buttons (jj-idea-e53e)
 

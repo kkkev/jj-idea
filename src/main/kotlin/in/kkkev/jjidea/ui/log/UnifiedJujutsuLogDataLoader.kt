@@ -36,6 +36,11 @@ class UnifiedJujutsuLogDataLoader(
     // Never discarded by loadCommits — only cleared on explicit Refresh (clearExpansions).
     private val expansionEntriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
 
+    // Per-repo whole-repo search results (jj-idea-lpbv), accumulated the same way as
+    // expansionEntriesByRepo above. Never discarded by loadCommits — only cleared on explicit
+    // Refresh (clearExpansions).
+    private val searchEntriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
+
     override fun load() = loadCommits()
 
     private fun notify(data: Data) {
@@ -117,33 +122,105 @@ class UnifiedJujutsuLogDataLoader(
     }
 
     fun loadExpanding(repo: JujutsuRepository, changeId: ChangeId) {
-        val limit = lastLimit
         val window = JujutsuSettings.getInstance(project).logContextWindow(repo)
         runInBackground {
             repo.logCache.loadContext(changeId, window).takeUnless { it.isEmpty() }?.let { expansion ->
                 expansionEntriesByRepo[repo] = expansion
-                // For each repo: combine loadCommits entries (from cache) with the expansion
-                // entries accumulated through navigation. This keeps other repos' expansions
-                // intact even if their caches have been partially overwritten by loadCommits.
-                val allEntries = repositories().flatMap { r ->
-                    val regular = r.logCache.all
-                    val expanded = expansionEntriesByRepo[r] ?: emptyList()
-                    regular + expanded
-                }
-                val merged = topologicalSort(allEntries.distinctBy { it.key })
-                val data = Data(merged, graphBuilder.buildGraph(merged), limit)
-                runLater { notify(data) }
+                mergeAndNotify()
             }
         }
     }
 
-    override fun clearExpansions() = expansionEntriesByRepo.clear()
+    /**
+     * Runs the whole-repo search revset (jj-idea-lpbv) against every repository and merges any
+     * commits found into the loaded set, so results outside the log window (e.g. a pasted Git
+     * hash or a match in an older commit's description) become visible. One `jj log -r` call per
+     * repository, same cost envelope as [loadExpanding].
+     *
+     * [onComplete] is invoked on EDT after the table has been updated, with the number of
+     * returned entries that were not already part of the currently loaded set — so the caller
+     * can distinguish "found nothing" from "found only what was already showing".
+     */
+    fun searchWholeRepo(
+        query: String,
+        useRegex: Boolean,
+        matchCase: Boolean,
+        wholeWords: Boolean,
+        onComplete: (Int) -> Unit
+    ) {
+        val revset = logSearchRevset(query, useRegex, matchCase, wholeWords)
+        if (revset == null) {
+            onComplete(0)
+            return
+        }
+        val repos = repositories()
+        val settings = JujutsuSettings.getInstance(project)
+        runInBackground {
+            val alreadyLoaded = repos.flatMap { it.logCache.all + (expansionEntriesByRepo[it] ?: emptyList()) }
+                .mapTo(HashSet()) { it.key }
+            val resultsByRepo = fetchSearchResults(repos, revset) { repo -> settings.logChangeLimit(repo) }
+            var newCount = 0
+            resultsByRepo.forEach { (repo, entries) ->
+                repo.logCache.store(entries)
+                searchEntriesByRepo[repo] = entries
+                newCount += entries.count { it.key !in alreadyLoaded }
+            }
+            mergeAndNotify()
+            runLater { onComplete(newCount) }
+        }
+    }
+
+    /**
+     * Rebuilds the merged (loaded + expansion + search) entry set for every repo, sorts it, and
+     * notifies the panel on EDT. Shared by [loadExpanding] and [searchWholeRepo] — both accumulate
+     * additive per-repo buckets on top of [JujutsuRepository.logCache], never discarded except by
+     * [clearExpansions] on an explicit Refresh. Must be called from a background thread, since it
+     * reads [JujutsuRepository.logCache].
+     */
+    private fun mergeAndNotify() {
+        val allEntries = repositories().flatMap { r ->
+            val regular = r.logCache.all
+            val expanded = expansionEntriesByRepo[r] ?: emptyList()
+            val searched = searchEntriesByRepo[r] ?: emptyList()
+            regular + expanded + searched
+        }
+        val merged = topologicalSort(allEntries.distinctBy { it.key })
+        val data = Data(merged, graphBuilder.buildGraph(merged), lastLimit)
+        runLater { notify(data) }
+    }
+
+    override fun clearExpansions() {
+        expansionEntriesByRepo.clear()
+        searchEntriesByRepo.clear()
+    }
 
     override fun refresh() {
         log.info("Refreshing unified log")
         loadCommits()
     }
 }
+
+/**
+ * Runs [revset] against each of [repos] via `jj log -r`, capped per-repo at [limitFor]. One
+ * process invocation per repo — O(#repos), independent of the number of commits loaded or the
+ * repo's total history size.
+ *
+ * `quiet = true` because a whole-repo search revset failing to resolve (e.g. the query happens
+ * to look like a `present(...)` revision that doesn't exist) is an expected, user-triggered
+ * outcome, not a bug — logged at INFO rather than WARN (same convention as
+ * [in.kkkev.jjidea.jj.RepoLogCache.fetchOne]). A repo whose fetch fails is simply omitted from
+ * the result map rather than failing the whole search.
+ */
+internal fun fetchSearchResults(
+    repos: Collection<JujutsuRepository>,
+    revset: Expression,
+    limitFor: (JujutsuRepository) -> Int
+): Map<JujutsuRepository, List<LogEntry>> = repos.mapNotNull { repo ->
+    repo.logService.getLog(revset = revset, limit = limitFor(repo), quiet = true)
+        .getOrNull()
+        ?.takeUnless { it.isEmpty() }
+        ?.let { repo to it }
+}.toMap()
 
 /**
  * Injects pending-deletion local bookmarks into log entries and zeroes out garbage ahead/behind counts.

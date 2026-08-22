@@ -202,6 +202,22 @@ class LogFilterMatcherTest {
         }
 
         @Test
+        fun `matches text that only appears in the description body, not just the summary line`() {
+            val matcher =
+                LogFilterMatcher.create("only in the body", useRegex = false, matchCase = false, wholeWords = false)!!
+
+            matcher.matches(entry(description = "Summary line\n\nDetails: only in the body")) shouldBe true
+        }
+
+        @Test
+        fun `empty description still matches its placeholder text`() {
+            val matcher =
+                LogFilterMatcher.create("no description", useRegex = false, matchCase = false, wholeWords = false)!!
+
+            matcher.matches(entry(description = "")) shouldBe true
+        }
+
+        @Test
         fun `matches by author name or email`() {
             val matcher = LogFilterMatcher.create("alice", useRegex = false, matchCase = false, wholeWords = false)!!
 

@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.stateModel
@@ -167,6 +168,28 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         // Restore root filter after data loads (roots are only available once the model is populated)
         if (config.selectedRootPaths.isNotEmpty()) {
             rootFilterComponent?.setSelectedRoots(config.selectedRootPaths.toSet())
+        }
+    }
+
+    /**
+     * Runs a whole-repo search (jj-idea-lpbv) when Enter is pressed with non-blank search text,
+     * so a pasted Git hash or a match in an older commit's description/author is found even when
+     * it's outside the loaded log window. Results merge into the table (see
+     * [UnifiedJujutsuLogDataLoader.searchWholeRepo]); the outcome replaces whatever the status bar
+     * was showing (e.g. the truncation notice set by [onDataLoaded] as part of the same reload).
+     */
+    override fun onSearchSubmitted(text: String) {
+        (dataLoader as UnifiedJujutsuLogDataLoader).searchWholeRepo(
+            text,
+            useRegex,
+            matchCase,
+            matchWholeWords
+        ) { found ->
+            if (found > 0) {
+                showStatusMessage(JujutsuBundle.message("log.status.search.found", found, text))
+            } else {
+                showStatusMessage(JujutsuBundle.message("log.status.search.none", text))
+            }
         }
     }
 

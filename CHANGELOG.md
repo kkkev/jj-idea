@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Rebase and Describe are now available as one-click buttons on the log toolbar, alongside New and Edit, with default keyboard shortcuts — previously only reachable via the right-click menu. Their right-click menu entries now show the same shortcut. Edit also gained a default keyboard shortcut of its own. ([#78](https://github.com/kkkev/jj-idea/issues/78))
+- New "Split into New Parent…" action alongside the existing "Split into New Child…" in file right-click menus, for splitting selected files off into a new commit that precedes the current one instead of one that follows it — useful for peeling off small commits backwards from a large verified set of changes. The current commit keeps its own change ID (and the working copy, if you're splitting it, stays put); only the new, split-off commit gets a new ID. The dialog is explicit about which side is which and, when splitting the working copy, about where `@` ends up either way. ([#74](https://github.com/kkkev/jj-idea/issues/74))
+- "Show History" is now available from file right-click menus in the commit details panel, the Working Copy tool window, and compare-changes panels, matching the editor's Jujutsu submenu.
+- Pressing Enter in the log search field now searches the whole repository, not just the commits currently loaded in the log window — useful for pasting a Git hash or finding an older commit by description or author. Matching commits are added into the log, and the status bar reports how many (or that none) were found.
+
+### Changed
+- The log search field now matches anywhere in a commit's full description, not just its first line.
+
+### Fixed
+- Fixed right-clicking a change-id link (e.g. a parent reference in a merge commit's details) showing an empty "Nothing Here" menu instead of that commit's usual context menu.
+
 ## [0.8.11] - 2026-08-20
 
 ### Added
@@ -16,9 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Two new settings under Settings → Version Control → Jujutsu:
   - A setting for how many surrounding revisions to load when jumping to a commit outside the visible log (e.g. from file annotation) — including an option to load only the target revision, with no surrounding context. Overridable per repository. ([#80](https://github.com/kkkev/jj-idea/issues/80))
   - A global "disable ignored-file scanning" option that applies to every repository, instead of having to turn it off one repository at a time — individual repositories can still opt back in. ([#35](https://github.com/kkkev/jj-idea/issues/35))
-- Rebase and Describe are now available as one-click buttons on the log toolbar, alongside New and Edit, with default keyboard shortcuts — previously only reachable via the right-click menu. Their right-click menu entries now show the same shortcut. Edit also gained a default keyboard shortcut of its own. ([#78](https://github.com/kkkev/jj-idea/issues/78))
-- New "Split into New Parent…" action alongside the existing "Split into New Child…" in file right-click menus, for splitting selected files off into a new commit that precedes the current one instead of one that follows it — useful for peeling off small commits backwards from a large verified set of changes. The current commit keeps its own change ID (and the working copy, if you're splitting it, stays put); only the new, split-off commit gets a new ID. The dialog is explicit about which side is which and, when splitting the working copy, about where `@` ends up either way. ([#74](https://github.com/kkkev/jj-idea/issues/74))
-- "Show History" is now available from file right-click menus in the commit details panel, the Working Copy tool window, and compare-changes panels, matching the editor's Jujutsu submenu.
 
 ### Changed
 - Freed up space in the log window's toolbar now that the bookmark widget has moved (see above), so more of the filter row stays visible before collapsing into the "»" overflow.
@@ -28,7 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed diffs, file history, restore, split, squash, and conflict resolution failing on files whose path contains parentheses or square brackets (e.g. Next.js app-router routes like `app/(app)/users/[id]/page.tsx`) — the diff pane used to show "Cannot get content from this revision." ([#73](https://github.com/kkkev/jj-idea/issues/73))
 - Fixed the bookmark widget in the log toolbar showing no bookmark at all (just the empty "Bookmark:" label) most of the time, instead of the nearest-bookmark indicator added in 0.8.9 — it now shows correctly from the moment the log opens, and keeps up to date after commands run outside the IDE (e.g. `jj new` in a terminal).
 - Fixed change descriptions in the log window's details pane and tooltips rendering with non-breaking spaces instead of the regular spaces you typed — this broke word-wrapping on long descriptions and, worse, meant copying description text pasted invisible non-breaking spaces in place of normal ones. ([#77](https://github.com/kkkev/jj-idea/issues/77))
-- Fixed right-clicking a change-id link (e.g. a parent reference in a merge commit's details) showing an empty "Nothing Here" menu instead of that commit's usual context menu.
 
 ## [0.8.10] - 2026-08-11
 

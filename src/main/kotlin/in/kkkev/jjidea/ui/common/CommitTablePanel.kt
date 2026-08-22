@@ -91,11 +91,12 @@ abstract class CommitTablePanel<D>(
             }
         )
 
-        // Add Enter key listener to save search to history
+        // Add Enter key listener to save search to history and trigger a whole-repo search
         textEditor.addActionListener {
             val text = text?.trim()
             if (!text.isNullOrEmpty()) {
                 addCurrentTextToHistory()
+                onSearchSubmitted(text)
             }
         }
     }
@@ -341,6 +342,14 @@ abstract class CommitTablePanel<D>(
     open fun onConfigChanged() {}
 
     /**
+     * Hook called when Enter is pressed in the search field with non-blank [text]. Default no-op;
+     * [UnifiedJujutsuLogPanel] overrides this to run a whole-repo search (jj-idea-lpbv) so results
+     * outside the loaded log window are found. File history does not opt in — its results are
+     * already the complete history of the file, so there is no "outside the window" to search.
+     */
+    protected open fun onSearchSubmitted(text: String) {}
+
+    /**
      * Refresh action - reload commits from all repositories.
      */
     private inner class RefreshAction : AnAction(
@@ -581,6 +590,26 @@ abstract class CommitTablePanel<D>(
             }
         )
         statusBar.isVisible = true
+    }
+
+    /**
+     * Shows a plain one-line message in the status bar strip below the table, replacing whatever
+     * was there (e.g. the truncation notice). Used by [UnifiedJujutsuLogPanel] to report the
+     * outcome of a whole-repo search (jj-idea-lpbv).
+     */
+    protected fun showStatusMessage(text: String) {
+        statusBar.removeAll()
+        statusBar.add(JBLabel(text))
+        statusBar.isVisible = true
+    }
+
+    /**
+     * Hides the status bar strip. Called before a whole-repo search's result message would
+     * otherwise linger.
+     */
+    protected fun clearStatusMessage() {
+        statusBar.removeAll()
+        statusBar.isVisible = false
     }
 
     /**

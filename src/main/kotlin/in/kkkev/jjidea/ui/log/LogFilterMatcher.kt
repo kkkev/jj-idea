@@ -28,9 +28,16 @@ class LogFilterMatcher private constructor(
      */
     fun matches(id: Shortenable): Boolean = prefixMatch(id.full) || prefixMatch(id.short)
 
-    /** Applies the field-level rules for a log row: which fields participate, and how. */
+    /**
+     * Applies the field-level rules for a log row: which fields participate, and how.
+     *
+     * Matches the whole description body (not just its first line), matching jj's own
+     * `description()` revset predicate — otherwise a query that only jj's whole-repo search
+     * (jj-idea-lpbv, [in.kkkev.jjidea.jj.logSearchRevset]) finds in a commit's body would be
+     * fetched into the table and then hidden by this filter.
+     */
     fun matches(entry: LogEntry): Boolean =
-        matches(entry.description.summary) ||
+        matches(entry.description.display) ||
             entry.author?.name?.let(::matches) == true ||
             entry.author?.email?.let(::matches) == true ||
             matches(entry.id) ||
