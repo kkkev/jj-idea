@@ -107,6 +107,43 @@ class CliExecutorSplitTest {
             )
         }
     }
+
+    @Nested
+    inner class `insert-before flag (jj-idea-tkog)` {
+        @Test
+        fun `split with -B revision, positioned right after -r`() {
+            val result = splitArgs(revision, insertBefore = revision)
+
+            result shouldBe listOf("split", "-r", "abc123def456", "-B", "abc123def456")
+        }
+
+        @Test
+        fun `absent when insertBefore is null`() {
+            val result = splitArgs(revision, filePaths = listOf("src/main.kt"))
+
+            result shouldNotContain "-B"
+        }
+
+        @Test
+        fun `combines with description and file paths in the same order as the no-flag case`() {
+            val result = splitArgs(
+                revision,
+                filePaths = listOf("src/main.kt"),
+                description = Description("New parent"),
+                insertBefore = revision
+            )
+
+            result shouldBe listOf(
+                "split",
+                "-r",
+                "abc123def456",
+                "-B",
+                "abc123def456",
+                "--message=New parent",
+                "cwd:\"src/main.kt\""
+            )
+        }
+    }
 }
 
 /**
@@ -196,6 +233,25 @@ class CliExecutorSplitInteractiveTest {
         fun `no --parallel by default`() {
             val result = splitInteractiveArgs(revision, tool = "t")
             result shouldNotContain "--parallel"
+        }
+    }
+
+    @Nested
+    inner class `insert-before flag (jj-idea-tkog)` {
+        @Test
+        fun `split --tool with -B revision, positioned right after -r`() {
+            val result = splitInteractiveArgs(revision, tool = "t", insertBefore = revision)
+
+            val rIdx = result.indexOf("-r")
+            result[rIdx + 1] shouldBe "abc123def456"
+            result[rIdx + 2] shouldBe "-B"
+            result[rIdx + 3] shouldBe "abc123def456"
+        }
+
+        @Test
+        fun `absent when insertBefore is null`() {
+            val result = splitInteractiveArgs(revision, tool = "t")
+            result shouldNotContain "-B"
         }
     }
 }

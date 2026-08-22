@@ -337,16 +337,25 @@ interface CommandExecutor {
     /**
      * Split a change into two changes.
      * @param revision The revision to split (default: working copy)
-     * @param filePaths Files to keep in the first commit (empty = interactive, but UI always provides paths)
-     * @param description Description for the first commit (null = keep original)
-     * @param parallel Create parallel (sibling) commits instead of parent/child
+     * @param filePaths The selected fileset passed to `jj split` (empty = interactive, but UI
+     *   always provides paths). With [insertBefore] null (default), the selected fileset stays on
+     *   [revision]'s original change ID and everything else becomes a new child. With
+     *   [insertBefore] set, this polarity flips - see [insertBefore].
+     * @param description Description for the *selected* fileset (`-m`; null = keep original)
+     * @param parallel Create parallel (sibling) commits instead of parent/child. Mutually
+     *   exclusive with [insertBefore] (rejected by `jj split` itself).
+     * @param insertBefore When set, the selected fileset is extracted into a **new** commit
+     *   inserted before this revision (`jj split -B`), and everything *not* in the fileset stays
+     *   on the original commit's identity/location - the inverse of the no-flag default. Typically
+     *   [revision] itself, to insert the new commit as its parent.
      * @return Command result
      */
     fun split(
         revision: Revision = WorkingCopy,
         filePaths: List<FilePath> = emptyList(),
         description: Description? = null,
-        parallel: Boolean = false
+        parallel: Boolean = false,
+        insertBefore: Revision? = null
     ): CommandResult
 
     /**
@@ -357,10 +366,12 @@ interface CommandExecutor {
      * prefixed with `--config` and prepended to the command (global jj options).
      *
      * @param revision The revision to split
-     * @param description Description for the first commit (passed as `-m`; null = keep original)
-     * @param parallel Create parallel (sibling) commits instead of parent/child
+     * @param description Description for the *selected* side (passed as `-m`; null = keep original)
+     * @param parallel Create parallel (sibling) commits instead of parent/child. Mutually
+     *   exclusive with [insertBefore].
      * @param configArgs Extra `--config NAME=VALUE` entries (prepended before the subcommand)
      * @param tool The diff-editor tool name registered via [configArgs]
+     * @param insertBefore See [split]'s parameter of the same name.
      * @return Command result
      */
     fun splitInteractive(
@@ -368,7 +379,8 @@ interface CommandExecutor {
         description: Description? = null,
         parallel: Boolean = false,
         configArgs: List<String> = emptyList(),
-        tool: String
+        tool: String,
+        insertBefore: Revision? = null
     ): CommandResult
 
     /**

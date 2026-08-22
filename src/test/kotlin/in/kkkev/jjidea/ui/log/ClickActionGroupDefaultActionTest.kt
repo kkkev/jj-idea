@@ -10,13 +10,16 @@ import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.shouldBe
+import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Tag as JupiterTag
@@ -143,5 +146,27 @@ class ClickActionGroupDefaultActionTest {
         val unchecked = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren().first()
 
         (unchecked as ToggleAction).isSelectedInTest() shouldBe false
+    }
+
+    @Test
+    fun `change-id link menu reuses the resolved commit's log-row context menu`() {
+        val changeId = ChangeId("qpvuntsm", "qp", 2)
+        every { repo.getLogEntry(changeId as Revision) } returns entry()
+        val target = ChangeNavigationClick(repo, ChangeKey(repo, changeId))
+
+        val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
+
+        children.isEmpty() shouldBe false
+    }
+
+    @Test
+    fun `change-id link menu is empty when the revision no longer resolves`() {
+        val changeId = ChangeId("qpvuntsm", "qp", 2)
+        every { repo.getLogEntry(changeId as Revision) } throws IllegalArgumentException("not found")
+        val target = ChangeNavigationClick(repo, ChangeKey(repo, changeId))
+
+        val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
+
+        children.isEmpty() shouldBe true
     }
 }

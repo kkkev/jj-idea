@@ -176,16 +176,28 @@ internal fun resolveArgs(paths: List<String>, tool: String, revision: Revision =
         addAll(paths.map { it.toFileset() })
     }
 
-/** Build the argument list for `jj split`. */
+/**
+ * Build the argument list for `jj split`.
+ *
+ * [insertBefore], when set, adds `-B <revision>` (`--insert-before`): the selected fileset is
+ * extracted into a new commit inserted before that revision, and the remaining changes stay on
+ * the original commit's identity/location - the inverse of the no-flag default. `jj` itself
+ * rejects `-B` combined with `--parallel`, so callers must not pass both.
+ */
 internal fun splitArgs(
     revision: Revision,
     filePaths: List<String> = emptyList(),
     description: Description? = null,
-    parallel: Boolean = false
+    parallel: Boolean = false,
+    insertBefore: Revision? = null
 ): List<String> = buildList {
     add("split")
     add("-r")
     add(revision.toString())
+    if (insertBefore != null) {
+        add("-B")
+        add(insertBefore.toString())
+    }
     if (description != null) {
         add("--message=${description.actual}")
     }
@@ -206,7 +218,8 @@ internal fun splitInteractiveArgs(
     description: Description? = null,
     parallel: Boolean = false,
     configArgs: List<String> = emptyList(),
-    tool: String
+    tool: String,
+    insertBefore: Revision? = null
 ): List<String> = buildList {
     // Global --config flags before the subcommand.
     for (kv in configArgs) {
@@ -216,6 +229,10 @@ internal fun splitInteractiveArgs(
     add("split")
     add("-r")
     add(revision.toString())
+    if (insertBefore != null) {
+        add("-B")
+        add(insertBefore.toString())
+    }
     if (description != null) add("--message=${description.actual}")
     if (parallel) add("--parallel")
     add("--tool=$tool")
@@ -537,16 +554,21 @@ class CliExecutor(
         revision: Revision,
         filePaths: List<FilePath>,
         description: Description?,
-        parallel: Boolean
-    ) = execute(root, splitArgs(revision, filePaths.map { it.relativeTo(root!!) }, description, parallel))
+        parallel: Boolean,
+        insertBefore: Revision?
+    ) = execute(
+        root,
+        splitArgs(revision, filePaths.map { it.relativeTo(root!!) }, description, parallel, insertBefore)
+    )
 
     override fun splitInteractive(
         revision: Revision,
         description: Description?,
         parallel: Boolean,
         configArgs: List<String>,
-        tool: String
-    ) = execute(root, splitInteractiveArgs(revision, description, parallel, configArgs, tool))
+        tool: String,
+        insertBefore: Revision?
+    ) = execute(root, splitInteractiveArgs(revision, description, parallel, configArgs, tool, insertBefore))
 
     override fun gitFetch(remote: Remote?, allRemotes: Boolean) =
         execute(root, gitFetchArgs(remote, allRemotes), timeout = networkTimeout)

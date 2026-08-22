@@ -146,8 +146,31 @@
       <keyboard-shortcut first-keystroke="meta shift N" keymap="Mac OS X 10.5+"/>
     </action>
 
-    <!-- "Edit": moves the working copy to the selected change. Used by the log toolbar and context menu. -->
-    <action id="Jujutsu.EditChange" class="in.kkkev.jjidea.actions.change.EditChangeAction"/>
+    <!-- "Edit": moves the working copy to the selected change. Used by the log toolbar and context menu.
+         Ctrl/Cmd+Shift+E soft-conflicts with IntelliJ's built-in "Recent Locations" - accepted, since
+         EditChangeAction disables outside the log table (no LOG_ENTRY), so Recent Locations still wins
+         everywhere except when a log row is selected. -->
+    <action id="Jujutsu.EditChange" class="in.kkkev.jjidea.actions.change.EditChangeAction">
+      <keyboard-shortcut first-keystroke="control shift E" keymap="$default"/>
+      <keyboard-shortcut first-keystroke="meta shift E" keymap="Mac OS X"/>
+      <keyboard-shortcut first-keystroke="meta shift E" keymap="Mac OS X 10.5+"/>
+    </action>
+
+    <!-- "Describe": edits the selected change's description. Log toolbar button (GitHub #78);
+         the context-menu entry is a separate, factory-built action (describeAction). -->
+    <action id="Jujutsu.DescribeChangeToolbar" class="in.kkkev.jjidea.actions.change.DescribeChangeAction">
+      <keyboard-shortcut first-keystroke="control shift D" keymap="$default"/>
+      <keyboard-shortcut first-keystroke="meta shift D" keymap="Mac OS X"/>
+      <keyboard-shortcut first-keystroke="meta shift D" keymap="Mac OS X 10.5+"/>
+    </action>
+
+    <!-- "Rebase": opens the rebase dialog for the selected change(s). Log toolbar button
+         (GitHub #78); the context-menu entry is a separate, factory-built action (rebaseAction). -->
+    <action id="Jujutsu.RebaseChangeToolbar" class="in.kkkev.jjidea.actions.change.RebaseChangeAction">
+      <keyboard-shortcut first-keystroke="control shift R" keymap="$default"/>
+      <keyboard-shortcut first-keystroke="meta shift R" keymap="Mac OS X"/>
+      <keyboard-shortcut first-keystroke="meta shift R" keymap="Mac OS X 10.5+"/>
+    </action>
 
     <!-- Open custom Jujutsu log tab -->
     <action id="Jujutsu.OpenLogTab"
@@ -187,6 +210,8 @@
     <action id="Jujutsu.SquashFiles" class="in.kkkev.jjidea.actions.filechange.SquashFilesAction"/>
     <action id="Jujutsu.SquashIntoFiles" class="in.kkkev.jjidea.actions.filechange.SquashIntoFilesAction"/>
     <action id="Jujutsu.SplitFiles" class="in.kkkev.jjidea.actions.filechange.SplitFilesAction"/>
+    <action id="Jujutsu.SplitIntoNewParentFiles"
+            class="in.kkkev.jjidea.actions.filechange.SplitIntoNewParentFilesAction"/>
     <action id="Jujutsu.CompareWithLocal" class="in.kkkev.jjidea.actions.filechange.CompareWithLocalAction"/>
     <action id="Jujutsu.CompareBeforeWithLocal"
             class="in.kkkev.jjidea.actions.filechange.CompareBeforeWithLocalAction"/>
@@ -223,6 +248,7 @@
       <reference ref="Jujutsu.SquashFiles"/>
       <reference ref="Jujutsu.SquashIntoFiles"/>
       <reference ref="Jujutsu.SplitFiles"/>
+      <reference ref="Jujutsu.SplitIntoNewParentFiles"/>
       <separator/>
       <reference ref="Jujutsu.TrackedToggle"/>
       <add-to-group group-id="EditorLangPopupMenu" anchor="after" relative-to-action="VersionControlsGroup"/>
