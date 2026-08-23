@@ -404,3 +404,42 @@ jobs:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
         run: ./gradlew publishPlugin
+
+      # publishPlugin succeeding only means the upload was accepted — Marketplace then runs its
+      # own automated compatibility check (its own plugin-verifier run against its full IDE
+      # matrix) asynchronously, which can reject the upload for reasons our verifyPlugin task
+      # doesn't check for (e.g. OVERRIDE_ONLY_API_USAGES wasn't in our failureLevel until this was
+      # added). 0.8.11 was rejected this way and nobody noticed until the next release attempt,
+      # because a successful publishPlugin looks identical in the Actions log either way. Poll the
+      # public Marketplace API and fail the job if the just-released version hasn't shown up as
+      # listed+approved within a generous window, so a rejection is visible in this run instead of
+      # discovered "yet again" later. 30576 is this plugin's numeric Marketplace ID (see
+      # https://plugins.jetbrains.com/plugin/30576), distinct from its xmlId (in.kkkev.jj-idea).
+      - name: Verify JetBrains Marketplace approval
+        if: steps.version.outputs.is_release == 'true' && env.PUBLISH_TOKEN != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          MAX_ATTEMPTS=25
+          SLEEP_SECONDS=120
+          for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
+            echo "Checking Marketplace listing for $VERSION (attempt $attempt/$MAX_ATTEMPTS)..."
+            # Response is a bare JSON array of version objects; the approval field is "approve",
+            # not "approved". Write to a file rather than capturing in a shell variable — command
+            # substitution has been observed to mangle the payload (the changelog notes embedded
+            # in each entry are large HTML blobs).
+            if curl -sf "https://plugins.jetbrains.com/api/plugins/30576/updates?page=1&size=5" -o /tmp/marketplace-updates.json; then
+              MATCH=$(jq -r --arg v "$VERSION" \
+                '.[]? | select(.version == $v and .approve == true and .listed == true) | .version' \
+                /tmp/marketplace-updates.json)
+              if [[ "$MATCH" == "$VERSION" ]]; then
+                echo "$VERSION is listed and approved on JetBrains Marketplace."
+                exit 0
+              fi
+            fi
+            sleep "$SLEEP_SECONDS"
+          done
+          echo "::error::$VERSION was not listed/approved on JetBrains Marketplace after $((MAX_ATTEMPTS * SLEEP_SECONDS / 60)) minutes."
+          echo "::error::The upload succeeded but Marketplace's own compatibility check may have rejected it (as happened with 0.8.11)."
+          echo "::error::Check https://plugins.jetbrains.com/plugin/30576 and the JetBrains Hub developer dashboard/email for the specific violation."
+          exit 1
