@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextArea
@@ -26,6 +27,7 @@ import `in`.kkkev.jjidea.actions.tag.setTagAction
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
+import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.ui.components.appendParents
 import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.htmlString
@@ -493,7 +495,8 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     private fun updateWorkingCopyLabel(entry: LogEntry) {
-        currentChangeLabel.text = htmlString {
+        val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
+        currentChangeLabel.text = htmlString(linkifier = linkifier) {
             appendSummary(entry)
             appendParents(entry)
         }

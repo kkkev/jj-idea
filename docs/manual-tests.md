@@ -1008,6 +1008,10 @@ be misclassified as backward/sideways.
 - [ ] Description text area shows current description
 - [ ] jj-idea-qa8i: clicking into the description text area, typing, and pressing Enter inserts
   a newline (does not do nothing or trigger another action)
+- [ ] jj-idea-n553 (GitHub #15): with an Issue Navigation pattern configured (Settings → Version
+  Control → Issue Navigation, e.g. issue `[A-Z]+-\d+` → link `https://example.com/browse/$0`),
+  an issue reference like `JIRA-123` inside a bookmark name shown in the current-change summary
+  (above the description area) renders as a clickable link, opening the configured URL on click
 - [ ] "Describe" button updates description via `jj describe`
 - [ ] "New Change" button creates new change via `jj new`
 - [ ] jj-idea-xsa8 (GitHub #61): the toolbar row also offers Split, Squash, Abandon, a separator,

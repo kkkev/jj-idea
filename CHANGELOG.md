@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Issue-tracker references (e.g. `JIRA-123`) in the "Working copy" tool window's current-change summary — including inside a bookmark name — now render as clickable links, matching the log table and commit details pane. ([#15](https://github.com/kkkev/jj-idea/issues/15))
+
 ## [0.8.12] - 2026-08-23
 
 ### Added
