@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.11/jj-idea-0.8.11.zip" version="0.8.11">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.12/jj-idea-0.8.12.zip" version="0.8.12">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,25 +23,21 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.8.11</h3>
+      <h3>0.8.12</h3>
       
 <h4>Added</h4>
-<li>The Working Copy tool window's toolbar now offers the common actions for the current change — Split, Squash into Parent, Abandon, Create Bookmark Here, Advance Bookmark Here, and Set Tag Here — alongside New Change, so you don't have to switch to the log to act on `@`. In a multi-root project, the repository selector now sits in that same row instead of further down the panel, and the changes tree collapses every other repository's changes into a single, per-repository-grouped "Other Repositories" group (and shows a "(no changes)" line for the selected repository when it's clean) so it's clear which repository the toolbar and description above are acting on. Advancing a bookmark from this toolbar now confirms with a Yes/No prompt before moving it, names the bookmark in its tooltip, and confirms with a notification once it moves, since — unlike the other actions here — it otherwise has no dialog and no other visible effect. ([#61](https://github.com/kkkev/jj-idea/issues/61))</li>
-<li>The bookmark indicator has moved out of the Jujutsu log window and into the main IDE toolbar, next to where Git's branch widget sits — so you can see which bookmark you're on, and act on it, without opening the log. If the main toolbar is hidden (Classic UI, or New UI with "Show main toolbar" turned off), the same indicator now appears in the status bar instead. ([#62](https://github.com/kkkev/jj-idea/issues/62))</li>
-<li>The log and file-history toolbars' eye-icon menu (now called "View Options") has two new tick-boxes: "Commit Tooltips", to turn off the row hover tooltip for anyone who finds it more distracting than useful now that the details pane covers the same info on selection ([#51](https://github.com/kkkev/jj-idea/issues/51), [#75](https://github.com/kkkev/jj-idea/issues/75)); and "Alternating Row Colors", to turn off the striped row background, where available in the current theme ([#79](https://github.com/kkkev/jj-idea/issues/79)). The column-visibility and details-position toggles that used to live in two separate submenus now live alongside them in one flat menu.</li>
-<li>Two new settings under Settings → Version Control → Jujutsu:</li>
-  - A setting for how many surrounding revisions to load when jumping to a commit outside the visible log (e.g. from file annotation) — including an option to load only the target revision, with no surrounding context. Overridable per repository. ([#80](https://github.com/kkkev/jj-idea/issues/80))
-  - A global "disable ignored-file scanning" option that applies to every repository, instead of having to turn it off one repository at a time — individual repositories can still opt back in. ([#35](https://github.com/kkkev/jj-idea/issues/35))
+<li>Rebase and Describe are now available as one-click buttons on the log toolbar, alongside New and Edit, with default keyboard shortcuts — previously only reachable via the right-click menu. Their right-click menu entries now show the same shortcut. Edit also gained a default keyboard shortcut of its own. ([#78](https://github.com/kkkev/jj-idea/issues/78))</li>
+<li>New "Split into New Parent…" action alongside the existing "Split into New Child…" in file right-click menus, for splitting selected files off into a new commit that precedes the current one instead of one that follows it — useful for peeling off small commits backwards from a large verified set of changes. The current commit keeps its own change ID (and the working copy, if you're splitting it, stays put); only the new, split-off commit gets a new ID. The dialog is explicit about which side is which and, when splitting the working copy, about where `@` ends up either way. ([#74](https://github.com/kkkev/jj-idea/issues/74))</li>
+<li>"Show History" is now available from file right-click menus in the commit details panel, the Working Copy tool window, and compare-changes panels, matching the editor's Jujutsu submenu.</li>
+<li>Pressing Enter in the log search field now searches the whole repository, not just the commits currently loaded in the log window — useful for pasting a Git hash or finding an older commit by description or author. Matching commits are added into the log, and the status bar reports how many (or that none) were found.</li>
 
 <h4>Changed</h4>
-<li>Freed up space in the log window's toolbar now that the bookmark widget has moved (see above), so more of the filter row stays visible before collapsing into the "»" overflow.</li>
+<li>The log search field now matches anywhere in a commit's full description, not just its first line.</li>
 
 <h4>Fixed</h4>
-<li>Fixed the log occasionally failing to load with an "ambiguous change ID prefix" error when jumping to a commit outside the loaded window (e.g. from file annotation, or navigating to a bookmark), or when squashing a change — a shortened change ID cached from an earlier moment could stop being unique by the time it was reused. ([#76](https://github.com/kkkev/jj-idea/issues/76))</li>
-<li>Fixed diffs, file history, restore, split, squash, and conflict resolution failing on files whose path contains parentheses or square brackets (e.g. Next.js app-router routes like `app/(app)/users/[id]/page.tsx`) — the diff pane used to show "Cannot get content from this revision." ([#73](https://github.com/kkkev/jj-idea/issues/73))</li>
-<li>Fixed the bookmark widget in the log toolbar showing no bookmark at all (just the empty "Bookmark:" label) most of the time, instead of the nearest-bookmark indicator added in 0.8.9 — it now shows correctly from the moment the log opens, and keeps up to date after commands run outside the IDE (e.g. `jj new` in a terminal).</li>
-<li>Fixed change descriptions in the log window's details pane and tooltips rendering with non-breaking spaces instead of the regular spaces you typed — this broke word-wrapping on long descriptions and, worse, meant copying description text pasted invisible non-breaking spaces in place of normal ones. ([#77](https://github.com/kkkev/jj-idea/issues/77))</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.11">full release notes</a> for details.</p>
+<li>Fixed right-clicking a change-id link (e.g. a parent reference in a merge commit's details) showing an empty "Nothing Here" menu instead of that commit's usual context menu.</li>
+<li>Fixed 0.8.11 failing JetBrains Marketplace's compatibility check and never going out to users — the Working Copy toolbar's Rebase/Squash/Abandon/etc. buttons and the status-bar bookmark widget used a couple of platform APIs the Marketplace flags but our own build didn't catch.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.12">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

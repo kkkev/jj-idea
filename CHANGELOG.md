@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.12] - 2026-08-23
+
 ### Added
 - Rebase and Describe are now available as one-click buttons on the log toolbar, alongside New and Edit, with default keyboard shortcuts — previously only reachable via the right-click menu. Their right-click menu entries now show the same shortcut. Edit also gained a default keyboard shortcut of its own. ([#78](https://github.com/kkkev/jj-idea/issues/78))
 - New "Split into New Parent…" action alongside the existing "Split into New Child…" in file right-click menus, for splitting selected files off into a new commit that precedes the current one instead of one that follows it — useful for peeling off small commits backwards from a large verified set of changes. The current commit keeps its own change ID (and the working copy, if you're splitting it, stays put); only the new, split-off commit gets a new ID. The dialog is explicit about which side is which and, when splitting the working copy, about where `@` ends up either way. ([#74](https://github.com/kkkev/jj-idea/issues/74))
@@ -804,7 +806,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.11...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.12...HEAD
+[0.8.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.12
 [0.8.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.11
 [0.8.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.10
 [0.8.9]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.9
