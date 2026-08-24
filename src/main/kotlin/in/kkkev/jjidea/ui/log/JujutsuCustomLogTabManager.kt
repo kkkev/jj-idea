@@ -200,8 +200,33 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
         JujutsuSettings.getInstance(project).upsertLogWindow(handle.config)
     }
 
+    /**
+     * Detaches every open tab's [Content] from the platform-owned [ChangesViewContentManager]
+     * before this service (and its child [UnifiedJujutsuLogPanel]s) are disposed.
+     *
+     * Without this, the platform's content list — which outlives the plugin across a dynamic
+     * unload/reload (jj-idea-nd8x) — keeps showing the stale panel and its toolbar, which then
+     * throws when its actions resolve services from the new plugin classloader.
+     *
+     * Runs synchronously rather than via [runLater]: this must complete before the plugin
+     * classloader becomes unreachable, and (unlike [openCustomLogTab]/[closeCustomLogTab], which
+     * are called from arbitrary background threads) [dispose] for a plugin unload runs on the EDT
+     * under a write action, so deferring via `invokeLater` is unnecessary and would risk racing
+     * the platform's post-unload leak check.
+     *
+     * Removes with `dispose = false` — unlike a user-initiated tab close, this must NOT fire each
+     * [Content]'s close-disposer (registered in [createTab]), which deletes the window from
+     * [JujutsuSettings]; the persisted [LogWindowConfig]s must survive a hot plugin reload.
+     */
     override fun dispose() {
         log.info("Disposing JujutsuCustomLogTabManager")
+        for (handle in openTabs.values) {
+            try {
+                handle.content.manager?.removeContent(handle.content, false)
+            } catch (e: Exception) {
+                log.warn("Failed to remove log tab from content manager: ${handle.config.name}", e)
+            }
+        }
         openTabs.clear()
         // Child disposables (panels) are cleaned up automatically via Disposer
     }

@@ -19,6 +19,7 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.LazyActionById
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.log.*
@@ -328,8 +329,8 @@ abstract class CommitTablePanel<D>(
             *(if (primary.isEmpty()) emptyArray() else arrayOf(Separator.create())),
             RefreshAction(),
             Separator.create(),
-            ActionManager.getInstance().getAction("Jujutsu.GitFetch"),
-            ActionManager.getInstance().getAction("Jujutsu.GitPush"),
+            LazyActionById("Jujutsu.GitFetch"),
+            LazyActionById("Jujutsu.GitPush"),
             Separator.create(),
             ViewOptionsAction()
         )

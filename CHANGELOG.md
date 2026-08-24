@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Push dialog's "Specific bookmark" dropdown no longer lists a tracked bookmark twice, once normally and once mislabelled "(new)".
 - The IDE no longer reports an internal error when a Jujutsu repository can't be read (e.g. a broken or moved `.jj` store). Instead: a warning notification appears with **Retry** and **Configure VCS Mappings...** actions, the Working copy tool window's empty state explains that the repository couldn't be read rather than claiming none are configured, the broken mapping shows in red under Settings → Version Control → Directory Mappings, and the plugin automatically detects when the repository is repaired and recovers without any manual action.
 - The log no longer reports an error when a selected change has been abandoned or rewritten outside the IDE — the selection is simply dropped instead of repeatedly failing on every refresh. ([#76](https://github.com/kkkev/jj-idea/issues/76))
+- Updating the plugin without restarting the IDE no longer leaves a stale log window on screen, which could throw internal errors from its Fetch/Push toolbar buttons until the IDE was restarted. ([#73](https://github.com/kkkev/jj-idea/issues/73), [#86](https://github.com/kkkev/jj-idea/issues/86))
 
 ## [0.8.12] - 2026-08-23
 

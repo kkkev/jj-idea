@@ -82,9 +82,31 @@ class JujutsuFileHistoryTabManager(private val project: Project) : Disposable {
         }
     }
 
+    /**
+     * Detaches every open tab's [Content] from the platform-owned [ChangesViewContentManager]
+     * before this service (and its child [JujutsuFileHistoryPanel]s) are disposed — otherwise the
+     * platform's content list, which outlives the plugin across a dynamic unload/reload
+     * (jj-idea-nd8x), keeps showing the stale panel.
+     *
+     * Runs synchronously, not via [runLater]: dispose for a plugin unload runs on the EDT under a
+     * write action, and this must complete before the classloader becomes unreachable.
+     *
+     * Removes with `dispose = false` and clears [openTabs] up front, rather than relying on each
+     * [Content]'s close-disposer (registered in [openFileHistory]) to do it — that disposer mutates
+     * [openTabs] itself, which would throw a `ConcurrentModificationException` if fired while this
+     * loop is iterating the same map.
+     */
     override fun dispose() {
         log.info("Disposing JujutsuFileHistoryTabManager")
+        val contents = openTabs.values.toList()
         openTabs.clear()
+        for (content in contents) {
+            try {
+                content.manager?.removeContent(content, false)
+            } catch (e: Exception) {
+                log.warn("Failed to remove file history tab from content manager", e)
+            }
+        }
     }
 
     companion object {

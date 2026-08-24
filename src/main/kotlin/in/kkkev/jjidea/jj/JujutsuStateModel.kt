@@ -569,7 +569,9 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         repos.any { "${it.directory.path}/$DOT_JJ/repo" == file.parent?.path }
 
     override fun dispose() {
-        LocalFileSystem.getInstance().removeWatchedRoots(opHeadsWatchRequests)
+        val fs = LocalFileSystem.getInstance()
+        fs.removeWatchedRoots(opHeadsWatchRequests)
+        fs.removeWatchedRoots(repoRootWatchRequests)
     }
 
     companion object {
