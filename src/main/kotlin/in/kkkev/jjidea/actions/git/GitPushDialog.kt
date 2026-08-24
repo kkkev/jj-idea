@@ -34,11 +34,22 @@ import javax.swing.JComponent
  *
  * **Important**: Remotes and bookmarks must be loaded off EDT before constructing this dialog.
  * Use [loadDialogData] to load data on a background thread, or [loadAllDialogData] for multiple repos.
+ *
+ * @param initialBookmark When set (from [in.kkkev.jjidea.actions.bookmark.pushBookmarkAction]),
+ *   opens pre-selected to "Specific bookmark" scope with this bookmark chosen. Lets a per-bookmark
+ *   push still go through this dialog's review step (mutating a remote is not something to fire
+ *   with no confirmation) while skipping the repo/remote/bookmark selection clicks a fresh
+ *   dialog would otherwise need.
+ * @param initialRemote The remote to preselect alongside [initialBookmark] — the caller already
+ *   knows which remote a specific per-bookmark push targets. Falls back to [pickInitialRemote]'s
+ *   "whichever remote already tracks this bookmark" heuristic when null.
  */
 class GitPushDialog(
     project: Project,
     private val allData: Map<JujutsuRepository, DialogData>,
-    initialRepo: JujutsuRepository
+    initialRepo: JujutsuRepository,
+    initialBookmark: Bookmark? = null,
+    initialRemote: Remote? = null
 ) : DialogWrapper(project) {
     /**
      * Result of the push dialog — the user's chosen parameters including which repo to push.
@@ -63,9 +74,12 @@ class GitPushDialog(
         private set
 
     private var selectedRepo = initialRepo
-    private var selectedRemote = allData[initialRepo]?.remotes?.firstOrNull()
-    private var pushScope = PushScope.DEFAULT
-    private var selectedBookmark = currentBookmarks().firstOrNull()
+    private var selectedRemote = initialRemote
+        ?: initialBookmark?.let { pickInitialRemote(currentData(), it) }
+        ?: currentRemotes().firstOrNull()
+    private var pushScope = if (initialBookmark != null) PushScope.BOOKMARK else PushScope.DEFAULT
+    private var selectedBookmark = initialBookmark?.let { bm -> currentBookmarks().firstOrNull { it.name == bm.name } }
+        ?: currentBookmarks().firstOrNull()
     private val remoteModel = DefaultComboBoxModel(currentRemotes().toTypedArray())
     private val bookmarkModel = DefaultComboBoxModel(currentBookmarks().toTypedArray())
 
@@ -91,8 +105,7 @@ class GitPushDialog(
     private fun currentBookmarks(): List<Bookmark> {
         val data = currentData()
         val tracked = data.trackedByRemote[selectedRemote] ?: emptyList()
-        val untracked = data.allLocal.filter { it !in tracked }
-        return tracked + untracked
+        return mergeBookmarks(tracked, data.allLocal)
     }
 
     private enum class PushScope { DEFAULT, BOOKMARK, ALL }
@@ -216,6 +229,27 @@ class GitPushDialog(
         private const val LOCAL_BOOKMARK_TEMPLATE =
             """if(remote, "", name ++ "\0" ++ present ++ "\0")"""
 
+        /**
+         * Merges the bookmarks tracked against the selected remote with the full local bookmark
+         * list, for display in the "Specific bookmark" dropdown. [tracked] entries win; a [Bookmark]
+         * appearing in both is deduplicated by [name][BookmarkName], not by full data-class equality
+         * — `tracked` differs between the two lists' parse calls (`tracked = true` vs `tracked =
+         * false`), so a naive `!in` check never matched and every tracked bookmark appeared twice,
+         * the second time mislabelled "(new)" (jj-idea-ehki).
+         */
+        internal fun mergeBookmarks(tracked: List<Bookmark>, allLocal: List<Bookmark>): List<Bookmark> =
+            tracked + allLocal.filterNot { local -> tracked.any { it.name == local.name } }
+
+        /**
+         * Picks which remote to preselect when opening the dialog for a specific bookmark
+         * ([initialBookmark]): whichever remote already tracks it, or the first available remote
+         * for a bookmark that's never been pushed.
+         */
+        internal fun pickInitialRemote(data: DialogData, bookmark: Bookmark): Remote? =
+            data.remotes.firstOrNull { remote ->
+                data.trackedByRemote[remote].orEmpty().any { it.name == bookmark.name }
+            } ?: data.remotes.firstOrNull()
+
         internal fun parseBookmarks(stdout: String, tracked: Boolean): List<Bookmark> =
             stdout.split(' ')
                 .asSequence()
@@ -242,6 +276,12 @@ class GitPushDialog(
                 }
             }
 
+        /** Runs `jj bookmark list --tracked`, scoped to [remote] and optionally [revision]. Call off EDT. */
+        private fun loadTrackedBookmarks(repo: JujutsuRepository, remote: Remote, revision: Revision?): List<Bookmark> =
+            repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE, remote, true, revision).let { result ->
+                if (result.isSuccess) parseBookmarks(result.stdout, tracked = true) else emptyList()
+            }
+
         /**
          * Load dialog data (remotes and tracked bookmarks per remote) from a repository. Call off EDT.
          * @param revision When provided, bookmarks are filtered to those on this revision or its ancestors.
@@ -249,13 +289,17 @@ class GitPushDialog(
         fun loadDialogData(repo: JujutsuRepository, revision: Revision? = null): DialogData {
             val remotes = loadRemotes(repo)
             val trackedByRemote = remotes.associateWith { remote ->
-                repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE, remote, true, revision).let { result ->
-                    if (result.isSuccess) {
-                        parseBookmarks(result.stdout, tracked = true)
-                    } else {
-                        emptyList()
-                    }
+                val scoped = loadTrackedBookmarks(repo, remote, revision)
+                // A pending-deletion bookmark has no target, so `-r ::revision` drops it entirely —
+                // it isn't "on" any revision. Without this, a deletion staged from the log context
+                // menu (which always scopes to a revision) could never be selected for push
+                // (jj-idea-ehki). Only queried when scoped, since the unscoped list is already this.
+                val deletions = if (revision == null) {
+                    emptyList()
+                } else {
+                    loadTrackedBookmarks(repo, remote, revision = null).filter { it.deleted }
                 }
+                mergeBookmarks(scoped, deletions)
             }
             val allBookmarks = repo.commandExecutor.bookmarkList(
                 template = LOCAL_BOOKMARK_TEMPLATE,

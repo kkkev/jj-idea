@@ -14,12 +14,21 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
  *
  * @param includeMoveToChange Whether to offer "Move to Change..." — omitted where the bookmark is
  *   already known to sit on the revision being shown (moving it there would be a no-op).
+ * @param remoteBookmarks This bookmark's remote-tracking siblings (e.g. `main@origin`), used by
+ *   [pushBookmarkAction] to evaluate per-remote push availability — see
+ *   [in.kkkev.jjidea.jj.remoteEntriesFor].
  */
-fun localBookmarkActions(repo: JujutsuRepository, bookmark: Bookmark, includeMoveToChange: Boolean): List<AnAction> =
+fun localBookmarkActions(
+    repo: JujutsuRepository,
+    bookmark: Bookmark,
+    includeMoveToChange: Boolean,
+    remoteBookmarks: List<Bookmark> = emptyList()
+): List<AnAction> =
     buildList {
         if (includeMoveToChange) add(moveBookmarkToChangeAction(repo, bookmark))
         add(advanceBookmarkAction(repo, bookmark))
         add(renameBookmarkAction(repo, bookmark))
+        add(pushBookmarkAction(repo, bookmark, remoteBookmarks))
         add(deleteBookmarkAction(repo, bookmark))
         add(forgetBookmarkAction(repo, bookmark))
     }

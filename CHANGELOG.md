@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Issue-tracker references (e.g. `JIRA-123`) in the "Working copy" tool window's current-change summary — including inside a bookmark name — now render as clickable links, matching the log table and commit details pane. ([#15](https://github.com/kkkev/jj-idea/issues/15))
+- A "Push" action on a bookmark's own context menu (right-click its chip in the log, or its sub-menu in the bookmark widget) opens the Push dialog pre-selected to that bookmark and remote, skipping the repo/remote/bookmark selection steps a fresh dialog needs — a single OK click pushes it. With more than one Git remote it becomes a submenu, one entry per remote, each disabled with "(up to date)" shown when that particular remote already has the bookmark's current position. ([#81](https://github.com/kkkev/jj-idea/issues/81))
+
+### Fixed
+- A bookmark deleted locally but still pending deletion on the remote (shown with strikethrough in the log) is no longer silently missing from the Push dialog's "Specific bookmark" dropdown when the dialog is opened from a commit's right-click menu — it previously appeared only from the toolbar's Push button.
+- The Push dialog's "Specific bookmark" dropdown no longer lists a tracked bookmark twice, once normally and once mislabelled "(new)".
 
 ## [0.8.12] - 2026-08-23
 

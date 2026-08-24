@@ -39,6 +39,7 @@ import `in`.kkkev.jjidea.actions.git.openInRemoteGroup
 import `in`.kkkev.jjidea.actions.tag.deleteTagAction
 import `in`.kkkev.jjidea.actions.tag.setTagAction
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.remoteEntriesFor
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import java.net.URI
@@ -150,7 +151,12 @@ object JujutsuLogContextMenuActions {
                         remoteBookmarkActions(entry.repo, bookmark)
                     } else {
                         // Already on entry, so "Move to Change..." here would be a no-op.
-                        localBookmarkActions(entry.repo, bookmark, includeMoveToChange = false)
+                        localBookmarkActions(
+                            entry.repo,
+                            bookmark,
+                            includeMoveToChange = false,
+                            remoteBookmarks = entry.bookmarks.remoteEntriesFor(bookmark.localName)
+                        )
                     }
                     actions.forEach(::add)
                 }
@@ -201,7 +207,12 @@ object JujutsuLogContextMenuActions {
                     val actions = if (bookmark.isRemote) {
                         remoteBookmarkActions(target.repo, bookmark)
                     } else {
-                        localBookmarkActions(target.repo, bookmark, includeMoveToChange = true)
+                        localBookmarkActions(
+                            target.repo,
+                            bookmark,
+                            includeMoveToChange = true,
+                            remoteBookmarks = target.entry.bookmarks.remoteEntriesFor(bookmark.localName)
+                        )
                     }
                     actions.forEach(::add)
                 }

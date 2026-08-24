@@ -88,6 +88,15 @@ fun List<Bookmark>.grouped(): List<BookmarkGroup> =
         )
     }
 
+/**
+ * The remote-tracking entries (e.g. `main@origin`, `main@github`) sharing [localName], each
+ * carrying tracking state specific to its own remote — unlike a local [Bookmark]'s own
+ * [Bookmark.aheadCount]/[Bookmark.behindCount], which (in a colocated repo) is always relative to
+ * every remote the bookmark tracks, including the automatic `@git` backing-store remote.
+ */
+fun List<Bookmark>.remoteEntriesFor(localName: String): List<Bookmark> =
+    filter { it.isRemote && it.localName == localName }
+
 @JvmInline
 value class Remote(val name: String) {
     override fun toString() = name

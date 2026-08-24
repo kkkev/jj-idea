@@ -85,7 +85,14 @@ private fun repoActionGroup(
 
 private fun bookmarkSubGroup(group: BookmarkGroup, repo: JujutsuRepository, onWc: Boolean) =
     DefaultActionGroup(group.localName, true).apply {
-        group.local?.let { local -> localBookmarkActions(repo, local, includeMoveToChange = !onWc).forEach(::add) }
+        group.local?.let { local ->
+            localBookmarkActions(
+                repo,
+                local,
+                includeMoveToChange = !onWc,
+                remoteBookmarks = group.remotes
+            ).forEach(::add)
+        }
         group.remotes.forEach { remote -> remoteBookmarkActions(repo, remote).forEach(::add) }
     }
 

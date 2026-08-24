@@ -881,8 +881,8 @@ state/routing logic, not rendering)
 
 **Bookmark widget**
 
-**Code:** `ui/toolbar/JujutsuBookmarkToolbarWidget.kt`, `ui/statusbar/JujutsuBookmarkStatusBarWidget.kt` + `JujutsuBookmarkStatusBarWidgetFactory.kt`, `actions/bookmark/BookmarkMenu.kt`, `actions/bookmark/`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt` (Advance Bookmark toolbar button)
-**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button)
+**Code:** `ui/toolbar/JujutsuBookmarkToolbarWidget.kt`, `ui/statusbar/JujutsuBookmarkStatusBarWidget.kt` + `JujutsuBookmarkStatusBarWidgetFactory.kt`, `actions/bookmark/BookmarkMenu.kt`, `actions/bookmark/`, `actions/bookmark/pushBookmarkAction.kt`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt` (Advance Bookmark toolbar button)
+**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button); MT-GIT (push confirmation dialogs triggered from this action)
 
 As of jj-idea-cpno, the bookmark widget lives in the main IDE toolbar (next to where Git's
 branch widget would sit), not the log window's filter row — this is the location fix for
@@ -995,6 +995,56 @@ be misclassified as backward/sideways.
 - [ ] Confirming a forward move without ticking the checkbox actually runs `jj bookmark set`
       without `-B` (check via `jj op log` or that the bookmark moved) — no unexpected
       "backwards or sideways" retry prompt
+
+#### Per-bookmark push (jj-idea-t29z, GitHub #81)
+
+`pushBookmarkAction` opens the same Push dialog as MT-GIT, pre-selected to "Specific bookmark"
+scope with this bookmark (and the chosen remote) already selected — skipping the repo/remote/
+bookmark selection clicks a fresh dialog needs, while still requiring an OK click before
+anything is pushed (pushing mutates a shared remote, so this is deliberately not a one-click
+fire-and-forget action). Reachable from every surface that shows a bookmark's other actions
+(Rename…, Delete, Forget): the bookmark's own sub-menu in this widget, the log row's Bookmark
+submenu, and a right-click on the bookmark's chip in the log.
+
+Whether there's anything to push is evaluated **per remote**, using that remote's own
+`name@remote` tracking entry — deliberately not the local bookmark's own aggregate ahead/behind
+count, which in a **colocated** repo (this plugin always colocates) is always `0` because jj
+auto-tracks a same-commit `@git` remote alongside any real ones. Getting this wrong makes every
+bookmark look permanently up to date; the checks below exist specifically to catch that.
+
+Setup: a repository with a local bookmark tracked against exactly one Git remote, and — for the
+multi-remote cases — a second Git remote configured (`jj git remote add <name> <url>`). The
+`/tmp/jj-idea-push-test` scratch repo (see jj-idea-ehki's fix) already has all three states set
+up: `main` (tracked, in sync on both remotes), `feature` (pending deletion, still present on
+both remotes), `new-thing` (never tracked anywhere).
+
+- [ ] Right-click a bookmark's chip in the log (or open its sub-menu from this widget) → a Push
+  entry appears alongside Rename…/Delete/Forget, with the same push icon as the toolbar Push
+  action
+- [ ] With exactly one Git remote: a single "Push '\<name\>' to \<remote\>..." entry, not a
+  submenu; clicking it opens the Push dialog with "Specific bookmark" scope, this bookmark, and
+  this remote already selected — confirming with OK is enough
+- [ ] With two or more Git remotes: the entry becomes a "Push '\<name\>' to ▸" submenu, one item
+  per remote, each independently labelled/enabled (see below) — clicking one opens the dialog
+  pre-selected to that specific remote
+- [ ] A bookmark that's up to date on `origin` (`main@origin` at the same commit as local `main`)
+  shows that remote's entry **disabled**, with "(up to date)" appended to the text (a disabled
+  item's tooltip alone is easy to miss in a menu) — **even though** the same bookmark is also
+  tracked by the automatic colocated `@git` remote at the same commit as local (this is the
+  actual regression case: confirm it stays disabled, not "always enabled because @git matches")
+- [ ] The same bookmark, if ahead on a second remote (`main@github` behind local `main`), shows
+  **that** remote's entry enabled while `origin`'s stays disabled — the two are evaluated
+  independently
+- [ ] A bookmark that has never been tracked/pushed to a given remote still shows an **enabled**
+  entry for it despite having nothing to compare against yet — opening it and confirming creates
+  it on that remote (with the usual "will create a new remote bookmark" confirmation from MT-GIT)
+- [ ] Cancelling the pre-populated dialog performs no push
+- [ ] (jj-idea-ehki) On a pending-deletion bookmark (`jj bookmark delete <name>`, still shown
+  strikethrough in the log) that's still present on a remote: that remote's entry is **enabled**
+  (deletions don't show up in `aheadCount`) and opens the dialog with `<name> (deleted)`
+  pre-selected; confirming runs the same "will be deleted from the remote" warning as MT-GIT,
+  then removes the bookmark from that remote. A remote the deletion has already been pushed to
+  (or that never had the bookmark) shows its entry **disabled**
 
 ### MT-WORKINGCOPY
 
@@ -1527,7 +1577,7 @@ testable without rendering)
 
 **Git push / fetch dialogs**
 
-**Code:** `actions/git/GitPushDialog.kt`, `actions/git/GitPushAction.kt`, `actions/git/GitFetchDialog.kt`, `actions/git/GitFetchAction.kt`, `actions/git/RadioScopeBinding.kt`
+**Code:** `actions/git/GitPushDialog.kt`, `actions/git/GitPushAction.kt`, `actions/git/gitRemoteActions.kt`, `actions/git/GitFetchDialog.kt`, `actions/git/GitFetchAction.kt`, `actions/git/RadioScopeBinding.kt`
 
 #### Git Push Dialog
 
@@ -1552,6 +1602,18 @@ Setup: have a local bookmark that has never been pushed to the remote.
   must be none (previously the Push button appeared completely inert after a remote switch)
 - [ ] Push a bookmark that's already up to date with the remote → the notification shows jj's
   own "Nothing changed." message rather than a bare "Push complete"
+- [ ] Every bookmark tracked against the selected remote appears **exactly once** in the
+  "Specific bookmark" dropdown — none of them also shows a duplicate "(new)" entry
+  (jj-idea-ehki — `GitPushDialog.currentBookmarks()`/`mergeBookmarks` used to dedupe by full
+  `Bookmark` equality, which never matched because `tracked` differs between the two source
+  lists)
+- [ ] (jj-idea-ehki) Delete a local bookmark that's still tracked on the remote
+  (`jj bookmark delete <name>`) so it's a pending deletion. Right-click the **commit** it used
+  to sit on in the log (not the bookmark chip) → Push… → "Specific bookmark" → the dropdown
+  must include `<name> (deleted)` in grey italic, even though the push was opened scoped to
+  that revision. Select it → OK → the "will be deleted from the remote" confirmation appears →
+  confirm → push succeeds and the bookmark disappears from the remote (`jj bookmark list
+  --all-remotes` shows it gone, not just `(deleted)` locally)
 
 #### Git Fetch Dialog
 
