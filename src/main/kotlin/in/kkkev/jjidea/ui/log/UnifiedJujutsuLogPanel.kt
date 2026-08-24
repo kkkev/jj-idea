@@ -110,7 +110,12 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
 
         logTable.onSelectionExpansionNeeded = { key ->
             val rev = key.revision
-            if (rev is ChangeId) (dataLoader as UnifiedJujutsuLogDataLoader).loadExpanding(key.repo, rev)
+            // onMissing (GitHub #76): the selected change was abandoned/rewritten since it was
+            // rendered - drop the stale pending selection rather than retrying it on every refresh.
+            if (rev is ChangeId) {
+                (dataLoader as UnifiedJujutsuLogDataLoader)
+                    .loadExpanding(key.repo, rev, onMissing = { logTable.clearNavigation() })
+            }
         }
 
         referenceFilterComponent.onReferenceExpansionNeeded = { referenceName ->
@@ -118,7 +123,10 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
                 val changeId =
                     references.bookmarks.firstOrNull { it.bookmark.name.name == referenceName }?.id
                         ?: references.tags.firstOrNull { it.tag.name == referenceName }?.id
-                changeId?.let { (dataLoader as UnifiedJujutsuLogDataLoader).loadExpanding(repo, it) }
+                changeId?.let {
+                    (dataLoader as UnifiedJujutsuLogDataLoader)
+                        .loadExpanding(repo, it, onMissing = { logTable.clearNavigation() })
+                }
             }
         }
 

@@ -39,7 +39,8 @@ interface LogCache {
     /**
      * Fetch a context window around [id]: `ancestors(id, window) | id | descendants(id, window)`.
      * Stores all returned entries in the cache as a side effect (same fetch-and-store pattern as [all]).
-     * Returns an empty list if [id] does not exist in the repository.
+     * Returns an empty list if [id] does not exist in the repository (e.g. abandoned or rewritten
+     * since it was last rendered) rather than throwing.
      * Always call from a background thread.
      */
     @RequiresBackgroundThread
@@ -129,13 +130,19 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
         // fetched/rendered, and jj's actual shortest-unique-prefix length shifts as the repo
         // changes - a short value cached from an earlier fetch can stop being unique by the time
         // it's substituted here, which jj then rejects as an ambiguous prefix (GitHub #76).
+        // present(...) additionally covers the id having been abandoned/rewritten entirely since
+        // it was rendered (also GitHub #76, a later comment): present(x) is jj's built-in idiom
+        // for "evaluate to empty instead of failing if x doesn't exist", so a vanished id here
+        // resolves to an empty result (handled by the interface contract above) rather than a jj
+        // error that fetch() would otherwise re-throw.
         // window <= 0 (jj-idea-isnf): skip the ancestors()/descendants() clauses entirely rather
         // than calling them with 0 - a plainly-correct revset instead of relying on jj's
         // edge-case handling of an explicit 0.
+        val target = "present(${id.full})"
         val revset = if (window <= 0) {
-            Expression(id.full)
+            Expression(target)
         } else {
-            Expression("ancestors(${id.full}, $window) | ${id.full} | descendants(${id.full}, $window)")
+            Expression("ancestors($target, $window) | $target | descendants($target, $window)")
         }
         fetch(revset)
     }

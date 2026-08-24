@@ -106,6 +106,11 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 - [ ] Clicking a parent/change-id link in the commit details panel (or working copy panel)
       selects that commit in the log and it stays selected (no flicker/deselect); if the
       linked commit is beyond the log limit, the log expands to include it (jj-idea-f27g)
+- [ ] Select a change that's outside the log window (so expansion is needed), then in a terminal
+      `jj abandon` it (or squash it into its parent) before the log refreshes — refresh the log
+      (and refresh again): no "Uncaught exception" error dialog appears, the selection is simply
+      dropped, and selecting another off-window change still expands normally afterwards
+      (GitHub #76)
 - [ ] Ctrl/Cmd+C on a selected row copies the change ID (or file path, when a file is selected)
 - [ ] Delete on a selected change abandons it, with a confirmation dialog first
 - [ ] F2 on a selected change renames/describes it (opens the describe dialog)

@@ -253,10 +253,12 @@ class RepoLogCacheTest {
     fun `loadContext builds its revset from the full id, not the short prefix`() {
         // short is a shortest-unique-prefix computed at fetch time; it can stop being unique by
         // the time it's substituted into a later revset, which jj then rejects as ambiguous
-        // (GitHub #76). The revset passed to logService must always use the full id.
+        // (GitHub #76). The revset passed to logService must always use the full id, wrapped in
+        // present(...) so a since-vanished id resolves to empty rather than erroring (also #76).
         val id = ChangeId(full = "qpvuntsmwlrtwvpypxzvwprnnpnqrkukntxp", short = "q")
+        val target = "present(${id.full})"
         val expectedRevset = Expression(
-            "ancestors(${id.full}, 5) | ${id.full} | descendants(${id.full}, 5)"
+            "ancestors($target, 5) | $target | descendants($target, 5)"
         )
         every { logService.getLog(revset = expectedRevset, quiet = false) } returns Result.success(emptyList())
 
@@ -270,12 +272,25 @@ class RepoLogCacheTest {
         // jj-idea-isnf: window 0 degenerates to the bare target id, skipping the
         // ancestors()/descendants() clauses entirely rather than calling them with 0.
         val id = ChangeId(full = "qpvuntsmwlrtwvpypxzvwprnnpnqrkukntxp", short = "q")
-        val expectedRevset = Expression(id.full)
+        val expectedRevset = Expression("present(${id.full})")
         every { logService.getLog(revset = expectedRevset, quiet = false) } returns Result.success(emptyList())
 
         cache.loadContext(id, window = 0)
 
         verify(exactly = 1) { logService.getLog(revset = expectedRevset, quiet = false) }
+    }
+
+    @Test
+    fun `loadContext returns empty when the revision no longer exists`() {
+        // GitHub #76: the change was abandoned/rewritten since it was rendered. present(...) in
+        // the revset makes jj itself report success with an empty result rather than an error, so
+        // this must not throw.
+        val id = ChangeId(full = "qpvuntsmwlrtwvpypxzvwprnnpnqrkukntxp", short = "q")
+        val target = "present(${id.full})"
+        val expectedRevset = Expression("ancestors($target, 10) | $target | descendants($target, 10)")
+        every { logService.getLog(revset = expectedRevset, quiet = false) } returns Result.success(emptyList())
+
+        cache.loadContext(id) shouldBe emptyList()
     }
 
     // ─── reload ───────────────────────────────────────────────────────────────

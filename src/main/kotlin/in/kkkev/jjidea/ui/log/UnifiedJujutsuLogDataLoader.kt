@@ -121,10 +121,18 @@ class UnifiedJujutsuLogDataLoader(
         )
     }
 
-    fun loadExpanding(repo: JujutsuRepository, changeId: ChangeId) {
+    // onMissing (GitHub #76): loadContext returns empty when changeId no longer exists (abandoned
+    // or rewritten outside the currently loaded log window). Without a way to signal that back,
+    // the caller has nothing to distinguish "still loading" from "gone", and JujutsuLogTable would
+    // keep re-requesting the same dead id on every refresh. Called on EDT via runLater so it can
+    // safely touch UI state (e.g. clearing a pending selection).
+    fun loadExpanding(repo: JujutsuRepository, changeId: ChangeId, onMissing: () -> Unit = {}) {
         val window = JujutsuSettings.getInstance(project).logContextWindow(repo)
         runInBackground {
-            repo.logCache.loadContext(changeId, window).takeUnless { it.isEmpty() }?.let { expansion ->
+            val expansion = repo.logCache.loadContext(changeId, window)
+            if (expansion.isEmpty()) {
+                runLater { onMissing() }
+            } else {
                 expansionEntriesByRepo[repo] = expansion
                 mergeAndNotify()
             }
