@@ -71,6 +71,12 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     private val changesTree = JujutsuChangesTree(project, groupConflicts = true)
     private val diffPreview = JujutsuEditorTabDiffPreview(changesTree) { "@" }
     private val controlsPanel = WorkingCopyControlsPanel(project)
+    private val emptyStateLabel = JBLabel().apply { alignmentX = CENTER_ALIGNMENT }
+    private var emptyStateLinkAction: () -> Unit = { project.showVcsMappingsSettings() }
+    private val emptyStateLink = HyperlinkLabel().apply {
+        alignmentX = CENTER_ALIGNMENT
+        addHyperlinkListener { emptyStateLinkAction() }
+    }
     private val emptyStatePanel = createEmptyStatePanel()
     private var notInstalledPanel: JPanel = JPanel() // Placeholder, updated when status changes
 
@@ -198,20 +204,34 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         val centerPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             border = JBUI.Borders.empty(20)
-
-            val label = JBLabel(JujutsuBundle.message("workingcopy.empty.message"))
-            label.alignmentX = CENTER_ALIGNMENT
-            add(label)
-
+            add(emptyStateLabel)
             add(Box.createVerticalStrut(8))
-
-            val link = HyperlinkLabel(JujutsuBundle.message("workingcopy.empty.link"))
-            link.alignmentX = CENTER_ALIGNMENT
-            link.addHyperlinkListener { project.showVcsMappingsSettings() }
-            add(link)
+            add(emptyStateLink)
         }
 
         add(centerPanel, BorderLayout.CENTER)
+    }
+
+    /**
+     * Refreshes [emptyStateLabel]/[emptyStateLink] before showing the "empty" card, distinguishing
+     * "nothing mapped" from "mapped but jj can't read it" (jj-idea-9ife) — otherwise a corrupted
+     * repo looks identical to no VCS mapping at all, with no way to tell why or to retry.
+     */
+    private fun updateEmptyState() {
+        val unreadable = project.stateModel.unreadableRepositories()
+        if (unreadable.isEmpty()) {
+            emptyStateLabel.text = JujutsuBundle.message("workingcopy.empty.message")
+            emptyStateLink.setHyperlinkText(JujutsuBundle.message("workingcopy.empty.link"))
+            emptyStateLinkAction = { project.showVcsMappingsSettings() }
+        } else {
+            emptyStateLabel.text = if (unreadable.size == 1) {
+                JujutsuBundle.message("workingcopy.empty.unreadable.message", unreadable.single().displayName)
+            } else {
+                JujutsuBundle.message("workingcopy.empty.unreadable.message.multiple", unreadable.size)
+            }
+            emptyStateLink.setHyperlinkText(JujutsuBundle.message("workingcopy.empty.unreadable.link"))
+            emptyStateLinkAction = { project.stateModel.invalidateRepositoryState() }
+        }
     }
 
     private fun subscribeToStateModel() {
@@ -224,6 +244,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             // Update UI based on whether we have any repos
             val hasRepos = new.isNotEmpty()
             val cardLayout = cardPanel.layout as CardLayout
+            if (!hasRepos) updateEmptyState()
             cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
 
             if (hasRepos) {
@@ -278,6 +299,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             is JjAvailabilityStatus.Available -> {
                 // Let state model handler decide between "content" and "empty"
                 val hasRepos = project.stateModel.workingCopies.value.isNotEmpty()
+                if (!hasRepos) updateEmptyState()
                 cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
             }
 

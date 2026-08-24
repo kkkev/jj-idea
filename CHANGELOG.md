@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - A bookmark deleted locally but still pending deletion on the remote (shown with strikethrough in the log) is no longer silently missing from the Push dialog's "Specific bookmark" dropdown when the dialog is opened from a commit's right-click menu — it previously appeared only from the toolbar's Push button.
 - The Push dialog's "Specific bookmark" dropdown no longer lists a tracked bookmark twice, once normally and once mislabelled "(new)".
+- The IDE no longer reports an internal error when a Jujutsu repository can't be read (e.g. a broken or moved `.jj` store). Instead: a warning notification appears with **Retry** and **Configure VCS Mappings...** actions, the Working copy tool window's empty state explains that the repository couldn't be read rather than claiming none are configured, the broken mapping shows in red under Settings → Version Control → Directory Mappings, and the plugin automatically detects when the repository is repaired and recovers without any manual action.
 
 ## [0.8.12] - 2026-08-23
 

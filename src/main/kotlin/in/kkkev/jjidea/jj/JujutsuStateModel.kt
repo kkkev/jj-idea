@@ -6,6 +6,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.VcsListener
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.ex.ProjectLevelVcsManagerEx
@@ -92,6 +93,13 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 
     /** Watch requests for each repo's operation-heads directory, replaced whenever the repo set changes. */
     private var opHeadsWatchRequests: Set<LocalFileSystem.WatchRequest> = emptySet()
+
+    /**
+     * Watch requests for currently-unreadable repos' `.jj/repo/` directory, replaced whenever
+     * [unreadableRepositories] changes. Lets a repair (e.g. restoring a deleted `store/`) be
+     * detected without polling — see [watchUnreadableRepoRoots].
+     */
+    private var repoRootWatchRequests: Set<LocalFileSystem.WatchRequest> = emptySet()
 
     /**
      * Cache of JJ VCS root directories, regardless of whether they have been initialised.
@@ -189,9 +197,13 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             a.mapValues { it.value.stateKey } == b.mapValues { it.value.stateKey }
         }
     ) {
-        initialisedRepositories.immediateValue
-            .map { (_, it) -> it.logCache[WorkingCopy] }
-            .associateBy { it.repo.directory.path }
+        val repos = initialisedRepositories.immediateValue.values
+        loadWorkingCopies(project, repos, log).also {
+            // Re-arm regardless of whether the published workingCopies value actually changed (a
+            // repo broken since project open never had a readable value to change *from*), so a
+            // repair is always detected — see watchUnreadableRepoRoots.
+            watchUnreadableRepoRoots(repos.filter { repo -> JujutsuRepositoryHealth.isUnreadable(repo.directory.path) })
+        }
     }
 
     /**
@@ -294,6 +306,14 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         closestBookmarks.invalidate()
     }
 
+    /**
+     * Initialised repos ([initialisedRepositories]) that [loadWorkingCopies] most recently found
+     * unreadable — jj-idea-9ife. Synchronous, cheap (reads two already-loaded cached values), so
+     * safe to call from EDT, e.g. to differentiate the Working Copy tool window's empty state.
+     */
+    fun unreadableRepositories(): List<JujutsuRepository> =
+        initialisedRepositories.value.values.filter { JujutsuRepositoryHealth.isUnreadable(it.directory.path) }
+
     private fun scheduleRepositoryRefresh() {
         repositoryStateAlarm.cancelAllRequests()
         repositoryStateAlarm.addRequest({
@@ -384,7 +404,11 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                     // operation head under .jj/repo/op_heads/. We refresh on it but never mark .jj/ files dirty.
                     val hasExternalJjOp = events.any { it.file?.let { f -> isOpHeadsChange(f, repos) } == true }
 
-                    if (hasRepoChanges || hasExternalJjOp) {
+                    // A previously-unreadable repo's .jj/repo/ directory changed (e.g. store/ was
+                    // restored) — recheck readability rather than waiting for the user to notice.
+                    val hasRepoRepair = events.any { it.file?.let { f -> isRepoRootChange(f, repos) } == true }
+
+                    if (hasRepoChanges || hasExternalJjOp || hasRepoRepair) {
                         if (refreshSuppression.get() > 0) {
                             log.info("File changes detected but refresh suppressed, skipping")
                             return
@@ -519,6 +543,31 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         repos.any { VfsUtil.isAncestor(it.directory, file, false) } &&
             file.path.contains("/$OP_HEADS_RELATIVE_PATH")
 
+    /**
+     * Watch each currently-unreadable repo's `.jj/repo/` directory itself (jj-idea-9ife) — so a
+     * repair (e.g. restoring a deleted `store/`, or `jj git init` recreating it) is detected
+     * without the user needing to manually retry or reopen the project.
+     *
+     * Non-recursive and only materializes the `repo/` directory's own listing, not its children —
+     * unlike [watchOpHeads], this never calls [VfsUtilCore.processFilesRecursively], so `store/`,
+     * `index/`, and `op_store/` (each potentially tens of MB) are never pulled into the VFS; we
+     * only need to know when an entry appears/disappears directly under `repo/`, not its contents.
+     * Scoped to unreadable repos only (typically zero), not every initialised repo, so the
+     * common (all-healthy) case adds no watch roots at all.
+     */
+    private fun watchUnreadableRepoRoots(repos: Collection<JujutsuRepository>) {
+        val fs = LocalFileSystem.getInstance()
+        fs.removeWatchedRoots(repoRootWatchRequests)
+        val paths = repos.map { "${it.directory.path}/$DOT_JJ/repo" }.toSet()
+        repoRootWatchRequests = fs.addRootsToWatch(paths, false)
+        runInBackground {
+            paths.forEach { fs.refreshAndFindFileByPath(it) }
+        }
+    }
+
+    private fun isRepoRootChange(file: VirtualFile, repos: Collection<JujutsuRepository>) =
+        repos.any { "${it.directory.path}/$DOT_JJ/repo" == file.parent?.path }
+
     override fun dispose() {
         LocalFileSystem.getInstance().removeWatchedRoots(opHeadsWatchRequests)
     }
@@ -530,6 +579,36 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 }
 
 val Project.stateModel: JujutsuStateModel get() = service()
+
+/**
+ * Loads the working-copy [LogEntry] for each repo, skipping (with a one-time warning
+ * notification) any repo whose `.jj` directory jj itself can't read — a broken/stale store, a
+ * moved repo, or one created by an incompatible jj version. Guarding here, rather than only at
+ * startup, also covers a repo that breaks after [JujutsuStateModel.initialisedRepositories] has
+ * already accepted it (jj-idea-9ife). Extracted from [JujutsuStateModel.workingCopies] so it can
+ * be unit-tested without registering real VCS roots.
+ */
+internal fun loadWorkingCopies(
+    project: Project,
+    repos: Collection<JujutsuRepository>,
+    log: Logger,
+    notifyUnreadable: (Project, JujutsuRepository, String) -> Unit = JujutsuNotifications::notifyUnreadableRoot
+) = repos.mapNotNull { repo ->
+    try {
+        repo.logCache[WorkingCopy].also {
+            // Clear a previously-recorded failure so a repaired repo stops being reported as
+            // unreadable (by JujutsuRootChecker.validateRoot and the Working Copy tool window's
+            // empty state) and can notify again if it breaks a second time.
+            JujutsuRepositoryHealth.markReadable(repo.directory.path)
+            JujutsuNotifications.clearNotificationState(repo.directory.path)
+        }
+    } catch (e: VcsException) {
+        log.warn("Could not read working copy for ${repo.directory.path}", e)
+        JujutsuRepositoryHealth.markUnreadable(repo.directory.path, e.message.orEmpty())
+        notifyUnreadable(project, repo, e.message.orEmpty())
+        null
+    }
+}.associateBy { it.repo.directory.path }
 
 /**
  * Invalidate cached repository state and optionally request a change selection.

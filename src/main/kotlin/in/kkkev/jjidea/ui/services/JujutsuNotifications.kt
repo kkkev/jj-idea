@@ -18,6 +18,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.performAction
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import java.awt.datatransfer.StringSelection
@@ -40,6 +41,9 @@ object JujutsuNotifications {
 
     // Track which roots we've already notified about to avoid spamming
     private val notifiedUninitializedRoots = ConcurrentHashMap.newKeySet<String>()
+
+    // Track which roots we've already notified as unreadable, to avoid spamming
+    private val notifiedUnreadableRoots = ConcurrentHashMap.newKeySet<String>()
 
     // Track current availability notification to avoid duplicates (global, not per-project)
     @Volatile
@@ -87,10 +91,48 @@ object JujutsuNotifications {
     }
 
     /**
-     * Clear the notification tracking for a root (e.g., after it's initialized).
+     * Show a notification that a repository's `.jj` directory exists but jj could not read it —
+     * a broken/stale store, a moved repo, or one created by an incompatible jj version
+     * (jj-idea-9ife). Includes an action to reconfigure the VCS mapping; there's no "Initialize"
+     * action since re-running init won't repair an already-broken repo.
+     *
+     * Only shows once per root per session to avoid notification spam.
+     */
+    fun notifyUnreadableRoot(project: Project, repo: JujutsuRepository, detail: String) {
+        val rootPath = repo.directory.path
+
+        // Only notify once per root
+        if (!notifiedUnreadableRoots.add(rootPath)) {
+            return
+        }
+
+        val notification = NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("notification.unreadable.title"),
+                JujutsuBundle.message("notification.unreadable.content", repo.displayName, detail),
+                NotificationType.WARNING
+            )
+
+        notification.addExpiringAction("notification.unreadable.action.retry") {
+            notifiedUnreadableRoots.remove(rootPath)
+            project.stateModel.invalidateRepositoryState()
+        }
+
+        notification.addExpiringAction("notification.unreadable.action.settings") {
+            notifiedUnreadableRoots.remove(rootPath)
+            project.showVcsMappingsSettings()
+        }
+
+        notification.notify(project)
+    }
+
+    /**
+     * Clear the notification tracking for a root (e.g., after it's initialized or repaired).
      */
     fun clearNotificationState(rootPath: String) {
         notifiedUninitializedRoots.remove(rootPath)
+        notifiedUnreadableRoots.remove(rootPath)
     }
 
     /**

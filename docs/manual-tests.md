@@ -1150,6 +1150,37 @@ equally-weighted group of their own.
   show the correct added/modified colour immediately, without needing to touch Settings,
   restart, or trigger an unrelated VCS refresh first
 
+#### Unreadable Repository (jj-idea-9ife)
+
+- [ ] With a working jj repo open (tool window populated), break its store on disk
+  while the IDE is running — e.g. `rm -rf .jj/repo/store` (leaves `.jj` present, so it still
+  passes the "is this a jj repo" check, but `jj log` fails) — then trigger a VCS re-scan
+  (e.g. touch a file, or reopen the project)
+- [ ] **Expected:** no red "IDE Internal Error" balloon; instead, a single WARNING
+  notification "Jujutsu Repository Could Not Be Read" appears, including jj's error detail,
+  and **Retry** and **Configure VCS Mappings…** actions
+- [ ] The Working copy tool window's empty state shows **"Jujutsu could not read the
+  repository '\<name\>'..."**, not the generic "No Jujutsu repositories configured", with its
+  own **Retry** link
+- [ ] Settings → Version Control → Directory Mappings shows the broken repo's row in red
+  (same treatment as an otherwise-invalid mapping)
+- [ ] Trigger another refresh (e.g. edit a file) — the toast notification does not repeat,
+  but the tool window's empty state and the red mapping row persist (they're not one-shot)
+- [ ] Click **Retry** on the notification, or on the tool window's empty-state link — it
+  re-checks immediately; while still broken, the same messages reappear (a fresh notification
+  can fire again since Retry re-arms it)
+- [ ] Restore the store (e.g. `jj git init --colocate .` again) **without** touching any
+  other file — within ~1s the tool window, Log, and the Directory Mappings row all recover on
+  their own, with no manual Retry/re-scan needed (the plugin watches the repo's `.jj/repo/`
+  directory for exactly this)
+- [ ] In a multi-repo project, break only one repo's store — the other repo's Working
+  copy/Log data is unaffected, and the tool window's empty-state message only mentions the
+  broken repo when *all* repos are unreadable (with more than one repo readable, the broken
+  one is just silently absent from the dropdown, matching existing uninitialized-repo
+  behavior)
+- [ ] Break two repos' stores in the same project — the notification message pluralizes
+  ("N Jujutsu repositories could not be read")
+
 #### Standard Commit Tool Window Suppression (jj-idea-wb5l)
 
 - [ ] In a **jj-only** project (default setting), the standard **Commit** tool window and
