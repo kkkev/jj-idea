@@ -20,6 +20,11 @@ fun renameBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark) = nullAndD
 
 class RenameBookmarkDialog(repo: JujutsuRepository, private val oldBookmark: Bookmark) :
     BookmarkNameDialog(repo, "rename") {
+    init {
+        nameField.text = oldBookmark.name.name
+        nameField.selectAll()
+    }
+
     override fun execute(executor: CommandExecutor) =
         executor.bookmarkRename(oldBookmark.name, bookmark)
 

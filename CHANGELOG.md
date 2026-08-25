@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - With more than one Git remote, a bookmark's Push submenu also gains a "Push to all remotes" entry that pushes it everywhere it's ahead in one click, still showing the usual force-push/deletion confirmations per remote.
 - The Push dialog gained a fourth scope, "Create bookmark for change", which auto-generates a remote bookmark for a specific commit instead of requiring one to be created by hand first — matching jj's own recommended `jj git push --change` workflow. Selecting one or more commits in the log before opening Push (from either the log's right-click menu or the toolbar/VCS-menu button) targets this scope at exactly those commits, pushing one bookmark per selected change in a single confirmation when more than one is selected. A new "Default push scope" setting lets you make it (or any other scope) the dialog's default. ([#65](https://github.com/kkkev/jj-idea/issues/65))
 
+### Changed
+- Bookmark rename dialog name field is now initially set to the old bookmark name. ([#82]((https://github.com/kkkev/jj-idea/issues/82)))
+
 ### Fixed
 - A bookmark deleted locally but still pending deletion on the remote (shown with strikethrough in the log) is no longer silently missing from the Push dialog's "Specific bookmark" dropdown when the dialog is opened from a commit's right-click menu — it previously appeared only from the toolbar's Push button.
 - The Push dialog's "Specific bookmark" dropdown no longer lists a tracked bookmark twice, once normally and once mislabelled "(new)".
