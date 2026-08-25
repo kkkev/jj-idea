@@ -111,6 +111,10 @@
     <!-- Editor banner nudging the user to resolve a conflicted file (jj-idea-aunm, GitHub #56) -->
     <editorNotificationProvider
         implementation="in.kkkev.jjidea.ui.editor.JujutsuConflictEditorNotificationProvider"/>
+
+    <!-- Per-hunk gutter arrows for HunkPickerDialog (jj-idea-xuob). Global EP: gated to a
+         strict no-op on every other diff viewer by HunkArrowDiffExtension.HUNK_PICKER_SESSION. -->
+    <diff.DiffExtension implementation="in.kkkev.jjidea.diffedit.HunkArrowDiffExtension"/>
   </extensions>
 
   <actions>

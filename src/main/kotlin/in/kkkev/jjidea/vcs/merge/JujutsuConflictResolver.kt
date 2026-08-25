@@ -10,7 +10,7 @@ import com.intellij.openapi.vcs.merge.MergeData
 import com.intellij.openapi.vcs.merge.MergeProvider
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.diffedit.HunkDiffPicker
+import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
 import `in`.kkkev.jjidea.jj.conflict.conflictRegistry
 import java.nio.file.Files
@@ -36,7 +36,8 @@ import java.nio.file.Files
  *
  * ### The fix
  * Give the merge tool a throwaway output [com.intellij.openapi.editor.Document] — the same
- * pattern [HunkDiffPicker] already uses safely for `jj split` — and only write the real file
+ * pattern [in.kkkev.jjidea.diffedit.HunkPickerDialog] already uses safely for `jj split` — and
+ * only write the real file
  * when the tool reports a non-cancel result. Files resolve one at a time; cancelling stops the
  * remaining queue, matching `showMergeDialog`'s one-shot-per-invocation semantics.
  *
@@ -120,7 +121,7 @@ class JujutsuConflictResolver(
 
             val request = DiffRequestFactory.getInstance().createMergeRequest(
                 project,
-                HunkDiffPicker.fileTypeFor(file.name),
+                HunkPicker.fileTypeFor(file.name),
                 outputDocument,
                 listOf(mergeData.CURRENT, mergeData.ORIGINAL, mergeData.LAST)
                     .map { String(it, Charsets.UTF_8) },

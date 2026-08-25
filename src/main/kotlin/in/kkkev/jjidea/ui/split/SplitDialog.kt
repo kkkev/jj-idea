@@ -22,7 +22,7 @@ import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.diffedit.HunkDiffPicker
+import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
@@ -389,15 +389,15 @@ class SplitDialog(
             ?: computePreviewLeftContent(isChild, null, data.baseContent, data.afterContent)
 
         val pickedContent: String? = hunkPickerForTest?.invoke(fp)
-            ?: HunkDiffPicker.pickParentContent(
+            ?: HunkPicker.pickRemainderContent(
                 project = project,
                 fileName = fp.name,
                 fileType = data.fileType,
                 baseContent = data.baseContent,
                 afterContent = data.afterContent,
                 initialContent = initialContent,
-                parentLabel = firstCommitLabel,
-                childLabel = secondCommitLabel
+                staysLabel = firstCommitLabel,
+                movesToLabel = secondCommitLabel
             )
 
         if (pickedContent == null) return // user cancelled — keep prior state

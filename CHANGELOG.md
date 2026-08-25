@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Bookmark rename dialog name field is now initially set to the old bookmark name. ([#82]((https://github.com/kkkev/jj-idea/issues/82)))
+- Split's "Pick Hunks…" now opens a three-pane diff — the original content, a live preview of what the parent will look like, and the child's content — with a click-to-move arrow at each divider, instead of a merge-conflict-style tool. This also removes an unrelated "mark the conflict resolved anyway?" confirmation that previously appeared every time you applied a partial pick.
 
 ### Fixed
 - A bookmark deleted locally but still pending deletion on the remote (shown with strikethrough in the log) is no longer silently missing from the Push dialog's "Specific bookmark" dropdown when the dialog is opened from a commit's right-click menu — it previously appeared only from the toolbar's Push button.

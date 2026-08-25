@@ -36,6 +36,7 @@ Components whose blast radius exceeds their own package:
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
+| `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
 
 ## Fixtures
 
@@ -793,21 +794,23 @@ string/state logic, no rendering dependency)
 
 **Split, hunk-level selection**
 
-**Code:** `ui/split/SplitDialog.kt`, `ui/split/HunkSelectionModel.kt`, `ui/split/SplitPreviewPanel.kt`, `ui/split/SplitSimulator.kt`, `diffedit/HunkDiffPicker.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
-**Also re-run:** MT-CTXMENU (shares the commit picker in some flows)
+**Code:** `ui/split/SplitDialog.kt`, `ui/split/HunkSelectionModel.kt`, `ui/split/SplitPreviewPanel.kt`, `ui/split/SplitSimulator.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
+**Also re-run:** MT-CTXMENU (shares the commit picker in some flows); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer)
 
 Setup: create a scratch jj repo with a file that has at least **two separate** hunks of changes
 (so partial selection is meaningful).
 
 Model: **ticking a file moves it to the new child commit**; unticked files stay in the
-parent. Nothing is ticked by default. "Pick Hunks…" opens a 3-way merge widget with **fixed,
-never-flipping roles**: Left = "Before" (the file's state before any of this change), Right =
-the child commit's label (always the source's full content — a structural invariant of
-`jj split`, not a bug), Middle = editable "Parent" (seeded from any existing partial pick, or a
-tick-derived default). Accepting a hunk from the **left** removes it from Parent (sends it to
-the child); accepting from the **right** adds it to Parent (pulls it from the child) — both are
-always available for the same hunk, so a pick can be reversed by accepting the opposite side,
-as many times as needed before closing the dialog.
+parent. Nothing is ticked by default. "Pick Hunks…" opens a native **3-pane** diff — Before
+(fixed) | Parent (live) | Child (fixed) — with a directional arrow at each hunk's divider instead
+of a checkbox: a right arrow at a Before|Parent divider moves that hunk to the child; a left
+arrow at a Parent|Child divider moves it back. The Parent pane genuinely updates in place as you
+click, so you always see the actual resulting parent content, not just an inferred state — this
+replaced an earlier 2-pane checkbox picker (itself replacing the original 3-way *merge* widget)
+specifically so gnarlier, many-hunk splits have somewhere to see the live result while picking.
+The Parent pane is view-only (arrow clicks only, no direct typing) — deliberately, so the result
+is always a well-formed composition of Before/Child hunks. No "resolved" concept, so no
+merge-conflict confirmation dialogs anywhere in this picker.
 
 #### Basic hunk selection (main dialog preview)
 - [ ] Right-click a mutable change → **Split…** → dialog shows changed-files list on the left (nothing ticked) and a native read-only diff preview on the right
@@ -843,22 +846,22 @@ the right-clicked files now tick **directly**, same as "Split into New Child".
 - [ ] Selecting **every** changed file → dialog opens with every file ticked, which trips the "at least one file must stay here" validation (nothing would be left at the original change ID) — expected, not a bug
 - [ ] Selecting **no** files → ticking nothing trips "move at least one file to the new commit" — expected
 
-#### Hunk picking with the 3-way picker
-- [ ] Click **Pick Hunks…** → a merge-style dialog opens titled "Pick Hunks — <filename>", with **Before** (left), **Parent** (editable, middle), and **Child** (right) panes
-- [ ] On a freshly-opened **unticked** file: Parent (middle) starts with the full content, identical to Child (right) — but differs from Before (left) at every hunk, so **left-side accept arrows are visible and clickable** (this used to show an empty, unusable diff — verify it no longer does)
-- [ ] Accepting a hunk from the **left** (Before) removes it from Parent — that hunk moves to the child
-- [ ] On a freshly-opened **ticked** file: Parent starts empty, matching Before (left) — but differs from Child (right) at every hunk, so **right-side accept arrows are visible**
-- [ ] Accepting a hunk from the **right** (Child) adds it to Parent — that hunk stays in the parent
-- [ ] **After accepting a hunk from one side, the opposite side's arrow reappears for that same hunk** — click it to reverse the pick (regression check: previously there was no way back once a hunk was accepted)
-- [ ] Accept some hunks (not all, mixing both directions is fine) and click **Apply** → a platform confirmation appears first: **"Apply Changes"** / "There is one change left unprocessed. Save changes and mark the conflict resolved anyway?" / **"Continue Merge"** / **"Apply Changes and Mark Resolved"**. This wording is IntelliJ's own conflict-resolution dialog and has no supported override hook (see jj-idea-xuob) — click **"Apply Changes and Mark Resolved"** to proceed; this is expected on every genuinely-partial pick, not a bug
-- [ ] After confirming → dialog closes; file shows **half-checked** in the file list; summary shows "(N partial)"
-- [ ] **The file's tick state is unchanged by a partial pick** — if it was unticked before opening the picker, it's still unticked after a partial accept (regression check: previously this force-ticked the file)
-- [ ] Accepting every hunk toward Parent → Apply results in a **fully ticked** file (no half-check), same as ticking it directly
-- [ ] Accepting no hunks (or reversing back to nothing) → Apply results in the file being **fully ticked or unticked** to match its starting state, with no partial override left over
-- [ ] Click **Cancel** → confirmation reads "Cancel Hunk Selection?" / "Discard your changes to Parent?"; confirming closes the dialog with file state (tick + any prior override) unchanged
-- [ ] **Reopen "Pick Hunks…" on a file with an existing partial selection** → Parent (middle) resumes exactly where you left it (not reset to a tick-derived default) — regression check for lost persistence
-- [ ] Split (linear) → child commit contains only the picked hunks; parent has the rest
+#### Hunk picking with the 3-pane arrow picker
+- [ ] Click **Pick Hunks…** → a dialog opens titled "Pick Hunks — <filename>" with **three** panes: Before | Parent (live) | Child
+- [ ] On a freshly-opened **unticked** file: Parent's text equals Child's; every hunk shows as a Before|Parent divider bar with a **right arrow**
+- [ ] Click a right arrow → that hunk's Parent content flips to Before's text (matching); the Before|Parent bar for that hunk disappears, and a **new** Parent|Child bar with a **left arrow** appears in its place
+- [ ] Click that left arrow → reverses back to a Before|Parent bar with a right arrow — confirm this is reversible any number of times, either direction, independently per hunk
+- [ ] **Try typing directly into the Parent pane** → rejected; it's view-only, arrow clicks are the only way to change it (a deliberate choice, so the result is always a clean composition of Before/Child hunks, never a hand-edited hybrid)
+- [ ] Click **Apply** with a mix of moved/unmoved hunks → dialog closes immediately with **no confirmation dialog of any kind** (the regression the original merge-widget picker had — a "Save changes and mark the conflict resolved anyway?" prompt used to fire here)
+- [ ] After Apply → file shows **half-checked** in the file list; summary shows "(N partial)"
+- [ ] **The file's tick state is unchanged by a partial pick** — if it was unticked before opening the picker, it's still unticked after a partial Apply
+- [ ] Moving every hunk to the child → Apply results in a **fully ticked** file (no half-check), same as ticking it directly
+- [ ] Moving no hunks (or reversing back to none) → Apply results in the file being **fully ticked or unticked** to match its starting state, with no partial override left over
+- [ ] Click **Cancel** → closes immediately with **no confirmation dialog**; file state (tick + any prior override) unchanged
+- [ ] **Reopen "Pick Hunks…" on a file with an existing partial selection** → the Parent pane opens already showing the exact prior split (the content itself resumes; no per-hunk state to reconstruct)
+- [ ] Split (linear) → child commit contains only the hunks left pointing at Child; parent has the rest
 - [ ] Log refreshes selecting the newly created change
+- [ ] **Global extension no-op check**: open any ordinary diff elsewhere (log → Show Diff, a working-copy file diff) — confirm **no arrows appear** and behavior is identical to before (the arrow overlay is registered as a plugin-wide `diff.DiffExtension`, gated to fire only inside this picker)
 
 → automate: jj-idea-ygtw (validation, whole-file fast path, and binary gating below are
 state/routing logic, not rendering)
