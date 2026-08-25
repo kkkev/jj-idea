@@ -99,5 +99,54 @@ class CliExecutorGitRemoteTest {
             val revision = ChangeId("abc123", "abc")
             gitPushArgs(allBookmarks = true, revision = revision) shouldBe listOf("git", "push", "--all")
         }
+
+        @Test
+        fun `push a change, auto-generating a bookmark`() {
+            val change = ChangeId("abc123", "abc")
+            gitPushArgs(changeRevisions = listOf(change)) shouldBe listOf("git", "push", "--change", "abc123")
+        }
+
+        @Test
+        fun `push multiple changes as repeated --change flags`() {
+            val a = ChangeId("abc123", "abc")
+            val b = ChangeId("def456", "def")
+            gitPushArgs(changeRevisions = listOf(a, b)) shouldBe
+                listOf("git", "push", "--change", "abc123", "--change", "def456")
+        }
+
+        @Test
+        fun `push a change to a specific remote`() {
+            val change = ChangeId("abc123", "abc")
+            gitPushArgs(remote = Remote("origin"), changeRevisions = listOf(change)) shouldBe
+                listOf("git", "push", "--remote", "origin", "--change", "abc123")
+        }
+
+        @Test
+        fun `bookmark takes precedence over change revisions`() {
+            val change = ChangeId("abc123", "abc")
+            gitPushArgs(bookmark = Bookmark("main"), changeRevisions = listOf(change)) shouldBe
+                listOf("git", "push", "--bookmark", "main")
+        }
+
+        @Test
+        fun `all bookmarks takes precedence over change revisions`() {
+            val change = ChangeId("abc123", "abc")
+            gitPushArgs(allBookmarks = true, changeRevisions = listOf(change)) shouldBe listOf("git", "push", "--all")
+        }
+
+        @Test
+        fun `change revisions take precedence over plain revision`() {
+            val change = ChangeId("abc123", "abc")
+            val revision = ChangeId("def456", "def")
+            gitPushArgs(changeRevisions = listOf(change), revision = revision) shouldBe
+                listOf("git", "push", "--change", "abc123")
+        }
+
+        @Test
+        fun `empty change revisions falls through to plain revision`() {
+            val revision = ChangeId("abc123", "abc")
+            gitPushArgs(changeRevisions = emptyList(), revision = revision) shouldBe
+                listOf("git", "push", "-r", "abc123")
+        }
     }
 }

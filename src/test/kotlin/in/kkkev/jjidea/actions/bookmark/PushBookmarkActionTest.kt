@@ -111,20 +111,43 @@ class PushBookmarkActionTest {
             group.isPopup shouldBe true
             presentation.text shouldBe "Push 'main' to"
 
+            // With >1 remote the submenu gains a leading "push to all remotes" entry plus a
+            // separator ahead of the per-remote actions (jj-idea-ndzp).
             val children = group.getChildren(event)
-            children.size shouldBe 2
+            children.size shouldBe 4
+
+            val allRemotesPresentation = Presentation()
+            val allRemotesEvent = mockk<AnActionEvent>(relaxed = true)
+            every { allRemotesEvent.presentation } returns allRemotesPresentation
+            children[0].update(allRemotesEvent)
+            // github is ahead, so pushing to all remotes is enabled even though origin is up to date.
+            allRemotesPresentation.isEnabled shouldBe true
 
             val originPresentation = Presentation()
             val originEvent = mockk<AnActionEvent>(relaxed = true)
             every { originEvent.presentation } returns originPresentation
-            children[0].update(originEvent)
+            children[2].update(originEvent)
             originPresentation.isEnabled shouldBe false
 
             val githubPresentation = Presentation()
             val githubEvent = mockk<AnActionEvent>(relaxed = true)
             every { githubEvent.presentation } returns githubPresentation
-            children[1].update(githubEvent)
+            children[3].update(githubEvent)
             githubPresentation.isEnabled shouldBe true
+        }
+
+        @Test
+        fun `push to all remotes is disabled when every remote is up to date`() {
+            every { repo.gitRemotes } returns remotes("origin", "github")
+            val group = pushBookmarkAction(
+                repo,
+                Bookmark("main"),
+                listOf(Bookmark("main@origin", aheadCount = 0), Bookmark("main@github", aheadCount = 0))
+            )
+            val allRemotes = group.getChildren(event).first()
+            allRemotes.update(event)
+            presentation.isEnabled shouldBe false
+            presentation.text shouldBe "Push 'main' to all remotes (up to date)"
         }
 
         @Test

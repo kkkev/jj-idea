@@ -5,6 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.logEntries
+import `in`.kkkev.jjidea.actions.uniqueRepo
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -32,8 +33,7 @@ data class NewChangeTarget(val repo: JujutsuRepository, val parents: List<Revisi
 fun resolveNewChangeTarget(selectedEntries: List<LogEntry>): NewChangeTarget? =
     selectedEntries.takeIf { it.isNotEmpty() }
         ?.let { entries ->
-            entries.map { it.repo }.toSet().singleOrNull()
-                ?.let { repo -> NewChangeTarget(repo, entries.map { entry -> entry.id }) }
+            entries.uniqueRepo?.let { repo -> NewChangeTarget(repo, entries.map { entry -> entry.id }) }
         }
 
 /**

@@ -27,6 +27,15 @@ val AnActionEvent.logEntry: LogEntry? get() = this.getData(JujutsuDataKeys.LOG_E
 /** The full multi-select log table selection, or empty if none (e.g. focus is outside the log table). */
 val AnActionEvent.logEntries: List<LogEntry> get() = this.getData(JujutsuDataKeys.LOG_ENTRIES) ?: emptyList()
 
+/**
+ * The single Jujutsu repository all of these entries belong to, or `null` if the list is empty
+ * or spans more than one repository — the "ambiguous, don't guess" convention shared by every
+ * multi-select log action (New Change, Rebase, Push). Mirrors [singleRepoForFiles]/
+ * [singleRepoForRestore] for the log-selection case.
+ */
+val List<LogEntry>.uniqueRepo: JujutsuRepository?
+    get() = map { it.repo }.toSet().singleOrNull()
+
 /** Gets the log entry from the DataSink, falling back to the file's user data. Use in actions that need to work in both changes tree and editor contexts. */
 val AnActionEvent.logEntryForFile: LogEntry?
     get() = logEntry ?: project?.let { p -> file?.let(p::possibleLogEntryFor) }
@@ -43,8 +52,8 @@ val AnActionEvent.fileList: List<VirtualFile>?
 /**
  * Resolves the selected virtual files from a raw file list or from selected changes.
  *
- * When [fileList] is non-null it is returned as-is. Otherwise each change's `after`
- * [FileChange.FileAtVersion] is resolved via [possibleVirtualFileFor], which may run a
+ * When [fileList] is non-null it is returned as-is. Otherwise, each change's `after`
+ * [`in`.kkkev.jjidea.jj.FileAtVersion] is resolved via [possibleVirtualFileFor], which may run a
  * `jj log` subprocess. Capture [fileList] and [changes] on the EDT, then call this from
  * a `runInBackground` block.
  */
@@ -70,13 +79,11 @@ fun Project.jujutsuFilesFor(
         .ifEmpty { listOfNotNull(focusedFile).filterInJujutsuRepo(this) }
 
 val AnActionEvent.filePaths: List<FilePath>
-    get() = this.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()?.map { it.filePath }
-        ?: changes.mapNotNull { it.after?.filePath }
+    get() = fileList?.map { it.filePath } ?: changes.mapNotNull { it.after?.filePath }
 
 /** Like [filePaths] but includes the source path of renames and the path of deletes. Use in restore operations. */
 val AnActionEvent.restorePaths: List<FilePath>
-    get() = this.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY)?.toList()?.map { it.filePath }
-        ?: changes.flatMap { it.allPaths }.distinct()
+    get() = fileList?.map { it.filePath } ?: changes.flatMap { it.allPaths }.distinct()
 
 val AnActionEvent.editor: Editor? get() = this.getData(CommonDataKeys.EDITOR)
 

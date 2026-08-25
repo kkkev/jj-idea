@@ -5,6 +5,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.git.GitPushDialog
@@ -63,6 +64,12 @@ internal fun pushAvailability(bookmark: Bookmark, remoteBookmark: Bookmark?): Pu
  * Also the most direct way to push a pending-deletion bookmark from the log (jj-idea-ehki): the
  * dialog's dropdown only sees a deletion when opened unscoped, but this entry point always knows
  * its bookmark directly and loads dialog data unscoped itself.
+ *
+ * With more than one remote, the submenu also gets a leading "push to all remotes" entry
+ * (jj-idea-ndzp) ahead of the per-remote ones — a one-click convenience for the common case of
+ * pushing everywhere, mirroring jjx. It still goes through [checkAndPush] once per remote that
+ * has something to push, so every existing force-push/deletion/untracked-bookmark confirmation
+ * still fires; it only skips [GitPushDialog] itself.
  */
 fun pushBookmarkAction(
     repo: JujutsuRepository,
@@ -76,17 +83,78 @@ fun pushBookmarkAction(
 
         override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
-        override fun getChildren(e: AnActionEvent?): Array<AnAction> =
-            repo.gitRemotes.map { gitRemote ->
+        override fun getChildren(e: AnActionEvent?): Array<AnAction> {
+            val perRemote = repo.gitRemotes.map { gitRemote ->
                 val remoteBookmark = remoteBookmarks.find { it.remote == gitRemote.name }
-                pushToRemoteAction(repo, bookmark, Remote(gitRemote.name), remoteBookmark)
-            }.toTypedArray()
+                Remote(gitRemote.name) to remoteBookmark
+            }
+            val remoteActions = perRemote.map { (remote, remoteBookmark) ->
+                pushToRemoteAction(repo, bookmark, remote, remoteBookmark)
+            }
+            return if (perRemote.size > 1) {
+                arrayOf(
+                    pushAllRemotesAction(repo, bookmark, perRemote),
+                    Separator.create(),
+                    *remoteActions.toTypedArray()
+                )
+            } else {
+                remoteActions.toTypedArray()
+            }
+        }
 
         override fun update(e: AnActionEvent) {
             val popupText = JujutsuBundle.message("action.bookmark.push.popup", bookmark.name)
             applyRemoteVisibility(e, repo.gitRemotes.size, popupText)
         }
     }
+
+/**
+ * One-click "push to all remotes" entry (jj-idea-ndzp): pushes [bookmark] to every remote in
+ * [perRemote] where [pushAvailability] says there's something to do, each via [checkAndPush] so
+ * the usual dry-run confirmations still apply. Remotes already up to date are silently skipped —
+ * a bookmark can be ahead on `github` but not `origin`, and this must not produce a redundant,
+ * always-a-no-op push to `origin`.
+ */
+private fun pushAllRemotesAction(
+    repo: JujutsuRepository,
+    bookmark: Bookmark,
+    perRemote: List<Pair<Remote, Bookmark?>>
+): DumbAwareAction = object : DumbAwareAction(
+    JujutsuBundle.message("action.bookmark.push.all", bookmark.name),
+    JujutsuBundle.message("action.bookmark.push.all.tooltip", bookmark.name),
+    AllIcons.Vcs.Push
+) {
+    override fun update(e: AnActionEvent) {
+        val anyEnabled = perRemote.any { (_, remoteBookmark) -> pushAvailability(bookmark, remoteBookmark).enabled }
+        e.presentation.isEnabled = anyEnabled
+        e.presentation.text = if (anyEnabled) {
+            JujutsuBundle.message("action.bookmark.push.all", bookmark.name)
+        } else {
+            JujutsuBundle.message("action.bookmark.push.all.disabled.upToDate", bookmark.name)
+        }
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        runInBackground {
+            val data = GitPushDialog.loadDialogData(repo)
+            if (data.remotes.isEmpty()) {
+                runLater { noRemoteNotification(repo.project) }
+                return@runInBackground
+            }
+            val targets = perRemote.filter { (_, remoteBookmark) -> pushAvailability(bookmark, remoteBookmark).enabled }
+            runLater {
+                targets.forEach { (remote, _) ->
+                    checkAndPush(
+                        GitPushDialog.GitPushSpec(repo, remote, bookmark, allBookmarks = false),
+                        repo.project
+                    )
+                }
+            }
+        }
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+}
 
 private fun pushToRemoteAction(
     repo: JujutsuRepository,

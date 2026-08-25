@@ -2,7 +2,14 @@ package `in`.kkkev.jjidea.actions.git
 
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.BookmarkName
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import io.kotest.matchers.shouldBe
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
@@ -205,6 +212,51 @@ class GitPushActionTest {
         @Test
         fun `blank stdout with whitespace-only stderr still falls through to the default`() {
             pushSuccessMessage("  \n", "  ") shouldBe JujutsuBundle.message("action.git.push.success.message.default")
+        }
+    }
+
+    @Nested
+    inner class `changeTargetsFor` {
+        private val repo = mockk<JujutsuRepository>()
+
+        private fun workingCopyEntry(isEmpty: Boolean) = LogEntry(
+            repo = repo,
+            id = ChangeId("qpvuntsm", "qp"),
+            commitId = CommitId("abc123def456", "ab"),
+            underlyingDescription = "",
+            isEmpty = isEmpty
+        )
+
+        private fun selectedEntry(id: String, commit: String) = LogEntry(
+            repo = repo,
+            id = ChangeId(id, id.take(2)),
+            commitId = CommitId(commit, commit.take(2)),
+            underlyingDescription = ""
+        )
+
+        @Test
+        fun `defaults to the working copy when it is not empty and nothing is selected`() {
+            every { repo.workingCopy } returns workingCopyEntry(isEmpty = false)
+            changeTargetsFor(repo, entries = emptyList()) shouldBe listOf(WorkingCopy)
+        }
+
+        @Test
+        fun `falls back to the working copy's parent when it is empty and nothing is selected`() {
+            every { repo.workingCopy } returns workingCopyEntry(isEmpty = true)
+            changeTargetsFor(repo, entries = emptyList()) shouldBe listOf(WorkingCopy.parent)
+        }
+
+        @Test
+        fun `uses a single selected entry's own id, ignoring the working copy`() {
+            val entry = selectedEntry("mzvwutvl", "def789")
+            changeTargetsFor(repo, entries = listOf(entry)) shouldBe listOf(entry.id)
+        }
+
+        @Test
+        fun `uses every selected entry's id in order for a multi-selection (jj-idea-ikof)`() {
+            val a = selectedEntry("mzvwutvl", "def789")
+            val b = selectedEntry("rlvkpnrz", "abc123")
+            changeTargetsFor(repo, entries = listOf(a, b)) shouldBe listOf(a.id, b.id)
         }
     }
 }

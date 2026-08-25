@@ -118,11 +118,19 @@ internal fun gitFetchArgs(remote: Remote? = null, allRemotes: Boolean = false): 
     }
 }
 
-/** Build the argument list for `jj git push`. */
+/**
+ * Build the argument list for `jj git push`.
+ * @param changeRevisions Revisions to push via repeated `--change` flags, each auto-generating its
+ *   own `push-<change-id>`-style bookmark (see `git.push-bookmark-prefix`) — `jj git push -c A -c B`
+ *   is natively supported and creates one bookmark per change. Mutually exclusive with
+ *   [bookmark]/[allBookmarks]/[revision] — one of the four scopes below wins, in this precedence
+ *   order.
+ */
 internal fun gitPushArgs(
     remote: Remote? = null,
     bookmark: Bookmark? = null,
     allBookmarks: Boolean = false,
+    changeRevisions: List<Revision> = emptyList(),
     revision: Revision? = null,
     dryRun: Boolean = false
 ): List<String> = buildList {
@@ -132,15 +140,22 @@ internal fun gitPushArgs(
         add("--remote")
         add(remote.name)
     }
-    if (allBookmarks) {
-        add("--all")
-    } else if (bookmark != null) {
-        add("--bookmark")
-        add(bookmark.name.name)
-    }
-    if (revision != null && bookmark == null && !allBookmarks) {
-        add("-r")
-        add(revision.toString())
+    when {
+        allBookmarks -> add("--all")
+        bookmark != null -> {
+            add("--bookmark")
+            add(bookmark.name.name)
+        }
+
+        changeRevisions.isNotEmpty() -> changeRevisions.forEach {
+            add("--change")
+            add(it.toString())
+        }
+
+        revision != null -> {
+            add("-r")
+            add(revision.toString())
+        }
     }
     if (dryRun) add("--dry-run")
 }
@@ -577,9 +592,14 @@ class CliExecutor(
         remote: Remote?,
         bookmark: Bookmark?,
         allBookmarks: Boolean,
+        changeRevisions: List<Revision>,
         revision: Revision?,
         dryRun: Boolean
-    ) = execute(root, gitPushArgs(remote, bookmark, allBookmarks, revision, dryRun), timeout = networkTimeout)
+    ) = execute(
+        root,
+        gitPushArgs(remote, bookmark, allBookmarks, changeRevisions, revision, dryRun),
+        timeout = networkTimeout
+    )
 
     override fun gitRemoteList() = execute(root, listOf("git", "remote", "list"))
 

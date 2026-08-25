@@ -172,6 +172,26 @@ class GitPushDialogTest {
     }
 
     @Nested
+    inner class `parsePushScope` {
+        @Test
+        fun `round-trips every scope by name`() {
+            GitPushDialog.PushScope.entries.forEach { scope ->
+                GitPushDialog.parsePushScope(scope.name) shouldBe scope
+            }
+        }
+
+        @Test
+        fun `falls back to DEFAULT for an unrecognised value`() {
+            GitPushDialog.parsePushScope("NOT_A_REAL_SCOPE") shouldBe GitPushDialog.PushScope.DEFAULT
+        }
+
+        @Test
+        fun `falls back to DEFAULT for an empty value`() {
+            GitPushDialog.parsePushScope("") shouldBe GitPushDialog.PushScope.DEFAULT
+        }
+    }
+
+    @Nested
     inner class `loadDialogData` {
         private fun repoWith(executor: CommandExecutor): JujutsuRepository {
             val repo = mockk<JujutsuRepository>()

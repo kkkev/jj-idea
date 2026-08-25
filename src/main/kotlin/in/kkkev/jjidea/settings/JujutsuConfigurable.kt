@@ -12,12 +12,14 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.ui.JBColor
+import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.git.GitPushDialog
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.jj.cli.Config
 import `in`.kkkev.jjidea.jj.cli.config
@@ -188,6 +190,19 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                 checkBox(JujutsuBundle.message("settings.general.disable.ignore.scan"))
                     .bindSelected(appSettings.state::disableIgnoredFileScanning)
                     .comment(JujutsuBundle.message("settings.general.disable.ignore.scan.comment"))
+            }
+            row(JujutsuBundle.message("settings.general.default.push.scope.label")) {
+                comboBox(GitPushDialog.PushScope.entries.toList())
+                    .applyToComponent {
+                        // Replacement (textListCellRenderer) unavailable until 2026.2
+                        @Suppress("removal")
+                        renderer = SimpleListCellRenderer.create("") { pushScopeLabel(it) }
+                    }
+                    .bindItem(
+                        { defaultPushScope() },
+                        { settings.state.defaultPushScope = (it ?: GitPushDialog.PushScope.DEFAULT).name }
+                    )
+                    .comment(JujutsuBundle.message("settings.general.default.push.scope.comment"))
             }
         }
 
@@ -629,6 +644,16 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     }
 
     private fun iconLabel(icon: javax.swing.Icon?, text: String) = JBLabel(text, icon, JBLabel.LEADING)
+
+    private fun defaultPushScope(): GitPushDialog.PushScope =
+        GitPushDialog.parsePushScope(settings.state.defaultPushScope)
+
+    private fun pushScopeLabel(scope: GitPushDialog.PushScope): String = when (scope) {
+        GitPushDialog.PushScope.DEFAULT -> JujutsuBundle.message("dialog.git.push.scope.default")
+        GitPushDialog.PushScope.BOOKMARK -> JujutsuBundle.message("dialog.git.push.scope.bookmark")
+        GitPushDialog.PushScope.ALL -> JujutsuBundle.message("dialog.git.push.scope.all")
+        GitPushDialog.PushScope.CHANGE -> JujutsuBundle.message("settings.general.default.push.scope.change")
+    }
 
     private fun showRevsetResult(label: JBLabel, success: Boolean?, message: String) {
         label.text = message

@@ -9,8 +9,11 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -71,11 +74,22 @@ fun gitFetchAction(project: Project, repo: JujutsuRepository?) =
 /**
  * Factory action for pushing to Git remote for a specific repository.
  * Loads remotes/bookmarks off EDT, then opens the push dialog.
- * @param revision When provided, bookmarks are filtered to those on this revision or its ancestors,
- *   and the push command targets this specific revision.
+ * @param entries The log selection this Push was invoked from (context menu only — the toolbar/
+ *   VCS-menu button is a different action, [GitPushAction]). Empty selection or the working-copy
+ *   row alone behave as before this parameter existed: bookmarks aren't revision-scoped, and the
+ *   "create bookmark for change" scope offers `@`/`@-`. A single non-`@` selection scopes
+ *   bookmarks to that revision's ancestry and offers just that change. A multi-selection (always
+ *   single-repo here — [repo] is `null` and this whole action is disabled otherwise, see
+ *   [in.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions]) offers pushing all selected changes at
+ *   once via repeated `--change` flags (jj-idea-ikof).
  */
-fun gitPushAction(project: Project, repo: JujutsuRepository?, revision: Revision? = null) =
+fun gitPushAction(project: Project, repo: JujutsuRepository?, entries: List<LogEntry> = emptyList()) =
     nullAndDumbAwareAction(repo, "log.action.git.push", AllIcons.Vcs.Push) {
+        // -r only ever scopes the DEFAULT (tracking-bookmarks) push to a single commit's
+        // ancestry, exactly as before this action started also accepting multi-selection: a
+        // multi-selection leaves it null, same as no selection at all.
+        val revision = entries.singleOrNull()?.id
+
         // Load remotes and bookmarks off EDT, then show dialog on EDT
         runInBackground {
             val data = GitPushDialog.loadDialogData(target, revision)
@@ -91,8 +105,18 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?, revision: Revision
                 return@runInBackground
             }
 
+            val changeTargets = changeTargetsFor(target, entries)
+            val defaultScope = GitPushDialog.parsePushScope(JujutsuSettings.getInstance(project).state.defaultPushScope)
+
             runLater {
-                val dialog = GitPushDialog(project, mapOf(target to data), target)
+                val dialog = GitPushDialog(
+                    project,
+                    mapOf(target to data),
+                    target,
+                    changeTargets = changeTargets,
+                    changeTargetsRepo = target,
+                    defaultScope = defaultScope
+                )
                 if (!dialog.showAndGet()) return@runLater
 
                 val spec = dialog.result ?: return@runLater
@@ -100,6 +124,20 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?, revision: Revision
                 checkAndPush(spec, project, revision)
             }
         }
+    }
+
+/**
+ * The targets for the push dialog's "create bookmark(s) for change(s)" scope
+ * (GitHub #65, jj-idea-fmzr/jj-idea-ikof): one entry per selected log commit. When nothing is
+ * selected, falls back to a single-element list: `@`, or `@-` if `@` is empty — satisfying both
+ * documented `jj git push --change` workflows (`jj commit; push --change @-` and
+ * `describe; push --change @; new`) without the user having to think about it. `jj git push`
+ * natively supports repeating `--change` for several revisions in one push (verified against jj
+ * 0.44), so a multi-selection pushes all of it in one dialog confirmation.
+ */
+internal fun changeTargetsFor(repo: JujutsuRepository, entries: List<LogEntry>): List<Revision> =
+    entries.map { it.id }.ifEmpty {
+        listOf(if (repo.workingCopy.isEmpty) WorkingCopy.parent else WorkingCopy)
     }
 
 /**
@@ -118,6 +156,7 @@ fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Re
             remote = spec.remote,
             bookmark = spec.bookmark,
             allBookmarks = spec.allBookmarks,
+            changeRevisions = spec.changeRevisions,
             revision = revision,
             dryRun = true
         )
@@ -172,7 +211,15 @@ private fun trackAndPush(
 
 private fun performPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Revision?) {
     spec.repo.commandExecutor
-        .createCommand { gitPush(spec.remote, spec.bookmark, spec.allBookmarks, revision = revision) }
+        .createCommand {
+            gitPush(
+                spec.remote,
+                spec.bookmark,
+                spec.allBookmarks,
+                changeRevisions = spec.changeRevisions,
+                revision = revision
+            )
+        }
         .onSuccessResult {
             spec.repo.invalidate()
             log.info("Pushed for ${spec.repo.displayName}")

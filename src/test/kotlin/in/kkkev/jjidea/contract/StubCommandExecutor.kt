@@ -228,6 +228,7 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         remote: Remote?,
         bookmark: Bookmark?,
         allBookmarks: Boolean,
+        changeRevisions: List<Revision>,
         revision: Revision?,
         dryRun: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")

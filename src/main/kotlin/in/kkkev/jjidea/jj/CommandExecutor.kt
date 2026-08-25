@@ -292,12 +292,15 @@ interface CommandExecutor {
      * @param remote Specific remote to push to (null = default)
      * @param bookmark Specific bookmark to push (null = tracking bookmarks)
      * @param allBookmarks Push all bookmarks
+     * @param changeRevisions Revisions to push via repeated `--change` flags, each auto-generating
+     *   its own bookmark
      * @return Command result
      */
     fun gitPush(
         remote: Remote? = null,
         bookmark: Bookmark? = null,
         allBookmarks: Boolean = false,
+        changeRevisions: List<Revision> = emptyList(),
         revision: Revision? = null,
         dryRun: Boolean = false
     ): CommandResult

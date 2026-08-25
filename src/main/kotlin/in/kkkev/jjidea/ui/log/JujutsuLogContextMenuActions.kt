@@ -38,6 +38,7 @@ import `in`.kkkev.jjidea.actions.git.gitPushAction
 import `in`.kkkev.jjidea.actions.git.openInRemoteGroup
 import `in`.kkkev.jjidea.actions.tag.deleteTagAction
 import `in`.kkkev.jjidea.actions.tag.setTagAction
+import `in`.kkkev.jjidea.actions.uniqueRepo
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.remoteEntriesFor
 import `in`.kkkev.jjidea.jj.stateModel
@@ -93,7 +94,7 @@ object JujutsuLogContextMenuActions {
         // Offer "New Change From This/These" if all entries are in the same root.
         // The quick (no-dialog) action is primary and shows the default keybinding; the
         // dialog-based variant is offered as a secondary "with description" option.
-        val uniqueRepo = entries.map { it.repo }.toSet().singleOrNull()
+        val uniqueRepo = entries.uniqueRepo
 
         if (liveSelection) {
             ActionManager.getInstance().getAction("Jujutsu.NewChange")?.let { add(it) }
@@ -176,7 +177,7 @@ object JujutsuLogContextMenuActions {
 
         addSeparator()
         add(gitFetchAction(project, uniqueRepo))
-        add(gitPushAction(project, uniqueRepo, entry?.id))
+        add(gitPushAction(project, uniqueRepo, entries))
         entry?.let { add(openInRemoteGroup(it.repo, it.commitId, it.immutable)) }
     }
 

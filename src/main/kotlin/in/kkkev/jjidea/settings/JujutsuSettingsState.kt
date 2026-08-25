@@ -30,5 +30,10 @@ data class JujutsuSettingsState(
     var stripedLogRows: Boolean = true,
     // jj-idea-isnf: context window (ancestors/descendants) loaded when navigating to a
     // revision outside the currently loaded log. 0 loads only the target revision.
-    var logContextWindow: Int = 10
+    var logContextWindow: Int = 10,
+    // jj-idea-fmzr: which scope the Push dialog opens on, by
+    // in.kkkev.jjidea.actions.git.GitPushDialog.PushScope name. Stored as a string rather than
+    // the enum itself so this class stays free of a UI-package dependency and survives enum
+    // reordering; an unrecognised value falls back to DEFAULT.
+    var defaultPushScope: String = "DEFAULT"
 )

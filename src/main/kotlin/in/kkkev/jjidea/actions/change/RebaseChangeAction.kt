@@ -6,6 +6,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.logEntries
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.actions.uniqueRepo
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -37,9 +38,8 @@ class RebaseChangeAction : DumbAwareAction(
 
     /** The repo to rebase in, or `null` if disabled - mirrors the old context-menu factory's logic. */
     private fun rebaseRepo(entries: List<LogEntry>): JujutsuRepository? {
-        val uniqueRepo = entries.map { it.repo }.toSet().singleOrNull()
         val mutableEntries = entries.filter { !it.immutable }
-        return uniqueRepo?.takeIf { mutableEntries.isNotEmpty() }
+        return entries.uniqueRepo?.takeIf { mutableEntries.isNotEmpty() }
     }
 
     override fun update(e: AnActionEvent) {

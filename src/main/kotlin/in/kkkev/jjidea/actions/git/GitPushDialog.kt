@@ -4,6 +4,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.ui.SimpleListCellRenderer
+import com.intellij.ui.dsl.builder.Row
 import com.intellij.ui.dsl.builder.bindItem
 import com.intellij.ui.dsl.builder.panel
 import com.intellij.ui.layout.selected
@@ -43,13 +44,27 @@ import javax.swing.JComponent
  * @param initialRemote The remote to preselect alongside [initialBookmark] — the caller already
  *   knows which remote a specific per-bookmark push targets. Falls back to [pickInitialRemote]'s
  *   "whichever remote already tracks this bookmark" heuristic when null.
+ * @param changeTargets The revisions to offer for the "create bookmark(s) for change(s)" scope
+ *   (GitHub #65, jj-idea-fmzr/jj-idea-ikof) — one entry per selected log commit, or a single `@`/
+ *   `@-` fallback when nothing is selected. Resolved by the caller — not this dialog, which stays
+ *   free of command execution — via [changeTargetsFor]. Empty hides the scope entirely.
+ * @param changeTargetsRepo The single repo [changeTargets] belongs to (null if the caller had no
+ *   unambiguous single repo, e.g. a log selection spanning multiple repos). The 4th scope's row
+ *   is only shown while [selectedRepo] equals this — see [updateForRepoChange] — since showing a
+ *   change target that belongs to a different repo than the one about to be pushed would be
+ *   actively misleading.
+ * @param defaultScope Which scope the dialog opens on when [initialBookmark] doesn't force
+ *   [PushScope.BOOKMARK] — driven by the user's "default push scope" setting.
  */
-class GitPushDialog(
+class GitPushDialog internal constructor(
     project: Project,
     private val allData: Map<JujutsuRepository, DialogData>,
     initialRepo: JujutsuRepository,
     initialBookmark: Bookmark? = null,
-    initialRemote: Remote? = null
+    initialRemote: Remote? = null,
+    private val changeTargets: List<Revision> = emptyList(),
+    private val changeTargetsRepo: JujutsuRepository? = null,
+    defaultScope: PushScope = PushScope.DEFAULT
 ) : DialogWrapper(project) {
     /**
      * Result of the push dialog — the user's chosen parameters including which repo to push.
@@ -58,7 +73,8 @@ class GitPushDialog(
         val repo: JujutsuRepository,
         val remote: Remote?,
         val bookmark: Bookmark?,
-        val allBookmarks: Boolean
+        val allBookmarks: Boolean,
+        val changeRevisions: List<Revision> = emptyList()
     )
 
     /**
@@ -77,7 +93,11 @@ class GitPushDialog(
     private var selectedRemote = initialRemote
         ?: initialBookmark?.let { pickInitialRemote(currentData(), it) }
         ?: currentRemotes().firstOrNull()
-    private var pushScope = if (initialBookmark != null) PushScope.BOOKMARK else PushScope.DEFAULT
+    private var pushScope = when {
+        initialBookmark != null -> PushScope.BOOKMARK
+        defaultScope == PushScope.CHANGE && !changeScopeAvailable() -> PushScope.DEFAULT
+        else -> defaultScope
+    }
     private var selectedBookmark = initialBookmark?.let { bm -> currentBookmarks().firstOrNull { it.name == bm.name } }
         ?: currentBookmarks().firstOrNull()
     private val remoteModel = DefaultComboBoxModel(currentRemotes().toTypedArray())
@@ -92,6 +112,19 @@ class GitPushDialog(
     internal val bookmarkComboBox = ComboBox(bookmarkModel).apply { renderer = BookmarkRenderer() }
     internal var specificBookmarkRadioButton: AbstractButton? = null
         private set
+
+    // The 4th scope's row, captured in createCenterPanel() so updateForRepoChange() can toggle
+    // its visibility — there's no ComponentPredicate for "the repo combo currently equals X", so
+    // this follows the same imperative pattern already used for remoteModel/bookmarkModel above
+    // rather than a declarative binding.
+    private var changeScopeRow: Row? = null
+
+    // bindScope() only writes the backing property when the *user* clicks a radio button
+    // (RadioScopeBinding.kt); it doesn't move the Swing selection when pushScope is changed
+    // programmatically. Captured so updateForRepoChange() can re-select Default in the UI (not
+    // just the backing property) when it auto-reverts away from a just-hidden Change scope —
+    // the enclosing ButtonGroup then deselects Change for us.
+    private var defaultScopeRadioButton: AbstractButton? = null
 
     // Guards against re-entry: repopulating remoteModel below fires the remote combo's own
     // actionListener (removeAllElements()/addAll() both fire contentsChanged), which would
@@ -108,7 +141,11 @@ class GitPushDialog(
         return mergeBookmarks(tracked, data.allLocal)
     }
 
-    private enum class PushScope { DEFAULT, BOOKMARK, ALL }
+    /** Whether the 4th scope has anything to offer for [selectedRepo] right now. */
+    private fun changeScopeAvailable() = changeTargets.isNotEmpty() && selectedRepo == changeTargetsRepo
+
+    /** Persisted by name in [in.kkkev.jjidea.settings.JujutsuSettingsState.defaultPushScope]. */
+    internal enum class PushScope { DEFAULT, BOOKMARK, ALL, CHANGE }
 
     private class BookmarkRenderer : TextListCellRenderer<Bookmark>() {
         override fun render(canvas: TextCanvas, value: Bookmark) {
@@ -136,6 +173,13 @@ class GitPushDialog(
             updatingModels = false
         }
         updateBookmarks()
+
+        val available = changeScopeAvailable()
+        changeScopeRow?.visible(available)
+        if (!available && pushScope == PushScope.CHANGE) {
+            defaultScopeRadioButton?.isSelected = true
+            pushScope = PushScope.DEFAULT
+        }
     }
 
     private fun updateBookmarks() {
@@ -188,8 +232,9 @@ class GitPushDialog(
 
         buttonsGroup {
             row {
-                radioButton(JujutsuBundle.message("dialog.git.push.scope.default"))
+                val rb = radioButton(JujutsuBundle.message("dialog.git.push.scope.default"))
                     .bindScope(::pushScope, PushScope.DEFAULT)
+                defaultScopeRadioButton = rb.component
             }
             row {
                 val rb = radioButton(JujutsuBundle.message("dialog.git.push.scope.bookmark"))
@@ -210,7 +255,22 @@ class GitPushDialog(
                 radioButton(JujutsuBundle.message("dialog.git.push.scope.all"))
                     .bindScope(::pushScope, PushScope.ALL)
             }
+            row {
+                radioButton(changeScopeLabel())
+                    .bindScope(::pushScope, PushScope.CHANGE)
+            }.visible(changeScopeAvailable()).also { changeScopeRow = it }
         }
+    }
+
+    /**
+     * "Create bookmark for change X" for a single target, or a pluralized count for several.
+     * The empty case (row always hidden — see [changeScopeAvailable]) is handled defensively
+     * rather than left to crash on [List.single].
+     */
+    private fun changeScopeLabel(): String = when (changeTargets.size) {
+        0 -> JujutsuBundle.message("dialog.git.push.scope.change", "")
+        1 -> JujutsuBundle.message("dialog.git.push.scope.change", changeTargets.single().short)
+        else -> JujutsuBundle.message("dialog.git.push.scope.change.plural", changeTargets.size)
     }
 
     override fun doOKAction() {
@@ -219,7 +279,8 @@ class GitPushDialog(
             repo = selectedRepo,
             remote = selectedRemote,
             bookmark = selectedBookmark.takeIf { pushScope == PushScope.BOOKMARK },
-            allBookmarks = pushScope == PushScope.ALL
+            allBookmarks = pushScope == PushScope.ALL,
+            changeRevisions = if (pushScope == PushScope.CHANGE) changeTargets else emptyList()
         )
         super.doOKAction()
     }
@@ -228,6 +289,14 @@ class GitPushDialog(
         // Outputs name\0present\0 per bookmark (remote-tracking entries produce empty strings, filtered by split)
         private const val LOCAL_BOOKMARK_TEMPLATE =
             """if(remote, "", name ++ "\0" ++ present ++ "\0")"""
+
+        /**
+         * Parses [in.kkkev.jjidea.settings.JujutsuSettingsState.defaultPushScope]'s stored name back
+         * into a [PushScope], falling back to [PushScope.DEFAULT] for an unrecognised or legacy
+         * value (e.g. a name from a future release the current one doesn't know about).
+         */
+        internal fun parsePushScope(name: String): PushScope =
+            runCatching { PushScope.valueOf(name) }.getOrDefault(PushScope.DEFAULT)
 
         /**
          * Merges the bookmarks tracked against the selected remote with the full local bookmark

@@ -1051,6 +1051,26 @@ both remotes), `new-thing` (never tracked anywhere).
   then removes the bookmark from that remote. A remote the deletion has already been pushed to
   (or that never had the bookmark) shows its entry **disabled**
 
+#### Push to all tracking remotes (jj-idea-ndzp)
+
+With two or more Git remotes, the submenu above gains a leading "Push '\<name\>' to all remotes"
+entry plus a separator, ahead of the per-remote entries. Unlike the per-remote entries, this one
+skips the Push dialog entirely — it goes straight to a dry-run push per remote that has
+something to push, so the usual force-push/deletion/untracked-bookmark confirmations still fire,
+one per affected remote.
+
+- [ ] With exactly one Git remote, no "all remotes" entry appears — just the single per-remote
+  entry as before
+- [ ] With two or more remotes, "Push '\<name\>' to all remotes" appears first, followed by a
+  separator, then the per-remote entries unchanged
+- [ ] A bookmark up to date on every remote shows the "all remotes" entry **disabled**, with
+  "(up to date)" appended
+- [ ] A bookmark ahead on only one of several remotes shows the entry **enabled**; clicking it
+  pushes only that remote (verify via `jj git remote list`/the remote's log) — the up-to-date
+  remote is silently skipped, not redundantly pushed
+- [ ] A bookmark moved backwards/sideways on a remote it would push to: clicking "all remotes"
+  still shows the same force-push confirmation as a per-remote push, scoped to that one remote
+
 ### MT-WORKINGCOPY
 
 **Working copy panel, status bar widget, and tool window behavior**
@@ -1651,6 +1671,46 @@ Setup: have a local bookmark that has never been pushed to the remote.
   confirm → push succeeds and the bookmark disappears from the remote (`jj bookmark list
   --all-remotes` shows it gone, not just `(deleted)` locally)
 
+#### `--change` push scope (jj-idea-fmzr, GitHub #65; multi-select/toolbar jj-idea-ikof)
+
+A fourth scope, "Create bookmark for change \<id\>", runs `jj git push --change <rev>` —
+auto-generating a `push-<change-id>`-style remote bookmark for the target revision, per jj's own
+recommended workflow. The dialog resolves the target itself; there's no revision picker in the
+dialog. Available from three entry points — the toolbar/VCS-menu Push button (`GitPushAction`),
+the log's right-click Push (`gitPushAction()`), and the per-bookmark Push submenu (which never
+offers this scope — it's always "Specific bookmark") — and reads the **log table's current
+selection** wherever one exists.
+
+- [ ] Toolbar Push (VCS menu icon or log toolbar button) with **nothing selected in the log** (or
+  invoked from a context with no log at all) → the fourth radio names `@`'s own change id (or
+  `@-` if `@` is empty — see below) → OK → a new `push-<id>` bookmark appears on the remote
+  (`jj bookmark list --all-remotes`)
+- [ ] Select a **single commit** in the log, then click the toolbar Push button → the fourth
+  radio names that commit's own change id, not `@` — confirms the toolbar button now reads the
+  log selection (previously it always ignored it)
+- [ ] `jj commit` so `@` is empty, then toolbar Push with nothing selected → the fourth radio now
+  names `@-`'s change id instead
+- [ ] Right-click a **specific commit** in the log → Push… → the fourth radio names that
+  commit's own change id, regardless of where `@` currently is
+- [ ] **Multi-select** several commits in one repo, then either right-click → Push… or the
+  toolbar Push button → the fourth radio reads "Create bookmarks for N changes" (plural) → OK →
+  one `push-<id>` bookmark per selected commit appears on the remote, all in one confirmation
+- [ ] **Multi-repo project**: select commits spanning two different repos, then toolbar Push →
+  dialog opens normally, but the fourth radio is **absent** (not just disabled) — the other
+  three scopes work as usual via the dialog's own Repository selector
+- [ ] Still with that cross-repo selection: right-click → Push… (context menu) is **entirely
+  disabled** — unchanged from before this scope existed, since the context menu's Push has
+  always required a single repo
+- [ ] With a single-repo selection and the fourth radio chosen, switch the dialog's own
+  **Repository** combo to a different repo → the fourth radio disappears and the scope silently
+  reverts to "Tracking bookmarks (default)" — no crash, no stale target left selected
+- [ ] Push the same change twice via this scope → the second push does not create a second
+  `push-*` bookmark (confirm via `jj bookmark list --all-remotes` — same bookmark name both
+  times)
+- [ ] This scope's dry-run does **not** spuriously trigger the "will create a new remote
+  bookmark" confirmation that the default/tracking scope shows (jj only refuses new remote
+  bookmarks for that scope, not `--change`)
+
 #### Git Fetch Dialog
 
 Setup: a repository with 2+ remotes (the scope radio group only appears in this case).
@@ -1688,6 +1748,23 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 - [ ] JJ executable path can be configured, including via the file picker
 - [ ] Auto-refresh toggle, change ID format preference (short/long), and log change limit
       each take effect as expected, and all settings persist across IDE restarts
+
+#### Default push scope (jj-idea-fmzr, jj-idea-ikof)
+
+- [ ] **General** section: a "Default push scope:" combo lists all four Push dialog scopes
+      (Tracking bookmarks / Specific bookmark / All bookmarks / Create bookmark for change).
+      Defaults to "Tracking bookmarks (default)" on a fresh install.
+- [ ] Set it to "Create bookmark for change", click Apply, then open Push from **both** the log's
+      right-click menu and the toolbar/VCS-menu button — both open with the fourth radio already
+      selected (the toolbar button didn't honor this setting at all before jj-idea-ikof; confirm
+      it does now). Restart the IDE — the setting persists.
+- [ ] With the default set to "Create bookmark for change", right-click a **bookmark** →
+      Push… (the per-bookmark entry point, jj-idea-t29z) still opens on "Specific bookmark" —
+      this setting only affects the dialog's *unforced* default, not a caller that already
+      knows which bookmark it wants
+- [ ] With the default set to "Create bookmark for change" and a cross-repo log selection: open
+      toolbar Push → the fourth scope is unavailable (see MT-GIT), so the dialog falls back to
+      "Tracking bookmarks (default)" instead — no crash, no radio stuck on a hidden option
 
 → automate: jj-idea-ajd0 (settings persistence and column width/visibility persistence,
 tracked in MT-LOG-TABLE, are state-serialization logic)
