@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj.cli
 
+import com.intellij.openapi.vcs.LocalFilePath
 import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -345,6 +346,42 @@ class LogTemplateTest {
         val item = tagListTemplate.take(fields.iterator())
 
         item shouldBe null
+    }
+
+    @Test
+    fun `fileStatusesFor built on fullLogTemplate parses author and committer`() {
+        val filePath = LocalFilePath("/repo/file.txt", false)
+        val template = cliLogService.logTemplates.fileStatusesFor(filePath, fullLogTemplate)
+        val fields = listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "Add new feature",
+            "", // bookmarks
+            "", // tags
+            "", // parents
+            "false",
+            "false",
+            "false",
+            "false",
+            "false",
+            "Test Author",
+            "author@example.com",
+            "1234567890",
+            "Test Committer",
+            "committer@example.com",
+            "1234567890",
+            "modified" // file status
+        )
+
+        val fileRevision = template.take(fields.iterator())
+
+        fileRevision.logEntry.author!!.name shouldBe "Test Author"
+        fileRevision.logEntry.author.email shouldBe "author@example.com"
+        fileRevision.logEntry.authorTimestamp shouldBe Instant.fromEpochSeconds(1234567890)
+        fileRevision.logEntry.committer!!.name shouldBe "Test Committer"
+        fileRevision.logEntry.committer.email shouldBe "committer@example.com"
+        fileRevision.logEntry.committerTimestamp shouldBe Instant.fromEpochSeconds(1234567890)
+        fileRevision.fileChangeStatus shouldBe FileChange.Status.MODIFIED
     }
 
     private val bookmarkListTemplate = cliLogService.logTemplates.bookmarkListTemplate

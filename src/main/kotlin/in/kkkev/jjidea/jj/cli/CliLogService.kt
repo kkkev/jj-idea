@@ -96,7 +96,26 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     }
 
     override fun getLogAndFileStatuses(revset: Revset, filePath: FilePath, limit: Int?) =
-        getLog(logTemplates.fileStatusesFor(filePath), revset, listOf(filePath), limit)
+        if (supportsPushedAncestor()) {
+            val fallbackTemplate = logTemplates.fileStatusesFor(
+                filePath,
+                logTemplates.fullLogTemplateWithoutPushedAncestor
+            )
+            getLog(
+                logTemplates.fileStatusesFor(filePath, logTemplates.fullLogTemplate),
+                revset,
+                listOf(filePath),
+                limit,
+                fallbackTemplate = fallbackTemplate
+            )
+        } else {
+            getLog(
+                logTemplates.fileStatusesFor(filePath, logTemplates.fullLogTemplateWithoutPushedAncestor),
+                revset,
+                listOf(filePath),
+                limit
+            )
+        }
 
     override fun getBookmarks() = getRefs("bookmark", logTemplates.bookmarkListTemplate) {
         executor.bookmarkList(it)
@@ -413,10 +432,10 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             }
         }
 
-        fun fileStatusesFor(filePath: FilePath): LogTemplate<FileRevision> {
+        fun fileStatusesFor(filePath: FilePath, baseTemplate: LogTemplate<LogEntry>): LogTemplate<FileRevision> {
             val fileStatus = fileChangeStatusFor(filePath)
-            return logTemplate(basicLogTemplate, fileStatus) {
-                val basic = basicLogTemplate.take(it)
+            return logTemplate(baseTemplate, fileStatus) {
+                val basic = baseTemplate.take(it)
                 FileRevision(basic, fileStatus.take(it))
             }
         }

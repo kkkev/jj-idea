@@ -1321,6 +1321,9 @@ equally-weighted group of their own.
 - [ ] jj-idea-hq4d: opening a file from the File History panel (right-click a file → "Show File
       History", pick an older revision, open the file) enables "Annotate"; it produces a blame
       gutter for that revision's content
+- [ ] jj-idea-qrne: open a file's platform history tab (editor's Jujutsu submenu → "Show
+      History") — Date, Author, and Committer columns are populated for every revision, not
+      blank
 
 ### MT-DIFF-PREVIEW
 
