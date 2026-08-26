@@ -1324,6 +1324,9 @@ equally-weighted group of their own.
 - [ ] jj-idea-qrne: open a file's platform history tab (editor's Jujutsu submenu → "Show
       History") — Date, Author, and Committer columns are populated for every revision, not
       blank
+- [ ] jj-idea-a1fh: in that same tab, click the "Commit Time" column header twice — rows
+      order chronologically (oldest→newest, then newest→oldest), not alphabetically by
+      committer name
 
 ### MT-DIFF-PREVIEW
 

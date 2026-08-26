@@ -11,6 +11,8 @@ import javax.swing.table.TableCellRenderer
 
 val VcsFileRevision?.committer get() = (this as? JujutsuFileRevision)?.committer ?: ""
 
+val VcsFileRevision?.committerDate get() = (this as? JujutsuFileRevision)?.committerDate
+
 /**
  * Custom column for committer (may differ from author in JJ)
  */
@@ -28,9 +30,9 @@ class CommitterColumnInfo : ColumnInfo<VcsFileRevision, String>("Committer") {
  * Custom column for commit timestamp (committer timestamp)
  */
 class CommitTimestampColumnInfo : ColumnInfo<VcsFileRevision, Date?>("Commit Time") {
-    override fun valueOf(revision: VcsFileRevision): Date? = (revision as? JujutsuFileRevision)?.committerDate
+    override fun valueOf(revision: VcsFileRevision): Date? = revision.committerDate
 
-    override fun getComparator(): Comparator<VcsFileRevision> = compareBy(nullsLast()) { it.committer }
+    override fun getComparator(): Comparator<VcsFileRevision> = compareBy(nullsLast()) { it.committerDate }
 
     override fun getRenderer(revision: VcsFileRevision): TableCellRenderer = object : ColoredTableCellRenderer() {
         override fun customizeCellRenderer(
