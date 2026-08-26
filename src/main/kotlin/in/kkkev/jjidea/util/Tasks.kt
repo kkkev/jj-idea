@@ -12,14 +12,37 @@ import java.util.concurrent.Future
 
 private val log = Logger.getInstance("in.kkkev.jjidea.util.Tasks")
 
+/**
+ * Saves all open documents before a command runs. Called as the first statement of both
+ * [in.kkkev.jjidea.jj.CommandExecutor.Command.executeAsync] and
+ * [in.kkkev.jjidea.jj.CommandExecutor.Command.executeWithProgress], on the calling thread - which
+ * is a pooled thread for both callers.
+ *
+ * ## Modality (jj-idea-c4tp)
+ * Posts with [ModalityState.any] rather than the default modality. `invokeAndWait` with default
+ * modality only ever runs the posted runnable once no modal dialog is showing - if a modal is up
+ * (e.g. the "Saving settings" dialog at shutdown, or any other plugin's modal), the pooled thread
+ * calling this would otherwise park for the modal's entire lifetime, which is one of the hazards
+ * behind that hang. Under [ModalityState.any], the runnable runs promptly even inside a modal, and
+ * the existing [TransactionGuard.isWriteSafeModality] guard then no-ops the save - the same
+ * "skip rather than save" outcome an EDT caller already gets inside a modal, just without the
+ * indefinite park.
+ */
 fun saveAllDocuments() {
-    ApplicationManager.getApplication().invokeAndWait {
-        if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
-            ApplicationManager.getApplication().runWriteIntentReadAction<Unit, Nothing> {
-                FileDocumentManager.getInstance().saveAllDocuments()
+    val app = ApplicationManager.getApplication()
+    if (app.isDisposed) return
+    app.invokeAndWait(
+        {
+            if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
+                app.runWriteIntentReadAction<Unit, Nothing> {
+                    FileDocumentManager.getInstance().saveAllDocuments()
+                }
+            } else {
+                log.info("saveAllDocuments skipped: modality ${ModalityState.current()} is not write-safe")
             }
-        }
-    }
+        },
+        ModalityState.any()
+    )
 }
 
 private val capturedModality = ThreadLocal<ModalityState>()

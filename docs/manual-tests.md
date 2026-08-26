@@ -590,6 +590,9 @@ alongside one other repo works.
       it rather than repeating it
 - [ ] Working copy (@) selection maintained after refresh
 - [ ] No flickering during refresh
+- [ ] jj-idea-c4tp: open a large repo's log, click Refresh, then close the project while it is
+      still loading → project closes promptly (no multi-minute stall); idea.log shows the load
+      being cancelled rather than running to completion
 
 ### MT-CTXMENU
 
@@ -1279,6 +1282,10 @@ equally-weighted group of their own.
       ancestor); hidden when no pushed ancestor exists; for an unpushed historical version,
       resolves to the nearest pushed ancestor — verify in Working Copy Panel, Project Tool
       Window, Editors for Current Files, and Editors for Historical Versions
+- [ ] jj-idea-c4tp: right-click a file (editor or Working Copy panel) to open "Open in Remote"
+      immediately after opening the project (first menu open, cold cache) — submenu still lists
+      remotes correctly, with no `Synchronous execution under ReadAction` warning in Help → Show
+      Log
 
 #### Project Tool Window
 

@@ -1,5 +1,8 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.progress.ProcessCanceledException
+import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
@@ -79,19 +82,27 @@ class UnifiedJujutsuLogDataLoader(
                 repos.forEachIndexed { index, repo ->
                     runInBackground {
                         try {
-                            indicator.text2 = "Loading from ${repo.displayName}..."
-                            indicator.fraction = index.toDouble() / repos.size
+                            indicator.checkCanceled()
+                            ProgressManager.getInstance().runProcess(
+                                {
+                                    indicator.text2 = "Loading from ${repo.displayName}..."
+                                    indicator.fraction = index.toDouble() / repos.size
 
-                            val loadedEntries = repo.logCache.reload()
-                            entriesByRepo[repo] = loadedEntries
-                            log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
+                                    val loadedEntries = repo.logCache.reload()
+                                    entriesByRepo[repo] = loadedEntries
+                                    log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
 
-                            repo.logService.getBookmarks().onSuccess { bookmarkItems ->
-                                deletedNamesByRepo[repo] = bookmarkItems
-                                    .filter { it.bookmark.deleted && !it.bookmark.isRemote }
-                                    .map { it.bookmark.localName }
-                                    .toSet()
-                            }
+                                    repo.logService.getBookmarks().onSuccess { bookmarkItems ->
+                                        deletedNamesByRepo[repo] = bookmarkItems
+                                            .filter { it.bookmark.deleted && !it.bookmark.isRemote }
+                                            .map { it.bookmark.localName }
+                                            .toSet()
+                                    }
+                                },
+                                indicator
+                            )
+                        } catch (e: ProcessCanceledException) {
+                            log.info("Loading commits from $repo cancelled")
                         } catch (e: Exception) {
                             errors[repo] = e
                             log.warn("Exception loading commits from $repo: ${e.message}")
@@ -101,7 +112,10 @@ class UnifiedJujutsuLogDataLoader(
                     }
                 }
 
-                latch.await(5, TimeUnit.MINUTES)
+                if (!awaitCancellably(latch, indicator, TimeUnit.MINUTES.toMillis(5))) {
+                    log.info("Loading commits cancelled while waiting for repositories")
+                    throw ProcessCanceledException()
+                }
 
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) {
                     log.warn("All repositories failed to load - jj may not be installed")
@@ -115,6 +129,8 @@ class UnifiedJujutsuLogDataLoader(
                 graphNodes = graphBuilder.buildGraph(allEntries)
             },
             onSuccess = {
+                // A cancelled wait throws ProcessCanceledException above, which routes to onCancel()
+                // instead of here - so reaching onSuccess means the load actually completed.
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) return@executeInBackground
                 notify(Data(allEntries, graphNodes, defaultLimit))
             }
@@ -206,6 +222,28 @@ class UnifiedJujutsuLogDataLoader(
         log.info("Refreshing unified log")
         loadCommits()
     }
+}
+
+/**
+ * Waits for [latch] to reach zero, polling [indicator] for cancellation instead of blocking for
+ * the full [timeoutMs] (jj-idea-c4tp): a plain `latch.await(timeoutMs, ...)` inside a cancellable
+ * [com.intellij.openapi.progress.Task.Backgroundable] ignores `indicator.isCanceled` entirely, so
+ * closing the project while the log is still loading could stall for up to [timeoutMs].
+ *
+ * Returns `true` if the latch counted down in time, `false` if cancelled or the deadline passed.
+ */
+internal fun awaitCancellably(
+    latch: CountDownLatch,
+    indicator: ProgressIndicator,
+    timeoutMs: Long,
+    pollMs: Long = 100
+): Boolean {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+        if (latch.await(pollMs, TimeUnit.MILLISECONDS)) return true
+        if (indicator.isCanceled) return false
+    }
+    return latch.count == 0L
 }
 
 /**

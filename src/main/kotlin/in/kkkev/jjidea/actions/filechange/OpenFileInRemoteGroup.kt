@@ -29,7 +29,7 @@ class OpenFileInRemoteGroup : DefaultActionGroup() {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     private fun classifiedRemotes(entry: LogEntry) =
-        RemoteUrlBuilder.classifiedRemotes(entry.repo.gitRemotes)
+        RemoteUrlBuilder.classifiedRemotes(entry.repo.cachedGitRemotes)
 
     override fun update(e: AnActionEvent) {
         val entry = e.logEntry

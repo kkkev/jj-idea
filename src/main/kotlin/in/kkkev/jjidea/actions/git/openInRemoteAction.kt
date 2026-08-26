@@ -26,7 +26,7 @@ import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
  */
 fun openInRemoteGroup(repo: JujutsuRepository, commitId: CommitId, isPushed: Boolean): DefaultActionGroup =
     object : DefaultActionGroup() {
-        private fun remotes() = RemoteUrlBuilder.recognizedRemotes(repo.gitRemotes, commitId.full, isPushed)
+        private fun remotes() = RemoteUrlBuilder.recognizedRemotes(repo.cachedGitRemotes, commitId.full, isPushed)
 
         override fun getActionUpdateThread() = ActionUpdateThread.BGT
 

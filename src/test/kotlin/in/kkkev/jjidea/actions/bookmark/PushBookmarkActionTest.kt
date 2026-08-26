@@ -71,7 +71,7 @@ class PushBookmarkActionTest {
 
         @Test
         fun `hidden with no Git remotes`() {
-            every { repo.gitRemotes } returns emptyList()
+            every { repo.cachedGitRemotes } returns emptyList()
             val group = pushBookmarkAction(repo, Bookmark("main"), emptyList())
             group.update(event)
             presentation.isVisible shouldBe false
@@ -79,7 +79,7 @@ class PushBookmarkActionTest {
 
         @Test
         fun `transparent with one remote - up to date`() {
-            every { repo.gitRemotes } returns remotes("origin")
+            every { repo.cachedGitRemotes } returns remotes("origin")
             val group = pushBookmarkAction(repo, Bookmark("main"), listOf(Bookmark("main@origin", aheadCount = 0)))
             group.update(event)
             group.isPopup shouldBe false
@@ -91,7 +91,7 @@ class PushBookmarkActionTest {
 
         @Test
         fun `transparent with one remote - ahead`() {
-            every { repo.gitRemotes } returns remotes("origin")
+            every { repo.cachedGitRemotes } returns remotes("origin")
             val group = pushBookmarkAction(repo, Bookmark("main"), listOf(Bookmark("main@origin", aheadCount = 1)))
             val child = group.getChildren(event).single()
             child.update(event)
@@ -101,7 +101,7 @@ class PushBookmarkActionTest {
 
         @Test
         fun `submenu with two remotes, each evaluated independently`() {
-            every { repo.gitRemotes } returns remotes("origin", "github")
+            every { repo.cachedGitRemotes } returns remotes("origin", "github")
             val group = pushBookmarkAction(
                 repo,
                 Bookmark("main"),
@@ -138,7 +138,7 @@ class PushBookmarkActionTest {
 
         @Test
         fun `push to all remotes is disabled when every remote is up to date`() {
-            every { repo.gitRemotes } returns remotes("origin", "github")
+            every { repo.cachedGitRemotes } returns remotes("origin", "github")
             val group = pushBookmarkAction(
                 repo,
                 Bookmark("main"),
@@ -152,7 +152,7 @@ class PushBookmarkActionTest {
 
         @Test
         fun `a remote never tracked for this bookmark is still enabled`() {
-            every { repo.gitRemotes } returns remotes("origin")
+            every { repo.cachedGitRemotes } returns remotes("origin")
             val group = pushBookmarkAction(repo, Bookmark("new-thing"), emptyList())
             val child = group.getChildren(event).single()
             child.update(event)

@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updating the plugin without restarting the IDE no longer leaves a stale log window on screen, which could throw internal errors from its Fetch/Push toolbar buttons until the IDE was restarted. ([#73](https://github.com/kkkev/jj-idea/issues/73), [#86](https://github.com/kkkev/jj-idea/issues/86))
 - The file history table (right-click a file → "Show History") no longer shows blank Date, Author, and Committer columns. ([#88](https://github.com/kkkev/jj-idea/issues/88))
 - Sorting the file history table by its "Commit Time" column now orders rows by date instead of alphabetically by committer name.
+- Closing a project while the log is still loading no longer risks a multi-minute stall; the load is now cancelled promptly instead of waiting out a fixed timeout.
+- Removed a blocking `jj` call that could occasionally freeze "Open in Remote" and the bookmark Push submenu when opened for the first time in a session.
 
 ## [0.8.12] - 2026-08-23
 

@@ -40,6 +40,11 @@ abstract class BackgroundDataLoader(
             return
         }
 
+        // Not a "cancel the previous run" mechanism - the `loading` CAS above already prevents two
+        // runs overlapping, so this indicator is only ever the one about to be replaced by a
+        // project-close/reload-triggered restart. Actual mid-run cancellation (e.g. project
+        // dispose while loading) must come from the indicator's own owner calling cancel() on it;
+        // see UnifiedJujutsuLogDataLoader.awaitCancellably (jj-idea-c4tp) for a loader that respects it.
         currentIndicator.get()?.cancel()
 
         object : Task.Backgroundable(project, taskTitle, true) {

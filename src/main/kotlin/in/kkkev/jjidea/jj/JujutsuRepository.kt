@@ -36,6 +36,12 @@ interface JujutsuRepository : Displayable {
     /** Git remotes for this repository. Call from BGT only — may block on first access if not yet loaded. */
     val gitRemotes: List<GitRemote>
 
+    /**
+     * Non-blocking git remotes for this repository — safe to call from a read action (jj-idea-c4tp),
+     * unlike [gitRemotes]. See [in.kkkev.jjidea.util.NotifiableState.cachedValue].
+     */
+    val cachedGitRemotes: List<GitRemote>
+
     fun getLogEntry(revision: Revision): LogEntry
     fun getLogEntry(contentLocator: ContentLocator): LogEntry?
     fun getLogEntry(changeId: ChangeId) = getLogEntry(changeId as Revision)
@@ -83,6 +89,17 @@ data class JujutsuRepositoryImpl(
      */
     override val gitRemotes: List<GitRemote>
         get() = project.stateModel.gitRemotes.immediateValue[directory.path].orEmpty()
+
+    /**
+     * Non-blocking counterpart to [gitRemotes] (jj-idea-c4tp): action `update()`/`getChildren()` run
+     * under a read action even on [com.intellij.openapi.actionSystem.ActionUpdateThread.BGT], where a
+     * synchronous `jj git remote list` shell-out (as [gitRemotes] can trigger on a cold cache) is
+     * forbidden — same hazard [in.kkkev.jjidea.actions.file.TrackedToggleAction] documents for tracked
+     * file state. Use this from any such context; use [gitRemotes] only where blocking is acceptable
+     * (e.g. [in.kkkev.jjidea.vcs.history.JujutsuHistoryProvider], off the EDT).
+     */
+    override val cachedGitRemotes: List<GitRemote>
+        get() = project.stateModel.gitRemotes.cachedValue[directory.path].orEmpty()
 
     private fun requireInitialised() {
         check(isInitialised) { "Repository at ${directory.path} is not initialized. Use initExecutor for gitInit." }

@@ -56,6 +56,28 @@ interface NotifiableState<T> {
      */
     val immediateValue: T
 
+    /**
+     * Returns the current cached [value] without ever blocking, firing off a background
+     * [invalidate] if the state has not loaded yet.
+     *
+     * ## When to use
+     * Call this from a read action or an action's `update()`/`getChildren()` (even on
+     * [com.intellij.openapi.actionSystem.ActionUpdateThread.BGT]) - platform code runs those under
+     * a read action, where a synchronous shell-out (as [immediateValue] can do on a cold cache)
+     * is forbidden (jj-idea-c4tp; see [in.kkkev.jjidea.actions.file.TrackedToggleAction] for the
+     * same pattern applied to tracked-file state).
+     *
+     * ## What it does NOT do
+     * Never blocks and never guarantees a fresh value: a caller on a cold cache gets [T]'s start
+     * value once, with the real value arriving asynchronously via [connect] on the next
+     * [invalidate] completion.
+     */
+    val cachedValue: T
+        get() {
+            if (!hasLoaded) invalidate()
+            return value
+        }
+
     fun connect(parent: Disposable, handler: Listener<T>)
 
     fun invalidate()
@@ -140,7 +162,15 @@ class SimpleNotifiableState<T : Any>(
         private set
 
     override val immediateValue: T
-        get() = if (!equalityCheck(value, startValue)) value else loader()
+        get() {
+            // Gate on hasLoaded, not equalityCheck(value, startValue) (jj-idea-c4tp): a repo that
+            // genuinely loads to the same value as startValue (e.g. no git remotes) would otherwise
+            // look "not yet loaded" forever and re-run loader() synchronously on every access.
+            if (hasLoaded) return value
+            val loaded = loader()
+            hasLoaded = true
+            return loaded
+        }
 
     override suspend fun awaitLoad(timeoutMs: Long): T {
         if (!equalityCheck(value, startValue)) return value

@@ -56,7 +56,7 @@ class OpenInRemoteFromEditorGroup : DefaultActionGroup() {
 
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         val repo = e?.repoForFileOrDiff ?: return emptyArray()
-        return RemoteUrlBuilder.classifiedRemotes(repo.gitRemotes).map { remote ->
+        return RemoteUrlBuilder.classifiedRemotes(repo.cachedGitRemotes).map { remote ->
             editorRemoteAction(remote)
         }.toTypedArray()
     }
@@ -66,7 +66,7 @@ class OpenInRemoteFromEditorGroup : DefaultActionGroup() {
             e.presentation.isVisible = false
             return
         }
-        applyRemoteVisibility(e, RemoteUrlBuilder.classifiedRemotes(repo.gitRemotes).size)
+        applyRemoteVisibility(e, RemoteUrlBuilder.classifiedRemotes(repo.cachedGitRemotes).size)
     }
 }
 

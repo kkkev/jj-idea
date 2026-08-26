@@ -544,7 +544,7 @@ class FileChangeActionVisibilityTest {
 
         @Test
         fun `visible when LOG_ENTRY is working copy with pushed ancestor`() {
-            every { repo.gitRemotes } returns listOf(GitRemote("origin", "https://github.com/user/repo.git"))
+            every { repo.cachedGitRemotes } returns listOf(GitRemote("origin", "https://github.com/user/repo.git"))
             withLogEntry(workingCopyEntry(hasPushedAncestor = true))
             withChanges(historicalChange("Main.kt"))
             OpenFileInRemoteGroup().update(event)

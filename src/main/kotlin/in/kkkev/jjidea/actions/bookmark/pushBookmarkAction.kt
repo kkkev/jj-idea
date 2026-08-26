@@ -84,7 +84,7 @@ fun pushBookmarkAction(
         override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
         override fun getChildren(e: AnActionEvent?): Array<AnAction> {
-            val perRemote = repo.gitRemotes.map { gitRemote ->
+            val perRemote = repo.cachedGitRemotes.map { gitRemote ->
                 val remoteBookmark = remoteBookmarks.find { it.remote == gitRemote.name }
                 Remote(gitRemote.name) to remoteBookmark
             }
@@ -104,7 +104,7 @@ fun pushBookmarkAction(
 
         override fun update(e: AnActionEvent) {
             val popupText = JujutsuBundle.message("action.bookmark.push.popup", bookmark.name)
-            applyRemoteVisibility(e, repo.gitRemotes.size, popupText)
+            applyRemoteVisibility(e, repo.cachedGitRemotes.size, popupText)
         }
     }
 
