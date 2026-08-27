@@ -13,8 +13,12 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
-import `in`.kkkev.jjidea.ui.components.*
-import `in`.kkkev.jjidea.ui.log.*
+import `in`.kkkev.jjidea.ui.common.createSourcePanel
+import `in`.kkkev.jjidea.ui.common.createVerticalPanel
+import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
+import `in`.kkkev.jjidea.ui.log.GraphNode
+import `in`.kkkev.jjidea.ui.log.JujutsuGraphAndDescriptionRenderer
+import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -144,7 +148,7 @@ class RebaseDialog(
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             add(createSectionLabel(JujutsuBundle.message("dialog.rebase.source")))
             add(Box.createVerticalStrut(JBUI.scale(4)))
-            add(createSourcePanel())
+            add(createSourcePanel(project, sourceEntries))
             add(Box.createVerticalStrut(JBUI.scale(8)))
             add(createSectionLabel(JujutsuBundle.message("dialog.rebase.source.mode")))
             add(Box.createVerticalStrut(JBUI.scale(4)))
@@ -198,30 +202,7 @@ class RebaseDialog(
         return label
     }
 
-    private fun createSourcePanel() = IconAwareHtmlPane(project).apply {
-        alignmentX = JPanel.LEFT_ALIGNMENT
-        text = htmlString {
-            append(sourceEntries, separator = "\n") { entry ->
-                appendStatusIndicators(entry)
-                append(entry.id)
-                append(" ")
-                appendDescriptionAndEmptyIndicator(entry)
-                append(" ")
-                appendDecorations(entry)
-            }
-        }
-    }
-
-    private fun createSourceModePanel(): JComponent {
-        val panel = JPanel()
-        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.alignmentX = JPanel.LEFT_ALIGNMENT
-        panel.border = JBUI.Borders.empty(0, 8)
-        panel.add(sourceModeRevision)
-        panel.add(sourceModeSource)
-        panel.add(sourceModeBranch)
-        return panel
-    }
+    private fun createSourceModePanel() = createVerticalPanel(sourceModeRevision, sourceModeSource, sourceModeBranch)
 
     private fun createDestinationPanel(): JComponent {
         val panel = JPanel(BorderLayout())
@@ -238,16 +219,7 @@ class RebaseDialog(
         return panel
     }
 
-    private fun createPlacementModePanel(): JComponent {
-        val panel = JPanel()
-        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.alignmentX = JPanel.LEFT_ALIGNMENT
-        panel.border = JBUI.Borders.empty(0, 8)
-        panel.add(destModeOnto)
-        panel.add(destModeAfter)
-        panel.add(destModeBefore)
-        return panel
-    }
+    private fun createPlacementModePanel() = createVerticalPanel(destModeOnto, destModeAfter, destModeBefore)
 
     private fun loadDestinations(query: String) {
         val trimmed = query.trim()

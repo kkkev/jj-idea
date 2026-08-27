@@ -10,6 +10,7 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.common.createVerticalPanel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.duplicate.validPlacementModes
 import `in`.kkkev.jjidea.ui.log.*
@@ -197,16 +198,8 @@ class NewChangeDialog(
         }
     }
 
-    private fun createPlacementModePanel(): JComponent {
-        val panel = JPanel()
-        panel.layout = BoxLayout(panel, BoxLayout.Y_AXIS)
-        panel.alignmentX = JPanel.LEFT_ALIGNMENT
-        panel.border = JBUI.Borders.empty(0, 8)
-        panel.add(destModeOnto)
-        panel.add(destModeAfter)
-        panel.add(destModeBefore)
-        return panel
-    }
+    private fun createPlacementModePanel(): JComponent =
+        createVerticalPanel(destModeOnto, destModeAfter, destModeBefore)
 
     /**
      * Disable placement modes the fixed [targetEntries] can't support (see

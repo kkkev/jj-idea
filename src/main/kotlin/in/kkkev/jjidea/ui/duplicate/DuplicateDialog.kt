@@ -12,7 +12,7 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
-import `in`.kkkev.jjidea.ui.components.*
+import `in`.kkkev.jjidea.ui.common.createSourcePanel
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -122,7 +122,7 @@ class DuplicateDialog(
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             add(createSectionLabel(JujutsuBundle.message("dialog.duplicate.source")))
             add(Box.createVerticalStrut(JBUI.scale(4)))
-            add(createSourcePanel())
+            add(createSourcePanel(project, sourceEntries))
             add(Box.createVerticalStrut(JBUI.scale(12)))
             add(JSeparator().apply { alignmentX = JPanel.LEFT_ALIGNMENT })
             add(Box.createVerticalStrut(JBUI.scale(12)))
@@ -153,20 +153,6 @@ class DuplicateDialog(
         label.font = label.font.deriveFont(java.awt.Font.BOLD)
         label.alignmentX = JLabel.LEFT_ALIGNMENT
         return label
-    }
-
-    private fun createSourcePanel() = IconAwareHtmlPane(project).apply {
-        alignmentX = JPanel.LEFT_ALIGNMENT
-        text = htmlString {
-            append(sourceEntries, separator = "\n") { entry ->
-                appendStatusIndicators(entry)
-                append(entry.id)
-                append(" ")
-                appendDescriptionAndEmptyIndicator(entry)
-                append(" ")
-                appendDecorations(entry)
-            }
-        }
     }
 
     private fun createDestinationPanel(): JComponent {
