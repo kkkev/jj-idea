@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
-import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
@@ -82,25 +81,26 @@ class UnifiedJujutsuLogDataLoader(
                 repos.forEachIndexed { index, repo ->
                     runInBackground {
                         try {
+                            // checkCanceled (not ProgressManager.runProcess(indicator)) - the
+                            // indicator is already owned by this Task.Backgroundable's thread;
+                            // wrapping it again from these pooled threads made CoreProgressManager
+                            // report "already running under this indicator" as a data race. This
+                            // check only skips repos that haven't started yet on cancellation; an
+                            // in-flight jj call still runs to completion (killing it is jj-idea-1a4c's job).
                             indicator.checkCanceled()
-                            ProgressManager.getInstance().runProcess(
-                                {
-                                    indicator.text2 = "Loading from ${repo.displayName}..."
-                                    indicator.fraction = index.toDouble() / repos.size
+                            indicator.text2 = "Loading from ${repo.displayName}..."
+                            indicator.fraction = index.toDouble() / repos.size
 
-                                    val loadedEntries = repo.logCache.reload()
-                                    entriesByRepo[repo] = loadedEntries
-                                    log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
+                            val loadedEntries = repo.logCache.reload()
+                            entriesByRepo[repo] = loadedEntries
+                            log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
 
-                                    repo.logService.getBookmarks().onSuccess { bookmarkItems ->
-                                        deletedNamesByRepo[repo] = bookmarkItems
-                                            .filter { it.bookmark.deleted && !it.bookmark.isRemote }
-                                            .map { it.bookmark.localName }
-                                            .toSet()
-                                    }
-                                },
-                                indicator
-                            )
+                            repo.logService.getBookmarks().onSuccess { bookmarkItems ->
+                                deletedNamesByRepo[repo] = bookmarkItems
+                                    .filter { it.bookmark.deleted && !it.bookmark.isRemote }
+                                    .map { it.bookmark.localName }
+                                    .toSet()
+                            }
                         } catch (e: ProcessCanceledException) {
                             log.info("Loading commits from $repo cancelled")
                         } catch (e: Exception) {
