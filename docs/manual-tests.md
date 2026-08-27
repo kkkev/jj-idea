@@ -599,14 +599,14 @@ alongside one other repo works.
 
 **Log row context menu actions**
 
-**Code:** `actions/change/`, `ui/duplicate/DuplicateDialog.kt`, `ui/duplicate/DuplicateImmutabilityGuard.kt`, `ui/common/JujutsuCompareChangesPanel.kt`, `ui/components/RevisionSelectorPopup.kt`
-**Also re-run:** MT-SQUASH, MT-SPLIT (share the commit picker); MT-DIFF (Compare with Working Copy / Show Diff in New Tab reuse the RevisionSelectorPopup and Changes-pane view)
+**Code:** `actions/change/`, `ui/duplicate/DuplicateDialog.kt`, `ui/duplicate/DuplicateImmutabilityGuard.kt`, `ui/newchange/NewChangeDialog.kt`, `ui/rebase/RebasePreviewPanel.kt`, `ui/rebase/RebaseSimulator.kt`, `ui/common/JujutsuCompareChangesPanel.kt`, `ui/components/RevisionSelectorPopup.kt`
+**Also re-run:** MT-SQUASH, MT-SPLIT (share the commit picker); MT-DIFF (Compare with Working Copy / Show Diff in New Tab reuse the RevisionSelectorPopup and Changes-pane view); MT-WORKINGCOPY (its "New Change" button shares `CommandExecutor.new`)
 
 - [ ] Right-click opens context menu
 - [ ] **Copy Change ID** works and copies to clipboard
 - [ ] **Copy Description** works and copies to clipboard
 - [ ] **New Change From This** (primary, no dialog) creates new change directly and refreshes
-- [ ] **New Change with Description...** (secondary) opens the description dialog and creates the change
+- [ ] **New Change...** (secondary) opens the New Change dialog and creates the change
 - [ ] **Edit** action changes working copy
 - [ ] **Describe** action opens dialog and updates description
 - [ ] **Abandon** action removes change after confirmation
@@ -659,6 +659,35 @@ In a **multi-repo** project (multiple `.jj` roots open together):
 - [ ] With the **editor** focused (not the log), Cmd/Ctrl+Shift+N still triggers the IDE's normal Go to File / New Scratch File action - it is not intercepted
 - [ ] Multi-selecting two commits (same repo) and choosing **New Change From These** (or the shortcut) creates a merge change with both as parents
 - [ ] Multi-selecting commits across two repos in a multi-root project: **New Change From This/These** is disabled/hidden (no arbitrary repo is picked)
+
+#### New Change... dialog (jj-idea-grc8, GitHub #83)
+
+Build a small stack `A → B → C` (three plain changes) for this section.
+
+- [ ] Right-click B → **New Change...** opens a dialog showing B as the target, an empty
+      description field, placement radios (Onto/Insert after/Insert before, Onto selected by
+      default), a "Switch working copy to the new change" checkbox (checked), and a live preview
+      graph
+- [ ] **Onto** + typing a description + Enter: behaves exactly like the old "New Change with
+      Description..." — creates a plain child of B with that description, `@` moves to it, same
+      keystrokes as before
+- [ ] **Insert after**: preview shows the new change between B and C; clicking Create makes it
+      so — C is rebased onto the new change, `@` moves to it, log reselects it
+- [ ] **Insert before**: preview shows the new change between A and B; clicking Create makes it
+      so — B (and C) are rebased onto the new change, `@` moves to it
+- [ ] Unchecking "Switch working copy to the new change" before clicking Create: the change is
+      inserted but `@` stays on its prior commit (`jj new --no-edit`)
+- [ ] Preview fidelity: for each placement mode, the graph shown before clicking Create matches
+      what the log shows immediately after
+- [ ] Multi-selecting B and another head, then **Insert after**: creates a merge change with both
+      as parents and relocates both targets' children onto it
+- [ ] Right-clicking an **immutable** change and choosing New Change...: **Insert before** is
+      disabled (would rewrite the immutable target); **Insert after** stays enabled unless the
+      target has an immutable child, matching the Duplicate Onto... immutability guard above
+- [ ] Cross-repo multi-select in a multi-root project: the action is disabled/hidden (no arbitrary
+      repo is picked), same as **New Change From This/These**
+- [ ] Right-clicking a `jjc://` change-navigation link (e.g. a parent reference in the commit
+      details panel) still offers **New Change...** and it acts on the link's target
 
 #### Compare with Working Copy (jj-idea-a6cz, jj-idea-vtdl)
 

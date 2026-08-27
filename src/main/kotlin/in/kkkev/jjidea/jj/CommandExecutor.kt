@@ -98,12 +98,25 @@ interface CommandExecutor {
     fun describe(description: Description, revision: Revision = WorkingCopy): CommandResult
 
     /**
-     * Create a new change on top of the current one
+     * Create a new change.
      * @param description Optional description for the new change
-     * @param parentRevisions Optional parent revisions (default: current working copy)
+     * @param parentRevisions Optional parent revisions (default: current working copy). With
+     *   [destinationMode] `ONTO` (the default) these are the new change's positional parents,
+     *   exactly like `jj new <revs>`. With `INSERT_AFTER`/`INSERT_BEFORE`, each is passed as a
+     *   separate `-A`/`-B` (`jj new -A/-B <rev>`), inserting the new change after/before that
+     *   revision and rebasing its affected descendants onto it - `jj new` has no `--onto` flag,
+     *   so [RebaseDestinationMode.ONTO]'s `flag` string is never used here.
+     * @param edit Whether to move the working copy to the new change (default: `true`, matching
+     *   `jj new`'s default). `false` passes `--no-edit`, leaving `@` where it was - useful when
+     *   inserting a placeholder mid-stack without interrupting current work.
      * @return Command result
      */
-    fun new(description: Description, parentRevisions: List<Revision> = listOf(WorkingCopy)): CommandResult
+    fun new(
+        description: Description,
+        parentRevisions: List<Revision> = listOf(WorkingCopy),
+        destinationMode: RebaseDestinationMode = RebaseDestinationMode.ONTO,
+        edit: Boolean = true
+    ): CommandResult
 
     /**
      * Abandon a change (remove it from the log)

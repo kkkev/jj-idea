@@ -349,7 +349,26 @@ fun TextCanvas.appendConflict(entry: LogEntry) {
     }
 }
 
+/**
+ * Minimal row/tooltip content for a [LogEntry.pending] entry - a not-yet-created change
+ * previewed by e.g. [in.kkkev.jjidea.ui.newchange.NewChangeDialog]. Deliberately doesn't touch
+ * bookmarks/tags/status badges, or build a [ChangeKey]-based `jjc://` navigation link the way
+ * [appendSummary]/[appendSummaryAndStatuses] do for a real entry: a pending entry structurally
+ * has none of that (no backing commit to link to), so the renderer never attempts to paint it,
+ * rather than needing believable placeholder values on a synthetic [LogEntry].
+ */
+fun TextCanvas.appendPendingSummary(entry: LogEntry) {
+    grey { italic { append(message("status.pending")) } }
+    append(" ")
+    appendDescriptionAndEmptyIndicator(entry)
+}
+
 fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
+    if (entry.pending) {
+        appendPendingSummary(entry)
+        return
+    }
+
     append(entry.repo)
     append("\n")
 

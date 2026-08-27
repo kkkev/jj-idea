@@ -99,7 +99,7 @@ object JujutsuLogContextMenuActions {
         if (liveSelection) {
             ActionManager.getInstance().getAction("Jujutsu.NewChange")?.let { add(it) }
         }
-        add(newChangeFromAction(project, uniqueRepo, entries.map { it.id }))
+        add(newChangeFromAction(project, uniqueRepo, entries))
 
         // Offer "Edit" for non-working-copy, non-immutable changes
         if (liveSelection) {

@@ -83,16 +83,23 @@ internal class LaidOutCell(
             frc: FontRenderContext
         ): LaidOutCell {
             val leftCanvas = entryCanvas(entry, fg, linkifier) {
-                if (columnManager.showStatus) appendStatusIndicators(entry)
-                if (columnManager.showChangeId) {
-                    append(entry.id)
-                    append(" ")
-                }
-                if (columnManager.showDescription) {
-                    appendDescriptionAndEmptyIndicator(entry)
+                if (entry.pending) {
+                    // A pending entry (see LogEntry.pending) has no real id/bookmarks/tags/status
+                    // to show - paint only its in-progress description, never the real-commit
+                    // fields below.
+                    appendPendingSummary(entry)
+                } else {
+                    if (columnManager.showStatus) appendStatusIndicators(entry)
+                    if (columnManager.showChangeId) {
+                        append(entry.id)
+                        append(" ")
+                    }
+                    if (columnManager.showDescription) {
+                        appendDescriptionAndEmptyIndicator(entry)
+                    }
                 }
             }
-            val decorations = if (columnManager.showDecorations) {
+            val decorations = if (columnManager.showDecorations && !entry.pending) {
                 cappedDecorations(entry, fg, columnWidth * DECORATION_WIDTH_FRACTION, font, frc, linkifier)
             } else {
                 CappedDecorations(FragmentRecordingCanvas(), emptyList())

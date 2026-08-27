@@ -4,6 +4,7 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.jj.cli.bookmarkListArgs
+import `in`.kkkev.jjidea.jj.cli.newArgs
 
 /**
  * Adapts [JjStub] to the [CommandExecutor] interface for integration tests.
@@ -134,8 +135,11 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
 
     override fun new(
         description: Description,
-        parentRevisions: List<Revision>
-    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+        parentRevisions: List<Revision>,
+        destinationMode: RebaseDestinationMode,
+        edit: Boolean
+    ): CommandExecutor.CommandResult =
+        toResult(stub.run(*newArgs(description, parentRevisions, destinationMode, edit).toTypedArray()))
 
     override fun abandon(revision: Revision): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")

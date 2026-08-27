@@ -21,11 +21,18 @@ abstract class MutatingCommandsContractTest {
     abstract fun createBackend(tempDir: Path): JjBackend
 
     private val fields = CliLogService.LogFields()
+
+    // Field order/positions (0-indexed): changeId, commitId, description, bookmarks, tags,
+    // parents, currentWorkingCopy, conflict, empty, immutable. `tags` is included (even though
+    // no test here currently reads it) because JjStub.formatLogEntry always emits it in this
+    // position regardless of what the template requests - omitting it here would desync this
+    // test's field indices between the CLI backend (which honors the spec exactly) and the stub.
     private val basicSpec = listOf(
         fields.changeId,
         fields.commitId,
         fields.description,
         fields.bookmarks,
+        fields.tags,
         fields.parents,
         fields.currentWorkingCopy,
         fields.conflict,
@@ -62,6 +69,62 @@ abstract class MutatingCommandsContractTest {
 
         // New working copy should have a different change id
         (afterChangeId != beforeChangeId) shouldBe true
+    }
+
+    @Test
+    fun `new --insert-after relocates the target's child onto the new change`() {
+        jj.describe("A")
+        jj.newChange("B")
+
+        val bLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val bChangeId = bLog.stdout.trim().split("\u0000")[0].split("~")[0]
+
+        val aLog = jj.run("log", "-r", "@-", "--no-graph", "-T", basicSpec)
+        val aChangeId = aLog.stdout.trim().split("\u0000")[0].split("~")[0]
+
+        val result = jj.run("new", "-A", aChangeId, "-m", "Inserted")
+        result.isSuccess shouldBe true
+
+        // The new change becomes @, parented directly on A.
+        val newLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val newFields = newLog.stdout.trim().split("\u0000")
+        newFields[2] shouldBe "Inserted\n"
+        newFields[5] shouldContain aChangeId
+        val newChangeId = newFields[0].split("~")[0]
+
+        // B, formerly A's child, is now the new change's child instead.
+        val bAfterLog = jj.run("log", "-r", bChangeId, "--no-graph", "-T", basicSpec)
+        val bAfterFields = bAfterLog.stdout.trim().split("\u0000")
+        bAfterFields[5] shouldContain newChangeId
+        bAfterFields[5] shouldNotContainString aChangeId
+    }
+
+    @Test
+    fun `new --insert-before rewrites the target's parent to the new change`() {
+        jj.describe("A")
+        jj.newChange("B")
+
+        val bLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val bChangeId = bLog.stdout.trim().split("\u0000")[0].split("~")[0]
+
+        val aLog = jj.run("log", "-r", "@-", "--no-graph", "-T", basicSpec)
+        val aChangeId = aLog.stdout.trim().split("\u0000")[0].split("~")[0]
+
+        val result = jj.run("new", "-B", bChangeId, "-m", "Inserted")
+        result.isSuccess shouldBe true
+
+        // The new change becomes @, taking B's old parent (A).
+        val newLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+        val newFields = newLog.stdout.trim().split("\u0000")
+        newFields[2] shouldBe "Inserted\n"
+        newFields[5] shouldContain aChangeId
+        val newChangeId = newFields[0].split("~")[0]
+
+        // B keeps its change id but is now parented on the new change instead of A.
+        val bAfterLog = jj.run("log", "-r", bChangeId, "--no-graph", "-T", basicSpec)
+        val bAfterFields = bAfterLog.stdout.trim().split("\u0000")
+        bAfterFields[5] shouldContain newChangeId
+        bAfterFields[5] shouldNotContainString aChangeId
     }
 
     @Test
@@ -271,21 +334,21 @@ abstract class MutatingCommandsContractTest {
         jj.describe("Original commit")
 
         val beforeLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
-        val originalChangeId = beforeLog.stdout.trim().split(" ")[0].split("~")[0]
+        val originalChangeId = beforeLog.stdout.trim().split("\u0000")[0].split("~")[0]
 
         val result = jj.run("split", "-r", "@", "-B", "@", "-m", "New parent (a.txt)", "a.txt")
         result.isSuccess shouldBe true
 
         // The working copy itself keeps the original change ID unchanged.
         val afterLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
-        val afterFields = afterLog.stdout.trim().split(" ")
+        val afterFields = afterLog.stdout.trim().split("\u0000")
         afterFields[0].split("~")[0] shouldBe originalChangeId
         // Remaining side keeps the original description (not re-described by -m).
         afterFields[2] shouldBe "Original commit\n"
 
         // The new parent got a genuinely different change ID and the -m description.
         val newParentLog = jj.run("log", "-r", "@-", "--no-graph", "-T", basicSpec)
-        val newParentFields = newParentLog.stdout.trim().split(" ")
+        val newParentFields = newParentLog.stdout.trim().split("\u0000")
         newParentFields[0].split("~")[0] shouldNotBe originalChangeId
         newParentFields[2] shouldBe "New parent (a.txt)\n"
     }
@@ -317,14 +380,14 @@ abstract class MutatingCommandsContractTest {
         jj.describe("Original commit")
 
         val beforeLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
-        val originalChangeId = beforeLog.stdout.trim().split(" ")[0].split("~")[0]
+        val originalChangeId = beforeLog.stdout.trim().split("\u0000")[0].split("~")[0]
 
         jj.run("split", "-r", "@", "-B", "@", "-m", "New parent", "a.txt")
         val describeResult = jj.run("describe", "-r", originalChangeId, "-m", "Edited remaining desc")
         describeResult.isSuccess shouldBe true
 
         val afterLog = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
-        val afterFields = afterLog.stdout.trim().split(" ")
+        val afterFields = afterLog.stdout.trim().split("\u0000")
         afterFields[0].split("~")[0] shouldBe originalChangeId
         afterFields[2] shouldBe "Edited remaining desc\n"
     }

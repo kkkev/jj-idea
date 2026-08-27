@@ -58,12 +58,19 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
 
     /**
      * Update the preview by simulating the rebase and rebuilding the graph.
+     *
+     * @param sourceLabel Override for the summary's source description (e.g. "the new change"),
+     *   for callers whose "source" entries don't already exist as real commits - see
+     *   [in.kkkev.jjidea.ui.newchange.NewChangeDialog], which simulates `jj new` by passing a
+     *   synthetic, not-yet-created [LogEntry] as the source. `null` (default) keeps the normal
+     *   short-id/"N changes" summary used for a real rebase source.
      */
     fun update(
         sourceEntries: List<LogEntry>,
         destinationIds: Set<ChangeId>,
         sourceMode: RebaseSourceMode,
-        destinationMode: RebaseDestinationMode
+        destinationMode: RebaseDestinationMode,
+        sourceLabel: String? = null
     ) {
         val simulation = RebaseSimulator.simulate(
             allEntries,
@@ -85,7 +92,7 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
         }
 
         updateRenderer()
-        updateDescription(simulation.sourceIds, destinationIds, sourceMode, destinationMode)
+        updateDescription(simulation.sourceIds, destinationIds, sourceMode, destinationMode, sourceLabel)
     }
 
     private fun updateRenderer() {
@@ -102,14 +109,15 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
         sourceIds: Set<ChangeId>,
         destinationIds: Set<ChangeId>,
         sourceMode: RebaseSourceMode,
-        destinationMode: RebaseDestinationMode
+        destinationMode: RebaseDestinationMode,
+        sourceLabel: String? = null
     ) {
         if (sourceIds.isEmpty() || destinationIds.isEmpty()) {
             descriptionLabel.text = ""
             return
         }
 
-        val sourceText = if (sourceIds.size == 1) {
+        val sourceText = sourceLabel ?: if (sourceIds.size == 1) {
             sourceIds.first().short
         } else {
             "${sourceIds.size} changes"

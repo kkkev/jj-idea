@@ -193,16 +193,80 @@ class JjStub(override val workDir: Path) : JjBackend {
         return ok()
     }
 
+    /**
+     * `jj new`. Three placement modes, mirroring [in.kkkev.jjidea.jj.cli.newArgs]:
+     * - Default (positional revsets, or none = `@`): the new change is a plain child.
+     * - `-A <revset>` (repeatable): the new change becomes a parent of the given target(s)'
+     *   *current* children - those children are reparented onto it - while the target(s)
+     *   themselves are unchanged and become the new change's parents.
+     * - `-B <revset>` (repeatable): the new change is inserted *before* the target(s), taking
+     *   their combined parents; each target is then reparented onto the new change.
+     *
+     * `--no-edit` skips moving `@` to the new change (default: moves it, like real `jj new`).
+     */
     private fun cmdNew(args: List<String>): JjBackend.Result {
-        val message = args.flagValue("-m") ?: ""
+        val message = args.messageValue()
+        val edit = "--no-edit" !in args
+
+        val insertAfter = mutableListOf<String>()
+        val insertBefore = mutableListOf<String>()
+        val positionalParents = mutableListOf<String>()
+
+        var i = 1 // skip "new"
+        while (i < args.size) {
+            when (args[i]) {
+                "-A" -> {
+                    insertAfter.add(args[i + 1])
+                    i += 2
+                }
+                "-B" -> {
+                    insertBefore.add(args[i + 1])
+                    i += 2
+                }
+                "-m" -> i += 2
+                "--no-edit" -> i += 1
+                else -> {
+                    if (!args[i].startsWith("--message=")) positionalParents.add(args[i])
+                    i += 1
+                }
+            }
+        }
+
         // Snapshot working copy files before creating new change
         snapshotWorkingCopy()
-        val wc = newStubChange(
-            description = message,
-            parentIds = listOf(workingCopy.commitId)
-        )
-        changes.add(wc)
-        workingCopyIndex = changes.size - 1
+
+        when {
+            insertAfter.isNotEmpty() -> {
+                val targets = insertAfter.map { resolveOne(it) }
+                val newChange = newStubChange(description = message, parentIds = targets.map { it.commitId })
+                // Reparent each target's existing children onto the new change *before* adding
+                // it to `changes`, so the new change's own (still-correct) parentIds aren't
+                // rewritten by the same pass.
+                targets.forEach { target -> reparentChildren(target.commitId, newChange.commitId) }
+                changes.add(newChange)
+                if (edit) workingCopyIndex = changes.size - 1
+            }
+            insertBefore.isNotEmpty() -> {
+                val targets = insertBefore.map { resolveOne(it) }
+                val newChange = newStubChange(
+                    description = message,
+                    parentIds = targets.flatMap { it.parentIds }.distinct()
+                )
+                changes.add(newChange)
+                targets.forEach { target ->
+                    val idx = changes.indexOf(target)
+                    changes[idx] = target.copy(commitId = nextCommitId(), parentIds = listOf(newChange.commitId))
+                }
+                if (edit) workingCopyIndex = changes.indexOf(newChange)
+            }
+            else -> {
+                val parentIds = positionalParents.map { resolveOne(it).commitId }
+                    .ifEmpty { listOf(workingCopy.commitId) }
+                val newChange = newStubChange(description = message, parentIds = parentIds)
+                changes.add(newChange)
+                if (edit) workingCopyIndex = changes.size - 1
+            }
+        }
         return ok()
     }
 
@@ -953,6 +1017,14 @@ class JjStub(override val workDir: Path) : JjBackend {
         val idx = indexOf(flag)
         return if (idx >= 0 && idx + 1 < size) this[idx + 1] else null
     }
+
+    /**
+     * A `-m` description, accepting both the separate-token form used by [JjBackend]'s test
+     * helpers (`"-m", message`) and the fused `--message=...` form the plugin's `CliExecutor`
+     * emits (e.g. `newArgs`/`splitArgs`).
+     */
+    private fun List<String>.messageValue(): String =
+        flagValue("-m") ?: firstOrNull { it.startsWith("--message=") }?.removePrefix("--message=") ?: ""
 
     private val List<String>.withoutFlags get() = buildList {
         var i = 0

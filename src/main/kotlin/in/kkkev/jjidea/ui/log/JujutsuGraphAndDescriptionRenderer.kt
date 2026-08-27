@@ -129,6 +129,13 @@ class JujutsuGraphAndDescriptionRenderer(
         }
 
         private fun buildTooltip(entry: LogEntry) = htmlString(linkifier = linkifier) {
+            if (entry.pending) {
+                // No repo/author/id to show - appendSummaryAndStatuses already covers the whole
+                // tooltip content for a pending entry.
+                appendSummaryAndStatuses(entry)
+                return@htmlString
+            }
+
             appendSummaryAndStatuses(entry)
             entry.author?.let { author ->
                 append(author)

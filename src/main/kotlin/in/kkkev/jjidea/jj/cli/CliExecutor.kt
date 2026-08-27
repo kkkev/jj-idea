@@ -285,6 +285,31 @@ internal fun squashIntoArgs(
     }
 }
 
+/**
+ * Build the argument list for `jj new`.
+ *
+ * `jj new` has no `--onto` flag - with [destinationMode] `ONTO`, [parentRevisions] are emitted
+ * as positional revsets; [RebaseDestinationMode.ONTO]'s `flag` string is ignored. With
+ * `INSERT_AFTER`/`INSERT_BEFORE`, each revision is emitted as its own `-A`/`-B`.
+ */
+internal fun newArgs(
+    description: Description,
+    parentRevisions: List<Revision>,
+    destinationMode: RebaseDestinationMode = RebaseDestinationMode.ONTO,
+    edit: Boolean = true
+): List<String> = buildList {
+    add("new")
+    if (!description.empty) add("--message=${description.actual}")
+    if (!edit) add("--no-edit")
+    when (destinationMode) {
+        RebaseDestinationMode.ONTO -> addAll(parentRevisions.map { it.toString() })
+        else -> parentRevisions.forEach {
+            add(destinationMode.flag)
+            add(it.toString())
+        }
+    }
+}
+
 /** Build the argument list for `jj rebase`. */
 internal fun duplicateArgs(
     revisions: List<Revision>,
@@ -414,14 +439,12 @@ class CliExecutor(
     override fun describe(description: Description, revision: Revision) =
         execute(root, listOf("describe", "-r", revision, "--message=${description.actual}"))
 
-    override fun new(description: Description, parentRevisions: List<Revision>): CommandExecutor.CommandResult {
-        val args = mutableListOf("new")
-        if (!description.empty) {
-            args.add("--message=${description.actual}")
-        }
-        args.addAll(parentRevisions.map { it.toString() })
-        return execute(root, args)
-    }
+    override fun new(
+        description: Description,
+        parentRevisions: List<Revision>,
+        destinationMode: RebaseDestinationMode,
+        edit: Boolean
+    ): CommandExecutor.CommandResult = execute(root, newArgs(description, parentRevisions, destinationMode, edit))
 
     override fun abandon(revision: Revision): CommandExecutor.CommandResult =
         execute(root, listOf("abandon", "-r", revision))

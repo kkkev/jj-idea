@@ -134,6 +134,52 @@ class LaidOutCellTest {
     }
 
     @Nested
+    inner class `pending entry` {
+        private fun pendingEntry(
+            id: String = "new",
+            description: String = "In progress",
+            isWorkingCopy: Boolean = false
+        ) = LogEntry(
+            repo = repo,
+            id = ChangeId(id, id),
+            commitId = CommitId(id),
+            underlyingDescription = description,
+            pending = true,
+            isWorkingCopy = isWorkingCopy
+        )
+
+        @Test
+        fun `never resolves a link target anywhere in the cell, even with an id containing illegal URI characters`() {
+            val e = pendingEntry(id = "<pending>")
+
+            val cell = laidOut(e, columnWidth = 2_000)
+
+            (0 until 2_000).forEach { x -> cell.linkTargetAt(x).shouldBeNull() }
+        }
+
+        private fun isBold(fragment: Fragment) =
+            fragment is Fragment.Text && (fragment.style.style and com.intellij.ui.SimpleTextAttributes.STYLE_BOLD) != 0
+
+        @Test
+        fun `renders bold when it stands in for the working copy, same as a real entry would`() {
+            val e = pendingEntry(isWorkingCopy = true)
+
+            val cell = laidOut(e, columnWidth = 2_000)
+
+            cell.leftFragments.any(::isBold) shouldBe true
+        }
+
+        @Test
+        fun `renders plain (not bold) when it doesn't stand in for the working copy`() {
+            val e = pendingEntry(isWorkingCopy = false)
+
+            val cell = laidOut(e, columnWidth = 2_000)
+
+            cell.leftFragments.any(::isBold) shouldBe false
+        }
+    }
+
+    @Nested
     inner class `decoration hit-testing` {
         @Test
         fun `clicking the overflow chip resolves to an overflow URI`() {

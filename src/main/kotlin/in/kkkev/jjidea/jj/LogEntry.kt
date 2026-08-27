@@ -24,7 +24,16 @@ data class LogEntry(
     override val author: VcsUser? = null,
     val committer: VcsUser? = null,
     override val immutable: Boolean = false,
-    val hasPushedAncestor: Boolean = false
+    val hasPushedAncestor: Boolean = false,
+    /**
+     * True for a not-yet-created change previewed in a rebase-simulator preview (e.g.
+     * [in.kkkev.jjidea.ui.newchange.NewChangeDialog]'s "the change about to be created" row).
+     * [id]/[commitId] are placeholders with no real backing commit - the log-row renderer checks
+     * this flag to paint a deliberately minimal representation instead of attempting real-commit
+     * rendering (bookmarks/tags/status badges/a `jjc://` navigation link), which a pending entry
+     * structurally can't support.
+     */
+    val pending: Boolean = false
 ) : GraphableEntry, ChangeStatus, ChangeDetail {
     override val description = Description(underlyingDescription)
 
