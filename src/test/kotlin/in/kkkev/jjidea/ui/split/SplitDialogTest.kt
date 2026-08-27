@@ -315,6 +315,17 @@ class SplitDialogTest {
     }
 
     @Test
+    fun `pickHunksButton is wired into the shared preview panel's footer`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList())
+
+        // Regression check for the FileDiffPreviewPanel extraction (jj-idea-8a8z): the button
+        // must actually be added to the shared shell's footer, not orphaned by the refactor.
+        dialog.pickHunksButton.parent shouldNotBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
     fun `computePreviewLeftContent unticked returns after content (nothing moves)`() {
         val source = createEntry("src1", description = "desc")
         val dialog = SplitDialog(project.get(), source, emptyList())

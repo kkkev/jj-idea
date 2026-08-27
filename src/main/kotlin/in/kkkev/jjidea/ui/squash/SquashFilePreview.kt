@@ -1,0 +1,65 @@
+package `in`.kkkev.jjidea.ui.squash
+
+import com.intellij.openapi.fileTypes.FileType
+import com.intellij.openapi.vcs.changes.Change
+import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.diffedit.HunkPicker
+
+/**
+ * Both sides of a squash source file's own change (its parent → itself), plus the file type
+ * for syntax highlighting. Both fields default to `""` when the corresponding
+ * [com.intellij.openapi.vcs.changes.ContentRevision] has no content (added/deleted files).
+ */
+internal data class SquashFileData(val before: String, val after: String, val fileType: FileType)
+
+/**
+ * Load both sides of [change]'s content. Hits `jj file show` via the change's
+ * [com.intellij.openapi.vcs.changes.ContentRevision]s (see [in.kkkev.jjidea.jj.ChangeService]
+ * for how those are built, including merge-parent reconstruction) — call off the EDT.
+ *
+ * Returns null only if both sides are unreadable (shouldn't happen for a real file change).
+ */
+internal fun loadSquashFileData(change: Change): SquashFileData? {
+    val before = change.beforeRevision?.content
+    val after = change.afterRevision?.content
+    if (before == null && after == null) return null
+    val fileName = (change.afterRevision ?: change.beforeRevision)!!.file.name
+    return SquashFileData(before = before ?: "", after = after ?: "", fileType = HunkPicker.fileTypeFor(fileName))
+}
+
+/**
+ * Right-hand pane content for the squash preview — the destination's result for this file.
+ *
+ * [override] is unused today (always null); it's the seam jj-idea-4q7m's hunk picker will fill
+ * in, exactly mirroring [in.kkkev.jjidea.ui.split.SplitDialog.computePreviewLeftContent].
+ */
+internal fun computePreviewAfterContent(
+    isIncluded: Boolean,
+    override: String?,
+    before: String,
+    after: String
+): String = when {
+    override != null -> override
+    isIncluded -> after
+    else -> before
+}
+
+/**
+ * Describe the squash preview's diff state as a pair of (before title, destination title) label
+ * fragments. Unlike [in.kkkev.jjidea.ui.split.SplitDialog]'s `describeSplitState`, the **before**
+ * side here never varies — it's always the source's own pre-change content — so its title is
+ * constant; only the **destination** side (see [computePreviewAfterContent]) changes: an unticked
+ * (nothing moves) file reads "Before" / "Destination (unchanged)"; a fully ticked file reads
+ * "Before" / "Destination (all changes)"; anything else (reserved for jj-idea-4q7m's partial hunk
+ * picks) is "Destination (partial)".
+ */
+internal fun describeSquashState(content: String, before: String, after: String): Pair<String, String> {
+    val beforeTitle = JujutsuBundle.message("dialog.squash.preview.legend.before")
+    val afterLabel = JujutsuBundle.message("dialog.squash.preview.legend.destination")
+    val afterTitle = when (content) {
+        before -> JujutsuBundle.message("dialog.squash.preview.after.unchanged", afterLabel)
+        after -> JujutsuBundle.message("dialog.squash.preview.after.allChanges", afterLabel)
+        else -> JujutsuBundle.message("dialog.squash.preview.after.partial", afterLabel)
+    }
+    return Pair(beforeTitle, afterTitle)
+}

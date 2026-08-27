@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.squash.SquashMode
+import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -169,6 +170,58 @@ class SquashIntoDialogParentModeTest {
             disposeDialog(dialog)
         } finally {
             JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove = false
+        }
+    }
+
+    @Test
+    fun `no files means no preview`() {
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), emptyList())
+
+        waitForRefresh(dialog.fileSelection)
+        dialog.preview.hasRequestForTest() shouldBe false
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `selecting a file shows its diff, header shows the file name`() {
+        val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+
+        waitForRefresh(dialog.fileSelection)
+        dialog.fileSelection.changesTree.selectFile(changes[1].filePath)
+        awaitPreview(dialog)
+
+        dialog.preview.headerTextForTest() shouldBe "Utils.kt"
+        dialog.preview.hasRequestForTest() shouldBe true
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `unticking the selected file keeps the preview showing (now an unchanged diff)`() {
+        val changes = listOf(change("src/Main.kt"), change("src/Utils.kt"))
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+
+        waitForRefresh(dialog.fileSelection)
+        dialog.fileSelection.changesTree.selectFile(changes[0].filePath)
+        awaitPreview(dialog)
+
+        dialog.fileSelection.changesTree.setIncludedChanges(changes.drop(1))
+
+        dialog.preview.headerTextForTest() shouldBe "Main.kt"
+        dialog.preview.hasRequestForTest() shouldBe true
+        disposeDialog(dialog)
+    }
+
+    private fun awaitPreview(dialog: SquashIntoDialog) {
+        val deadline = System.currentTimeMillis() + 5_000
+        while (!dialog.preview.hasRequestForTest() && System.currentTimeMillis() < deadline) {
+            UIUtil.dispatchAllInvocationEvents()
         }
     }
 

@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
+import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -92,6 +93,32 @@ class SquashIntoDialogPickSourcesModeTest {
 
         dialog.selectPickerRowsForTest(0)
         dialog.descriptionText shouldBe ""
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `changing the source selection resets the preview to the placeholder`() {
+        val dest = createEntry("dest1", description = "dest desc")
+        val src1 = createEntry("src1", description = "src1 desc")
+        val src2 = createEntry("src2", description = "src2 desc")
+        val dialog = dialog(dest, listOf(src1, src2))
+
+        dialog.selectPickerRowsForTest(0)
+        val changes = listOf(change("src/Main.kt"))
+        dialog.fileSelection.setChanges(changes)
+        waitForRefresh(dialog.fileSelection)
+        dialog.fileSelection.changesTree.selectFile(changes[0].filePath)
+        val deadline1 = System.currentTimeMillis() + 5_000
+        while (!dialog.preview.hasRequestForTest() && System.currentTimeMillis() < deadline1) {
+            UIUtil.dispatchAllInvocationEvents()
+        }
+        dialog.preview.hasRequestForTest() shouldBe true
+
+        // Changing the picker selection replaces the file tree wholesale (reloadChangesForSelection) —
+        // the preview must not keep showing a diff for a file that may no longer be in the tree.
+        dialog.selectPickerRowsForTest(1)
+
+        dialog.preview.hasRequestForTest() shouldBe false
         disposeDialog(dialog)
     }
 

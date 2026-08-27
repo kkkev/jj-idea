@@ -34,6 +34,7 @@ Components whose blast radius exceeds their own package:
 | `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff) |
 | Shared commit picker (used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
+| In-dialog file diff preview shell (`ui/common/FileDiffPreviewPanel.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
 | `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
@@ -679,9 +680,9 @@ In a **multi-repo** project (multiple `.jj` roots open together):
 
 **Squash Into…**
 
-**Code:** `ui/squash/SquashIntoDialog.kt`, `actions/change/squashIntoAction.kt`, `actions/change/squashFromAction.kt`, `actions/filechange/SquashIntoFilesAction.kt`
+**Code:** `ui/squash/SquashIntoDialog.kt`, `ui/squash/SquashFilePreview.kt`, `ui/common/FileDiffPreviewPanel.kt`, `actions/change/squashIntoAction.kt`, `actions/change/squashFromAction.kt`, `actions/filechange/SquashIntoFilesAction.kt`
 **Fixture:** FX-STACK
-**Also re-run:** MT-CTXMENU (shares the commit picker)
+**Also re-run:** MT-CTXMENU (shares the commit picker); MT-SPLIT (shares `ui/common/FileDiffPreviewPanel.kt`)
 
 #### Availability / enablement
 
@@ -703,6 +704,29 @@ In a **multi-repo** project (multiple `.jj` roots open together):
 
 → automate: jj-idea-ikr6 (description auto-population + validation logic below is pure
 string/state logic, no rendering dependency)
+
+#### Per-file diff preview (jj-idea-8a8z)
+
+The preview always shows **Before** (the source's own pre-change content, fixed) next to
+**Destination** (that same content, plus this file's change if it's ticked — i.e. what the
+destination ends up with). This is deliberately anchored to the source's own before/after,
+not the real destination's content — see the section's linked issue for why.
+
+- [ ] Right-click a mutable change with 2+ changed files → **Squash into Parent…** (or
+      **Squash from Here into…**) → a preview pane appears to the right of the file list,
+      wider dialog overall
+- [ ] Click a file → preview shows a syntax-highlighted, read-only diff titled roughly
+      "Before" / "Destination (all changes)", showing the file's full change (all files are
+      ticked by default, so everything moves)
+- [ ] Untick that file → titles flip to "Destination (unchanged)" and the diff goes empty;
+      re-tick → restored
+- [ ] Click a second file → preview switches to it; click back to the first → switches back
+      immediately (no visible reload)
+- [ ] **Squash Into Here from…** (multi-source picker): select a file, then change the
+      source selection in the picker table → preview resets to the placeholder and the file
+      tree repopulates
+- [ ] Multi-select two changes → **Squash Into…** → preview works on the combined file list
+- [ ] Select a binary or deleted file → preview degrades gracefully (no exception)
 
 #### Description auto-population (full squash — all files selected)
 
@@ -797,8 +821,8 @@ string/state logic, no rendering dependency)
 
 **Split, hunk-level selection**
 
-**Code:** `ui/split/SplitDialog.kt`, `ui/split/HunkSelectionModel.kt`, `ui/split/SplitPreviewPanel.kt`, `ui/split/SplitSimulator.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
-**Also re-run:** MT-CTXMENU (shares the commit picker in some flows); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer)
+**Code:** `ui/split/SplitDialog.kt`, `ui/split/HunkSelectionModel.kt`, `ui/split/SplitPreviewPanel.kt`, `ui/split/SplitSimulator.kt`, `ui/common/FileDiffPreviewPanel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
+**Also re-run:** MT-CTXMENU (shares the commit picker in some flows); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer); MT-SQUASH (shares `ui/common/FileDiffPreviewPanel.kt`)
 
 Setup: create a scratch jj repo with a file that has at least **two separate** hunks of changes
 (so partial selection is meaningful).

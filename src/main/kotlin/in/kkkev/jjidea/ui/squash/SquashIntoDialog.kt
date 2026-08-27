@@ -1,6 +1,11 @@
 package `in`.kkkev.jjidea.ui.squash
 
+import com.intellij.diff.DiffContentFactory
+import com.intellij.diff.contents.DiffContent
+import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.diff.util.DiffUserDataKeys
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
@@ -17,6 +22,7 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.common.FileDiffPreviewPanel
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.*
@@ -123,6 +129,13 @@ class SquashIntoDialog(
     }
 
     internal val fileSelection = FileSelectionPanel(project)
+
+    // --- Right panel: native diff preview, showing what moves into the destination ---
+    internal val preview = FileDiffPreviewPanel(project, disposable)
+    private val fileDataCache: MutableMap<FilePath, SquashFileData> = LinkedHashMap()
+    private var currentPreviewFile: FilePath? = null
+    private var previewLoadGeneration = 0
+
     internal val descriptionText: String get() = descriptionField.text
     internal var deleteEmptyAndMoveIsSelected: Boolean
         get() = deleteEmptyAndMoveCheckBox.isSelected
@@ -183,8 +196,14 @@ class SquashIntoDialog(
             updateDeleteEmptyEnabled()
             updateDescription()
             initValidation()
+            currentPreviewFile?.let { fp -> refreshPreview(fp) }
         }
         fileSelection.changesTree.invokeAfterRefresh { updateDeleteEmptyEnabled() }
+
+        fileSelection.changesTree.addTreeSelectionListener {
+            val selected = fileSelection.changesTree.selectedChanges.firstOrNull()
+            if (selected != null) showPreviewForChange(selected)
+        }
 
         init()
 
@@ -211,6 +230,68 @@ class SquashIntoDialog(
     private fun updateDeleteEmptyEnabled() {
         deleteEmptyAndMoveCheckBox.isEnabled = fileSelection.allIncluded
     }
+
+    // ---- File diff loading + preview ----
+    // Mirrors in.kkkev.jjidea.ui.split.SplitDialog's preview, but the diff shown is different:
+    // left = this file's content before the source touched it (fixed), right = that content
+    // plus this file's change if ticked, i.e. the destination's result (live-by-checkbox for
+    // now; jj-idea-4q7m adds real hunk picking). See SquashFilePreview.kt for why this framing
+    // (anchored to the source's own before/after) is the one well-defined in every squash mode.
+
+    /**
+     * Show the diff preview for [change], loading its content lazily.
+     */
+    private fun showPreviewForChange(change: Change) {
+        val fp = change.filePath
+        currentPreviewFile = fp
+
+        val cached = fileDataCache[fp]
+        if (cached != null) {
+            updateDiffPreview(fp, cached)
+            return
+        }
+
+        // Clear while loading, keeping the header showing the file name.
+        preview.show(fp.name)
+
+        val gen = ++previewLoadGeneration
+        runInBackground(ModalityState.any()) {
+            val data = loadSquashFileData(change)
+            runLater {
+                if (!isDisposed && gen == previewLoadGeneration && currentPreviewFile == fp) {
+                    if (data != null) {
+                        fileDataCache[fp] = data
+                        updateDiffPreview(fp, data)
+                    } else {
+                        preview.show(fp.name)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun refreshPreview(fp: FilePath) {
+        val data = fileDataCache[fp] ?: return
+        updateDiffPreview(fp, data)
+    }
+
+    private fun updateDiffPreview(fp: FilePath, data: SquashFileData) {
+        val isIncluded = fileSelection.includedChanges.any { it.filePath == fp }
+        val afterContent = computePreviewAfterContent(isIncluded, null, data.before, data.after)
+
+        val (beforeTitle, afterTitle) = describeSquashState(afterContent, data.before, data.after)
+
+        val beforeDiffContent = makeReadOnlyContent(data.before, data.fileType)
+        val afterDiffContent = makeReadOnlyContent(afterContent, data.fileType)
+
+        val request = SimpleDiffRequest(fp.name, beforeDiffContent, afterDiffContent, beforeTitle, afterTitle)
+        preview.show(fp.name, request)
+    }
+
+    private fun makeReadOnlyContent(text: String, fileType: FileType): DiffContent =
+        DiffContentFactory.getInstance().create(project, text, fileType).apply {
+            putUserData(DiffUserDataKeys.FORCE_READ_ONLY, true)
+        }
 
     override fun createCenterPanel(): JComponent {
         val fixedLabel = JujutsuBundle.message(
@@ -261,7 +342,7 @@ class SquashIntoDialog(
             add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.files")), BorderLayout.NORTH)
             add(fileSelection, BorderLayout.CENTER)
         }
-        val centerContent: JComponent = if (hasPredefinedCandidates) {
+        val pickerAndFiles: JComponent = if (hasPredefinedCandidates) {
             JPanel(BorderLayout()).apply {
                 add(pickerScrollPane, BorderLayout.NORTH)
                 add(filePanel, BorderLayout.CENTER)
@@ -273,13 +354,18 @@ class SquashIntoDialog(
             }
         }
 
+        val centerContent = OnePixelSplitter(false, 0.45f).apply {
+            firstComponent = pickerAndFiles
+            secondComponent = preview
+        }
+
         val wrapper = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(8)
             add(topSection, BorderLayout.NORTH)
             add(centerContent, BorderLayout.CENTER)
             add(bottomSection, BorderLayout.SOUTH)
         }
-        wrapper.preferredSize = Dimension(JBUI.scale(800), JBUI.scale(650))
+        wrapper.preferredSize = Dimension(JBUI.scale(1150), JBUI.scale(650))
         return wrapper
     }
 
@@ -376,6 +462,7 @@ class SquashIntoDialog(
     private fun reloadChangesForSelection() {
         val sources = selectedSourceEntries()
         val gen = ++loadGeneration
+        resetPreview()
         if (sources.isEmpty()) {
             fileSelection.setChanges(emptyList())
             return
@@ -384,6 +471,13 @@ class SquashIntoDialog(
             val loaded = ChangeService.loadChanges(sources)
             runLater { if (loadGeneration == gen) fileSelection.setChanges(loaded) }
         }
+    }
+
+    /** Clear the preview and its cache — the file tree is about to be replaced wholesale. */
+    private fun resetPreview() {
+        currentPreviewFile = null
+        fileDataCache.clear()
+        preview.showPlaceholder()
     }
 
     private fun hideExtraColumns() {

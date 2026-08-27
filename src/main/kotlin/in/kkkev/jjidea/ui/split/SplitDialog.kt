@@ -1,8 +1,6 @@
 package `in`.kkkev.jjidea.ui.split
 
 import com.intellij.diff.DiffContentFactory
-import com.intellij.diff.DiffManager
-import com.intellij.diff.DiffRequestPanel
 import com.intellij.diff.contents.DiffContent
 import com.intellij.diff.requests.SimpleDiffRequest
 import com.intellij.diff.util.DiffUserDataKeys
@@ -26,6 +24,7 @@ import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.ui.common.FileDiffPreviewPanel
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import `in`.kkkev.jjidea.ui.components.append
@@ -125,8 +124,7 @@ class SplitDialog(
     private var previousIncluded: Set<FilePath> = emptySet()
 
     // --- Right panel: native diff preview ---
-    private val diffPreviewPanel: DiffRequestPanel =
-        DiffManager.getInstance().createRequestPanel(project, disposable, null)
+    private val diffPreview = FileDiffPreviewPanel(project, disposable)
     private var currentPreviewFile: FilePath? = null
 
     // --- "Pick Hunks…" button ---
@@ -176,15 +174,6 @@ class SplitDialog(
                 sourceEntry.id.short
             )
         }
-    }
-
-    // Preview panel header.
-    private val previewHeader = JBLabel(
-        JujutsuBundle.message("dialog.split.preview.select"),
-        SwingConstants.CENTER
-    ).apply {
-        foreground = JBUI.CurrentTheme.Label.disabledForeground()
-        font = font.deriveFont(Font.BOLD)
     }
 
     // --- Test seam: injectable merge picker (avoids modal merge under tests) ---
@@ -253,10 +242,6 @@ class SplitDialog(
         val fp = change.filePath
         currentPreviewFile = fp
 
-        // Update header.
-        previewHeader.text = fp.name
-        previewHeader.foreground = JBUI.CurrentTheme.Label.foreground()
-
         // If already loaded, update the preview immediately.
         val cached = fileDataCache[fp]
         if (cached != null) {
@@ -264,8 +249,8 @@ class SplitDialog(
             return
         }
 
-        // Clear while loading.
-        diffPreviewPanel.setRequest(null)
+        // Clear while loading, keeping the header showing the file name.
+        diffPreview.show(fp.name)
         pickHunksButton.isEnabled = false
 
         val revision = sourceEntry.id
@@ -301,7 +286,7 @@ class SplitDialog(
                     if (fileData != null) {
                         updateDiffPreview(fp, fileData)
                     } else {
-                        diffPreviewPanel.setRequest(null)
+                        diffPreview.show(fp.name)
                         pickHunksButton.isEnabled = false
                     }
                     updateSummary()
@@ -338,7 +323,7 @@ class SplitDialog(
         val rightDiffContent = makeContent(data.afterContent, data.fileType)
 
         val request = SimpleDiffRequest(fp.name, leftDiffContent, rightDiffContent, leftTitle, rightTitle)
-        diffPreviewPanel.setRequest(request)
+        diffPreview.show(fp.name, request)
 
         // Enable "Pick Hunks…" only for text files that have changes.
         pickHunksButton.isEnabled = data.baseContent != data.afterContent
@@ -545,10 +530,9 @@ class SplitDialog(
 
         val rightPanel = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(8, 4, 0, 8)
-            add(previewHeader, BorderLayout.NORTH)
-            add(diffPreviewPanel.component, BorderLayout.CENTER)
-            add(createPickHunksBar(), BorderLayout.SOUTH)
+            add(diffPreview, BorderLayout.CENTER)
         }
+        diffPreview.addFooterComponent(pickHunksButton)
 
         val splitter = OnePixelSplitter(false, 0.4f).apply {
             firstComponent = leftPanel
@@ -560,13 +544,6 @@ class SplitDialog(
         outer.add(createBottomSection(), BorderLayout.SOUTH)
         outer.preferredSize = Dimension(JBUI.scale(960), JBUI.scale(600))
         return outer
-    }
-
-    private fun createPickHunksBar(): JPanel = JPanel().apply {
-        layout = BoxLayout(this, BoxLayout.X_AXIS)
-        border = JBUI.Borders.emptyTop(4)
-        add(pickHunksButton)
-        add(Box.createHorizontalGlue())
     }
 
     private fun createSourceSection() = JPanel().apply {
