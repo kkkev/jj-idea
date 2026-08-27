@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.rebase
 
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.log.DagNode
 import java.util.*
 
 /**
@@ -18,6 +19,13 @@ data class RebaseSimulation(
  *
  * Given a set of log entries and rebase parameters, produces a [RebaseSimulation]
  * containing reparented entries suitable for graph rendering in the preview panel.
+ *
+ * The actual graph-shuffling (everything below [simulate]) only ever needs [ChangeId]-level
+ * identity and parent linkage, so it's written generically against [DagNode] rather than
+ * concrete [LogEntry] - [simulate] itself stays concrete (its public signature is unchanged)
+ * and is just the `T = LogEntry` instantiation of that generic core, the same way
+ * [in.kkkev.jjidea.ui.log.CommitGraphBuilder] is a concrete wrapper around the fully generic
+ * [in.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl].
  */
 object RebaseSimulator {
     fun simulate(
@@ -59,8 +67,8 @@ object RebaseSimulator {
     /**
      * Collect the set of change IDs that will be moved, based on source mode.
      */
-    internal fun collectMovedIds(
-        allEntries: List<LogEntry>,
+    internal fun <T : DagNode<T>> collectMovedIds(
+        allEntries: List<T>,
         sourceIds: Set<ChangeId>,
         sourceMode: RebaseSourceMode
     ): Set<ChangeId> = when (sourceMode) {
@@ -85,7 +93,7 @@ object RebaseSimulator {
     /**
      * Collect all descendants of the given roots (children, grandchildren, etc.).
      */
-    internal fun collectDescendants(entries: List<LogEntry>, roots: Set<ChangeId>): Set<ChangeId> {
+    internal fun <T : DagNode<T>> collectDescendants(entries: List<T>, roots: Set<ChangeId>): Set<ChangeId> {
         val childrenOf = buildChildrenMap(entries)
         val result = mutableSetOf<ChangeId>()
         val queue: Queue<ChangeId> = LinkedList(roots)
@@ -102,7 +110,7 @@ object RebaseSimulator {
      * Collect the entire branch containing the source entries:
      * walk up to roots (entries with no parents in the set), then collect all descendants.
      */
-    private fun collectBranch(entries: List<LogEntry>, sourceIds: Set<ChangeId>): Set<ChangeId> {
+    internal fun <T : DagNode<T>> collectBranch(entries: List<T>, sourceIds: Set<ChangeId>): Set<ChangeId> {
         val entryById = entries.associateBy { it.id }
         val allIds = entries.map { it.id }.toSet()
 
@@ -130,13 +138,13 @@ object RebaseSimulator {
      * Reparent moved entries based on destination mode.
      * Returns the full list of entries with moved entries reparented.
      */
-    private fun reparent(
-        allEntries: List<LogEntry>,
-        entryById: Map<ChangeId, LogEntry>,
+    internal fun <T : DagNode<T>> reparent(
+        allEntries: List<T>,
+        entryById: Map<ChangeId, T>,
         movedIds: Set<ChangeId>,
         destinationIds: Set<ChangeId>,
         destinationMode: RebaseDestinationMode
-    ): List<LogEntry> {
+    ): List<T> {
         // Find the roots and tips of the moved set
         val movedRoots = movedIds.filter { id ->
             val entry = entryById[id] ?: return@filter true
@@ -152,7 +160,6 @@ object RebaseSimulator {
             RebaseDestinationMode.ONTO -> reparentOnto(allEntries, movedIds, movedRoots, destinationIds)
             RebaseDestinationMode.INSERT_AFTER -> reparentInsertAfter(
                 allEntries,
-                entryById,
                 movedIds,
                 movedRoots,
                 movedTips,
@@ -173,33 +180,31 @@ object RebaseSimulator {
      * ONTO: Each moved root's parents become the destination IDs.
      * Internal parent links within the moved set stay the same.
      */
-    private fun reparentOnto(
-        allEntries: List<LogEntry>,
+    internal fun <T : DagNode<T>> reparentOnto(
+        allEntries: List<T>,
         movedIds: Set<ChangeId>,
         movedRoots: Set<ChangeId>,
         destinationIds: Set<ChangeId>
-    ): List<LogEntry> {
-        val destIdentifiers = destinationIds.map { destId ->
-            LogEntry.Identifiers(destId, CommitId("0000000000000000000000000000000000000000"))
-        }
+    ): List<T> {
+        val destinationList = destinationIds.toList()
 
         return allEntries.map { entry ->
             when {
-                entry.id in movedRoots -> entry.copy(parentIdentifiers = destIdentifiers)
+                entry.id in movedRoots -> entry.withParents(destinationList)
                 entry.id in movedIds -> entry // Keep internal links
                 else -> {
                     // Non-moved entries: if they had moved entries as parents, repoint to moved entries' original parents
-                    val newParents = entry.parentIdentifiers.flatMap { parentId ->
-                        if (parentId.changeId in movedIds) {
+                    val newParents = entry.parentIds.flatMap { parentId ->
+                        if (parentId in movedIds) {
                             // Skip this parent — the moved entry is no longer here
                             // For REVISION mode, descendants of moved entries need new parents
-                            val movedEntry = allEntries.find { it.id == parentId.changeId }
-                            movedEntry?.parentIdentifiers ?: listOf(parentId)
+                            val movedEntry = allEntries.find { it.id == parentId }
+                            movedEntry?.parentIds ?: listOf(parentId)
                         } else {
                             listOf(parentId)
                         }
                     }
-                    if (newParents != entry.parentIdentifiers) entry.copy(parentIdentifiers = newParents) else entry
+                    if (newParents != entry.parentIds) entry.withParents(newParents) else entry
                 }
             }
         }
@@ -209,35 +214,30 @@ object RebaseSimulator {
      * INSERT_AFTER: Moved entries become children of destinations.
      * Destinations' former children become children of moved tips.
      */
-    private fun reparentInsertAfter(
-        allEntries: List<LogEntry>,
-        entryById: Map<ChangeId, LogEntry>,
+    internal fun <T : DagNode<T>> reparentInsertAfter(
+        allEntries: List<T>,
         movedIds: Set<ChangeId>,
         movedRoots: Set<ChangeId>,
         movedTips: Set<ChangeId>,
         destinationIds: Set<ChangeId>
-    ): List<LogEntry> {
-        val destIdentifiers = destinationIds.map { destId ->
-            LogEntry.Identifiers(destId, CommitId("0000000000000000000000000000000000000000"))
-        }
-        val tipIdentifiers = movedTips.map { tipId ->
-            LogEntry.Identifiers(tipId, CommitId("0000000000000000000000000000000000000000"))
-        }
+    ): List<T> {
+        val destinationList = destinationIds.toList()
+        val tipList = movedTips.toList()
 
         return allEntries.map { entry ->
             when {
                 // Moved roots: parents become destinations
-                entry.id in movedRoots -> entry.copy(parentIdentifiers = destIdentifiers)
+                entry.id in movedRoots -> entry.withParents(destinationList)
                 // Other moved entries: keep internal links
                 entry.id in movedIds -> entry
                 // Non-moved entries that were children of destinations: reparent to moved tips
                 else -> {
-                    val hasDestParent = entry.parentIdentifiers.any { it.changeId in destinationIds }
+                    val hasDestParent = entry.parentIds.any { it in destinationIds }
                     if (hasDestParent && entry.id !in movedIds) {
-                        val newParents = entry.parentIdentifiers.map { parentId ->
-                            if (parentId.changeId in destinationIds) tipIdentifiers else listOf(parentId)
-                        }.flatten()
-                        entry.copy(parentIdentifiers = newParents)
+                        val newParents = entry.parentIds.flatMap { parentId ->
+                            if (parentId in destinationIds) tipList else listOf(parentId)
+                        }
+                        entry.withParents(newParents)
                     } else {
                         entry
                     }
@@ -250,31 +250,29 @@ object RebaseSimulator {
      * INSERT_BEFORE: Moved entries become parents of destinations.
      * Destinations' former parents become parents of moved roots.
      */
-    private fun reparentInsertBefore(
-        allEntries: List<LogEntry>,
-        entryById: Map<ChangeId, LogEntry>,
+    internal fun <T : DagNode<T>> reparentInsertBefore(
+        allEntries: List<T>,
+        entryById: Map<ChangeId, T>,
         movedIds: Set<ChangeId>,
         movedRoots: Set<ChangeId>,
         movedTips: Set<ChangeId>,
         destinationIds: Set<ChangeId>
-    ): List<LogEntry> {
+    ): List<T> {
         // Destinations' original parents
         val destOriginalParents = destinationIds.flatMap { destId ->
-            entryById[destId]?.parentIdentifiers ?: emptyList()
-        }.distinctBy { it.changeId }
+            entryById[destId]?.parentIds ?: emptyList()
+        }.distinct()
 
-        val tipIdentifiers = movedTips.map { tipId ->
-            LogEntry.Identifiers(tipId, CommitId("0000000000000000000000000000000000000000"))
-        }
+        val tipList = movedTips.toList()
 
         return allEntries.map { entry ->
             when {
                 // Moved roots: parents become destinations' original parents
-                entry.id in movedRoots -> entry.copy(parentIdentifiers = destOriginalParents)
+                entry.id in movedRoots -> entry.withParents(destOriginalParents)
                 // Other moved entries: keep internal links
                 entry.id in movedIds -> entry
                 // Destinations: parents become moved tips
-                entry.id in destinationIds -> entry.copy(parentIdentifiers = tipIdentifiers)
+                entry.id in destinationIds -> entry.withParents(tipList)
                 else -> entry
             }
         }
@@ -284,11 +282,11 @@ object RebaseSimulator {
      * Scope the entries to only those relevant to the rebase:
      * ancestors and descendants of source + destination entries.
      */
-    internal fun scopeToRelevant(
-        allEntries: List<LogEntry>,
+    internal fun <T : DagNode<T>> scopeToRelevant(
+        allEntries: List<T>,
         sourceIds: Set<ChangeId>,
         destinationIds: Set<ChangeId>
-    ): List<LogEntry> {
+    ): List<T> {
         if (allEntries.size <= 20) return allEntries
 
         val interestingIds = sourceIds + destinationIds
@@ -324,7 +322,7 @@ object RebaseSimulator {
      * Topological sort: children before parents (newest first), matching jj log order.
      * Uses Kahn's algorithm on in-degree (number of children pointing to each entry).
      */
-    internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
+    internal fun <T : DagNode<T>> topologicalSort(entries: List<T>): List<T> {
         if (entries.size <= 1) return entries
 
         val entryById = entries.associateBy { it.id }
@@ -353,7 +351,7 @@ object RebaseSimulator {
             if (deg == 0) queue.add(id)
         }
 
-        val result = mutableListOf<LogEntry>()
+        val result = mutableListOf<T>()
         while (queue.isNotEmpty()) {
             val id = queue.poll()
             val entry = entryById[id] ?: continue
@@ -380,7 +378,7 @@ object RebaseSimulator {
     /**
      * Build a map of parent → set of children.
      */
-    private fun buildChildrenMap(entries: List<LogEntry>): Map<ChangeId, Set<ChangeId>> {
+    private fun <T : DagNode<T>> buildChildrenMap(entries: List<T>): Map<ChangeId, Set<ChangeId>> {
         val childrenOf = mutableMapOf<ChangeId, MutableSet<ChangeId>>()
         for (entry in entries) {
             for (parentId in entry.parentIds) {

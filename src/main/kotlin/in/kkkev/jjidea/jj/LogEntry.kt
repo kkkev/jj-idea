@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.vcs.log.VcsUser
+import `in`.kkkev.jjidea.ui.log.DagNode
 import `in`.kkkev.jjidea.ui.log.GraphableEntry
 import kotlinx.datetime.Instant
 
@@ -34,10 +35,18 @@ data class LogEntry(
      * structurally can't support.
      */
     val pending: Boolean = false
-) : GraphableEntry, ChangeStatus, ChangeDetail {
+) : GraphableEntry, ChangeStatus, ChangeDetail, DagNode<LogEntry> {
     override val description = Description(underlyingDescription)
 
     override val parentIds: List<ChangeId> get() = parentIdentifiers.map { it.changeId }
+
+    /**
+     * See [DagNode.withParents] - used by [in.kkkev.jjidea.ui.rebase.RebaseSimulator] to reparent
+     * a simulated entry. The simulator only ever deals in [ChangeId]s, so the resulting
+     * [Identifiers] get a [CommitId.PLACEHOLDER] - never a real commit id.
+     */
+    override fun withParents(parentIds: List<ChangeId>): LogEntry =
+        copy(parentIdentifiers = parentIds.map { Identifiers(it, CommitId.PLACEHOLDER) })
 
     val isDivergent get() = id.divergent
 
