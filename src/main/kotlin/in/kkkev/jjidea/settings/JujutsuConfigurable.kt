@@ -10,11 +10,13 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
 import com.intellij.util.ui.JBUI
@@ -54,7 +56,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private val validationLabel = JBLabel()
 
     // Revset validation
-    private lateinit var revsetField: Cell<JBTextField>
+    private lateinit var revsetField: Cell<JBTextArea>
     private val revsetValidationPanel = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         isOpaque = false
@@ -102,8 +104,13 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         .withTitle(JujutsuBundle.message("settings.jj.path.chooser.title")),
                     project
                 ).bindText(appSettings.state::jjExecutablePath)
-                    .columns(COLUMNS_LARGE)
-                    .comment(JujutsuBundle.message("settings.jj.path.comment"))
+                    .columns(COLUMNS_MEDIUM)
+                    .align(AlignX.FILL)
+                    .resizableColumn()
+                    .comment(
+                        JujutsuBundle.message("settings.jj.path.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
 
                 button(JujutsuBundle.message("settings.jj.path.test")) {
                     testExecutable()
@@ -217,27 +224,55 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                 intTextField(range = 0..1000)
                     .bindIntText(settings.state::logContextWindow)
                     .columns(COLUMNS_TINY)
-                    .comment(JujutsuBundle.message("settings.log.context.window.comment"))
+                    .comment(
+                        JujutsuBundle.message("settings.log.context.window.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
             }
-            row(JujutsuBundle.message("settings.log.revset.label")) {
-                revsetField = textField()
+            row {
+                // Built manually rather than via row(label) { } so the label can be pinned to
+                // the top of the row instead of centering against the multi-line field
+                // (jj-idea-bwdk) — layout(LABEL_ALIGNED) keeps this row's label/field columns
+                // sharing width with the "Changes to show:"/"Context window:" rows above.
+                layout(RowLayout.LABEL_ALIGNED)
+                val revsetLabel = label(JujutsuBundle.message("settings.log.revset.label"))
+                    .align(AlignY.TOP)
+                    .component
+                revsetLabel.putClientProperty(DslComponentProperty.ROW_LABEL, true)
+
+                // A multi-line field (jj-idea-bwdk) so its left edge lines up with the fields
+                // above instead of being indented under its own label, and so long expressions
+                // have room to be read without horizontal scrolling.
+                revsetField = textArea()
                     .bindText(settings.state::logRevset)
-                    .columns(COLUMNS_LARGE)
+                    .rows(REVSET_FIELD_ROWS)
+                    .columns(COLUMNS_MEDIUM)
+                    .align(AlignX.FILL)
+                    .resizableColumn()
+                    // Word-wrap only — the field holds one logical expression; Enter still
+                    // inserts a literal newline, which jj's revset parser tolerates as
+                    // insignificant whitespace, but nothing here encourages typing one.
+                    .applyToComponent {
+                        lineWrap = true
+                        wrapStyleWord = true
+                    }
                     .validationOnApply {
                         revsetError?.let { error(it) }
                     }
                     .also {
                         it.component.document.addDocumentListener(clearErrorListener { revsetError = null })
                     }
+                    .comment(
+                        JujutsuBundle.message("settings.log.revset.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
+                revsetLabel.labelFor = revsetField.component
                 button(JujutsuBundle.message("settings.log.revset.test")) {
                     testRevset()
-                }
+                }.align(AlignY.TOP)
             }
             row("") {
                 cell(revsetValidationPanel).align(AlignX.FILL)
-            }
-            row {
-                comment(JujutsuBundle.message("settings.log.revset.comment"))
             }
         }
 
@@ -399,20 +434,26 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         }
                         row {
                             cell(revsetCb)
-                            cell(revsetField).columns(COLUMNS_LARGE)
-                                .validationOnApply {
-                                    if (revsetCb.isSelected) {
-                                        repoPanel.revsetError?.let { error(it) }
-                                    } else {
-                                        null
-                                    }
-                                }
-                            button(JujutsuBundle.message("settings.log.revset.test")) {
-                                testRepoRevset(repoPanel)
-                            }
                         }
-                        row("") {
-                            cell(repoPanel.revsetValidationLabel)
+                        indent {
+                            row {
+                                cell(revsetField).columns(COLUMNS_MEDIUM)
+                                    .align(AlignX.FILL)
+                                    .resizableColumn()
+                                    .validationOnApply {
+                                        if (revsetCb.isSelected) {
+                                            repoPanel.revsetError?.let { error(it) }
+                                        } else {
+                                            null
+                                        }
+                                    }
+                                button(JujutsuBundle.message("settings.log.revset.test")) {
+                                    testRepoRevset(repoPanel)
+                                }
+                            }
+                            row {
+                                cell(repoPanel.revsetValidationLabel)
+                            }
                         }
                         row {
                             cell(contextCb)
@@ -420,8 +461,12 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         }
                         row {
                             cell(disableScanOverrideCb)
-                            cell(disableScanCb)
-                                .comment(JujutsuBundle.message("settings.repo.disableignorescan.comment"))
+                        }
+                        indent {
+                            row {
+                                cell(disableScanCb)
+                                    .comment(JujutsuBundle.message("settings.repo.disableignorescan.comment"))
+                            }
                         }
                     }.apply { expanded = repos.size == 1 }
                 }
@@ -643,7 +688,17 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         return repo.commandExecutor.log(revset = revset, template = "'.'", limit = 10000)
     }
 
-    private fun iconLabel(icon: javax.swing.Icon?, text: String) = JBLabel(text, icon, JBLabel.LEADING)
+    private fun iconLabel(icon: javax.swing.Icon?, text: String) = JBLabel(wrapped(text), icon, JBLabel.LEADING)
+
+    /**
+     * Wraps [text] (which may contain raw `jj` stderr or a long path) in HTML with a fixed
+     * body width, so validation-result labels wrap instead of driving the settings panel's
+     * preferred width past the page (jj-idea-bwdk).
+     */
+    private fun wrapped(text: String): String =
+        "<html><body width='${JBUI.scale(VALIDATION_MESSAGE_WIDTH)}'>" +
+            StringUtil.escapeXmlEntities(text) +
+            "</body></html>"
 
     private fun defaultPushScope(): GitPushDialog.PushScope =
         GitPushDialog.parsePushScope(settings.state.defaultPushScope)
@@ -656,7 +711,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     }
 
     private fun showRevsetResult(label: JBLabel, success: Boolean?, message: String) {
-        label.text = message
+        label.text = wrapped(message)
         label.icon = when (success) {
             true -> AllIcons.General.InspectionsOK
             false -> AllIcons.General.Error
@@ -738,13 +793,16 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     }
 
     private fun showValidationResult(success: Boolean?, message: String) {
-        validationLabel.text = message
+        validationLabel.text = wrapped(message)
         validationLabel.icon = when (success) {
             true -> AllIcons.General.InspectionsOK
             false -> AllIcons.General.Error
             null -> AllIcons.Process.Step_1 // Loading indicator
         }
     }
+
+    /** Test seam for jj-idea-bwdk's panel-width regression guard. */
+    internal fun showValidationResultForTest(message: String) = showValidationResult(false, message)
 
     /** Creates a row with method name, monospace command in a box, and copy button. */
     private fun Panel.commandRow(methodName: String, command: String) {
@@ -766,12 +824,25 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
 
     companion object {
         private const val SPONSORS_URL = "https://github.com/sponsors/kkkev"
+
+        /** Max width (unscaled px) for wrapped validation-result labels (jj-idea-bwdk). */
+        private const val VALIDATION_MESSAGE_WIDTH = 360
+
+        /**
+         * Narrower alternative to the DSL's [com.intellij.ui.dsl.builder.DEFAULT_COMMENT_WIDTH]
+         * (70 chars), for a comment cell sharing its row with a wide control and a button —
+         * at 70 chars the comment itself becomes the row's widest element (jj-idea-bwdk).
+         */
+        private const val NARROW_COMMENT_WIDTH = 50
+
+        /** Visible height of the revset expression field, in text rows (jj-idea-bwdk). */
+        private const val REVSET_FIELD_ROWS = 3
     }
 
     /** Creates a read-only text field with monospace font for displaying commands. */
     private fun createCommandField(command: String): JBTextField {
         val consoleFontName = EditorColorsManager.getInstance().globalScheme.consoleFontName
-        return JBTextField(command).apply {
+        return JBTextField(command, COLUMNS_SHORT).apply {
             isEditable = false
             font = Font(consoleFontName, Font.PLAIN, font.size)
             border = JBUI.Borders.compound(

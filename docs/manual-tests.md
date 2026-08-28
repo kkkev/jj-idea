@@ -1886,10 +1886,10 @@ tracked in MT-LOG-TABLE, are state-serialization logic)
       per-repo override set, click Apply. Confirm scanning stops in every repo. In a repo with
       its own override explicitly set to "off" (see Repository Settings below), confirm it still
       scans despite the global checkbox.
-- [ ] **Log Settings** section: set "Context window when navigating outside the log" to 0, click
-      Apply. Navigate to a revision outside the loaded log (e.g. via file annotation, or jump to
-      a bookmark outside the current revset) — exactly one row (the target) appears, no
-      ancestors/descendants. Set it back to 10 and repeat — the ~19-revision window returns.
+- [ ] **Log Settings** section: set "Context window" to 0, click Apply. Navigate to a revision
+      outside the loaded log (e.g. via file annotation, or jump to a bookmark outside the
+      current revset) — exactly one row (the target) appears, no ancestors/descendants. Set it
+      back to 10 and repeat — the ~19-revision window returns.
 - [ ] **Repository Settings** (multi-repo project): expand a repo's collapsible group. "Override
       context window" checkbox + field lets that repo use a different window (e.g. 0) than the
       project default — confirm only that repo's out-of-view navigation degenerates.
@@ -1902,6 +1902,32 @@ tracked in MT-LOG-TABLE, are state-serialization logic)
 - [ ] Open **Settings → Version Control → Jujutsu**
 - [ ] A **Support** group appears at the bottom of the panel with a "Sponsor this plugin on GitHub..." link
 - [ ] Clicking the link opens `https://github.com/sponsors/kkkev` in the default browser
+
+#### Settings panel width (jj-idea-bwdk)
+
+→ automate: `JujutsuConfigurablePanelTest` covers the panel's overall preferred width and a
+long validation message, both without any repository configured; the checks below cover what
+that test can't (a live dialog, and the per-repo group, which needs a real project).
+
+- [ ] Open **Settings → Version Control → Jujutsu** at the dialog's default size — no horizontal
+      scrollbar anywhere in the panel; the **Test** button next to the executable path is fully
+      visible without scrolling
+- [ ] Widen and narrow the Settings dialog — the executable path and revset fields grow/shrink
+      with it; nothing gets clipped that wasn't already clipped before this change
+- [ ] Click **Test** with a bogus executable path (e.g. `/bin/ls`) — the error message wraps
+      over multiple lines instead of widening the panel
+- [ ] **Log Settings**: the "Revset expression:" box is a ~3-line multi-line field whose left
+      edge lines up with the "Changes to show:" and "Context window:" fields above it, and its
+      guidance text below lines up with that same left edge (not the row's label). Type an
+      expression longer than the box's width — it word-wraps inside the box instead of
+      scrolling horizontally; pressing Enter does not submit or otherwise misbehave
+- [ ] Enter a syntactically invalid revset (e.g. `zz(`) in **Log Settings** and click **Test** —
+      the raw `jj` error wraps instead of widening the panel
+- [ ] Expand **Installation Help** — every command row and its **Copy** button are fully visible
+- [ ] In a multi-repo project, expand a repo under **Repository Settings** — the "Override
+      revset expression" and "Override ignored-file scanning default" rows read correctly with
+      their field/checkbox stacked under the label, the Test button is fully visible, and Apply
+      still persists every override (identity, limit, revset, context window, ignore-scan)
 
 ### MT-CROSS
 
