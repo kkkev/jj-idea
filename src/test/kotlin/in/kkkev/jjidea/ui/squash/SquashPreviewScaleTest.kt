@@ -6,6 +6,7 @@ import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
+import com.intellij.testFramework.LoggedErrorProcessor
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
@@ -55,30 +56,63 @@ class SquashPreviewScaleTest {
             SquashMode.PickDestination(listOf(source), listOf(parent)),
             changes
         )
+        try {
+            // The tree auto-selects its first row on populate, which triggers one preview load —
+            // exactly 2 fetches (before + after) for that one file, not one per file in the change.
+            selectAndAwaitPreview(dialog, changes[0].filePath, loadCount, expected = 2)
+            loadCount.get() shouldBe 2
 
-        // The tree auto-selects its first row on populate, which triggers one preview load —
-        // exactly 2 fetches (before + after) for that one file, not one per file in the change.
-        selectAndAwaitPreview(dialog, changes[0].filePath, loadCount, expected = 2)
-        loadCount.get() shouldBe 2
+            selectAndAwaitPreview(dialog, changes[0].filePath, loadCount, expected = 2)
+            loadCount.get() shouldBe 2 // re-selecting the same (cached) file: no new loads.
 
-        selectAndAwaitPreview(dialog, changes[0].filePath, loadCount, expected = 2)
-        loadCount.get() shouldBe 2 // re-selecting the same (cached) file: no new loads.
+            // Each toggle re-renders the preview with genuinely different content (included vs.
+            // excluded), so 10 toggles legitimately rebuild the diff viewer 20 times in a row.
+            // On 2025.1 only, DiffRequestProcessor.buildToolbar force-updates the diff toolbar
+            // synchronously on every setRequest, and ActionToolbarImpl.
+            // reportActionButtonChangedEveryTimeIfNeeded logs an error once a toolbar creates new
+            // button instances for 20 updates in a row — a real diagnostic for a toolbar whose
+            // actions actually don't change, but a false positive here where the diff content
+            // does change every time. 2025.2+ dropped that synchronous update from buildToolbar,
+            // so this never fires there. Suppress only that one message, scoped to this loop —
+            // any other logged error still fails the test.
+            suppressingToolbarRebuildDiagnostic {
+                repeat(10) {
+                    dialog.fileSelection.changesTree.setIncludedChanges(
+                        dialog.fileSelection.includedChanges - changes[0]
+                    )
+                    dialog.fileSelection.changesTree.setIncludedChanges(changes.take(1))
+                }
+            }
+            loadCount.get() shouldBe 2 // toggling the checked state 10x: still no new loads.
 
-        repeat(10) {
-            dialog.fileSelection.changesTree.setIncludedChanges(
-                dialog.fileSelection.includedChanges - changes[0]
-            )
-            dialog.fileSelection.changesTree.setIncludedChanges(changes.take(1))
+            val distinctFilesToView = 5
+            for (i in 1 until distinctFilesToView) {
+                selectAndAwaitPreview(dialog, changes[i].filePath, loadCount, expected = 2 * (i + 1))
+            }
+            loadCount.get() shouldBe (2 * distinctFilesToView) // 2 * distinct files viewed, not 2 * fileCount.
+        } finally {
+            disposeDialog(dialog)
         }
-        loadCount.get() shouldBe 2 // toggling the checked state 10x: still no new loads.
+    }
 
-        val distinctFilesToView = 5
-        for (i in 1 until distinctFilesToView) {
-            selectAndAwaitPreview(dialog, changes[i].filePath, loadCount, expected = 2 * (i + 1))
-        }
-        loadCount.get() shouldBe (2 * distinctFilesToView) // 2 * distinct files viewed, not 2 * fileCount.
-
-        disposeDialog(dialog)
+    /**
+     * Runs [action] with [LoggedErrorProcessor] set to swallow only the 2025.1-only
+     * "toolbar creates new components for N updates in a row" diagnostic (see call site KDoc);
+     * any other logged error still propagates and fails the test.
+     */
+    private fun suppressingToolbarRebuildDiagnostic(action: () -> Unit) {
+        LoggedErrorProcessor.executeWith<RuntimeException>(
+            object : LoggedErrorProcessor() {
+                override fun processError(
+                    category: String,
+                    message: String,
+                    details: Array<String>,
+                    t: Throwable?
+                ): Set<Action> =
+                    if (message.contains("toolbar creates new components")) Action.NONE else Action.ALL
+            },
+            action
+        )
     }
 
     @Test
@@ -94,16 +128,19 @@ class SquashPreviewScaleTest {
             SquashMode.PickDestination(listOf(source), listOf(parent)),
             changes
         )
-        waitForRefresh(dialog)
+        try {
+            waitForRefresh(dialog)
 
-        for (change in changes) {
-            selectAndAwaitPreview(dialog, change.filePath, loadCount, expected = loadCount.get() + 2)
+            for (change in changes) {
+                selectAndAwaitPreview(dialog, change.filePath, loadCount, expected = loadCount.get() + 2)
+            }
+
+            // Exactly 2 per distinct file (each selected once here) — a quadratic re-fetch-on-every-
+            // -selection regression would blow well past this bound.
+            loadCount.get().toLong() shouldBeLessThan (3L * n)
+        } finally {
+            disposeDialog(dialog)
         }
-
-        // Exactly 2 per distinct file (each selected once here) — a quadratic re-fetch-on-every-
-        // -selection regression would blow well past this bound.
-        loadCount.get().toLong() shouldBeLessThan (3L * n)
-        disposeDialog(dialog)
     }
 
     private fun selectAndAwaitPreview(
