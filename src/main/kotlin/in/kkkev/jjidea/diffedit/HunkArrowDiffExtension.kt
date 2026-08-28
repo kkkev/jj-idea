@@ -43,7 +43,7 @@ class HunkArrowDiffExtension : DiffExtension() {
         if (viewer !is SimpleThreesideDiffViewer) return
 
         session.viewer = viewer
-        val installer = ArrowInstaller(viewer, session.project, session.staysLabel, session.movesToLabel)
+        val installer = ArrowInstaller(viewer, session.project, session.labels)
         viewer.addListener(object : DiffViewerListener() {
             override fun onAfterRediff() = installer.install()
         })
@@ -60,7 +60,7 @@ class HunkArrowDiffExtension : DiffExtension() {
  * document *is* the state — only a back-reference to the constructed viewer, for the test seam
  * (see [HunkPickerDialog.viewerForTest]).
  */
-class HunkArrowSession(val project: Project, val staysLabel: String, val movesToLabel: String) {
+class HunkArrowSession(val project: Project, val labels: HunkPickerLabels) {
     internal var viewer: SimpleThreesideDiffViewer? = null
 }
 
@@ -73,8 +73,7 @@ class HunkArrowSession(val project: Project, val staysLabel: String, val movesTo
 private class ArrowInstaller(
     private val viewer: SimpleThreesideDiffViewer,
     private val project: Project,
-    private val staysLabel: String,
-    private val movesToLabel: String
+    private val labels: HunkPickerLabels
 ) {
     private var installedOperations: List<DiffGutterOperation> = emptyList()
 
@@ -88,7 +87,7 @@ private class ArrowInstaller(
                     editor = ThreeSide.BASE,
                     line = change.getStartLine(ThreeSide.BASE),
                     icon = AllIcons.Diff.ArrowRight,
-                    tooltip = JujutsuBundle.message("dialog.hunks.arrow.toChild", movesToLabel),
+                    tooltip = labels.middleArrowTooltip,
                     sourceSide = ThreeSide.LEFT,
                     change = change
                 )
@@ -98,7 +97,7 @@ private class ArrowInstaller(
                     editor = ThreeSide.RIGHT,
                     line = change.getStartLine(ThreeSide.RIGHT),
                     icon = AllIcons.Diff.Arrow,
-                    tooltip = JujutsuBundle.message("dialog.hunks.arrow.toParent", staysLabel),
+                    tooltip = labels.rightArrowTooltip,
                     sourceSide = ThreeSide.RIGHT,
                     change = change
                 )

@@ -12,6 +12,7 @@ import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -110,8 +111,7 @@ class HunkPickerDialogTest {
             baseContent = base,
             afterContent = after,
             initialContent = after,
-            staysLabel = "Parent",
-            movesToLabel = "Child"
+            labels = HunkPickerLabels.forSplit("Parent", "Child")
         )
 
         result shouldBe base
@@ -131,8 +131,7 @@ class HunkPickerDialogTest {
             baseContent = base,
             afterContent = after,
             initialContent = after,
-            staysLabel = "Parent",
-            movesToLabel = "Child"
+            labels = HunkPickerLabels.forSplit("Parent", "Child")
         )
 
         result shouldBe null
@@ -158,8 +157,7 @@ class HunkPickerDialogTest {
             baseContent = twoHunkBase,
             afterContent = twoHunkAfter,
             initialContent = partialRemainder,
-            staysLabel = "Parent",
-            movesToLabel = "Child"
+            labels = HunkPickerLabels.forSplit("Parent", "Child")
         )
 
         capturedText shouldBe partialRemainder
@@ -173,8 +171,7 @@ class HunkPickerDialogTest {
             base,
             initialContent,
             after,
-            "Parent",
-            "Child"
+            HunkPickerLabels.forSplit("Parent", "Child")
         )
 
     /**
@@ -205,5 +202,40 @@ class HunkPickerDialogTest {
 
     private fun disposeDialog(dialog: DialogWrapper) {
         if (!dialog.isDisposed) dialog.close(DialogWrapper.CANCEL_EXIT_CODE)
+    }
+
+    // ---- HunkPickerLabels.forSquash wiring (jj-idea-4q7m) ----
+
+    @Test
+    fun `squash labels render distinct pane titles from split labels`() {
+        val dialog = HunkPickerDialog(
+            project.get(),
+            "file.txt",
+            PlainTextFileType.INSTANCE,
+            base,
+            after,
+            after,
+            HunkPickerLabels.forSquash("mytest", "@-")
+        )
+        val viewer = viewerReady(dialog)
+
+        // Mechanics are unaffected by which labels are used — an arrow click still moves a hunk.
+        replaceChange(viewer, viewer.getChanges().single(), ThreeSide.LEFT)
+        dialog.resultContent() shouldBe base
+
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `forSquash and forSplit produce different wording for the same commit labels`() {
+        val split = HunkPickerLabels.forSplit("Parent", "Child")
+        val squash = HunkPickerLabels.forSquash("Parent", "Child")
+
+        split.leftTitle shouldBe "Parent"
+        squash.leftTitle shouldNotBe split.leftTitle
+        squash.middleTitle shouldNotBe split.middleTitle
+        squash.rightTitle shouldNotBe split.rightTitle
+        squash.middleArrowTooltip shouldNotBe split.middleArrowTooltip
+        squash.rightArrowTooltip shouldNotBe split.rightArrowTooltip
     }
 }

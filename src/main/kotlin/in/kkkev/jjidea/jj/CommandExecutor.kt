@@ -351,6 +351,33 @@ interface CommandExecutor {
     ): CommandResult
 
     /**
+     * Squash a single source change into a destination interactively, using a diff editor tool —
+     * the squash analog of [splitInteractive]. Uses `jj squash --from <SRC> --into <DEST> --tool
+     * <tool>` (implies `--interactive`), driven non-interactively by the IDE's diff-edit helper.
+     * No filesets are passed - the staging tree built by [in.kkkev.jjidea.diffedit.DiffEditTool]
+     * carries the selection, exactly as for [splitInteractive].
+     *
+     * Single-source only: jj's diff editor is one before/after pair, so hunk-level squashing
+     * across multiple sources isn't well-defined - see [in.kkkev.jjidea.ui.squash.SquashIntoDialog].
+     *
+     * @param source The single revision whose changes will be moved
+     * @param destination Revision to receive the changes
+     * @param description Description for the combined result at [destination] (null = let jj merge)
+     * @param keepEmptied Keep the emptied source change
+     * @param configArgs Extra `--config NAME=VALUE` entries (prepended before the subcommand)
+     * @param tool The diff-editor tool name registered via [configArgs]
+     * @return Command result
+     */
+    fun squashIntoInteractive(
+        source: Revision,
+        destination: Revision,
+        description: Description? = null,
+        keepEmptied: Boolean = false,
+        configArgs: List<String> = emptyList(),
+        tool: String
+    ): CommandResult
+
+    /**
      * Split a change into two changes.
      * @param revision The revision to split (default: working copy)
      * @param filePaths The selected fileset passed to `jj split` (empty = interactive, but UI

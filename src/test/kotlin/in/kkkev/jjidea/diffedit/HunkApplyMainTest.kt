@@ -174,4 +174,84 @@ class HunkApplyMainTest {
 
         right.resolve("file.txt").readText() shouldBe content
     }
+
+    // ---- deletion manifest (jj-idea-4q7m) ----
+
+    @Test
+    fun `mirrorTree deletes a manifest-listed path present in left and right`() {
+        // fileA is unchanged from left (present in both left and right) but its deletion was
+        // explicitly selected — it must be deleted from right, not restored from left.
+        val staging = staging()
+        val left = left()
+        val right = right()
+
+        left.resolve("fileA.txt").writeText("base content")
+        right.resolve("fileA.txt").writeText("base content")
+        staging.resolve(DiffEditTool.DELETED_MANIFEST_NAME).writeText("fileA.txt")
+
+        mirrorTree(staging, left, right)
+
+        Files.exists(right.resolve("fileA.txt")) shouldBe false
+    }
+
+    @Test
+    fun `mirrorTree manifest deletion overrides an unrelated left-restore`() {
+        val staging = staging()
+        val left = left()
+        val right = right()
+
+        left.resolve("fileA.txt").writeText("base-A")
+        left.resolve("fileB.txt").writeText("base-B")
+        right.resolve("fileA.txt").writeText("revision-A")
+        right.resolve("fileB.txt").writeText("revision-B")
+        staging.resolve(DiffEditTool.DELETED_MANIFEST_NAME).writeText("fileA.txt")
+
+        mirrorTree(staging, left, right)
+
+        Files.exists(right.resolve("fileA.txt")) shouldBe false
+        right.resolve("fileB.txt").readText() shouldBe "base-B" // unaffected files still restore normally
+    }
+
+    @Test
+    fun `mirrorTree manifest file itself is never mirrored into right`() {
+        val staging = staging()
+        val right = right()
+
+        staging.resolve("fileA.txt").writeText("staged")
+        staging.resolve(DiffEditTool.DELETED_MANIFEST_NAME).writeText("someOtherFile.txt")
+
+        mirrorTree(staging, left(), right)
+
+        Files.exists(right.resolve(DiffEditTool.DELETED_MANIFEST_NAME)) shouldBe false
+        right.resolve("fileA.txt").readText() shouldBe "staged"
+    }
+
+    @Test
+    fun `mirrorTree with no manifest behaves exactly as before (no deletions)`() {
+        val staging = staging()
+        val left = left()
+        val right = right()
+
+        left.resolve("fileA.txt").writeText("base-A")
+        right.resolve("fileA.txt").writeText("revision-A")
+
+        mirrorTree(staging, left, right)
+
+        right.resolve("fileA.txt").readText() shouldBe "base-A"
+    }
+
+    @Test
+    fun `mirrorTree ignores blank lines in the manifest`() {
+        val staging = staging()
+        val left = left()
+        val right = right()
+
+        left.resolve("fileA.txt").writeText("base-A")
+        right.resolve("fileA.txt").writeText("base-A")
+        staging.resolve(DiffEditTool.DELETED_MANIFEST_NAME).writeText("fileA.txt\n\n  \n")
+
+        mirrorTree(staging, left, right)
+
+        Files.exists(right.resolve("fileA.txt")) shouldBe false
+    }
 }

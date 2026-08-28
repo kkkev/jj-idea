@@ -160,7 +160,13 @@ internal fun gitPushArgs(
     if (dryRun) add("--dry-run")
 }
 
-/** Build the argument list for `jj squash`. */
+/**
+ * Build the argument list for `jj squash`.
+ *
+ * Emits `--` before the filesets, aligned with [squashIntoArgs] (needed there because `--from` is
+ * repeatable and could otherwise swallow a fileset argument; kept here too for consistency, even
+ * though `-r` doesn't have the same ambiguity).
+ */
 internal fun squashArgs(
     revision: Revision,
     filePaths: List<String> = emptyList(),
@@ -174,7 +180,10 @@ internal fun squashArgs(
         add("--message=${description.actual}")
     }
     if (keepEmptied) add("--keep-emptied")
-    addAll(filePaths.map { it.toFileset() })
+    if (filePaths.isNotEmpty()) {
+        add("--")
+        addAll(filePaths.map { it.toFileset() })
+    }
 }
 
 internal fun resolveListArgs(revision: Revision = WorkingCopy): List<String> =
@@ -270,6 +279,46 @@ internal fun squashIntoArgs(
     description: Description? = null,
     keepEmptied: Boolean = false
 ): List<String> = buildList {
+    addAll(squashIntoPrefixArgs(sources, destination, description, keepEmptied))
+    if (filePaths.isNotEmpty()) {
+        add("--")
+        addAll(filePaths.map { it.toFileset() })
+    }
+}
+
+/**
+ * Build the full argument list for `jj squash --from <source> --into <destination> --tool <tool>`
+ * (interactive diff-editor squash) — the squash analog of [splitInteractiveArgs].
+ *
+ * [configArgs] are `NAME=VALUE` strings emitted as `--config NAME=VALUE` **before** the
+ * subcommand, since `--config` is a jj global option that must precede the subcommand. No
+ * filesets are passed — the tool drives selection over the whole diff, exactly as for
+ * [splitInteractiveArgs]. Single-source only — see [in.kkkev.jjidea.jj.CommandExecutor.
+ * squashIntoInteractive].
+ */
+internal fun squashIntoInteractiveArgs(
+    source: Revision,
+    destination: Revision,
+    description: Description? = null,
+    keepEmptied: Boolean = false,
+    configArgs: List<String> = emptyList(),
+    tool: String
+): List<String> = buildList {
+    for (kv in configArgs) {
+        add("--config")
+        add(kv)
+    }
+    addAll(squashIntoPrefixArgs(listOf(source), destination, description, keepEmptied))
+    add("--tool=$tool")
+}
+
+/** Shared `squash --into <dest> --from <src>... [--message] [--keep-emptied]` prefix. */
+private fun squashIntoPrefixArgs(
+    sources: List<Revision>,
+    destination: Revision,
+    description: Description?,
+    keepEmptied: Boolean
+): List<String> = buildList {
     add("squash")
     add("--into")
     add(destination.toString())
@@ -279,10 +328,6 @@ internal fun squashIntoArgs(
     }
     if (description != null) add("--message=${description.actual}")
     if (keepEmptied) add("--keep-emptied")
-    if (filePaths.isNotEmpty()) {
-        add("--")
-        addAll(filePaths.map { it.toFileset() })
-    }
 }
 
 /**
@@ -587,6 +632,15 @@ class CliExecutor(
             keepEmptied
         )
     )
+
+    override fun squashIntoInteractive(
+        source: Revision,
+        destination: Revision,
+        description: Description?,
+        keepEmptied: Boolean,
+        configArgs: List<String>,
+        tool: String
+    ) = execute(root, squashIntoInteractiveArgs(source, destination, description, keepEmptied, configArgs, tool))
 
     override fun split(
         revision: Revision,

@@ -202,6 +202,57 @@ class SquashIntoDialogPickSourcesModeTest {
         disposeDialog(dialog)
     }
 
+    // ---- Hunk picking (jj-idea-4q7m) ----
+
+    @Test
+    fun `pickHunksButton hidden with two sources selected, visible with one`() {
+        val dest = createEntry("dest1", description = "dest desc")
+        val src1 = createEntry("src1", description = "src1 desc")
+        val src2 = createEntry("src2", description = "src2 desc")
+        val dialog = dialog(dest, listOf(src1, src2))
+
+        dialog.selectPickerRowsForTest(0, 1)
+        dialog.pickHunksButton.isVisible shouldBe false
+
+        dialog.selectPickerRowsForTest(0)
+        dialog.pickHunksButton.isVisible shouldBe true
+
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `pickHunksButton hidden with zero sources selected`() {
+        val dest = createEntry("dest1", description = "dest desc")
+        val src = createEntry("src1", description = "src1 desc")
+        val dialog = dialog(dest, listOf(src))
+
+        dialog.pickHunksButton.isVisible shouldBe false
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `changing the source selection clears hunk-picked overrides`() {
+        val dest = createEntry("dest1", description = "dest desc")
+        val src1 = createEntry("src1", description = "src1 desc")
+        val src2 = createEntry("src2", description = "src2 desc")
+        val dialog = dialog(dest, listOf(src1, src2))
+
+        dialog.selectPickerRowsForTest(0)
+        val changes = listOf(change("src/Main.kt"))
+        dialog.fileSelection.setChanges(changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.setDestinationOverrideForTest(changes[0].filePath, "partial\n")
+        dialog.fileSelection.changesTree.partialChanges shouldBe changes.toSet()
+
+        // Changing the picker selection replaces the file tree wholesale — a stale override for
+        // a file that may no longer be in the (new) tree must not survive.
+        dialog.selectPickerRowsForTest(1)
+
+        dialog.fileSelection.changesTree.partialChanges shouldBe emptySet()
+        disposeDialog(dialog)
+    }
+
     private fun dialog(
         destination: LogEntry,
         candidates: List<LogEntry>

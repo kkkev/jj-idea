@@ -64,4 +64,22 @@ class FileSelectionPanel(project: Project) : JPanel(BorderLayout()) {
     fun setPartialChanges(changes: Set<Change>) {
         changesTree.partialChanges = changes
     }
+
+    /**
+     * Tick or untick a single [change], a no-op if it's already in the requested state.
+     * Used by hunk-picking (see [in.kkkev.jjidea.ui.common.HunkPickPreviewController]) to sync
+     * the checkbox when a picker result collapses to a whole-file "fully moved"/"fully stays"
+     * outcome.
+     */
+    fun setIncluded(change: Change, included: Boolean) {
+        val current = includedChanges.toMutableList()
+        val already = change in current
+        if (included && !already) {
+            current.add(change)
+            changesTree.setIncludedChanges(current)
+        } else if (!included && already) {
+            current.remove(change)
+            changesTree.setIncludedChanges(current)
+        }
+    }
 }

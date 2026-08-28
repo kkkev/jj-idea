@@ -1,30 +1,26 @@
 package `in`.kkkev.jjidea.ui.squash
 
-import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.vcs.changes.Change
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
+import `in`.kkkev.jjidea.ui.common.FileContents
 
 /**
- * Both sides of a squash source file's own change (its parent → itself), plus the file type
- * for syntax highlighting. Both fields default to `""` when the corresponding
- * [com.intellij.openapi.vcs.changes.ContentRevision] has no content (added/deleted files).
- */
-internal data class SquashFileData(val before: String, val after: String, val fileType: FileType)
-
-/**
- * Load both sides of [change]'s content. Hits `jj file show` via the change's
+ * Load both sides of [change]'s own content — its parent → itself — plus the file type for
+ * syntax highlighting. Hits `jj file show` via the change's
  * [com.intellij.openapi.vcs.changes.ContentRevision]s (see [in.kkkev.jjidea.jj.ChangeService]
- * for how those are built, including merge-parent reconstruction) — call off the EDT.
+ * for how those are built, including merge-parent reconstruction) — call off the EDT. Both sides
+ * default to `""` when the corresponding `ContentRevision` has no content (added/deleted files).
  *
- * Returns null only if both sides are unreadable (shouldn't happen for a real file change).
+ * Returns null only if both sides are unreadable (shouldn't happen for a real file change) — the
+ * [in.kkkev.jjidea.ui.common.HunkPickPreviewController] loader signature for [SquashIntoDialog].
  */
-internal fun loadSquashFileData(change: Change): SquashFileData? {
+internal fun loadSquashFileData(change: Change): FileContents? {
     val before = change.beforeRevision?.content
     val after = change.afterRevision?.content
     if (before == null && after == null) return null
     val fileName = (change.afterRevision ?: change.beforeRevision)!!.file.name
-    return SquashFileData(before = before ?: "", after = after ?: "", fileType = HunkPicker.fileTypeFor(fileName))
+    return FileContents(before = before ?: "", after = after ?: "", fileType = HunkPicker.fileTypeFor(fileName))
 }
 
 /**

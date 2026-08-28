@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog
 import `in`.kkkev.jjidea.ui.split.SplitSpec
@@ -106,7 +107,7 @@ private fun executeSplitInteractive(
     project: Project,
     target: LogEntry,
     spec: SplitSpec,
-    hunkSelection: `in`.kkkev.jjidea.ui.split.SplitHunkSelection
+    hunkSelection: HunkSelection
 ) {
     runInBackground {
         val perFileContent = hunkSelection.buildPerFileContent().toMutableMap()
@@ -128,29 +129,23 @@ private fun executeSplitInteractive(
             }
         }
 
-        val stagingDir = DiffEditTool.buildStagingTree(perFileContent)
-        try {
-            val configArgs = DiffEditTool.diffEditConfigArgs(DiffEditTool.TOOL_NAME, stagingDir)
-
-            val result = target.repo.commandExecutor.splitInteractive(
+        val result = DiffEditTool.withStagingTree(perFileContent, hunkSelection.deletedPaths) { configArgs, tool ->
+            target.repo.commandExecutor.splitInteractive(
                 revision = spec.revision,
                 description = spec.selectedDescription,
                 parallel = spec.parallel,
                 configArgs = configArgs,
-                tool = DiffEditTool.TOOL_NAME,
+                tool = tool,
                 insertBefore = spec.insertBefore
             )
+        }
 
-            runLater {
-                if (!result.isSuccess) {
-                    result.tellUser(project, "log.action.split.error")
-                    return@runLater
-                }
-                onSplitSuccess(project, target, spec, result.stderr)
+        runLater {
+            if (!result.isSuccess) {
+                result.tellUser(project, "log.action.split.error")
+                return@runLater
             }
-        } finally {
-            stagingDir.toFile().deleteRecursively()
-            splitLog.debug("Cleaned up staging dir $stagingDir")
+            onSplitSuccess(project, target, spec, result.stderr)
         }
     }
 }

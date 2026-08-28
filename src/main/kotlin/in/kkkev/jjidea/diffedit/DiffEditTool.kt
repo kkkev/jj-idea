@@ -23,15 +23,28 @@ private val log = Logger.getInstance("in.kkkev.jjidea.diffedit.DiffEditTool")
  */
 object DiffEditTool {
     /**
-     * Build a temporary staging directory containing the desired first-commit state of each
-     * changed file.
+     * Name of the manifest file inside the staging directory listing repo-relative paths whose
+     * *deletion* should be written into `$right` — see [buildStagingTree]'s `deletedPaths` param
+     * and [HunkApplyMain.mirrorTree] for why an absent staging entry can't express this on its
+     * own (it means "leave unchanged", not "delete").
+     */
+    internal const val DELETED_MANIFEST_NAME = ".jj-idea-deleted"
+
+    /**
+     * Build a temporary staging directory containing the desired `$right` state of each changed
+     * file — see this file's KDoc for the diff-editor protocol.
      *
      * @param perFileContent Map of repo-relative POSIX path → desired content.
-     *   - Non-null value: write this content to `stagingDir/<path>` (file goes to first commit).
-     *   - Null value: omit from stagingDir (file absent from first commit → goes to second commit).
+     *   - Non-null value: write this content to `stagingDir/<path>`.
+     *   - Null value: omit from stagingDir (file left at [HunkApplyMain.mirrorTree]'s default:
+     *     restored unchanged from `$left`).
+     * @param deletedPaths Repo-relative POSIX paths whose deletion should be written into
+     *   `$right`, distinct from omitting them from [perFileContent] (which means "unchanged",
+     *   not "deleted"). Written to a manifest file inside the staging directory; see
+     *   [HunkApplyMain.mirrorTree].
      * @return Path to the staging directory. The caller is responsible for deleting it.
      */
-    fun buildStagingTree(perFileContent: Map<String, String?>): Path {
+    fun buildStagingTree(perFileContent: Map<String, String?>, deletedPaths: Set<String> = emptySet()): Path {
         val stagingDir = Files.createTempDirectory("jj-idea-split-staging-")
         for ((relPath, content) in perFileContent) {
             if (content == null) continue
@@ -39,8 +52,37 @@ object DiffEditTool {
             target.parent?.toFile()?.mkdirs()
             target.writeText(content)
         }
-        log.debug("Built staging tree at $stagingDir with ${perFileContent.values.count { it != null }} files")
+        if (deletedPaths.isNotEmpty()) {
+            stagingDir.resolve(DELETED_MANIFEST_NAME).writeText(deletedPaths.joinToString("\n"))
+        }
+        log.debug(
+            "Built staging tree at $stagingDir with ${perFileContent.values.count { it != null }} files, " +
+                "${deletedPaths.size} deletions"
+        )
         return stagingDir
+    }
+
+    /**
+     * Build the staging tree, derive its `--config` args, run [run] with them, and delete the
+     * staging directory afterward — regardless of whether [run] succeeds or throws. Shared by
+     * [in.kkkev.jjidea.actions.change.executeSplitInteractive] and
+     * [in.kkkev.jjidea.actions.change.executeSquashIntoInteractive] so neither duplicates the
+     * temp-directory lifecycle.
+     *
+     * @param toolName An ephemeral tool name (e.g. [TOOL_NAME]).
+     */
+    fun <T> withStagingTree(
+        perFileContent: Map<String, String?>,
+        deletedPaths: Set<String> = emptySet(),
+        toolName: String = TOOL_NAME,
+        run: (configArgs: List<String>, tool: String) -> T
+    ): T {
+        val stagingDir = buildStagingTree(perFileContent, deletedPaths)
+        try {
+            return run(diffEditConfigArgs(toolName, stagingDir), toolName)
+        } finally {
+            stagingDir.toFile().deleteRecursively()
+        }
     }
 
     /**

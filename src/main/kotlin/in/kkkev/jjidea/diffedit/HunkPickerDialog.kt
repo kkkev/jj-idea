@@ -18,15 +18,20 @@ import java.awt.Dimension
 import javax.swing.JComponent
 
 /**
- * Lets the user interactively pick which hunks of a file's change move away from `after`
- * (back toward `base`), via a native 3-pane diff — Before | eventual Parent (live) | Child —
- * with a directional arrow at each hunk's divider instead of the earlier 3-way *merge* widget
- * (`HunkDiffPicker`, replaced by jj-idea-xuob) or the intermediate 2-pane checkbox picker.
+ * Lets the user interactively pick which hunks of a file's change move from [HunkPickerLabels]'s
+ * left (fixed) side to its right (fixed) side, via a native 3-pane diff — Left | live middle |
+ * Right — with a directional arrow at each hunk's divider instead of the earlier 3-way *merge*
+ * widget (`HunkDiffPicker`, replaced by jj-idea-xuob) or the intermediate 2-pane checkbox picker.
  *
- * Clicking the right arrow at a Before|Parent divider moves that hunk to the child (pulls
- * Before's content into the live middle pane); clicking the left arrow at a Parent|Child divider
- * moves it back to the parent (pulls Child's content back in) — reversible, either direction, any
- * number of times, per hunk. No "resolved" concept, so no merge-conflict confirmation dialogs.
+ * The mechanics are polarity-agnostic — used by both Split ("first commit" content moving to a
+ * new child) and Squash ("destination" content receiving hunks from the source) — see
+ * [HunkPickerLabels] for how the two calling conventions differ only in wording, never in
+ * mechanism.
+ *
+ * Clicking the right arrow at a Left|middle divider moves that hunk to the right side (pulls
+ * Left's content into the live middle pane); clicking the left arrow at a middle|Right divider
+ * moves it back (pulls Right's content back in) — reversible, either direction, any number of
+ * times, per hunk. No "resolved" concept, so no merge-conflict confirmation dialogs.
  *
  * The middle pane is genuinely editable (required for [SimpleThreesideDiffViewer.replaceChange]
  * to have a document to write into) but marked `FORCE_READ_ONLY` like the other two, so direct
@@ -36,22 +41,24 @@ import javax.swing.JComponent
  */
 object HunkPicker {
     /**
-     * Open the picker and return the resulting "stays here" (parent) content, or null if
-     * cancelled (caller keeps prior state).
+     * Open the picker and return the resulting middle-pane content, or null if cancelled
+     * (caller keeps prior state).
      *
      * Must be called on the EDT (modal dialog).
      *
      * @param project        The current project.
      * @param fileName       Display name of the file (e.g. "Auth.kt") — used for the dialog title.
      * @param fileType       File type for syntax highlighting. Use [fileTypeFor] to resolve.
-     * @param baseContent    The "stays here" side's original content (the fixed left pane).
-     * @param afterContent   The "moves" side's full content (the fixed right pane).
+     * @param baseContent    The fixed left pane's content — the middle pane's "nothing moved"
+     *                       default.
+     * @param afterContent   The fixed right pane's content — the middle pane's "everything moved"
+     *                       default.
      * @param initialContent Starting content for the live middle pane: pass any existing partial
      *                       override to resume it, or a tick-derived default (== [baseContent] or
      *                       [afterContent]) otherwise. Resuming needs no reconstruction — the
      *                       string itself is the exact resume state.
-     * @param staysLabel     Name of the commit that keeps [baseContent]'s hunks (e.g. "Parent").
-     * @param movesToLabel   Name of the commit that receives moved hunks (e.g. "Child").
+     * @param labels         Pane titles and arrow tooltips — see [HunkPickerLabels.forSplit] /
+     *                       [HunkPickerLabels.forSquash].
      */
     fun pickRemainderContent(
         project: Project,
@@ -60,8 +67,7 @@ object HunkPicker {
         baseContent: String,
         afterContent: String,
         initialContent: String,
-        staysLabel: String,
-        movesToLabel: String
+        labels: HunkPickerLabels
     ): String? {
         val dialog = HunkPickerDialog(
             project,
@@ -70,8 +76,7 @@ object HunkPicker {
             baseContent,
             initialContent,
             afterContent,
-            staysLabel,
-            movesToLabel
+            labels
         )
         val accepted = dialogRunnerForTest?.invoke(dialog) ?: dialog.showAndGet()
         return if (accepted) dialog.resultContent() else null
@@ -108,10 +113,9 @@ internal class HunkPickerDialog(
     private val baseContent: String,
     private val initialContent: String,
     private val afterContent: String,
-    private val staysLabel: String,
-    private val movesToLabel: String
+    private val labels: HunkPickerLabels
 ) : DialogWrapper(project) {
-    private val session = HunkArrowSession(project, staysLabel, movesToLabel)
+    private val session = HunkArrowSession(project, labels)
 
     @org.jetbrains.annotations.TestOnly
     internal fun performOKForTest() = doOKAction()
@@ -160,9 +164,9 @@ internal class HunkPickerDialog(
                 leftContent,
                 middleContent,
                 rightContent,
-                staysLabel,
-                JujutsuBundle.message("dialog.hunks.side.parent", staysLabel),
-                JujutsuBundle.message("dialog.hunks.side.moves", movesToLabel)
+                labels.leftTitle,
+                labels.middleTitle,
+                labels.rightTitle
             )
             request.putUserData(
                 DiffUserDataKeys.THREESIDE_DIFF_COLORS_MODE,

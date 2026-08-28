@@ -57,6 +57,71 @@ class DiffEditToolTest {
         }
     }
 
+    @Test
+    fun `buildStagingTree writes no manifest when deletedPaths is empty`() {
+        val stagingDir = DiffEditTool.buildStagingTree(mapOf("a.txt" to "x"))
+        try {
+            stagingDir.resolve(DiffEditTool.DELETED_MANIFEST_NAME).exists() shouldBe false
+        } finally {
+            stagingDir.toFile().deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `buildStagingTree writes a newline-separated manifest for deletedPaths`() {
+        val stagingDir = DiffEditTool.buildStagingTree(emptyMap(), deletedPaths = setOf("a.txt", "src/b.txt"))
+        try {
+            val manifest = stagingDir.resolve(DiffEditTool.DELETED_MANIFEST_NAME).readText()
+            manifest.lines().toSet() shouldBe setOf("a.txt", "src/b.txt")
+        } finally {
+            stagingDir.toFile().deleteRecursively()
+        }
+    }
+
+    // ---- withStagingTree ----
+
+    /** Extract the staging dir path from a `merge-tools.<tool>.program=<java>` arg's sibling. */
+    private fun stagingDirFrom(configArgs: List<String>): Path {
+        val editArgs = configArgs[1].substringAfter("edit-args=")
+        val values = editArgs.trim('[', ']').split(",").map { it.trim('"') }
+        val stagingPath = values[values.indexOf("-cp") + 3] // -cp, classpath, mainClass, stagingPath
+        return Path.of(stagingPath)
+    }
+
+    @Test
+    fun `withStagingTree passes config args through and returns run's result`() {
+        val result = DiffEditTool.withStagingTree(mapOf("a.txt" to "x")) { configArgs, tool ->
+            configArgs.size shouldBe 3
+            tool shouldBe DiffEditTool.TOOL_NAME
+            "ok"
+        }
+        result shouldBe "ok"
+    }
+
+    @Test
+    fun `withStagingTree deletes the staging directory after a successful run`() {
+        var dir: Path? = null
+        DiffEditTool.withStagingTree(mapOf("a.txt" to "x")) { configArgs, _ ->
+            dir = stagingDirFrom(configArgs)
+            dir!!.exists() shouldBe true
+        }
+        dir!!.exists() shouldBe false
+    }
+
+    @Test
+    fun `withStagingTree deletes the staging directory even when run throws`() {
+        var dir: Path? = null
+        try {
+            DiffEditTool.withStagingTree(mapOf("a.txt" to "x")) { configArgs, _ ->
+                dir = stagingDirFrom(configArgs)
+                error("boom")
+            }
+        } catch (e: IllegalStateException) {
+            e.message shouldBe "boom"
+        }
+        dir!!.exists() shouldBe false
+    }
+
     // ---- diffEditConfigArgs ----
 
     @Test

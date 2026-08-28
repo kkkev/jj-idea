@@ -1,13 +1,5 @@
 package `in`.kkkev.jjidea.ui.split
 
-import com.intellij.diff.DiffContentFactory
-import com.intellij.diff.contents.DiffContent
-import com.intellij.diff.requests.SimpleDiffRequest
-import com.intellij.diff.util.DiffUserDataKeys
-import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.fileTypes.FileType
-import com.intellij.openapi.fileTypes.FileTypeManager
-import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
@@ -21,11 +13,15 @@ import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
+import `in`.kkkev.jjidea.diffedit.HunkPickerLabels
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.ui.common.FileDiffPreviewPanel
+import `in`.kkkev.jjidea.ui.common.FileContents
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
+import `in`.kkkev.jjidea.ui.common.HunkPickPreviewController
+import `in`.kkkev.jjidea.ui.common.HunkSelection
+import `in`.kkkev.jjidea.ui.common.buildHunkSelection
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.ui.components.appendDescriptionAndEmptyIndicator
@@ -33,10 +29,7 @@ import `in`.kkkev.jjidea.ui.components.htmlString
 import `in`.kkkev.jjidea.ui.log.appendDecorations
 import `in`.kkkev.jjidea.ui.log.appendStatusIndicators
 import `in`.kkkev.jjidea.util.GitDiffReverseApplier
-import `in`.kkkev.jjidea.util.runInBackground
-import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
-import `in`.kkkev.jjidea.vcs.relativeTo
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Font
@@ -63,7 +56,7 @@ data class SplitSpec(
     /** Whole-file fast path: see this class's KDoc for which side's files end up here. */
     val filePaths: List<FilePath>,
     /** Hunk-level selection. Non-null when at least one file is partially selected. */
-    val hunkSelection: SplitHunkSelection?,
+    val hunkSelection: HunkSelection?,
     val selectedDescription: Description,
     val remainingDescription: Description?,
     val parallel: Boolean,
@@ -106,15 +99,6 @@ class SplitDialog(
 
     private val allChanges = changes.toList()
 
-    // --- Per-file loaded data cache (base content, after content, file type) ---
-    private data class FileData(
-        val afterContent: String,
-        val baseContent: String, // null-safe: reverseApply result; empty string for added files
-        val fileType: FileType
-    )
-
-    private val fileDataCache: MutableMap<FilePath, FileData> = LinkedHashMap()
-
     // --- Partial-file overrides: merge-picked first-commit content for partially-split files ---
     // Non-null entry = this file has a partial first-commit content (from the merge picker).
     private val firstCommitOverrides: MutableMap<FilePath, String> = LinkedHashMap()
@@ -123,15 +107,25 @@ class SplitDialog(
     internal val fileSelection = FileSelectionPanel(project)
     private var previousIncluded: Set<FilePath> = emptySet()
 
-    // --- Right panel: native diff preview ---
-    private val diffPreview = FileDiffPreviewPanel(project, disposable)
-    private var currentPreviewFile: FilePath? = null
+    // --- Right panel: native diff preview, cache + lazy-load shared with SquashIntoDialog ---
+    private val previewController = HunkPickPreviewController(
+        project = project,
+        disposable = disposable,
+        loadContents = ::loadFileContents,
+        resolveContent = { fp, included, contents ->
+            firstCommitOverrides[fp] ?: computePreviewLeftContent(included, null, contents.before, contents.after)
+        },
+        previewTitles = { content, contents ->
+            describeSplitState(content, contents.before, contents.after, firstCommitLabel, secondCommitLabel)
+        },
+        isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } }
+    )
+    private val diffPreview get() = previewController.preview
 
     // --- "Pick Hunks…" button ---
     // Hidden entirely in newParent mode - see class KDoc for why partial hunk selection isn't
     // supported there.
-    internal val pickHunksButton = JButton(JujutsuBundle.message("dialog.split.pickHunks")).apply {
-        isEnabled = false
+    internal val pickHunksButton = previewController.pickHunksButton.apply {
         isVisible = !newParent
         addActionListener { onPickHunks() }
     }
@@ -202,7 +196,7 @@ class SplitDialog(
         // Listen for file selection changes (to show diff preview for selected file).
         fileSelection.changesTree.addTreeSelectionListener {
             val selected = fileSelection.changesTree.selectedChanges.firstOrNull()
-            if (selected != null) showPreviewForChange(selected)
+            if (selected != null) previewController.showFor(selected)
         }
 
         updateSummary()
@@ -227,113 +221,50 @@ class SplitDialog(
         updateSummary()
 
         // Refresh preview if the currently-shown file's inclusion changed.
-        currentPreviewFile?.let { fp ->
+        previewController.currentFile?.let { fp ->
             val change = allChanges.find { it.filePath == fp }
-            if (change != null) refreshPreview(fp)
+            if (change != null) previewController.refresh(fp)
         }
     }
 
     // ---- File diff loading + preview ----
 
     /**
-     * Show the diff preview for [change], loading the diff lazily.
+     * Load the split-off change's before/after content and file type for [change], off the EDT —
+     * the [HunkPickPreviewController] loader.
+     *
+     * The preview shows the **split-off change that moves to the child**: the right side is
+     * always the child's full content (the child is the tip, so it always holds the full
+     * original content). The left side reflects what **remains in the parent** — see
+     * [computePreviewLeftContent].
      */
-    private fun showPreviewForChange(change: Change) {
+    private fun loadFileContents(change: Change): FileContents? {
         val fp = change.filePath
-        currentPreviewFile = fp
-
-        // If already loaded, update the preview immediately.
-        val cached = fileDataCache[fp]
-        if (cached != null) {
-            updateDiffPreview(fp, cached)
-            return
-        }
-
-        // Clear while loading, keeping the header showing the file name.
-        diffPreview.show(fp.name)
-        pickHunksButton.isEnabled = false
-
         val revision = sourceEntry.id
         val executor = sourceEntry.repo.commandExecutor
 
-        runInBackground(ModalityState.any()) {
-            val afterResult = executor.show(fp, revision)
-            val diffResult = executor.diffGitFile(revision, fp)
+        val afterResult = executor.show(fp, revision)
+        val diffResult = executor.diffGitFile(revision, fp)
 
-            val afterContent = if (afterResult.isSuccess) afterResult.stdout else null
-            val gitDiff = diffResult.stdout
+        val afterContent = if (afterResult.isSuccess) afterResult.stdout else null
+        val gitDiff = diffResult.stdout
 
-            // Derive base (parent) content from the diff.
-            val baseContent = if (afterContent != null) {
-                GitDiffReverseApplier.reverseApply(afterContent, gitDiff) ?: afterContent
-            } else {
-                null
-            }
-
-            val fileData = if (afterContent != null && baseContent != null) {
-                val fileType = fileTypeFor(fp.name)
-                FileData(afterContent = afterContent, baseContent = baseContent, fileType = fileType)
-            } else {
-                null
-            }
-
-            if (fileData != null) {
-                fileDataCache[fp] = fileData
-            }
-
-            runLater {
-                if (!isDisposed && currentPreviewFile == fp) {
-                    if (fileData != null) {
-                        updateDiffPreview(fp, fileData)
-                    } else {
-                        diffPreview.show(fp.name)
-                        pickHunksButton.isEnabled = false
-                    }
-                    updateSummary()
-                }
-            }
+        // Derive base (parent) content from the diff.
+        val baseContent = if (afterContent != null) {
+            GitDiffReverseApplier.reverseApply(afterContent, gitDiff) ?: afterContent
+        } else {
+            null
         }
-    }
 
-    /**
-     * Update the diff preview for [fp] using [data].
-     *
-     * The preview shows the **split-off change that moves to the child**: the right side is
-     * always [FileData.afterContent] (the child's content — the child is the tip, so it always
-     * holds the full original content). The left side reflects what **remains in the parent**:
-     * - Ticked (moving to child): `baseContent` — nothing left for the parent.
-     * - Partial (merge-picked override): the picked parent-remainder content.
-     * - Unticked (stays in parent): `afterContent` — the parent keeps everything, so there's
-     *   nothing left to move (left == right, empty diff).
-     */
-    private fun updateDiffPreview(fp: FilePath, data: FileData) {
-        val isChild = fileSelection.includedChanges.any { it.filePath == fp }
-        val override = firstCommitOverrides[fp]
-        val leftContent = computePreviewLeftContent(isChild, override, data.baseContent, data.afterContent)
-
-        val (leftTitle, rightTitle) = describeSplitState(
-            leftContent,
-            data.baseContent,
-            data.afterContent,
-            firstCommitLabel,
-            secondCommitLabel
-        )
-
-        val leftDiffContent = makeContent(leftContent, data.fileType)
-        val rightDiffContent = makeContent(data.afterContent, data.fileType)
-
-        val request = SimpleDiffRequest(fp.name, leftDiffContent, rightDiffContent, leftTitle, rightTitle)
-        diffPreview.show(fp.name, request)
-
-        // Enable "Pick Hunks…" only for text files that have changes.
-        pickHunksButton.isEnabled = data.baseContent != data.afterContent
+        if (afterContent == null || baseContent == null) return null
+        return FileContents(before = baseContent, after = afterContent, fileType = HunkPicker.fileTypeFor(fp.name))
     }
 
     /**
      * Compute the left-side (parent-remainder) content for the diff preview: an explicit
      * override wins, otherwise it's derived from whether the file is ticked to move to the
      * child (parent ends up empty) or stays put (parent keeps everything).
-     * Extracted for test seaming; takes plain strings so the private [FileData] type is not exposed.
+     * Extracted for test seaming; takes plain strings so [FileContents] is not exposed.
      */
     internal fun computePreviewLeftContent(
         isIncludedInChild: Boolean,
@@ -346,49 +277,32 @@ class SplitDialog(
         else -> afterContent
     }
 
-    private fun refreshPreview(fp: FilePath) {
-        val data = fileDataCache[fp] ?: return
-        updateDiffPreview(fp, data)
-    }
-
-    private fun makeContent(text: String, fileType: FileType): DiffContent {
-        val content = DiffContentFactory.getInstance().create(project, text, fileType)
-        content.putUserData(DiffUserDataKeys.FORCE_READ_ONLY, true)
-        return content
-    }
-
-    private fun fileTypeFor(name: String): FileType =
-        FileTypeManager.getInstance().getFileTypeByFileName(name)
-            .takeIf { it != com.intellij.openapi.fileTypes.UnknownFileType.INSTANCE }
-            ?: PlainTextFileType.INSTANCE
-
     // ---- Hunk picker ----
 
     private fun onPickHunks() {
-        val fp = currentPreviewFile ?: return
-        val data = fileDataCache[fp] ?: return
+        val fp = previewController.currentFile ?: return
+        val data = previewController.cachedContents(fp) ?: return
         val isChild = fileSelection.includedChanges.any { it.filePath == fp }
 
         // Resume any existing partial pick; otherwise start from the tick-derived default.
         val initialContent = firstCommitOverrides[fp]
-            ?: computePreviewLeftContent(isChild, null, data.baseContent, data.afterContent)
+            ?: computePreviewLeftContent(isChild, null, data.before, data.after)
 
         val pickedContent: String? = hunkPickerForTest?.invoke(fp)
             ?: HunkPicker.pickRemainderContent(
                 project = project,
                 fileName = fp.name,
                 fileType = data.fileType,
-                baseContent = data.baseContent,
-                afterContent = data.afterContent,
+                baseContent = data.before,
+                afterContent = data.after,
                 initialContent = initialContent,
-                staysLabel = firstCommitLabel,
-                movesToLabel = secondCommitLabel
+                labels = HunkPickerLabels.forSplit(firstCommitLabel, secondCommitLabel)
             )
 
         if (pickedContent == null) return // user cancelled — keep prior state
 
-        applyPickedContent(fp, pickedContent, data.baseContent, data.afterContent)
-        refreshPreview(fp)
+        applyPickedContent(fp, pickedContent, data.before, data.after)
+        previewController.refresh(fp)
         updateSummary()
     }
 
@@ -425,22 +339,14 @@ class SplitDialog(
 
     private fun ensureFileIncluded(fp: FilePath) {
         val change = allChanges.find { it.filePath == fp } ?: return
-        val current = fileSelection.includedChanges.toMutableList()
-        if (change !in current) {
-            current.add(change)
-            fileSelection.changesTree.setIncludedChanges(current)
-            previousIncluded = current.map { it.filePath }.toSet()
-        }
+        fileSelection.setIncluded(change, true)
+        previousIncluded = fileSelection.includedChanges.map { it.filePath }.toSet()
     }
 
     private fun ensureFileExcluded(fp: FilePath) {
         val change = allChanges.find { it.filePath == fp } ?: return
-        val current = fileSelection.includedChanges.toMutableList()
-        if (change in current) {
-            current.remove(change)
-            fileSelection.changesTree.setIncludedChanges(current)
-            previousIncluded = current.map { it.filePath }.toSet()
-        }
+        fileSelection.setIncluded(change, false)
+        previousIncluded = fileSelection.includedChanges.map { it.filePath }.toSet()
     }
 
     // ---- Dynamic labels ----
@@ -681,23 +587,22 @@ class SplitDialog(
             allChanges.map { it.filePath }.filter { it !in tickedPaths }
         }
 
-        val hunkSelection: SplitHunkSelection? = if (!newParent && firstCommitOverrides.isNotEmpty()) {
-            // Build FileFirstCommit (parent-remainder content) for every changed file.
+        val hunkSelection: HunkSelection? = if (!newParent && firstCommitOverrides.isNotEmpty()) {
+            // Build the parent-remainder content for every changed file.
             // newParent mode never reaches here - "Pick Hunks…" is hidden in that mode.
-            val files = allChanges.map { change ->
-                val fp = change.filePath
-                val root = sourceEntry.repo.directory
-                val relPath = fp.relativeTo(root)
-                val override = firstCommitOverrides[fp]
-                val isChild = fp in tickedPaths
-                val content: String? = when {
-                    override != null -> override // partial via merge picker
-                    isChild -> null // whole file moves to child → absent from first/parent commit
-                    else -> fileDataCache[fp]?.afterContent // whole file stays in parent
+            // Deletion-manifest handling is deferred here (isDeletion always false) - see
+            // jj-idea-4q7m's follow-up bead for Split's symmetric gap (an *unticked* deletion
+            // should land in the first commit, which today just writes an empty file instead).
+            buildHunkSelection(
+                changes = allChanges,
+                root = sourceEntry.repo.directory,
+                overrides = firstCommitOverrides,
+                isIncluded = { it in tickedPaths },
+                isDeletion = { false },
+                contentFor = { change, included ->
+                    if (included) null else previewController.cachedContents(change.filePath)?.after
                 }
-                FileFirstCommit(relPath = relPath, filePath = fp, content = content)
-            }
-            SplitHunkSelection(files)
+            )
         } else {
             null
         }

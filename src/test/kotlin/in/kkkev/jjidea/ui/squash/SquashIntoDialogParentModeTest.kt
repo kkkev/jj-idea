@@ -17,6 +17,7 @@ import `in`.kkkev.jjidea.ui.squash.SquashMode
 import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -245,5 +246,163 @@ class SquashIntoDialogParentModeTest {
 
     private fun disposeDialog(dialog: DialogWrapper) {
         if (!dialog.isDisposed) dialog.close(DialogWrapper.CANCEL_EXIT_CODE)
+    }
+
+    // ---- Hunk picking (jj-idea-4q7m) ----
+
+    @Test
+    fun `pickHunksButton is wired into the shared preview panel's footer`() {
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent))
+
+        dialog.pickHunksButton.parent shouldNotBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `pickHunksButton is visible for a single source`() {
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent))
+
+        dialog.pickHunksButton.isVisible shouldBe true
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `pickHunksButton disabled until a changed file is previewed`() {
+        val changes = listOf(change("src/Main.kt"))
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+
+        dialog.pickHunksButton.isEnabled shouldBe false
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `override injected for test produces non-null hunkSelection`() {
+        val changes = listOf(change("src/Main.kt"))
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.setDestinationOverrideForTest(fp, "partial content\n")
+
+        dialog.performOKForTest()
+        dialog.result shouldNotBe null
+        dialog.result!!.hunkSelection shouldNotBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `ok action produces null hunkSelection when no partial files`() {
+        val changes = listOf(change("src/Main.kt"))
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.performOKForTest()
+        dialog.result?.hunkSelection shouldBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `setDestinationOverrideForTest reflects in partialChanges on tree`() {
+        val mainChange = change("src/Main.kt")
+        val changes = listOf(mainChange, change("src/Utils.kt"))
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.setDestinationOverrideForTest(fp, "partial\n")
+
+        dialog.fileSelection.changesTree.partialChanges shouldBe setOf(mainChange)
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `clearing override removes from partialChanges`() {
+        val changes = listOf(change("src/Main.kt"))
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.setDestinationOverrideForTest(fp, "partial\n")
+        dialog.setDestinationOverrideForTest(fp, null)
+
+        dialog.fileSelection.changesTree.partialChanges shouldBe emptySet()
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `applyPickedContent for a genuine partial does not force-untick a ticked file`() {
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), listOf(change("src/Main.kt")))
+        waitForRefresh(dialog.fileSelection)
+        // Main.kt starts ticked by default (all-included). A genuine partial should leave that
+        // tick alone - the half-checked render, not the tick, communicates "partial".
+        dialog.applyPickedContent(fp, "partial\n", before = "before\n", after = "after\n")
+
+        dialog.fileSelection.includedChanges.map { it.filePath } shouldBe listOf(fp)
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `applyPickedContent for a fully-picked (after) result ticks the file`() {
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), listOf(change("src/Main.kt")))
+        waitForRefresh(dialog.fileSelection)
+        dialog.fileSelection.changesTree.setIncludedChanges(emptyList<Change>())
+
+        dialog.applyPickedContent(fp, "after\n", before = "before\n", after = "after\n")
+
+        dialog.fileSelection.includedChanges.map { it.filePath } shouldBe listOf(fp)
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `applyPickedContent for an empty-picked (before) result unticks the file`() {
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), listOf(change("src/Main.kt")))
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.applyPickedContent(fp, "before\n", before = "before\n", after = "after\n")
+
+        dialog.fileSelection.includedChanges shouldBe emptyList()
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `partial squash disables the delete-empty-and-move checkbox at OK time`() {
+        val changes = listOf(change("src/Main.kt"))
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.deleteEmptyAndMoveIsSelected = true // still selected+enabled here (allIncluded)
+        dialog.setDestinationOverrideForTest(fp, "partial content\n")
+
+        // isSelected is untouched by the disable, but doOKAction gates on isEnabled too - a
+        // partial squash can't empty the source, so the effective result must be false.
+        dialog.performOKForTest()
+        dialog.result?.deleteEmptyAndMoveWorkingCopy shouldBe false
+        disposeDialog(dialog)
     }
 }

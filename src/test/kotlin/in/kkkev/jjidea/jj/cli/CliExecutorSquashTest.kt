@@ -34,7 +34,7 @@ class CliExecutorSquashTest {
         fun `squash with single file path`() {
             val result = squashArgs(revision, filePaths = listOf("src/main.kt"))
 
-            result shouldBe listOf("squash", "-r", "abc123def456", "cwd:\"src/main.kt\"")
+            result shouldBe listOf("squash", "-r", "abc123def456", "--", "cwd:\"src/main.kt\"")
         }
 
         @Test
@@ -48,10 +48,18 @@ class CliExecutorSquashTest {
                 "squash",
                 "-r",
                 "abc123def456",
+                "--",
                 "cwd:\"src/main.kt\"",
                 "cwd:\"src/utils.kt\"",
                 "cwd:\"README.md\""
             )
+        }
+
+        @Test
+        fun `empty file list omits the -- separator`() {
+            val result = squashArgs(revision, filePaths = emptyList())
+
+            result shouldBe listOf("squash", "-r", "abc123def456")
         }
     }
 
@@ -77,6 +85,7 @@ class CliExecutorSquashTest {
                 "-r",
                 "abc123def456",
                 "--message=Partial squash",
+                "--",
                 "cwd:\"src/main.kt\""
             )
         }
@@ -106,6 +115,7 @@ class CliExecutorSquashTest {
                 "abc123def456",
                 "--message=Combined",
                 "--keep-emptied",
+                "--",
                 "cwd:\"src/main.kt\""
             )
         }
