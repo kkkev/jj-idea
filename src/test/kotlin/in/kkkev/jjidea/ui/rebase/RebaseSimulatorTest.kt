@@ -31,9 +31,7 @@ class RebaseSimulatorTest {
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = description,
         bookmarks = emptyList(),
-        parentIdentifiers = parents.map {
-            LogEntry.Identifiers(ChangeId(it, it.take(2), null), CommitId("0000000000000000000000000000000000000000"))
-        }
+        parentIds = parents.map { ChangeId(it, it.take(2), null) }
     )
 
     private fun ids(entries: List<LogEntry>) = entries.map { it.id.full }

@@ -16,7 +16,7 @@ data class LogEntry(
     private val underlyingDescription: String,
     val bookmarks: List<Bookmark> = emptyList(),
     val tags: List<Tag> = emptyList(),
-    val parentIdentifiers: List<Identifiers> = emptyList(),
+    override val parentIds: List<ChangeId> = emptyList(),
     override val isWorkingCopy: Boolean = false,
     override val hasConflict: Boolean = false,
     override val isEmpty: Boolean = false,
@@ -38,15 +38,8 @@ data class LogEntry(
 ) : GraphableEntry, ChangeStatus, ChangeDetail, DagNode<LogEntry> {
     override val description = Description(underlyingDescription)
 
-    override val parentIds: List<ChangeId> get() = parentIdentifiers.map { it.changeId }
-
-    /**
-     * See [DagNode.withParents] - used by [in.kkkev.jjidea.ui.rebase.RebaseSimulator] to reparent
-     * a simulated entry. The simulator only ever deals in [ChangeId]s, so the resulting
-     * [Identifiers] get a [CommitId.PLACEHOLDER] - never a real commit id.
-     */
-    override fun withParents(parentIds: List<ChangeId>): LogEntry =
-        copy(parentIdentifiers = parentIds.map { Identifiers(it, CommitId.PLACEHOLDER) })
+    /** See [DagNode.withParents] - used by [in.kkkev.jjidea.ui.rebase.RebaseSimulator] to reparent a simulated entry. */
+    override fun withParents(parentIds: List<ChangeId>): LogEntry = copy(parentIds = parentIds)
 
     val isDivergent get() = id.divergent
 
@@ -92,6 +85,4 @@ data class LogEntry(
             isEmpty = isEmpty,
             immutable = immutable
         )
-
-    data class Identifiers(val changeId: ChangeId, val commitId: CommitId)
 }

@@ -46,7 +46,7 @@ class JujutsuLogTableSelectionFilterTest {
         id = ChangeId(changeId, changeId, null),
         commitId = CommitId("0".repeat(40)),
         underlyingDescription = "Test commit $changeId",
-        parentIdentifiers = emptyList(),
+        parentIds = emptyList(),
         isWorkingCopy = false,
         hasConflict = false,
         isEmpty = false,

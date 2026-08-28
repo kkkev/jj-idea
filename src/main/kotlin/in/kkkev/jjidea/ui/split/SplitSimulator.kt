@@ -35,46 +35,46 @@ object SplitSimulator {
         val parentId = ChangeId("${sourceEntry.id.short}'", "${sourceEntry.id.short}'")
         val childId = ChangeId("${sourceEntry.id.short}''", "${sourceEntry.id.short}''")
 
-        val sourceParentIds = sourceEntry.parentIdentifiers
+        val sourceParentIds = sourceEntry.parentIds
 
-        val childIdentifiers: List<LogEntry.Identifiers>
+        val childParentIds: List<ChangeId>
         val parentEntry: LogEntry
         val childEntry: LogEntry
 
         if (parallel) {
             // Parallel: both are children of source's parents (siblings)
-            childIdentifiers = sourceParentIds
+            childParentIds = sourceParentIds
 
             parentEntry = sourceEntry.copy(
                 id = parentId,
                 commitId = SYNTHETIC_COMMIT,
                 underlyingDescription = parentDescription ?: sourceEntry.description.actual,
-                parentIdentifiers = sourceParentIds,
+                parentIds = sourceParentIds,
                 isWorkingCopy = false
             )
             childEntry = sourceEntry.copy(
                 id = childId,
                 commitId = SYNTHETIC_COMMIT,
                 underlyingDescription = childDescription ?: sourceEntry.description.actual,
-                parentIdentifiers = childIdentifiers,
+                parentIds = childParentIds,
                 isWorkingCopy = false
             )
         } else {
             // Linear: parent keeps original position, child is child of parent
-            childIdentifiers = listOf(LogEntry.Identifiers(parentId, SYNTHETIC_COMMIT))
+            childParentIds = listOf(parentId)
 
             parentEntry = sourceEntry.copy(
                 id = parentId,
                 commitId = SYNTHETIC_COMMIT,
                 underlyingDescription = parentDescription ?: sourceEntry.description.actual,
-                parentIdentifiers = sourceParentIds,
+                parentIds = sourceParentIds,
                 isWorkingCopy = false
             )
             childEntry = sourceEntry.copy(
                 id = childId,
                 commitId = SYNTHETIC_COMMIT,
                 underlyingDescription = childDescription ?: sourceEntry.description.actual,
-                parentIdentifiers = childIdentifiers,
+                parentIds = childParentIds,
                 isWorkingCopy = sourceEntry.isWorkingCopy
             )
         }
@@ -84,32 +84,19 @@ object SplitSimulator {
         val reparentedEntries = allEntries.mapNotNull { entry ->
             if (entry.id == sourceId) return@mapNotNull null // Remove source
 
-            val hasSourceAsParent = entry.parentIdentifiers.any { it.changeId == sourceId }
+            val hasSourceAsParent = entry.parentIds.any { it == sourceId }
             if (!hasSourceAsParent) return@mapNotNull entry
 
             if (parallel) {
                 // Children of source become children of both split results (merge)
-                val newParents = entry.parentIdentifiers.flatMap { pid ->
-                    if (pid.changeId == sourceId) {
-                        listOf(
-                            LogEntry.Identifiers(parentId, SYNTHETIC_COMMIT),
-                            LogEntry.Identifiers(childId, SYNTHETIC_COMMIT)
-                        )
-                    } else {
-                        listOf(pid)
-                    }
+                val newParents = entry.parentIds.flatMap { pid ->
+                    if (pid == sourceId) listOf(parentId, childId) else listOf(pid)
                 }
-                entry.copy(parentIdentifiers = newParents)
+                entry.copy(parentIds = newParents)
             } else {
                 // Children of source become children of child
-                val newParents = entry.parentIdentifiers.map { pid ->
-                    if (pid.changeId == sourceId) {
-                        LogEntry.Identifiers(childId, SYNTHETIC_COMMIT)
-                    } else {
-                        pid
-                    }
-                }
-                entry.copy(parentIdentifiers = newParents)
+                val newParents = entry.parentIds.map { pid -> if (pid == sourceId) childId else pid }
+                entry.copy(parentIds = newParents)
             }
         }
 

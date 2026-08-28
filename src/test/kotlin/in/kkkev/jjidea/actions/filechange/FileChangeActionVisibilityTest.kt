@@ -89,12 +89,7 @@ class FileChangeActionVisibilityTest {
         isWorkingCopy = false,
         immutable = immutable,
         hasPushedAncestor = hasPushedAncestor,
-        parentIdentifiers = (1..parentCount).map {
-            LogEntry.Identifiers(
-                ChangeId("par${it}23456789ab", "par$it"),
-                CommitId("par${it}00000000000000000000000000000000000000000")
-            )
-        }
+        parentIds = (1..parentCount).map { ChangeId("par${it}23456789ab", "par$it") }
     )
 
     private fun workingCopyEntry(hasPushedAncestor: Boolean = false) = LogEntry(

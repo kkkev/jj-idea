@@ -42,9 +42,7 @@ class TopologicalSortTest {
         id = ChangeId(changeId, changeId.take(2), null),
         commitId = CommitId("0".repeat(40)),
         underlyingDescription = "Commit $changeId",
-        parentIdentifiers = parentIds.map {
-            LogEntry.Identifiers(ChangeId(it, it.take(2), null), CommitId("0".repeat(40)))
-        },
+        parentIds = parentIds.map { ChangeId(it, it.take(2), null) },
         authorTimestamp = Instant.fromEpochSeconds(timestamp)
     )
 

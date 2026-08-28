@@ -26,7 +26,7 @@ class NewChangeActionTest {
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = "Test commit",
         bookmarks = emptyList(),
-        parentIdentifiers = emptyList(),
+        parentIds = emptyList(),
         isWorkingCopy = false,
         hasConflict = false,
         isEmpty = true,

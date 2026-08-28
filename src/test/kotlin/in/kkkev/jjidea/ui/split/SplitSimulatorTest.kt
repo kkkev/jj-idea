@@ -35,9 +35,7 @@ class SplitSimulatorTest {
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = description,
         bookmarks = emptyList(),
-        parentIdentifiers = parents.map {
-            LogEntry.Identifiers(ChangeId(it, it, null), CommitId("0000000000000000000000000000000000000000"))
-        },
+        parentIds = parents.map { ChangeId(it, it, null) },
         isWorkingCopy = isWorkingCopy
     )
 

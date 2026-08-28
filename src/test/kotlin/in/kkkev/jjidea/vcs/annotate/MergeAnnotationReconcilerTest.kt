@@ -20,7 +20,7 @@ class MergeAnnotationReconcilerTest {
         id = ChangeId(id, id),
         commitId = CommitId(id, id),
         underlyingDescription = "merge",
-        parentIdentifiers = parentIds.map { LogEntry.Identifiers(it, CommitId(it.full, it.full)) },
+        parentIds = parentIds,
         author = VcsUserImpl("Merger", "merger@example.com")
     )
 

@@ -55,9 +55,7 @@ class JujutsuLogContextMenuActionsTest {
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = "Test commit",
         bookmarks = bookmarks,
-        parentIdentifiers = parentIds.map {
-            LogEntry.Identifiers(ChangeId(it, it.take(2), null), CommitId(it))
-        },
+        parentIds = parentIds.map { ChangeId(it, it.take(2), null) },
         isWorkingCopy = isWorkingCopy,
         hasConflict = false,
         isEmpty = isEmpty,
@@ -561,7 +559,7 @@ class JujutsuLogContextMenuActionsTest {
                 commitId = CommitId("0000000000000000000000000000000000000000"),
                 underlyingDescription = "Conflict commit",
                 bookmarks = emptyList(),
-                parentIdentifiers = emptyList(),
+                parentIds = emptyList(),
                 isWorkingCopy = true,
                 hasConflict = true, // has conflict
                 isEmpty = false,

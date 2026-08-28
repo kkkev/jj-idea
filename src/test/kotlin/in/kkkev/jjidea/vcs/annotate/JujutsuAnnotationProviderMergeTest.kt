@@ -61,7 +61,7 @@ class JujutsuAnnotationProviderMergeTest {
         id = ChangeId("merge1", "merge1"),
         commitId = CommitId("merge1", "merge1"),
         underlyingDescription = "merge",
-        parentIdentifiers = parentIds.map { LogEntry.Identifiers(it, CommitId(it.full, it.full)) }
+        parentIds = parentIds
     )
 
     private fun annotateResult(changeId: ChangeId, content: String) = CommandExecutor.CommandResult(

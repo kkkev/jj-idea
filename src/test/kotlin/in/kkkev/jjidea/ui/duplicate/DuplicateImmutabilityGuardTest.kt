@@ -22,9 +22,7 @@ class DuplicateImmutabilityGuardTest {
         id = ChangeId(changeId, changeId, null),
         commitId = CommitId(changeId.padEnd(40, '0')),
         underlyingDescription = "Test commit",
-        parentIdentifiers = parentIds.map {
-            LogEntry.Identifiers(ChangeId(it, it, null), CommitId(it.padEnd(40, '0')))
-        },
+        parentIds = parentIds.map { ChangeId(it, it, null) },
         immutable = immutable
     )
 

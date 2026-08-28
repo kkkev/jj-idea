@@ -345,17 +345,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             it.splitByComma { name -> Tag(name) }
         }
         val parents = singleField(
-            """
-                |parents.map(|c|
-                | ${TemplateParts.qualifiedChangeId("c")} ++ "|" ++
-                | ${TemplateParts.commitId("c")}
-                |).join(",")
-            """.trimMargin()
+            """parents.map(|c| ${TemplateParts.qualifiedChangeId("c")}).join(",")"""
         ) {
-            it.splitByComma { p ->
-                val (changeIdParts, commitIdParts) = p.split("|")
-                LogEntry.Identifiers(changeId.parse(changeIdParts), commitId.parse(commitIdParts))
-            }
+            it.splitByComma { p -> changeId.parse(p) }
         }
         val author = SignatureFields("author")
         val committer = SignatureFields("committer")

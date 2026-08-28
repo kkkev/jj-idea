@@ -179,7 +179,7 @@ abstract class LogContractTest {
     }
 
     @Test
-    fun `parents field contains parent identifiers`() {
+    fun `parents field contains parent change ids`() {
         jj.describe("Parent commit")
         jj.newChange("Child commit")
 
@@ -187,15 +187,12 @@ abstract class LogContractTest {
         val fields = result.stdout.trim().split("\u0000")
         val parentsField = fields[5]
 
-        // Should have at least one parent with changeId|commitId format
+        // Should have at least one parent, each a qualified change id (full~short~offset) -
+        // parents carry no commit id (jj-idea-f2un: nothing ever read it).
         parentsField.length shouldBeGreaterThan 0
         val parentParts = parentsField.split(",")
         parentParts.forEach { parent ->
-            val halves = parent.split("|")
-            halves.size shouldBe 2
-            // Each half should have ~ separators
-            halves[0].split("~").size shouldBe 3 // change id: full~short~offset
-            halves[1].split("~").size shouldBe 2 // commit id: full~short
+            parent.split("~").size shouldBe 3
         }
     }
 

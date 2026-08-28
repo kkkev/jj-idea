@@ -34,9 +34,7 @@ class ReferenceAncestorKeysTest {
         commitId = CommitId("0".repeat(40)),
         underlyingDescription = "commit $changeId",
         bookmarks = bookmarks,
-        parentIdentifiers = parentIds.map {
-            LogEntry.Identifiers(ChangeId(it, it, null), CommitId("0".repeat(40)))
-        },
+        parentIds = parentIds.map { ChangeId(it, it, null) },
         isWorkingCopy = isWorkingCopy
     )
 

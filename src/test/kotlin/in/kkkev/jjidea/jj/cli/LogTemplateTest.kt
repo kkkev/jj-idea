@@ -77,7 +77,7 @@ class LogTemplateTest {
             "Merge commit",
             "", // bookmarks
             "", // tags
-            "plkvukqt~p~|bcd123~bc,rlvkpnrz~rl~34|cde234~cde", // parents
+            "plkvukqt~p~,rlvkpnrz~rl~34", // parents
             "false",
             "false",
             "false",

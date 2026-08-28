@@ -24,7 +24,7 @@ class EditChangeActionTest {
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = "Test commit",
         bookmarks = emptyList(),
-        parentIdentifiers = emptyList(),
+        parentIds = emptyList(),
         isWorkingCopy = isWorkingCopy,
         hasConflict = false,
         isEmpty = true,

@@ -724,7 +724,7 @@ class JjStub(override val workDir: Path) : JjBackend {
     private fun formatParents(change: StubChange): String =
         change.parentIds.mapNotNull { pid ->
             val parent = changes.firstOrNull { it.commitId == pid } ?: return@mapNotNull null
-            "${qualifiedChangeId(parent)}|${qualifiedCommitId(parent)}"
+            qualifiedChangeId(parent)
         }.joinToString(",")
 
     private fun qualifiedChangeId(change: StubChange) =

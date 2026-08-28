@@ -308,7 +308,7 @@ class JujutsuLogTableColumnTest {
         commitId = CommitId("0000000000000000000000000000000000000000"),
         underlyingDescription = description,
         bookmarks = emptyList(),
-        parentIdentifiers = emptyList(),
+        parentIds = emptyList(),
         isWorkingCopy = false,
         hasConflict = hasConflict,
         isEmpty = isEmpty,

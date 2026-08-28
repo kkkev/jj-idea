@@ -27,7 +27,7 @@ class UnifiedJujutsuLogDataLoaderTest {
             commitId = CommitId("0000000000000000000000000000000000000000"),
             underlyingDescription = "test",
             bookmarks = bookmarks.toList(),
-            parentIdentifiers = emptyList(),
+            parentIds = emptyList(),
             isWorkingCopy = false,
             hasConflict = false,
             isEmpty = false

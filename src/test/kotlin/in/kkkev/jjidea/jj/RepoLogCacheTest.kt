@@ -54,7 +54,7 @@ class RepoLogCacheTest {
         commitId = CommitId(commitId),
         underlyingDescription = "desc $id",
         bookmarks = bookmarks,
-        parentIdentifiers = parentIds.map { LogEntry.Identifiers(ChangeId(it, it, null), CommitId("commit-$it")) },
+        parentIds = parentIds.map { ChangeId(it, it, null) },
         immutable = immutable
     )
 

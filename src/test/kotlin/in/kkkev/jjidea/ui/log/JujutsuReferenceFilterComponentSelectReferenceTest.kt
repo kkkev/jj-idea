@@ -55,9 +55,7 @@ class JujutsuReferenceFilterComponentSelectReferenceTest {
         underlyingDescription = "Test commit $changeId",
         bookmarks = bookmarks,
         tags = tags,
-        parentIdentifiers = parentId?.let {
-            listOf(LogEntry.Identifiers(ChangeId(it, it, null), CommitId("1".repeat(40))))
-        } ?: emptyList(),
+        parentIds = parentId?.let { listOf(ChangeId(it, it, null)) } ?: emptyList(),
         isWorkingCopy = false,
         hasConflict = false,
         isEmpty = false,

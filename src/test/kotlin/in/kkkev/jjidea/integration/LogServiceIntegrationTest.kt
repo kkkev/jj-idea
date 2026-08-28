@@ -140,16 +140,15 @@ class LogServiceIntegrationTest {
         }
 
         @Test
-        fun `parent identifiers populated`() {
+        fun `parent ids populated`() {
             stub.describe("Parent")
             stub.newChange("Child")
 
             val entries = logService.getLogBasic().getOrThrow()
             val child = entries.first { it.isWorkingCopy }
 
-            child.parentIdentifiers shouldHaveSize 1
-            child.parentIdentifiers[0].changeId.full.shouldNotBeBlank()
-            child.parentIdentifiers[0].commitId.full.shouldNotBeBlank()
+            child.parentIds shouldHaveSize 1
+            child.parentIds[0].full.shouldNotBeBlank()
         }
 
         @Test
