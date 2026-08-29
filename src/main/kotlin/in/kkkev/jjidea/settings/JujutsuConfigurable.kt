@@ -26,6 +26,7 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.jj.cli.Config
 import `in`.kkkev.jjidea.jj.cli.config
 import `in`.kkkev.jjidea.jj.cli.rootlessConfig
+import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.util.runLaterInModal
@@ -823,8 +824,6 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     }
 
     companion object {
-        private const val SPONSORS_URL = "https://github.com/sponsors/kkkev"
-
         /** Max width (unscaled px) for wrapped validation-result labels (jj-idea-bwdk). */
         private const val VALIDATION_MESSAGE_WIDTH = 360
 

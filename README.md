@@ -72,6 +72,18 @@ Then install from `build/distributions/` via **Settings → Plugins → Install 
 2. The Working Copy panel appears on the left; the Jujutsu log appears in the Version Control tool window
 3. Configure settings at **Settings → Version Control → Jujutsu**
 
+## Support
+
+This plugin is free and maintained in my spare time, with a lot of the work done using AI
+coding tools. If it saves you time, you can [sponsor me on GitHub](https://github.com/sponsors/kkkev)
+to help fund those tools and continued development — entirely optional. Feedback and issues
+are just as welcome.
+
+### Sponsors
+
+Thanks to everyone who has sponsored this plugin! Recurring sponsors at $20/month or more
+are listed here.
+
 ## Roadmap
 
 See **[ROADMAP.md](ROADMAP.md)** for planned features, including hunk-level squash & split, a bookmark widget and branches panel, operation log & undo, and forge integration.
@@ -80,13 +92,6 @@ See **[ROADMAP.md](ROADMAP.md)** for planned features, including hunk-level squa
 
 - **[Contributing](contributing.md)** — Architecture, coding standards, testing, and workflow
 - **[Agent Instructions](CLAUDE.md)** — Operating rules for AI coding agents working in this repo
-
-## Support
-
-This plugin is free and maintained in my spare time, with a lot of the work done using AI
-coding tools. If it saves you time, you can [sponsor me on GitHub](https://github.com/sponsors/kkkev)
-to help fund those tools and continued development — entirely optional. Feedback and issues
-are just as welcome.
 
 ## License
 

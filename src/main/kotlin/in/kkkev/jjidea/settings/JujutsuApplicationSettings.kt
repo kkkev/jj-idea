@@ -38,5 +38,11 @@ data class JujutsuApplicationSettingsState(
     var workingCopySignpostShown: Boolean = false,
     // jj-idea-ixju: global default for disableIgnoredFileScanning, applied to any repository
     // that doesn't set its own per-repo override (see JujutsuSettings.disableIgnoredFileScanning).
-    var disableIgnoredFileScanning: Boolean = false
+    var disableIgnoredFileScanning: Boolean = false,
+    // jj-idea-z1ld: epoch millis of the first time a jj project was opened on this machine.
+    // 0 means "not yet recorded"; used to gate the sponsor ask on sustained use.
+    var firstRunEpochMillis: Long = 0,
+    // jj-idea-z1ld: the one-time sponsor ask has been shown (or explicitly dismissed) on this
+    // machine. Set when the balloon is shown, so it never appears twice.
+    var sponsorAskShown: Boolean = false
 )

@@ -44,6 +44,10 @@ class JujutsuStartupActivity : ProjectActivity {
         // ToolWindowEnabler.getInstance(project)), ensuring tool window availability is settled.
         WorkingCopySignpost.signpostIfNeeded(project)
 
+        // Non-intrusive, once-per-install sponsor ask after sustained use (jj-idea-z1ld). Also
+        // runs via its own runLater, queued behind the signpost's above.
+        SponsorAsk.askIfNeeded(project)
+
         // Initialize availability checking
         val checker = JjAvailabilityChecker.getInstance(project)
         checker.status.connect(project) { status ->

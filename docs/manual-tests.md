@@ -1176,7 +1176,7 @@ one per affected remote.
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
@@ -1334,6 +1334,18 @@ equally-weighted group of their own.
 - [ ] Open a **second, different** jj project in the same sandbox → the tool window opens
   automatically again (per-project), but no balloon appears (per-install, already shown)
 - [ ] Open a non-jj project → neither the tool window nor the balloon appear
+
+#### Sponsor Ask (jj-idea-z1ld)
+
+- [ ] Fresh sandbox config, open a jj project → no sponsor balloon on first run
+- [ ] Quit, backdate `firstRunEpochMillis` in the sandbox `jujutsu.xml` (under
+  `JujutsuApplicationSettings`) to more than 30 days ago, restart → a sticky balloon fires
+  once; clicking **Sponsor** opens `https://github.com/sponsors/kkkev` in the default browser
+- [ ] Restart again → the balloon does not reappear
+- [ ] Repeat the backdate in a fresh sandbox, click **Don't show again** instead → restart →
+  the balloon never reappears
+- [ ] The Working Copy signpost above still fires independently and is unaffected by the
+  sponsor ask (both read/write disjoint fields in `JujutsuApplicationSettingsState`)
 
 #### Status Bar Widget (Switch Working Copy)
 
@@ -1902,6 +1914,9 @@ tracked in MT-LOG-TABLE, are state-serialization logic)
 - [ ] Open **Settings → Version Control → Jujutsu**
 - [ ] A **Support** group appears at the bottom of the panel with a "Sponsor this plugin on GitHub..." link
 - [ ] Clicking the link opens `https://github.com/sponsors/kkkev` in the default browser
+  (jj-idea-z1ld: `SPONSORS_URL` is now defined once in `ui/services/SponsorAsk.kt` and
+  shared with the in-product sponsor ask under MT-WORKINGCOPY — both must point at the
+  same URL)
 
 #### Settings panel width (jj-idea-bwdk)
 
