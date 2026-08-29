@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.12/jj-idea-0.8.12.zip" version="0.8.12">
+  <plugin id="in.kkkev.jj-idea" url="https://github.com/kkkev/jj-idea/releases/download/v0.8.13/jj-idea-0.8.13.zip" version="0.8.13">
     <idea-version since-build="251.0" />
     <name>Jujutsu VCS Integration</name>
     <description><![CDATA[
@@ -23,21 +23,34 @@
     ]]></description>
     <vendor email="jj-idea@kkkev.in" url="https://github.com/kkkev/jj-idea">Kevin Thomas</vendor>
     <change-notes><![CDATA[
-      <h3>0.8.12</h3>
+      <h3>0.8.13</h3>
       
 <h4>Added</h4>
-<li>Rebase and Describe are now available as one-click buttons on the log toolbar, alongside New and Edit, with default keyboard shortcuts — previously only reachable via the right-click menu. Their right-click menu entries now show the same shortcut. Edit also gained a default keyboard shortcut of its own. ([#78](https://github.com/kkkev/jj-idea/issues/78))</li>
-<li>New "Split into New Parent…" action alongside the existing "Split into New Child…" in file right-click menus, for splitting selected files off into a new commit that precedes the current one instead of one that follows it — useful for peeling off small commits backwards from a large verified set of changes. The current commit keeps its own change ID (and the working copy, if you're splitting it, stays put); only the new, split-off commit gets a new ID. The dialog is explicit about which side is which and, when splitting the working copy, about where `@` ends up either way. ([#74](https://github.com/kkkev/jj-idea/issues/74))</li>
-<li>"Show History" is now available from file right-click menus in the commit details panel, the Working Copy tool window, and compare-changes panels, matching the editor's Jujutsu submenu.</li>
-<li>Pressing Enter in the log search field now searches the whole repository, not just the commits currently loaded in the log window — useful for pasting a Git hash or finding an older commit by description or author. Matching commits are added into the log, and the status bar reports how many (or that none) were found.</li>
+<li>Issue-tracker references (e.g. `JIRA-123`) in the "Working copy" tool window's current-change summary — including inside a bookmark name — now render as clickable links, matching the log table and commit details pane. ([#15](https://github.com/kkkev/jj-idea/issues/15))</li>
+<li>A "Push" action on a bookmark's own context menu (right-click its chip in the log, or its sub-menu in the bookmark widget) opens the Push dialog pre-selected to that bookmark and remote, skipping the repo/remote/bookmark selection steps a fresh dialog needs — a single OK click pushes it. With more than one Git remote it becomes a submenu, one entry per remote, each disabled with "(up to date)" shown when that particular remote already has the bookmark's current position. ([#81](https://github.com/kkkev/jj-idea/issues/81))</li>
+<li>With more than one Git remote, a bookmark's Push submenu also gains a "Push to all remotes" entry that pushes it everywhere it's ahead in one click, still showing the usual force-push/deletion confirmations per remote.</li>
+<li>The Push dialog gained a fourth scope, "Create bookmark for change", which auto-generates a remote bookmark for a specific commit instead of requiring one to be created by hand first — matching jj's own recommended `jj git push --change` workflow. Selecting one or more commits in the log before opening Push (from either the log's right-click menu or the toolbar/VCS-menu button) targets this scope at exactly those commits, pushing one bookmark per selected change in a single confirmation when more than one is selected. A new "Default push scope" setting lets you make it (or any other scope) the dialog's default. ([#65](https://github.com/kkkev/jj-idea/issues/65))</li>
+<li>The "Squash Into..." dialogs now show a read-only diff preview for the selected file, matching Split's preview: a "Before" pane and a "Destination" pane, updating as you click files or tick/untick them.</li>
+<li>The "Squash Into..." dialogs gained a "Pick Hunks…" button, letting you squash only part of a file's change into the destination while the rest stays in the source — the same three-pane arrow picker Split already uses. Only available when squashing a single source; the file shows half-checked afterward, and unchecking/rechecking discards the partial pick.</li>
+<li>"New Change..." in the log's right-click menu now opens a dialog offering a description, a placement choice (a plain child — jj's default — or inserting the new change before/after the selected commit(s), rebasing the affected descendants onto it), and whether the working copy follows, with a live preview of the resulting graph before you commit to it. ([#83](https://github.com/kkkev/jj-idea/issues/83))</li>
 
 <h4>Changed</h4>
-<li>The log search field now matches anywhere in a commit's full description, not just its first line.</li>
+<li>Bookmark rename dialog name field is now initially set to the old bookmark name. ([#82]((https://github.com/kkkev/jj-idea/issues/82)))</li>
+<li>Split's "Pick Hunks…" now opens a three-pane diff — the original content, a live preview of what the parent will look like, and the child's content — with a click-to-move arrow at each divider, instead of a merge-conflict-style tool. This also removes an unrelated "mark the conflict resolved anyway?" confirmation that previously appeared every time you applied a partial pick.</li>
 
 <h4>Fixed</h4>
-<li>Fixed right-clicking a change-id link (e.g. a parent reference in a merge commit's details) showing an empty "Nothing Here" menu instead of that commit's usual context menu.</li>
-<li>Fixed 0.8.11 failing JetBrains Marketplace's compatibility check and never going out to users — the Working Copy toolbar's Rebase/Squash/Abandon/etc. buttons and the status-bar bookmark widget used a couple of platform APIs the Marketplace flags but our own build didn't catch.</li>
-      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.12">full release notes</a> for details.</p>
+<li>A bookmark deleted locally but still pending deletion on the remote (shown with strikethrough in the log) is no longer silently missing from the Push dialog's "Specific bookmark" dropdown when the dialog is opened from a commit's right-click menu — it previously appeared only from the toolbar's Push button.</li>
+<li>The Push dialog's "Specific bookmark" dropdown no longer lists a tracked bookmark twice, once normally and once mislabelled "(new)".</li>
+<li>The IDE no longer reports an internal error when a Jujutsu repository can't be read (e.g. a broken or moved `.jj` store). Instead: a warning notification appears with **Retry** and **Configure VCS Mappings...** actions, the Working copy tool window's empty state explains that the repository couldn't be read rather than claiming none are configured, the broken mapping shows in red under Settings → Version Control → Directory Mappings, and the plugin automatically detects when the repository is repaired and recovers without any manual action.</li>
+<li>The log no longer reports an error when a selected change has been abandoned or rewritten outside the IDE — the selection is simply dropped instead of repeatedly failing on every refresh. ([#76](https://github.com/kkkev/jj-idea/issues/76))</li>
+<li>Updating the plugin without restarting the IDE no longer leaves a stale log window on screen, which could throw internal errors from its Fetch/Push toolbar buttons until the IDE was restarted. ([#73](https://github.com/kkkev/jj-idea/issues/73), [#86](https://github.com/kkkev/jj-idea/issues/86))</li>
+<li>The file history table (right-click a file → "Show History") no longer shows blank Date, Author, and Committer columns. ([#88](https://github.com/kkkev/jj-idea/issues/88))</li>
+<li>Sorting the file history table by its "Commit Time" column now orders rows by date instead of alphabetically by committer name.</li>
+<li>Closing a project while the log is still loading no longer risks a multi-minute stall; the load is now cancelled promptly instead of waiting out a fixed timeout.</li>
+<li>Removed a blocking `jj` call that could occasionally freeze "Open in Remote" and the bookmark Push submenu when opened for the first time in a session.</li>
+<li>The Settings → Version Control → Jujutsu page no longer needs horizontal scrolling to reach its right-hand controls; fields shrink to fit and grow with the window, and long error messages now wrap instead of widening the page. The revset expression field is now a multi-line box that word-wraps long expressions and lines up with the fields above it.</li>
+<li>The commit details panel no longer shows a stale diff after selecting a different commit that touches the same file(s) as the previously selected one — the tab title updated but the diff content kept showing the old selection's changes.</li>
+      <p>See <a href="https://github.com/kkkev/jj-idea/releases/tag/v0.8.13">full release notes</a> for details.</p>
     ]]></change-notes>
   </plugin>
 </plugins>

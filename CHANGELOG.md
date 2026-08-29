@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.13] - 2026-08-29
+
 ### Added
 - Issue-tracker references (e.g. `JIRA-123`) in the "Working copy" tool window's current-change summary — including inside a bookmark name — now render as clickable links, matching the log table and commit details pane. ([#15](https://github.com/kkkev/jj-idea/issues/15))
 - A "Push" action on a bookmark's own context menu (right-click its chip in the log, or its sub-menu in the bookmark widget) opens the Push dialog pre-selected to that bookmark and remote, skipping the repo/remote/bookmark selection steps a fresh dialog needs — a single OK click pushes it. With more than one Git remote it becomes a submenu, one entry per remote, each disabled with "(up to date)" shown when that particular remote already has the bookmark's current position. ([#81](https://github.com/kkkev/jj-idea/issues/81))
@@ -832,7 +834,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.12...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.13...HEAD
+[0.8.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.13
 [0.8.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.12
 [0.8.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.11
 [0.8.10]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.10
