@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.common
 
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatus
@@ -162,6 +163,14 @@ class JujutsuChangesTree(
     override fun uiDataSnapshot(sink: DataSink) {
         super.uiDataSnapshot(sink)
         sink[VcsDataKeys.CHANGES] = selectedChanges.toTypedArray()
+
+        // Mirrors the platform's own ChangesListView: exposing the selection as virtual files lets
+        // globally-bound file actions (e.g. Reformat Code, Optimize Imports) act on it, the same way
+        // they already do in IntelliJ's built-in Git/Commit changes view.
+        val selectedFiles = selectedChanges.mapNotNull { it.filePath.virtualFile }
+        sink[CommonDataKeys.VIRTUAL_FILE_ARRAY] = selectedFiles.toTypedArray()
+        sink[CommonDataKeys.VIRTUAL_FILE] = selectedFiles.firstOrNull()
+
         additionalDataProvider?.invoke(sink)
     }
 
