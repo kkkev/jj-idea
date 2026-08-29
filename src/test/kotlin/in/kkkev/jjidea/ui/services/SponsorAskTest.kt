@@ -14,17 +14,17 @@ class SponsorAskTest {
     }
 
     @Test
-    fun `29 days elapsed does not show the ask`() {
+    fun `13 days elapsed does not show the ask`() {
         val firstRun = 1_000_000L
-        val now = firstRun + 29 * DAY_MILLIS
+        val now = firstRun + 13 * DAY_MILLIS
         sponsorAskActionsFor(nowMillis = now, firstRunEpochMillis = firstRun, askShown = false) shouldBe
             SponsorAskActions(recordFirstRun = false, showAsk = false)
     }
 
     @Test
-    fun `exactly 30 days elapsed shows the ask`() {
+    fun `exactly 14 days elapsed shows the ask`() {
         val firstRun = 1_000_000L
-        val now = firstRun + 30 * DAY_MILLIS
+        val now = firstRun + 14 * DAY_MILLIS
         sponsorAskActionsFor(nowMillis = now, firstRunEpochMillis = firstRun, askShown = false) shouldBe
             SponsorAskActions(recordFirstRun = false, showAsk = true)
     }

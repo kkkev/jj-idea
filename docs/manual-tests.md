@@ -1339,7 +1339,7 @@ equally-weighted group of their own.
 
 - [ ] Fresh sandbox config, open a jj project → no sponsor balloon on first run
 - [ ] Quit, backdate `firstRunEpochMillis` in the sandbox `jujutsu.xml` (under
-  `JujutsuApplicationSettings`) to more than 30 days ago, restart → a sticky balloon fires
+  `JujutsuApplicationSettings`) to more than 14 days ago, restart → a sticky balloon fires
   once; clicking **Sponsor** opens `https://github.com/sponsors/kkkev` in the default browser
 - [ ] Restart again → the balloon does not reappear
 - [ ] Repeat the backdate in a fresh sandbox, click **Don't show again** instead → restart →
