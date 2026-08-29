@@ -5,6 +5,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
+import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import com.intellij.openapi.vcs.changes.ui.AsyncChangesTreeImpl
 import com.intellij.openapi.vcs.changes.ui.ChangesBrowserNode
 import com.intellij.openapi.vcs.changes.ui.ChangesGroupingPolicyFactory
@@ -170,17 +172,52 @@ class JujutsuChangesTree(
 
 /**
  * True if [a] and [b] represent the same set of changes, comparing each pair's
- * [Change.equals] (which only compares before/after [com.intellij.openapi.vcs.FilePath]s) *and*
- * [Change.getFileStatus]. A plain list comparison would treat e.g. a file that transitioned
- * MERGED_WITH_CONFLICTS -> MODIFIED (same paths, resolved conflict) as unchanged, leaving stale
- * conflict decoration in the tree (jj-idea-3cvb).
+ * [Change.equals] (which only compares before/after [com.intellij.openapi.vcs.FilePath]s),
+ * [Change.getFileStatus], *and* the before/after [ContentRevision]s themselves.
+ *
+ * The [FileStatus][com.intellij.openapi.vcs.FileStatus] check guards jj-idea-3cvb: a plain
+ * [Change.equals] comparison would treat a file that transitioned MERGED_WITH_CONFLICTS ->
+ * MODIFIED (same paths, resolved conflict) as unchanged, leaving stale conflict decoration in
+ * the tree.
+ *
+ * The [ContentRevision] check guards jj-idea-4diu: selecting a different commit that happens to
+ * touch the same paths with the same statuses (e.g. the same file modified in consecutive
+ * commits) produces a [Change] list that is indistinguishable from the old one by path+status
+ * alone, even though the revisions being diffed have moved on. Without this check the tree kept
+ * the old selection's stale [Change] objects, so the diff preview kept showing the old
+ * selection's diff even after the details panel's title had updated.
  *
  * Callers that rebuild a [JujutsuChangesTree]'s contents from a background refresh should skip
  * the rebuild when this returns true, to avoid discarding UI state such as tree expansion or the
  * diff preview's scroll position (jj-idea-q6vn).
  */
 fun sameChangesAndStatuses(a: List<Change>, b: List<Change>): Boolean =
-    a.size == b.size && a.indices.all { i -> a[i] == b[i] && a[i].fileStatus == b[i].fileStatus }
+    a.size == b.size &&
+        a.indices.all { i ->
+            a[i] == b[i] &&
+                a[i].fileStatus == b[i].fileStatus &&
+                sameRevision(a[i].beforeRevision, b[i].beforeRevision) &&
+                sameRevision(a[i].afterRevision, b[i].afterRevision)
+        }
+
+/**
+ * True if [a] and [b] represent the same content revision. The plugin's own [ContentRevision]
+ * implementations ([in.kkkev.jjidea.jj.ContentLogEntryImpl],
+ * [in.kkkev.jjidea.jj.MergeParentContentRevision], [in.kkkev.jjidea.jj.EmptyContentRevisionImpl])
+ * are `data class`es keyed on change id, so plain `==` already discriminates correctly. The one
+ * wrinkle is [CurrentContentRevision] (the platform class used for the working-copy side), which
+ * has no value equality; it's compared by [com.intellij.openapi.vcs.FilePath] instead, mirroring
+ * `ChangeDiffRequestProducer.isEquals(ContentRevision, ContentRevision)`'s special case.
+ *
+ * Deliberately does *not* delegate to `ChangeDiffRequestProducer.isEquals`: that method iterates
+ * `ChangeDiffViewerWrapperProvider`/`ChangeDiffRequestProvider` extension points and needs a live
+ * `Application`, which would break this file's pure/unit-testable comparisons.
+ */
+private fun sameRevision(a: ContentRevision?, b: ContentRevision?): Boolean = when {
+    a == b -> true
+    a is CurrentContentRevision && b is CurrentContentRevision -> a.file == b.file
+    else -> false
+}
 
 /**
  * Splits [changes] into (belonging to [currentRepo], everything else). `currentRepo == null`
