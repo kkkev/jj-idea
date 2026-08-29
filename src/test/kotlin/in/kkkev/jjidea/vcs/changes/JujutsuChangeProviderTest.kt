@@ -14,9 +14,11 @@ import com.intellij.openapi.vcs.actions.VcsContextFactory
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangelistBuilder
 import com.intellij.openapi.vcs.changes.ContentRevision
+import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import com.intellij.openapi.vcs.util.paths.RecursiveFilePathSet
 import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.ui.common.sameChangesAndStatuses
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.ignore.IGNORE_REPORT_CAP
@@ -24,6 +26,7 @@ import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import `in`.kkkev.jjidea.vcs.relativeTo
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -94,6 +97,15 @@ class JujutsuChangeProviderTest {
         override fun isNonLocal() = TODO("Not yet implemented")
 
         override fun toString() = name + if (isDirectory) "/" else ""
+
+        // Real FilePath implementations (e.g. LocalFilePath) are value-equal by path, which
+        // sameChangesAndStatuses/ChangeDiffRequestProducer rely on for CurrentContentRevision.
+        // vcsContextFactory.createFilePath mints a fresh MockFilePath per call, so without this
+        // two separately-parsed statuses would never compare equal (jj-idea-ouul).
+        override fun equals(other: Any?) =
+            other is MockFilePath && other.name == name && other.isDirectory == isDirectory
+
+        override fun hashCode() = name.hashCode() * 31 + isDirectory.hashCode()
     }
 
     @Test
@@ -167,6 +179,47 @@ class JujutsuChangeProviderTest {
         change.fileStatus shouldBe FileStatus.DELETED
         change.beforeRevision?.file?.relativeTo(directory) shouldBe "foo.txt"
         change.afterRevision?.file?.relativeTo(directory).shouldBeNull()
+    }
+
+    /**
+     * jj-idea-ouul: recomputing the working-copy [Change] list for an unchanged status (the
+     * refresh a save triggers while a file is shown in the "@: <file>" diff preview tab, GitHub
+     * #67) must produce a list [sameChangesAndStatuses] with the previous one, or the platform
+     * rebuilds the diff viewer and resets scroll position. [ContentRevision]s for the working
+     * copy's own side come back as [CurrentContentRevision] (path-based identity, independent of
+     * content) and unmodified-parent sides come back value-equal — this asserts both calls into
+     * [JujutsuChangeProvider.parseStatus] agree, matching jj-idea-q6vn's fix.
+     */
+    @Test
+    fun `parseStatus is idempotent across a save-triggered refresh (jj-idea-ouul)`() {
+        directory.addChild(getOrCreateVirtualFile(false, "modified.txt"))
+        directory.addChild(getOrCreateVirtualFile(false, "added.txt"))
+        directory.addChild(getOrCreateVirtualFile(false, "deleted.txt"))
+
+        val output = statusOutput("M modified.txt", "A added.txt", "D deleted.txt")
+
+        // Mirrors ContentLogEntryImpl: value-equal for the same path, since the parent-side
+        // content hasn't changed (only the working-copy file was edited and saved).
+        data class UnchangedParentRevision(private val path: FilePath) : ContentRevision {
+            override fun getFile() = path
+            override fun getContent(): String? = null
+            override fun getRevisionNumber() = throw UnsupportedOperationException()
+        }
+        every { repo.createContentRevision(any(), any<ContentLocator>()) } answers {
+            UnchangedParentRevision(firstArg<FilePath>())
+        }
+
+        val firstPass = mutableListOf<Change>()
+        every { builder.processChange(capture(firstPass), JujutsuVcsBase.getKey()) } returns Unit
+        jcp.parseStatus(output, repo, builder)
+
+        val secondPass = mutableListOf<Change>()
+        every { builder.processChange(capture(secondPass), JujutsuVcsBase.getKey()) } returns Unit
+        jcp.parseStatus(output, repo, builder)
+
+        sameChangesAndStatuses(firstPass, secondPass) shouldBe true
+        firstPass.find { it.fileStatus == FileStatus.MODIFIED }
+            ?.afterRevision.shouldBeInstanceOf<CurrentContentRevision>()
     }
 
     @Test
