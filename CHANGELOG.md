@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Editor gutter change markers and Annotate (blame) can now be based on the latest immutable ancestor (trunk) or any revset you choose, instead of always the working copy's parent — useful when you have several commits stacked on top of trunk and want to see everything changed so far, not just the last one. Configure it in Settings → Version Control → Jujutsu → Diff Base, project-wide or per repository; the Local Changes / Working copy view is unaffected. ([#43](https://github.com/kkkev/jj-idea/issues/43))
+
 ## [0.8.13] - 2026-08-29
 
 ### Added

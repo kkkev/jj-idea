@@ -35,5 +35,9 @@ data class JujutsuSettingsState(
     // in.kkkev.jjidea.actions.git.GitPushDialog.PushScope name. Stored as a string rather than
     // the enum itself so this class stays free of a UI-package dependency and survives enum
     // reordering; an unrecognised value falls back to DEFAULT.
-    var defaultPushScope: String = "DEFAULT"
+    var defaultPushScope: String = "DEFAULT",
+    // jj-idea-fwea: base revision for editor gutter change markers and Annotate (GitHub #43).
+    // WORKING_COPY_PARENT (the default) means "no override — behave exactly as before".
+    var diffbaseStrategy: DiffbaseStrategy = DiffbaseStrategy.WORKING_COPY_PARENT,
+    var customDiffbaseRevset: String = ""
 )

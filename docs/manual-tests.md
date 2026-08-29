@@ -39,6 +39,7 @@ Components whose blast radius exceeds their own package:
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
 | `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
+| `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
 
 ## Fixtures
 
@@ -1368,7 +1369,8 @@ equally-weighted group of their own.
 **Diff viewing across file surfaces**
 
 **Code:** `vcs/diff/JujutsuDiffProvider.kt`, `actions/filechange/`, `vcs/annotate/`, `vcs/history/JujutsuHistoryProvider.kt`, `actions/file/OpenInRemoteFromEditorGroup.kt`, `actions/filechange/OpenFileInRemoteGroup.kt`
-**Also re-run:** MT-DIFF-PREVIEW; see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, which recur across every surface in this section
+**Also re-run:** MT-DIFF-PREVIEW; MT-DIFFBASE (a configured diff base changes what `Annotate`
+below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, which recur across every surface in this section
 
 #### Diffs
 
@@ -1464,6 +1466,59 @@ verify it once per surface it's referenced from, not three times independently:
 - [ ] With the diff tab open and a different (regular) editor tab focused, edit and save that file — the editor stays on it; it does not switch to the diff tab (GitHub #67)
 - [ ] jj-idea-q6vn: with the diff tab open on a long file, scrolled away from the top, edit and save a *different* tracked file from outside the IDE (e.g. a terminal) — once the background refresh lands, the diff stays scrolled where it was, it does not jump to the top
 - [ ] jj-idea-q6vn / jj-idea-ouul (GitHub #67): with `@` selected and its diff tab open on the working-copy side, the right-hand pane title reads "Current" (not the change id) and is editable; on a long file, scroll well away from the top, then edit and save *that same file* (the one shown in the diff, not a different one) — content updates in place and scroll position is unchanged
+
+### MT-DIFFBASE
+
+**Custom diff base for gutter markers and Annotate (jj-idea-fwea, GitHub #43)**
+
+**Code:** `vcs/diffbase/`, `settings/DiffbaseStrategy.kt`, `settings/JujutsuConfigurable.kt` (Diff Base group + per-repo override)
+**Also re-run:** MT-DIFF (Annotate is the other consumer of the diff base); MT-SETTINGS (the settings group itself)
+
+Requires a repo with at least one immutable ancestor and a few mutable commits above it (e.g.
+`jj new trunk()` a couple of times) so "latest immutable ancestor" differs visibly from `@-`.
+
+- [ ] Settings → Version Control → Jujutsu → **Diff Base** defaults to "Working copy parent
+      (default)" on a fresh install; gutter markers and Annotate behave exactly as before this
+      feature existed
+- [ ] jj-idea-fwea: the "Working copy parent" and "Latest immutable ancestor" radio buttons show
+      a "(?)" icon after the label — hovering (or focusing) it shows the underlying revset
+      (`@-` / `latest(ancestors(@-) & immutable())`); the labels themselves stay short, no raw
+      revset text visible without hovering
+- [ ] Select "Latest immutable ancestor (trunk)", click Apply — without touching the editor,
+      every open file's gutter markers expand to the full diff vs trunk (not just vs `@-`)
+- [ ] Annotate the same file (Jujutsu → Annotate). **Alignment check:** every blame line lines
+      up with the correct source line; lines changed anywhere in the stack read as
+      unattributed, not shifted onto the wrong line — this is the bug this feature exists to
+      prevent (gutter base and Annotate base must never disagree)
+- [ ] Select "Custom revset", type `trunk()`, click **Test** — reports success per repo; gutter
+      and Annotate match the "Latest immutable ancestor" case above
+- [ ] Type an invalid revset (e.g. `zz(`) and click **Test** — the raw jj error wraps instead
+      of widening the panel (same pattern as the Log revset's Test button)
+- [ ] Type a revset that matches more than one revision (e.g. `heads(mutable())` in a repo with
+      concurrent branches) and click **Test** — reports it resolves to N revisions, not one,
+      as an error rather than success; Apply is blocked the same way an unresolvable revset is
+- [ ] Leaving "Custom revset" selected with an empty field shows a validation error on Apply
+- [ ] **Live update with an editor already open** (the scenario this feature exists to get
+      right): with a file's Annotate gutter already showing (from a prior "Latest immutable
+      ancestor" run), switch the setting back to "Working copy parent" and click Apply —
+      *without* closing the editor or manually re-running Annotate, the gutter's blame updates
+      in place to the new base and stays correctly aligned (no line showing the wrong change's
+      author). Repeat switching between all three strategies with the gutter left open each
+      time — each switch is reflected immediately, never requiring a close/reopen to correct
+      itself
+- [ ] Multi-repo project: set a per-repo override (Repository Settings → the repo's group →
+      "Override diff base") on one repo only — confirm only that repo's files use the
+      override, in both the gutter and Annotate; the other repo keeps using the project default
+- [ ] jj-idea-fwea: with at least one repo (so the "Repository Settings" group renders — the
+      automated `JujutsuConfigurablePanelTest` fixture has none and can't cover this), the
+      per-repo "Override diff base" combo box shows short strategy names, not the raw revset
+      text; a grey comment line below it explains what `@-` and "Latest immutable ancestor"
+      resolve to. Opening Settings → Version Control → Jujutsu at its default size shows no
+      horizontal scrollbar with this group expanded (see jj-idea-bwdk's width checklist above)
+- [ ] Edge cases: a repo with no immutable ancestor falls back to `@-` (no error dialog, no
+      crash); an ignored or unversioned file gets no gutter markers and no error; a file opened
+      from the log or File History (a historical version) is unaffected; the **Local Changes** /
+      **Working copy** panel keeps showing changes vs `@-` regardless of this setting
 
 ### MT-CONFLICT
 
@@ -1867,6 +1922,7 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 **Settings panel**
 
 **Code:** `settings/JujutsuConfigurable.kt`, `settings/JujutsuSettings.kt`, `settings/JujutsuSettingsState.kt`, `settings/JujutsuApplicationSettings.kt`
+**Also re-run:** MT-DIFFBASE (its Diff Base group and per-repo override live in this same panel)
 
 - [ ] JJ executable path can be configured, including via the file picker
 - [ ] Auto-refresh toggle, change ID format preference (short/long), and log change limit

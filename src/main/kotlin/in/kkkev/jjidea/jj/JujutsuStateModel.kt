@@ -243,6 +243,14 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     val logRefresh = simpleNotifier<Unit>(project, "Jujutsu Log Refresh")
 
     /**
+     * Fired when the configured diff base ([in.kkkev.jjidea.settings.DiffbaseStrategy]) changes
+     * (jj-idea-fwea). [in.kkkev.jjidea.vcs.diffbase.DiffbaseService] fires this after clearing
+     * its own resolution cache; [in.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider] listens
+     * to also drop its per-file annotation cache, which would otherwise go stale silently.
+     */
+    val diffbaseChanged = simpleNotifier<Unit>(project, "Jujutsu Diffbase Changed")
+
+    /**
      * Change selection notifier. Actions use this to request a specific change be selected.
      * Log panels and data loaders listen and select the matching entry if it belongs to their repo.
      */

@@ -139,6 +139,13 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     fun logContextWindow(repo: JujutsuRepository) =
         state.repositoryOverrides[repo.directory.path]?.logContextWindow ?: state.logContextWindow
 
+    /** jj-idea-fwea: diff-base strategy for gutter markers and Annotate, see [DiffbaseStrategy]. */
+    fun diffbaseStrategy(repo: JujutsuRepository) =
+        state.repositoryOverrides[repo.directory.path]?.diffbaseStrategy ?: state.diffbaseStrategy
+
+    fun customDiffbaseRevset(repo: JujutsuRepository) =
+        state.repositoryOverrides[repo.directory.path]?.customDiffbaseRevset ?: state.customDiffbaseRevset
+
     companion object {
         const val DEFAULT_LOG_WINDOW_ID = "default"
 

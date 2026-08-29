@@ -29,6 +29,7 @@ import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.contentLocator
 import `in`.kkkev.jjidea.vcs.contentLocator
+import `in`.kkkev.jjidea.vcs.diffbase.DiffbaseService
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
@@ -66,6 +67,9 @@ class JujutsuAnnotationProvider(
     private fun ensureCacheInvalidationSubscribed() {
         if (invalidationSubscribed.compareAndSet(false, true)) {
             project.stateModel.workingCopies.connect(project) { _ -> cache.clear() }
+            // jj-idea-fwea: every cached FileAnnotation for @ is computed against the
+            // configured diff base and would otherwise go stale silently when it changes.
+            project.stateModel.diffbaseChanged.connect(project) { cache.clear() }
         }
     }
 
@@ -109,12 +113,24 @@ class JujutsuAnnotationProvider(
     /**
      * Annotate a file at the working copy parent (@-), matching the LineStatusTracker base.
      * Lines changed in @ appear unannotated; IntelliJ's UpToDateLineNumberProvider handles the mapping.
+     *
+     * When a custom diff base is configured (jj-idea-fwea / GitHub #43), annotate at that
+     * revision instead, via [DiffbaseService] — the same service [in.kkkev.jjidea.vcs.diffbase.DiffbaseContentLoader]
+     * uses for the LineStatusTracker base, so the two never disagree and blame lines stay aligned.
      */
     override fun annotate(file: VirtualFile): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
 
         // 1. Find the content locator
         val contentLocator = file.contentLocator
+
+        if (contentLocator is WorkingCopy) {
+            DiffbaseService.getInstance(project).resolve(repo)?.let { base ->
+                repo.getVirtualFile(FileAtVersion(file.filePath, base))?.let { baseFile ->
+                    return annotateInternal(baseFile, base, repo)
+                }
+            }
+        }
 
         // 2. Find the change object
         val change = repo.logService.getFileChanges(repo.getLogEntry(contentLocator) ?: repo.workingCopy, file.filePath)

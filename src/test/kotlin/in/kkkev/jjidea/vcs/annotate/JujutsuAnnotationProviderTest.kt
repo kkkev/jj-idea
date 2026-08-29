@@ -17,8 +17,12 @@ import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.util.NotifiableState
+import `in`.kkkev.jjidea.util.Notifier
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.contentLocator
+import `in`.kkkev.jjidea.vcs.diffbase.DiffbaseService
+import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -136,8 +140,13 @@ class JujutsuAnnotationProviderTest {
         val workingCopies = mockk<NotifiableState<Map<String, LogEntry>>> {
             every { connect(any(), capture(listenerSlot)) } just Runs
         }
+        // jj-idea-fwea: also subscribed to on the same first-cache-access path.
+        val diffbaseChanged = mockk<Notifier<Unit>> {
+            every { connect(any(), any()) } just Runs
+        }
         val stateModel = mockk<JujutsuStateModel> {
             every { this@mockk.workingCopies } returns workingCopies
+            every { this@mockk.diffbaseChanged } returns diffbaseChanged
         }
         every { project.getService(JujutsuStateModel::class.java) } returns stateModel
 
@@ -173,6 +182,39 @@ class JujutsuAnnotationProviderTest {
             provider.annotate(filePath, ChangeIdRevisionNumber(targetRevision))
 
             verify(exactly = 1) { commandExecutor.annotate(file, targetRevision, any()) }
+        } finally {
+            unmockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        }
+    }
+
+    // jj-idea-fwea / GitHub #43: annotate(file) must consult DiffbaseService — the same service
+    // DiffbaseContentLoader uses for the LineStatusTracker base — so gutter markers and blame
+    // never disagree on the base revision.
+    @Test
+    fun `annotate(file) annotates at the resolved diff base when one is configured`() {
+        mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        try {
+            val filePath = LocalFilePath("/repo/file.txt", false)
+            every { file.filePath } returns filePath
+            every { file.contentLocator } returns WorkingCopy
+            every { project.jujutsuRepositoryFor(file) } returns repo
+
+            val diffbaseService = mockk<DiffbaseService>()
+            every { project.getService(DiffbaseService::class.java) } returns diffbaseService
+            val base = ChangeId("base", "base")
+            every { diffbaseService.resolve(repo) } returns base
+
+            val baseFile = MockVirtualFile("file.txt")
+            every { repo.getVirtualFile(FileAtVersion(filePath, base)) } returns baseFile
+            every { repo.commandExecutor } returns commandExecutor
+            every { repo.directory } returns MockVirtualFile("repo")
+            every { repo.workingCopy } returns mockk { every { id } returns ChangeId("wc", "wc") }
+            every { commandExecutor.annotate(baseFile, base, any()) } returns
+                CommandExecutor.CommandResult(exitCode = 0, stdout = "", stderr = "")
+
+            provider.annotate(file)
+
+            verify(exactly = 1) { commandExecutor.annotate(baseFile, base, any()) }
         } finally {
             unmockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
         }

@@ -8,6 +8,7 @@ import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.util.text.StringUtil
@@ -16,9 +17,11 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
+import com.intellij.ui.components.JBRadioButton
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
+import com.intellij.ui.layout.selected
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.git.GitPushDialog
@@ -30,6 +33,7 @@ import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.util.runLaterInModal
+import `in`.kkkev.jjidea.vcs.diffbase.DiffbaseService
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import java.awt.Font
 import java.awt.datatransfer.StringSelection
@@ -50,6 +54,8 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private var previousLogRevset = settings.state.logRevset
     private var previousHideStandardCommitToolWindow = settings.state.hideStandardCommitToolWindow
     private var previousDisableIgnoredFileScanning = appSettings.state.disableIgnoredFileScanning
+    private var previousDiffbaseStrategy = settings.state.diffbaseStrategy
+    private var previousCustomDiffbaseRevset = settings.state.customDiffbaseRevset
     private val finder = JjExecutableFinder()
 
     // UI components for validation feedback
@@ -63,6 +69,12 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         isOpaque = false
     }
     private var revsetError: String? = null
+
+    // jj-idea-fwea: diff-base validation
+    private lateinit var diffbaseCustomOption: Cell<JBRadioButton>
+    private lateinit var diffbaseRevsetField: Cell<JBTextField>
+    private val diffbaseValidationLabel = JBLabel()
+    private var diffbaseError: String? = null
 
     // Global identity — backing properties for bindText(); async-loaded from jj config
     private var globalNameBinding = ""
@@ -90,6 +102,10 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         // jj-idea-isnf: per-repo context-window override.
         val contextCb: JBCheckBox,
         val contextField: JBTextField,
+        // jj-idea-fwea: per-repo diff-base override.
+        val diffbaseOverrideCb: JBCheckBox,
+        val diffbaseCombo: ComboBox<DiffbaseStrategy>,
+        val diffbaseRevsetField: JBTextField,
         val revsetValidationLabel: JBLabel = JBLabel(),
         var revsetError: String? = null
     )
@@ -277,6 +293,71 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             }
         }
 
+        group(JujutsuBundle.message("settings.group.diffbase")) {
+            buttonsGroup {
+                row {
+                    radioButton(JujutsuBundle.message("settings.diffbase.workingcopy"))
+                        .bindSelected(
+                            { settings.state.diffbaseStrategy == DiffbaseStrategy.WORKING_COPY_PARENT },
+                            { if (it) settings.state.diffbaseStrategy = DiffbaseStrategy.WORKING_COPY_PARENT }
+                        )
+                        .contextHelp(JujutsuBundle.message("settings.diffbase.workingcopy.help"))
+                }
+                row {
+                    radioButton(JujutsuBundle.message("settings.diffbase.immutable"))
+                        .bindSelected(
+                            { settings.state.diffbaseStrategy == DiffbaseStrategy.IMMUTABLE_ANCESTOR },
+                            { if (it) settings.state.diffbaseStrategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR }
+                        )
+                        .contextHelp(
+                            JujutsuBundle.message(
+                                "settings.diffbase.immutable.help",
+                                DiffbaseStrategy.IMMUTABLE_ANCESTOR_REVSET
+                            )
+                        )
+                }
+                row {
+                    diffbaseCustomOption = radioButton(JujutsuBundle.message("settings.diffbase.custom"))
+                        .bindSelected(
+                            { settings.state.diffbaseStrategy == DiffbaseStrategy.CUSTOM_REVSET },
+                            { if (it) settings.state.diffbaseStrategy = DiffbaseStrategy.CUSTOM_REVSET }
+                        )
+                }
+                indent {
+                    row {
+                        diffbaseRevsetField = textField()
+                            .bindText(settings.state::customDiffbaseRevset)
+                            .columns(COLUMNS_MEDIUM)
+                            .align(AlignX.FILL)
+                            .resizableColumn()
+                            .enabledIf(diffbaseCustomOption.selected)
+                            .also {
+                                it.component.document.addDocumentListener(clearErrorListener { diffbaseError = null })
+                            }
+                            .validationOnApply {
+                                if (diffbaseCustomOption.component.isSelected && it.text.isBlank()) {
+                                    error(JujutsuBundle.message("settings.diffbase.error.empty"))
+                                } else {
+                                    diffbaseError?.let { message -> error(message) }
+                                }
+                            }
+                        button(JujutsuBundle.message("settings.log.revset.test")) {
+                            testDiffbaseRevset()
+                        }
+                    }
+                    row("") {
+                        cell(diffbaseValidationLabel)
+                    }
+                }
+            }
+            row {
+                comment(
+                    JujutsuBundle.message("settings.diffbase.comment"),
+                    maxLineLength = NARROW_COMMENT_WIDTH
+                )
+            }
+        }
+
         if (repos.isNotEmpty()) {
             group(JujutsuBundle.message("settings.group.repo")) {
                 val dirtyListener = object : javax.swing.event.DocumentListener {
@@ -306,6 +387,12 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     val disableScanCb = JBCheckBox(JujutsuBundle.message("settings.repo.disableignorescan"))
                     val contextCb = JBCheckBox(JujutsuBundle.message("settings.repo.contextwindow.override"))
                     val contextField = JBTextField()
+                    val diffbaseOverrideCb = JBCheckBox(JujutsuBundle.message("settings.repo.diffbase.override"))
+                    val diffbaseCombo = ComboBox(DiffbaseStrategy.entries.toTypedArray()).apply {
+                        @Suppress("removal")
+                        renderer = SimpleListCellRenderer.create("") { diffbaseStrategyLabel(it) }
+                    }
+                    val diffbaseRevsetField = JBTextField()
 
                     fun updateIdentityEnabled() {
                         nameField.isEnabled = identityCb.isSelected
@@ -326,6 +413,13 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
 
                     fun updateContextEnabled() {
                         contextField.isEnabled = contextCb.isSelected
+                    }
+
+                    fun updateDiffbaseEnabled() {
+                        diffbaseCombo.isEnabled = diffbaseOverrideCb.isSelected
+                        diffbaseRevsetField.isEnabled =
+                            diffbaseOverrideCb.isSelected &&
+                            diffbaseCombo.selectedItem == DiffbaseStrategy.CUSTOM_REVSET
                     }
 
                     identityCb.addActionListener {
@@ -349,13 +443,22 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         updateContextEnabled()
                         repoSettingsDirty = true
                     }
+                    diffbaseOverrideCb.addActionListener {
+                        updateDiffbaseEnabled()
+                        repoSettingsDirty = true
+                    }
+                    diffbaseCombo.addActionListener {
+                        updateDiffbaseEnabled()
+                        repoSettingsDirty = true
+                    }
                     nameField.document.addDocumentListener(dirtyListener)
                     emailField.document.addDocumentListener(dirtyListener)
                     limitField.document.addDocumentListener(dirtyListener)
                     revsetField.document.addDocumentListener(dirtyListener)
                     contextField.document.addDocumentListener(dirtyListener)
+                    diffbaseRevsetField.document.addDocumentListener(dirtyListener)
 
-                    // Load limit, revset, ignore-scan, and context-window overrides (synchronous)
+                    // Load limit, revset, ignore-scan, context-window, and diff-base overrides (synchronous)
                     val repoPath = repo.directory.path
                     val repoConfig = settings.state.repositoryOverrides[repoPath]
                     limitCb.isSelected = repoConfig?.logChangeLimit != null
@@ -366,6 +469,9 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     disableScanCb.isSelected = repoConfig?.disableIgnoredFileScanning == true
                     contextCb.isSelected = repoConfig?.logContextWindow != null
                     contextField.text = repoConfig?.logContextWindow?.toString() ?: ""
+                    diffbaseOverrideCb.isSelected = repoConfig?.diffbaseStrategy != null
+                    diffbaseCombo.selectedItem = repoConfig?.diffbaseStrategy ?: DiffbaseStrategy.WORKING_COPY_PARENT
+                    diffbaseRevsetField.text = repoConfig?.customDiffbaseRevset ?: ""
 
                     // Load identity from jj config (background): prefer repo-scoped, fall back to effective
                     runInBackground {
@@ -385,6 +491,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                     updateRevsetEnabled()
                     updateDisableScanEnabled()
                     updateContextEnabled()
+                    updateDiffbaseEnabled()
 
                     val repoPanel = RepoSettingsPanel(
                         repo,
@@ -398,7 +505,10 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         disableScanOverrideCb,
                         disableScanCb,
                         contextCb,
-                        contextField
+                        contextField,
+                        diffbaseOverrideCb,
+                        diffbaseCombo,
+                        diffbaseRevsetField
                     )
                     revsetField.document.addDocumentListener(clearErrorListener { repoPanel.revsetError = null })
                     repoSettingsPanels.add(repoPanel)
@@ -469,6 +579,36 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                                     .comment(JujutsuBundle.message("settings.repo.disableignorescan.comment"))
                             }
                         }
+                        row {
+                            cell(diffbaseOverrideCb)
+                        }
+                        indent {
+                            row {
+                                cell(diffbaseCombo)
+                                cell(diffbaseRevsetField).columns(COLUMNS_MEDIUM)
+                                    .align(AlignX.FILL)
+                                    .resizableColumn()
+                                    .validationOnApply {
+                                        if (diffbaseOverrideCb.isSelected &&
+                                            diffbaseCombo.selectedItem == DiffbaseStrategy.CUSTOM_REVSET &&
+                                            diffbaseRevsetField.text.isBlank()
+                                        ) {
+                                            error(JujutsuBundle.message("settings.diffbase.error.empty"))
+                                        } else {
+                                            null
+                                        }
+                                    }
+                            }
+                            row("") {
+                                comment(
+                                    JujutsuBundle.message(
+                                        "settings.repo.diffbase.revsets.hint",
+                                        DiffbaseStrategy.IMMUTABLE_ANCESTOR_REVSET
+                                    ),
+                                    maxLineLength = NARROW_COMMENT_WIDTH
+                                )
+                            }
+                        }
                     }.apply { expanded = repos.size == 1 }
                 }
             }
@@ -530,10 +670,12 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         }
 
         // Save per-repo settings
+        var diffbaseOverrideChanged = false
         repoSettingsPanels.forEach { panel ->
             val repoPath = panel.repo.directory.path
 
-            // Save log limit, revset, ignore-scan, and context-window overrides to plugin settings
+            // Save log limit, revset, ignore-scan, context-window, and diff-base overrides to
+            // plugin settings
             var currentOverride = settings.state.repositoryOverrides[repoPath]
             val newLimit = if (panel.limitCb.isSelected) panel.limitField.text.trim().toIntOrNull() else null
             val newRevset = if (panel.revsetCb.isSelected) panel.revsetField.text.trim() else null
@@ -543,17 +685,32 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             val newDisableScan = if (panel.disableScanOverrideCb.isSelected) panel.disableScanCb.isSelected else null
             val newContextWindow =
                 if (panel.contextCb.isSelected) panel.contextField.text.trim().toIntOrNull() else null
+            // jj-idea-fwea: same overrideCb-gates-the-value shape as ignore-scan above.
+            val newDiffbaseStrategy =
+                if (panel.diffbaseOverrideCb.isSelected) panel.diffbaseCombo.selectedItem as DiffbaseStrategy else null
+            val newCustomDiffbaseRevset =
+                if (panel.diffbaseOverrideCb.isSelected) panel.diffbaseRevsetField.text.trim() else null
+
+            if (newDiffbaseStrategy != currentOverride?.diffbaseStrategy ||
+                newCustomDiffbaseRevset != currentOverride?.customDiffbaseRevset
+            ) {
+                diffbaseOverrideChanged = true
+            }
 
             if (newLimit != currentOverride?.logChangeLimit ||
                 newRevset != currentOverride?.logRevset ||
                 newDisableScan != currentOverride?.disableIgnoredFileScanning ||
-                newContextWindow != currentOverride?.logContextWindow
+                newContextWindow != currentOverride?.logContextWindow ||
+                newDiffbaseStrategy != currentOverride?.diffbaseStrategy ||
+                newCustomDiffbaseRevset != currentOverride?.customDiffbaseRevset
             ) {
                 val updated = (currentOverride ?: RepositoryConfig()).copy(
                     logChangeLimit = newLimit,
                     logRevset = newRevset,
                     disableIgnoredFileScanning = newDisableScan,
-                    logContextWindow = newContextWindow
+                    logContextWindow = newContextWindow,
+                    diffbaseStrategy = newDiffbaseStrategy,
+                    customDiffbaseRevset = newCustomDiffbaseRevset
                 )
                 if (updated.isEmpty()) {
                     settings.state.repositoryOverrides.remove(repoPath)
@@ -608,6 +765,20 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             previousLogLimit = newLogLimit
             previousLogRevset = newLogRevset
             project.stateModel.logRefresh.notify(Unit)
+        }
+
+        // jj-idea-fwea: if the project-level diff base changed, or any per-repo override did
+        // (diffbaseOverrideChanged, computed above), refresh every open editor's gutter markers
+        // and Annotate cache so the new base takes effect without a restart.
+        val newDiffbaseStrategy = settings.state.diffbaseStrategy
+        val newCustomDiffbaseRevset = settings.state.customDiffbaseRevset
+        if (newDiffbaseStrategy != previousDiffbaseStrategy ||
+            newCustomDiffbaseRevset != previousCustomDiffbaseRevset ||
+            diffbaseOverrideChanged
+        ) {
+            previousDiffbaseStrategy = newDiffbaseStrategy
+            previousCustomDiffbaseRevset = newCustomDiffbaseRevset
+            DiffbaseService.getInstance(project).notifyDiffbaseChanged()
         }
     }
 
@@ -687,6 +858,72 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private fun runRevsetTest(repo: JujutsuRepository, expression: String): CommandExecutor.CommandResult {
         val revset = if (expression.isEmpty()) Revset.Default else Expression(expression)
         return repo.commandExecutor.log(revset = revset, template = "'.'", limit = 10000)
+    }
+
+    /**
+     * Resolves the project-level custom diff-base revset against every repo (jj-idea-fwea), the
+     * same shape as [testRevset] for the log revset — but unlike the log revset (which is fine
+     * matching many changes), a diff base needs to resolve to *exactly one* revision, so a
+     * revset matching more than one is flagged as an error here rather than reported as valid.
+     * [DiffbaseService.resolve] applies the same "not exactly one is a failure" rule at
+     * resolution time, falling back to `@-` rather than picking one of the matches arbitrarily.
+     * A per-repo diff-base override, if checked, is tested with its own revset instead of the
+     * project-level field's value.
+     */
+    private fun testDiffbaseRevset() {
+        val expression = diffbaseRevsetField.component.text.trim()
+        showRevsetResult(diffbaseValidationLabel, null, JujutsuBundle.message("settings.log.revset.test.testing"))
+        diffbaseError = null
+
+        runInBackground {
+            val results = repos.map { repo ->
+                val panel = repoSettingsPanels.find { it.repo == repo }
+                val hasOverride = panel?.diffbaseOverrideCb?.isSelected == true &&
+                    panel.diffbaseCombo.selectedItem == DiffbaseStrategy.CUSTOM_REVSET
+                val effectiveRevset = if (hasOverride) panel.diffbaseRevsetField.text.trim() else expression
+                repo to runRevsetTest(repo, effectiveRevset)
+            }
+
+            runLater {
+                val failure = results.firstOrNull { (_, result) -> !result.isSuccess }
+                val ambiguous = results.firstOrNull { (_, result) -> result.isSuccess && result.stdout.length > 1 }
+                when {
+                    failure != null -> {
+                        val errorMsg = failure.second.stderr.trim()
+                        diffbaseError = errorMsg
+                        showRevsetResult(
+                            diffbaseValidationLabel,
+                            false,
+                            JujutsuBundle.message("settings.log.revset.test.error.single", errorMsg)
+                        )
+                    }
+                    ambiguous != null -> {
+                        val (repo, result) = ambiguous
+                        val errorMsg = JujutsuBundle.message(
+                            "settings.diffbase.error.ambiguous",
+                            repo.displayName,
+                            result.stdout.length
+                        )
+                        diffbaseError = errorMsg
+                        showRevsetResult(diffbaseValidationLabel, false, errorMsg)
+                    }
+                    else -> {
+                        diffbaseError = null
+                        showRevsetResult(
+                            diffbaseValidationLabel,
+                            true,
+                            JujutsuBundle.message("settings.diffbase.test.valid")
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun diffbaseStrategyLabel(strategy: DiffbaseStrategy): String = when (strategy) {
+        DiffbaseStrategy.WORKING_COPY_PARENT -> JujutsuBundle.message("settings.diffbase.workingcopy")
+        DiffbaseStrategy.IMMUTABLE_ANCESTOR -> JujutsuBundle.message("settings.diffbase.immutable")
+        DiffbaseStrategy.CUSTOM_REVSET -> JujutsuBundle.message("settings.diffbase.custom")
     }
 
     private fun iconLabel(icon: javax.swing.Icon?, text: String) = JBLabel(wrapped(text), icon, JBLabel.LEADING)

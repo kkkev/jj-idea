@@ -115,6 +115,11 @@
     <!-- Per-hunk gutter arrows for HunkPickerDialog (jj-idea-xuob). Global EP: gated to a
          strict no-op on every other diff viewer by HunkArrowDiffExtension.HUNK_PICKER_SESSION. -->
     <diff.DiffExtension implementation="in.kkkev.jjidea.diffedit.HunkArrowDiffExtension"/>
+
+    <!-- Custom diff base for editor gutter change markers (jj-idea-fwea, GitHub #43). No-op
+         (isTrackedFile returns false) unless a custom diff base is configured. -->
+    <openapi.vcs.impl.LocalLineStatusTrackerProvider
+        implementation="in.kkkev.jjidea.vcs.diffbase.DiffbaseContentLoader"/>
   </extensions>
 
   <actions>

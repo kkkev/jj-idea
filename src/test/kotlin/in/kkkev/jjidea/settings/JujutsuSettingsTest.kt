@@ -116,6 +116,75 @@ class JujutsuSettingsTest {
         RepositoryConfig(logContextWindow = 0).isEmpty() shouldBe false
     }
 
+    @Test
+    fun `RepositoryConfig isEmpty returns false when diffbaseStrategy is set`() {
+        RepositoryConfig(diffbaseStrategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR).isEmpty() shouldBe false
+    }
+
+    @Test
+    fun `RepositoryConfig isEmpty returns false when customDiffbaseRevset is set`() {
+        RepositoryConfig(customDiffbaseRevset = "trunk()").isEmpty() shouldBe false
+    }
+
+    // ── diffbaseStrategy / customDiffbaseRevset resolvers (jj-idea-fwea) ────────
+
+    @Test
+    fun `diffbaseStrategy returns project default when no repo override`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState(diffbaseStrategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR))
+        settings.diffbaseStrategy(mockRepo("/repo")) shouldBe DiffbaseStrategy.IMMUTABLE_ANCESTOR
+    }
+
+    @Test
+    fun `diffbaseStrategy returns repo override when present`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                diffbaseStrategy = DiffbaseStrategy.WORKING_COPY_PARENT,
+                repositoryOverrides = mutableMapOf(
+                    "/repo" to RepositoryConfig(diffbaseStrategy = DiffbaseStrategy.CUSTOM_REVSET)
+                )
+            )
+        )
+        settings.diffbaseStrategy(mockRepo("/repo")) shouldBe DiffbaseStrategy.CUSTOM_REVSET
+    }
+
+    @Test
+    fun `diffbaseStrategy falls back to project default when repo override is null`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                diffbaseStrategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR,
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(diffbaseStrategy = null))
+            )
+        )
+        settings.diffbaseStrategy(mockRepo("/repo")) shouldBe DiffbaseStrategy.IMMUTABLE_ANCESTOR
+    }
+
+    @Test
+    fun `diffbaseStrategy defaults to WORKING_COPY_PARENT`() {
+        JujutsuSettingsState().diffbaseStrategy shouldBe DiffbaseStrategy.WORKING_COPY_PARENT
+    }
+
+    @Test
+    fun `customDiffbaseRevset returns repo override when present`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                customDiffbaseRevset = "",
+                repositoryOverrides = mutableMapOf("/repo" to RepositoryConfig(customDiffbaseRevset = "trunk()"))
+            )
+        )
+        settings.customDiffbaseRevset(mockRepo("/repo")) shouldBe "trunk()"
+    }
+
+    @Test
+    fun `customDiffbaseRevset falls back to project default when no repo override`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState(customDiffbaseRevset = "trunk()"))
+        settings.customDiffbaseRevset(mockRepo("/repo")) shouldBe "trunk()"
+    }
+
     // ── disableIgnoredFileScanning resolver (jj-idea-ixju) ──────────────────────
     // The no-override case falls through to JujutsuApplicationSettings.getInstance(), which
     // needs a real ApplicationManager - covered by JujutsuSettingsPlatformTest, not here.

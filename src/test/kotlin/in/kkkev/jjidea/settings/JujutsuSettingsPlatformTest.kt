@@ -57,6 +57,25 @@ class JujutsuSettingsPlatformTest {
         settings.disableIgnoredFileScanning(repo) shouldBe false
     }
 
+    // ── diffbaseStrategy / customDiffbaseRevset (jj-idea-fwea) ──────────────────
+    // The resolver itself has no ApplicationManager dependency (see JujutsuSettingsTest for the
+    // full override/fallback matrix); this just confirms the service exposes it end-to-end.
+
+    @Test
+    fun `diffbaseStrategy defaults to WORKING_COPY_PARENT via the real settings service`() {
+        val settings = JujutsuSettings.getInstance(project.get())
+        settings.diffbaseStrategy(mockRepo("/repo")) shouldBe DiffbaseStrategy.WORKING_COPY_PARENT
+    }
+
+    @Test
+    fun `diffbaseStrategy per-repo override wins over the project default via the real settings service`() {
+        val settings = JujutsuSettings.getInstance(project.get())
+        val repo = mockRepo("/repo")
+        settings.state.repositoryOverrides["/repo"] =
+            RepositoryConfig(diffbaseStrategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR)
+        settings.diffbaseStrategy(repo) shouldBe DiffbaseStrategy.IMMUTABLE_ANCESTOR
+    }
+
     private fun mockRepo(path: String): JujutsuRepository {
         val dir = mockk<VirtualFile>()
         every { dir.path } returns path

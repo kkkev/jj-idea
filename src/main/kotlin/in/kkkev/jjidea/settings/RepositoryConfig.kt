@@ -10,8 +10,16 @@ data class RepositoryConfig(
     var logChangeLimit: Int? = null,
     var logRevset: String? = null,
     var disableIgnoredFileScanning: Boolean? = null,
-    var logContextWindow: Int? = null
+    var logContextWindow: Int? = null,
+    // jj-idea-fwea: per-repo diff-base override, see JujutsuSettings.diffbaseStrategy.
+    var diffbaseStrategy: DiffbaseStrategy? = null,
+    var customDiffbaseRevset: String? = null
 ) {
     fun isEmpty() =
-        logChangeLimit == null && logRevset == null && disableIgnoredFileScanning == null && logContextWindow == null
+        logChangeLimit == null &&
+            logRevset == null &&
+            disableIgnoredFileScanning == null &&
+            logContextWindow == null &&
+            diffbaseStrategy == null &&
+            customDiffbaseRevset == null
 }
