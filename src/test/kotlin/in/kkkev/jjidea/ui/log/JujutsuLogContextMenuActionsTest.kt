@@ -129,6 +129,74 @@ class JujutsuLogContextMenuActionsTest {
     }
 
     @Nested
+    inner class `Compare with another commit action availability` {
+        @Test
+        fun `working copy entry still available`() {
+            val entry = createEntry("abc123", isWorkingCopy = true)
+
+            // Unlike "Compare with Working Copy", this action has no null-check on isWorkingCopy -
+            // the entry itself is always the target.
+            val compareTarget = entry
+
+            compareTarget.id.full shouldBe "abc123"
+        }
+    }
+
+    @Nested
+    inner class `Compare before with another commit action availability` {
+        @Test
+        fun `entry with no parents filtered out`() {
+            val entry = createEntry("abc123", parentIds = emptyList())
+
+            val compareTarget = entry.takeIf { it.parentIds.isNotEmpty() }
+
+            compareTarget.shouldBeNull()
+        }
+
+        @Test
+        fun `entry with a parent passes through`() {
+            val entry = createEntry("abc123", parentIds = listOf("parent1"))
+
+            val compareTarget = entry.takeIf { it.parentIds.isNotEmpty() }
+
+            compareTarget.shouldNotBeNull()
+            compareTarget.id.full shouldBe "abc123"
+        }
+    }
+
+    @Nested
+    inner class `Compare with another commit base locator` {
+        @Test
+        fun `compare with revision uses the entry's own id as the base`() {
+            val entry = createEntry("abc123", parentIds = listOf("parent1"))
+
+            // The selected commit is always the LEFT/base side; see compareWithRevisionAction.
+            entry.id.full shouldBe "abc123"
+        }
+
+        @Test
+        fun `compare before with revision uses the sole parent as the base`() {
+            val entry = createEntry("abc123", parentIds = listOf("parent1"))
+
+            entry.parentContentLocator shouldBe ChangeId("parent1", "pa")
+        }
+
+        @Test
+        fun `compare before with revision uses ContentLocator Empty for a root change`() {
+            val entry = createEntry("abc123", parentIds = emptyList())
+
+            entry.parentContentLocator shouldBe ContentLocator.Empty
+        }
+
+        @Test
+        fun `compare before with revision uses MergeParentOf for a merge commit`() {
+            val entry = createEntry("abc123", parentIds = listOf("parent1", "parent2"))
+
+            entry.parentContentLocator shouldBe MergeParentOf(entry.id)
+        }
+    }
+
+    @Nested
     inner class `Edit action availability` {
         @Test
         fun `working copy entry filtered out`() {

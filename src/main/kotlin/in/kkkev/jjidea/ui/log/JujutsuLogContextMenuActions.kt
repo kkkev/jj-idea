@@ -18,6 +18,8 @@ import `in`.kkkev.jjidea.actions.bookmark.localBookmarkActions
 import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkAction
 import `in`.kkkev.jjidea.actions.bookmark.remoteBookmarkActions
 import `in`.kkkev.jjidea.actions.change.abandonChangeAction
+import `in`.kkkev.jjidea.actions.change.compareBeforeWithRevisionAction
+import `in`.kkkev.jjidea.actions.change.compareWithRevisionAction
 import `in`.kkkev.jjidea.actions.change.compareWithWorkingCopyAction
 import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
 import `in`.kkkev.jjidea.actions.change.copyIdAction
@@ -85,6 +87,8 @@ object JujutsuLogContextMenuActions {
 
         val entry = entries.singleOrNull()
         add(compareWithWorkingCopyAction(project, entry?.takeIf { !it.isWorkingCopy }))
+        add(compareWithRevisionAction(project, entry))
+        add(compareBeforeWithRevisionAction(project, entry?.takeIf { it.parentIds.isNotEmpty() }))
         addSeparator()
 
         entry?.run { add(copyIdAction(id)) }

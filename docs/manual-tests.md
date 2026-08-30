@@ -601,7 +601,7 @@ alongside one other repo works.
 
 **Log row context menu actions**
 
-**Code:** `actions/change/`, `ui/duplicate/DuplicateDialog.kt`, `ui/duplicate/DuplicateImmutabilityGuard.kt`, `ui/newchange/NewChangeDialog.kt`, `ui/rebase/RebasePreviewPanel.kt`, `ui/rebase/RebaseSimulator.kt`, `ui/common/JujutsuCompareChangesPanel.kt`, `ui/components/RevisionSelectorPopup.kt`
+**Code:** `actions/change/`, `ui/duplicate/DuplicateDialog.kt`, `ui/duplicate/DuplicateImmutabilityGuard.kt`, `ui/newchange/NewChangeDialog.kt`, `ui/rebase/RebasePreviewPanel.kt`, `ui/rebase/RebaseSimulator.kt`, `ui/common/JujutsuCompareChangesPanel.kt`, `ui/components/RevisionSelectorPopup.kt`, `actions/change/compareWithRevisionAction.kt`
 **Also re-run:** MT-SQUASH, MT-SPLIT (share the commit picker); MT-DIFF (Compare with Working Copy / Show Diff in New Tab reuse the RevisionSelectorPopup and Changes-pane view); MT-WORKINGCOPY (its "New Change" button shares `CommandExecutor.new`)
 
 - [ ] Right-click opens context menu
@@ -701,6 +701,25 @@ Build a small stack `A → B → C` (three plain changes) for this section.
 - [ ] The left (commit) side is read-only
 - [ ] Right-clicking a file in the Changes tree shows the jj file-change context menu (Show Diff, Restore, etc.)
 - [ ] Invoking it on a commit identical to `@` shows a "No Differences" notification instead of an empty pane
+
+#### Compare with Another Commit / Compare Before with Another Commit (jj-idea-jp33)
+
+- [ ] Right-clicking any historical commit shows **Compare with Working Copy**, **Compare with
+      Another Commit...**, and **Compare Before with Another Commit...** together, in that order
+- [ ] Right-clicking the **working-copy** entry: **Compare with Working Copy** is not visible, but
+      **Compare with Another Commit...** is still shown and enabled
+- [ ] Right-clicking a **root commit** (no parents): **Compare Before with Another Commit...** is disabled
+- [ ] Invoking **Compare with Another Commit...** opens the same revision-picker popup as
+      **Compare with Branch...** (bookmark/change ID/revision search); picking one opens a
+      Changes-pane tab titled `<selected> vs <picked>`, with the **selected commit's content on
+      the left** and the **picked revision's content on the right**, both read-only
+- [ ] Invoking **Compare Before with Another Commit...** on a commit compares its **parent** (not
+      itself) against the picked revision, same left/right convention; on a **merge commit** the
+      left side reflects the auto-merged parent content (matching Compare with Working Copy's
+      merge-parent handling)
+- [ ] Picking a revision identical in content to the base shows a "No Differences" notification, no tab opens
+- [ ] Typing an unresolvable revision in the picker shows a "Compare Failed" error dialog
+- [ ] Both actions also appear, and work identically, from a `jjc://` change-navigation link's menu
 
 #### Show Diff in New Tab, multi-file (jj-idea-vtdl)
 
