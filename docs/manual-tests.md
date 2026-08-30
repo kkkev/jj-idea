@@ -611,6 +611,9 @@ alongside one other repo works.
 - [ ] **New Change...** (secondary) opens the New Change dialog and creates the change
 - [ ] **Edit** action changes working copy
 - [ ] **Describe** action opens dialog and updates description
+- [ ] jj-idea-n3w1 (GitHub #46): the Describe dialog opens with the description field already
+      focused; it's a real commit-message editor (spellcheck, subject-length inspection, Ctrl+E
+      history popup), not a plain text box; Enter inserts a newline, Ctrl+Enter accepts
 - [ ] **Abandon** action removes change after confirmation
 - [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
 - [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
@@ -670,9 +673,12 @@ Build a small stack `A → B → C` (three plain changes) for this section.
       description field, placement radios (Onto/Insert after/Insert before, Onto selected by
       default), a "Switch working copy to the new change" checkbox (checked), and a live preview
       graph
-- [ ] **Onto** + typing a description + Enter: behaves exactly like the old "New Change with
-      Description..." — creates a plain child of B with that description, `@` moves to it, same
-      keystrokes as before
+- [ ] **Onto** + typing a description + Ctrl+Enter (Cmd+Enter): creates a plain child of B with
+      that description, `@` moves to it — matching the old "New Change with Description..."
+      flow's effect. (jj-idea-n3w1, GitHub #46: the description field became a real
+      commit-message editor, so plain Enter now inserts a newline instead of submitting — verify
+      this is in fact the current behavior, since it's a change from the plain text area this
+      dialog used before)
 - [ ] **Insert after**: preview shows the new change between B and C; clicking Create makes it
       so — C is rebased onto the new change, `@` moves to it, log reselects it
 - [ ] **Insert before**: preview shows the new change between A and B; clicking Create makes it
@@ -754,6 +760,18 @@ Build a small stack `A → B → C` (three plain changes) for this section.
 
 → automate: jj-idea-ikr6 (description auto-population + validation logic below is pure
 string/state logic, no rendering dependency)
+
+#### Description editor (jj-idea-n3w1, GitHub #46)
+
+The description field is now a real commit-message editor (`ui/components/DescriptionEditor.kt`,
+wrapping the platform's `CommitMessage`) instead of a plain text area:
+
+- [ ] Typing a long first line shows the subject-length inspection highlight; misspelling a word
+      shows a spellcheck squiggle
+- [ ] The toolbar's history button (Ctrl+E / Cmd+E) opens a popup of recently-used descriptions
+      from other dialogs/changes; picking one previews it, Escape reverts, and it doesn't close
+      the dialog
+- [ ] Enter inserts a newline (does not submit/click OK); Ctrl+Enter (Cmd+Enter) submits
 
 #### Per-file diff preview (jj-idea-8a8z)
 
@@ -988,6 +1006,9 @@ state/routing logic, not rendering)
 - [ ] Both description fields are pre-populated with the source commit's description
 - [ ] Child description field appears **above** the parent field (matching the child's position above the parent in the log)
 - [ ] Editing the child description field updates the child commit; editing parent updates the parent
+- [ ] (jj-idea-n3w1, GitHub #46) Both fields are real commit-message editors, not plain text
+      areas: typing a long subject line highlights it, misspellings get a spellcheck squiggle,
+      and Enter inserts a newline rather than doing anything else
 
 #### Parallel split
 - [ ] Check "Create parallel commits" → header labels switch to "First" / "Second"
@@ -1259,6 +1280,15 @@ selection does nothing; right-click for actions.
 - [ ] Description text area shows current description
 - [ ] jj-idea-qa8i: clicking into the description text area, typing, and pressing Enter inserts
   a newline (does not do nothing or trigger another action)
+- [ ] jj-idea-n3w1 (GitHub #46): the description field is a real commit-message editor, not a
+  plain text area - typing a long first line highlights the subject-length inspection, a
+  misspelled word gets a spellcheck squiggle, and the toolbar's history button (Ctrl+E / Cmd+E)
+  opens a popup of recently-used descriptions (shared with Git's own commit UI and every other
+  description editor in this plugin)
+- [ ] With IdeaVim installed: describe the working copy, enter Insert mode in the description
+  field, then press Escape - it should leave Insert mode, not close/cancel anything (this was the
+  requester's headline ask on GitHub #46; if Escape does something else, note what and whether
+  `:set ideavimsupport=dialog` changes it)
 - [ ] jj-idea-n553 (GitHub #15): with an Issue Navigation pattern configured (Settings → Version
   Control → Issue Navigation, e.g. issue `[A-Z]+-\d+` → link `https://example.com/browse/$0`),
   an issue reference like `JIRA-123` inside a bookmark name shown in the current-change summary

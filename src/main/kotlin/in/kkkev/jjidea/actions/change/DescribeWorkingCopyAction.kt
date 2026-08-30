@@ -5,6 +5,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.requestDescription
+import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
@@ -37,7 +38,10 @@ class DescribeWorkingCopyAction : DumbAwareAction(
                 Description(currentDescription.removeSuffix("\n"))
             ) ?: return@onSuccess
             commandExecutor.createCommand { describe(newDescription) }
-                .onSuccess { repo.invalidate() }
+                .onSuccess {
+                    repo.invalidate()
+                    project.saveDescriptionToHistory(newDescription)
+                }
                 .onFailure { tellUser(project, "dialog.describe.error") }
                 .executeAsync()
         }.executeAsync()

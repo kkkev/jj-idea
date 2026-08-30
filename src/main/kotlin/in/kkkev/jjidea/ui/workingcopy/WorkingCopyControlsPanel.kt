@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.workingcopy
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.ActionUpdateThread
@@ -10,10 +11,9 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
-import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmark.advanceClosestBookmarkAction
@@ -23,9 +23,11 @@ import `in`.kkkev.jjidea.actions.change.splitAction
 import `in`.kkkev.jjidea.actions.change.squashAction
 import `in`.kkkev.jjidea.actions.change.squashableEntry
 import `in`.kkkev.jjidea.actions.requestDescription
+import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.actions.tag.setTagAction
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import `in`.kkkev.jjidea.ui.components.DescriptionEditor
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.ui.components.appendParents
@@ -35,18 +37,14 @@ import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
-import java.awt.event.ActionEvent
 import java.awt.event.ItemEvent
-import java.awt.event.KeyEvent
 import javax.swing.*
-import javax.swing.event.DocumentEvent
-import javax.swing.event.DocumentListener
 
 /**
  * Per-repository working copy controls: description editor, current change info, and action buttons.
  * This panel is bound to a specific repository and updates when the bound repository changes.
  */
-class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayout()) {
+class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
     private val log = Logger.getInstance(javaClass)
 
     /** Provider for per-repo description state */
@@ -99,40 +97,20 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         }
     }
 
-    private val descriptionArea = JBTextArea().apply {
-        val area = this
-        rows = 4
-        columns = 50
-        lineWrap = true
-        wrapStyleWord = true
-        isEditable = true
-        toolTipText = JujutsuBundle.message("toolwindow.description.tooltip")
-
-        document.addDocumentListener(object : DocumentListener {
-            override fun insertUpdate(e: DocumentEvent?) = checkModified()
-            override fun removeUpdate(e: DocumentEvent?) = checkModified()
-            override fun changedUpdate(e: DocumentEvent?) = checkModified()
-
-            private fun checkModified() {
-                isDescriptionModified = text != persistedDescription.actual
-                updateDescriptionLabel()
-            }
-        })
-
-        // Explicitly bind Enter to insert a newline rather than relying on JTextArea's default
-        // key binding. On platform 2026.2 (build 262) something higher up the focus/action chain
-        // now consumes VK_ENTER before it reaches the text area (jj-idea-qa8i / GitHub #57), so we
-        // bind it directly at the component level (WHEN_FOCUSED takes priority while this text
-        // area has focus) and consume the event here.
-        getInputMap(JComponent.WHEN_FOCUSED).put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "jjidea-insert-newline")
-        actionMap.put(
-            "jjidea-insert-newline",
-            object : AbstractAction() {
-                override fun actionPerformed(e: ActionEvent) {
-                    area.replaceSelection("\n")
-                }
-            }
-        )
+    // Real commit-message editor (spellcheck, inspections, message history - GitHub #46,
+    // jj-idea-n3w1) instead of a plain JBTextArea. As a genuine multi-line platform editor it no
+    // longer needs the WHEN_FOCUSED Enter-key workaround that JBTextArea required (jj-idea-qa8i /
+    // GitHub #57) - Enter/newline handling is the platform editor's own, not ours to patch.
+    private val descriptionEditor = DescriptionEditor(
+        project,
+        placeholder = JujutsuBundle.message("toolwindow.description.tooltip"),
+        minimumSize = JBUI.size(200, 70)
+    ).apply {
+        component.preferredSize = JBUI.size(400, 90)
+        addTextChangeListener {
+            isDescriptionModified = text != persistedDescription
+            updateDescriptionLabel()
+        }
     }
 
     private val currentChangeLabel = IconAwareHtmlPane(project)
@@ -143,8 +121,11 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     private lateinit var revertButton: JButton
 
     init {
+        Disposer.register(this, descriptionEditor)
         createUI()
     }
+
+    override fun dispose() = Unit
 
     private fun createUI() {
         border = JBUI.Borders.empty(8)
@@ -180,15 +161,11 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         gbc.gridy = 1
         topPanel.add(descriptionHeaderPanel, gbc)
 
-        // Description text area with scroll pane
-        val scrollPane = ScrollPaneFactory.createScrollPane(descriptionArea).apply {
-            minimumSize = JBUI.size(200, 70)
-            preferredSize = JBUI.size(400, 90)
-        }
+        // Description editor. CommitMessage scrolls itself - no JScrollPane wrapper needed.
         gbc.gridy = 2
         gbc.weighty = 1.0
         gbc.fill = GridBagConstraints.BOTH
-        topPanel.add(scrollPane, gbc)
+        topPanel.add(descriptionEditor.component, gbc)
 
         add(topPanel, BorderLayout.CENTER)
     }
@@ -394,8 +371,8 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
 
     private fun updateForRepository(repo: JujutsuRepository?) {
         if (repo == null) {
-            descriptionArea.text = ""
-            descriptionArea.isEnabled = false
+            descriptionEditor.text = Description.EMPTY
+            descriptionEditor.component.isEnabled = false
             currentChangeLabel.text = ""
             isDescriptionModified = false
             persistedDescription = Description.EMPTY
@@ -403,18 +380,18 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             return
         }
 
-        descriptionArea.isEnabled = true
+        descriptionEditor.component.isEnabled = true
 
         // Restore state from provider
         val state = stateProvider?.invoke(repo)
         if (state != null) {
             persistedDescription = state.persisted
             isDescriptionModified = state.isModified
-            descriptionArea.text = persistedDescription.actual
+            descriptionEditor.text = persistedDescription
         } else {
             persistedDescription = Description.EMPTY
             isDescriptionModified = false
-            descriptionArea.text = ""
+            descriptionEditor.text = Description.EMPTY
         }
 
         updateDescriptionLabel()
@@ -430,9 +407,9 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             if (logEntry.repo != boundRepository) return@runLater
             persistedDescription = logEntry.description
             if (!isDescriptionModified) {
-                descriptionArea.text = persistedDescription.actual
+                descriptionEditor.text = persistedDescription
             }
-            isDescriptionModified = descriptionArea.text != persistedDescription.actual
+            isDescriptionModified = descriptionEditor.text != persistedDescription
             updateDescriptionLabel()
             updateWorkingCopyLabel(logEntry)
         }
@@ -446,14 +423,14 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     }
 
     private fun revertDescription() {
-        descriptionArea.text = persistedDescription.actual
+        descriptionEditor.text = persistedDescription
         isDescriptionModified = false
         updateDescriptionLabel()
     }
 
     private fun describeCurrentChange() {
         val repo = boundRepository ?: return
-        val description = Description(descriptionArea.text.trim())
+        val description = Description(descriptionEditor.text.actual.trim())
 
         repo.commandExecutor
             .createCommand { describe(description) }
@@ -462,6 +439,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
                 isDescriptionModified = false
                 updateDescriptionLabel()
                 repo.invalidate()
+                project.saveDescriptionToHistory(description)
             }.onFailure {
                 JOptionPane.showMessageDialog(
                     this@WorkingCopyControlsPanel,
@@ -480,10 +458,11 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             new(description = description)
         }.onSuccess {
             persistedDescription = Description.EMPTY
-            descriptionArea.text = ""
+            descriptionEditor.text = Description.EMPTY
             isDescriptionModified = false
             updateDescriptionLabel()
             repo.invalidate(select = WorkingCopy)
+            project.saveDescriptionToHistory(description)
         }.onFailure {
             JOptionPane.showMessageDialog(
                 this@WorkingCopyControlsPanel,

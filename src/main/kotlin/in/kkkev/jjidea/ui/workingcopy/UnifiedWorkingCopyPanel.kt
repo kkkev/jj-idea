@@ -115,6 +115,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         controlsPanel.onRepositorySelected = { bindRepository(it) }
 
         Disposer.register(this, diffPreview)
+        Disposer.register(this, controlsPanel)
         createUI()
         setupTreeInteractions()
         setupTreeExpansionTracking()

@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.actions.change
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
+import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.diffedit.DiffEditTool
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -93,6 +94,7 @@ private fun executeSquashIntoFilePaths(
         .onSuccess {
             val selectId: Revision = if (deleteAndMove) spec.destination else sources.first().id
             repo.invalidate(select = selectId, vfsChanged = true)
+            spec.description?.let { project.saveDescriptionToHistory(it) }
             squashIntoLog.info("Squashed ${spec.sources} into ${spec.destination}")
         }
         .onFailure { tellUser(project, "log.action.squash.into.error") }
@@ -162,6 +164,7 @@ private fun executeSquashIntoInteractive(
             }
             val selectId: Revision = if (deleteAndMove) spec.destination else source.id
             repo.invalidate(select = selectId, vfsChanged = true)
+            spec.description?.let { project.saveDescriptionToHistory(it) }
             squashIntoLog.info("Squashed hunks from ${source.id} into ${spec.destination}")
         }
     }

@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.actionSystem.Separator
+import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.TestActionEvent
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
@@ -31,7 +32,7 @@ import javax.swing.JPanel
  * enablement even before/after a repository is bound.
  *
  * Platform-tagged because constructing [WorkingCopyControlsPanel] needs IJPGP's full platform
- * classpath, same as the sibling [WorkingCopyControlsPanelEnterKeyTest].
+ * classpath, same as the sibling [WorkingCopyControlsPanelDescriptionEditorTest].
  */
 @Tag("platform")
 @TestApplication
@@ -47,7 +48,7 @@ class WorkingCopyToolbarTest {
 
     @Test
     fun `toolbar offers New Change, Split, Squash, Abandon, Create Bookmark, Advance Bookmark, Set Tag, in order`() {
-        val panel = WorkingCopyControlsPanel(project.get())
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val actions = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
 
         actions.map { if (it is Separator) null else updated(it).text } shouldBe listOf(
@@ -64,14 +65,14 @@ class WorkingCopyToolbarTest {
 
     @Test
     fun `the group updates on EDT`() {
-        val panel = WorkingCopyControlsPanel(project.get())
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         panel.createActionToolbar(JPanel()).actionGroup.getActionUpdateThread() shouldBe ActionUpdateThread.EDT
     }
 
     @Test
     fun `the same action instances are returned across repeated getChildren() calls`() {
         // ActionToolbarImpl reuses each button's JComponent by action identity.
-        val panel = WorkingCopyControlsPanel(project.get())
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val group = panel.createActionToolbar(JPanel()).actionGroup
 
         val first = group.getChildren(null)
@@ -83,7 +84,7 @@ class WorkingCopyToolbarTest {
 
     @Test
     fun `with no bound repository Advance Bookmark Here is hidden, not just disabled`() {
-        val panel = WorkingCopyControlsPanel(project.get())
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val advanceAction = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
             .single { updated(it).text == JujutsuBundle.message("action.bookmark.advance.closest") }
 
@@ -92,7 +93,7 @@ class WorkingCopyToolbarTest {
 
     @Test
     fun `binding a repository makes the SAME Advance action instance show Advance Bookmark Here`() {
-        val panel = WorkingCopyControlsPanel(project.get())
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val advanceAction = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
             .single { updated(it).text == JujutsuBundle.message("action.bookmark.advance.closest") }
 
@@ -110,7 +111,7 @@ class WorkingCopyToolbarTest {
 
     @Test
     fun `Split starts disabled with no bound repository, not accidentally always-enabled`() {
-        val panel = WorkingCopyControlsPanel(project.get())
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val splitAction = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
             .single { updated(it).text == JujutsuBundle.message("log.action.split") }
 
@@ -119,7 +120,7 @@ class WorkingCopyToolbarTest {
 
     @Test
     fun `createTopBar includes the repo selector alongside the action toolbar`() {
-        val panel = WorkingCopyControlsPanel(project.get())
+        val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val topBar = panel.createTopBar(JPanel())
 
         UIUtil.findComponentOfType(topBar, JComboBox::class.java) shouldNotBe null

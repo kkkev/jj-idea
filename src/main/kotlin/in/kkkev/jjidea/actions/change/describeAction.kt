@@ -4,6 +4,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.actions.requestDescription
+import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.invalidate
@@ -43,6 +44,7 @@ internal fun performDescribe(project: Project, target: LogEntry) {
         commandExecutor.createCommand { describe(newDescription, target.id) }
             .onSuccess {
                 jujutsuRoot.invalidate()
+                project.saveDescriptionToHistory(newDescription)
 
                 describeLog.info("Updated working copy description")
             }.onFailure { tellUser(project, "log.action.describe.error") }

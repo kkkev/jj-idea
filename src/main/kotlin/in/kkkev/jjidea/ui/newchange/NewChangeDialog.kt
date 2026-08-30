@@ -3,24 +3,22 @@ package `in`.kkkev.jjidea.ui.newchange
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.ui.DocumentAdapter
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.OnePixelSplitter
-import com.intellij.ui.ScrollPaneFactory
-import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.ui.common.createSourcePanel
 import `in`.kkkev.jjidea.ui.common.createVerticalPanel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.duplicate.validPlacementModes
-import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.ui.rebase.RebasePreviewPanel
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.Font
 import javax.swing.*
-import javax.swing.event.DocumentEvent
 
 /**
  * Result of the "New Change…" dialog.
@@ -71,11 +69,11 @@ class NewChangeDialog(
 
     private var repoEntries: List<LogEntry> = emptyList()
 
-    private val descriptionField = JBTextArea().apply {
-        rows = 4
-        lineWrap = true
-        wrapStyleWord = true
-        toolTipText = JujutsuBundle.message("dialog.newchange.description.tooltip")
+    private val descriptionEditor = DescriptionEditor(
+        project,
+        placeholder = JujutsuBundle.message("dialog.newchange.description.tooltip")
+    ).apply {
+        Disposer.register(disposable, this)
     }
 
     private val destModeOnto = JRadioButton(JujutsuBundle.message("dialog.newchange.placement.onto")).apply {
@@ -110,9 +108,7 @@ class NewChangeDialog(
         destModeAfter.addActionListener { updatePreviewPanel() }
         destModeBefore.addActionListener { updatePreviewPanel() }
         editCheckBox.addActionListener { updatePreviewPanel() }
-        descriptionField.document.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent) = updatePreviewPanel()
-        })
+        descriptionEditor.addTextChangeListener { updatePreviewPanel() }
 
         init()
 
@@ -169,34 +165,23 @@ class NewChangeDialog(
         }
     }
 
-    private fun createSectionLabel(text: String): JLabel {
-        val label = JLabel(text)
-        label.font = label.font.deriveFont(java.awt.Font.BOLD)
-        label.alignmentX = JLabel.LEFT_ALIGNMENT
-        return label
+    private fun createSectionLabel(text: String) = JLabel(text).apply {
+        font = font.deriveFont(Font.BOLD)
+        alignmentX = JLabel.LEFT_ALIGNMENT
     }
 
-    /** Multi-line description, matching [in.kkkev.jjidea.ui.workingcopy.WorkingCopyControlsPanel]'s styling. */
-    private fun createDescriptionPanel(): JComponent =
-        ScrollPaneFactory.createScrollPane(descriptionField).apply {
-            alignmentX = JPanel.LEFT_ALIGNMENT
-            minimumSize = JBUI.size(200, 70)
-            preferredSize = JBUI.size(400, 90)
-        }
-
-    private fun createTargetPanel() = IconAwareHtmlPane(project).apply {
+    /**
+     * Real commit-message editor, matching
+     * [in.kkkev.jjidea.ui.workingcopy.WorkingCopyControlsPanel]'s. CommitMessage scrolls itself -
+     * no JScrollPane wrapper needed, unlike the old JBTextArea.
+     */
+    private fun createDescriptionPanel() = descriptionEditor.component.apply {
         alignmentX = JPanel.LEFT_ALIGNMENT
-        text = htmlString {
-            append(targetEntries, separator = "\n") { entry ->
-                appendStatusIndicators(entry)
-                append(entry.id)
-                append(" ")
-                appendDescriptionAndEmptyIndicator(entry)
-                append(" ")
-                appendDecorations(entry)
-            }
-        }
+        minimumSize = JBUI.size(200, 70)
+        preferredSize = JBUI.size(400, 90)
     }
+
+    private fun createTargetPanel() = createSourcePanel(project, targetEntries)
 
     private fun createPlacementModePanel(): JComponent =
         createVerticalPanel(destModeOnto, destModeAfter, destModeBefore)
@@ -224,7 +209,7 @@ class NewChangeDialog(
         repo = repo,
         id = PENDING_CHANGE_ID,
         commitId = PENDING_COMMIT_ID,
-        underlyingDescription = descriptionField.text,
+        underlyingDescription = descriptionEditor.text.actual,
         isEmpty = true,
         pending = true,
         isWorkingCopy = isWorkingCopy
@@ -265,7 +250,7 @@ class NewChangeDialog(
 
     override fun doOKAction() {
         result = NewChangeSpec(
-            description = Description(descriptionField.text),
+            description = descriptionEditor.text,
             parents = targetEntries.map { it.id },
             destinationMode = selectedDestinationMode,
             edit = editCheckBox.isSelected

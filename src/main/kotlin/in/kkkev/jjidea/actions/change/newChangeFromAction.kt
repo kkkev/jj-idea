@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.actions.change
 
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
+import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
@@ -37,6 +38,7 @@ fun newChangeFromAction(project: Project, repo: JujutsuRepository?, targetEntrie
             } else {
                 target.invalidate(vfsChanged = true)
             }
+            project.saveDescriptionToHistory(spec.description)
             log.info("Created new change from ${spec.parents} with description: ${spec.description}")
         }.onFailure { tellUser(project, "log.action.new.error") }
             .executeAsync()

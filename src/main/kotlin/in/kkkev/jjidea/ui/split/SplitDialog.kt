@@ -3,13 +3,12 @@ package `in`.kkkev.jjidea.ui.split
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.components.JBTextArea
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
@@ -22,12 +21,8 @@ import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.common.HunkPickPreviewController
 import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.ui.common.buildHunkSelection
-import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
-import `in`.kkkev.jjidea.ui.components.append
-import `in`.kkkev.jjidea.ui.components.appendDescriptionAndEmptyIndicator
-import `in`.kkkev.jjidea.ui.components.htmlString
-import `in`.kkkev.jjidea.ui.log.appendDecorations
-import `in`.kkkev.jjidea.ui.log.appendStatusIndicators
+import `in`.kkkev.jjidea.ui.common.createSourcePanel
+import `in`.kkkev.jjidea.ui.components.DescriptionEditor
 import `in`.kkkev.jjidea.util.GitDiffReverseApplier
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
@@ -131,8 +126,14 @@ class SplitDialog(
     }
 
     // --- Descriptions ---
-    internal val parentDescriptionField = JBTextArea(sourceEntry.description.actual, 2, 0)
-    internal val childDescriptionField = JBTextArea(sourceEntry.description.actual, 2, 0)
+    internal val parentDescriptionEditor = DescriptionEditor(project).apply {
+        text = sourceEntry.description
+        Disposer.register(disposable, this)
+    }
+    internal val childDescriptionEditor = DescriptionEditor(project).apply {
+        text = sourceEntry.description
+        Disposer.register(disposable, this)
+    }
 
     // --- Dynamic labels ---
     internal val parentHeaderLabel = JLabel()
@@ -481,14 +482,14 @@ class SplitDialog(
             border = JBUI.Borders.empty(8)
         }
 
-        val childBlock = descriptionBlock(childHeaderLabel, childDescriptionLabel, childDescriptionField)
-        val parentBlock = descriptionBlock(parentHeaderLabel, parentDescriptionLabel, parentDescriptionField)
+        val childBlock = descriptionBlock(childHeaderLabel, childDescriptionLabel, childDescriptionEditor)
+        val parentBlock = descriptionBlock(parentHeaderLabel, parentDescriptionLabel, parentDescriptionEditor)
 
         if (newParent) {
-            // parentHeaderLabel/parentDescriptionField is the *unticked* pane here, i.e. the
+            // parentHeaderLabel/parentDescriptionEditor is the *unticked* pane here, i.e. the
             // "Stays here" side - shown first (top) since it occupies the more-recent, unmoved
             // position, matching where it already sits in the log; childHeaderLabel/
-            // childDescriptionField ("New commit") is the newly-inserted *older* parent, shown
+            // childDescriptionEditor ("New commit") is the newly-inserted *older* parent, shown
             // second (bottom) to match its position one row further down the log.
             panel.add(parentBlock)
             panel.add(Box.createVerticalStrut(JBUI.scale(6)))
@@ -509,10 +510,11 @@ class SplitDialog(
         return panel
     }
 
-    private fun descriptionBlock(header: JLabel, description: JLabel, field: JBTextArea): JPanel {
+    private fun descriptionBlock(header: JLabel, description: JLabel, editor: DescriptionEditor): JPanel {
         header.alignmentX = JLabel.LEFT_ALIGNMENT
         description.alignmentX = JLabel.LEFT_ALIGNMENT
-        val scroll = JBScrollPane(field).apply {
+        // CommitMessage scrolls itself - no JBScrollPane wrapper needed, unlike the old JBTextArea.
+        editor.component.apply {
             alignmentX = JPanel.LEFT_ALIGNMENT
             preferredSize = Dimension(0, JBUI.scale(46))
             maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(46))
@@ -522,7 +524,7 @@ class SplitDialog(
             alignmentX = JPanel.LEFT_ALIGNMENT
             add(header)
             add(description)
-            add(scroll)
+            add(editor.component)
         }
     }
 
@@ -534,17 +536,7 @@ class SplitDialog(
         border = JBUI.Borders.empty(4, 0)
     }
 
-    private fun createEntryPane(entry: LogEntry) = IconAwareHtmlPane(project).apply {
-        alignmentX = JPanel.LEFT_ALIGNMENT
-        text = htmlString {
-            appendStatusIndicators(entry)
-            append(entry.id)
-            append(" ")
-            appendDescriptionAndEmptyIndicator(entry)
-            append(" ")
-            appendDecorations(entry)
-        }
-    }
+    private fun createEntryPane(entry: LogEntry) = createSourcePanel(project, listOf(entry))
 
     // ---- Validation ----
 
@@ -607,8 +599,8 @@ class SplitDialog(
             null
         }
 
-        val parentFieldText = parentDescriptionField.text.trim()
-        val childFieldText = childDescriptionField.text.trim()
+        val parentFieldText = parentDescriptionEditor.text.actual.trim()
+        val childFieldText = childDescriptionEditor.text.actual.trim()
         val originalDesc = sourceEntry.description.actual
 
         // Route by role, not by pane: the selected side (see selectedPaths above) always gets
@@ -650,10 +642,10 @@ class SplitDialog(
     internal fun doValidateForTest() = doValidate()
 
     /** Current parent description text (for testing). */
-    internal val parentDescriptionText: String get() = parentDescriptionField.text
+    internal val parentDescriptionText: String get() = parentDescriptionEditor.text.actual
 
     /** Current child description text (for testing). */
-    internal val childDescriptionText: String get() = childDescriptionField.text
+    internal val childDescriptionText: String get() = childDescriptionEditor.text.actual
 }
 
 /** Capitalize a legend bundle key value (e.g. "parent" → "Parent"). */

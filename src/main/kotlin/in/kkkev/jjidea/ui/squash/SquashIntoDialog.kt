@@ -4,6 +4,7 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.ui.DocumentAdapter
@@ -11,7 +12,6 @@ import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -19,12 +19,12 @@ import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.diffedit.HunkPickerLabels
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
-import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
-import `in`.kkkev.jjidea.ui.common.HunkPickPreviewController
-import `in`.kkkev.jjidea.ui.common.HunkSelection
-import `in`.kkkev.jjidea.ui.common.buildHunkSelection
-import `in`.kkkev.jjidea.ui.components.*
-import `in`.kkkev.jjidea.ui.log.*
+import `in`.kkkev.jjidea.ui.common.*
+import `in`.kkkev.jjidea.ui.components.DescriptionEditor
+import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
+import `in`.kkkev.jjidea.ui.log.GraphNode
+import `in`.kkkev.jjidea.ui.log.JujutsuGraphAndDescriptionRenderer
+import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
 import `in`.kkkev.jjidea.ui.rebase.RebaseSimulator
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -174,7 +174,7 @@ class SquashIntoDialog(
     @org.jetbrains.annotations.TestOnly
     internal var hunkPickerForTest: ((FilePath) -> String?)? = null
 
-    internal val descriptionText: String get() = descriptionField.text
+    internal val descriptionText: String get() = descriptionEditor.text.actual
     internal var deleteEmptyAndMoveIsSelected: Boolean
         get() = deleteEmptyAndMoveCheckBox.isSelected
         set(value) {
@@ -204,7 +204,9 @@ class SquashIntoDialog(
 
     private var userEditedDescription = false
     private var loadGeneration = 0
-    private val descriptionField = JBTextArea(4, 0)
+    private val descriptionEditor = DescriptionEditor(project).apply {
+        Disposer.register(disposable, this)
+    }
     private val deleteEmptyAndMoveCheckBox = JBCheckBox(
         JujutsuBundle.message("dialog.squash.into.delete.empty.and.move")
     ).apply {
@@ -238,11 +240,7 @@ class SquashIntoDialog(
             if (pickingSources) reloadChangesForSelection()
         }
 
-        descriptionField.document.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent) {
-                userEditedDescription = true
-            }
-        })
+        descriptionEditor.addTextChangeListener { userEditedDescription = true }
 
         fileSelection.addInclusionListener {
             onFileInclusionChanged()
@@ -411,12 +409,13 @@ class SquashIntoDialog(
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             add(Box.createVerticalStrut(JBUI.scale(8)))
             add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.description")))
-            val scrollPane = JScrollPane(descriptionField).apply {
+            // CommitMessage scrolls itself - no JScrollPane wrapper needed, unlike the old JBTextArea.
+            descriptionEditor.component.apply {
                 alignmentX = JPanel.LEFT_ALIGNMENT
                 preferredSize = Dimension(0, JBUI.scale(80))
                 maximumSize = Dimension(Int.MAX_VALUE, JBUI.scale(80))
             }
-            add(scrollPane)
+            add(descriptionEditor.component)
             add(deleteEmptyAndMoveCheckBox.apply { alignmentX = JPanel.LEFT_ALIGNMENT })
         }
 
@@ -467,23 +466,13 @@ class SquashIntoDialog(
         border = JBUI.Borders.empty(4, 0)
     }
 
-    private fun createFixedSidePane() = IconAwareHtmlPane(project).apply {
-        alignmentX = JPanel.LEFT_ALIGNMENT
-        val entries = when (mode) {
+    private fun createFixedSidePane() = createSourcePanel(
+        project,
+        when (mode) {
             is SquashMode.PickDestination -> mode.sources
             is SquashMode.PickSources -> listOf(mode.destination)
         }
-        text = htmlString {
-            append(entries, separator = "\n") { entry ->
-                appendStatusIndicators(entry)
-                append(entry.id)
-                append(" ")
-                appendDescriptionAndEmptyIndicator(entry)
-                append(" ")
-                appendDecorations(entry)
-            }
-        }
-    }
+    )
 
     private fun setupPredefinedCandidates() {
         val candidates = mode.candidates!!
@@ -510,6 +499,7 @@ class SquashIntoDialog(
                 val excluded = RebaseSimulator.excludedDestinationIds(repoEntries, sourceIds, RebaseSourceMode.REVISION)
                 repoEntries.filter { it.id !in excluded && !it.immutable && matchesSearch(it) }
             }
+
             is SquashMode.PickSources -> {
                 val destId = mode.destination.id
                 repoEntries.filter { it.id != destId && !it.immutable && matchesSearch(it) }
@@ -608,6 +598,7 @@ class SquashIntoDialog(
                 destDesc = destEntry?.description?.actual ?: ""
                 sourceDescs = mode.sources.map { it.description.actual }
             }
+
             is SquashMode.PickSources -> {
                 val sources = selectedSourceEntries()
                 if (sources.isEmpty()) return
@@ -621,7 +612,7 @@ class SquashIntoDialog(
             destDesc
         }
         userEditedDescription = true
-        descriptionField.text = text
+        descriptionEditor.text = Description(text)
         userEditedDescription = false
     }
 
@@ -645,6 +636,7 @@ class SquashIntoDialog(
             pickingSources -> if (selectedSourceEntries().isEmpty()) {
                 return ValidationInfo(JujutsuBundle.message("dialog.squash.into.source.none"), pickerTable)
             }
+
             else -> if (selectedDestinationId() == null) {
                 return ValidationInfo(JujutsuBundle.message("dialog.squash.into.destination.none"), pickerTable)
             }
@@ -699,7 +691,7 @@ class SquashIntoDialog(
                 val description = if (userEditedDescription ||
                     combining
                 ) {
-                    Description(descriptionField.text.trim())
+                    Description(descriptionEditor.text.actual.trim())
                 } else {
                     null
                 }
@@ -712,6 +704,7 @@ class SquashIntoDialog(
                     hunkSelection = hunkSelection
                 )
             }
+
             is SquashMode.PickSources -> {
                 val sourceEntries = selectedSourceEntries()
                 if (sourceEntries.isEmpty()) return
@@ -722,7 +715,7 @@ class SquashIntoDialog(
                 val description = if (userEditedDescription ||
                     combining
                 ) {
-                    Description(descriptionField.text.trim())
+                    Description(descriptionEditor.text.actual.trim())
                 } else {
                     null
                 }

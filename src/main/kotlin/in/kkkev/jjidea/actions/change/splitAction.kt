@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.actions.change
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
+import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.diffedit.DiffEditTool
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeService
@@ -151,6 +152,8 @@ private fun executeSplitInteractive(
 }
 
 private fun onSplitSuccess(project: Project, target: LogEntry, spec: SplitSpec, stderr: String) {
+    project.saveDescriptionToHistory(spec.selectedDescription)
+
     val remainingDesc = spec.remainingDescription
     if (remainingDesc == null) {
         target.repo.invalidate(select = target.id, vfsChanged = true)
@@ -168,6 +171,7 @@ private fun onSplitSuccess(project: Project, target: LogEntry, spec: SplitSpec, 
             .createCommand { describe(remainingDesc, remainingId) }
             .onSuccess {
                 target.repo.invalidate(select = target.id, vfsChanged = true)
+                project.saveDescriptionToHistory(remainingDesc)
                 splitLog.info("Split ${target.id} and described remaining $remainingId")
             }
             .onFailure { tellUser(project, "log.action.split.error") }
