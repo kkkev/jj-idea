@@ -49,7 +49,17 @@ data class LogWindowConfig(
      */
     var selectedRootPaths: MutableList<String> = mutableListOf(),
     /** Whether the multi-repo root gutter shows repo name + color (true) or just a thin colored strip (false). */
-    var rootGutterExpanded: Boolean = true
+    var rootGutterExpanded: Boolean = true,
+    /**
+     * Whether the bookmarks panel (jj-idea-b2ae / GitHub #48) is expanded. Defaults to expanded,
+     * matching [rootGutterExpanded]'s default. The splitter's own width is persisted globally via
+     * [com.intellij.ui.OnePixelSplitter]'s `proportionKey`, the same as git4idea's single shared
+     * `"vcs.branch.view.splitter.proportion"` key — not per-window here either. A persistent
+     * clickable strip stays visible even when this is `false` (see
+     * [in.kkkev.jjidea.ui.log.bookmarks.BookmarksStripeButton]), so collapsing it doesn't make it
+     * undiscoverable.
+     */
+    var bookmarksPanelVisible: Boolean = true
 ) {
     /**
      * Returns the subset of [allRepos] that this config selects.

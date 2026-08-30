@@ -51,7 +51,7 @@ interface TextCanvas {
      * the canvas is already italic, and bold is applied, then content is both bold and italic.
      */
     fun styled(style: Int, builder: TextCanvas.() -> Unit)
-    fun bold(builder: TextCanvas.() -> Unit) = styled(Font.BOLD, builder)
+    fun bold(on: Boolean = true, builder: TextCanvas.() -> Unit) = styled(if (on) Font.BOLD else 0, builder)
     fun italic(builder: TextCanvas.() -> Unit) = styled(Font.ITALIC, builder)
 
     fun smaller(builder: TextCanvas.() -> Unit) = styled(SimpleTextAttributes.STYLE_SMALLER, builder)

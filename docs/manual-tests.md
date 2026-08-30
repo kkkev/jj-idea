@@ -989,7 +989,7 @@ state/routing logic, not rendering)
 **Bookmark widget**
 
 **Code:** `ui/toolbar/JujutsuBookmarkToolbarWidget.kt`, `ui/statusbar/JujutsuBookmarkStatusBarWidget.kt` + `JujutsuBookmarkStatusBarWidgetFactory.kt`, `actions/bookmark/BookmarkMenu.kt`, `actions/bookmark/`, `actions/bookmark/pushBookmarkAction.kt`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt` (Advance Bookmark toolbar button)
-**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button); MT-GIT (push confirmation dialogs triggered from this action)
+**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button); MT-GIT (push confirmation dialogs triggered from this action); MT-LOG-FILTER (the bookmarks panel's "Filter Log to Bookmark" action); MT-LOG-TABLE (log tab layout — the bookmarks panel adds a splitter); MT-SETTINGS (new persisted per-window panel-visibility state)
 
 As of jj-idea-cpno, the bookmark widget lives in the main IDE toolbar (next to where Git's
 branch widget would sit), not the log window's filter row — this is the location fix for
@@ -1172,6 +1172,61 @@ one per affected remote.
   remote is silently skipped, not redundantly pushed
 - [ ] A bookmark moved backwards/sideways on a remote it would push to: clicking "all remotes"
   still shows the same force-push confirmation as a per-remote push, scoped to that one remote
+
+#### Bookmarks panel (jj-idea-b2ae, GitHub #48)
+
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `ui/common/CommitTablePanel.kt` (`installLeftComponent`)
+
+A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
+git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
+narrow always-visible strip with a bookmark icon sits at the far left, outside the panel's own
+splitter — clicking it toggles the panel even while collapsed, so there's always something on
+screen to bring it back; the same toggle also lives in the toolbar's View Options popup. Plain
+selection does nothing; right-click for actions.
+
+- [ ] Panel starts expanded on a fresh log tab
+- [ ] Clicking the bookmark-icon strip at the far left collapses the panel; the strip itself
+  stays visible (tooltip switches to "Expand Bookmarks Panel") and clicking it again re-expands
+- [ ] "Show Bookmarks Panel" in the toolbar's View Options popup (below the Details Position
+  toggles) reflects and controls the same state as the strip
+- [ ] With bookmarks `feature/A`, `feature/B`, `fix/C`: a "Local" group contains a `feature`
+  group (with `A`, `B` underneath) and `fix` (with `C` underneath) — not three flat top-level
+  entries
+- [ ] A tracked `main@origin` appears under an `origin` group, itself `/`-grouped the same way
+- [ ] Tags appear under their own "Tags" group, also `/`-grouped
+- [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
+  or "main +3") — create/delete a bookmark and confirm both update together
+- [ ] The "@" node's label is bookmark-coloured, followed by a bold "@" glyph in the log's own
+  working-copy colour (same colour as the "@" the log table appends after a working-copy row's
+  bookmarks/tags — compare side by side)
+- [ ] Local/remote bookmark leaves, and their "Local"/remote-name folder groups, render in the
+  same brownish colour as bookmark chips in the log table
+- [ ] Tag leaves, and the "Tags" folder group, render in the same greenish colour as tag chips in
+  the log table
+- [ ] A bookmark sitting on `@` renders **bold** (still bookmark-coloured) in the tree
+- [ ] Right-click a local bookmark → same actions as its dropdown sub-menu (Move…/Advance/
+  Rename…/Delete/Forget, minus Move… when it's on @), plus "Filter Log to Bookmark" and
+  "Navigate Log to Bookmark" at the bottom
+- [ ] "Filter Log to Bookmark" narrows the log the same way the reference filter does
+- [ ] "Navigate Log to Bookmark" scrolls/selects that bookmark's change, including one outside
+  the currently loaded log window (triggers an expanding load, same as clicking a bookmark chip)
+- [ ] Right-click a remote bookmark → Track/Untrack, plus Filter/Navigate
+- [ ] Right-click a tag → Delete, plus Navigate (no Filter — tags aren't a log filter reference
+  here)
+- [ ] Right-click the "@" node → Create Bookmark Here…, Advance Bookmark Here
+- [ ] With an issue-tracker pattern configured (Settings → Version Control → Issue Navigation) and
+  a bookmark named e.g. `JIRA-123-fix-thing`: the `JIRA-123` portion of its label renders as a
+  link (same styling as the log table/description) while the rest of the name doesn't; hovering it
+  shows a hand cursor and clicking opens the configured issue URL in a browser. Same for a tag
+  named the same way, and for the "@" node when the bookmark on `@` has such a name
+- [ ] Clicking elsewhere on a linked bookmark's row (its icon, or non-linked text) does not open a
+  browser — only the linked portion is clickable
+- [ ] Renaming/creating/deleting a bookmark in the terminal updates the tree reactively, without
+  a manual refresh (same auto-refresh path as MT-LOG-REFRESH)
+- [ ] Multi-repo project: one top-level group per repository (with its icon), each containing its
+  own Local/remote/Tags structure; single-repo project has no such wrapper level
+- [ ] Type while the tree has focus — speed search jumps to/filters matching bookmark names
+- [ ] Restart the IDE — the panel's expanded/collapsed state is restored per log window
 
 ### MT-WORKINGCOPY
 

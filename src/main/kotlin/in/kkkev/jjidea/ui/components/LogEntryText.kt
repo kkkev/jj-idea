@@ -120,7 +120,13 @@ internal fun bookmarkIcon(bookmark: Bookmark): KProperty0<Icon> = when {
     else -> JujutsuIcons::Bookmark
 }
 
-private fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = colored(JujutsuColors.BOOKMARK) {
+/**
+ * Renders a single bookmark's chip (icon, name, strikethrough if pending deletion, ahead/behind
+ * divergence) with an explicit [label] rather than [bookmark]'s own full name — used by
+ * [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel] to show just a name's last `/`-segment
+ * while still getting the same icon/colour/strikethrough/divergence rendering as the log table.
+ */
+internal fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = colored(JujutsuColors.BOOKMARK) {
     smaller {
         val divergence = buildString {
             if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
@@ -278,17 +284,24 @@ internal fun tagRefChips(entry: LogEntry): List<RefChip> =
     entry.tags.map { tag -> RefChip(tag) { refChip(entry, "tag", tag.name) { append(tag) } } }
 
 /**
- * [TextCanvas.linkifier] linkifies any issue-tracker reference within the tag's own name
- * (jj-idea-vrmv) - see [appendUnbreakable].
+ * Renders a single tag's chip (icon, name) with an explicit [label] rather than [tag]'s own full
+ * name — used by [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel] to show just a name's
+ * last `/`-segment while still getting the same icon/colour rendering as the log table.
  */
-fun TextCanvas.append(tag: Tag) = colored(JujutsuColors.TAG) {
+internal fun TextCanvas.appendTagChip(tag: Tag, label: String) = colored(JujutsuColors.TAG) {
     smaller {
         appendUnbreakable {
             append(icon(JujutsuIcons::Tag))
-            appendLinkified(tag.name)
+            appendLinkified(label)
         }
     }
 }
+
+/**
+ * [TextCanvas.linkifier] linkifies any issue-tracker reference within the tag's own name
+ * (jj-idea-vrmv) - see [appendUnbreakable].
+ */
+fun TextCanvas.append(tag: Tag) = appendTagChip(tag, tag.name)
 
 fun TextCanvas.appendTags(entry: LogEntry, suffix: String = "") {
     var first = true

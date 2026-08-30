@@ -1,8 +1,12 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
+import com.intellij.ui.OnePixelSplitter
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
@@ -10,6 +14,8 @@ import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.LogWindowConfig
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
+import `in`.kkkev.jjidea.ui.log.bookmarks.BookmarksStripeButton
+import `in`.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 
 /**
@@ -50,6 +56,16 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
      */
     private var fullGraphNodes: Map<ChangeKey, GraphNode> = emptyMap()
 
+    // Bookmarks panel (jj-idea-b2ae / GitHub #48): hosted in an outer splitter to the left of the
+    // table+details area, git4idea-Branches-dashboard style. Visibility is per-window
+    // (config.bookmarksPanelVisible, default expanded — matches rootGutterExpanded's default);
+    // the splitter's own width is a global PropertiesComponent key, matching git4idea's single
+    // shared proportion key for its own splitter. bookmarksStripe stays visible even when
+    // collapsed, so there's always something on screen to click back open.
+    private val bookmarksPanel = JujutsuBookmarksPanel(project)
+    private val bookmarksStripe = BookmarksStripeButton { setBookmarksPanelVisible(!config.bookmarksPanelVisible) }
+    private val bookmarksSplitter: OnePixelSplitter
+
     /**
      * Called by the tab manager when this window's name changes (via the configure dialog) so the
      * tab title in the Changes tool window can be updated.
@@ -57,6 +73,15 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     var onTitleChanged: ((String) -> Unit)? = null
 
     init {
+        Disposer.register(this, bookmarksPanel)
+        bookmarksStripe.setExpanded(config.bookmarksPanelVisible)
+        bookmarksSplitter = installLeftComponent(
+            bookmarksPanel,
+            bookmarksStripe,
+            "jujutsu.bookmarks.panel.proportion",
+            config.bookmarksPanelVisible
+        )
+
         // Wire per-window column-width storage so resizes are persisted to config, not global settings
         logTable.columnWidthsStorage = config.columnWidths
         logTable.onColumnWidthsSaved = { persistConfig() }
@@ -213,6 +238,31 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         ActionManager.getInstance().getAction("Jujutsu.RebaseChangeToolbar"),
         ActionManager.getInstance().getAction("Jujutsu.DescribeChangeToolbar")
     )
+
+    /**
+     * Adds a "Show Bookmarks Panel" toggle (jj-idea-b2ae) to the shared View Options popup,
+     * alongside the other per-table display toggles — rather than a dedicated toolbar button,
+     * since [bookmarksStripe] already gives it an always-visible click target.
+     */
+    override fun createViewOptionsActionGroup() = super.createViewOptionsActionGroup().apply {
+        addSeparator()
+        addAction(ToggleBookmarksPanelAction())
+    }
+
+    /** Single place both [ToggleBookmarksPanelAction] and [bookmarksStripe] toggle through. */
+    private fun setBookmarksPanelVisible(visible: Boolean) {
+        config.bookmarksPanelVisible = visible
+        bookmarksSplitter.firstComponent = if (visible) bookmarksPanel else null
+        bookmarksStripe.setExpanded(visible)
+        persistConfig()
+    }
+
+    /** Shows/hides [bookmarksPanel] (jj-idea-b2ae) from the View Options popup. */
+    private inner class ToggleBookmarksPanelAction : ToggleAction(JujutsuBundle.message("bookmarks.panel.viewoption")) {
+        override fun isSelected(e: AnActionEvent) = config.bookmarksPanelVisible
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) = setBookmarksPanelVisible(state)
+    }
 
     /**
      * Persists all UI state into [config] and calls [JujutsuSettings.upsertLogWindow].

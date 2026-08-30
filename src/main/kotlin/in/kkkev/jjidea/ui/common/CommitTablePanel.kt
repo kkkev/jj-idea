@@ -61,6 +61,11 @@ abstract class CommitTablePanel<D>(
     // Splitter for table and details panel
     var splitter: OnePixelSplitter
 
+    // Always holds [splitter] alone; exists so [installLeftComponent] can wrap this whole
+    // table+details area in an outer splitter without [toggleDetailsPosition]'s remove/re-add of
+    // [splitter] needing to know whether such a wrapper is present.
+    private val centerContainer = JPanel(BorderLayout())
+
     // Details panel position (true = right, false = bottom)
     var detailsOnRight = initialDetailsOnRight
 
@@ -135,7 +140,8 @@ abstract class CommitTablePanel<D>(
         // Create splitter with table panel and details panel
         splitter = createSplitter(tablePanel, detailsOnRight)
 
-        add(splitter, BorderLayout.CENTER)
+        centerContainer.add(splitter, BorderLayout.CENTER)
+        add(centerContainer, BorderLayout.CENTER)
 
         // Wire table selection to details panel. Deferred via runLater (rather than reading
         // logTable.selectedEntries synchronously in the listener) so that a filter change which
@@ -502,7 +508,7 @@ abstract class CommitTablePanel<D>(
         }
     }
 
-    fun createViewOptionsActionGroup() = DefaultActionGroup().apply {
+    open fun createViewOptionsActionGroup() = DefaultActionGroup().apply {
         addSeparator(JujutsuBundle.message("log.view.group.columns"))
         addAction(ToggleColumnAction("status", JujutsuColumnManager::showStatus))
         addAction(ToggleColumnAction("changeid", JujutsuColumnManager::showChangeId))
@@ -614,24 +620,60 @@ abstract class CommitTablePanel<D>(
     }
 
     /**
+     * Wraps the whole table+details area in an outer horizontal splitter with [component] as its
+     * first (left) child, initially shown or hidden per [initiallyVisible], with [gutter] pinned
+     * outside the splitter (west of it) and always visible regardless of that state. Used by
+     * [in.kkkev.jjidea.ui.log.UnifiedJujutsuLogPanel] to host the bookmarks panel (jj-idea-b2ae)
+     * to the left of the log table, git4idea-Branches-dashboard style — [gutter] is the
+     * discoverable click target that survives collapsing [component], analogous to the multi-repo
+     * root gutter's always-visible strip ([in.kkkev.jjidea.ui.log.JujutsuRootGutterRenderer]).
+     *
+     * [proportionKey] is a global (not per-window) [com.intellij.ide.util.PropertiesComponent] key for the splitter
+     * width, the same scheme git4idea's Branches dashboard uses for its own splitter.
+     *
+     * Must be called after this panel's `init` has run (so [centerContainer] already holds
+     * [splitter]) — i.e. from a subclass's own `init` block, never from this class's constructor.
+     * Returns the outer splitter so the caller can toggle [OnePixelSplitter.firstComponent]
+     * between `null` and [component] later.
+     */
+    protected fun installLeftComponent(
+        component: JComponent,
+        gutter: JComponent,
+        proportionKey: String,
+        initiallyVisible: Boolean
+    ): OnePixelSplitter {
+        remove(centerContainer)
+        val splitter = OnePixelSplitter(false, proportionKey, 0.25f).apply {
+            firstComponent = if (initiallyVisible) component else null
+            secondComponent = centerContainer
+        }
+        val wrapper = JPanel(BorderLayout()).apply {
+            add(gutter, BorderLayout.WEST)
+            add(splitter, BorderLayout.CENTER)
+        }
+        add(wrapper, BorderLayout.CENTER)
+        return splitter
+    }
+
+    /**
      * Toggle the details panel position between right and bottom.
      */
     private fun toggleDetailsPosition() {
         detailsOnRight = !detailsOnRight
 
         // Remove old splitter
-        remove(splitter)
+        centerContainer.remove(splitter)
 
         // Create new splitter with new orientation
         val tablePanel = createTablePanel()
         splitter = createSplitter(tablePanel, detailsOnRight)
 
         // Add new splitter
-        add(splitter, BorderLayout.CENTER)
+        centerContainer.add(splitter, BorderLayout.CENTER)
 
         // Refresh UI
-        revalidate()
-        repaint()
+        centerContainer.revalidate()
+        centerContainer.repaint()
 
         onConfigChanged()
 

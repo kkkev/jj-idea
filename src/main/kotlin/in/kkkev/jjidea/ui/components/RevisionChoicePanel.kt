@@ -292,7 +292,7 @@ abstract class RevisionChoicePanel(
                     canvas.append(" ")
                     canvas.append(value, allEntries)
                 }
-                if (isWorkingCopy) canvas.bold { doRender() } else doRender()
+                canvas.bold(isWorkingCopy) { doRender() }
             }
         }
     }
