@@ -301,7 +301,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                             { settings.state.diffbaseStrategy == DiffbaseStrategy.WORKING_COPY_PARENT },
                             { if (it) settings.state.diffbaseStrategy = DiffbaseStrategy.WORKING_COPY_PARENT }
                         )
-                        .contextHelp(JujutsuBundle.message("settings.diffbase.workingcopy.help"))
+                    contextHelp(JujutsuBundle.message("settings.diffbase.workingcopy.help"))
                 }
                 row {
                     radioButton(JujutsuBundle.message("settings.diffbase.immutable"))
@@ -309,12 +309,12 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                             { settings.state.diffbaseStrategy == DiffbaseStrategy.IMMUTABLE_ANCESTOR },
                             { if (it) settings.state.diffbaseStrategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR }
                         )
-                        .contextHelp(
-                            JujutsuBundle.message(
-                                "settings.diffbase.immutable.help",
-                                DiffbaseStrategy.IMMUTABLE_ANCESTOR_REVSET
-                            )
+                    contextHelp(
+                        JujutsuBundle.message(
+                            "settings.diffbase.immutable.help",
+                            DiffbaseStrategy.IMMUTABLE_ANCESTOR_REVSET
                         )
+                    )
                 }
                 row {
                     diffbaseCustomOption = radioButton(JujutsuBundle.message("settings.diffbase.custom"))
