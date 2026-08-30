@@ -5,7 +5,6 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatusManager
-import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Expression
@@ -13,6 +12,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
+import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -127,7 +127,7 @@ class DiffbaseService(private val project: Project) {
     fun notifyDiffbaseChanged() {
         cache.clear()
         FileStatusManager.getInstance(project).fileStatusesChanged()
-        ProjectLevelVcsManager.getInstance(project).annotationLocalChangesListener.reloadAnnotations()
+        project.projectLevelVcsManager.annotationLocalChangesListener.reloadAnnotations()
         project.stateModel.diffbaseChanged.notify(Unit)
     }
 

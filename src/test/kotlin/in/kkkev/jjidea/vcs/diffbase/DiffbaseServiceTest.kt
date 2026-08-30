@@ -20,7 +20,6 @@ import io.kotest.matchers.shouldBe
 import io.mockk.Called
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
@@ -49,8 +48,7 @@ class DiffbaseServiceTest {
         project = mockk(relaxed = true)
         every { project.getService(JujutsuStateModel::class.java) } returns mockk(relaxed = true)
         every { project.getService(FileStatusManager::class.java) } returns mockk(relaxed = true)
-        mockkStatic(ProjectLevelVcsManager::class)
-        every { ProjectLevelVcsManager.getInstance(project) } returns mockk(relaxed = true)
+        every { project.getService(ProjectLevelVcsManager::class.java) } returns mockk(relaxed = true)
         logService = mockk()
         val dir = mockk<VirtualFile>()
         every { dir.path } returns "/repo"
@@ -223,7 +221,7 @@ class DiffbaseServiceTest {
         val vcsManager = mockk<ProjectLevelVcsManager> {
             every { annotationLocalChangesListener } returns annotationListener
         }
-        every { ProjectLevelVcsManager.getInstance(project) } returns vcsManager
+        every { project.getService(ProjectLevelVcsManager::class.java) } returns vcsManager
 
         service.notifyDiffbaseChanged()
 
