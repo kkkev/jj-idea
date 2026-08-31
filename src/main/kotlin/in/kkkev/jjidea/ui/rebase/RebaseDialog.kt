@@ -15,10 +15,12 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.createSourcePanel
 import `in`.kkkev.jjidea.ui.common.createVerticalPanel
+import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
 import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
 import `in`.kkkev.jjidea.ui.log.GraphNode
-import `in`.kkkev.jjidea.ui.log.JujutsuGraphAndDescriptionRenderer
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
+import `in`.kkkev.jjidea.ui.log.hideAllButGraphColumn
+import `in`.kkkev.jjidea.ui.log.setGraphRenderer
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -91,7 +93,7 @@ class RebaseDialog(
     }
 
     // Preview
-    private val previewPanel = RebasePreviewPanel()
+    private val previewPanel = RebasePreviewPanel(project)
 
     init {
         title = JujutsuBundle.message("dialog.rebase.title")
@@ -129,6 +131,9 @@ class RebaseDialog(
         // Hide extra columns once — doesn't depend on data
         hideExtraColumns()
         updateDestRenderer()
+        // Renders row tooltips (bookmark/tag chips) via IconAwareHtmlPane instead of a plain
+        // Swing tooltip, which paints chip <img> markup as a broken image (jj-idea-2md7).
+        installIconAwareTableTooltip(destinationTable, project)
 
         runInBackground(ModalityState.any()) {
             val entries = repo.logCache.all
@@ -253,26 +258,9 @@ class RebaseDialog(
         updatePreviewPanel()
     }
 
-    private fun hideExtraColumns() {
-        val columnsToRemove = (destinationTable.columnCount - 1 downTo 0)
-            .filter { it != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
+    private fun hideExtraColumns() = destinationTable.hideAllButGraphColumn()
 
-        for (colIndex in columnsToRemove) {
-            if (colIndex < destinationTable.columnModel.columnCount) {
-                destinationTable.removeColumn(destinationTable.columnModel.getColumn(colIndex))
-            }
-        }
-    }
-
-    private fun updateDestRenderer() {
-        for (i in 0 until destinationTable.columnModel.columnCount) {
-            val column = destinationTable.columnModel.getColumn(i)
-            if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(destGraphNodes)
-                break
-            }
-        }
-    }
+    private fun updateDestRenderer() = destinationTable.setGraphRenderer(destGraphNodes)
 
     private fun selectedDestinationIds(): Set<ChangeId> =
         destinationTable.selectedRows.toList()

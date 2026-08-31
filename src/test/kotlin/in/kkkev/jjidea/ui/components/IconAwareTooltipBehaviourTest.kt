@@ -43,6 +43,8 @@ class IconAwareTooltipBehaviourTest {
         override fun hideNow(owner: JComponent) {
             hideNowCalls++
         }
+
+        override fun showNow(tooltip: IdeTooltip) {}
     }
 
     private val project = mockk<Project>()
@@ -139,6 +141,41 @@ class IconAwareTooltipBehaviourTest {
         owner.mouseMotionListeners.single().mouseMoved(moveEvent(owner, x = 1))
 
         tooltip.isSuppressedUntilMouseMove shouldBe false
+    }
+
+    /**
+     * jj-idea-2md7 follow-up: [Component.getMousePosition] re-polls the OS cursor and is
+     * unreliable inside a `JDialog` on macOS - it can spuriously return null while the pointer is
+     * genuinely still over the component, unlike the position carried by the mouseMoved event
+     * itself. `beforeShow()` falls back to that last real point (exposed here via
+     * [MouseTrackingTooltip] rather than invoking the protected `beforeShow()` directly, which
+     * would need a running platform Application to build the real tip component).
+     */
+    @Test
+    fun `last mouseMoved point is tracked as the getMousePosition fallback`() {
+        val owner = JPanel()
+        val host = FakeHost()
+        val tooltip = install(owner, host) as MouseTrackingTooltip
+
+        tooltip.lastMousePoint shouldBe null
+
+        owner.mouseMotionListeners.single().mouseMoved(moveEvent(owner, x = 1))
+
+        tooltip.lastMousePoint shouldBe Point(1, 0)
+    }
+
+    @Test
+    fun `the fallback point is cleared on mouse exit`() {
+        val owner = JPanel()
+        val host = FakeHost()
+        val tooltip = install(owner, host) as MouseTrackingTooltip
+
+        owner.mouseMotionListeners.single().mouseMoved(moveEvent(owner, x = 1))
+        owner.mouseListeners.forEach {
+            it.mouseExited(MouseEvent(owner, MouseEvent.MOUSE_EXITED, System.currentTimeMillis(), 0, 1, 0, 0, false))
+        }
+
+        tooltip.lastMousePoint shouldBe null
     }
 
     @Test

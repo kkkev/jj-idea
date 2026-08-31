@@ -1,15 +1,18 @@
 package `in`.kkkev.jjidea.ui.rebase
 
+import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
 import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
 import `in`.kkkev.jjidea.ui.log.GraphNode
-import `in`.kkkev.jjidea.ui.log.JujutsuGraphAndDescriptionRenderer
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
+import `in`.kkkev.jjidea.ui.log.hideAllButGraphColumn
+import `in`.kkkev.jjidea.ui.log.setGraphRenderer
 import java.awt.BorderLayout
 import java.awt.Color
 import javax.swing.JPanel
@@ -23,7 +26,7 @@ import javax.swing.ListSelectionModel
  *
  * Driven entirely by [setEntries] and [update] calls — no data in constructor.
  */
-class RebasePreviewPanel : JPanel(BorderLayout()) {
+class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
     private val tableModel = JujutsuLogTableModel()
     private val table = JBTable(tableModel).apply {
         setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
@@ -45,7 +48,10 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
         add(scrollPane, BorderLayout.CENTER)
         add(descriptionLabel, BorderLayout.SOUTH)
         // Hide extra columns once — setEntries/fireTableDataChanged don't recreate them
-        hideExtraColumns()
+        table.hideAllButGraphColumn()
+        // Renders row tooltips (bookmark/tag chips) via IconAwareHtmlPane instead of a plain
+        // Swing tooltip, which paints chip <img> markup as a broken image (jj-idea-2md7).
+        installIconAwareTableTooltip(table, project)
     }
 
     /**
@@ -91,18 +97,8 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
             }
         }
 
-        updateRenderer()
+        table.setGraphRenderer(graphNodes)
         updateDescription(simulation.sourceIds, destinationIds, sourceMode, destinationMode, sourceLabel)
-    }
-
-    private fun updateRenderer() {
-        for (i in 0 until table.columnModel.columnCount) {
-            val column = table.columnModel.getColumn(i)
-            if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(graphNodes)
-                break
-            }
-        }
     }
 
     private fun updateDescription(
@@ -160,16 +156,4 @@ class RebasePreviewPanel : JPanel(BorderLayout()) {
     }
 
     private fun colorHex(color: Color) = String.format("#%06x", color.rgb and 0xFFFFFF)
-
-    private fun hideExtraColumns() {
-        // Remove columns in reverse order to preserve indices
-        val columnsToRemove = (table.columnCount - 1 downTo 0)
-            .filter { it != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
-
-        for (colIndex in columnsToRemove) {
-            if (colIndex < table.columnModel.columnCount) {
-                table.removeColumn(table.columnModel.getColumn(colIndex))
-            }
-        }
-    }
 }

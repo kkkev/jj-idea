@@ -92,7 +92,7 @@ class NewChangeDialog(
         toolTipText = JujutsuBundle.message("dialog.newchange.edit.description")
     }
 
-    private val previewPanel = RebasePreviewPanel()
+    private val previewPanel = RebasePreviewPanel(project)
 
     init {
         title = JujutsuBundle.message("dialog.newchange.title")

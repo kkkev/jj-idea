@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The log's right-click menu gained "Compare with Another Commit..." and "Compare Before with Another Commit...", letting you diff a whole commit (or its parent) against any bookmark, change ID, or revision you pick, not just the working copy.
 - Every description field in the plugin — Describe, Split, Squash Into, New Change, and the Working Copy tool window — is now a real commit-message editor instead of a plain text box: spellcheck, subject-length/format highlighting, and a recent-messages history popup (Ctrl+E / Cmd+E), shared with the IDE's own Git commit UI. IdeaVim users get proper Insert-mode support (Escape no longer closes the dialog). ([#46](https://github.com/kkkev/jj-idea/issues/46))
 
+### Fixed
+- Hovering a commit row's tooltip in the Rebase, Squash Into…, Duplicate Onto…, and New Change dialogs no longer shows a broken-image icon in place of bookmark/tag chips.
+
 ## [0.8.13] - 2026-08-29
 
 ### Added

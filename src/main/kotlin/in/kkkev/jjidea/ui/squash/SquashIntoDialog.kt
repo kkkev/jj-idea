@@ -21,10 +21,12 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.*
 import `in`.kkkev.jjidea.ui.components.DescriptionEditor
+import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
 import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
 import `in`.kkkev.jjidea.ui.log.GraphNode
-import `in`.kkkev.jjidea.ui.log.JujutsuGraphAndDescriptionRenderer
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
+import `in`.kkkev.jjidea.ui.log.hideAllButGraphColumn
+import `in`.kkkev.jjidea.ui.log.setGraphRenderer
 import `in`.kkkev.jjidea.ui.rebase.RebaseSimulator
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -118,7 +120,7 @@ class SquashIntoDialog(
     }
     private val pickerTableModel = JujutsuLogTableModel()
     private var pickerGraphNodes: Map<ChangeKey, GraphNode> = emptyMap()
-    private val pickerTable = JBTable(pickerTableModel).apply {
+    internal val pickerTable = JBTable(pickerTableModel).apply {
         setSelectionMode(
             if (pickingSources) {
                 ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
@@ -276,6 +278,9 @@ class SquashIntoDialog(
         updatePickerRenderer()
         updateDeleteEmptyEnabled()
         updatePickHunksVisibility()
+        // Renders row tooltips (bookmark/tag chips) via IconAwareHtmlPane instead of a plain
+        // Swing tooltip, which paints chip <img> markup as a broken image (jj-idea-2md7).
+        installIconAwareTableTooltip(pickerTable, project)
     }
 
     private fun updateDeleteEmptyEnabled() {
@@ -567,25 +572,9 @@ class SquashIntoDialog(
         updateDeleteEmptyEnabled()
     }
 
-    private fun hideExtraColumns() {
-        val toRemove = (pickerTable.columnCount - 1 downTo 0)
-            .filter { it != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
-        for (col in toRemove) {
-            if (col < pickerTable.columnModel.columnCount) {
-                pickerTable.removeColumn(pickerTable.columnModel.getColumn(col))
-            }
-        }
-    }
+    private fun hideExtraColumns() = pickerTable.hideAllButGraphColumn()
 
-    private fun updatePickerRenderer() {
-        for (i in 0 until pickerTable.columnModel.columnCount) {
-            val column = pickerTable.columnModel.getColumn(i)
-            if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(pickerGraphNodes)
-                break
-            }
-        }
-    }
+    private fun updatePickerRenderer() = pickerTable.setGraphRenderer(pickerGraphNodes)
 
     private fun updateDescription() {
         if (userEditedDescription) return

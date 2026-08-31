@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.createSourcePanel
+import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -105,6 +106,9 @@ class DuplicateDialog(
 
         hideExtraColumns()
         updateDestRenderer()
+        // Renders row tooltips (bookmark/tag chips) via IconAwareHtmlPane instead of a plain
+        // Swing tooltip, which paints chip <img> markup as a broken image (jj-idea-2md7).
+        installIconAwareTableTooltip(destinationTable, project)
 
         runInBackground(ModalityState.any()) {
             val entries = repo.logCache.all
@@ -242,26 +246,9 @@ class DuplicateDialog(
         }
     }
 
-    private fun hideExtraColumns() {
-        val columnsToRemove = (destinationTable.columnCount - 1 downTo 0)
-            .filter { it != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
+    private fun hideExtraColumns() = destinationTable.hideAllButGraphColumn()
 
-        for (colIndex in columnsToRemove) {
-            if (colIndex < destinationTable.columnModel.columnCount) {
-                destinationTable.removeColumn(destinationTable.columnModel.getColumn(colIndex))
-            }
-        }
-    }
-
-    private fun updateDestRenderer() {
-        for (i in 0 until destinationTable.columnModel.columnCount) {
-            val column = destinationTable.columnModel.getColumn(i)
-            if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(destGraphNodes)
-                break
-            }
-        }
-    }
+    private fun updateDestRenderer() = destinationTable.setGraphRenderer(destGraphNodes)
 
     private fun selectedDestinationIds(): Set<ChangeId> =
         destinationTable.selectedRows.toList()

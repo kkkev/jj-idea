@@ -33,6 +33,7 @@ Components whose blast radius exceeds their own package:
 | Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details) |
 | `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff) |
 | Shared commit picker (used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split) |
+| `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
 | In-dialog file diff preview shell (`ui/common/FileDiffPreviewPanel.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
 | Shared hunk-pick preview cache/renderer (`ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`) and the diff-editor staging protocol (`diffedit/DiffEditTool.kt`, `diffedit/HunkApplyMain.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
@@ -617,6 +618,9 @@ alongside one other repo works.
 - [ ] **Abandon** action removes change after confirmation
 - [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
 - [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
+- [ ] jj-idea-2md7: hovering a commit row in the Duplicate Onto... destination picker, and in the
+      Rebase destination picker / preview, shows real bookmark/tag chips and status icons in the
+      tooltip - not a broken-image glyph
 - [ ] jj-idea-rskx: **Set Tag Here...** shows a distinct tag-plus badge icon (not the platform's
       generic + icon); entering a name creates the tag at that commit and the log updates
 
@@ -757,6 +761,8 @@ Build a small stack `A → B → C` (three plain changes) for this section.
 - [ ] Typing in the search field filters by change ID, description, and bookmark name
 - [ ] Clearing the search restores the full filtered list
 - [ ] Selecting a destination populates the description field (if user hasn't typed)
+- [ ] jj-idea-2md7: hovering a commit row with bookmarks/tags in the picker table shows real chip
+      icons in the tooltip - not a broken-image glyph
 
 → automate: jj-idea-ikr6 (description auto-population + validation logic below is pure
 string/state logic, no rendering dependency)
@@ -930,7 +936,7 @@ confirmation dialogs.
 
 **Split, hunk-level selection**
 
-**Code:** `ui/split/SplitDialog.kt`, `ui/common/HunkSelectionModel.kt`, `ui/common/HunkPickPreviewController.kt`, `ui/split/SplitPreviewPanel.kt`, `ui/split/SplitSimulator.kt`, `ui/common/FileDiffPreviewPanel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
+**Code:** `ui/split/SplitDialog.kt`, `ui/common/HunkSelectionModel.kt`, `ui/common/HunkPickPreviewController.kt`, `ui/common/FileDiffPreviewPanel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
 **Also re-run:** MT-CTXMENU (shares the commit picker in some flows); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer); MT-SQUASH (shares `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, the hunk picker, and the staging protocol)
 
 Setup: create a scratch jj repo with a file that has at least **two separate** hunks of changes

@@ -20,13 +20,12 @@ import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IssueLinkifier
-import `in`.kkkev.jjidea.ui.components.installIconAwareTooltip
+import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
 import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
 import kotlinx.datetime.Instant
 import org.apache.commons.lang3.ArrayUtils.addAll
 import java.awt.*
 import java.awt.event.*
-import javax.swing.JComponent
 import javax.swing.JViewport
 import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
@@ -232,23 +231,11 @@ class JujutsuLogTable(
 
         // Register custom tooltip that renders all tooltips via IconAwareHtmlPane, so chip
         // <img> tags render correctly and all tooltips have consistent styling.
-        installIconAwareTooltip(
-            owner = this,
-            project = project,
-            cellKeyAt = { rowAtPoint(it) to columnAtPoint(it) },
-            htmlAt = { point ->
-                val row = rowAtPoint(point)
-                val col = columnAtPoint(point)
-                // jj-idea-tknb: off-switch, read live (not cached) so it applies without restart.
-                // beforeShow() already treats null as "show nothing" - no need to guard the
-                // installIconAwareTooltip call itself.
-                if (row < 0 || col < 0 || !JujutsuSettings.getInstance(project).state.showLogHoverTooltip) {
-                    null
-                } else {
-                    val renderer = getCellRenderer(row, col)
-                    (prepareRenderer(renderer, row, col) as? JComponent)?.toolTipText
-                }
-            }
+        // jj-idea-tknb: off-switch, read live (not cached) so it applies without restart.
+        installIconAwareTableTooltip(
+            this,
+            project,
+            isEnabled = { JujutsuSettings.getInstance(project).state.showLogHoverTooltip }
         )
 
         // Handle clicks on the gutter column to toggle expansion
