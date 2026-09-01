@@ -1,26 +1,18 @@
 package `in`.kkkev.jjidea.ui.duplicate
 
-import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
-import com.intellij.ui.DocumentAdapter
-import com.intellij.ui.SearchTextField
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.table.JBTable
+import com.intellij.openapi.util.Disposer
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.common.createSectionLabel
 import `in`.kkkev.jjidea.ui.common.createSourcePanel
-import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
-import `in`.kkkev.jjidea.ui.log.*
-import `in`.kkkev.jjidea.util.runInBackground
-import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.ui.components.CommitPickerPanel
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.*
-import javax.swing.event.DocumentEvent
 
 /**
  * Result of the duplicate dialog — the user's chosen destination and placement.
@@ -45,12 +37,10 @@ class DuplicateDialog(
     var result: DuplicateSpec? = null
         private set
 
-    private var repoEntries: List<LogEntry> = emptyList()
-
     /**
-     * True while [loadDestinations] or a programmatic mode change is in progress, so the
-     * placement-radio and destination-table listeners don't re-trigger each other (e.g.
-     * restoring several row selections fires one selection event per row).
+     * True while [reloadDestinations] (and the placement-mode reset it can trigger) is in
+     * progress, so the destination-table's raw selection listener doesn't fire redundantly once
+     * per row while [CommitPickerPanel] restores the previous selection internally.
      */
     private var updating = false
 
@@ -65,17 +55,14 @@ class DuplicateDialog(
         toolTipText = JujutsuBundle.message("dialog.rebase.placement.before.description")
     }
 
-    private val searchField = SearchTextField(false).apply {
-        textEditor.emptyText.text = JujutsuBundle.message("dialog.duplicate.destination.search")
-    }
-    private val destTableModel = JujutsuLogTableModel()
-    private var destGraphNodes: Map<ChangeKey, GraphNode> = emptyMap()
-    private val destinationTable = JBTable(destTableModel).apply {
-        setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
-        tableHeader.isVisible = false
-        rowHeight = JBUI.scale(22)
-        setStriped(JujutsuSettings.getInstance(project).state.stripedLogRows)
-    }
+    // Destination picker — search + log-style table (jj-idea-tq4b)
+    private val picker: CommitPickerPanel = CommitPickerPanel(
+        project = project,
+        repo = repo,
+        searchPlaceholder = JujutsuBundle.message("dialog.duplicate.destination.search"),
+        multiSelect = true,
+        onReloaded = { updateModeAvailability() }
+    )
 
     init {
         title = JujutsuBundle.message("dialog.duplicate.title")
@@ -87,38 +74,22 @@ class DuplicateDialog(
             add(destModeBefore)
         }
 
-        searchField.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent) = loadDestinations(searchField.text)
-        })
-
         // Re-filter destinations when placement mode changes (invalid set depends on mode)
-        val onModeChanged = { if (!updating) loadDestinations(searchField.text) }
+        val onModeChanged = { if (!updating) reloadDestinations() }
         destModeOnto.addActionListener { onModeChanged() }
         destModeAfter.addActionListener { onModeChanged() }
         destModeBefore.addActionListener { onModeChanged() }
 
         // Disable placement modes that the current destination selection can't support
-        destinationTable.selectionModel.addListSelectionListener { e ->
+        picker.table.selectionModel.addListSelectionListener { e ->
             if (!e.valueIsAdjusting && !updating) updateModeAvailability()
         }
 
+        Disposer.register(disposable, picker)
+
         init()
 
-        hideExtraColumns()
-        updateDestRenderer()
-        // Renders row tooltips (bookmark/tag chips) via IconAwareHtmlPane instead of a plain
-        // Swing tooltip, which paints chip <img> markup as a broken image (jj-idea-2md7).
-        installIconAwareTableTooltip(destinationTable, project)
-
-        runInBackground(ModalityState.any()) {
-            val entries = repo.logCache.all
-            runLater {
-                if (!isDisposed) {
-                    repoEntries = entries
-                    loadDestinations("")
-                }
-            }
-        }
+        reloadDestinations()
     }
 
     override fun createCenterPanel(): JComponent {
@@ -145,33 +116,11 @@ class DuplicateDialog(
         val wrapper = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(8)
             add(topSection, BorderLayout.NORTH)
-            add(createDestinationPanel(), BorderLayout.CENTER)
+            add(picker, BorderLayout.CENTER)
             add(bottomSection, BorderLayout.SOUTH)
             preferredSize = Dimension(JBUI.scale(550), JBUI.scale(500))
         }
         return wrapper
-    }
-
-    private fun createSectionLabel(text: String): JLabel {
-        val label = JLabel(text)
-        label.font = label.font.deriveFont(java.awt.Font.BOLD)
-        label.alignmentX = JLabel.LEFT_ALIGNMENT
-        return label
-    }
-
-    private fun createDestinationPanel(): JComponent {
-        val panel = JPanel(BorderLayout())
-        panel.alignmentX = JPanel.LEFT_ALIGNMENT
-
-        searchField.alignmentX = JPanel.LEFT_ALIGNMENT
-        panel.add(searchField, BorderLayout.NORTH)
-
-        val scrollPane = JBScrollPane(destinationTable).apply {
-            border = JBUI.Borders.empty()
-        }
-        panel.add(scrollPane, BorderLayout.CENTER)
-
-        return panel
     }
 
     private fun createPlacementModePanel(): JComponent {
@@ -185,44 +134,22 @@ class DuplicateDialog(
         return panel
     }
 
-    private fun loadDestinations(query: String) {
-        val trimmed = query.trim()
+    private fun reloadDestinations() {
         val sourceIds = sourceEntries.map { it.id }.toSet()
-        // Destinations that would make jj rewrite an immutable commit under the current
-        // placement mode (see DuplicateImmutabilityGuard) — never offered as a target.
-        val invalid = invalidDestinationIds(repoEntries, selectedDestinationMode)
-
-        val matchesSearch = { entry: LogEntry ->
-            trimmed.isEmpty() ||
-                entry.id.short.contains(trimmed, ignoreCase = true) ||
-                entry.id.full.contains(trimmed, ignoreCase = true) ||
-                entry.description.display.contains(trimmed, ignoreCase = true) ||
-                entry.bookmarks.any { it.name.name.contains(trimmed, ignoreCase = true) }
-        }
-        // Unlike rebase, duplicating onto a descendant (or even a source itself, once
-        // it's a copy) is meaningful, so beyond the immutability guard above, the only
-        // revisions excluded from the picker are the sources themselves.
-        val filtered = repoEntries.filter { it.id !in sourceIds && it.id !in invalid && matchesSearch(it) }
-
-        val previousSelections = selectedDestinationIds() - invalid
-
         updating = true
         try {
-            destTableModel.setEntries(filtered)
-            destGraphNodes = CommitGraphBuilder().buildGraph(filtered)
-            updateDestRenderer()
-
-            for (i in 0 until destTableModel.rowCount) {
-                val entry = destTableModel.getEntry(i)
-                if (entry != null && entry.id in previousSelections) {
-                    destinationTable.addRowSelectionInterval(i, i)
-                }
+            picker.reload { entry ->
+                // Destinations that would make jj rewrite an immutable commit under the current
+                // placement mode (see DuplicateImmutabilityGuard) — never offered as a target.
+                // Unlike rebase, duplicating onto a descendant (or even a source itself, once
+                // it's a copy) is meaningful, so beyond the immutability guard, the only
+                // revisions excluded from the picker are the sources themselves.
+                val invalid = invalidDestinationIds(picker.entries, selectedDestinationMode)
+                entry.id !in sourceIds && entry.id !in invalid
             }
         } finally {
             updating = false
         }
-
-        updateModeAvailability()
     }
 
     /**
@@ -231,7 +158,7 @@ class DuplicateDialog(
      * currently selected just became unavailable.
      */
     private fun updateModeAvailability() {
-        val valid = validPlacementModes(repoEntries, selectedDestinationIds())
+        val valid = validPlacementModes(picker.entries, picker.selectedIds())
         destModeAfter.isEnabled = RebaseDestinationMode.INSERT_AFTER in valid
         destModeBefore.isEnabled = RebaseDestinationMode.INSERT_BEFORE in valid
 
@@ -242,22 +169,9 @@ class DuplicateDialog(
             } finally {
                 updating = false
             }
-            loadDestinations(searchField.text)
+            reloadDestinations()
         }
     }
-
-    private fun hideExtraColumns() = destinationTable.hideAllButGraphColumn()
-
-    private fun updateDestRenderer() = destinationTable.setGraphRenderer(destGraphNodes)
-
-    private fun selectedDestinationIds(): Set<ChangeId> =
-        destinationTable.selectedRows.toList()
-            .mapNotNull { destTableModel.getEntry(it) }
-            .map { it.id }
-            .toSet()
-
-    private fun selectedDestinationEntries(): List<LogEntry> =
-        destinationTable.selectedRows.toList().mapNotNull { destTableModel.getEntry(it) }
 
     private val selectedDestinationMode: RebaseDestinationMode
         get() = when {
@@ -267,14 +181,14 @@ class DuplicateDialog(
         }
 
     override fun doValidate(): ValidationInfo? {
-        if (selectedDestinationIds().isEmpty()) {
-            return ValidationInfo(JujutsuBundle.message("dialog.duplicate.destination.none"), destinationTable)
+        if (picker.selectedIds().isEmpty()) {
+            return ValidationInfo(JujutsuBundle.message("dialog.duplicate.destination.none"), picker.table)
         }
         return null
     }
 
     override fun doOKAction() {
-        val destinations = selectedDestinationEntries().map { it.id as Revision }
+        val destinations = picker.selectedEntries().map { it.id as Revision }
 
         result = DuplicateSpec(
             destinations = destinations,

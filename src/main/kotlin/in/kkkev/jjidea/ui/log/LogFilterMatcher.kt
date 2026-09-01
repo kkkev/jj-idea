@@ -35,13 +35,19 @@ class LogFilterMatcher private constructor(
      * `description()` revset predicate — otherwise a query that only jj's whole-repo search
      * (jj-idea-lpbv, [in.kkkev.jjidea.jj.logSearchRevset]) finds in a commit's body would be
      * fetched into the table and then hidden by this filter.
+     *
+     * Bookmark names use substring semantics (like description/author), matched against the raw
+     * [in.kkkev.jjidea.jj.BookmarkName.name] — so a remote bookmark `"foo@origin"` matches a
+     * query for either half. This mirrors [in.kkkev.jjidea.jj.logSearchRevset]'s `bookmarks()`/
+     * `remote_bookmarks()` terms, with the one deliberate asymmetry documented there.
      */
     fun matches(entry: LogEntry): Boolean =
         matches(entry.description.display) ||
             entry.author?.name?.let(::matches) == true ||
             entry.author?.email?.let(::matches) == true ||
             matches(entry.id) ||
-            matches(entry.commitId)
+            matches(entry.commitId) ||
+            entry.bookmarks.any { matches(it.name.name) }
 
     companion object {
         /** Returns null when [query] is blank, meaning no text filter is active. */

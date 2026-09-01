@@ -32,7 +32,7 @@ Components whose blast radius exceeds their own package:
 | `ui/components/TextCanvas.kt`, `LogEntryText.kt`, `HtmlTextCanvas.kt`, `UnbreakableContent.kt`, `AtomicHtmlView.kt`, `HtmlIcons.kt`, `Linkifier.kt` | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-BOOKMARK](#mt-bookmark) |
 | Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details) |
 | `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff) |
-| Shared commit picker (used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split) |
+| Shared commit picker (`ui/components/CommitPickerPanel.kt`, `ui/components/LogSearchField.kt`, used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split), [MT-BOOKMARK](#mt-bookmark), [MT-LOG-FILTER](#mt-log-filter) |
 | `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
 | In-dialog file diff preview shell (`ui/common/FileDiffPreviewPanel.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
@@ -679,6 +679,56 @@ In a **multi-repo** project (multiple `.jj` roots open together):
 
 - [ ] Open the main log tab (loads and merges all repos), then open a commit picker for each repo in turn — every repo shows its own commits newest-first, root last; none show the root (or any commit) out of place
 - [ ] Repeat across a few IDE restarts — the correct ordering should hold consistently for every repo, not just some of them
+
+#### Dialog commit-picker search (jj-idea-tq4b)
+
+**Code:** `ui/components/LogSearchField.kt`, `ui/components/CommitPickerPanel.kt`,
+`jj/LogSearchRevset.kt`, `ui/log/LogFilterMatcher.kt`, `ui/rebase/RebaseDialog.kt`,
+`ui/duplicate/DuplicateDialog.kt`, `ui/squash/SquashIntoDialog.kt`,
+`actions/bookmark/MoveBookmarkToChangeDialog.kt`
+
+→ automate: `CommitPickerPanelTest` covers predicate/search combination, selection
+preservation, and the one-`jj log`-call-per-Enter contract without rendering a dialog; this
+section is for the toggles' visible behavior and the end-to-end off-window search in each
+dialog.
+
+- [ ] Open **Rebase**, **Squash Into…**, and **Duplicate Onto…** on a mutable commit — each
+      destination picker's search field now shows regex/match-case/whole-words toggle icons,
+      matching the main log window's search field
+- [ ] In each, toggling **regex** and typing a pattern (e.g. `fix.*bug`) filters the picker by
+      regex instead of literal text; toggling **match case** makes the filter case-sensitive;
+      toggling **whole words** restricts matches to whole-word boundaries
+- [ ] In each, typing part of a bookmark name filters to commits carrying that bookmark (this is
+      new — previously only Rebase/Squash Into…/Duplicate Onto… matched bookmark names by plain
+      substring, and Move Bookmark to Change didn't match them at all)
+- [ ] **Squash Into…**'s **parent mode** (right-click → Squash Into Parent) still shows its small
+      fixed candidate list with **no** search field — unaffected by this change
+
+Setup for the off-window checks below: lower "Number of changes to show" (Settings → Version
+Control → Jujutsu) to something small (e.g. 100) against a repo with several hundred commits
+(e.g. `scripts/fixtures/fx-stress.sh`'s `jj-stress-test` fixture, shared with MT-LOG-FILTER's
+whole-repo-search section) so most commits are off-window. Find a change ID well past the
+window (e.g. `jj log -r 'all()' -T change_id --no-graph --limit 2000`).
+
+- [ ] **Rebase**: paste the off-window change ID into the destination search — typing alone
+      shows no rows; pressing **Enter** fetches and shows it as a selectable destination, and a
+      status line below the table reports it was found; selecting it and clicking Rebase succeeds
+- [ ] **Squash Into…** (both picking a destination and picking sources) and **Duplicate Onto…**:
+      repeat the same paste-then-Enter check; the found commit is selectable and the operation
+      completes
+- [ ] **Move Bookmark to Change**: paste the off-window change ID, press Enter — it appears under
+      the correct Forward/Backward section (matches the classification the initially-loaded rows
+      use) and moving the bookmark to it succeeds
+- [ ] In **Rebase**/**Duplicate Onto…**, search for a change ID that both matches nothing loaded
+      *and* would be invalid as a destination for the current source (e.g. a descendant) — Enter
+      still finds it via the whole-repo query, but selecting it and confirming shows jj's own
+      rejection rather than silently succeeding (this is the documented ancestry-completeness
+      limitation, not a crash)
+- [ ] Typing gibberish that matches nothing and pressing Enter leaves the picker unchanged and the
+      status line reports no results, in every dialog above
+- [ ] Closing a dialog mid-search (e.g. click Cancel immediately after pressing Enter, before the
+      result would normally appear) does not throw in `idea.log` and does not reopen/flash the
+      dialog
 
 #### New Change quick action (jj-idea-byfa)
 

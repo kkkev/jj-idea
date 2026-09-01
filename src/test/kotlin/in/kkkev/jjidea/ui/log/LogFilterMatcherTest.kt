@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.vcs.log.VcsUser
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -184,13 +185,15 @@ class LogFilterMatcherTest {
             changeId: String = "abc123",
             description: String = "Test commit",
             author: VcsUser? = alice,
-            commitId: String = "0000000000000000000000000000000000000000"
+            commitId: String = "0000000000000000000000000000000000000000",
+            bookmarks: List<Bookmark> = emptyList()
         ) = LogEntry(
             repo = mockk<JujutsuRepository>(),
             id = ChangeId(changeId, changeId, null),
             commitId = CommitId(commitId),
             underlyingDescription = description,
-            author = author
+            author = author,
+            bookmarks = bookmarks
         )
 
         @Test
@@ -253,6 +256,22 @@ class LogFilterMatcherTest {
             matcher.matches(
                 entry(commitId = "8640b2e26aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
             ) shouldBe false
+        }
+
+        @Test
+        fun `matches a local bookmark name as a substring`() {
+            val matcher =
+                LogFilterMatcher.create("release", useRegex = false, matchCase = false, wholeWords = false)!!
+
+            matcher.matches(entry(bookmarks = listOf(Bookmark("release-1.0")))) shouldBe true
+            matcher.matches(entry(bookmarks = listOf(Bookmark("main")))) shouldBe false
+        }
+
+        @Test
+        fun `matches either half of a remote bookmark name`() {
+            val matcher = LogFilterMatcher.create("origin", useRegex = false, matchCase = false, wholeWords = false)!!
+
+            matcher.matches(entry(bookmarks = listOf(Bookmark("main@origin")))) shouldBe true
         }
     }
 }

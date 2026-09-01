@@ -1,32 +1,20 @@
 package `in`.kkkev.jjidea.ui.rebase
 
-import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
-import com.intellij.ui.DocumentAdapter
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.OnePixelSplitter
-import com.intellij.ui.SearchTextField
-import com.intellij.ui.components.JBScrollPane
-import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.common.createSectionLabel
 import `in`.kkkev.jjidea.ui.common.createSourcePanel
 import `in`.kkkev.jjidea.ui.common.createVerticalPanel
-import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
-import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
-import `in`.kkkev.jjidea.ui.log.GraphNode
-import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
-import `in`.kkkev.jjidea.ui.log.hideAllButGraphColumn
-import `in`.kkkev.jjidea.ui.log.setGraphRenderer
-import `in`.kkkev.jjidea.util.runInBackground
-import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.ui.components.CommitPickerPanel
 import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.*
-import javax.swing.event.DocumentEvent
 
 /**
  * Result of the rebase dialog — the user's chosen parameters.
@@ -41,8 +29,15 @@ data class RebaseSpec(
 /**
  * Dialog for configuring a `jj rebase` operation.
  *
- * Left side: source section, source mode, destination table (log-style with graph), placement mode.
+ * Left side: source section, source mode, destination picker (log-style table with search), placement mode.
  * Right side: simulated post-rebase preview graph.
+ *
+ * Known limitation: [CommitPickerPanel]'s whole-repo search (jj-idea-tq4b) can merge in a commit
+ * whose ancestry isn't otherwise loaded, so [RebaseSimulator.excludedDestinationIds] — which
+ * derives ancestry from the loaded set — may not catch every case where that commit is actually a
+ * descendant of a source (an invalid destination). jj's own rebase command still rejects that
+ * combination with a clear error; pre-loading the connecting range to catch it here would defeat
+ * the point of the bounded log window.
  */
 class RebaseDialog(
     private val project: Project,
@@ -51,8 +46,6 @@ class RebaseDialog(
 ) : DialogWrapper(project) {
     var result: RebaseSpec? = null
         private set
-
-    private var repoEntries: List<LogEntry> = emptyList()
 
     // Source mode radio buttons
     private val sourceModeRevision = JRadioButton(JujutsuBundle.message("dialog.rebase.source.mode.revision")).apply {
@@ -79,21 +72,20 @@ class RebaseDialog(
         toolTipText = JujutsuBundle.message("dialog.rebase.placement.before.description")
     }
 
-    // Destination picker — log-style table
-    private val searchField = SearchTextField(false).apply {
-        textEditor.emptyText.text = JujutsuBundle.message("dialog.rebase.destination.search")
-    }
-    private val destTableModel = JujutsuLogTableModel()
-    private var destGraphNodes: Map<ChangeKey, GraphNode> = emptyMap()
-    private val destinationTable = JBTable(destTableModel).apply {
-        setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION)
-        tableHeader.isVisible = false
-        rowHeight = JBUI.scale(22)
-        setStriped(JujutsuSettings.getInstance(project).state.stripedLogRows)
-    }
-
     // Preview
     private val previewPanel = RebasePreviewPanel(project)
+
+    // Destination picker — search + log-style table (jj-idea-tq4b)
+    private val picker: CommitPickerPanel = CommitPickerPanel(
+        project = project,
+        repo = repo,
+        searchPlaceholder = JujutsuBundle.message("dialog.rebase.destination.search"),
+        multiSelect = true,
+        onReloaded = {
+            previewPanel.setEntries(picker.entries)
+            updatePreviewPanel()
+        }
+    )
 
     init {
         title = JujutsuBundle.message("dialog.rebase.title")
@@ -110,41 +102,22 @@ class RebaseDialog(
             add(destModeBefore)
         }
 
-        // Listen to search changes
-        searchField.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent) = loadDestinations(searchField.text)
-        })
-
         // Update preview when destination selection or placement mode changes
-        destinationTable.selectionModel.addListSelectionListener { updatePreviewPanel() }
+        picker.table.selectionModel.addListSelectionListener { updatePreviewPanel() }
         destModeOnto.addActionListener { updatePreviewPanel() }
         destModeAfter.addActionListener { updatePreviewPanel() }
         destModeBefore.addActionListener { updatePreviewPanel() }
 
         // Re-filter destinations when source mode changes (excluded set depends on mode)
-        sourceModeRevision.addActionListener { loadDestinations(searchField.text) }
-        sourceModeSource.addActionListener { loadDestinations(searchField.text) }
-        sourceModeBranch.addActionListener { loadDestinations(searchField.text) }
+        sourceModeRevision.addActionListener { reloadDestinations() }
+        sourceModeSource.addActionListener { reloadDestinations() }
+        sourceModeBranch.addActionListener { reloadDestinations() }
+
+        Disposer.register(disposable, picker)
 
         init()
 
-        // Hide extra columns once — doesn't depend on data
-        hideExtraColumns()
-        updateDestRenderer()
-        // Renders row tooltips (bookmark/tag chips) via IconAwareHtmlPane instead of a plain
-        // Swing tooltip, which paints chip <img> markup as a broken image (jj-idea-2md7).
-        installIconAwareTableTooltip(destinationTable, project)
-
-        runInBackground(ModalityState.any()) {
-            val entries = repo.logCache.all
-            runLater {
-                if (!isDisposed) {
-                    repoEntries = entries
-                    previewPanel.setEntries(repoEntries)
-                    loadDestinations("")
-                }
-            }
-        }
+        reloadDestinations()
     }
 
     override fun createCenterPanel(): JComponent {
@@ -178,7 +151,7 @@ class RebaseDialog(
         val leftWrapper = JPanel(BorderLayout()).apply {
             border = JBUI.Borders.empty(8)
             add(topSection, BorderLayout.NORTH)
-            add(createDestinationPanel(), BorderLayout.CENTER)
+            add(picker, BorderLayout.CENTER)
             add(bottomSection, BorderLayout.SOUTH)
         }
 
@@ -200,83 +173,21 @@ class RebaseDialog(
         return wrapper
     }
 
-    private fun createSectionLabel(text: String): JLabel {
-        val label = JLabel(text)
-        label.font = label.font.deriveFont(java.awt.Font.BOLD)
-        label.alignmentX = JLabel.LEFT_ALIGNMENT
-        return label
-    }
-
     private fun createSourceModePanel() = createVerticalPanel(sourceModeRevision, sourceModeSource, sourceModeBranch)
-
-    private fun createDestinationPanel(): JComponent {
-        val panel = JPanel(BorderLayout())
-        panel.alignmentX = JPanel.LEFT_ALIGNMENT
-
-        searchField.alignmentX = JPanel.LEFT_ALIGNMENT
-        panel.add(searchField, BorderLayout.NORTH)
-
-        val scrollPane = JBScrollPane(destinationTable).apply {
-            border = JBUI.Borders.empty()
-        }
-        panel.add(scrollPane, BorderLayout.CENTER)
-
-        return panel
-    }
 
     private fun createPlacementModePanel() = createVerticalPanel(destModeOnto, destModeAfter, destModeBefore)
 
-    private fun loadDestinations(query: String) {
-        val trimmed = query.trim()
+    private fun reloadDestinations() {
         val sourceIds = sourceEntries.map { it.id }.toSet()
-        val excluded = RebaseSimulator.excludedDestinationIds(repoEntries, sourceIds, selectedSourceMode)
-
-        val matchesSearch = { entry: LogEntry ->
-            trimmed.isEmpty() ||
-                entry.id.short.contains(trimmed, ignoreCase = true) ||
-                entry.id.full.contains(trimmed, ignoreCase = true) ||
-                entry.description.display.contains(trimmed, ignoreCase = true) ||
-                entry.bookmarks.any { it.name.name.contains(trimmed, ignoreCase = true) }
+        picker.reload { entry ->
+            entry.id !in RebaseSimulator.excludedDestinationIds(picker.entries, sourceIds, selectedSourceMode)
         }
-        val filtered = repoEntries.filter { it.id !in excluded && matchesSearch(it) }
-
-        // Remember previous selections (drop any that are now excluded)
-        val previousSelections = selectedDestinationIds() - excluded
-
-        destTableModel.setEntries(filtered)
-        destGraphNodes = CommitGraphBuilder().buildGraph(filtered)
-        updateDestRenderer()
-
-        // Restore previous selections
-        for (i in 0 until destTableModel.rowCount) {
-            val entry = destTableModel.getEntry(i)
-            if (entry != null && entry.id in previousSelections) {
-                destinationTable.addRowSelectionInterval(i, i)
-            }
-        }
-
-        updatePreviewPanel()
     }
 
-    private fun hideExtraColumns() = destinationTable.hideAllButGraphColumn()
-
-    private fun updateDestRenderer() = destinationTable.setGraphRenderer(destGraphNodes)
-
-    private fun selectedDestinationIds(): Set<ChangeId> =
-        destinationTable.selectedRows.toList()
-            .mapNotNull { destTableModel.getEntry(it) }
-            .map { it.id }
-            .toSet()
-
-    private fun selectedDestinationEntries(): List<LogEntry> =
-        destinationTable.selectedRows.toList().mapNotNull { destTableModel.getEntry(it) }
-
     private fun updatePreviewPanel() {
-        val destIds = selectedDestinationIds()
-
         previewPanel.update(
             sourceEntries = sourceEntries,
-            destinationIds = destIds,
+            destinationIds = picker.selectedIds(),
             sourceMode = selectedSourceMode,
             destinationMode = selectedDestinationMode
         )
@@ -297,14 +208,14 @@ class RebaseDialog(
         }
 
     override fun doValidate(): ValidationInfo? {
-        if (selectedDestinationIds().isEmpty()) {
-            return ValidationInfo(JujutsuBundle.message("dialog.rebase.destination.none"), destinationTable)
+        if (picker.selectedIds().isEmpty()) {
+            return ValidationInfo(JujutsuBundle.message("dialog.rebase.destination.none"), picker.table)
         }
         return null
     }
 
     override fun doOKAction() {
-        val destinations = selectedDestinationEntries().map { it.id as Revision }
+        val destinations = picker.selectedEntries().map { it.id as Revision }
 
         result = RebaseSpec(
             revisions = sourceEntries.map { it.id },

@@ -12,9 +12,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
-import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.SearchFieldWithExtension
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
@@ -22,17 +20,14 @@ import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.LazyActionById
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
-import java.awt.Dimension
 import javax.swing.Box
 import javax.swing.BoxLayout
-import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
-import javax.swing.event.DocumentEvent
-import javax.swing.event.DocumentListener
 import javax.swing.table.TableColumn
 import kotlin.reflect.KMutableProperty1
 
@@ -69,48 +64,35 @@ abstract class CommitTablePanel<D>(
     // Details panel position (true = right, false = bottom)
     var detailsOnRight = initialDetailsOnRight
 
-    // Filter panel using SearchFieldWithExtension
-    private val filterField: SearchFieldWithExtension
+    // Search field with regex/match-case/whole-words toggles, and history (jj-idea-lpbv).
+    protected val searchField: LogSearchField = LogSearchField(
+        placeholder = JujutsuBundle.message("log.filter.text.placeholder"),
+        tooltip = JujutsuBundle.message("log.filter.text.tooltip"),
+        withHistory = true,
+        onFilterChanged = {
+            applyFilter()
+            onConfigChanged()
+        },
+        onSubmitted = { text -> onSearchSubmitted(text) }
+    )
 
-    // Base search field with history
-    protected val searchTextField = SearchTextField(true).apply {
-        textEditor.emptyText.text = JujutsuBundle.message("log.filter.text.placeholder")
-        toolTipText = JujutsuBundle.message("log.filter.text.tooltip")
-
-        // Listen for text changes
-        textEditor.document.addDocumentListener(
-            object : DocumentListener {
-                override fun insertUpdate(e: DocumentEvent?) {
-                    applyFilter()
-                    onConfigChanged()
-                }
-
-                override fun removeUpdate(e: DocumentEvent?) {
-                    applyFilter()
-                    onConfigChanged()
-                }
-
-                override fun changedUpdate(e: DocumentEvent?) {
-                    applyFilter()
-                    onConfigChanged()
-                }
-            }
-        )
-
-        // Add Enter key listener to save search to history and trigger a whole-repo search
-        textEditor.addActionListener {
-            val text = text?.trim()
-            if (!text.isNullOrEmpty()) {
-                addCurrentTextToHistory()
-                onSearchSubmitted(text)
-            }
+    // Filter options state — delegate to [searchField] so persistence (LogWindowConfig) and
+    // status-bar code can keep reading/writing these as plain properties.
+    var useRegex: Boolean
+        get() = searchField.useRegex
+        set(value) {
+            searchField.useRegex = value
         }
-    }
-
-    // Filter options state
-    var useRegex = false
-    var matchCase = false
-    var matchWholeWords = false
+    var matchCase: Boolean
+        get() = searchField.matchCase
+        set(value) {
+            searchField.matchCase = value
+        }
+    var matchWholeWords: Boolean
+        get() = searchField.matchWholeWords
+        set(value) {
+            searchField.matchWholeWords = value
+        }
 
     // Status bar for truncation indicator
     private val statusBar = JPanel().apply {
@@ -124,9 +106,6 @@ abstract class CommitTablePanel<D>(
         // jj-idea-eyf1: logTable now subscribes to logRefresh (to pick up striping changes live),
         // so it must be disposed with the panel or that subscription leaks the panel/project.
         Disposer.register(this, logTable)
-
-        // Create filter field with extension toolbar
-        filterField = createFilterField()
 
         // Install custom renderers
         logTable.installRenderers()
@@ -169,31 +148,6 @@ abstract class CommitTablePanel<D>(
         }
 
     /**
-     * Create the filter field using SearchFieldWithExtension pattern.
-     */
-    private fun createFilterField(): SearchFieldWithExtension {
-        val filterActionsGroup = BackgroundActionGroup(
-            FilterToggleAction("regex", AllIcons.Actions.RegexHovered, CommitTablePanel<D>::useRegex),
-            FilterToggleAction("matchcase", AllIcons.Actions.MatchCase, CommitTablePanel<D>::matchCase),
-            FilterToggleAction("words", AllIcons.Actions.Words, CommitTablePanel<D>::matchWholeWords)
-        )
-
-        val toolbar = ActionManager.getInstance().createActionToolbar(
-            "JujutsuFileHistoryFilter",
-            filterActionsGroup,
-            true
-        )
-        toolbar.targetComponent = searchTextField.textEditor
-
-        return SearchFieldWithExtension(toolbar.component, searchTextField).apply {
-            // Allow the search field to shrink under width pressure, but not below a
-            // sensible floor (matches IntelliJ's own VCS Log text filter field), so it
-            // degrades gracefully instead of forcing the action toolbar off-screen.
-            minimumSize = Dimension(JBUI.scale(150), preferredSize.height)
-        }
-    }
-
-    /**
      * Create a panel containing the table with its toolbar.
      */
     private fun createTablePanel() = JPanel(BorderLayout()).apply {
@@ -211,7 +165,7 @@ abstract class CommitTablePanel<D>(
         // Create left-side panel with text filter
         val leftPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
-            add(filterField)
+            add(searchField)
             add(Box.createHorizontalStrut(5))
             add(createFilterComponents())
         }
@@ -411,22 +365,6 @@ abstract class CommitTablePanel<D>(
         }
     }
 
-    private inner class FilterToggleAction(
-        messageKeySuffix: String, icon: Icon, private val property: KMutableProperty1<CommitTablePanel<D>, Boolean>
-    ) : ToggleAction(
-            JujutsuBundle.message("log.filter.$messageKeySuffix"),
-            JujutsuBundle.message("log.filter.$messageKeySuffix.tooltip"),
-            icon
-        ) {
-        override fun isSelected(e: AnActionEvent) = property.get(this@CommitTablePanel)
-
-        override fun setSelected(e: AnActionEvent, state: Boolean) {
-            property.set(this@CommitTablePanel, state)
-            applyFilter()
-            onConfigChanged()
-        }
-    }
-
     /**
      * Update table column visibility based on column manager settings.
      */
@@ -571,7 +509,7 @@ abstract class CommitTablePanel<D>(
      * Apply the current filter text to the table.
      */
     private fun applyFilter() {
-        val filterText = searchTextField.text
+        val filterText = searchField.text
         log.info("Applying filter: '$filterText' (regex=$useRegex, matchCase=$matchCase, wholeWords=$matchWholeWords)")
         logTable.logModel.setFilter(filterText, useRegex, matchCase, matchWholeWords)
     }

@@ -1,10 +1,9 @@
 package `in`.kkkev.jjidea.actions.bookmark
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ui.DialogWrapper
-import com.intellij.ui.DocumentAdapter
-import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
@@ -17,10 +16,13 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
+import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.icon
 import `in`.kkkev.jjidea.ui.log.entryCanvas
+import `in`.kkkev.jjidea.ui.log.fetchSearchResults
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -42,7 +44,6 @@ import javax.swing.JSeparator
 import javax.swing.ListCellRenderer
 import javax.swing.ListSelectionModel
 import javax.swing.SwingConstants
-import javax.swing.event.DocumentEvent
 
 private sealed class ChangeItem {
     data object EmptyState : ChangeItem()
@@ -127,18 +128,25 @@ private class ChangeItemRenderer(private val checkbox: JBCheckBox) : ListCellRen
 
 class MoveBookmarkToChangeDialog(
     private val repo: JujutsuRepository,
-    private val classified: List<Pair<LogEntry, MoveDirection>>
+    initialClassified: List<Pair<LogEntry, MoveDirection>>,
+    /** The bookmark's current target, needed to classify any commit found by [searchWholeRepo]. */
+    private val currentId: ChangeId?
 ) : DialogWrapper(repo.project) {
     data class Result(val changeId: ChangeId, val allowBackwards: Boolean)
 
     var result: Result? = null
         private set
 
-    private var query = ""
+    /** Grows via [searchWholeRepo] (jj-idea-tq4b) as off-window commits are found and classified. */
+    private var classified: List<Pair<LogEntry, MoveDirection>> = initialClassified
 
-    private val searchField = SearchTextField(false).apply {
-        textEditor.emptyText.text = JujutsuBundle.message("dialog.bookmark.moveTo.search.emptytext")
-    }
+    private val searchField = LogSearchField(
+        placeholder = JujutsuBundle.message("dialog.bookmark.moveTo.search.emptytext"),
+        onFilterChanged = { rebuildList() },
+        onSubmitted = { searchWholeRepo() }
+    )
+
+    private val statusLabel = JBLabel().apply { isVisible = false }
 
     private val listModel = DefaultListModel<ChangeItem>()
 
@@ -165,13 +173,8 @@ class MoveBookmarkToChangeDialog(
 
         rebuildList()
 
-        searchField.addDocumentListener(object : DocumentAdapter() {
-            override fun textChanged(e: DocumentEvent) {
-                query = searchField.text.trim()
-                rebuildList()
-            }
-        })
-
+        // Up/Down navigate the list from the search field; Enter is handled by LogSearchField
+        // itself (jj-idea-lpbv/jj-idea-tq4b: it now runs a whole-repo search, not dialog OK).
         searchField.textEditor.addKeyListener(object : KeyAdapter() {
             override fun keyPressed(e: KeyEvent) {
                 when (e.keyCode) {
@@ -182,12 +185,6 @@ class MoveBookmarkToChangeDialog(
                     KeyEvent.VK_UP -> {
                         navigateList(-1)
                         e.consume()
-                    }
-                    KeyEvent.VK_ENTER -> {
-                        if (isOKActionEnabled) {
-                            doOKAction()
-                            e.consume()
-                        }
                     }
                 }
             }
@@ -235,9 +232,13 @@ class MoveBookmarkToChangeDialog(
             border = JBUI.Borders.empty(4, 4, 0, 4)
             add(allowBackwardCheckbox, BorderLayout.WEST)
         }
+        val topPanel = JPanel(BorderLayout()).apply {
+            add(searchField, BorderLayout.CENTER)
+            add(statusLabel, BorderLayout.SOUTH)
+        }
         return JPanel(BorderLayout()).apply {
             preferredSize = Dimension(JBUI.scale(500), JBUI.scale(380))
-            add(searchField, BorderLayout.NORTH)
+            add(topPanel, BorderLayout.NORTH)
             add(scrollPane, BorderLayout.CENTER)
             add(checkboxPanel, BorderLayout.SOUTH)
         }
@@ -255,14 +256,8 @@ class MoveBookmarkToChangeDialog(
     }
 
     private fun rebuildList() {
-        val filtered = if (query.isEmpty()) {
-            classified
-        } else {
-            classified.filter {
-                it.first.id.shortenable.full.contains(query, ignoreCase = true) ||
-                    it.first.description.summary.contains(query, ignoreCase = true)
-            }
-        }
+        val matcher = searchField.matcher()
+        val filtered = if (matcher == null) classified else classified.filter { matcher.matches(it.first) }
 
         val forwards = filtered.filter { it.second == MoveDirection.FORWARD }
         val backwards = filtered.filter { it.second == MoveDirection.BACKWARD_OR_SIDEWAYS }
@@ -282,6 +277,37 @@ class MoveBookmarkToChangeDialog(
         }
 
         selectFirstSelectable()
+    }
+
+    /**
+     * Whole-repo search (jj-idea-lpbv/jj-idea-tq4b): runs the search revset against [repo],
+     * classifies any newly found commits against [currentId] (the same rule [loadData] uses),
+     * and merges them into [classified] so they become pickable even though they were outside
+     * the loaded log window.
+     */
+    private fun searchWholeRepo() {
+        val revset = searchField.revset() ?: return
+        val settings = JujutsuSettings.getInstance(repo.project)
+        runInBackground(ModalityState.any()) {
+            val found = fetchSearchResults(listOf(repo), revset) { settings.logChangeLimit(it) }[repo] ?: emptyList()
+            val alreadyKnown = classified.mapTo(mutableSetOf()) { it.first.id } + listOfNotNull(currentId)
+            val newEntries = found.filter { it.id !in alreadyKnown }
+            if (newEntries.isNotEmpty()) repo.logCache.store(newEntries)
+            val newlyClassified = classifyAgainstBookmark(repo, currentId, newEntries)
+            runLater {
+                if (isDisposed) return@runLater
+                if (newlyClassified.isNotEmpty()) {
+                    classified = classified + newlyClassified
+                    rebuildList()
+                }
+                statusLabel.text = if (newlyClassified.isNotEmpty()) {
+                    JujutsuBundle.message("log.status.search.found", newlyClassified.size, searchField.text)
+                } else {
+                    JujutsuBundle.message("log.status.search.none", searchField.text)
+                }
+                statusLabel.isVisible = true
+            }
+        }
     }
 
     private fun selectFirstSelectable() {
@@ -331,9 +357,11 @@ class MoveBookmarkToChangeDialog(
 
         fun show(repo: JujutsuRepository, bookmark: Bookmark, onSelected: (ChangeId, Boolean) -> Unit) {
             runInBackground {
-                val classified = loadData(repo, bookmark)
+                val currentId = currentBookmarkTarget(repo, bookmark)
+                val entries = repo.logCache.all
+                val classified = classifyAgainstBookmark(repo, currentId, entries.filter { it.id != currentId })
                 runLater {
-                    val dlg = MoveBookmarkToChangeDialog(repo, classified)
+                    val dlg = MoveBookmarkToChangeDialog(repo, classified, currentId)
                     if (dlg.showAndGet()) {
                         val r = dlg.result ?: return@runLater
                         onSelected(r.changeId, r.allowBackwards)
@@ -342,19 +370,22 @@ class MoveBookmarkToChangeDialog(
             }
         }
 
-        fun loadData(repo: JujutsuRepository, bookmark: Bookmark): List<Pair<LogEntry, MoveDirection>> {
-            val entries = repo.logCache.all
-            if (entries.isEmpty()) return emptyList()
+        /** The bookmark's current target change id, or null if the bookmark doesn't exist yet. */
+        private fun currentBookmarkTarget(repo: JujutsuRepository, bookmark: Bookmark): ChangeId? =
+            repo.logService.getBookmarks().getOrNull()?.find { it.bookmark.name == bookmark.name }?.id
 
-            // Exclude the entry the bookmark is currently on (no point in "moving" there)
-            val currentId = repo.logService.getBookmarks().getOrNull()
-                ?.find { it.bookmark.name == bookmark.name }?.id
-
-            val candidates = entries.filter { it.id != currentId }
+        /**
+         * Classifies [candidates] against [currentId]: descendants of the bookmark's current
+         * target → FORWARD (the bookmark would advance); everything else → BACKWARD_OR_SIDEWAYS.
+         * Shared by [loadData] (the initial load) and [searchWholeRepo] (jj-idea-tq4b, classifying
+         * commits found outside the loaded log window).
+         */
+        private fun classifyAgainstBookmark(
+            repo: JujutsuRepository,
+            currentId: ChangeId?,
+            candidates: List<LogEntry>
+        ): List<Pair<LogEntry, MoveDirection>> {
             if (candidates.isEmpty()) return emptyList()
-
-            // Classify: entries that are descendants of the current bookmark target → FORWARD
-            // (the bookmark would advance). Ancestors → BACKWARD_OR_SIDEWAYS.
             if (currentId == null) {
                 return candidates.map { it to MoveDirection.BACKWARD_OR_SIDEWAYS }
             }
@@ -382,6 +413,16 @@ class MoveBookmarkToChangeDialog(
                 }
                 entry to direction
             }
+        }
+
+        fun loadData(repo: JujutsuRepository, bookmark: Bookmark): List<Pair<LogEntry, MoveDirection>> {
+            val entries = repo.logCache.all
+            if (entries.isEmpty()) return emptyList()
+
+            // Exclude the entry the bookmark is currently on (no point in "moving" there)
+            val currentId = currentBookmarkTarget(repo, bookmark)
+            val candidates = entries.filter { it.id != currentId }
+            return classifyAgainstBookmark(repo, currentId, candidates)
         }
     }
 }

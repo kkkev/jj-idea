@@ -20,6 +20,12 @@ package `in`.kkkev.jjidea.jj
  * fail the whole revset, not a harmless non-match, so only text that cannot contain revset syntax
  * is ever spliced in as a revision.
  *
+ * Also matches bookmark names via `bookmarks()`/`remote_bookmarks()`, mirroring
+ * [in.kkkev.jjidea.ui.log.LogFilterMatcher.matches] (LogEntry) — with one deliberate asymmetry:
+ * jj's `remote_bookmarks(pattern)` matches only the local half of a remote bookmark's name
+ * (e.g. `"foo"`, not `"foo@origin"`), so a query for just the remote part (e.g. `"origin"`)
+ * matches client-side (against the full `"foo@origin"` string) but is not found by this revset.
+ *
  * Returns null for a blank query (nothing to search).
  */
 internal fun logSearchRevset(query: String, useRegex: Boolean, matchCase: Boolean, wholeWords: Boolean): Expression? {
@@ -38,7 +44,12 @@ internal fun logSearchRevset(query: String, useRegex: Boolean, matchCase: Boolea
         "${if (matchCase) "substring" else "substring-i"}:${quoteRevsetString(query)}"
     }
 
-    val terms = mutableListOf("description($stringPattern)", "author($stringPattern)")
+    val terms = mutableListOf(
+        "description($stringPattern)",
+        "author($stringPattern)",
+        "bookmarks($stringPattern)",
+        "remote_bookmarks($stringPattern)"
+    )
     if (looksLikeRevisionName(query)) {
         terms.add(0, "present(${quoteRevsetString(query)})")
     }

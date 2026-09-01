@@ -100,7 +100,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         useRegex = config.useRegex
         matchCase = config.matchCase
         matchWholeWords = config.matchWholeWords
-        if (config.searchText.isNotEmpty()) searchTextField.text = config.searchText
+        if (config.searchText.isNotEmpty()) searchField.text = config.searchText
 
         // Restore filter component state (reference is restored later in onDataLoaded via retryFilter)
         if (config.selectedReference.isNotEmpty()) {
@@ -274,7 +274,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         config.useRegex = useRegex
         config.matchCase = matchCase
         config.matchWholeWords = matchWholeWords
-        config.searchText = searchTextField.text
+        config.searchText = searchField.text
         persistConfig()
     }
 

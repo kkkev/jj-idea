@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.ui.log.appendDecorations
 import `in`.kkkev.jjidea.ui.log.appendStatusIndicators
 import java.awt.Component
 import javax.swing.BoxLayout
+import javax.swing.JLabel
 import javax.swing.JPanel
 
 fun createVerticalPanel(vararg children: Component) = JPanel().apply {
@@ -18,6 +19,14 @@ fun createVerticalPanel(vararg children: Component) = JPanel().apply {
     this.alignmentX = JPanel.LEFT_ALIGNMENT
     this.border = JBUI.Borders.empty(0, 8)
     children.forEach(this::add)
+}
+
+/** A bold, left-aligned section header, as used above each block of a picker dialog. */
+fun createSectionLabel(text: String): JLabel {
+    val label = JLabel(text)
+    label.font = label.font.deriveFont(java.awt.Font.BOLD)
+    label.alignmentX = JLabel.LEFT_ALIGNMENT
+    return label
 }
 
 fun createSourcePanel(project: Project, sourceEntries: List<LogEntry>) = IconAwareHtmlPane(project).apply {

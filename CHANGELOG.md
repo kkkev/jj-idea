@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Every description field in the plugin — Describe, Split, Squash Into, New Change, and the Working Copy tool window — is now a real commit-message editor instead of a plain text box: spellcheck, subject-length/format highlighting, and a recent-messages history popup (Ctrl+E / Cmd+E), shared with the IDE's own Git commit UI. IdeaVim users get proper Insert-mode support (Escape no longer closes the dialog). ([#46](https://github.com/kkkev/jj-idea/issues/46))
 - The Working Copy tool window's file list, and the log's commit details pane when showing the working copy, now work with the IDE's own file actions — Reformat Code and Optimize Imports act on the files you've selected there, the same as in the built-in Commit view. Right-clicking a file there also gained the standard Annotate action. ([#94](https://github.com/kkkev/jj-idea/pull/94))
 
+### Changed
+- The commit pickers in Rebase, Squash Into…, Duplicate Onto…, and Move Bookmark to Change now use the same search as the log window: regex, match-case, and whole-words toggles, and bookmark-name matching. Pressing Enter with no match in the currently-loaded list runs a one-off search of the whole repository (the same fallback the log window's search already has), so you can now rebase onto, squash into, duplicate onto, or move a bookmark to a commit that isn't in the loaded window — for example by pasting its full change ID or Git hash.
+
 ### Fixed
 - Hovering a commit row's tooltip in the Rebase, Squash Into…, Duplicate Onto…, and New Change dialogs no longer shows a broken-image icon in place of bookmark/tag chips.
 
