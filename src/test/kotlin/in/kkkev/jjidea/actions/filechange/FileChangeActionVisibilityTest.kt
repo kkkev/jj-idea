@@ -43,8 +43,9 @@ import javax.swing.JTree
  *
  * The action system has 5 UI contexts, each providing different DataContext keys:
  * - **Details panel (historical entry)**: LOG_ENTRY (isWorkingCopy=false), CHANGES
- * - **Details panel (WC entry selected)**: LOG_ENTRY (isWorkingCopy=true), CHANGES
- * - **Working copy panel**: CHANGES only (no LOG_ENTRY)
+ * - **Details panel (WC entry selected)**: LOG_ENTRY (isWorkingCopy=true), CHANGES,
+ *   VIRTUAL_FILE/VIRTUAL_FILE_ARRAY (JujutsuChangesTree.showsLocalFiles is true here)
+ * - **Working copy panel**: CHANGES, VIRTUAL_FILE/VIRTUAL_FILE_ARRAY (no LOG_ENTRY)
  * - **Editor (current file)**: VIRTUAL_FILE, PROJECT (no LOG_ENTRY, no CHANGES)
  * - **Editor (historical file)**: VIRTUAL_FILE with VIRTUAL_FILE_LOG_ENTRY user data
  *
@@ -595,7 +596,8 @@ class FileChangeActionVisibilityTest {
         @Test
         fun `enabled in a changes-tree context (commit details panel, working copy panel)`() {
             // No VIRTUAL_FILE here - this is the bug: the action used to only ever read
-            // CommonDataKeys.VIRTUAL_FILE, which JujutsuChangesTree never supplies.
+            // CommonDataKeys.VIRTUAL_FILE, which a historical JujutsuChangesTree selection never
+            // supplies (only a working-copy one does, via JujutsuChangesTree.showsLocalFiles).
             every { event.restorePaths } returns listOf(LocalFilePath("/project/Main.kt", false))
             every { event.singleRepoForRestore } returns repo
             ShowFileHistoryAction().update(event)
@@ -615,6 +617,21 @@ class FileChangeActionVisibilityTest {
             every { event.restorePaths } returns
                 listOf(LocalFilePath("/a/Main.kt", false), LocalFilePath("/b/Main.kt", false))
             every { event.singleRepoForRestore } returns null
+            ShowFileHistoryAction().update(event)
+            presentation.isEnabledAndVisible shouldBe false
+        }
+
+        @Test
+        fun `disabled for a multi-file working-copy tree selection, even though VIRTUAL_FILE resolves a lead file`() {
+            // A working-copy JujutsuChangesTree (showsLocalFiles = true) publishes VIRTUAL_FILE as
+            // some single file out of a multi-file selection alongside VIRTUAL_FILE_ARRAY/CHANGES.
+            // hasEditorTarget must defer to hasTreeTarget here rather than treat that lead file as
+            // the whole (single-file) target - see the class kdoc.
+            every { event.restorePaths } returns
+                listOf(LocalFilePath("/project/Main.kt", false), LocalFilePath("/project/Utils.kt", false))
+            every { event.singleRepoForRestore } returns repo
+            every { event.file } returns mockk<VirtualFile> { every { isDirectory } returns false }
+            every { event.repoForFile } returns repo
             ShowFileHistoryAction().update(event)
             presentation.isEnabledAndVisible shouldBe false
         }

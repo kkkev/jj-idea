@@ -133,6 +133,11 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
             entry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
         }
 
+        // The changes shown here are change-id-based (ContentLogEntryImpl), even for the
+        // working-copy entry, so a change's local file only actually matches what's on screen
+        // when the selection includes `@` - see JujutsuChangesTree.showsLocalFiles' kdoc.
+        changesTree.showsLocalFiles = { currentEntries.any { it.isWorkingCopy } }
+
         // Create splitter: changes on top, metadata on bottom
         splitter = OnePixelSplitter(true, 0.5f).apply {
             firstComponent = changesPanel

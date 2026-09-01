@@ -16,6 +16,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * - Compare with Another Commit (Jujutsu.CompareWithBranch) - visible in historical context
  * - Compare Before with Another Commit (Jujutsu.CompareBeforeWithBranch) - visible in historical context with parents
  * - Open Repository Version (Jujutsu.OpenRepositoryVersion) - visible in historical context
+ * - Annotate (standard "Annotate") - jj-idea-0t5o, matches Jujutsu.EditorGroup's placement
  * - Show History (Jujutsu.ShowFileHistory)
  * - Separator
  * - Restore (Jujutsu.RestoreFile) - visible in working copy context
@@ -43,6 +44,12 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     actionManager.getAction("Jujutsu.CompareWithBranch")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.CompareBeforeWithBranch")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.OpenFileInRemote")?.let { group.add(it) }
+
+    // jj-idea-0t5o: same slot Jujutsu.EditorGroup gives the standard Annotate action (right
+    // before Show History, no separator between them). It resolves the file via VIRTUAL_FILE,
+    // which JujutsuChangesTree only supplies for a working-copy selection
+    // (JujutsuChangesTree.showsLocalFiles) - self-filters (hidden) otherwise.
+    actionManager.getAction("Annotate")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.ShowFileHistory")?.let { group.add(it) }
 
     group.addSeparator()

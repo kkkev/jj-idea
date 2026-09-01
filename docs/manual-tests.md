@@ -415,13 +415,32 @@ more lanes than the 3-4 needed here.
 - [ ] Right-click a file in the details panel's change tree → **Show History** appears in the
       menu (jj-idea-cb3r, fixed for real in jj-idea-v9g4 — the initial jj-idea-cb3r fix added it to
       the menu-building code but the action stayed invisible there since it only read
-      `CommonDataKeys.VIRTUAL_FILE`, which this tree never supplies) and opens that file's custom
-      history tab, same as from the editor's Jujutsu submenu
+      `CommonDataKeys.VIRTUAL_FILE`, which this tree only supplies for a working-copy selection —
+      see `JujutsuChangesTree.showsLocalFiles`) and opens that file's custom history tab, same as
+      from the editor's Jujutsu submenu
 - [ ] Repeat from the **Working Copy** tool window's file tree and from a compare-changes panel
       (e.g. "Compare with Another Commit…") — **Show History** works from all of them, not just
       the commit details panel
 - [ ] Right-click a **deleted** file (e.g. in a historical commit's file list) → **Show History**
       is still available (uses the file's last-known path, not just files with current content)
+- [ ] Multi-select several files in the details panel's change tree for a **historical** commit
+      (not `@`) → **Show History** is disabled/hidden rather than silently acting on just one of
+      the selected files
+
+#### Platform file actions on the changes tree (`JujutsuChangesTree.showsLocalFiles`)
+
+- [ ] Select `@` (the working copy) in the log → in the details panel's change tree, select one
+      or more files → the IDE's **Reformat Code** (Ctrl/Cmd+Alt+L) and **Optimize Imports**
+      (Ctrl/Cmd+Alt+O) both act on the selected file(s) on disk
+- [ ] Right-click a file in that same `@`-selection tree → Jujutsu submenu → **Annotate** opens
+      the gutter annotations for that file
+- [ ] F4 on that same `@`-selection still opens the file via **Jujutsu.OpenChangeFile** (unchanged
+      — this tree owns the F4 shortcut, not the platform's generic Jump to Source)
+- [ ] Select a **historical** (non-`@`) commit in the log → in the details panel's change tree,
+      Reformat Code/Optimize Imports/Annotate either do nothing or act on the *editor's* current
+      file (not silently acting on the historical revision or the working-copy file instead)
+- [ ] "Open File" on a historical commit's change still opens that **revision's** content, not
+      the current working-copy file, both before and after selecting files in the tree
 
 ### MT-LOG-FILTER
 
@@ -1320,6 +1339,11 @@ selection does nothing; right-click for actions.
 - [ ] Right-click shows context menu with file actions
 - [ ] jj-idea-lo7u: "Compare Before with Another Commit..." is **not** in that menu (working
       copy context — same as "Compare Before with Local")
+- [ ] Select one or more files in the changed-files tree → the IDE's **Reformat Code**
+      (Ctrl/Cmd+Alt+L) and **Optimize Imports** (Ctrl/Cmd+Alt+O) both act on the selected file(s),
+      same as the built-in Git/Commit changes view (`JujutsuChangesTree.showsLocalFiles`)
+- [ ] Right-click a file → Jujutsu submenu → **Annotate** opens the gutter annotations for that
+      file (jj-idea-0t5o)
 - [ ] Open shows working copy as editable
 - [ ] Open for multiple files opens multiple editors
 - [ ] Menu has Open in -> remote; see MT-DIFF for "Open in -> remote for single parent" and the hidden-when-no-pushed-ancestor case

@@ -52,7 +52,16 @@ val AnActionEvent.fileList: List<VirtualFile>?
 /**
  * Resolves the selected virtual files from a raw file list or from selected changes.
  *
- * When [fileList] is non-null it is returned as-is. Otherwise, each change's `after`
+ * When [fileList] is non-null it is returned as-is - **unconditionally taking precedence over
+ * [changes]**, even when [changes] would resolve to something different (e.g. a historical
+ * revision). This is safe today because [in.kkkev.jjidea.ui.common.JujutsuChangesTree] only ever
+ * supplies a non-null `VIRTUAL_FILE_ARRAY` (the source of [fileList] via
+ * [in.kkkev.jjidea.actions.fileList]) when [in.kkkev.jjidea.ui.common.JujutsuChangesTree.showsLocalFiles]
+ * is true, i.e. only when the local file genuinely *is* the file on screen. Any future context
+ * that starts publishing `VIRTUAL_FILE_ARRAY` alongside `CHANGES` for a *historical* selection
+ * would silently resolve to the wrong (local, not historical) file here - this precedence is
+ * pinned by `ActionEventExtensionsTest`'s "fileList takes precedence over changes" test.
+ * Otherwise, each change's `after`
  * [`in`.kkkev.jjidea.jj.FileAtVersion] is resolved via [possibleVirtualFileFor], which may run a
  * `jj log` subprocess. Capture [fileList] and [changes] on the EDT, then call this from
  * a `runInBackground` block.

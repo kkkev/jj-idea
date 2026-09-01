@@ -54,6 +54,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareWithBranch",
             "Jujutsu.CompareBeforeWithBranch",
             "Jujutsu.OpenFileInRemote",
+            "Annotate",
             "Jujutsu.ShowFileHistory",
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
@@ -84,6 +85,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.CompareWithBranch",
             "Jujutsu.CompareBeforeWithBranch",
             "Jujutsu.OpenFileInRemote",
+            "Annotate",
             "Jujutsu.ShowFileHistory"
         )
     }

@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.common
 
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatus
@@ -43,6 +44,20 @@ class JujutsuChangesTree(
      * [in.kkkev.jjidea.actions.JujutsuDataKeys.LOG_ENTRY].
      */
     var additionalDataProvider: ((DataSink) -> Unit)? = null
+
+    /**
+     * True when this tree's contents *are* the live working copy, so a selected change's local
+     * file is the file actually on screen. Gates [CommonDataKeys.VIRTUAL_FILE]/
+     * [CommonDataKeys.VIRTUAL_FILE_ARRAY] in [uiDataSnapshot]: in a historical tree (commit
+     * details pane on a non-`@` commit, compare-changes panel, file-selection dialog) a change's
+     * local file is *not* the revision being shown, so publishing these would let
+     * platform-global file actions (Reformat Code, Optimize Imports, ...) silently act on the
+     * wrong file — and [in.kkkev.jjidea.actions.filesFor] prefers a non-null
+     * `VIRTUAL_FILE_ARRAY` over historical resolution, so it would also break actions like
+     * Open File there. Defaults to false; only the Working Copy tool window and a commit
+     * details pane showing the working-copy entry opt in.
+     */
+    var showsLocalFiles: () -> Boolean = { false }
 
     /**
      * Changes that should be shown as **partially** included (half-checked).
@@ -162,6 +177,37 @@ class JujutsuChangesTree(
     override fun uiDataSnapshot(sink: DataSink) {
         super.uiDataSnapshot(sink)
         sink[VcsDataKeys.CHANGES] = selectedChanges.toTypedArray()
+
+        if (showsLocalFiles()) {
+            // Mirrors the platform's own ChangesListView.uiDataSnapshot: lets globally-bound file
+            // actions (Reformat Code, Optimize Imports) act on the selection, the same way they
+            // already do in IntelliJ's built-in Git/Commit changes view. Published lazily (as
+            // ChangesListView does) so a select-all doesn't resolve every VirtualFile eagerly on
+            // every snapshot; gated by showsLocalFiles (see its kdoc) so it never misrepresents a
+            // historical selection as the local file.
+            //
+            // Deliberately NOT publishing NAVIGATABLE/NAVIGATABLE_ARRAY (F4/"Jump to Source"),
+            // unlike ChangesListView: Jujutsu.OpenChangeFile already owns the F4 shortcut in this
+            // tree (plugin.xml) and already works in every context (not just showsLocalFiles),
+            // navigating directly via OpenFileDescriptor. A second action claiming the same
+            // keystroke in the same component would be redundant at best and an ambiguous
+            // shortcut conflict at worst - and it can't simply replace OpenChangeFileAction
+            // either: that action resolves a *historical* selection's file via Project.filesFor,
+            // which may run a `jj log`/`jj show` subprocess and is therefore deliberately kept off
+            // the EDT (see its actionPerformed). A DataSink.lazy callback like this one has no
+            // such threading guarantee - any consumer may call getData synchronously on the EDT -
+            // so doing that resolution here would risk blocking the UI thread on a subprocess
+            // call. OpenChangeFileAction is also the Enter shortcut and the "Open File" menu
+            // item, so it would stick around regardless of how F4 were wired.
+            val selectedChangesSnapshot = selectedChanges
+            sink.lazy(CommonDataKeys.VIRTUAL_FILE_ARRAY) {
+                selectedChangesSnapshot.mapNotNull { it.filePath.virtualFile }.toTypedArray()
+            }
+            sink.lazy(CommonDataKeys.VIRTUAL_FILE) {
+                selectedChangesSnapshot.firstNotNullOfOrNull { it.filePath.virtualFile }
+            }
+        }
+
         additionalDataProvider?.invoke(sink)
     }
 
