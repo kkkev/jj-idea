@@ -54,7 +54,11 @@ class JujutsuStartupActivity : ProjectActivity {
             log.info("jj availability status changed: $status")
             when (status) {
                 is JjAvailabilityStatus.Checking -> {} // Initial state, wait for real result
-                is JjAvailabilityStatus.Available -> JujutsuNotifications.clearAvailabilityNotification()
+                is JjAvailabilityStatus.Available -> {
+                    JujutsuNotifications.clearAvailabilityNotification()
+                    FeatureUpgradeNudge.nudgeIfNeeded(project, status)
+                }
+
                 else -> JujutsuNotifications.notifyJjUnavailable(project, status)
             }
         }

@@ -1167,7 +1167,7 @@ toolbar itself is hidden or unavailable.
 - [ ] The per-bookmark "Advance … to Working Copy" action (in a bookmark's own sub-menu, or via right-click on its chip in the log) moves that specific bookmark to @ regardless of distance, without opening a picker
 - [ ] Advancing a bookmark that's already at @ is a no-op (no error)
 - [ ] With no bookmark anywhere in @'s ancestry: "Advance Bookmark Here" is visible but disabled, with a tooltip explaining there's nothing to advance
-- [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark Here" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one, and Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method
+- [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark Here" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one, and Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method (see also MT-WORKINGCOPY's "Version-Gated Feature Upgrade Nudge", jj-idea-sov0, for the startup balloon this same gating also surfaces)
 - [ ] The disabled reason is also appended to the menu item's own text, not just its tooltip (menus don't reliably show tooltips) — e.g. "Advance Bookmark Here (needs jj 0.39+)" or "Advance 'main' to Working Copy (needs jj 0.39+)"; with no bookmark anywhere in @'s ancestry, "Advance Bookmark Here (nothing to advance)"
 - [ ] jj-idea-xsa8 (GitHub #61): the same "Advance Bookmark Here" action is also available as an
       icon button in the Working Copy tool window's toolbar, alongside New Change/Split/Squash/
@@ -1347,7 +1347,7 @@ selection does nothing; right-click for actions.
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
@@ -1531,6 +1531,27 @@ equally-weighted group of their own.
   the balloon never reappears
 - [ ] The Working Copy signpost above still fires independently and is unaffected by the
   sponsor ask (both read/write disjoint fields in `JujutsuApplicationSettingsState`)
+
+#### Version-Gated Feature Upgrade Nudge (jj-idea-sov0)
+
+Requires the multi-version harness — see [Test Tooling](#test-tooling) — to have a jj
+executable older than 0.39 available to point the plugin at.
+
+- [ ] Fresh sandbox config, jj executable path (Settings → Version Control → Jujutsu) pointed
+  at a pinned jj **below 0.39** (e.g. `~/.local/bin/jj-0.38`) → open a jj project → a balloon
+  fires once naming "Advance Bookmark (needs jj 0.39)" and your current version
+- [ ] Clicking **Update jj...** opens Settings → Version Control → Jujutsu
+- [ ] Restart the same sandbox → the balloon does not reappear
+- [ ] Repeat in a fresh sandbox, click **Don't show again** instead → restart → the balloon
+  never reappears
+- [ ] Change the configured jj path to a **different** old version (e.g. 0.37 instead of 0.38)
+  → the balloon fires again (re-nudges per jj version)
+- [ ] Point the executable path at a jj **0.39 or newer**, or clear it back to default
+  resolution → no balloon at all, regardless of prior dismissal state
+- [ ] Point the executable path at a jj **below the plugin's hard minimum** (0.37) → only the
+  existing "jj version too old" warning appears (MT-CROSS's Error Handling) — this nudge never
+  fires for that case
+- [ ] Open a **non-jj** project with an old jj configured → no balloon
 
 #### Status Bar Widget (Switch Working Copy)
 

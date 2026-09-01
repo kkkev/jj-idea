@@ -44,5 +44,10 @@ data class JujutsuApplicationSettingsState(
     var firstRunEpochMillis: Long = 0,
     // jj-idea-z1ld: the one-time sponsor ask has been shown (or explicitly dismissed) on this
     // machine. Set when the balloon is shown, so it never appears twice.
-    var sponsorAskShown: Boolean = false
+    var sponsorAskShown: Boolean = false,
+    // jj-idea-sov0: key of the (jj version, gated feature set) combination the version-gated
+    // upgrade nudge has already been shown for, e.g. "0.38.0|BOOKMARK_ADVANCE". Empty means
+    // never shown. Keyed on both halves so the nudge reappears when the user's jj version
+    // changes AND when a plugin update newly gates a feature at the same jj version.
+    var featureNudgeShownKey: String = ""
 )

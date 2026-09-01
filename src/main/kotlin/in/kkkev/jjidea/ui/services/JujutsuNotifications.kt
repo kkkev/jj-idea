@@ -17,6 +17,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.performAction
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
+import `in`.kkkev.jjidea.jj.JjFeature
+import `in`.kkkev.jjidea.jj.JjVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
@@ -328,6 +330,39 @@ object JujutsuNotifications {
         notification.addExpiringAction("notification.userconfig.action.configure") {
             ShowSettingsUtil.getInstance().showSettingsDialog(project, "Jujutsu")
         }
+
+        notification.notify(project)
+    }
+
+    /**
+     * Show a one-time upgrade nudge (jj-idea-sov0) that jj [version] doesn't support
+     * [gatedFeatures] yet. Never called for an unsupported/too-old jj — that's Scenario A,
+     * handled entirely by [notifyJjUnavailable] — so this always uses [NotificationType.INFORMATION]:
+     * nothing is broken, the user is just missing optional features.
+     */
+    fun notifyFeaturesGatedByVersion(project: Project, version: JjVersion, gatedFeatures: List<JjFeature>) {
+        if (gatedFeatures.isEmpty()) return
+
+        val list = gatedFeatures.joinToString("<br>") {
+            JujutsuBundle.message("notification.feature.gated.item", it.displayName, it.minVersion.toString())
+        }
+
+        val notification = NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("notification.feature.gated.title"),
+                JujutsuBundle.message("notification.feature.gated.content", version.toString(), list),
+                NotificationType.INFORMATION
+            )
+
+        notification.addExpiringAction("notification.feature.gated.action.update") {
+            ShowSettingsUtil.getInstance().showSettingsDialog(project, "Jujutsu")
+        }
+
+        // The shown-key is already persisted by the time this balloon appears (see
+        // FeatureUpgradeNudge), so dismissal needs no side effect beyond expiring — the action
+        // exists purely as an explicit "never again" affordance, same as SponsorAsk's dismiss.
+        notification.addExpiringAction("notification.feature.gated.action.dismiss") {}
 
         notification.notify(project)
     }
