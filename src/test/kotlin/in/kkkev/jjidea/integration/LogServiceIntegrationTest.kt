@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.CliLogService
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.vcs.getChildPath
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.inspectors.forAtLeastOne
@@ -365,7 +366,7 @@ class LogServiceIntegrationTest {
                 ): CommandExecutor.CommandResult {
                     logCallCount++
                     return if (template != null && failOn(template)) {
-                        CommandExecutor.CommandResult(1, "", stderr)
+                        commandResult(1, "", stderr)
                     } else {
                         base.log(revset, template, filePaths, limit, quiet)
                     }

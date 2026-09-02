@@ -121,28 +121,6 @@ interface CommandExecutor {
             val message = JujutsuBundle.message("$resourceKeyPrefix.message", stderr)
             Messages.showErrorDialog(project, message, JujutsuBundle.message("$resourceKeyPrefix.title"))
         }
-
-        /**
-         * Transitional compatibility shim for the old flat `CommandResult(exitCode, stdout,
-         * stderr, timedOut)` constructor - kept only until every construction site is migrated
-         * to an explicit subtype, then deleted. A successful transitional result carries no undo
-         * information yet (nothing calls [withUndoTracking] before that migration), so it always
-         * becomes [Success.Irreversible] with [Success.Irreversible.Reason.NOT_TRACKED] - which
-         * is exactly correct: today, literally no command is undo-tracked.
-         */
-        companion object {
-            @Deprecated("Transitional only - construct an explicit CommandResult subtype instead.")
-            operator fun invoke(
-                exitCode: Int,
-                stdout: String,
-                stderr: String,
-                timedOut: Boolean = false
-            ): CommandResult = when {
-                exitCode == 0 -> Success.Irreversible(stdout, stderr, Success.Irreversible.Reason.NOT_TRACKED)
-                timedOut -> Failure.TimedOut(stdout, timeoutMillis = 0, stderr = stderr)
-                else -> Failure.Exited(stdout, stderr, exitCode)
-            }
-        }
     }
 
     /**

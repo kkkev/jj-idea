@@ -9,6 +9,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -229,7 +230,7 @@ class JujutsuMergeProviderTest {
     fun `acceptFilesRevisions - AcceptedYours - resolves with the ours tool`() {
         val executor = mockk<CommandExecutor>()
         every { executor.resolve(listOf("foo.txt"), ":ours", WorkingCopy) } returns
-            CommandExecutor.CommandResult(0, "", "")
+            commandResult(0, "", "")
         val repo = mockRepo("/repo", executor)
         val file = mockFile("/repo/foo.txt")
 
@@ -242,7 +243,7 @@ class JujutsuMergeProviderTest {
     fun `acceptFilesRevisions - AcceptedTheirs - resolves with the theirs tool`() {
         val executor = mockk<CommandExecutor>()
         every { executor.resolve(listOf("foo.txt"), ":theirs", WorkingCopy) } returns
-            CommandExecutor.CommandResult(0, "", "")
+            commandResult(0, "", "")
         val repo = mockRepo("/repo", executor)
         val file = mockFile("/repo/foo.txt")
 
@@ -255,7 +256,7 @@ class JujutsuMergeProviderTest {
     fun `acceptFilesRevisions - resolve fails - notifies with the failure reason, does not throw`() {
         val executor = mockk<CommandExecutor>()
         every { executor.resolve(listOf("foo.txt"), ":ours", WorkingCopy) } returns
-            CommandExecutor.CommandResult(1, "", "boom")
+            commandResult(1, "", "boom")
         val repo = mockRepo("/repo", executor)
         val file = mockk<VirtualFile> {
             every { path } returns "/repo/foo.txt"

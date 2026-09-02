@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import io.kotest.matchers.nulls.shouldBeNull
@@ -62,7 +63,7 @@ class JujutsuFileAnnotationPreviousRevisionTest {
     @Test
     fun `previous revision for a single-parent line is that parent when the parent has the file`() {
         every { repo.commandExecutor } returns commandExecutor
-        every { commandExecutor.show(any(), parent) } returns CommandExecutor.CommandResult(0, "content", "")
+        every { commandExecutor.show(any(), parent) } returns commandResult(0, "content", "")
         val annotation = annotationWith(line("child1", parentIds = listOf(parent)))
 
         val previous = annotation.getPreviousFileRevisionProvider()?.getPreviousRevision(0)
@@ -74,7 +75,7 @@ class JujutsuFileAnnotationPreviousRevisionTest {
     fun `previous revision declines when the line's own change added the file (parent lacks it)`() {
         every { repo.commandExecutor } returns commandExecutor
         every { commandExecutor.show(any(), parent) } returns
-            CommandExecutor.CommandResult(1, "", "Error: No such path: file.txt")
+            commandResult(1, "", "Error: No such path: file.txt")
         val annotation = annotationWith(line("child1", parentIds = listOf(parent)))
 
         val previous = annotation.getPreviousFileRevisionProvider()?.getPreviousRevision(0)

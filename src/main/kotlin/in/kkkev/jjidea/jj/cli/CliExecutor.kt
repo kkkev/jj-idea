@@ -397,14 +397,19 @@ internal fun rebaseArgs(
 internal fun ProcessOutput.toCommandResult(cmdName: String, timeoutMillis: Long): CommandExecutor.CommandResult =
     if (isTimeout) {
         val seconds = TimeUnit.MILLISECONDS.toSeconds(timeoutMillis)
-        CommandExecutor.CommandResult(
-            exitCode = -1,
+        CommandExecutor.CommandResult.Failure.TimedOut(
             stdout = stdout,
-            stderr = JujutsuBundle.message("cli.error.timeout", cmdName, seconds.toString()),
-            timedOut = true
+            timeoutMillis = timeoutMillis,
+            stderr = JujutsuBundle.message("cli.error.timeout", cmdName, seconds.toString())
+        )
+    } else if (exitCode == 0) {
+        CommandExecutor.CommandResult.Success.Irreversible(
+            stdout,
+            stderr,
+            CommandExecutor.CommandResult.Success.Irreversible.Reason.NOT_TRACKED
         )
     } else {
-        CommandExecutor.CommandResult(exitCode, stdout, stderr)
+        CommandExecutor.CommandResult.Failure.Exited(stdout, stderr, exitCode)
     }
 
 /**
@@ -758,31 +763,34 @@ class CliExecutor(
                 log.warn("Clone timed out after ${networkTimeout}ms")
                 handler.destroyProcess()
                 val seconds = TimeUnit.MILLISECONDS.toSeconds(networkTimeout)
-                CommandExecutor.CommandResult(
-                    exitCode = -1,
+                CommandExecutor.CommandResult.Failure.TimedOut(
                     stdout = stdout.toString(),
-                    stderr = JujutsuBundle.message("cli.error.timeout", "git clone", seconds.toString()),
-                    timedOut = true
+                    timeoutMillis = networkTimeout,
+                    stderr = JujutsuBundle.message("cli.error.timeout", "git clone", seconds.toString())
                 )
             } else {
                 log.info("Clone completed: exit=$exitCode")
                 if (exitCode != 0) {
                     log.warn("Clone failed: $stderr")
+                    CommandExecutor.CommandResult.Failure.Exited(stdout.toString(), stderr.toString(), exitCode)
+                } else {
+                    CommandExecutor.CommandResult.Success.Irreversible(
+                        stdout.toString(),
+                        stderr.toString(),
+                        CommandExecutor.CommandResult.Success.Irreversible.Reason.NOT_TRACKED
+                    )
                 }
-
-                CommandExecutor.CommandResult(exitCode, stdout.toString(), stderr.toString())
             }
         } catch (_: ProcessNotCreatedException) {
             log.warn("jj executable not found: $executable")
             onJjNotFound?.invoke()
-            CommandExecutor.CommandResult(
-                exitCode = -1,
-                stdout = "",
+            CommandExecutor.CommandResult.Failure.NotLaunched(
+                executable = executable,
                 stderr = "jj executable not found: $executable. Please install jj or configure the path in Settings."
             )
         } catch (e: Exception) {
             log.error("Failed to execute jj git clone", e)
-            CommandExecutor.CommandResult(-1, "", "Failed to execute jj: ${e.message}")
+            CommandExecutor.CommandResult.Failure.NotLaunched(executable, "Failed to execute jj: ${e.message}")
         }
     }
 
@@ -834,9 +842,8 @@ class CliExecutor(
             // jj executable not found - return error result instead of throwing
             log.warn("jj executable not found: $executable")
             onJjNotFound?.invoke()
-            return CommandExecutor.CommandResult(
-                exitCode = -1,
-                stdout = "",
+            return CommandExecutor.CommandResult.Failure.NotLaunched(
+                executable = executable,
                 stderr = "jj executable not found: $executable. Please install jj or configure the path in Settings."
             )
         }

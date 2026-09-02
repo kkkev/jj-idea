@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.util.NotifiableState
 import `in`.kkkev.jjidea.util.Notifier
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
@@ -121,7 +122,7 @@ class JujutsuAnnotationProviderTest {
         every { repo.commandExecutor } returns commandExecutor
         every { repo.directory } returns MockVirtualFile("repo")
         every { commandExecutor.annotate(any(), any(), any()) } returns
-            CommandExecutor.CommandResult(exitCode = -1, stdout = "", stderr = "", timedOut = true)
+            CommandExecutor.CommandResult.Failure.TimedOut(stdout = "", timeoutMillis = 120_000, stderr = "")
 
         val exception = shouldThrow<VcsException> {
             provider.annotateInternal(file, WorkingCopy, repo)
@@ -177,7 +178,7 @@ class JujutsuAnnotationProviderTest {
             every { repo.directory } returns MockVirtualFile("repo")
             every { repo.workingCopy } returns mockk { every { id } returns ChangeId("wc", "wc") }
             every { commandExecutor.annotate(file, targetRevision, any()) } returns
-                CommandExecutor.CommandResult(exitCode = 0, stdout = "", stderr = "")
+                commandResult(exitCode = 0, stdout = "", stderr = "")
 
             provider.annotate(filePath, ChangeIdRevisionNumber(targetRevision))
 
@@ -210,7 +211,7 @@ class JujutsuAnnotationProviderTest {
             every { repo.directory } returns MockVirtualFile("repo")
             every { repo.workingCopy } returns mockk { every { id } returns ChangeId("wc", "wc") }
             every { commandExecutor.annotate(baseFile, base, any()) } returns
-                CommandExecutor.CommandResult(exitCode = 0, stdout = "", stderr = "")
+                commandResult(exitCode = 0, stdout = "", stderr = "")
 
             provider.annotate(file)
 

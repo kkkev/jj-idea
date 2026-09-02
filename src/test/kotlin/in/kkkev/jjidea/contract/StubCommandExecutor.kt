@@ -5,6 +5,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.jj.cli.bookmarkListArgs
 import `in`.kkkev.jjidea.jj.cli.newArgs
+import `in`.kkkev.jjidea.jj.commandResult
 
 /**
  * Adapts [JjStub] to the [CommandExecutor] interface for integration tests.
@@ -13,7 +14,7 @@ import `in`.kkkev.jjidea.jj.cli.newArgs
  */
 class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     private fun toResult(r: JjBackend.Result) =
-        CommandExecutor.CommandResult(r.exitCode, r.stdout, r.stderr)
+        commandResult(r.exitCode, r.stdout, r.stderr)
 
     override fun log(
         revset: Revset,

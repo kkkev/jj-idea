@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
@@ -53,7 +54,7 @@ class JujutsuAnnotationProviderScaleTest {
         every { commandExecutor.annotate(any(), any(), any()) } answers {
             annotateCallCount++
             clockMs += stepMs
-            CommandExecutor.CommandResult(exitCode = 0, stdout = "", stderr = "")
+            commandResult(exitCode = 0, stdout = "", stderr = "")
         }
         return JujutsuAnnotationProvider(project, vcs, nowMs = { clockMs })
     }

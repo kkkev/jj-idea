@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Remote
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.commandResult
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.junit.jupiter.api.Nested
@@ -16,12 +17,12 @@ private class FakeExecutor(private val onBookmarkList: (Remote?, Revision?) -> S
     val bookmarkListCalls = mutableListOf<Pair<Remote?, Revision?>>()
 
     override fun gitRemoteList() =
-        CommandExecutor.CommandResult(0, "origin https://example.com/repo.git\n", "")
+        commandResult(0, "origin https://example.com/repo.git\n", "")
 
     override fun bookmarkList(template: String?, remote: Remote?, tracked: Boolean, revision: Revision?):
         CommandExecutor.CommandResult {
         bookmarkListCalls += remote to revision
-        return CommandExecutor.CommandResult(0, onBookmarkList(remote, revision), "")
+        return commandResult(0, onBookmarkList(remote, revision), "")
     }
 }
 

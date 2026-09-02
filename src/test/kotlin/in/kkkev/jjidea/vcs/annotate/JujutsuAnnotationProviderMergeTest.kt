@@ -12,6 +12,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.vcs.JujutsuVcs
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
@@ -64,7 +65,7 @@ class JujutsuAnnotationProviderMergeTest {
         parentIds = parentIds
     )
 
-    private fun annotateResult(changeId: ChangeId, content: String) = CommandExecutor.CommandResult(
+    private fun annotateResult(changeId: ChangeId, content: String) = commandResult(
         0,
         // Mirrors AnnotationParser.TEMPLATE: fields joined by "\0", record ends with `content`'s
         // own trailing "\n" (no extra separator after it) — see jj-idea-3191.
@@ -79,9 +80,9 @@ class JujutsuAnnotationProviderMergeTest {
         every { repo.getLogEntry(childRevision) } returns mergeCommit(listOf(parent1, parent2))
         every { repo.workingCopy } returns mergeCommit(listOf(parent1, parent2))
         every { commandExecutor.show(any(), childRevision) } returns
-            CommandExecutor.CommandResult(0, "line one\nline two\n", "")
+            commandResult(0, "line one\nline two\n", "")
         every { commandExecutor.diffGitFile(childRevision, any()) } returns
-            CommandExecutor.CommandResult(0, "", "")
+            commandResult(0, "", "")
         every { commandExecutor.annotate(file, parent1, any()) } returns
             annotateResult(parent1, "line one\n")
         every { commandExecutor.annotate(file, parent2, any()) } returns
@@ -104,9 +105,9 @@ class JujutsuAnnotationProviderMergeTest {
         every { repo.getLogEntry(childRevision) } returns mergeCommit(listOf(parent1, parent2))
         every { repo.workingCopy } returns mergeCommit(listOf(parent1, parent2))
         every { commandExecutor.show(any(), childRevision) } returns
-            CommandExecutor.CommandResult(0, "line one\nline two\n", "")
+            commandResult(0, "line one\nline two\n", "")
         every { commandExecutor.diffGitFile(childRevision, any()) } returns
-            CommandExecutor.CommandResult(0, "", "")
+            commandResult(0, "", "")
         every { commandExecutor.annotate(file, parent1, any()) } returns
             annotateResult(parent1, "line one\n")
         every { commandExecutor.annotate(file, parent2, any()) } returns
@@ -123,13 +124,13 @@ class JujutsuAnnotationProviderMergeTest {
         every { repo.commandExecutor } returns commandExecutor
         every { repo.getLogEntry(childRevision) } returns mergeCommit(listOf(parent1, parent2))
         every { commandExecutor.show(any(), childRevision) } returns
-            CommandExecutor.CommandResult(0, "line one\n", "")
+            commandResult(0, "line one\n", "")
         every { commandExecutor.diffGitFile(childRevision, any()) } returns
-            CommandExecutor.CommandResult(0, "", "")
+            commandResult(0, "", "")
         every { commandExecutor.annotate(file, parent1, any()) } returns
-            CommandExecutor.CommandResult(1, "", "boom")
+            commandResult(1, "", "boom")
         every { commandExecutor.annotate(file, parent2, any()) } returns
-            CommandExecutor.CommandResult(1, "", "boom")
+            commandResult(1, "", "boom")
 
         val result = provider.annotateMerge(file, MergeParentOf(childRevision), repo)
 
@@ -144,13 +145,13 @@ class JujutsuAnnotationProviderMergeTest {
         every { repo.commandExecutor } returns commandExecutor
         every { repo.getLogEntry(childRevision) } returns mergeCommit(listOf(parent1, parent2))
         every { commandExecutor.show(any(), childRevision) } returns
-            CommandExecutor.CommandResult(0, "line one\n", "")
+            commandResult(0, "line one\n", "")
         every { commandExecutor.diffGitFile(childRevision, any()) } returns
-            CommandExecutor.CommandResult(0, "", "")
+            commandResult(0, "", "")
         every { commandExecutor.annotate(file, parent1, any()) } returns
-            CommandExecutor.CommandResult(exitCode = -1, stdout = "", stderr = "", timedOut = true)
+            CommandExecutor.CommandResult.Failure.TimedOut(stdout = "", timeoutMillis = 120_000, stderr = "")
         every { commandExecutor.annotate(file, parent2, any()) } returns
-            CommandExecutor.CommandResult(exitCode = -1, stdout = "", stderr = "", timedOut = true)
+            CommandExecutor.CommandResult.Failure.TimedOut(stdout = "", timeoutMillis = 120_000, stderr = "")
 
         val result = provider.annotateMerge(file, MergeParentOf(childRevision), repo)
 
@@ -168,11 +169,11 @@ class JujutsuAnnotationProviderMergeTest {
         every { repo.getLogEntry(childRevision) } returns mergeCommit(listOf(parent1, parent2))
         every { repo.workingCopy } returns mergeCommit(listOf(parent1, parent2))
         every { commandExecutor.show(any(), childRevision) } returns
-            CommandExecutor.CommandResult(0, "line one\n", "")
+            commandResult(0, "line one\n", "")
         every { commandExecutor.diffGitFile(childRevision, any()) } returns
-            CommandExecutor.CommandResult(0, "", "")
+            commandResult(0, "", "")
         every { commandExecutor.annotate(file, parent1, any()) } returns
-            CommandExecutor.CommandResult(1, "", "Error: No such path: test.txt")
+            commandResult(1, "", "Error: No such path: test.txt")
         every { commandExecutor.annotate(file, parent2, any()) } returns
             annotateResult(parent2, "line one\n")
 
@@ -198,9 +199,9 @@ class JujutsuAnnotationProviderMergeTest {
             every { repo.getLogEntry(childRevision) } returns mergeCommit(listOf(parent1, parent2))
             every { repo.workingCopy } returns mergeCommit(listOf(parent1, parent2))
             every { commandExecutor.show(any(), childRevision) } returns
-                CommandExecutor.CommandResult(0, "line one\nline two\n", "")
+                commandResult(0, "line one\nline two\n", "")
             every { commandExecutor.diffGitFile(childRevision, any()) } returns
-                CommandExecutor.CommandResult(0, "", "")
+                commandResult(0, "", "")
             every { commandExecutor.annotate(file, parent1, any()) } returns
                 annotateResult(parent1, "line one\n")
             every { commandExecutor.annotate(file, parent2, any()) } returns

@@ -7,6 +7,7 @@ import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.testFramework.junit5.TestApplication
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.commandResult
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -51,7 +52,7 @@ class JujutsuTrackedFilesServicePlatformTest {
     private fun path(name: String) = LocalFilePath("${directory.path}/$name", false)
 
     private fun stubFileList(stdout: String) {
-        every { commandExecutor.fileList(any()) } returns CommandExecutor.CommandResult(0, stdout, "")
+        every { commandExecutor.fileList(any()) } returns commandResult(0, stdout, "")
     }
 
     @Test

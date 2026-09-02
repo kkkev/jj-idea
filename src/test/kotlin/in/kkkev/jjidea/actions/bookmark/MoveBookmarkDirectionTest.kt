@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.jj.LogCache
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.Revset
+import `in`.kkkev.jjidea.jj.commandResult
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -41,7 +42,7 @@ class MoveBookmarkDirectionTest {
                 quiet: Boolean
             ): CommandExecutor.CommandResult {
                 lastRevset = revset
-                return CommandExecutor.CommandResult(0, stdout, "")
+                return commandResult(0, stdout, "")
             }
         }
         return executor to { lastRevset ?: error("log() was never called") }
