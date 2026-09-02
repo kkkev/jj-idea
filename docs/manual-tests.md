@@ -643,6 +643,35 @@ alongside one other repo works.
 - [ ] jj-idea-rskx: **Set Tag Here...** shows a distinct tag-plus badge icon (not the platform's
       generic + icon); entering a name creates the tag at that commit and the log updates
 
+#### Undo (jj-idea-v9zp)
+
+**Code:** `ui/services/UndoBalloon.kt`, `ui/services/JujutsuUndoService.kt`,
+`actions/undo/UndoLastOperationAction.kt`, `actions/change/abandonChangeAction.kt`
+
+Stage 1 of the undo roadmap (docs/design/undo-support-roadmap.md), wired to **Abandon**
+only for now.
+
+- [ ] Create a change, `jj new`, then **edit a file so the working copy is dirty** before
+      abandoning (exercises the snapshot-op exclusion) → right-click → **Abandon** → confirm
+- [ ] The change disappears **and** a Jujutsu balloon appears with an inline **Undo** link
+- [ ] Click **Undo** → the change reappears, working-copy files refresh, the balloon expires
+- [ ] Repeat with a **clean** working copy (no snapshot op written) — identical behavior
+- [ ] Abandon again, **dismiss the balloon without clicking Undo**, then open the **VCS**
+      main-menu → an entry reads **"Undo Abandon"**; invoking it brings the change back
+- [ ] Invoke **"Undo Abandon"** a second time (nothing left to undo) → the entry is now
+      disabled, reading "Undo Last Jujutsu Operation" (visible, not hidden - hover shows why)
+- [ ] While a balloon is still showing, run `jj new` in a terminal in the same repo, *then*
+      click the balloon's Undo link → it undoes the abandon specifically, not the terminal
+      command
+- [ ] In a terminal, `jj op log` shows a **new** "revert" operation was added (the log grew),
+      not that an earlier operation was removed
+- [ ] Settings → Version Control → Jujutsu → JJ executable path → point at a pinned older jj
+      (`scripts/jj-install-version.sh 0.37.0`, then `~/.local/bin/jj-0.37`) → repeat the first
+      three checks above — confirms the mechanism works at `JjVersion.MINIMUM`
+- [ ] Push, fetch, squash, split, bookmark, tag, resolve, file track/untrack, and config
+      actions all behave exactly as before this change, and **none** of them show an undo
+      balloon (only Abandon is wired up yet - jj-idea-t0iy extends this to the rest)
+
 #### Duplicate Change (jj-idea-vu35)
 
 - [ ] Right-clicking an **immutable** change still offers both Duplicate actions (unlike Abandon/Describe/Edit)
