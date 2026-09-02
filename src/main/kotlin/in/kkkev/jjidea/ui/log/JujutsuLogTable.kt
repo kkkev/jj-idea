@@ -26,6 +26,7 @@ import kotlinx.datetime.Instant
 import org.apache.commons.lang3.ArrayUtils.addAll
 import java.awt.*
 import java.awt.event.*
+import javax.swing.JTable
 import javax.swing.JViewport
 import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
@@ -384,6 +385,49 @@ class JujutsuLogTable(
             if (key != null && !selectEntry(key.repo, key.revision)) {
                 clearSelection()
             }
+        }
+
+        // jj-idea-6jvh: drag-and-drop gesture support (payload/target model, y-aware zone
+        // hit-test, guards). The table is its own disposable parent for the DnD registration.
+        installDragAndDrop(this)
+    }
+
+    // Selection as of the most recent MOUSE_PRESSED, held only while the button stays down -
+    // null whenever the mouse is up. Used by processMouseMotionEvent below to undo
+    // BasicTableUI's own drag-to-select behavior (jj-idea-6jvh follow-up: manual testing of the
+    // DnD gesture found dragging over a row sometimes selected it).
+    private var preDragSelection: List<Int>? = null
+
+    /**
+     * Captures the pre-drag selection on press, for [processMouseMotionEvent] to restore against.
+     * `dragEnabled` is never set to `true` on this table - the JDK's own fix for "dragging
+     * shouldn't fight a JTable's selection" (`BasicTableUI.Handler` special-cases
+     * `getDragEnabled()`) - because `JTable.setDragEnabled(true)` throws `HeadlessException` in
+     * this project's platform test environment (`GraphicsEnvironment.isHeadless()` is true
+     * there), which would break every platform test that constructs a [JujutsuLogTable]. This
+     * restore-after-the-fact approach reaches the same end result without needing that flag.
+     */
+    override fun processMouseEvent(e: MouseEvent) {
+        super.processMouseEvent(e)
+        when (e.id) {
+            MouseEvent.MOUSE_PRESSED -> preDragSelection = selectedRows.toList()
+            MouseEvent.MOUSE_RELEASED -> preDragSelection = null
+        }
+    }
+
+    /**
+     * Undoes `BasicTableUI.Handler.mouseDragged`'s own fallback behavior for a plain
+     * (`dragEnabled = false`) table: on every `MOUSE_DRAGGED` it unconditionally calls
+     * `table.changeSelection(row, column, ..., extend = true)`, selecting whatever row is
+     * currently under the pointer. That directly fights this table's drag-and-drop gesture
+     * (jj-idea-6jvh) - the row under a dragged commit would flicker into the selection - so once
+     * a drag has actually started (see [preDragSelection]), every drag tick restores the
+     * selection to what it was when the press began, via [restoreSelectionIfChanged].
+     */
+    override fun processMouseMotionEvent(e: MouseEvent) {
+        super.processMouseMotionEvent(e)
+        if (e.id == MouseEvent.MOUSE_DRAGGED) {
+            preDragSelection?.let { restoreSelectionIfChanged(this, it) }
         }
     }
 
@@ -785,6 +829,20 @@ class JujutsuLogTable(
  */
 internal fun rowRectPreservingHorizontalScroll(rowRect: Rectangle, currentVisible: Rectangle): Rectangle =
     Rectangle(currentVisible.x, rowRect.y, currentVisible.width, rowRect.height)
+
+/**
+ * If [table]'s current selected-row set (view indices) differs from [snapshot], restore it -
+ * the testable core of [JujutsuLogTable.processMouseMotionEvent]'s drag-selection-suppression
+ * fix. Split out because dispatching a real `MOUSE_DRAGGED` through Swing's own `BasicTableUI`
+ * throws `HeadlessException` in this project's platform test environment (it unconditionally
+ * calls `BasicGraphicsUtils.isMenuShortcutKeyDown`, which needs a non-headless `Toolkit`), so this
+ * function is exercised directly against a selection model rather than via dispatched events.
+ */
+internal fun restoreSelectionIfChanged(table: JTable, snapshot: List<Int>) {
+    if (table.selectedRows.toList() == snapshot) return
+    table.clearSelection()
+    for (row in snapshot) table.addRowSelectionInterval(row, row)
+}
 
 /** A shrinkable fixed-width column (author/committer/date) as input to [fitColumnWidths]. */
 internal data class FixedColumn(val desired: Int, val min: Int)

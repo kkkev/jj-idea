@@ -92,7 +92,7 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 
 **Log table selection, navigation, and row interaction**
 
-**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`
+**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch)
 **Also re-run:** MT-LOG-DETAILS (issue-tracker link rendering is shared with the details panel)
 
 #### Selection & navigation
@@ -277,6 +277,29 @@ here" without a hand cursor implying a left-click action that doesn't exist.
 - [ ] Choosing **Filter Log to '...'** from the right-click menu applies the filter and closes the menu; choosing it again while already active clears the filter and closes the menu
 - [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
 - [ ] The "+N more" overflow chip shows both a hand cursor and the same grey background highlight on hover (jj-idea-ttmp), and **left-clicking** it still opens its popup of hidden refs, each still openable via their own submenu
+
+#### Drag and drop - core infrastructure (jj-idea-6jvh)
+
+This bead ships only the drag-and-drop *infrastructure* (payload/target model, y-aware zone
+hit-test, guards, indicator painting) with no operational drop handler wired in — no gesture bead
+(rebase-by-drag, etc.) has landed yet, so **no drop should ever actually apply**. What's
+verifiable here is the gesture *shell*: dragging initiates, the zone indicator tracks the pointer
+correctly, and every drop is uniformly rejected.
+
+- [ ] Pressing and dragging from a commit row starts a drag gesture (the cursor changes to a
+      drag/reject cursor); releasing anywhere does **not** change the log or repository state
+- [ ] Dragging over the top ~5px of a row shows no drop indicator and a reject cursor (no
+      performer is wired up yet, so every position is currently rejected)
+- [ ] Dragging near the bottom edge of a long log (more rows than fit the viewport) auto-scrolls
+      the table as the pointer approaches the edge (`SmoothAutoScroller`)
+- [ ] Regression: with drag-and-drop installed, single-click select, Shift+click range,
+      Ctrl/Cmd+click multi-select, double-click (Show Diff), right-click context menu (row and ref
+      chip), and author/committer hover-link behavior are all unaffected
+- [ ] Pressing on a row and dragging over *other* rows does not change the table's selection
+      highlight to whatever row the pointer is currently over - the selection stays exactly what
+      it was when the drag started, for the whole gesture (regression: a plain `JTable` without
+      `dragEnabled` extends its selection to the row under the pointer on every drag tick, which
+      visually fought the drop-zone indicator until this was suppressed)
 
 #### Palette readability (jj-idea-mn1a)
 
