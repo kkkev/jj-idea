@@ -44,7 +44,7 @@ internal data class ContentLogEntryImpl(
 
     override fun getContent(): String? {
         val result = repo.commandExecutor.show(filePath, changeId)
-        return result.stdout.takeIf { result.isSuccess }
+        return result.stdout.takeIf { result is CommandExecutor.CommandResult.Success }
     }
 }
 

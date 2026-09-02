@@ -60,7 +60,7 @@ object ChangeService {
 
     private fun conflictedPathsFor(entry: LogEntry): Set<String> {
         val result = entry.repo.commandExecutor.resolveList(entry.id)
-        if (!result.isSuccess || result.stdout.isBlank()) return emptySet()
+        if (result !is CommandExecutor.CommandResult.Success || result.stdout.isBlank()) return emptySet()
         return result.stdout.lines()
             .mapNotNull { it.trim().split(Regex("\\s+")).firstOrNull()?.takeIf { p -> p.isNotEmpty() } }
             .toSet()

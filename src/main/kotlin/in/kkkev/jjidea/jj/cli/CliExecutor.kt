@@ -465,7 +465,7 @@ class CliExecutor(
 
     override fun isAvailable() = try {
         val result = execute(null, listOf("--version"))
-        result.isSuccess
+        result is CommandExecutor.CommandResult.Success
     } catch (e: Exception) {
         log.warn("Failed to check jj availability", e)
         false
@@ -473,7 +473,7 @@ class CliExecutor(
 
     override fun version() = try {
         val result = execute(null, listOf("--version"))
-        if (result.isSuccess) {
+        if (result is CommandExecutor.CommandResult.Success) {
             result.stdout.trim()
         } else {
             null
@@ -688,7 +688,7 @@ class CliExecutor(
     override fun latestPushedAncestorCommitId(revision: Revision, remoteName: String): String? {
         val revset = Expression("latest(ancestors($revision) & ancestors(remote_bookmarks(remote=$remoteName)))")
         val result = log(revset, template = "commit_id", limit = 1)
-        return result.stdout.trim().takeIf { result.isSuccess && it.isNotEmpty() }
+        return result.stdout.trim().takeIf { result is CommandExecutor.CommandResult.Success && it.isNotEmpty() }
     }
 
     override fun latestPushedAncestorCommitId(remoteName: String) =

@@ -24,6 +24,7 @@ import com.intellij.util.io.URLUtil
 import com.intellij.util.ui.JBEmptyBorder
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -136,7 +137,7 @@ class JujutsuCloneComponent(private val project: Project) : VcsCloneDialogExtens
                 val executor = CliExecutor.forRootlessOperations { appSettings.state.jjExecutablePath }
                 val result = executor.gitCloneWithProgress(url, directory, colocate, indicator)
 
-                if (result.isSuccess) {
+                if (result is CommandExecutor.CommandResult.Success) {
                     // Refresh VFS so IntelliJ sees the new directory
                     LocalFileSystem.getInstance().findFileByIoFile(parentDir)?.refresh(true, true)
 

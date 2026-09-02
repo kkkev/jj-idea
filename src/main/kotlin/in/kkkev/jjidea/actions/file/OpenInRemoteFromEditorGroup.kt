@@ -24,6 +24,7 @@ import `in`.kkkev.jjidea.actions.git.ClassifiedRemote
 import `in`.kkkev.jjidea.actions.git.RemoteUrlBuilder
 import `in`.kkkev.jjidea.actions.git.applyRemoteVisibility
 import `in`.kkkev.jjidea.actions.repoForFile
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -184,7 +185,7 @@ private fun mapToRemoteLineRange(
     if (localText == null || localLineRange == null) return null
     val filePath = VcsUtil.getFilePath(File("${repo.directory.path}/$relativePath"), false)
     val remoteText = repo.commandExecutor.show(filePath, CommitId(commitHash))
-        .takeIf { it.isSuccess }?.stdout ?: return null
+        .takeIf { it is CommandExecutor.CommandResult.Success }?.stdout ?: return null
     val fragments = ComparisonManager.getInstance()
         .compareLines(remoteText, localText, ComparisonPolicy.DEFAULT, EmptyProgressIndicator())
     return translateRange(fragments, localLineRange)

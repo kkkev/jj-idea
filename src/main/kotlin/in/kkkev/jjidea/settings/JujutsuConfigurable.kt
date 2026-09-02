@@ -802,7 +802,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                 revsetValidationPanel.removeAll()
                 revsetError = null
                 results.forEach { (repo, result, hasOverride) ->
-                    val (icon, msg) = if (!result.isSuccess) {
+                    val (icon, msg) = if (result !is CommandExecutor.CommandResult.Success) {
                         revsetError = result.stderr.trim()
                         AllIcons.General.Error to JujutsuBundle.message(
                             "settings.log.revset.test.error",
@@ -834,7 +834,7 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
         runInBackground {
             val result = runRevsetTest(panel.repo, expression)
             runLater {
-                if (result.isSuccess) {
+                if (result is CommandExecutor.CommandResult.Success) {
                     val count = result.stdout.length
                     showRevsetResult(
                         panel.revsetValidationLabel,
@@ -885,8 +885,11 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
             }
 
             runLater {
-                val failure = results.firstOrNull { (_, result) -> !result.isSuccess }
-                val ambiguous = results.firstOrNull { (_, result) -> result.isSuccess && result.stdout.length > 1 }
+                val failure = results.firstOrNull { (_, result) -> result !is CommandExecutor.CommandResult.Success }
+                val ambiguous = results.firstOrNull { (_, result) ->
+                    result is CommandExecutor.CommandResult.Success &&
+                        result.stdout.length > 1
+                }
                 when {
                     failure != null -> {
                         val errorMsg = failure.second.stderr.trim()

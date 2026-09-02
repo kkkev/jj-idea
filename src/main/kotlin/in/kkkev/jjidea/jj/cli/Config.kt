@@ -22,16 +22,18 @@ class Config(private val commandExecutor: CommandExecutor) {
     private inner class ScopedConfigImpl(private val scope: CommandExecutor.ConfigScope?) : ScopedConfig {
         // If a scope has been specified, check the config option exists in that scope via listing.
         // Falls back to effective (cross-scope) lookup when no scope filter is active.
-        override fun get(key: Key): String? =
-            if (
-                scope != null &&
-                commandExecutor.configList(key.string, scope).takeIf { it.isSuccess }?.stdout?.isNotBlank() != true
-            ) {
-                null
-            } else {
-                commandExecutor.configGet(key.string).takeIf { it.isSuccess }?.stdout?.trim()
-                    ?.takeIf { it.isNotEmpty() }
-            }
+        override fun get(key: Key): String? {
+            val listedInScope = scope == null ||
+                run {
+                    val listing = commandExecutor.configList(key.string, scope)
+                    listing is CommandExecutor.CommandResult.Success && listing.stdout.isNotBlank()
+                }
+            if (!listedInScope) return null
+
+            val result = commandExecutor.configGet(key.string)
+            if (result !is CommandExecutor.CommandResult.Success) return null
+            return result.stdout.trim().takeIf { it.isNotEmpty() }
+        }
 
         override fun set(key: Key, value: String?) {
             val actualScope = scope ?: CommandExecutor.ConfigScope.REPO

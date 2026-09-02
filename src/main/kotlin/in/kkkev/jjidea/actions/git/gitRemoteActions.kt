@@ -8,6 +8,7 @@ import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.BookmarkName
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
@@ -171,7 +172,7 @@ fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Re
             return@runInBackground
         }
 
-        if (!dryRun.isSuccess) {
+        if (dryRun !is CommandExecutor.CommandResult.Success) {
             runLater { dryRun.tellUser(project, "action.git.push.error") }
             return@runInBackground
         }
@@ -201,7 +202,7 @@ private fun trackAndPush(
 ) {
     runInBackground {
         val result = spec.repo.commandExecutor.bookmarkTrack(newBookmarks)
-        if (!result.isSuccess) {
+        if (result !is CommandExecutor.CommandResult.Success) {
             runLater { result.tellUser(project, "action.git.push.error") }
             return@runInBackground
         }

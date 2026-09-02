@@ -41,9 +41,6 @@ interface CommandExecutor {
         val stdout: String
         val stderr: String
 
-        /** `true` for [Success]. Kept temporarily for callers not yet migrated to `is Success`. */
-        val isSuccess: Boolean get() = this is Success
-
         sealed interface Success : CommandResult {
             /** Succeeded and wrote an operation we identified and can revert via [opRevert]. */
             data class Reversible(

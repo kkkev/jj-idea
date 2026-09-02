@@ -230,9 +230,9 @@ data class JujutsuRepositoryImpl(
  */
 fun JujutsuRepository.reconstructMergeParentContent(childRevision: Revision, filePath: FilePath): String {
     val afterContent = commandExecutor.show(filePath, childRevision).let {
-        if (it.isSuccess) it.stdout else ""
+        if (it is CommandExecutor.CommandResult.Success) it.stdout else ""
     }
     val diffResult = commandExecutor.diffGitFile(childRevision, filePath)
-    if (!diffResult.isSuccess || diffResult.stdout.isBlank()) return afterContent
+    if (diffResult !is CommandExecutor.CommandResult.Success || diffResult.stdout.isBlank()) return afterContent
     return GitDiffReverseApplier.reverseApply(afterContent, diffResult.stdout) ?: afterContent
 }

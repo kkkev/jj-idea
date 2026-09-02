@@ -12,6 +12,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.git.GitPushDialog.Companion.loadAllDialogData
 import `in`.kkkev.jjidea.actions.git.GitPushDialog.Companion.loadDialogData
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Remote
 import `in`.kkkev.jjidea.jj.Revision
@@ -334,7 +335,7 @@ class GitPushDialog internal constructor(
          */
         fun loadRemotes(repo: JujutsuRepository): List<Remote> =
             repo.commandExecutor.gitRemoteList().let { result ->
-                if (result.isSuccess) {
+                if (result is CommandExecutor.CommandResult.Success) {
                     result.stdout.lines()
                         .map { it.trim() }
                         .filter { it.isNotEmpty() }
@@ -348,7 +349,11 @@ class GitPushDialog internal constructor(
         /** Runs `jj bookmark list --tracked`, scoped to [remote] and optionally [revision]. Call off EDT. */
         private fun loadTrackedBookmarks(repo: JujutsuRepository, remote: Remote, revision: Revision?): List<Bookmark> =
             repo.commandExecutor.bookmarkList(LOCAL_BOOKMARK_TEMPLATE, remote, true, revision).let { result ->
-                if (result.isSuccess) parseBookmarks(result.stdout, tracked = true) else emptyList()
+                if (result is CommandExecutor.CommandResult.Success) {
+                    parseBookmarks(result.stdout, tracked = true)
+                } else {
+                    emptyList()
+                }
             }
 
         /**
@@ -374,7 +379,11 @@ class GitPushDialog internal constructor(
                 template = LOCAL_BOOKMARK_TEMPLATE,
                 revision = revision
             ).let { result ->
-                if (result.isSuccess) parseBookmarks(result.stdout, tracked = false) else emptyList()
+                if (result is CommandExecutor.CommandResult.Success) {
+                    parseBookmarks(result.stdout, tracked = false)
+                } else {
+                    emptyList()
+                }
             }
             return DialogData(
                 remotes = remotes,

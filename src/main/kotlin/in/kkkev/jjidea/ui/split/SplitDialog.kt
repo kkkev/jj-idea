@@ -13,6 +13,7 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.diffedit.HunkPickerLabels
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
@@ -247,7 +248,7 @@ class SplitDialog(
         val afterResult = executor.show(fp, revision)
         val diffResult = executor.diffGitFile(revision, fp)
 
-        val afterContent = if (afterResult.isSuccess) afterResult.stdout else null
+        val afterContent = if (afterResult is CommandExecutor.CommandResult.Success) afterResult.stdout else null
         val gitDiff = diffResult.stdout
 
         // Derive base (parent) content from the diff.

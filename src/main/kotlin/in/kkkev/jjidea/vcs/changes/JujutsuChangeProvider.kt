@@ -6,6 +6,7 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.*
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
 import `in`.kkkev.jjidea.jj.conflict.ConflictInfoParser
@@ -45,14 +46,14 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcsBase) : ChangeProvider {
                         }
                         val result = repo.commandExecutor.status()
 
-                        if (!result.isSuccess) {
+                        if (result !is CommandExecutor.CommandResult.Success) {
                             log.warn("Failed to get jj status for $repo: ${result.stderr}")
                             return@measurePerf
                         }
 
                         val conflictInfos = if (workingCopyInConflict(result.stdout)) {
                             val resolveResult = repo.commandExecutor.resolveList()
-                            if (resolveResult.isSuccess) {
+                            if (resolveResult is CommandExecutor.CommandResult.Success) {
                                 ConflictInfoParser.parse(resolveResult.stdout)
                             } else {
                                 collectConflictPathsFromStatus(result.stdout).associateWith {

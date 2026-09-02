@@ -115,7 +115,7 @@ class JujutsuFileAnnotation(
      */
     private fun fileExistsAt(revision: Revision): Boolean {
         val future = runInBackground { repo.commandExecutor.show(file.filePath, revision) }
-        return ProgressIndicatorUtils.awaitWithCheckCanceled(future).isSuccess
+        return ProgressIndicatorUtils.awaitWithCheckCanceled(future) is CommandExecutor.CommandResult.Success
     }
 
     /**
@@ -221,7 +221,11 @@ private class AnnotationFileRevision(
     override fun loadContent(): ByteArray {
         val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, line.id) }
         val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
-        if (!result.isSuccess) throw VcsException("Failed to load content at ${line.id}: ${result.stderr}")
+        if (result !is CommandExecutor.CommandResult.Success) {
+            throw VcsException(
+                "Failed to load content at ${line.id}: ${result.stderr}"
+            )
+        }
         return result.stdout.toByteArray()
     }
 
@@ -256,7 +260,11 @@ private class ParentFileRevision(
     override fun loadContent(): ByteArray {
         val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, changeId) }
         val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
-        if (!result.isSuccess) throw VcsException("Failed to load content at $changeId: ${result.stderr}")
+        if (result !is CommandExecutor.CommandResult.Success) {
+            throw VcsException(
+                "Failed to load content at $changeId: ${result.stderr}"
+            )
+        }
         return result.stdout.toByteArray()
     }
 

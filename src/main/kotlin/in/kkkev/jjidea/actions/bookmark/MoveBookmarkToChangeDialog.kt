@@ -13,6 +13,7 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
@@ -398,7 +399,7 @@ class MoveBookmarkToChangeDialog(
                 revset = revset,
                 template = "${TemplateParts.changeIdWithOffset()} ++ \"\\n\""
             )
-            val forwardIds = if (result.isSuccess) {
+            val forwardIds = if (result is CommandExecutor.CommandResult.Success) {
                 result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             } else {
                 log.warn("Descendant revset query '$revset' failed: ${result.stderr}")

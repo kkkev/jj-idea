@@ -132,7 +132,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     ): Result<List<T>> {
         log.debug("Getting ${noun}s")
         val result = list(template.spec)
-        return if (result.isSuccess) {
+        return if (result is CommandExecutor.CommandResult.Success) {
             toResult("Failed to parse ${noun}s") {
                 parse(template, result.stdout).filterNotNull()
             }
@@ -155,7 +155,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         val result = executor.diffSummary(changeId, filePath)
 
-        return if (result.isSuccess) {
+        return if (result is CommandExecutor.CommandResult.Success) {
             toResult("Failed to parse file changes") {
                 parseFileChanges(result.stdout, changeId, logEntry.parentContentLocator).also {
                     log.debug("Parsed ${it.size} file changes")
@@ -171,7 +171,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         val result = executor.diffSummaryBetween(from, to)
 
-        return if (result.isSuccess) {
+        return if (result is CommandExecutor.CommandResult.Success) {
             toResult("Failed to parse file changes") {
                 parseFileChanges(result.stdout, afterContentLocator = to, beforeContentLocator = from).also {
                     log.debug("Parsed ${it.size} file changes")
@@ -250,12 +250,12 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                     .also { r -> r.onSuccess { report.count("entries", it.size.toLong()) } }
 
             val result = executor.log(revset, template.spec, filePaths, limit, quiet)
-            if (result.isSuccess) {
+            if (result is CommandExecutor.CommandResult.Success) {
                 parseSuccess(result.stdout, template)
             } else if (fallbackTemplate != null && TEMPLATE_EVALUATION_FAILURE in result.stderr) {
                 markPushedAncestorUnsupported()
                 val retry = executor.log(revset, fallbackTemplate.spec, filePaths, limit, quiet)
-                if (retry.isSuccess) {
+                if (retry is CommandExecutor.CommandResult.Success) {
                     parseSuccess(retry.stdout, fallbackTemplate)
                 } else {
                     Result.failure(VcsException("Error from jj log: " + retry.stderr))

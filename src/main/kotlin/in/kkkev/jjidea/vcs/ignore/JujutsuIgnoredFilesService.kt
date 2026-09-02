@@ -12,6 +12,7 @@ import com.intellij.openapi.vcs.util.paths.RecursiveFilePathSet
 import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import com.intellij.vcsUtil.VcsUtil
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -162,7 +163,14 @@ class JujutsuIgnoredFilesService(private val project: Project) : Disposable {
             // Files reported by `jj status` must not also appear as ignored
             val trackedPaths: Set<String> = run {
                 val result = repo.commandExecutor.status()
-                if (result.isSuccess) collectTrackedAbsolutePaths(result.stdout, repo) else emptySet()
+                if (result is CommandExecutor.CommandResult.Success) {
+                    collectTrackedAbsolutePaths(
+                        result.stdout,
+                        repo
+                    )
+                } else {
+                    emptySet()
+                }
             }
 
             val ignoreService = JujutsuIgnoreService.getInstance(project)

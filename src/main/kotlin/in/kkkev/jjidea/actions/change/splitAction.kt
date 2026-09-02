@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.diffedit.DiffEditTool
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeService
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.HunkSelection
@@ -94,7 +95,7 @@ private fun executeSplitFilePaths(project: Project, target: LogEntry, spec: Spli
         )
 
         runLater {
-            if (!result.isSuccess) {
+            if (result !is CommandExecutor.CommandResult.Success) {
                 result.tellUser(project, "log.action.split.error")
                 return@runLater
             }
@@ -122,7 +123,7 @@ private fun executeSplitInteractive(
             val relPath = fp.relativeTo(root)
             if (perFileContent[relPath] == null) {
                 val result = target.repo.commandExecutor.show(fp, spec.revision)
-                if (result.isSuccess) {
+                if (result is CommandExecutor.CommandResult.Success) {
                     perFileContent[relPath] = result.stdout
                 } else {
                     splitLog.warn("Could not fetch after-content for $relPath; file may be missing from first commit")
@@ -142,7 +143,7 @@ private fun executeSplitInteractive(
         }
 
         runLater {
-            if (!result.isSuccess) {
+            if (result !is CommandExecutor.CommandResult.Success) {
                 result.tellUser(project, "log.action.split.error")
                 return@runLater
             }

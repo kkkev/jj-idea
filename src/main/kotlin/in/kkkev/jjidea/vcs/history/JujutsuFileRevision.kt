@@ -5,6 +5,7 @@ import com.intellij.openapi.vcs.RepositoryLocation
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.history.VcsFileRevisionEx
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.GitRemote
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -55,7 +56,7 @@ class JujutsuFileRevision(
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
         val result = entry.repo.commandExecutor.show(filePath, entry.id)
-        if (!result.isSuccess) {
+        if (result !is CommandExecutor.CommandResult.Success) {
             throw VcsException("Failed to load file content at revision ${entry.id}: ${result.stderr}")
         }
         return result.stdout.toByteArray()

@@ -18,14 +18,13 @@ class JujutsuCommandResultTest {
                 reason = CommandResult.Success.Irreversible.Reason.NOT_TRACKED
             )
 
-        result.isSuccess shouldBe true
+        result.shouldBeInstanceOf<CommandResult.Success>()
     }
 
     @Test
     fun `a Failure is not success`() {
         val result: CommandResult = CommandResult.Failure.Exited(stdout = "", stderr = "error", exitCode = 1)
 
-        result.isSuccess shouldBe false
         result.shouldBeInstanceOf<CommandResult.Failure>().exitCode shouldBe 1
     }
 

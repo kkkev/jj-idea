@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.diffedit.DiffEditTool
 import `in`.kkkev.jjidea.jj.ChangeService
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
@@ -88,7 +89,7 @@ private fun executeSquashIntoFilePaths(
                 spec.description,
                 keepEmptied = !deleteAndMove
             )
-            if (!result.isSuccess) return@createCommand result
+            if (result !is CommandExecutor.CommandResult.Success) return@createCommand result
             if (editDestinationAfter) edit(spec.destination) else result
         }
         .onSuccess {
@@ -150,7 +151,7 @@ private fun executeSquashIntoInteractive(
                 configArgs = configArgs,
                 tool = tool
             )
-            if (squashResult.isSuccess && editDestinationAfter) {
+            if (squashResult is CommandExecutor.CommandResult.Success && editDestinationAfter) {
                 repo.commandExecutor.edit(spec.destination)
             } else {
                 squashResult
@@ -158,7 +159,7 @@ private fun executeSquashIntoInteractive(
         }
 
         runLater {
-            if (!result.isSuccess) {
+            if (result !is CommandExecutor.CommandResult.Success) {
                 result.tellUser(project, "log.action.squash.into.error")
                 return@runLater
             }

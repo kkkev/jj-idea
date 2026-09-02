@@ -215,7 +215,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     val gitRemotes = notifiableState(project, "Jujutsu Git Remotes", emptyMap()) {
         initialisedRepositories.immediateValue.values.associate { repo ->
             val result = repo.commandExecutor.gitRemoteList()
-            val remotes = if (!result.isSuccess) {
+            val remotes = if (result !is CommandExecutor.CommandResult.Success) {
                 emptyList()
             } else {
                 result.stdout.lines()

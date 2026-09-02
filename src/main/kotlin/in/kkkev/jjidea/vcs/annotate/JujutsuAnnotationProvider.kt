@@ -278,7 +278,7 @@ class JujutsuAnnotationProvider(
         // timed-out annotate's CommandResult is the honest ~120s cost and should count toward the
         // preload backoff decision (jj-idea-1sza) just as much as a slow success would.
         annotateTimings.computeIfAbsent(repo.directory.path) { AnnotateTiming() }.record(nowMs() - startMs)
-        if (!result.isSuccess) {
+        if (result !is CommandExecutor.CommandResult.Success) {
             val message = if (result is CommandExecutor.CommandResult.Failure.TimedOut) {
                 JujutsuBundle.message("annotation.error.timeout", file.name)
             } else {
