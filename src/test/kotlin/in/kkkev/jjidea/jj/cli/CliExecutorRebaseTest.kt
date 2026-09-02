@@ -19,7 +19,7 @@ class CliExecutorRebaseTest {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main"))
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main")
         }
@@ -30,7 +30,7 @@ class CliExecutorRebaseTest {
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main")),
                 RebaseSourceMode.SOURCE
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-s", "abc123def456", "--onto", "main")
         }
@@ -41,7 +41,7 @@ class CliExecutorRebaseTest {
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main")),
                 RebaseSourceMode.BRANCH
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-b", "abc123def456", "--onto", "main")
         }
@@ -58,7 +58,7 @@ class CliExecutorRebaseTest {
                 listOf(revision),
                 listOf(destination),
                 destinationMode = RebaseDestinationMode.INSERT_AFTER
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-A", "main")
         }
@@ -69,7 +69,7 @@ class CliExecutorRebaseTest {
                 listOf(revision),
                 listOf(destination),
                 destinationMode = RebaseDestinationMode.INSERT_BEFORE
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-B", "main")
         }
@@ -85,7 +85,7 @@ class CliExecutorRebaseTest {
                     ChangeId("fed987cba654", "fed987cb", null)
                 ),
                 listOf(BookmarkName("main"))
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-r", "fed987cba654", "--onto", "main")
         }
@@ -99,7 +99,7 @@ class CliExecutorRebaseTest {
                 ),
                 listOf(BookmarkName("main")),
                 RebaseSourceMode.SOURCE
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-s", "abc123def456", "-s", "fed987cba654", "--onto", "main")
         }
@@ -112,7 +112,7 @@ class CliExecutorRebaseTest {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main"), BookmarkName("feature"))
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main", "--onto", "feature")
         }
@@ -126,7 +126,7 @@ class CliExecutorRebaseTest {
                     ChangeId("ccc333ddd444", "ccc333dd", null)
                 ),
                 destinationMode = RebaseDestinationMode.INSERT_AFTER
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "-A", "aaa111bbb222", "-A", "ccc333ddd444")
         }
@@ -140,7 +140,7 @@ class CliExecutorRebaseTest {
                 listOf(WorkingCopy),
                 listOf(BookmarkName("main")),
                 RebaseSourceMode.BRANCH
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-b", "@", "--onto", "main")
         }
@@ -150,7 +150,7 @@ class CliExecutorRebaseTest {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(ChangeId("fed987cba654", "fed987cb", null))
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "fed987cba654")
         }
@@ -160,7 +160,7 @@ class CliExecutorRebaseTest {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(RevisionExpression("main@origin"))
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main@origin")
         }
@@ -173,9 +173,17 @@ class CliExecutorRebaseTest {
             val result = rebaseArgs(
                 listOf(ChangeId("abc123def456", "abc123de", null)),
                 listOf(BookmarkName("main"))
-            )
+            ).args
 
             result shouldBe listOf("rebase", "-r", "abc123def456", "--onto", "main")
         }
+    }
+
+    @Test
+    fun `rebase is reversible`() {
+        rebaseArgs(
+            listOf(ChangeId("abc123def456", "abc123de", null)),
+            listOf(BookmarkName("main"))
+        ).reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

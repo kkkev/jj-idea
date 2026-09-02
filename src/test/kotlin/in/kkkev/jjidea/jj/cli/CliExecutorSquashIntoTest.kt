@@ -17,14 +17,14 @@ class CliExecutorSquashIntoTest {
     inner class `single source` {
         @Test
         fun `squash --from src --into dest`() {
-            val result = squashIntoArgs(listOf(src1), dest)
+            val result = squashIntoArgs(listOf(src1), dest).args
 
             result shouldBe listOf("squash", "--into", "fff111222333", "--from", "abc123def456")
         }
 
         @Test
         fun `working copy as source`() {
-            val result = squashIntoArgs(listOf(WorkingCopy), dest)
+            val result = squashIntoArgs(listOf(WorkingCopy), dest).args
 
             result shouldBe listOf("squash", "--into", "fff111222333", "--from", WorkingCopy.REF)
         }
@@ -34,7 +34,7 @@ class CliExecutorSquashIntoTest {
     inner class `multiple sources` {
         @Test
         fun `squash with two sources`() {
-            val result = squashIntoArgs(listOf(src1, src2), dest)
+            val result = squashIntoArgs(listOf(src1, src2), dest).args
 
             result shouldBe listOf(
                 "squash",
@@ -52,7 +52,7 @@ class CliExecutorSquashIntoTest {
     inner class `selective squash with file paths` {
         @Test
         fun `single file is passed after --`() {
-            val result = squashIntoArgs(listOf(src1), dest, filePaths = listOf("src/main.kt"))
+            val result = squashIntoArgs(listOf(src1), dest, filePaths = listOf("src/main.kt")).args
 
             result shouldBe listOf(
                 "squash",
@@ -71,7 +71,7 @@ class CliExecutorSquashIntoTest {
                 listOf(src1),
                 dest,
                 filePaths = listOf("src/main.kt", "README.md")
-            )
+            ).args
 
             result shouldBe listOf(
                 "squash",
@@ -87,7 +87,7 @@ class CliExecutorSquashIntoTest {
 
         @Test
         fun `empty file list omits the -- separator`() {
-            val result = squashIntoArgs(listOf(src1), dest, filePaths = emptyList())
+            val result = squashIntoArgs(listOf(src1), dest, filePaths = emptyList()).args
 
             result shouldBe listOf("squash", "--into", "fff111222333", "--from", "abc123def456")
         }
@@ -97,7 +97,7 @@ class CliExecutorSquashIntoTest {
     inner class `with description` {
         @Test
         fun `squash with message`() {
-            val result = squashIntoArgs(listOf(src1), dest, description = Description("Combined"))
+            val result = squashIntoArgs(listOf(src1), dest, description = Description("Combined")).args
 
             result shouldBe listOf(
                 "squash",
@@ -116,7 +116,7 @@ class CliExecutorSquashIntoTest {
                 dest,
                 filePaths = listOf("a.kt"),
                 description = Description("Two-source")
-            )
+            ).args
 
             result shouldBe listOf(
                 "squash",
@@ -137,7 +137,7 @@ class CliExecutorSquashIntoTest {
     inner class `keep emptied` {
         @Test
         fun `squash with --keep-emptied`() {
-            val result = squashIntoArgs(listOf(src1), dest, keepEmptied = true)
+            val result = squashIntoArgs(listOf(src1), dest, keepEmptied = true).args
 
             result shouldBe listOf(
                 "squash",
@@ -157,7 +157,7 @@ class CliExecutorSquashIntoTest {
                 filePaths = listOf("a.kt"),
                 description = Description("All"),
                 keepEmptied = true
-            )
+            ).args
 
             result shouldBe listOf(
                 "squash",
@@ -173,5 +173,10 @@ class CliExecutorSquashIntoTest {
                 "cwd:\"a.kt\""
             )
         }
+    }
+
+    @Test
+    fun `squash into is reversible`() {
+        squashIntoArgs(listOf(src1), dest).reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

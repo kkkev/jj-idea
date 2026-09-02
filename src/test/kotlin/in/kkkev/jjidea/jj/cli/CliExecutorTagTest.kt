@@ -15,24 +15,24 @@ class CliExecutorTagTest {
     inner class `tag set` {
         @Test
         fun `set at working copy`() {
-            tagSetArgs(Tag("v1.0")) shouldBe listOf("tag", "set", "v1.0", "-r", "@")
+            tagSetArgs(Tag("v1.0")).args shouldBe listOf("tag", "set", "v1.0", "-r", "@")
         }
 
         @Test
         fun `set at specific revision`() {
-            tagSetArgs(Tag("v1.0"), ChangeId("abc123", "abc1", null)) shouldBe
+            tagSetArgs(Tag("v1.0"), ChangeId("abc123", "abc1", null)).args shouldBe
                 listOf("tag", "set", "v1.0", "-r", "abc123")
         }
 
         @Test
         fun `set with allow move`() {
-            tagSetArgs(Tag("v1.0"), WorkingCopy, allowMove = true) shouldBe
+            tagSetArgs(Tag("v1.0"), WorkingCopy, allowMove = true).args shouldBe
                 listOf("tag", "set", "v1.0", "-r", "@", "--allow-move")
         }
 
         @Test
         fun `set without allow move does not include flag`() {
-            tagSetArgs(Tag("v1.0"), WorkingCopy, allowMove = false) shouldBe
+            tagSetArgs(Tag("v1.0"), WorkingCopy, allowMove = false).args shouldBe
                 listOf("tag", "set", "v1.0", "-r", "@")
         }
     }
@@ -41,7 +41,13 @@ class CliExecutorTagTest {
     inner class `tag delete` {
         @Test
         fun `delete tag`() {
-            tagDeleteArgs(Tag("v1.0")) shouldBe listOf("tag", "delete", "v1.0")
+            tagDeleteArgs(Tag("v1.0")).args shouldBe listOf("tag", "delete", "v1.0")
         }
+    }
+
+    @Test
+    fun `tag set and delete are reversible`() {
+        tagSetArgs(Tag("v1.0")).reversibility shouldBe Reversibility.REVERSIBLE
+        tagDeleteArgs(Tag("v1.0")).reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

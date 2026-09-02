@@ -15,14 +15,14 @@ class CliExecutorSquashTest {
     inner class `whole squash` {
         @Test
         fun `squash -r revision`() {
-            val result = squashArgs(revision)
+            val result = squashArgs(revision).args
 
             result shouldBe listOf("squash", "-r", "abc123def456")
         }
 
         @Test
         fun `squash working copy`() {
-            val result = squashArgs(WorkingCopy)
+            val result = squashArgs(WorkingCopy).args
 
             result shouldBe listOf("squash", "-r", WorkingCopy.REF)
         }
@@ -32,7 +32,7 @@ class CliExecutorSquashTest {
     inner class `selective squash with file paths` {
         @Test
         fun `squash with single file path`() {
-            val result = squashArgs(revision, filePaths = listOf("src/main.kt"))
+            val result = squashArgs(revision, filePaths = listOf("src/main.kt")).args
 
             result shouldBe listOf("squash", "-r", "abc123def456", "--", "cwd:\"src/main.kt\"")
         }
@@ -42,7 +42,7 @@ class CliExecutorSquashTest {
             val result = squashArgs(
                 revision,
                 filePaths = listOf("src/main.kt", "src/utils.kt", "README.md")
-            )
+            ).args
 
             result shouldBe listOf(
                 "squash",
@@ -57,7 +57,7 @@ class CliExecutorSquashTest {
 
         @Test
         fun `empty file list omits the -- separator`() {
-            val result = squashArgs(revision, filePaths = emptyList())
+            val result = squashArgs(revision, filePaths = emptyList()).args
 
             result shouldBe listOf("squash", "-r", "abc123def456")
         }
@@ -67,7 +67,7 @@ class CliExecutorSquashTest {
     inner class `with description` {
         @Test
         fun `squash with message`() {
-            val result = squashArgs(revision, description = Description("Combined change"))
+            val result = squashArgs(revision, description = Description("Combined change")).args
 
             result shouldBe listOf("squash", "-r", "abc123def456", "--message=Combined change")
         }
@@ -78,7 +78,7 @@ class CliExecutorSquashTest {
                 revision,
                 filePaths = listOf("src/main.kt"),
                 description = Description("Partial squash")
-            )
+            ).args
 
             result shouldBe listOf(
                 "squash",
@@ -95,7 +95,7 @@ class CliExecutorSquashTest {
     inner class `keep emptied` {
         @Test
         fun `squash with --keep-emptied`() {
-            val result = squashArgs(revision, keepEmptied = true)
+            val result = squashArgs(revision, keepEmptied = true).args
 
             result shouldBe listOf("squash", "-r", "abc123def456", "--keep-emptied")
         }
@@ -107,7 +107,7 @@ class CliExecutorSquashTest {
                 filePaths = listOf("src/main.kt"),
                 description = Description("Combined"),
                 keepEmptied = true
-            )
+            ).args
 
             result shouldBe listOf(
                 "squash",
@@ -119,5 +119,10 @@ class CliExecutorSquashTest {
                 "cwd:\"src/main.kt\""
             )
         }
+    }
+
+    @Test
+    fun `squash is reversible`() {
+        squashArgs(revision).reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

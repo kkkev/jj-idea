@@ -75,7 +75,7 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         tracked: Boolean,
         revision: Revision?
     ) = toResult(
-        stub.run(*bookmarkListArgs(template, remote, tracked, revision).toTypedArray())
+        stub.run(*bookmarkListArgs(template, remote, tracked, revision).args.toTypedArray())
     )
 
     override fun tagList(template: String?) = toResult(
@@ -140,7 +140,7 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         destinationMode: RebaseDestinationMode,
         edit: Boolean
     ): CommandExecutor.CommandResult =
-        toResult(stub.run(*newArgs(description, parentRevisions, destinationMode, edit).toTypedArray()))
+        toResult(stub.run(*newArgs(description, parentRevisions, destinationMode, edit).args.toTypedArray()))
 
     override fun abandon(revision: Revision): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")

@@ -19,7 +19,7 @@ class CliExecutorTimeoutTest {
     fun `timed out output is flagged and gets a real message naming the command and limit`() {
         val output = ProcessOutput("partial stdout", "", -1, true, false)
 
-        val result = output.toCommandResult("file annotate -r @ file.txt", 120_000)
+        val result = output.toCommandResult("file annotate -r @ file.txt", 120_000, Reversibility.READ_ONLY)
 
         val timedOut = result.shouldBeInstanceOf<CommandResult.Failure.TimedOut>()
         timedOut.exitCode shouldBe -1
@@ -32,7 +32,7 @@ class CliExecutorTimeoutTest {
     fun `successful output is not flagged as timed out`() {
         val output = ProcessOutput("ok", "", 0, false, false)
 
-        val result = output.toCommandResult("status", 30_000)
+        val result = output.toCommandResult("status", 30_000, Reversibility.READ_ONLY)
 
         val success = result.shouldBeInstanceOf<CommandResult.Success>()
         success.stdout shouldBe "ok"
@@ -43,7 +43,7 @@ class CliExecutorTimeoutTest {
     fun `ordinary failure is not flagged as timed out and stderr passes through verbatim`() {
         val output = ProcessOutput("", "boom", 1, false, false)
 
-        val result = output.toCommandResult("status", 30_000)
+        val result = output.toCommandResult("status", 30_000, Reversibility.READ_ONLY)
 
         val exited = result.shouldBeInstanceOf<CommandResult.Failure.Exited>()
         exited.exitCode shouldBe 1

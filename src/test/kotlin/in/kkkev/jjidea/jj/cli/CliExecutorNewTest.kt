@@ -15,7 +15,7 @@ class CliExecutorNewTest {
     inner class `onto (default placement)` {
         @Test
         fun `single revision is positional, not flagged`() {
-            val result = newArgs(Description.EMPTY, listOf(revision))
+            val result = newArgs(Description.EMPTY, listOf(revision)).args
 
             // jj new has no --onto flag - RebaseDestinationMode.ONTO's `flag` string must never
             // appear here, unlike duplicateArgs/rebaseArgs which do emit it.
@@ -24,7 +24,7 @@ class CliExecutorNewTest {
 
         @Test
         fun `working copy default`() {
-            val result = newArgs(Description.EMPTY, listOf(WorkingCopy))
+            val result = newArgs(Description.EMPTY, listOf(WorkingCopy)).args
 
             result shouldBe listOf("new", "@")
         }
@@ -37,14 +37,14 @@ class CliExecutorNewTest {
                     ChangeId("aaa111bbb222", "aaa111bb", null),
                     ChangeId("bbb222ccc333", "bbb222cc", null)
                 )
-            )
+            ).args
 
             result shouldBe listOf("new", "aaa111bbb222", "bbb222ccc333")
         }
 
         @Test
         fun `description is fused with --message=`() {
-            val result = newArgs(Description("A new task"), listOf(revision))
+            val result = newArgs(Description("A new task"), listOf(revision)).args
 
             result shouldBe listOf("new", "--message=A new task", "abc123def456")
         }
@@ -54,7 +54,7 @@ class CliExecutorNewTest {
     inner class `insert after (-A)` {
         @Test
         fun `single target`() {
-            val result = newArgs(Description.EMPTY, listOf(revision), RebaseDestinationMode.INSERT_AFTER)
+            val result = newArgs(Description.EMPTY, listOf(revision), RebaseDestinationMode.INSERT_AFTER).args
 
             result shouldBe listOf("new", "-A", "abc123def456")
         }
@@ -68,7 +68,7 @@ class CliExecutorNewTest {
                     ChangeId("bbb222ccc333", "bbb222cc", null)
                 ),
                 RebaseDestinationMode.INSERT_AFTER
-            )
+            ).args
 
             result shouldBe listOf("new", "-A", "aaa111bbb222", "-A", "bbb222ccc333")
         }
@@ -78,7 +78,7 @@ class CliExecutorNewTest {
     inner class `insert before (-B)` {
         @Test
         fun `single target`() {
-            val result = newArgs(Description.EMPTY, listOf(revision), RebaseDestinationMode.INSERT_BEFORE)
+            val result = newArgs(Description.EMPTY, listOf(revision), RebaseDestinationMode.INSERT_BEFORE).args
 
             result shouldBe listOf("new", "-B", "abc123def456")
         }
@@ -88,14 +88,14 @@ class CliExecutorNewTest {
     inner class `--no-edit` {
         @Test
         fun `edit=false emits --no-edit`() {
-            val result = newArgs(Description.EMPTY, listOf(revision), edit = false)
+            val result = newArgs(Description.EMPTY, listOf(revision), edit = false).args
 
             result shouldBe listOf("new", "--no-edit", "abc123def456")
         }
 
         @Test
         fun `edit=true (default) omits --no-edit`() {
-            val result = newArgs(Description.EMPTY, listOf(revision), edit = true)
+            val result = newArgs(Description.EMPTY, listOf(revision), edit = true).args
 
             result shouldBe listOf("new", "abc123def456")
         }
@@ -107,9 +107,14 @@ class CliExecutorNewTest {
                 listOf(revision),
                 RebaseDestinationMode.INSERT_AFTER,
                 edit = false
-            )
+            ).args
 
             result shouldBe listOf("new", "--message=Placeholder", "--no-edit", "-A", "abc123def456")
         }
+    }
+
+    @Test
+    fun `new is reversible`() {
+        newArgs(Description.EMPTY, listOf(revision)).reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

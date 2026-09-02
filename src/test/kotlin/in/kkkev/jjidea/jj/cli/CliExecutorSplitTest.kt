@@ -18,14 +18,14 @@ class CliExecutorSplitTest {
     inner class `basic split` {
         @Test
         fun `split -r revision`() {
-            val result = splitArgs(revision)
+            val result = splitArgs(revision).args
 
             result shouldBe listOf("split", "-r", "abc123def456")
         }
 
         @Test
         fun `split working copy`() {
-            val result = splitArgs(WorkingCopy)
+            val result = splitArgs(WorkingCopy).args
 
             result shouldBe listOf("split", "-r", "@")
         }
@@ -35,7 +35,7 @@ class CliExecutorSplitTest {
     inner class `with file paths` {
         @Test
         fun `split with single file path`() {
-            val result = splitArgs(revision, filePaths = listOf("src/main.kt"))
+            val result = splitArgs(revision, filePaths = listOf("src/main.kt")).args
 
             result shouldBe listOf("split", "-r", "abc123def456", "cwd:\"src/main.kt\"")
         }
@@ -45,7 +45,7 @@ class CliExecutorSplitTest {
             val result = splitArgs(
                 revision,
                 filePaths = listOf("src/main.kt", "src/utils.kt", "README.md")
-            )
+            ).args
 
             result shouldBe listOf(
                 "split",
@@ -62,7 +62,7 @@ class CliExecutorSplitTest {
     inner class `with description` {
         @Test
         fun `split with message`() {
-            val result = splitArgs(revision, description = Description("First half"))
+            val result = splitArgs(revision, description = Description("First half")).args
 
             result shouldBe listOf("split", "-r", "abc123def456", "--message=First half")
         }
@@ -73,7 +73,7 @@ class CliExecutorSplitTest {
                 revision,
                 filePaths = listOf("src/main.kt"),
                 description = Description("Core changes")
-            )
+            ).args
 
             result shouldBe listOf("split", "-r", "abc123def456", "--message=Core changes", "cwd:\"src/main.kt\"")
         }
@@ -83,7 +83,7 @@ class CliExecutorSplitTest {
     inner class `parallel flag` {
         @Test
         fun `split with --parallel`() {
-            val result = splitArgs(revision, parallel = true)
+            val result = splitArgs(revision, parallel = true).args
 
             result shouldBe listOf("split", "-r", "abc123def456", "--parallel")
         }
@@ -95,7 +95,7 @@ class CliExecutorSplitTest {
                 filePaths = listOf("src/main.kt"),
                 description = Description("First commit"),
                 parallel = true
-            )
+            ).args
 
             result shouldBe listOf(
                 "split",
@@ -112,14 +112,14 @@ class CliExecutorSplitTest {
     inner class `insert-before flag (jj-idea-tkog)` {
         @Test
         fun `split with -B revision, positioned right after -r`() {
-            val result = splitArgs(revision, insertBefore = revision)
+            val result = splitArgs(revision, insertBefore = revision).args
 
             result shouldBe listOf("split", "-r", "abc123def456", "-B", "abc123def456")
         }
 
         @Test
         fun `absent when insertBefore is null`() {
-            val result = splitArgs(revision, filePaths = listOf("src/main.kt"))
+            val result = splitArgs(revision, filePaths = listOf("src/main.kt")).args
 
             result shouldNotContain "-B"
         }
@@ -131,7 +131,7 @@ class CliExecutorSplitTest {
                 filePaths = listOf("src/main.kt"),
                 description = Description("New parent"),
                 insertBefore = revision
-            )
+            ).args
 
             result shouldBe listOf(
                 "split",
@@ -156,7 +156,7 @@ class CliExecutorSplitInteractiveTest {
     inner class `basic interactive split` {
         @Test
         fun `includes --tool flag`() {
-            val result = splitInteractiveArgs(revision, tool = "my-tool")
+            val result = splitInteractiveArgs(revision, tool = "my-tool").args
             result shouldContain "--tool=my-tool"
         }
 
@@ -166,7 +166,7 @@ class CliExecutorSplitInteractiveTest {
                 revision,
                 tool = "my-tool"
                 // Even if filePaths were passed (they aren't in the signature), none appear.
-            )
+            ).args
             // The only positional args should be the revision value; no file paths.
             // Concretely: after "--tool=my-tool" there should be nothing else.
             val toolIdx = result.indexOfFirst { it.startsWith("--tool=") }
@@ -175,7 +175,7 @@ class CliExecutorSplitInteractiveTest {
 
         @Test
         fun `includes -r revision`() {
-            val result = splitInteractiveArgs(revision, tool = "my-tool")
+            val result = splitInteractiveArgs(revision, tool = "my-tool").args
             result shouldContain "-r"
             result shouldContain "abc123def456"
         }
@@ -189,7 +189,7 @@ class CliExecutorSplitInteractiveTest {
                 revision,
                 tool = "my-tool",
                 configArgs = listOf("ui.diff-editor=my-tool", "merge-tools.my-tool.program=java")
-            )
+            ).args
             val splitIdx = result.indexOf("split")
             // Both --config flags must appear before "split".
             result.subList(0, splitIdx) shouldContain "--config"
@@ -202,7 +202,7 @@ class CliExecutorSplitInteractiveTest {
                 revision,
                 tool = "my-tool",
                 configArgs = listOf("k1=v1", "k2=v2")
-            )
+            ).args
             // Pairs: --config k1=v1, --config k2=v2
             val configIdx1 = result.indexOf("k1=v1")
             result[configIdx1 - 1] shouldBe "--config"
@@ -219,19 +219,19 @@ class CliExecutorSplitInteractiveTest {
                 revision,
                 description = Description("First part"),
                 tool = "t"
-            )
+            ).args
             result shouldContain "--message=First part"
         }
 
         @Test
         fun `includes --parallel flag`() {
-            val result = splitInteractiveArgs(revision, parallel = true, tool = "t")
+            val result = splitInteractiveArgs(revision, parallel = true, tool = "t").args
             result shouldContain "--parallel"
         }
 
         @Test
         fun `no --parallel by default`() {
-            val result = splitInteractiveArgs(revision, tool = "t")
+            val result = splitInteractiveArgs(revision, tool = "t").args
             result shouldNotContain "--parallel"
         }
     }
@@ -240,7 +240,7 @@ class CliExecutorSplitInteractiveTest {
     inner class `insert-before flag (jj-idea-tkog)` {
         @Test
         fun `split --tool with -B revision, positioned right after -r`() {
-            val result = splitInteractiveArgs(revision, tool = "t", insertBefore = revision)
+            val result = splitInteractiveArgs(revision, tool = "t", insertBefore = revision).args
 
             val rIdx = result.indexOf("-r")
             result[rIdx + 1] shouldBe "abc123def456"
@@ -250,8 +250,14 @@ class CliExecutorSplitInteractiveTest {
 
         @Test
         fun `absent when insertBefore is null`() {
-            val result = splitInteractiveArgs(revision, tool = "t")
+            val result = splitInteractiveArgs(revision, tool = "t").args
             result shouldNotContain "-B"
         }
+    }
+
+    @Test
+    fun `split and splitInteractive are reversible`() {
+        splitArgs(revision).reversibility shouldBe Reversibility.REVERSIBLE
+        splitInteractiveArgs(revision, tool = "t").reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

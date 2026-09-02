@@ -17,7 +17,7 @@ class CliExecutorSquashInteractiveTest {
     inner class `basic wiring` {
         @Test
         fun `squash --from source --into dest --tool tool`() {
-            val result = squashIntoInteractiveArgs(source, dest, tool = "jj-idea-hunk-apply")
+            val result = squashIntoInteractiveArgs(source, dest, tool = "jj-idea-hunk-apply").args
 
             result shouldBe listOf(
                 "squash",
@@ -31,7 +31,7 @@ class CliExecutorSquashInteractiveTest {
 
         @Test
         fun `working copy as source`() {
-            val result = squashIntoInteractiveArgs(WorkingCopy, dest, tool = "jj-idea-hunk-apply")
+            val result = squashIntoInteractiveArgs(WorkingCopy, dest, tool = "jj-idea-hunk-apply").args
 
             result shouldBe listOf(
                 "squash",
@@ -45,7 +45,7 @@ class CliExecutorSquashInteractiveTest {
 
         @Test
         fun `no filesets are ever passed`() {
-            val result = squashIntoInteractiveArgs(source, dest, tool = "t")
+            val result = squashIntoInteractiveArgs(source, dest, tool = "t").args
 
             result.none { it.startsWith("cwd:") } shouldBe true
             result.contains("--") shouldBe false
@@ -61,7 +61,7 @@ class CliExecutorSquashInteractiveTest {
                 dest,
                 configArgs = listOf("merge-tools.t.program=/usr/bin/java"),
                 tool = "t"
-            )
+            ).args
 
             result shouldBe listOf(
                 "--config",
@@ -82,7 +82,7 @@ class CliExecutorSquashInteractiveTest {
                 dest,
                 configArgs = listOf("a=1", "b=2", "c=3"),
                 tool = "t"
-            )
+            ).args
 
             result.take(6) shouldBe listOf("--config", "a=1", "--config", "b=2", "--config", "c=3")
             result.subList(6, result.size) shouldBe listOf(
@@ -97,7 +97,7 @@ class CliExecutorSquashInteractiveTest {
 
         @Test
         fun `no config args means no --config flags`() {
-            val result = squashIntoInteractiveArgs(source, dest, tool = "t")
+            val result = squashIntoInteractiveArgs(source, dest, tool = "t").args
 
             result.none { it == "--config" } shouldBe true
         }
@@ -107,7 +107,7 @@ class CliExecutorSquashInteractiveTest {
     inner class `description and keep-emptied` {
         @Test
         fun `message is passed inline, never via editor`() {
-            val result = squashIntoInteractiveArgs(source, dest, description = Description("Combined"), tool = "t")
+            val result = squashIntoInteractiveArgs(source, dest, description = Description("Combined"), tool = "t").args
 
             result shouldBe listOf(
                 "squash",
@@ -122,7 +122,7 @@ class CliExecutorSquashInteractiveTest {
 
         @Test
         fun `keep-emptied flag`() {
-            val result = squashIntoInteractiveArgs(source, dest, keepEmptied = true, tool = "t")
+            val result = squashIntoInteractiveArgs(source, dest, keepEmptied = true, tool = "t").args
 
             result shouldBe listOf(
                 "squash",
@@ -144,7 +144,7 @@ class CliExecutorSquashInteractiveTest {
                 keepEmptied = true,
                 configArgs = listOf("k=v"),
                 tool = "jj-idea-hunk-apply"
-            )
+            ).args
 
             result shouldBe listOf(
                 "--config",
@@ -159,5 +159,10 @@ class CliExecutorSquashInteractiveTest {
                 "--tool=jj-idea-hunk-apply"
             )
         }
+    }
+
+    @Test
+    fun `squash into interactive is reversible`() {
+        squashIntoInteractiveArgs(source, dest, tool = "t").reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

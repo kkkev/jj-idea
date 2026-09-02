@@ -7,31 +7,37 @@ import org.junit.jupiter.api.Test
 class CliExecutorResolveTest {
     @Test
     fun `resolveListArgs - working copy default`() {
-        resolveListArgs() shouldBe listOf("resolve", "--list", "-r", "@")
+        resolveListArgs().args shouldBe listOf("resolve", "--list", "-r", "@")
     }
 
     @Test
     fun `resolveListArgs - explicit revision`() {
         val revision = ChangeId("abc123def456", "abc123de", null)
-        resolveListArgs(revision) shouldBe listOf("resolve", "--list", "-r", "abc123def456")
+        resolveListArgs(revision).args shouldBe listOf("resolve", "--list", "-r", "abc123def456")
     }
 
     @Test
     fun `resolveArgs - single path - working copy default`() {
-        resolveArgs(listOf("a.txt"), ":ours") shouldBe
+        resolveArgs(listOf("a.txt"), ":ours").args shouldBe
             listOf("resolve", "-r", "@", "--tool", ":ours", "cwd:\"a.txt\"")
     }
 
     @Test
     fun `resolveArgs - multiple paths`() {
-        resolveArgs(listOf("a.txt", "b.txt"), ":theirs") shouldBe
+        resolveArgs(listOf("a.txt", "b.txt"), ":theirs").args shouldBe
             listOf("resolve", "-r", "@", "--tool", ":theirs", "cwd:\"a.txt\"", "cwd:\"b.txt\"")
     }
 
     @Test
     fun `resolveArgs - explicit revision`() {
         val revision = ChangeId("abc123def456", "abc123de", null)
-        resolveArgs(listOf("a.txt"), ":ours", revision) shouldBe
+        resolveArgs(listOf("a.txt"), ":ours", revision).args shouldBe
             listOf("resolve", "-r", "abc123def456", "--tool", ":ours", "cwd:\"a.txt\"")
+    }
+
+    @Test
+    fun `resolveListArgs is read-only, resolveArgs is reversible`() {
+        resolveListArgs().reversibility shouldBe Reversibility.READ_ONLY
+        resolveArgs(listOf("a.txt"), ":ours").reversibility shouldBe Reversibility.REVERSIBLE
     }
 }

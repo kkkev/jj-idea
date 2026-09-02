@@ -15,14 +15,14 @@ class CliExecutorDuplicateTest {
     inner class `in place (no destination)` {
         @Test
         fun `single revision`() {
-            val result = duplicateArgs(listOf(revision))
+            val result = duplicateArgs(listOf(revision)).args
 
             result shouldBe listOf("duplicate", "abc123def456")
         }
 
         @Test
         fun `working copy`() {
-            val result = duplicateArgs(listOf(WorkingCopy))
+            val result = duplicateArgs(listOf(WorkingCopy)).args
 
             result shouldBe listOf("duplicate", "@")
         }
@@ -35,7 +35,7 @@ class CliExecutorDuplicateTest {
                     ChangeId("bbb222ccc333", "bbb222cc", null),
                     ChangeId("ccc333ddd444", "ccc333dd", null)
                 )
-            )
+            ).args
 
             result shouldBe listOf("duplicate", "aaa111bbb222", "bbb222ccc333", "ccc333ddd444")
         }
@@ -45,7 +45,7 @@ class CliExecutorDuplicateTest {
     inner class `with destination` {
         @Test
         fun `onto uses --onto flag`() {
-            val result = duplicateArgs(listOf(revision), listOf(BookmarkName("main")))
+            val result = duplicateArgs(listOf(revision), listOf(BookmarkName("main"))).args
 
             result shouldBe listOf("duplicate", "abc123def456", "--onto", "main")
         }
@@ -56,7 +56,7 @@ class CliExecutorDuplicateTest {
                 listOf(revision),
                 listOf(BookmarkName("main")),
                 RebaseDestinationMode.INSERT_AFTER
-            )
+            ).args
 
             result shouldBe listOf("duplicate", "abc123def456", "-A", "main")
         }
@@ -67,7 +67,7 @@ class CliExecutorDuplicateTest {
                 listOf(revision),
                 listOf(BookmarkName("main")),
                 RebaseDestinationMode.INSERT_BEFORE
-            )
+            ).args
 
             result shouldBe listOf("duplicate", "abc123def456", "-B", "main")
         }
@@ -77,7 +77,7 @@ class CliExecutorDuplicateTest {
             val result = duplicateArgs(
                 listOf(revision),
                 listOf(BookmarkName("main"), BookmarkName("feature"))
-            )
+            ).args
 
             result shouldBe listOf("duplicate", "abc123def456", "--onto", "main", "--onto", "feature")
         }
@@ -90,9 +90,14 @@ class CliExecutorDuplicateTest {
                     ChangeId("bbb222ccc333", "bbb222cc", null)
                 ),
                 listOf(BookmarkName("main"))
-            )
+            ).args
 
             result shouldBe listOf("duplicate", "aaa111bbb222", "bbb222ccc333", "--onto", "main")
         }
+    }
+
+    @Test
+    fun `duplicate is reversible`() {
+        duplicateArgs(listOf(revision)).reversibility shouldBe Reversibility.REVERSIBLE
     }
 }
