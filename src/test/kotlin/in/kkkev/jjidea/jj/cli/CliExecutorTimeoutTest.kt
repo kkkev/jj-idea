@@ -1,8 +1,10 @@
 package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.execution.process.ProcessOutput
+import `in`.kkkev.jjidea.jj.CommandExecutor.CommandResult
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.types.shouldBeInstanceOf
 import org.junit.jupiter.api.Test
 
 /**
@@ -19,11 +21,11 @@ class CliExecutorTimeoutTest {
 
         val result = output.toCommandResult("file annotate -r @ file.txt", 120_000)
 
-        result.timedOut shouldBe true
-        result.exitCode shouldBe -1
-        result.stdout shouldBe "partial stdout"
-        result.stderr shouldContain "file annotate -r @ file.txt"
-        result.stderr shouldContain "120"
+        val timedOut = result.shouldBeInstanceOf<CommandResult.Failure.TimedOut>()
+        timedOut.exitCode shouldBe -1
+        timedOut.stdout shouldBe "partial stdout"
+        timedOut.stderr shouldContain "file annotate -r @ file.txt"
+        timedOut.stderr shouldContain "120"
     }
 
     @Test
@@ -32,10 +34,9 @@ class CliExecutorTimeoutTest {
 
         val result = output.toCommandResult("status", 30_000)
 
-        result.timedOut shouldBe false
-        result.exitCode shouldBe 0
-        result.stdout shouldBe "ok"
-        result.stderr shouldBe ""
+        val success = result.shouldBeInstanceOf<CommandResult.Success>()
+        success.stdout shouldBe "ok"
+        success.stderr shouldBe ""
     }
 
     @Test
@@ -44,8 +45,8 @@ class CliExecutorTimeoutTest {
 
         val result = output.toCommandResult("status", 30_000)
 
-        result.timedOut shouldBe false
-        result.exitCode shouldBe 1
-        result.stderr shouldBe "boom"
+        val exited = result.shouldBeInstanceOf<CommandResult.Failure.Exited>()
+        exited.exitCode shouldBe 1
+        exited.stderr shouldBe "boom"
     }
 }

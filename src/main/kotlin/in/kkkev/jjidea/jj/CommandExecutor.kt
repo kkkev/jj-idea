@@ -17,19 +17,131 @@ import `in`.kkkev.jjidea.util.saveAllDocuments
  */
 interface CommandExecutor {
     /**
-     * Result of a jujutsu command execution
+     * Result of a jujutsu command execution.
+     *
+     * [Success] and [Failure] split first because that's the only distinction most callers ever
+     * made against the old flat `exitCode == 0` shape. Below that:
+     * - [Success.Reversible] / [Success.Irreversible] record whether the command wrote an
+     *   operation we can revert via [opRevert] — see [Success.Irreversible.Reason] for why a
+     *   command can succeed but still not be offered for undo (e.g. `git push`: its effect
+     *   reaches beyond the `repo` scope that `jj op revert --what repo` inverts).
+     * - [Failure.Executed] separates a process that actually ran ([Failure.Exited],
+     *   [Failure.TimedOut]) from one that never started ([Failure.NotLaunched]) — a timed-out
+     *   process has real partial [Failure.Executed.stdout] but no real stderr (the process never
+     *   got to report anything), and a not-launched one has no streams at all. Both synthesize a
+     *   diagnostic into [Failure.message] instead of pretending to have captured real output.
      */
-    data class CommandResult(
-        val exitCode: Int,
-        val stdout: String,
-        val stderr: String,
-        val timedOut: Boolean = false
-    ) {
-        val isSuccess: Boolean get() = exitCode == 0
+    sealed interface CommandResult {
+        /**
+         * Kept readable on every result, matching the pre-sealed-hierarchy flat shape: jj prints
+         * non-fatal warnings to stderr even on exit 0 (see [Command.onSuccessResult]), and every
+         * failure kind synthesizes something meaningful here even when no real stderr exists
+         * (see [Failure.message], which aliases this on [Failure]).
+         */
+        val stdout: String
+        val stderr: String
+
+        /** `true` for [Success]. Kept temporarily for callers not yet migrated to `is Success`. */
+        val isSuccess: Boolean get() = this is Success
+
+        sealed interface Success : CommandResult {
+            /** Succeeded and wrote an operation we identified and can revert via [opRevert]. */
+            data class Reversible(
+                override val stdout: String,
+                override val stderr: String,
+                val operation: OperationId
+            ) : Success
+
+            /** Succeeded, but no undo can be offered - see [reason]. */
+            data class Irreversible(
+                override val stdout: String,
+                override val stderr: String,
+                val reason: Reason
+            ) : Success {
+                enum class Reason {
+                    /**
+                     * The command's effect reaches beyond the `repo` scope that
+                     * `jj op revert --what repo` inverts - `git push`/`fetch`/`clone`/`remote`,
+                     * `bookmark track`/`untrack`, `config`. Verified: reverting these either
+                     * reports "Nothing changed." or desyncs local and remote-tracking state.
+                     */
+                    NOT_REVERSIBLE_COMMAND,
+
+                    /** A read-only command; it wrote no operation of its own. */
+                    READ_ONLY,
+
+                    /** Reversible command, but it wrote no operation - a no-op ("Nothing changed."). */
+                    NO_OPERATION,
+
+                    /** Reversible command, but the written operation could not be identified. */
+                    NOT_IDENTIFIED,
+
+                    /** Undo tracking was not requested for this invocation - see [withUndoTracking]. */
+                    NOT_TRACKED
+                }
+            }
+        }
+
+        sealed interface Failure : CommandResult {
+            /** Exit code: real for [Exited]; the old `-1` sentinel for [TimedOut]/[NotLaunched]. */
+            val exitCode: Int
+
+            /**
+             * Always-meaningful, user-facing diagnostic - what [tellUser] renders. For [Exited]
+             * this is the real stderr; for [TimedOut] and [NotLaunched] it is synthesized (and
+             * mirrored into [stderr] too, for source compatibility with pre-existing readers).
+             */
+            val message: String get() = stderr
+
+            /** A process actually ran and produced output - as opposed to [NotLaunched]. */
+            sealed interface Executed : Failure
+
+            /** Ran to completion with a non-zero exit code. */
+            data class Exited(override val stdout: String, override val stderr: String, override val exitCode: Int) :
+                Executed
+
+            /**
+             * Killed at the timeout: [stdout] is real partial output; there is no exit code
+             * because `runProcess(timeout)` destroys the process without setting one - [exitCode]
+             * is the old `-1` sentinel.
+             */
+            data class TimedOut(override val stdout: String, val timeoutMillis: Long, override val stderr: String) :
+                Executed {
+                override val exitCode get() = -1
+            }
+
+            /** No process was created (e.g. the jj executable wasn't found), so there are no streams. */
+            data class NotLaunched(val executable: String, override val stderr: String) : Failure {
+                override val stdout get() = ""
+                override val exitCode get() = -1
+            }
+        }
 
         fun tellUser(project: Project, resourceKeyPrefix: String) {
             val message = JujutsuBundle.message("$resourceKeyPrefix.message", stderr)
             Messages.showErrorDialog(project, message, JujutsuBundle.message("$resourceKeyPrefix.title"))
+        }
+
+        /**
+         * Transitional compatibility shim for the old flat `CommandResult(exitCode, stdout,
+         * stderr, timedOut)` constructor - kept only until every construction site is migrated
+         * to an explicit subtype, then deleted. A successful transitional result carries no undo
+         * information yet (nothing calls [withUndoTracking] before that migration), so it always
+         * becomes [Success.Irreversible] with [Success.Irreversible.Reason.NOT_TRACKED] - which
+         * is exactly correct: today, literally no command is undo-tracked.
+         */
+        companion object {
+            @Deprecated("Transitional only - construct an explicit CommandResult subtype instead.")
+            operator fun invoke(
+                exitCode: Int,
+                stdout: String,
+                stderr: String,
+                timedOut: Boolean = false
+            ): CommandResult = when {
+                exitCode == 0 -> Success.Irreversible(stdout, stderr, Success.Irreversible.Reason.NOT_TRACKED)
+                timedOut -> Failure.TimedOut(stdout, timeoutMillis = 0, stderr = stderr)
+                else -> Failure.Exited(stdout, stderr, exitCode)
+            }
         }
     }
 
@@ -497,29 +609,32 @@ interface CommandExecutor {
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,
         val onSuccess: (String) -> Unit = {},
-        val onSuccessResult: CommandResult.() -> Unit = {},
-        val onFailure: CommandResult.() -> Unit = {}
+        val onSuccessResult: CommandResult.Success.() -> Unit = {},
+        val onFailure: CommandResult.Failure.() -> Unit = {}
     ) {
         fun onSuccess(callback: (String) -> Unit) = copy(onSuccess = callback)
 
         /**
-         * Like [onSuccess], but receives the full [CommandResult] (including [CommandResult.stderr])
-         * instead of just stdout. Some jj subcommands print a non-fatal warning to stderr on an
-         * otherwise-successful (exit 0) run - e.g. `jj file untrack` on a path that's already
-         * untracked - which plain [onSuccess] can't see. Prefer this when a caller needs to surface
-         * such warnings; both callbacks run on success, so most callers only need one or the other.
+         * Like [onSuccess], but receives the full [CommandResult.Success] (including
+         * [CommandResult.Success.stderr]) instead of just stdout. Some jj subcommands print a
+         * non-fatal warning to stderr on an otherwise-successful (exit 0) run - e.g.
+         * `jj file untrack` on a path that's already untracked - which plain [onSuccess] can't
+         * see. Prefer this when a caller needs to surface such warnings; both callbacks run on
+         * success, so most callers only need one or the other.
          */
-        fun onSuccessResult(callback: CommandResult.() -> Unit) = copy(onSuccessResult = callback)
+        fun onSuccessResult(callback: CommandResult.Success.() -> Unit) = copy(onSuccessResult = callback)
 
-        fun onFailure(callback: CommandResult.() -> Unit) = copy(onFailure = callback)
+        fun onFailure(callback: CommandResult.Failure.() -> Unit) = copy(onFailure = callback)
 
         private fun handleResult(result: CommandResult) {
             runLater {
-                if (result.isSuccess) {
-                    onSuccess(result.stdout)
-                    result.onSuccessResult()
-                } else {
-                    onFailure(result)
+                when (result) {
+                    is CommandResult.Success -> {
+                        onSuccess(result.stdout)
+                        result.onSuccessResult()
+                    }
+
+                    is CommandResult.Failure -> onFailure(result)
                 }
             }
         }

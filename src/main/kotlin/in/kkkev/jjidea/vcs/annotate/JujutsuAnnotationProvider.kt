@@ -16,6 +16,7 @@ import com.intellij.vcs.AnnotationProviderEx
 import com.intellij.vcs.CacheableAnnotationProvider
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.AnnotationLine
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -278,7 +279,7 @@ class JujutsuAnnotationProvider(
         // preload backoff decision (jj-idea-1sza) just as much as a slow success would.
         annotateTimings.computeIfAbsent(repo.directory.path) { AnnotateTiming() }.record(nowMs() - startMs)
         if (!result.isSuccess) {
-            val message = if (result.timedOut) {
+            val message = if (result is CommandExecutor.CommandResult.Failure.TimedOut) {
                 JujutsuBundle.message("annotation.error.timeout", file.name)
             } else {
                 JujutsuBundle.message("annotation.error.failed", file.name, result.stderr)

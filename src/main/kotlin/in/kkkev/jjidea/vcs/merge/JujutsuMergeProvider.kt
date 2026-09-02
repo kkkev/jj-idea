@@ -12,6 +12,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorNotifications
 import com.intellij.util.ui.ColumnInfo
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
@@ -110,7 +111,7 @@ class JujutsuMergeProvider(
                 }
                 val relativePath = file.path.removePrefix(repo.directory.path).removePrefix("/")
                 val result = repo.commandExecutor.resolve(listOf(relativePath), tool)
-                if (!result.isSuccess) {
+                if (result is CommandExecutor.CommandResult.Failure) {
                     failures += file to result.stderr.ifBlank { "exit ${result.exitCode}" }
                 }
             }
