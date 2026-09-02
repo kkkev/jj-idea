@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.14] - 2026-09-02
+
 ### Added
 - Editor gutter change markers and Annotate (blame) can now be based on the latest immutable ancestor (trunk) or any revset you choose, instead of always the working copy's parent — useful when you have several commits stacked on top of trunk and want to see everything changed so far, not just the last one. Configure it in Settings → Version Control → Jujutsu → Diff Base, project-wide or per repository; the Local Changes / Working copy view is unaffected. ([#43](https://github.com/kkkev/jj-idea/issues/43))
 - A dedicated bookmarks panel to the left of the log table, expanded by default: a tree of every repo's bookmarks and tags, colour-matched to their log-table chips, with `feature/A`/`feature/B`-style names shown as a hierarchy instead of a flat list, matching the Git plugin's Branches panel. Its "@" node carries the same working-copy marker and colour as the log, and an issue-tracker reference embedded in a bookmark or tag name (e.g. `JIRA-123-fix-thing`) is a clickable link, same as everywhere else in the plugin. Collapse/expand it via the always-visible strip at the panel's edge or the toolbar's View Options popup. Right-click a bookmark for the same actions as its dropdown menu, plus "Filter Log to Bookmark" and "Navigate Log to Bookmark". ([#48](https://github.com/kkkev/jj-idea/issues/48))
@@ -848,7 +850,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.13...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.14...HEAD
+[0.8.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.14
 [0.8.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.13
 [0.8.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.12
 [0.8.11]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.11
