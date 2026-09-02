@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JjFeature
 import `in`.kkkev.jjidea.jj.JjVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.OperationId
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
@@ -363,6 +364,29 @@ object JujutsuNotifications {
         // FeatureUpgradeNudge), so dismissal needs no side effect beyond expiring — the action
         // exists purely as an explicit "never again" affordance, same as SponsorAsk's dismiss.
         notification.addExpiringAction("notification.feature.gated.action.dismiss") {}
+
+        notification.notify(project)
+    }
+
+    /**
+     * Shows an INFORMATION balloon with an inline Undo link for a just-completed, reversible
+     * [operation] in [repo] - the Stage 1 undo affordance
+     * (docs/design/undo-support-roadmap.md). [description] names the action that was performed
+     * (e.g. "Abandon"), matching the roadmap's requirement that an undo affordance says what it
+     * targets rather than acting as a blind "Undo" button.
+     */
+    fun notifyUndoable(project: Project, repo: JujutsuRepository, operation: OperationId, description: String) {
+        val notification = NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("notification.undo.title"),
+                JujutsuBundle.message("notification.undo.content", description),
+                NotificationType.INFORMATION
+            )
+
+        notification.addExpiringAction("notification.undo.action") {
+            performUndo(project, repo, operation)
+        }
 
         notification.notify(project)
     }

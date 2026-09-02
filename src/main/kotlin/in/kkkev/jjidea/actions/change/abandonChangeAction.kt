@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 
 /**
  * Abandon change action.
@@ -47,10 +48,11 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
     val repo = target.repo
     val selectAfter = if (target.isWorkingCopy) WorkingCopy else target.parentIds.firstOrNull() ?: WorkingCopy
 
-    repo.commandExecutor.createCommand { abandon(target.id) }
+    repo.commandExecutor.withUndoTracking().createCommand { abandon(target.id) }
         .onSuccess {
             repo.invalidate(select = selectAfter, vfsChanged = true)
             log.info("Abandoned change ${target.id}")
         }.onFailure { tellUser(project, "log.action.abandon.error") }
+        .withUndoBalloon(project, repo, "log.action.abandon.undo")
         .executeAsync()
 }

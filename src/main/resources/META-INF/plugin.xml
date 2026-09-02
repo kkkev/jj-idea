@@ -140,6 +140,13 @@
     <action id="Jujutsu.GitFetch" class="in.kkkev.jjidea.actions.git.GitFetchAction"/>
     <action id="Jujutsu.GitPush" class="in.kkkev.jjidea.actions.git.GitPushAction"/>
 
+    <!-- Stage 1 of the undo roadmap (jj-idea-v9zp): persistent "Undo <last action>" entry that
+         survives a dismissed undo balloon. Presentation names the operation - see
+         UndoLastOperationAction's KDoc. -->
+    <action id="Jujutsu.UndoLastOperation" class="in.kkkev.jjidea.actions.undo.UndoLastOperationAction">
+      <add-to-group group-id="Vcs.MainMenu" anchor="last"/>
+    </action>
+
     <!-- Describe working copy: Ctrl+K replacement for Jujutsu projects -->
     <action id="Jujutsu.DescribeWorkingCopy"
             class="in.kkkev.jjidea.actions.change.DescribeWorkingCopyAction">
