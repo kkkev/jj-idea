@@ -580,6 +580,47 @@ interface CommandExecutor {
 
     fun configUnset(scope: ConfigScope, key: String): CommandResult
 
+    /**
+     * What portions of local state `jj op revert` restores. Only [REPO] is ever passed by this
+     * plugin - the default CLI scope is `repo remote-tracking`, and jj's own help warns that
+     * restoring remote-tracking bookmarks as a side effect of an unrelated undo would desync the
+     * push story. See docs/design/undo-support-roadmap.md.
+     */
+    enum class OpRevertScope {
+        /** The jj repo state and local bookmarks. */
+        REPO,
+
+        /** The remote-tracking bookmarks - never passed here; documented for completeness. */
+        REMOTE_TRACKING;
+
+        val value = name.lowercase().replace('_', '-')
+    }
+
+    /**
+     * `jj op log`. [limit] and an optional [template] - `null` prints jj's default human-readable
+     * format, useful for logging/debugging; production callers pass a template.
+     */
+    fun opLog(limit: Int, template: String? = null): CommandResult
+
+    /**
+     * `jj op revert <id> --what <what>`. Reverts exactly the one named operation, leaving every
+     * other operation - including concurrent ones - intact; this is the `git revert` of the
+     * operation log, never the `git reset`-like `jj op restore`. See
+     * docs/design/undo-support-roadmap.md for why this is the only safe undo primitive to expose
+     * per-action.
+     */
+    fun opRevert(id: OperationId, what: Set<OpRevertScope> = setOf(OpRevertScope.REPO)): CommandResult
+
+    /**
+     * An executor that resolves [CommandResult.Success.Reversible.operation] for commands whose
+     * [in.kkkev.jjidea.jj.cli.Reversibility] is `REVERSIBLE`, by injecting a per-invocation token
+     * and matching it back against the operation log - see
+     * [in.kkkev.jjidea.jj.cli.CliExecutor]'s private `execute`. Costs one extra `jj op log` per
+     * reversible command, so it is opt-in; the default implementation returns `this` unchanged
+     * (no tracking, matching every command's behaviour before this existed).
+     */
+    fun withUndoTracking(): CommandExecutor = this
+
     data class Command(
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,

@@ -16,7 +16,42 @@ import `in`.kkkev.jjidea.jj.cli.Reversibility.REVERSIBLE
 import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
+import java.util.UUID
 import java.util.concurrent.TimeUnit
+
+/**
+ * `--ignore-working-copy` is deliberate and non-optional: reading the op log must never itself
+ * append a "snapshot working copy" operation to the log we are about to inspect.
+ */
+internal fun opLogArgs(limit: Int, template: String? = null) = JjInvocation(
+    READ_ONLY,
+    buildList {
+        add("op")
+        add("log")
+        add("-n")
+        add(limit.toString())
+        add("--no-graph")
+        add("--ignore-working-copy")
+        if (template != null) {
+            add("-T")
+            add(template)
+        }
+    }
+)
+
+/** Reverting a revert is itself a valid, repo-scope operation. */
+internal fun opRevertArgs(id: OperationId, what: Set<CommandExecutor.OpRevertScope>) = JjInvocation(
+    REVERSIBLE,
+    buildList {
+        add("op")
+        add("revert")
+        add(id.toString())
+        what.forEach {
+            add("--what")
+            add(it.value)
+        }
+    }
+)
 
 internal fun statusArgs() = JjInvocation(READ_ONLY, "status")
 
@@ -576,7 +611,8 @@ internal fun ProcessOutput.toCommandResult(
 class CliExecutor(
     private val root: VirtualFile?,
     private val executableProvider: () -> String = { "jj" },
-    private val onJjNotFound: (() -> Unit)? = null
+    private val onJjNotFound: (() -> Unit)? = null,
+    private val trackUndo: Boolean = false
 ) : CommandExecutor {
     private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
@@ -591,6 +627,9 @@ class CliExecutor(
         /** Pattern to extract percentage from git progress output (e.g., "Receiving objects:  45% (123/456)") */
         private val PROGRESS_PATTERN = Regex("""(\d+)%""")
 
+        /** How many recent operations to scan for the one carrying our undo token. */
+        private const val UNDO_WINDOW = 20
+
         /**
          * Creates a CliExecutor for operations that don't require an existing repository
          * (e.g., gitClone, isAvailable, version).
@@ -598,6 +637,14 @@ class CliExecutor(
         fun forRootlessOperations(executableProvider: () -> String = { "jj" }) =
             CliExecutor(root = null, executableProvider = executableProvider)
     }
+
+    override fun withUndoTracking(): CommandExecutor =
+        CliExecutor(root, executableProvider, onJjNotFound, trackUndo = true)
+
+    override fun opLog(limit: Int, template: String?) = execute(root, opLogArgs(limit, template))
+
+    override fun opRevert(id: OperationId, what: Set<CommandExecutor.OpRevertScope>) =
+        execute(root, opRevertArgs(id, what))
 
     override fun status() = execute(root, statusArgs())
 
@@ -952,7 +999,15 @@ class CliExecutor(
         timeout: Long = defaultTimeout,
         warnOnFailure: Boolean = true
     ): CommandExecutor.CommandResult {
-        val args = invocation.args
+        // Only a REVERSIBLE command is worth the extra `op log` call below - tracking anything
+        // else would either find nothing (READ_ONLY writes no operation) or offer an undo we know
+        // is unsafe (IRREVERSIBLE, e.g. `git push`/`fetch` - see Reversibility's KDoc).
+        val undoToken = UUID.randomUUID().toString().takeIf { trackUndo && invocation.reversibility == REVERSIBLE }
+        val args = if (undoToken != null) {
+            listOf("--config", "$UNDO_TOKEN_CONFIG_KEY=$undoToken") + invocation.args
+        } else {
+            invocation.args
+        }
         val executable = executableProvider()
         val commandLine = GeneralCommandLine(executable)
             .withParameters(args)
@@ -1003,6 +1058,54 @@ class CliExecutor(
             }
         }
 
-        return output.toCommandResult(cmdName, timeout, invocation.reversibility)
+        val result = output.toCommandResult(cmdName, timeout, invocation.reversibility)
+        return if (undoToken != null && result is CommandExecutor.CommandResult.Success) {
+            identifyOperation(undoToken, result)
+        } else {
+            result
+        }
+    }
+
+    /**
+     * Reads back the most recent operations and matches [token] against the one this invocation
+     * wrote, per the algorithm in docs/design/undo-support-roadmap.md: the token is injected as
+     * an unknown `--config` key (verified accepted, and inert, on jj 0.37 through 0.44), so it
+     * appears verbatim in that operation's recorded argv (the `tags` template keyword) and in
+     * nothing else - including the paired "snapshot working copy" operation jj may write first,
+     * which is excluded by [in.kkkev.jjidea.jj.OperationEntry.isSnapshot] so a dirty working copy
+     * can never cause the snapshot to be offered for undo instead of the real command.
+     *
+     * A concurrent process (another IDE window, an agent, a terminal `jj` invocation) can only
+     * ever produce operations *without* our token, so unlike a parent-linkage approach, this
+     * match is exact regardless of what else lands in the log around the same time.
+     */
+    private fun identifyOperation(
+        token: String,
+        result: CommandExecutor.CommandResult.Success
+    ): CommandExecutor.CommandResult.Success {
+        val opLogResult = execute(root, opLogArgs(UNDO_WINDOW, OP_LOG_TEMPLATE))
+        val match = if (opLogResult is CommandExecutor.CommandResult.Success) {
+            findTaggedOperation(parseOpLog(opLogResult.stdout), token)
+        } else {
+            // Couldn't even read the op log back - fail-safe as "could not identify", not as
+            // "wrote nothing" (NO_OPERATION would misleadingly imply the command was a no-op).
+            TaggedOperationMatch.Ambiguous
+        }
+        return when (match) {
+            is TaggedOperationMatch.Found ->
+                CommandExecutor.CommandResult.Success.Reversible(result.stdout, result.stderr, match.id)
+
+            TaggedOperationMatch.NotFound -> CommandExecutor.CommandResult.Success.Irreversible(
+                result.stdout,
+                result.stderr,
+                CommandExecutor.CommandResult.Success.Irreversible.Reason.NO_OPERATION
+            )
+
+            TaggedOperationMatch.Ambiguous -> CommandExecutor.CommandResult.Success.Irreversible(
+                result.stdout,
+                result.stderr,
+                CommandExecutor.CommandResult.Success.Irreversible.Reason.NOT_IDENTIFIED
+            )
+        }
     }
 }
