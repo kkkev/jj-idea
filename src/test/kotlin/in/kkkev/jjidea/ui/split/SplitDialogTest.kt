@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.split
 
+import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.Change
@@ -12,6 +13,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.common.FileContents
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.shouldBe
@@ -407,6 +409,61 @@ class SplitDialogTest {
         )
         parentTitle shouldContain "partial"
         childTitle shouldContain "partial"
+    }
+
+    // Regression coverage for jj-idea-jb2q (GitHub #101): the preview's left/right panes must
+    // match their own titles — previously the right pane always showed the parent-remainder
+    // content (same as the left pane) even though its title claimed "Child".
+    @Test
+    fun `splitPreviewPanes fully ticked shows base on the left, after on the right (regression)`() {
+        val contents = FileContents(before = "before\n", after = "after\n", fileType = PlainTextFileType.INSTANCE)
+
+        val (left, right) = splitPreviewPanes(
+            content = "before\n",
+            contents = contents,
+            parentLabel = "Parent",
+            childLabel = "Child"
+        )
+
+        left.text shouldBe "before\n"
+        right.text shouldBe "after\n"
+        left.text shouldNotBe right.text
+        left.title shouldContain "unchanged"
+        right.title shouldContain "all changes"
+    }
+
+    @Test
+    fun `splitPreviewPanes unticked shows after on both sides (nothing moves)`() {
+        val contents = FileContents(before = "before\n", after = "after\n", fileType = PlainTextFileType.INSTANCE)
+
+        val (left, right) = splitPreviewPanes(
+            content = "after\n",
+            contents = contents,
+            parentLabel = "Parent",
+            childLabel = "Child"
+        )
+
+        left.text shouldBe "after\n"
+        right.text shouldBe "after\n"
+        left.title shouldContain "all changes"
+        right.title shouldContain "no changes"
+    }
+
+    @Test
+    fun `splitPreviewPanes partial shows the remainder on the left, after on the right`() {
+        val contents = FileContents(before = "before\n", after = "after\n", fileType = PlainTextFileType.INSTANCE)
+
+        val (left, right) = splitPreviewPanes(
+            content = "partial\n",
+            contents = contents,
+            parentLabel = "Parent",
+            childLabel = "Child"
+        )
+
+        left.text shouldBe "partial\n"
+        right.text shouldBe "after\n"
+        left.title shouldContain "partial"
+        right.title shouldContain "partial"
     }
 
     @Test

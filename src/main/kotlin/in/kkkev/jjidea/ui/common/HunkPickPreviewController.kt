@@ -26,23 +26,29 @@ import javax.swing.JButton
  */
 data class FileContents(val before: String, val after: String, val fileType: FileType)
 
+/** One diff pane's text and title — paired so a pane can't disagree with its own title. */
+data class DiffPane(val text: String, val title: String)
+
 /**
  * Shared per-file diff preview cache and renderer for [in.kkkev.jjidea.ui.split.SplitDialog] and
  * [in.kkkev.jjidea.ui.squash.SquashIntoDialog]. Owns the mechanical parts common to both — the
  * content cache, lazy off-EDT loading with a generation guard, `FORCE_READ_ONLY` diff-request
  * construction, and the "Pick Hunks…" button's enabled state — while each dialog keeps the parts
  * that genuinely differ in polarity: which content a ticked/unticked file *means*
- * ([resolveContent]), and what happens when the hunk picker returns a result (each dialog still
- * owns its own override map and tick/untick logic — see [in.kkkev.jjidea.ui.split.SplitDialog.
- * applyPickedContent] / the Squash equivalent — since Split's "ticked ⇒ null content" and Squash's
- * "ticked ⇒ full content" are opposite defaults, not worth forcing through one shared branch).
+ * ([resolveContent]), and what each pane shows/is titled ([previewPanes]), plus what happens when
+ * the hunk picker returns a result (each dialog still owns its own override map and tick/untick
+ * logic — see [in.kkkev.jjidea.ui.split.SplitDialog.applyPickedContent] / the Squash equivalent —
+ * since Split's "ticked ⇒ null content" and Squash's "ticked ⇒ full content" are opposite
+ * defaults, not worth forcing through one shared branch).
  *
  * @param loadContents   Off-EDT loader for a file's before/after content and file type.
- * @param resolveContent The content to preview for [FilePath] given its tick state and loaded
- *   [FileContents] — e.g. Split's `firstCommitOverrides[fp] ?: computePreviewLeftContent(...)`,
- *   Squash's equivalent with `computePreviewAfterContent`.
- * @param previewTitles  Diff-pane titles for the preview, given the resolved content — e.g.
- *   Split's `describeSplitState`, Squash's `describeSquashState`.
+ * @param resolveContent The content that a ticked/unticked/partial file *means* for [FilePath],
+ *   given its tick state and loaded [FileContents] — e.g. Split's `firstCommitOverrides[fp] ?:
+ *   computePreviewLeftContent(...)`, Squash's equivalent with `computePreviewAfterContent`. Also
+ *   feeds the hunk picker's initial state.
+ * @param previewPanes   The (left, right) [DiffPane]s to render, given the resolved content — text
+ *   and title together per side, so left/right can never end up on the wrong content for their
+ *   title. E.g. Split's `splitPreviewPanes`, Squash's `squashPreviewPanes`.
  * @param isIncluded     Whether [FilePath] is currently ticked.
  */
 class HunkPickPreviewController(
@@ -50,7 +56,7 @@ class HunkPickPreviewController(
     private val disposable: Disposable,
     private val loadContents: (Change) -> FileContents?,
     private val resolveContent: (fp: FilePath, included: Boolean, contents: FileContents) -> String,
-    private val previewTitles: (content: String, contents: FileContents) -> Pair<String, String>,
+    private val previewPanes: (content: String, contents: FileContents) -> Pair<DiffPane, DiffPane>,
     private val isIncluded: (FilePath) -> Boolean
 ) {
     val preview: FileDiffPreviewPanel = FileDiffPreviewPanel(project, disposable)
@@ -121,14 +127,14 @@ class HunkPickPreviewController(
 
     private fun render(fp: FilePath, contents: FileContents) {
         val content = resolveContent(fp, isIncluded(fp), contents)
-        val (leftTitle, rightTitle) = previewTitles(content, contents)
+        val (left, right) = previewPanes(content, contents)
 
         val request = SimpleDiffRequest(
             fp.name,
-            makeReadOnlyContent(contents.before, contents.fileType),
-            makeReadOnlyContent(content, contents.fileType),
-            leftTitle,
-            rightTitle
+            makeReadOnlyContent(left.text, contents.fileType),
+            makeReadOnlyContent(right.text, contents.fileType),
+            left.title,
+            right.title
         )
         preview.show(fp.name, request)
 

@@ -17,6 +17,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.ui.common.DiffPane
 import `in`.kkkev.jjidea.ui.common.FileContents
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.common.HunkPickPreviewController
@@ -111,8 +112,8 @@ class SplitDialog(
         resolveContent = { fp, included, contents ->
             firstCommitOverrides[fp] ?: computePreviewLeftContent(included, null, contents.before, contents.after)
         },
-        previewTitles = { content, contents ->
-            describeSplitState(content, contents.before, contents.after, firstCommitLabel, secondCommitLabel)
+        previewPanes = { content, contents ->
+            splitPreviewPanes(content, contents, firstCommitLabel, secondCommitLabel)
         },
         isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } }
     )
@@ -235,10 +236,10 @@ class SplitDialog(
      * Load the split-off change's before/after content and file type for [change], off the EDT —
      * the [HunkPickPreviewController] loader.
      *
-     * The preview shows the **split-off change that moves to the child**: the right side is
-     * always the child's full content (the child is the tip, so it always holds the full
-     * original content). The left side reflects what **remains in the parent** — see
-     * [computePreviewLeftContent].
+     * The preview shows the **split-off change that moves to the child**: the right (Child) side
+     * is always the child's full content (the child is the tip, so it always holds the full
+     * original content — see [splitPreviewPanes]). The left (Parent) side reflects what
+     * **remains in the parent** — see [computePreviewLeftContent].
      */
     private fun loadFileContents(change: Change): FileContents? {
         val fp = change.filePath
@@ -681,4 +682,28 @@ internal fun describeSplitState(
         JujutsuBundle.message("dialog.split.hunks.parent.partial", parentLabel),
         JujutsuBundle.message("dialog.split.hunks.child.partial", childLabel)
     )
+}
+
+/**
+ * The (left, right) [DiffPane]s for the main file preview: left is [content] itself (the
+ * parent-remainder — see [SplitDialog.computePreviewLeftContent]), right is always
+ * [FileContents.after] (the child is the tip of the split, so it always holds the full original
+ * content). Titles come from [describeSplitState], evaluated on the same [content] that decides
+ * the left pane's text, so a pane's text and its own title can never disagree (jj-idea-jb2q,
+ * GitHub #101).
+ */
+internal fun splitPreviewPanes(
+    content: String,
+    contents: FileContents,
+    parentLabel: String,
+    childLabel: String
+): Pair<DiffPane, DiffPane> {
+    val (parentTitle, childTitle) = describeSplitState(
+        content,
+        contents.before,
+        contents.after,
+        parentLabel,
+        childLabel
+    )
+    return Pair(DiffPane(content, parentTitle), DiffPane(contents.after, childTitle))
 }

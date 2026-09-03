@@ -128,7 +128,7 @@ class SquashIntoDialog(
         resolveContent = { fp, included, contents ->
             destinationOverrides[fp] ?: computePreviewAfterContent(included, null, contents.before, contents.after)
         },
-        previewTitles = { content, contents -> describeSquashState(content, contents.before, contents.after) },
+        previewPanes = { content, contents -> squashPreviewPanes(content, contents) },
         isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } }
     )
     internal val preview get() = previewController.preview

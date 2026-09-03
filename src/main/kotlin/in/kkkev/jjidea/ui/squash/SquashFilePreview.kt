@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.squash
 import com.intellij.openapi.vcs.changes.Change
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
+import `in`.kkkev.jjidea.ui.common.DiffPane
 import `in`.kkkev.jjidea.ui.common.FileContents
 
 /**
@@ -58,4 +59,15 @@ internal fun describeSquashState(content: String, before: String, after: String)
         else -> JujutsuBundle.message("dialog.squash.preview.after.partial", afterLabel)
     }
     return Pair(beforeTitle, afterTitle)
+}
+
+/**
+ * The (left, right) [DiffPane]s for the squash preview: left is always [FileContents.before] (the
+ * source's own pre-change content, which never varies), right is [content] (the resolved
+ * destination content). Titles come from [describeSquashState]; text and title are paired per
+ * side so a pane can't disagree with its own title (jj-idea-jb2q).
+ */
+internal fun squashPreviewPanes(content: String, contents: FileContents): Pair<DiffPane, DiffPane> {
+    val (beforeTitle, afterTitle) = describeSquashState(content, contents.before, contents.after)
+    return Pair(DiffPane(contents.before, beforeTitle), DiffPane(content, afterTitle))
 }
