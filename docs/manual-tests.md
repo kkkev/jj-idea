@@ -1605,36 +1605,41 @@ executable older than 0.39 available to point the plugin at.
   fires for that case
 - [ ] Open a **non-jj** project with an old jj configured → no balloon
 
-#### Feature Availability list (jj-idea-vcqn, polish in jj-idea-vwni)
+#### Feature-gated upgrade prompt in Installation Help (jj-idea-vcqn, jj-idea-vwni, jj-idea-258c)
 
 Surface 1 of jj-idea-xuah — the passive counterpart to the nudge balloon above. Requires the
 same multi-version harness (see [Test Tooling](#test-tooling)). `JjVersion.MINIMUM` is currently
 0.37.0 — a pinned jj exactly at or above that but below 0.39.0 (e.g. 0.37.x/0.38.x) is Scenario B
 (gated on a feature); anything below 0.37.0 is Scenario A (below the plugin's hard minimum).
 
-- [ ] With a current jj configured, open Settings → Version Control → Jujutsu — a "Feature
-  Availability" group is present but **collapsed**, right below Installation Help
-- [ ] Expand it — shows "All plugin features are supported by jj *X.Y.Z*" (your actual version)
+This started as its own standalone "Feature Availability" group (jj-idea-vcqn), then a linked
+pair with Installation Help (jj-idea-vwni); jj-idea-258c folded the gated-feature list directly
+into Installation Help's own description, since the standalone group and its "see Installation
+Help above" pointer amounted to filler for what's fundamentally one message: "here's what's
+wrong and here's how to fix it."
+
+- [ ] With a current jj configured, open Settings → Version Control → Jujutsu → expand
+  "Installation Help" — reads "If jj is not installed, use one of these commands:" (no feature
+  list) — this is the "everything's fine" case, so there's nothing else to say here
 - [ ] Point the jj executable path at a pinned jj **below 0.39 but ≥ 0.37.0** (e.g.
-  `~/.local/bin/jj-0.38`), click Apply, **without closing Settings** — **both** "Feature
-  Availability" and "Installation Help" auto-expand live, from the same Apply that reran
-  availability detection. Feature Availability lists "Advance Bookmark — needs jj 0.39.0" plus a
-  grey hint ("↑ Upgrade jj to unlock these...") that reads as secondary text (not the same weight
-  as the status rows above it) and doesn't wrap to more than 2 lines.
-- [ ] Installation Help's *expand* is live, but its *content* (install vs upgrade wording and
-  commands) is fixed at whatever it was when Settings was opened — jj-idea-vwni only fixed the
-  content for a **fresh open** while already gated, not a change mid-session. Close and reopen
-  Settings with the same jj-0.38 path still configured — Installation Help now reads "Your current
-  jj version is too old. Upgrade using:" with **upgrade** commands (`brew upgrade jj`, not
-  `brew install jj`) — before this fix it wrongly showed install commands here on a fresh open
-  too, even though jj was already installed.
-- [ ] Point the executable path at a jj **below the plugin's hard minimum** (e.g. 0.36), Apply —
-  Feature Availability goes back to collapsed, showing "jj *X.Y.Z* is below the minimum..." — no
-  feature rows, no double-reporting on top of the existing "jj version too old" warning (MT-CROSS's
-  Error Handling)
-- [ ] Clear the path back to default resolution (a current jj) — Feature Availability's content
-  updates live to the all-supported line; both groups **stay expanded** (deliberate — the plugin
-  never auto-collapses a group once opened, in case you opened it yourself)
+  `~/.local/bin/jj-0.38`), click Apply, **without closing Settings** — "Installation Help"
+  auto-expands live, from the same Apply that reran availability detection. Content is a
+  one-shot snapshot at panel-open time though (see below), so close and reopen Settings with
+  the same path still configured to see it read: "Your current jj version is too old. Upgrade
+  now to unlock these features:" followed by an **indented bullet line** "• Advance Bookmark
+  *(needs jj 0.39.0)*" — the "*(needs jj 0.39.0)*" part in grey secondary text, not the same
+  weight as the feature name — then "Upgrade using:" and the **upgrade** commands
+  (`brew upgrade jj`, not `brew install jj`). No separate group, no "now expanded" or similar
+  filler phrasing anywhere on the page.
+- [ ] Point the executable path at a jj **below the plugin's hard minimum** (e.g. 0.36), Apply,
+  reopen Settings — Installation Help reads "Your current jj version is too old. Upgrade using:"
+  with upgrade commands, but **no feature list** — Scenario A already has its own balloon and
+  JjNotInstalledPanel (MT-CROSS's Error Handling), so this must not double-report feature gating
+  on top of those
+- [ ] Clear the path back to default resolution (a current jj) — Installation Help **stays
+  expanded** (deliberate — the plugin never auto-collapses a group once opened, in case you
+  opened it yourself) but its content still needs a Settings reopen to drop back to the
+  "if jj is not installed" wording, per the one-shot-snapshot limitation above
 
 #### Status Bar Widget (Switch Working Copy)
 
@@ -2218,10 +2223,16 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 - [ ] (jj-idea-ye1x) In a **multi-repo** project, expand a repo's "Repository Settings" group and
       turn on "Override diff base for this repository" with "Custom revset" selected — no
       horizontal scrollbar appears on the settings panel
-- [ ] (jj-idea-bslw) Expand "Installation Help" — "Homebrew:"/"Cargo:" (or whichever methods are
-      detected) have a visible gap before their command box, not sitting flush against it. Narrow
-      the Settings window/pane as much as the IDE allows — the "JJ executable path:" row's field +
-      Test button should need less width than before to stay fully visible
+- [ ] (jj-idea-bslw, real fix in jj-idea-258c) Expand "Installation Help" — "Homebrew:"/"Cargo:"
+      (or whichever methods are detected) have a comfortable, clearly visible gap before their
+      command box, not sitting close to it. (jj-idea-bslw's first attempt — a Border on the
+      label — measured fine in a unit test but was invisible on screen: the DSL's grid absorbs a
+      component's own border into its layout math instead of pushing the next cell over.
+      jj-idea-258c's `.gap(RightGap.COLUMNS)` is the real inter-cell gap and is what to expect
+      here.)
+- [ ] Narrow the Settings window/pane as much as the IDE allows — nothing should need horizontal
+      scrolling to stay fully visible: the "JJ executable path:" row's field + Test button, and
+      Installation Help's command rows + Copy buttons
 
 #### Default push scope (jj-idea-fmzr, jj-idea-ikof)
 

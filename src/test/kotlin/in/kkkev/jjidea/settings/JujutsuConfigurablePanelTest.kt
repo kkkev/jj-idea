@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.jj.InstallMethod
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
@@ -24,10 +25,24 @@ import org.junit.jupiter.api.Test
  * clipping — `align(AlignX.FILL)`/`resizableColumn()` only distribute extra space, they
  * don't shrink it.
  *
- * The fixture project has no jj repositories, so this test alone never built the per-repo
- * "Repository Settings" group — jj-idea-fwea's per-repo diff-base override subsequently
- * widened that group past budget without any test noticing. jj-idea-ye1x closes that blind
- * spot via [stubRepo].
+ * This has regressed multiple times since, each time in a spot the width tests of the day
+ * didn't cover:
+ * - jj-idea-fwea's per-repo diff-base override widened the per-repo "Repository Settings"
+ *   group, which the fixture project (no jj repositories) never built — jj-idea-ye1x closed
+ *   that blind spot via [stubRepo].
+ * - jj-idea-258c's Installation Help content is only built once the group is expanded — its
+ *   own [WIDTH_BUDGET] test builds the panel without expanding it, so a dedicated test forces
+ *   expansion first (see "fits within budget with Installation Help expanded and gated").
+ * - Narrowing *other* rows (jj-idea-258c's `.comment()` calls) silently shrank the panel's
+ *   overall baseline enough that a fixed-width row elsewhere (the validation-error label)
+ *   became the new bottleneck and exceeded it — "a long validation error does not widen the
+ *   panel" catches exactly this class of regression by comparing against the panel's own
+ *   width rather than a hardcoded number.
+ *
+ * [WIDTH_BUDGET] is intentionally kept close to the actual measured width (currently ~531px
+ * across every scenario below) rather than the original generous 640px estimate, so a change
+ * that quietly adds even a modest amount of width fails a test immediately instead of eroding
+ * the safety margin unnoticed until the panel is genuinely too wide again.
  */
 @Tag("platform")
 @TestApplication
@@ -72,29 +87,87 @@ class JujutsuConfigurablePanelTest {
     }
 
     @Test
-    fun `Installation Help command labels have extra right padding before their field`() {
-        // jj-idea-bslw: "Homebrew:"/"Cargo:" sat uncomfortably close to their command field —
-        // each collapsibleGroup auto-sizes its own label column independent of the (longer) "JJ
-        // executable path:" label above, so there's no natural extra room without padding.
-        val panel = JujutsuConfigurable(project.get()).createPanel()
+    fun `Installation Help command labels leave a real rendered gap before their field`() {
+        // jj-idea-bslw/258c: "Homebrew:"/"Cargo:" sat uncomfortably close to their command
+        // field. A first fix added a Border to the label, which *does* grow its preferredSize
+        // (a border-insets assertion here would have passed) but produces **no visible change**:
+        // the grid layout treats a component's own border as "visual padding" and shifts the
+        // component to absorb it rather than pushing the next cell over (GridImpl.kt computes
+        // cell x as `... - visualPaddings.left` and pads the component's own bounds back out by
+        // the same amount) — confirmed by actually laying this panel out and finding the gap
+        // hadn't moved. So this test lays the panel out for real and measures the actual x-gap
+        // between the label and the field, the only way to catch that class of regression.
+        val configurable = JujutsuConfigurable(project.get())
+        val panel = configurable.createPanel()
+        // A collapsed CollapsibleRow's content is measured for preferred size but not actually
+        // positioned by layout — expand it so the manual layout pass below assigns it real bounds.
+        configurable.expandInstallGroupForTest()
 
-        val commandLabels = mutableListOf<javax.swing.JLabel>()
+        // Container.validate()/doLayout() silently no-op here: AWT only recurses a validate()
+        // into a child Container via validateTree() when that child has a live peer, i.e. is
+        // part of a realized, displayable Window — impossible in this headless test JVM (a real
+        // JFrame throws HeadlessException here). Each group/collapsibleGroup is its own nested
+        // Grid/LayoutManager2, so bypass AWT's peer-gated recursion and call each container's
+        // own layoutContainer() directly and top-down instead — pure geometry, no peer needed.
+        panel.size = panel.preferredSize
+        fun layoutRecursively(c: java.awt.Container) {
+            c.layout?.layoutContainer(c)
+            c.components.forEach { if (it is java.awt.Container) layoutRecursively(it) }
+        }
+        layoutRecursively(panel)
+
+        val labels = mutableListOf<javax.swing.JLabel>()
+        val fields = mutableListOf<javax.swing.JTextField>()
         fun walk(c: java.awt.Component) {
-            if (c is javax.swing.JLabel && c.text?.endsWith(":") == true && c.text != "JJ executable path:") {
-                commandLabels += c
+            when (c) {
+                is javax.swing.JLabel -> if (c.text?.endsWith(":") == true) labels += c
+                is javax.swing.JTextField -> fields += c
             }
             if (c is java.awt.Container) c.components.forEach(::walk)
         }
         walk(panel)
 
-        val installMethodLabels = commandLabels.filter { label ->
-            InstallMethod.allAvailable.any { it !is InstallMethod.Manual && label.text == "${it.name}:" }
+        val commandRows = InstallMethod.allAvailable.filterNot { it is InstallMethod.Manual }
+        commandRows shouldNotBe emptyList<InstallMethod>()
+        commandRows.forEach { method ->
+            val label = labels.first { it.text == "${method.name}:" }
+            // The command field is the JTextField in the same row — LABEL_ALIGNED can vertically
+            // offset a label and its field by a few px within the row, so match by y-range
+            // overlap rather than exact containment.
+            val field = fields.first {
+                it.x > label.x && it.y < label.y + label.height && it.y + it.height > label.y
+            }
+
+            val gap = field.x - (label.x + label.width)
+            gap shouldBeGreaterThan MIN_LABEL_FIELD_GAP
         }
-        installMethodLabels shouldNotBe emptyList<javax.swing.JLabel>()
-        installMethodLabels.forEach { label ->
-            val rightInset = label.border?.getBorderInsets(label)?.right ?: 0
-            rightInset shouldBeGreaterThan 0
+    }
+
+    @Test
+    fun `settings panel fits within budget with Installation Help expanded and gated`() {
+        // jj-idea-258c: the widest Installation Help can get — every command row plus the
+        // gated-feature list, all only laid out once the group is actually expanded.
+        val configurable = JujutsuConfigurable(project.get())
+        val panel = configurable.createPanel()
+        configurable.expandInstallGroupForTest()
+
+        panel.preferredSize.width shouldBeLessThanOrEqual JBUI.scale(WIDTH_BUDGET)
+    }
+
+    @Test
+    fun `there is no standalone Feature Availability group`() {
+        // jj-idea-258c: superseded by folding the gated-feature list directly into Installation
+        // Help — regression guard against reintroducing the separate group.
+        val panel = JujutsuConfigurable(project.get()).createPanel()
+
+        val texts = mutableListOf<String>()
+        fun walk(c: java.awt.Component) {
+            (c as? javax.swing.JLabel)?.text?.let { texts += it }
+            if (c is java.awt.Container) c.components.forEach(::walk)
         }
+        walk(panel)
+
+        texts.none { it.contains("Feature Availability") } shouldBe true
     }
 
     @Test
@@ -111,10 +184,25 @@ class JujutsuConfigurablePanelTest {
 
     companion object {
         /**
-         * A default-size Settings dialog leaves roughly 700px to the right of the category
-         * tree; this leaves headroom for the page's own 16px insets and a vertical scrollbar.
+         * jj-idea-bwdk originally set this to 640 (a default-size Settings dialog's ~700px minus
+         * headroom for insets/scrollbar), but that left ~100px of slack in which the panel could
+         * silently grow without any test noticing — which is exactly what happened (see the
+         * class doc's regression history). jj-idea-258c tightened it to sit just above the
+         * actual measured width (~531px across every scenario below), so it now catches a
+         * regression close to the point it's introduced rather than only once it's severe enough
+         * to exceed a much narrower real-world Settings window (e.g. a pinned single-configurable
+         * view, which has no category tree to make room for).
          */
-        private const val WIDTH_BUDGET = 640
+        private const val WIDTH_BUDGET = 560
+
+        /**
+         * Lower bound (raw px, this JVM's default — no scaling in a headless test) for the
+         * rendered gap between an Installation Help command label and its field. The DSL's
+         * automatic RightGap.SMALL after a row label measured well under this before jj-idea-258c
+         * switched to `.gap(RightGap.COLUMNS)`; this is comfortably between the two so the test
+         * fails on a regression back to SMALL (or no gap override at all).
+         */
+        private const val MIN_LABEL_FIELD_GAP = 8
 
         /**
          * A relaxed [JujutsuRepository] double good enough to build the panel's per-repo group:

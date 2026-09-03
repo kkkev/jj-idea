@@ -87,18 +87,10 @@ class JujutsuConfigurable(
     private val diffbaseValidationLabel = JBLabel()
     private var diffbaseError: String? = null
 
-    // jj-idea-vwni: so Feature Availability can auto-expand Installation Help alongside itself
-    // when something is gated — the two are cross-referenced, so opening one without the other
-    // leaves the hint pointing at a still-folded section.
+    // jj-idea-258c: so its expansion can react live to a jj-availability status change (see the
+    // status.connect wiring in createPanel) — never auto-collapse a group the user may already
+    // have opened themselves.
     private lateinit var installGroupRow: CollapsibleRow
-
-    // jj-idea-vcqn: Feature Availability group — rebuilt on every jj-availability status change,
-    // same "own the panel, repopulate it" shape as revsetValidationPanel above.
-    private lateinit var featureAvailabilityRow: CollapsibleRow
-    private val featureAvailabilityPanel = JPanel().apply {
-        layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        isOpaque = false
-    }
 
     // Global identity — backing properties for bindText(); async-loaded from jj config
     private var globalNameBinding = ""
@@ -166,25 +158,45 @@ class JujutsuConfigurable(
         }
 
         installGroupRow = collapsibleGroup(JujutsuBundle.message("settings.group.install")) {
-            // Check current status to decide install vs upgrade. Unlike featureAvailabilityPanel,
-            // this content is a one-shot snapshot at panel build time, not rebuilt on later
-            // status changes — only installGroupRow.expanded reacts live (see the status.connect
-            // wiring below). So a status change mid-session (e.g. editing the path and clicking
-            // Apply without closing Settings) opens this group but may still show stale
-            // install-vs-upgrade wording until Settings is reopened. Acceptable for now: matches
-            // the pre-existing limitation Scenario A already had before jj-idea-vwni extended
-            // this same isUpgrade check to Scenario B.
+            // Check current status to decide install vs upgrade, and which features (if any) are
+            // gated. This content is a one-shot snapshot at panel build time, not rebuilt on
+            // later status changes — only installGroupRow.expanded reacts live (see the
+            // status.connect wiring below). So a status change mid-session (e.g. editing the
+            // path and clicking Apply without closing Settings) opens this group but may still
+            // show stale wording until Settings is reopened.
             val status = JjAvailabilityChecker.getInstance(project).status.value
             val isUpgrade = installHelpIsUpgradeFor(status)
             val detectedMethod = detectedInstallMethodFor(status)
+            // jj-idea-258c: folded in from the former standalone "Feature Availability" group —
+            // Scenario A (BelowMinimum) deliberately excludes this list, same rule
+            // unsupportedFeatures(status) already encodes: it has its own balloon and
+            // JjNotInstalledPanel and must not be double-reported here.
+            val gatedFeatures = (featureAvailabilityFor(status) as? FeatureAvailability.Gated)?.features.orEmpty()
 
             row {
-                val descriptionKey = if (isUpgrade) {
+                val descriptionKey = if (gatedFeatures.isNotEmpty()) {
+                    "settings.upgrade.description.features"
+                } else if (isUpgrade) {
                     "settings.upgrade.description"
                 } else {
                     "settings.install.description"
                 }
                 label(JujutsuBundle.message(descriptionKey))
+            }
+
+            if (gatedFeatures.isNotEmpty()) {
+                indent {
+                    gatedFeatures.forEach { feature ->
+                        row {
+                            cell(featureLine(feature))
+                        }
+                    }
+                }
+            }
+            if (gatedFeatures.isNotEmpty()) {
+                row {
+                    label(JujutsuBundle.message("settings.upgrade.using"))
+                }
             }
 
             // Show upgrade for detected method first if applicable
@@ -219,22 +231,16 @@ class JujutsuConfigurable(
             }
         }.apply { expanded = false }
 
-        // jj-idea-vcqn: passive discovery for jj-idea-xuah's Scenario B — jj meets the plugin's
-        // hard minimum but is too old for one or more JjFeatures, so the gated action is merely
-        // disabled with a tooltip. Collapsed by default (matches Installation Help above) so a
-        // fully up-to-date jj costs one header line; auto-expands the moment something is gated.
-        featureAvailabilityRow = collapsibleGroup(JujutsuBundle.message("settings.group.features")) {
-            row {
-                cell(featureAvailabilityPanel).align(AlignX.FILL)
-            }
-        }.apply { expanded = false }
-        renderFeatureAvailability(JjAvailabilityChecker.getInstance(project).status.value)
-        // `disposable` is null when a test builds the panel directly via createPanel() (it's set
-        // by DslConfigurableBase before createPanel() runs in the real Settings dialog) — the
-        // unconditional render above already covers that case with a one-time snapshot.
+        // jj-idea-258c: auto-expand Installation Help the moment jj is gated or below minimum —
+        // never auto-collapse a group the user may already have opened themselves. `disposable`
+        // is null when a test builds the panel directly via createPanel() (it's set by
+        // DslConfigurableBase before createPanel() runs in the real Settings dialog); the initial
+        // `expanded = false` above already covers that case with a one-time snapshot.
         disposable?.let { parent ->
             JjAvailabilityChecker.getInstance(project).status.connect(parent) { status ->
-                renderFeatureAvailability(status)
+                if (installHelpIsUpgradeFor(status)) {
+                    installGroupRow.expanded = true
+                }
             }
         }
 
@@ -261,12 +267,18 @@ class JujutsuConfigurable(
             row {
                 checkBox(JujutsuBundle.message("settings.general.hide.commit.toolwindow"))
                     .bindSelected(settings.state::hideStandardCommitToolWindow)
-                    .comment(JujutsuBundle.message("settings.general.hide.commit.toolwindow.comment"))
+                    .comment(
+                        JujutsuBundle.message("settings.general.hide.commit.toolwindow.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
             }
             row {
                 checkBox(JujutsuBundle.message("settings.general.disable.ignore.scan"))
                     .bindSelected(appSettings.state::disableIgnoredFileScanning)
-                    .comment(JujutsuBundle.message("settings.general.disable.ignore.scan.comment"))
+                    .comment(
+                        JujutsuBundle.message("settings.general.disable.ignore.scan.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
             }
             row(JujutsuBundle.message("settings.general.default.push.scope.label")) {
                 comboBox(GitPushDialog.PushScope.entries.toList())
@@ -279,7 +291,10 @@ class JujutsuConfigurable(
                         { defaultPushScope() },
                         { settings.state.defaultPushScope = (it ?: GitPushDialog.PushScope.DEFAULT).name }
                     )
-                    .comment(JujutsuBundle.message("settings.general.default.push.scope.comment"))
+                    .comment(
+                        JujutsuBundle.message("settings.general.default.push.scope.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
             }
         }
 
@@ -288,7 +303,10 @@ class JujutsuConfigurable(
                 intTextField(range = 1..10000)
                     .bindIntText(settings.state::logChangeLimit)
                     .columns(COLUMNS_TINY)
-                    .comment(JujutsuBundle.message("settings.log.limit.comment"))
+                    .comment(
+                        JujutsuBundle.message("settings.log.limit.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
             }
             row(JujutsuBundle.message("settings.log.context.window.label")) {
                 intTextField(range = 0..1000)
@@ -629,7 +647,10 @@ class JujutsuConfigurable(
                         indent {
                             row {
                                 cell(disableScanCb)
-                                    .comment(JujutsuBundle.message("settings.repo.disableignorescan.comment"))
+                                    .comment(
+                                        JujutsuBundle.message("settings.repo.disableignorescan.comment"),
+                                        maxLineLength = NARROW_COMMENT_WIDTH
+                                    )
                             }
                         }
                         row {
@@ -703,55 +724,19 @@ class JujutsuConfigurable(
     }
 
     /**
-     * Repopulates [featureAvailabilityPanel] from the current jj-availability [status] (jj-idea-vcqn).
-     * Called once at panel construction and again on every [JjAvailabilityChecker] status change
-     * (executable path edits, recheck, etc.) — see the `status.connect` wiring in [createPanel].
+     * One "Advance Bookmark (needs jj 0.39.0)" line inside Installation Help's gated-feature
+     * list (jj-idea-258c, folded in from the former standalone "Feature Availability" group).
+     * The version clause is baked in as grey secondary text — matching the DSL's `comment()`
+     * styling — via an inline HTML `<span>`, since Swing's HTML renderer has no equivalent of a
+     * CSS variable/`currentColor` to defer that color to a stylesheet.
      */
-    private fun renderFeatureAvailability(status: JjAvailabilityStatus) {
-        featureAvailabilityPanel.removeAll()
-        when (val availability = featureAvailabilityFor(status)) {
-            is FeatureAvailability.Gated -> {
-                availability.features.forEach { feature ->
-                    featureAvailabilityPanel.add(
-                        iconLabel(
-                            AllIcons.General.Error,
-                            JujutsuBundle.message(
-                                "settings.features.gated",
-                                feature.displayName,
-                                feature.minVersion.toString()
-                            )
-                        )
-                    )
-                }
-                featureAvailabilityPanel.add(hintLabel(JujutsuBundle.message("settings.features.hint")))
-                // Never auto-collapse a group the user may already have opened themselves
-                // (jj-idea-vwni: same for Installation Help, which the hint above points at —
-                // opening one without the other leaves the pointer aimed at a folded section).
-                featureAvailabilityRow.expanded = true
-                installGroupRow.expanded = true
-            }
-
-            is FeatureAvailability.AllSupported ->
-                featureAvailabilityPanel.add(
-                    iconLabel(
-                        AllIcons.General.InspectionsOK,
-                        JujutsuBundle.message("settings.features.all.supported", availability.version.toString())
-                    )
-                )
-
-            is FeatureAvailability.BelowMinimum ->
-                featureAvailabilityPanel.add(
-                    iconLabel(
-                        null,
-                        JujutsuBundle.message("settings.features.below.minimum", availability.version.toString())
-                    )
-                )
-
-            FeatureAvailability.Unknown ->
-                featureAvailabilityPanel.add(iconLabel(null, JujutsuBundle.message("settings.features.unknown")))
-        }
-        featureAvailabilityPanel.revalidate()
-        featureAvailabilityPanel.repaint()
+    private fun featureLine(feature: JjFeature): JBLabel {
+        val greyHex = String.format("#%06x", UIUtil.getContextHelpForeground().rgb and 0xFFFFFF)
+        val needs = JujutsuBundle.message("settings.upgrade.feature.needs", feature.minVersion.toString())
+        return JBLabel(
+            "<html>• ${StringUtil.escapeXmlEntities(feature.displayName)} " +
+                "<span style='color:$greyHex'>${StringUtil.escapeXmlEntities(needs)}</span></html>"
+        )
     }
 
     override fun isModified() = super.isModified() || repoSettingsDirty
@@ -1044,16 +1029,6 @@ class JujutsuConfigurable(
     private fun iconLabel(icon: javax.swing.Icon?, text: String) = JBLabel(wrapped(text), icon, JBLabel.LEADING)
 
     /**
-     * Grey secondary-text label matching the DSL's `comment()` styling (jj-idea-vwni) — for
-     * hints, as opposed to [iconLabel]'s status rows. Wraps at [HINT_MESSAGE_WIDTH], wider than
-     * [VALIDATION_MESSAGE_WIDTH]: that constant was sized for short validation-error text and
-     * wrapped this hint's longer sentence too aggressively.
-     */
-    private fun hintLabel(text: String) = JBLabel(wrapped(text, HINT_MESSAGE_WIDTH)).apply {
-        foreground = UIUtil.getContextHelpForeground()
-    }
-
-    /**
      * Wraps [text] (which may contain raw `jj` stderr or a long path) in HTML with a fixed
      * body width, so validation-result labels wrap instead of driving the settings panel's
      * preferred width past the page (jj-idea-bwdk).
@@ -1167,19 +1142,29 @@ class JujutsuConfigurable(
     /** Test seam for jj-idea-bwdk's panel-width regression guard. */
     internal fun showValidationResultForTest(message: String) = showValidationResult(false, message)
 
+    /**
+     * Test seam for jj-idea-258c's label/field gap regression guard: a collapsed
+     * [CollapsibleRow]'s content isn't actually positioned by layout (only measured for
+     * preferred size), so a test that lays the panel out for real to check rendered gaps needs
+     * this expanded first.
+     */
+    internal fun expandInstallGroupForTest() {
+        installGroupRow.expanded = true
+    }
+
     /** Creates a row with method name, monospace command in a box, and copy button. */
     private fun Panel.commandRow(methodName: String, command: String) {
         row {
-            // jj-idea-bslw: built manually (not the row(label) shorthand) so extra right-padding
-            // can be added to the label. This group's label column otherwise auto-sizes to just
-            // "Homebrew:"/"Cargo:" (each collapsibleGroup computes its own label column,
-            // independent of the longer "JJ executable path:" label above), leaving barely any
-            // gap before the command field. Cell.widthGroup can't fix this: it only syncs widths
-            // within one Grid and doesn't reach across separate collapsibleGroups.
+            // jj-idea-bslw/258c: built manually (not the row(label) shorthand) so `.gap()` can
+            // override the label's gap to the field. The DSL auto-applies RightGap.SMALL after a
+            // row label, which for a short label like "Homebrew:" reads as flush against the
+            // field. A JBUI.Borders-based approach doesn't help here: the grid treats a
+            // component's own border as "visual padding" and compensates the *next* cell's
+            // position to absorb it, so extra border width is invisible in the actual gap
+            // (confirmed empirically — border insets showed up in preferredSize but not on
+            // screen). RightGap.COLUMNS is the real inter-cell gap the grid actually uses.
             layout(RowLayout.LABEL_ALIGNED)
-            label("$methodName:").applyToComponent {
-                border = JBUI.Borders.emptyRight(COMMAND_LABEL_EXTRA_GAP)
-            }
+            label("$methodName:").gap(RightGap.COLUMNS)
             cell(createCommandField(command))
                 .align(AlignX.FILL)
                 .resizableColumn()
@@ -1197,13 +1182,7 @@ class JujutsuConfigurable(
 
     companion object {
         /** Max width (unscaled px) for wrapped validation-result labels (jj-idea-bwdk). */
-        private const val VALIDATION_MESSAGE_WIDTH = 360
-
-        /** Wrap width (unscaled px) for [hintLabel] text — wider than [VALIDATION_MESSAGE_WIDTH] (jj-idea-vwni). */
-        private const val HINT_MESSAGE_WIDTH = 500
-
-        /** Extra right-padding (unscaled px) on Installation Help's command labels (jj-idea-bslw). */
-        private const val COMMAND_LABEL_EXTRA_GAP = 12
+        private const val VALIDATION_MESSAGE_WIDTH = 320
 
         /**
          * Narrower alternative to the DSL's [com.intellij.ui.dsl.builder.DEFAULT_COMMENT_WIDTH]

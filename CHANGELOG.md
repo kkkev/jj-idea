@@ -8,12 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Settings → Version Control → Jujutsu gained a "Feature Availability" section: collapsed and out of your way when your jj is current, it lists any plugin feature your jj is too old for (with the version you'd need) the moment one is gated.
+- Settings → Version Control → Jujutsu's "Installation Help" now tells you when your jj is too old for a plugin feature (e.g. Advance Bookmark, which needs jj 0.39+), listing exactly which one(s) and switching straight to the matching upgrade command — no separate section to find, and it stays out of your way entirely when your jj already supports everything.
 
 ### Fixed
 - Settings → Version Control → Jujutsu no longer shows a horizontal scrollbar in a multi-repo project with a per-repository diff-base override set.
-- When a plugin feature is gated on a newer jj (see "Feature Availability" above), Settings now automatically expands Installation Help alongside it and shows the correct upgrade commands there — previously it stayed collapsed and, even when opened, showed "if jj is not installed" install commands despite jj already being installed.
-- The Installation Help section's command labels ("Homebrew:", "Cargo:", etc.) no longer sit uncomfortably close to their command box, and the executable-path row takes up less minimum width, reducing the chance of a horizontal scrollbar in a narrower Settings window.
+- The Installation Help section's command labels ("Homebrew:", "Cargo:", etc.) now have a comfortable gap before their command box instead of sitting flush against it, and several rows across the page take up less minimum width, reducing the chance of a horizontal scrollbar in a narrower Settings window.
 
 ## [0.8.14] - 2026-09-02
 
