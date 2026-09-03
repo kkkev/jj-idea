@@ -2184,6 +2184,9 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 - [ ] JJ executable path can be configured, including via the file picker
 - [ ] Auto-refresh toggle, change ID format preference (short/long), and log change limit
       each take effect as expected, and all settings persist across IDE restarts
+- [ ] (jj-idea-ye1x) In a **multi-repo** project, expand a repo's "Repository Settings" group and
+      turn on "Override diff base for this repository" with "Custom revset" selected — no
+      horizontal scrollbar appears on the settings panel
 
 #### Default push scope (jj-idea-fmzr, jj-idea-ikof)
 

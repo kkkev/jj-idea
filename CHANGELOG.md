@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Settings → Version Control → Jujutsu no longer shows a horizontal scrollbar in a multi-repo project with a per-repository diff-base override set.
+
 ## [0.8.14] - 2026-09-02
 
 ### Added

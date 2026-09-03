@@ -45,7 +45,17 @@ import javax.swing.JPanel
  *
  * Appears under Settings → Version Control → Jujutsu
  */
-class JujutsuConfigurable(private val project: Project) : BoundConfigurable(JujutsuBundle.message("settings.title")) {
+class JujutsuConfigurable(
+    private val project: Project,
+    private val repos: Collection<JujutsuRepository>
+) : BoundConfigurable(JujutsuBundle.message("settings.title")) {
+    // The platform instantiates Configurables via reflection looking for a single-Project
+    // constructor; a Kotlin default parameter on the primary constructor doesn't expose that
+    // overload to Java on its own (this broke Settings entirely — jj-idea-ye1x). A secondary
+    // constructor is the plain-Kotlin fix, and doubles as the test seam so a width-guard test
+    // can exercise the per-repo "Repository Settings" group without a real jj repository on disk.
+    constructor(project: Project) : this(project, project.stateModel.initialisedRepositories.value.values)
+
     private val log = Logger.getInstance(javaClass)
     private val settings = JujutsuSettings.getInstance(project)
     private val appSettings = JujutsuApplicationSettings.getInstance()
@@ -83,7 +93,6 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
     private var globalEmailField: JBTextField? = null
 
     // Per-repo settings
-    private val repos: Collection<JujutsuRepository> = project.stateModel.initialisedRepositories.value.values
     private var repoSettingsDirty = false
 
     private data class RepoSettingsPanel(
@@ -585,6 +594,13 @@ class JujutsuConfigurable(private val project: Project) : BoundConfigurable(Juju
                         indent {
                             row {
                                 cell(diffbaseCombo)
+                            }
+                            // jj-idea-ye1x: on its own row, not sharing one with diffbaseCombo —
+                            // combo + a COLUMNS_MEDIUM field together overflowed the settings
+                            // panel's width budget (jj-idea-bwdk). Mirrors the project-level
+                            // Diff Base group above, which already keeps its custom-revset field
+                            // on its own row (`:296-352`).
+                            row {
                                 cell(diffbaseRevsetField).columns(COLUMNS_MEDIUM)
                                     .align(AlignX.FILL)
                                     .resizableColumn()
