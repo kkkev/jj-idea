@@ -1605,6 +1605,26 @@ executable older than 0.39 available to point the plugin at.
   fires for that case
 - [ ] Open a **non-jj** project with an old jj configured → no balloon
 
+#### Feature Availability list (jj-idea-vcqn)
+
+Surface 1 of jj-idea-xuah — the passive counterpart to the nudge balloon above. Requires the
+same multi-version harness (see [Test Tooling](#test-tooling)).
+
+- [ ] With a current jj configured, open Settings → Version Control → Jujutsu — a "Feature
+  Availability" group is present but **collapsed**, right below Installation Help
+- [ ] Expand it — shows "All plugin features are supported by jj *X.Y.Z*" (your actual version)
+- [ ] Point the jj executable path at a pinned jj **below 0.39 but ≥ the plugin minimum**
+  (e.g. `~/.local/bin/jj-0.38`), click Apply, **without closing Settings** — the group
+  auto-expands and lists "Advance Bookmark — needs jj 0.39.0", plus a hint pointing at
+  Installation Help. This must happen live, from the same Apply that reran availability
+  detection — not only after reopening Settings.
+- [ ] Point the executable path at a jj **below the plugin's hard minimum** (0.37), Apply — the
+  group goes back to collapsed, showing "jj *X.Y.Z* is below the minimum..." — no feature rows,
+  no double-reporting on top of the existing "jj version too old" warning (MT-CROSS's Error
+  Handling)
+- [ ] Clear the path back to default resolution (a current jj) — group collapses back to the
+  all-supported line
+
 #### Status Bar Widget (Switch Working Copy)
 
 - [ ] jj-idea-fmrj: click the Jujutsu widget in the IDE status bar to open the "Switch Working

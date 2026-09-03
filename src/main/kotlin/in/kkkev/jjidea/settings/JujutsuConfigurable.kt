@@ -86,6 +86,14 @@ class JujutsuConfigurable(
     private val diffbaseValidationLabel = JBLabel()
     private var diffbaseError: String? = null
 
+    // jj-idea-vcqn: Feature Availability group — rebuilt on every jj-availability status change,
+    // same "own the panel, repopulate it" shape as revsetValidationPanel above.
+    private lateinit var featureAvailabilityRow: CollapsibleRow
+    private val featureAvailabilityPanel = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        isOpaque = false
+    }
+
     // Global identity — backing properties for bindText(); async-loaded from jj config
     private var globalNameBinding = ""
     private var globalEmailBinding = ""
@@ -193,6 +201,25 @@ class JujutsuConfigurable(
                 }
             }
         }.apply { expanded = false }
+
+        // jj-idea-vcqn: passive discovery for jj-idea-xuah's Scenario B — jj meets the plugin's
+        // hard minimum but is too old for one or more JjFeatures, so the gated action is merely
+        // disabled with a tooltip. Collapsed by default (matches Installation Help above) so a
+        // fully up-to-date jj costs one header line; auto-expands the moment something is gated.
+        featureAvailabilityRow = collapsibleGroup(JujutsuBundle.message("settings.group.features")) {
+            row {
+                cell(featureAvailabilityPanel).align(AlignX.FILL)
+            }
+        }.apply { expanded = false }
+        renderFeatureAvailability(JjAvailabilityChecker.getInstance(project).status.value)
+        // `disposable` is null when a test builds the panel directly via createPanel() (it's set
+        // by DslConfigurableBase before createPanel() runs in the real Settings dialog) — the
+        // unconditional render above already covers that case with a one-time snapshot.
+        disposable?.let { parent ->
+            JjAvailabilityChecker.getInstance(project).status.connect(parent) { status ->
+                renderFeatureAvailability(status)
+            }
+        }
 
         group(JujutsuBundle.message("settings.group.identity")) {
             row(JujutsuBundle.message("settings.identity.name.label")) {
@@ -656,6 +683,55 @@ class JujutsuConfigurable(
                 globalEmailField?.text = email
             }
         }
+    }
+
+    /**
+     * Repopulates [featureAvailabilityPanel] from the current jj-availability [status] (jj-idea-vcqn).
+     * Called once at panel construction and again on every [JjAvailabilityChecker] status change
+     * (executable path edits, recheck, etc.) — see the `status.connect` wiring in [createPanel].
+     */
+    private fun renderFeatureAvailability(status: JjAvailabilityStatus) {
+        featureAvailabilityPanel.removeAll()
+        when (val availability = featureAvailabilityFor(status)) {
+            is FeatureAvailability.Gated -> {
+                availability.features.forEach { feature ->
+                    featureAvailabilityPanel.add(
+                        iconLabel(
+                            AllIcons.General.Error,
+                            JujutsuBundle.message(
+                                "settings.features.gated",
+                                feature.displayName,
+                                feature.minVersion.toString()
+                            )
+                        )
+                    )
+                }
+                featureAvailabilityPanel.add(iconLabel(null, JujutsuBundle.message("settings.features.hint")))
+                // Never auto-collapse a group the user may already have opened themselves.
+                featureAvailabilityRow.expanded = true
+            }
+
+            is FeatureAvailability.AllSupported ->
+                featureAvailabilityPanel.add(
+                    iconLabel(
+                        AllIcons.General.InspectionsOK,
+                        JujutsuBundle.message("settings.features.all.supported", availability.version.toString())
+                    )
+                )
+
+            is FeatureAvailability.BelowMinimum ->
+                featureAvailabilityPanel.add(
+                    iconLabel(
+                        null,
+                        JujutsuBundle.message("settings.features.below.minimum", availability.version.toString())
+                    )
+                )
+
+            FeatureAvailability.Unknown ->
+                featureAvailabilityPanel.add(iconLabel(null, JujutsuBundle.message("settings.features.unknown")))
+        }
+        featureAvailabilityPanel.revalidate()
+        featureAvailabilityPanel.repaint()
     }
 
     override fun isModified() = super.isModified() || repoSettingsDirty

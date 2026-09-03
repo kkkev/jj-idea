@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Settings → Version Control → Jujutsu gained a "Feature Availability" section: collapsed and out of your way when your jj is current, it lists any plugin feature your jj is too old for (with the version you'd need) the moment one is gated.
+
 ### Fixed
 - Settings → Version Control → Jujutsu no longer shows a horizontal scrollbar in a multi-repo project with a per-repository diff-base override set.
 
