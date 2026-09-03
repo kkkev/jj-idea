@@ -187,13 +187,17 @@ class JujutsuConfigurablePanelTest {
          * jj-idea-bwdk originally set this to 640 (a default-size Settings dialog's ~700px minus
          * headroom for insets/scrollbar), but that left ~100px of slack in which the panel could
          * silently grow without any test noticing — which is exactly what happened (see the
-         * class doc's regression history). jj-idea-258c tightened it to sit just above the
-         * actual measured width (~531px across every scenario below), so it now catches a
-         * regression close to the point it's introduced rather than only once it's severe enough
-         * to exceed a much narrower real-world Settings window (e.g. a pinned single-configurable
-         * view, which has no category tree to make room for).
+         * class doc's regression history). jj-idea-258c tightened it to 560, just above the width
+         * it measured locally (~531px) — but that measurement was taken on macOS. The `compat`
+         * CI job runs headless on Linux, where AWT substitutes different fonts; the monospace
+         * command field (`COLUMNS_SHORT` sized against the font's average char width) and the
+         * `.gap(RightGap.COLUMNS)` label spacing both render measurably wider there, landing at
+         * 592px in every `compat` matrix leg (2025.1/2025.2/2026.2) — verified by reproducing the
+         * `compat` job's exact environment locally (`eclipse-temurin:21-jdk` container). 630
+         * keeps the same close-to-actual margin jj-idea-258c intended, sized against the
+         * platform CI actually renders on rather than a local macOS measurement.
          */
-        private const val WIDTH_BUDGET = 560
+        private const val WIDTH_BUDGET = 630
 
         /**
          * Lower bound (raw px, this JVM's default — no scaling in a headless test) for the
