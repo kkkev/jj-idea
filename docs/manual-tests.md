@@ -1656,6 +1656,10 @@ wrong and here's how to fix it."
   reappear until the pointer moves
 - [ ] Regression: hover a commit row in the Jujutsu log — its tooltip still renders bookmark/tag
   chips correctly and still reflows/scrolls for a commit with many bookmarks (jj-idea-szn8)
+- [ ] jj-idea-6nas: `jj describe` @ with a very long single-line description — the widget's
+  label ellipsizes and other status bar widgets (line/column, encoding, memory, notifications)
+  stay visible, both at full window width and after shrinking the IDE window to ~900px; hovering
+  the widget's tooltip still shows the full, untruncated description
 
 ### MT-DIFF
 

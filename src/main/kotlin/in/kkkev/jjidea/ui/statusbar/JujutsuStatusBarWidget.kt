@@ -13,12 +13,12 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
-import `in`.kkkev.jjidea.ui.components.RevisionChoice
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
-import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Graphics
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
@@ -28,19 +28,10 @@ import javax.swing.JPanel
 class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidget {
     private val panel = WidgetPanel()
     private var currentRepo: JujutsuRepository? = null
-
-    companion object {
-        private const val MAX_DISPLAY_LEN = 40
-
-        fun displayTextFor(entry: LogEntry): String {
-            val sortedBookmarks = entry.bookmarks.sortedBy { it.isRemote }
-            val text = when {
-                sortedBookmarks.isNotEmpty() -> sortedBookmarks.joinToString(", ") { it.name.name }
-                entry.tags.isNotEmpty() -> entry.tags.joinToString(", ") { it.name }
-                !entry.description.empty -> entry.description.summary
-                else -> "(no description set)"
-            }
-            return if (text.length > MAX_DISPLAY_LEN) text.take(MAX_DISPLAY_LEN - 1) + "…" else text
+    private var statusBarComponent: JComponent? = null
+    private val resizeListener = object : ComponentAdapter() {
+        override fun componentResized(e: ComponentEvent) {
+            panel.statusBarWidth = e.component.width
         }
     }
 
@@ -50,6 +41,12 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
 
     override fun install(statusBar: StatusBar) {
         panel.onClick = ::openPopup
+
+        statusBar.component?.let { component ->
+            statusBarComponent = component
+            panel.statusBarWidth = component.width
+            component.addComponentListener(resizeListener)
+        }
 
         project.stateModel.workingCopies.connect(this) { _ -> refresh() }
 
@@ -83,6 +80,8 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
 
     override fun dispose() {
         currentRepo = null
+        statusBarComponent?.removeComponentListener(resizeListener)
+        statusBarComponent = null
     }
 
     private class WidgetPanel : JPanel(BorderLayout()) {
@@ -90,6 +89,14 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
         private val content = TextCanvasPanel()
         private val arrow = JLabel(" ▾")
         private var hovered = false
+        private var entry: LogEntry? = null
+
+        /** The [StatusBar]'s live component width — read by [WidgetTextLayout.budget] (jj-idea-6nas). */
+        var statusBarWidth: Int = 0
+            set(value) {
+                field = value
+                renderTruncated()
+            }
 
         init {
             border = JBUI.Borders.empty(0, 4)
@@ -119,14 +126,56 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
             super.paintComponent(g)
         }
 
+        /**
+         * Clamp the whole widget's width to [WidgetTextLayout.budget] (jj-idea-6nas) — belt and
+         * braces alongside [renderTruncated]'s fragment-level truncation, in case Swing's own
+         * `FontMetrics` measurement of the rendered [com.intellij.ui.SimpleColoredComponent] ever
+         * drifts from [in.kkkev.jjidea.ui.components.FragmentLayout]'s.
+         */
+        override fun getMaximumSize() = capWidth(super.getMaximumSize())
+        override fun getPreferredSize() = capWidth(super.getPreferredSize())
+
+        private fun capWidth(size: java.awt.Dimension): java.awt.Dimension {
+            val cap = kotlin.math.ceil(WidgetTextLayout.budget(statusBarWidth)).toInt()
+            return if (size.width > cap) java.awt.Dimension(cap, size.height) else size
+        }
+
         fun update(repo: JujutsuRepository?, entry: LogEntry?, isMultiRoot: Boolean) {
-            val canvas = FragmentRecordingCanvas()
-            entry?.let { canvas.append(RevisionChoice.Change(it)) }
-            content.renderFrom(canvas)
+            this.entry = entry
+            renderTruncated()
             isVisible = repo != null
             toolTipText = if (entry != null) buildTooltip(entry, repo, isMultiRoot) else null
+        }
+
+        private fun renderTruncated() {
+            val entry = entry
+            val canvas = if (entry == null) {
+                FragmentRecordingCanvas()
+            } else {
+                // Budget for `content` alone: the panel's own left/right border insets and the
+                // arrow label both eat into the overall cap, and aren't part of what `content`
+                // gets to render into. RENDER_SAFETY_MARGIN_PX further guards against
+                // FragmentLayout's logical-bounds text measurement (java.awt.Font.getStringBounds)
+                // coming out a little narrower than what SimpleColoredComponent actually paints -
+                // without it, the truncated text can render a few px wider than measured and get
+                // clipped by the real layout, cutting off part of the "..." ellipsis (jj-idea-6nas).
+                val budget = (
+                    WidgetTextLayout.budget(statusBarWidth) -
+                        arrow.preferredSize.width -
+                        insets.left -
+                        insets.right -
+                        RENDER_SAFETY_MARGIN_PX
+                ).coerceAtLeast(0.0)
+                val frc = getFontMetrics(font).fontRenderContext
+                FragmentRecordingCanvas(WidgetTextLayout.fit(entry, budget, font, frc))
+            }
+            content.renderFrom(canvas)
             revalidate()
             repaint()
+        }
+
+        private companion object {
+            const val RENDER_SAFETY_MARGIN_PX = 4.0
         }
 
         private fun buildTooltip(entry: LogEntry, repo: JujutsuRepository?, isMultiRoot: Boolean) = buildString {

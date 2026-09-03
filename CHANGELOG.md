@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Settings → Version Control → Jujutsu no longer shows a horizontal scrollbar in a multi-repo project with a per-repository diff-base override set.
 - The Installation Help section's command labels ("Homebrew:", "Cargo:", etc.) now have a comfortable gap before their command box instead of sitting flush against it, and several rows across the page take up less minimum width, reducing the chance of a horizontal scrollbar in a narrower Settings window.
+- The status bar working-copy widget no longer grows to fill the whole status bar and crowd out other widgets when the current change has a very long description — it now ellipsizes to a sensible width, shrinking further on a narrow window, with the full description still available in its tooltip. ([#95](https://github.com/kkkev/jj-idea/issues/95))
 
 ## [0.8.14] - 2026-09-02
 
