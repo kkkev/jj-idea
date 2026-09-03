@@ -856,6 +856,39 @@ class JujutsuLogTableModelFilterTest {
             model.setRootFilter(emptySet())
             model.rowCount shouldBe 2
         }
+
+        @Test
+        fun `excluded roots hide only those roots (jj-idea-qcks)`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Frontend commit"),
+                    createEntryInRepo("def456", repo2, "Backend commit"),
+                    createEntryInRepo("ghi789", repo3, "Shared commit")
+                )
+            )
+
+            model.setRootFilter(emptySet(), setOf(repo2))
+
+            model.rowCount shouldBe 2
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+            model.getEntry(1)?.id?.short shouldBe "ghi789"
+        }
+
+        @Test
+        fun `included roots win over excluded roots when both are set (jj-idea-qcks)`() {
+            model.setEntries(
+                listOf(
+                    createEntryInRepo("abc123", repo1, "Frontend commit"),
+                    createEntryInRepo("def456", repo2, "Backend commit"),
+                    createEntryInRepo("ghi789", repo3, "Shared commit")
+                )
+            )
+
+            model.setRootFilter(setOf(repo1), setOf(repo3))
+
+            model.rowCount shouldBe 1
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+        }
     }
 
     @Nested

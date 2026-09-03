@@ -42,12 +42,20 @@ data class LogWindowConfig(
     /** Name of the selected reference (bookmark, tag, or "@"), or "" for none. */
     var selectedReference: String = "",
     /**
-     * Repository paths selected in the per-tab root display filter.
-     * Empty means all loaded repos are shown (no filter active).
-     * Distinct from [selectedRepoPaths] which controls which repos are *loaded*;
-     * this field controls which of the loaded repos are *displayed*.
+     * Repository paths *included* in the per-tab root display filter (the allowlist half of
+     * the tri-state filter - jj-idea-qcks, GitHub #96). Empty means no inclusion filter is
+     * active - see [excludedRootPaths] for the other half. Distinct from [selectedRepoPaths]
+     * which controls which repos are *loaded*; these two fields control which of the loaded
+     * repos are *displayed*.
      */
     var selectedRootPaths: MutableList<String> = mutableListOf(),
+    /**
+     * Repository paths *excluded* from the per-tab root display filter (the denylist/mute-list
+     * half - jj-idea-qcks, GitHub #96). Only applied when [selectedRootPaths] is empty -
+     * included roots always win. Absent in settings files written before this field existed;
+     * xmlb defaults it to empty, so old files load with no exclusions.
+     */
+    var excludedRootPaths: MutableList<String> = mutableListOf(),
     /** Whether the multi-repo root gutter shows repo name + color (true) or just a thin colored strip (false). */
     var rootGutterExpanded: Boolean = true,
     /**

@@ -2314,12 +2314,27 @@ that test can't (a live dialog, and the per-repo group, which needs a real proje
 
 **Multi-repository, visual consistency, edge cases, and error handling**
 
-**Code:** `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/JujutsuRootGutterRenderer.kt`, `ui/log/RepositoryColors.kt`, `ui/common/JjNotInstalledPanel.kt`
+**Code:** `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/RootFilterSelection.kt`, `ui/log/JujutsuRootGutterRenderer.kt`, `ui/log/RepositoryColors.kt`, `ui/common/JjNotInstalledPanel.kt`
 
 #### Multi-Repository (if applicable)
 
 - [ ] Root filter appears for multi-root projects and hides for single-root projects
-- [ ] Root gutter column shows repo names; filtering by root works correctly
+- [ ] Root gutter column shows repo names
+- [ ] Tri-state root filter (jj-idea-qcks, GitHub #96): open the Root filter popup — a
+      "Select All" header, then one outlined coloured square per root. Click a root once:
+      icon fills, popup stays open, log shows only that root. Click again: icon shows an
+      outlined-and-struck-through square, log shows every root *except* it. Click again:
+      back to outline, log shows everything
+- [ ] Include one root and exclude another — only the included root shows (included wins).
+      Cycle the included root back to unset — the excluded root stays hidden, everything
+      else shows
+- [ ] With a root excluded, click "Select All": every root fills and the exclusion clears;
+      click "Select None": all icons return to outline and every row shows
+- [ ] Restart the IDE — the include/exclude selection persists. Then remove the
+      `excludedRootPaths` element from `.idea/jujutsu.xml` by hand and restart — loads
+      cleanly with no exclusions (old settings files without the field)
+- [ ] With an include active, map an additional repo (**Settings → Version Control**) — it
+      stays hidden. Clear the filter, exclude one root instead, map another repo — it shows
 - [ ] Entries from different roots sort by timestamp
 - [ ] Reference filter and graph repo scoping: see MT-LOG-FILTER's "Multi-repo scoping" subsection
       (jj-idea-1ra9) — no cross-repo ancestry or graph lines, even when repos' root commits share

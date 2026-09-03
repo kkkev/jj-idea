@@ -199,8 +199,8 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         detailsPanel.showCommits(logTable.selectedEntries)
         referenceFilterComponent.retryFilter()
         // Restore root filter after data loads (roots are only available once the model is populated)
-        if (config.selectedRootPaths.isNotEmpty()) {
-            rootFilterComponent?.setSelectedRoots(config.selectedRootPaths.toSet())
+        if (config.selectedRootPaths.isNotEmpty() || config.excludedRootPaths.isNotEmpty()) {
+            rootFilterComponent?.setSelectedRoots(config.selectedRootPaths.toSet(), config.excludedRootPaths.toSet())
         }
     }
 
@@ -313,6 +313,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             // Persist root selection changes
             addChangeListener {
                 config.selectedRootPaths = getSelectedRootPaths().toMutableList()
+                config.excludedRootPaths = getExcludedRootPaths().toMutableList()
                 persistConfig()
             }
         }

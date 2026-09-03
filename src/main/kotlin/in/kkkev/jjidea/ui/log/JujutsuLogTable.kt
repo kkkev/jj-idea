@@ -896,7 +896,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
         emptySet() // Filter by repo-scoped bookmark change keys (includes ancestors)
     private var dateFilterCutoff: Instant? = null // Filter by date (show commits after cutoff)
     private var pathsFilter: Set<String> = emptySet() // Filter by paths
-    private var rootFilter: Set<JujutsuRepository> = emptySet() // Filter by repository root
+    private var rootFilter = RootFilterSelection() // Filter by repository root (jj-idea-qcks)
 
     /**
      * Invoked on the EDT after [applyFilter] rebuilds [filteredEntries], except when called
@@ -1042,11 +1042,13 @@ class JujutsuLogTableModel : AbstractTableModel() {
     }
 
     /**
-     * Set the root filter (by repository).
-     * Empty set means no root filtering (show all roots).
+     * Set the root filter (by repository). Both empty means no root filtering (show all
+     * roots); [included] wins over [excluded] when both are non-empty - see
+     * [RootFilterSelection]. Copies both sets so this model doesn't alias the caller's
+     * live mutable state (jj-idea-qcks).
      */
-    fun setRootFilter(roots: Set<JujutsuRepository>) {
-        rootFilter = roots
+    fun setRootFilter(included: Set<JujutsuRepository>, excluded: Set<JujutsuRepository> = emptySet()) {
+        rootFilter = RootFilterSelection(included.toSet(), excluded.toSet())
         applyFilter()
     }
 
@@ -1129,7 +1131,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
                 val matchesPaths = pathsFilter.isEmpty()
 
                 // Root filter (if active)
-                val matchesRoot = rootFilter.isEmpty() || rootFilter.contains(entry.repo)
+                val matchesRoot = rootFilter.shows(entry.repo)
 
                 matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths && matchesRoot
             }
