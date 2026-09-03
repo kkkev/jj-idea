@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.settings
 
+import `in`.kkkev.jjidea.jj.InstallMethod
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JjFeature
 import `in`.kkkev.jjidea.jj.JjVersion
@@ -49,4 +50,26 @@ internal fun featureAvailabilityFor(status: JjAvailabilityStatus): FeatureAvaila
         is JjAvailabilityStatus.Checking,
         is JjAvailabilityStatus.NotFound,
         is JjAvailabilityStatus.InvalidPath -> FeatureAvailability.Unknown
+    }
+
+/**
+ * Whether Settings → Jujutsu's "Installation Help" group should show upgrade commands instead
+ * of install commands (jj-idea-vwni). True for both "jj is too old" cases — Scenario A
+ * ([FeatureAvailability.BelowMinimum]) and Scenario B ([FeatureAvailability.Gated]) — since jj is
+ * genuinely installed and just needs updating in both; showing "if jj is not installed, use..."
+ * for Scenario B was actively wrong, not just unhelpful. Derived from [featureAvailabilityFor]
+ * rather than re-deriving the Scenario A/B split, so the two decisions can't drift apart.
+ */
+internal fun installHelpIsUpgradeFor(status: JjAvailabilityStatus): Boolean =
+    when (featureAvailabilityFor(status)) {
+        is FeatureAvailability.Gated, is FeatureAvailability.BelowMinimum -> true
+        is FeatureAvailability.AllSupported, FeatureAvailability.Unknown -> false
+    }
+
+/** The [InstallMethod] jj was actually found via, when known — both "too old" statuses carry one. */
+internal fun detectedInstallMethodFor(status: JjAvailabilityStatus): InstallMethod? =
+    when (status) {
+        is JjAvailabilityStatus.VersionTooOld -> status.installMethod
+        is JjAvailabilityStatus.Available -> status.installMethod
+        else -> null
     }

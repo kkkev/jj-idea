@@ -23,6 +23,7 @@ import com.intellij.ui.components.JBTextField
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.layout.selected
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.git.GitPushDialog
 import `in`.kkkev.jjidea.jj.*
@@ -85,6 +86,11 @@ class JujutsuConfigurable(
     private lateinit var diffbaseRevsetField: Cell<JBTextField>
     private val diffbaseValidationLabel = JBLabel()
     private var diffbaseError: String? = null
+
+    // jj-idea-vwni: so Feature Availability can auto-expand Installation Help alongside itself
+    // when something is gated — the two are cross-referenced, so opening one without the other
+    // leaves the hint pointing at a still-folded section.
+    private lateinit var installGroupRow: CollapsibleRow
 
     // jj-idea-vcqn: Feature Availability group — rebuilt on every jj-availability status change,
     // same "own the panel, repopulate it" shape as revsetValidationPanel above.
@@ -155,11 +161,18 @@ class JujutsuConfigurable(
             }
         }
 
-        collapsibleGroup(JujutsuBundle.message("settings.group.install")) {
-            // Check current status to decide install vs upgrade
+        installGroupRow = collapsibleGroup(JujutsuBundle.message("settings.group.install")) {
+            // Check current status to decide install vs upgrade. Unlike featureAvailabilityPanel,
+            // this content is a one-shot snapshot at panel build time, not rebuilt on later
+            // status changes — only installGroupRow.expanded reacts live (see the status.connect
+            // wiring below). So a status change mid-session (e.g. editing the path and clicking
+            // Apply without closing Settings) opens this group but may still show stale
+            // install-vs-upgrade wording until Settings is reopened. Acceptable for now: matches
+            // the pre-existing limitation Scenario A already had before jj-idea-vwni extended
+            // this same isUpgrade check to Scenario B.
             val status = JjAvailabilityChecker.getInstance(project).status.value
-            val isUpgrade = status is JjAvailabilityStatus.VersionTooOld
-            val detectedMethod = (status as? JjAvailabilityStatus.VersionTooOld)?.installMethod
+            val isUpgrade = installHelpIsUpgradeFor(status)
+            val detectedMethod = detectedInstallMethodFor(status)
 
             row {
                 val descriptionKey = if (isUpgrade) {
@@ -706,9 +719,12 @@ class JujutsuConfigurable(
                         )
                     )
                 }
-                featureAvailabilityPanel.add(iconLabel(null, JujutsuBundle.message("settings.features.hint")))
-                // Never auto-collapse a group the user may already have opened themselves.
+                featureAvailabilityPanel.add(hintLabel(JujutsuBundle.message("settings.features.hint")))
+                // Never auto-collapse a group the user may already have opened themselves
+                // (jj-idea-vwni: same for Installation Help, which the hint above points at —
+                // opening one without the other leaves the pointer aimed at a folded section).
                 featureAvailabilityRow.expanded = true
+                installGroupRow.expanded = true
             }
 
             is FeatureAvailability.AllSupported ->
@@ -1024,12 +1040,22 @@ class JujutsuConfigurable(
     private fun iconLabel(icon: javax.swing.Icon?, text: String) = JBLabel(wrapped(text), icon, JBLabel.LEADING)
 
     /**
+     * Grey secondary-text label matching the DSL's `comment()` styling (jj-idea-vwni) — for
+     * hints, as opposed to [iconLabel]'s status rows. Wraps at [HINT_MESSAGE_WIDTH], wider than
+     * [VALIDATION_MESSAGE_WIDTH]: that constant was sized for short validation-error text and
+     * wrapped this hint's longer sentence too aggressively.
+     */
+    private fun hintLabel(text: String) = JBLabel(wrapped(text, HINT_MESSAGE_WIDTH)).apply {
+        foreground = UIUtil.getContextHelpForeground()
+    }
+
+    /**
      * Wraps [text] (which may contain raw `jj` stderr or a long path) in HTML with a fixed
      * body width, so validation-result labels wrap instead of driving the settings panel's
      * preferred width past the page (jj-idea-bwdk).
      */
-    private fun wrapped(text: String): String =
-        "<html><body width='${JBUI.scale(VALIDATION_MESSAGE_WIDTH)}'>" +
+    private fun wrapped(text: String, width: Int = VALIDATION_MESSAGE_WIDTH): String =
+        "<html><body width='${JBUI.scale(width)}'>" +
             StringUtil.escapeXmlEntities(text) +
             "</body></html>"
 
@@ -1158,6 +1184,9 @@ class JujutsuConfigurable(
     companion object {
         /** Max width (unscaled px) for wrapped validation-result labels (jj-idea-bwdk). */
         private const val VALIDATION_MESSAGE_WIDTH = 360
+
+        /** Wrap width (unscaled px) for [hintLabel] text — wider than [VALIDATION_MESSAGE_WIDTH] (jj-idea-vwni). */
+        private const val HINT_MESSAGE_WIDTH = 500
 
         /**
          * Narrower alternative to the DSL's [com.intellij.ui.dsl.builder.DEFAULT_COMMENT_WIDTH]

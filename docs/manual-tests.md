@@ -1605,25 +1605,36 @@ executable older than 0.39 available to point the plugin at.
   fires for that case
 - [ ] Open a **non-jj** project with an old jj configured → no balloon
 
-#### Feature Availability list (jj-idea-vcqn)
+#### Feature Availability list (jj-idea-vcqn, polish in jj-idea-vwni)
 
 Surface 1 of jj-idea-xuah — the passive counterpart to the nudge balloon above. Requires the
-same multi-version harness (see [Test Tooling](#test-tooling)).
+same multi-version harness (see [Test Tooling](#test-tooling)). `JjVersion.MINIMUM` is currently
+0.37.0 — a pinned jj exactly at or above that but below 0.39.0 (e.g. 0.37.x/0.38.x) is Scenario B
+(gated on a feature); anything below 0.37.0 is Scenario A (below the plugin's hard minimum).
 
 - [ ] With a current jj configured, open Settings → Version Control → Jujutsu — a "Feature
   Availability" group is present but **collapsed**, right below Installation Help
 - [ ] Expand it — shows "All plugin features are supported by jj *X.Y.Z*" (your actual version)
-- [ ] Point the jj executable path at a pinned jj **below 0.39 but ≥ the plugin minimum**
-  (e.g. `~/.local/bin/jj-0.38`), click Apply, **without closing Settings** — the group
-  auto-expands and lists "Advance Bookmark — needs jj 0.39.0", plus a hint pointing at
-  Installation Help. This must happen live, from the same Apply that reran availability
-  detection — not only after reopening Settings.
-- [ ] Point the executable path at a jj **below the plugin's hard minimum** (0.37), Apply — the
-  group goes back to collapsed, showing "jj *X.Y.Z* is below the minimum..." — no feature rows,
-  no double-reporting on top of the existing "jj version too old" warning (MT-CROSS's Error
-  Handling)
-- [ ] Clear the path back to default resolution (a current jj) — group collapses back to the
-  all-supported line
+- [ ] Point the jj executable path at a pinned jj **below 0.39 but ≥ 0.37.0** (e.g.
+  `~/.local/bin/jj-0.38`), click Apply, **without closing Settings** — **both** "Feature
+  Availability" and "Installation Help" auto-expand live, from the same Apply that reran
+  availability detection. Feature Availability lists "Advance Bookmark — needs jj 0.39.0" plus a
+  grey hint ("↑ Upgrade jj to unlock these...") that reads as secondary text (not the same weight
+  as the status rows above it) and doesn't wrap to more than 2 lines.
+- [ ] Installation Help's *expand* is live, but its *content* (install vs upgrade wording and
+  commands) is fixed at whatever it was when Settings was opened — jj-idea-vwni only fixed the
+  content for a **fresh open** while already gated, not a change mid-session. Close and reopen
+  Settings with the same jj-0.38 path still configured — Installation Help now reads "Your current
+  jj version is too old. Upgrade using:" with **upgrade** commands (`brew upgrade jj`, not
+  `brew install jj`) — before this fix it wrongly showed install commands here on a fresh open
+  too, even though jj was already installed.
+- [ ] Point the executable path at a jj **below the plugin's hard minimum** (e.g. 0.36), Apply —
+  Feature Availability goes back to collapsed, showing "jj *X.Y.Z* is below the minimum..." — no
+  feature rows, no double-reporting on top of the existing "jj version too old" warning (MT-CROSS's
+  Error Handling)
+- [ ] Clear the path back to default resolution (a current jj) — Feature Availability's content
+  updates live to the all-supported line; both groups **stay expanded** (deliberate — the plugin
+  never auto-collapses a group once opened, in case you opened it yourself)
 
 #### Status Bar Widget (Switch Working Copy)
 

@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Settings → Version Control → Jujutsu no longer shows a horizontal scrollbar in a multi-repo project with a per-repository diff-base override set.
+- When a plugin feature is gated on a newer jj (see "Feature Availability" above), Settings now automatically expands Installation Help alongside it and shows the correct upgrade commands there — previously it stayed collapsed and, even when opened, showed "if jj is not installed" install commands despite jj already being installed.
 
 ## [0.8.14] - 2026-09-02
 
