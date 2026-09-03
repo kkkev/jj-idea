@@ -144,7 +144,11 @@ class JujutsuConfigurable(
                         .withTitle(JujutsuBundle.message("settings.jj.path.chooser.title")),
                     project
                 ).bindText(appSettings.state::jjExecutablePath)
-                    .columns(COLUMNS_MEDIUM)
+                    // jj-idea-bslw: was COLUMNS_MEDIUM — this row (path field + browse icon +
+                    // Test button) was the widest in the panel and overflowed a narrower Settings
+                    // window. Still resizable/FILL, so it still expands to fill available width;
+                    // this only lowers its minimum/preferred contribution.
+                    .columns(COLUMNS_SHORT)
                     .align(AlignX.FILL)
                     .resizableColumn()
                     .comment(
@@ -1165,7 +1169,17 @@ class JujutsuConfigurable(
 
     /** Creates a row with method name, monospace command in a box, and copy button. */
     private fun Panel.commandRow(methodName: String, command: String) {
-        row(methodName + ":") {
+        row {
+            // jj-idea-bslw: built manually (not the row(label) shorthand) so extra right-padding
+            // can be added to the label. This group's label column otherwise auto-sizes to just
+            // "Homebrew:"/"Cargo:" (each collapsibleGroup computes its own label column,
+            // independent of the longer "JJ executable path:" label above), leaving barely any
+            // gap before the command field. Cell.widthGroup can't fix this: it only syncs widths
+            // within one Grid and doesn't reach across separate collapsibleGroups.
+            layout(RowLayout.LABEL_ALIGNED)
+            label("$methodName:").applyToComponent {
+                border = JBUI.Borders.emptyRight(COMMAND_LABEL_EXTRA_GAP)
+            }
             cell(createCommandField(command))
                 .align(AlignX.FILL)
                 .resizableColumn()
@@ -1187,6 +1201,9 @@ class JujutsuConfigurable(
 
         /** Wrap width (unscaled px) for [hintLabel] text — wider than [VALIDATION_MESSAGE_WIDTH] (jj-idea-vwni). */
         private const val HINT_MESSAGE_WIDTH = 500
+
+        /** Extra right-padding (unscaled px) on Installation Help's command labels (jj-idea-bslw). */
+        private const val COMMAND_LABEL_EXTRA_GAP = 12
 
         /**
          * Narrower alternative to the DSL's [com.intellij.ui.dsl.builder.DEFAULT_COMMENT_WIDTH]

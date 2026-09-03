@@ -6,8 +6,11 @@ import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.jj.InstallMethod
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
+import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Tag
@@ -66,6 +69,32 @@ class JujutsuConfigurablePanelTest {
         val panel = JujutsuConfigurable(project.get(), listOf(repo)).createPanel()
 
         panel.preferredSize.width shouldBeLessThanOrEqual JBUI.scale(WIDTH_BUDGET)
+    }
+
+    @Test
+    fun `Installation Help command labels have extra right padding before their field`() {
+        // jj-idea-bslw: "Homebrew:"/"Cargo:" sat uncomfortably close to their command field —
+        // each collapsibleGroup auto-sizes its own label column independent of the (longer) "JJ
+        // executable path:" label above, so there's no natural extra room without padding.
+        val panel = JujutsuConfigurable(project.get()).createPanel()
+
+        val commandLabels = mutableListOf<javax.swing.JLabel>()
+        fun walk(c: java.awt.Component) {
+            if (c is javax.swing.JLabel && c.text?.endsWith(":") == true && c.text != "JJ executable path:") {
+                commandLabels += c
+            }
+            if (c is java.awt.Container) c.components.forEach(::walk)
+        }
+        walk(panel)
+
+        val installMethodLabels = commandLabels.filter { label ->
+            InstallMethod.allAvailable.any { it !is InstallMethod.Manual && label.text == "${it.name}:" }
+        }
+        installMethodLabels shouldNotBe emptyList<javax.swing.JLabel>()
+        installMethodLabels.forEach { label ->
+            val rightInset = label.border?.getBorderInsets(label)?.right ?: 0
+            rightInset shouldBeGreaterThan 0
+        }
     }
 
     @Test

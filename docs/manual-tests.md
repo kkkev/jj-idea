@@ -2218,6 +2218,10 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 - [ ] (jj-idea-ye1x) In a **multi-repo** project, expand a repo's "Repository Settings" group and
       turn on "Override diff base for this repository" with "Custom revset" selected — no
       horizontal scrollbar appears on the settings panel
+- [ ] (jj-idea-bslw) Expand "Installation Help" — "Homebrew:"/"Cargo:" (or whichever methods are
+      detected) have a visible gap before their command box, not sitting flush against it. Narrow
+      the Settings window/pane as much as the IDE allows — the "JJ executable path:" row's field +
+      Test button should need less width than before to stay fully visible
 
 #### Default push scope (jj-idea-fmzr, jj-idea-ikof)
 
