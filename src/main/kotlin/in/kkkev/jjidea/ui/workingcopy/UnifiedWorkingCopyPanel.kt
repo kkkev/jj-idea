@@ -26,11 +26,7 @@ import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
-import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
-import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
@@ -261,7 +257,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      */
     internal fun onWorkingCopiesChanged(new: Map<String, LogEntry>) {
         val hasRepos = new.isNotEmpty()
-        if (JjAvailabilityChecker.getInstance(project).status.value is JjAvailabilityStatus.Available) {
+        if (project.jjAvailabilityStatus.isAvailable) {
             val cardLayout = cardPanel.layout as CardLayout
             if (!hasRepos) updateEmptyState()
             cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
@@ -296,12 +292,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     internal val boundRepository: JujutsuRepository? get() = controlsPanel.boundRepository
 
     private fun subscribeToAvailabilityStatus() {
-        val checker = JjAvailabilityChecker.getInstance(project)
-        checker.status.connect(this) { status ->
-            updateForAvailabilityStatus(status)
-        }
-        // Also check current status immediately
-        updateForAvailabilityStatus(checker.status.value)
+        project.jjAvailabilityStatus.connectAndFireSync(this) { status -> updateForAvailabilityStatus(status) }
     }
 
     private fun updateForAvailabilityStatus(status: JjAvailabilityStatus) {

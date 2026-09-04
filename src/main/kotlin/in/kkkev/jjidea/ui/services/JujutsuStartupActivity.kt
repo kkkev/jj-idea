@@ -3,10 +3,7 @@ package `in`.kkkev.jjidea.ui.services
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
-import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
-import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.setup.JjUserConfigChecker
 import `in`.kkkev.jjidea.util.runInBackground
@@ -49,8 +46,7 @@ class JujutsuStartupActivity : ProjectActivity {
         SponsorAsk.askIfNeeded(project)
 
         // Initialize availability checking
-        val checker = JjAvailabilityChecker.getInstance(project)
-        checker.status.connect(project) { status ->
+        project.jjAvailabilityStatus.connectAndFireSync(project) { status ->
             log.info("jj availability status changed: $status")
             when (status) {
                 is JjAvailabilityStatus.Checking -> {} // Initial state, wait for real result
@@ -62,7 +58,6 @@ class JujutsuStartupActivity : ProjectActivity {
                 else -> JujutsuNotifications.notifyJjUnavailable(project, status)
             }
         }
-        checker.recheck()
 
         // Check user config per repo as repos become available
         project.stateModel.initialisedRepositories.connect(project) { roots ->

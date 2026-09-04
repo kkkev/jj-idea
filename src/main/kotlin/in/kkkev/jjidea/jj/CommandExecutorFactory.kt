@@ -20,6 +20,6 @@ class CliExecutorFactory(private val project: Project) : CommandExecutorFactory 
     override fun create(directory: VirtualFile) = CliExecutor(
         root = directory,
         executableProvider = { JujutsuApplicationSettings.getInstance().state.jjExecutablePath },
-        onJjNotFound = { JjAvailabilityChecker.getInstance(project).recheck() }
+        onJjNotFound = { project.jjAvailabilityStatus.invalidate() }
     )
 }

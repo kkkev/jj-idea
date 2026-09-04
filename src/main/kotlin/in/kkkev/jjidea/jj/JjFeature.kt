@@ -52,8 +52,8 @@ val JjAvailabilityStatus.versionOrNull: JjVersion?
  * Whether jj as currently detected in [project] supports [feature]. `false` (not gated-enabled)
  * when jj's version can't be determined yet.
  */
-fun JjFeature.isSupportedIn(project: Project): Boolean =
-    JjAvailabilityChecker.getInstance(project).status.value.versionOrNull?.supports(this) ?: false
+fun JjFeature.isSupportedIn(project: Project) =
+    project.jjAvailabilityStatus.cachedValue.versionOrNull?.supports(this) ?: false
 
 /**
  * Standard "requires jj X.Y.Z" description for a disabled, version-gated
@@ -62,7 +62,7 @@ fun JjFeature.isSupportedIn(project: Project): Boolean =
  * already supported.
  */
 fun JjFeature.disabledReasonIn(project: Project): String? {
-    val version = JjAvailabilityChecker.getInstance(project).status.value.versionOrNull ?: return null
+    val version = project.jjAvailabilityStatus.cachedValue.versionOrNull ?: return null
     if (version.supports(this)) return null
     return JujutsuBundle.message("action.disabled.requires.jj.version", minVersion, version)
 }

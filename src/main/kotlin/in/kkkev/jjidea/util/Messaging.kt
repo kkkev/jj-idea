@@ -80,6 +80,16 @@ interface NotifiableState<T> {
 
     fun connect(parent: Disposable, handler: Listener<T>)
 
+    /**
+     * Connects to the notifiable state, and fires the current state immediately and synchronously, rather than waiting
+     * for an asynchronous event fired via [runLater].
+     *
+     * Like [cachedValue], this starts a background load if the state has not loaded yet — so a consumer that
+     * subscribes before anything else has touched the state still gets a real value, delivered later via [connect].
+     * Without that, a state whose only observers use this method would sit on its start value forever.
+     */
+    fun connectAndFireSync(parent: Disposable, handler: Listener<T>)
+
     fun invalidate()
 
     /**
@@ -209,8 +219,20 @@ class SimpleNotifiableState<T : Any>(
         }
     }
 
-    override fun connect(parent: Disposable, handler: Listener<T>) {
+    override fun connectAndFireSync(parent: Disposable, handler: Listener<T>) {
+        // Subscribe directly rather than via connect(): connect() replays a warm value through
+        // runLater, which would deliver the same value twice (once here, once on the EDT) to
+        // handlers that aren't idempotent — JujutsuStartupActivity's raises a user notification.
+        subscribe(parent, handler)
+        handler.changed(cachedValue)
+    }
+
+    private fun subscribe(parent: Disposable, handler: Listener<T>) {
         project.messageBus.connect(parent).subscribe(topic, handler)
+    }
+
+    override fun connect(parent: Disposable, handler: Listener<T>) {
+        subscribe(parent, handler)
         val current = value
         if (!equalityCheck(current, startValue)) {
             // Replay current value to the new handler only (not all subscribers).

@@ -81,9 +81,4 @@ class JjNotInstalledPanel(private val project: Project, private val status: JjAv
             ShowSettingsUtil.getInstance().showSettingsDialog(project, "Jujutsu")
         }
     }
-
-    companion object {
-        fun create(project: Project, status: JjAvailabilityStatus): JjNotInstalledPanel? =
-            if (status is JjAvailabilityStatus.Available) null else JjNotInstalledPanel(project, status)
-    }
 }

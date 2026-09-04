@@ -10,8 +10,8 @@ import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.changes.ui.ChangesViewContentManager
 import com.intellij.ui.content.Content
 import com.intellij.ui.content.ContentFactory
-import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
+import `in`.kkkev.jjidea.jj.jjAvailabilityStatus
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.LogWindowConfig
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
@@ -136,9 +136,9 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
         }
 
         // Subscribe to availability status (per-tab card switching)
-        val checker = JjAvailabilityChecker.getInstance(project)
-        checker.status.connect(this) { status -> updateTabForAvailabilityStatus(config.id, status) }
-        updateTabForAvailabilityStatus(config.id, checker.status.value)
+        project.jjAvailabilityStatus.connectAndFireSync(this) { status ->
+            updateTabForAvailabilityStatus(config.id, status)
+        }
 
         return LogTabHandle(config, content, logPanel, wrapper, layout, notInstalled)
     }

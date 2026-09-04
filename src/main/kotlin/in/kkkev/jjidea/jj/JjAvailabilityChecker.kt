@@ -13,12 +13,15 @@ import `in`.kkkev.jjidea.util.notifiableState
  * Project-level service that checks jj availability and tracks status.
  *
  * Provides a [NotifiableState] that components can subscribe to for availability changes.
- * Status is rechecked when:
- * - The service is initialized
+ * Status is checked when:
+ * - It is first observed, via [NotifiableState.cachedValue] or [NotifiableState.connectAndFireSync]
  * - Settings change (executable path)
- * - [recheck] is called explicitly
+ * - [NotifiableState.invalidate] is called explicitly
  *
- * Use [status] to get the current availability status or subscribe to changes.
+ * Use [status] to get the current availability status or subscribe to changes. Read it through
+ * [jjAvailabilityStatus], and prefer `cachedValue`/`connectAndFireSync` over the raw `value`:
+ * nothing checks availability on project open by itself, so a plain `value` read on a cold state
+ * returns [JjAvailabilityStatus.Checking] indefinitely.
  */
 @Service(Service.Level.PROJECT)
 class JjAvailabilityChecker(private val project: Project) : Disposable {
@@ -27,7 +30,7 @@ class JjAvailabilityChecker(private val project: Project) : Disposable {
 
     /**
      * Current jj availability status.
-     * Starts with NotFound and is updated asynchronously on first [recheck].
+     * Starts as [JjAvailabilityStatus.Checking] and is updated asynchronously once loaded.
      */
     val status: NotifiableState<JjAvailabilityStatus> = notifiableState(
         project,
@@ -100,19 +103,12 @@ class JjAvailabilityChecker(private val project: Project) : Disposable {
             }
         }
 
-    /**
-     * Re-check jj availability. Call this when settings change.
-     */
-    fun recheck() {
-        log.info("Rechecking jj availability")
-        status.invalidate()
-    }
-
     override fun dispose() {
         // Nothing to dispose
     }
-
-    companion object {
-        fun getInstance(project: Project): JjAvailabilityChecker = project.service()
-    }
 }
+
+val Project.jjAvailabilityStatus get() = service<JjAvailabilityChecker>().status
+
+/** Triggers a first check if the status hasn't loaded yet — see [NotifiableState.cachedValue]. */
+val NotifiableState<JjAvailabilityStatus>.isAvailable get() = this.cachedValue is JjAvailabilityStatus.Available

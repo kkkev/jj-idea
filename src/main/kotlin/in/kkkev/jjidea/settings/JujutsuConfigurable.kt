@@ -15,13 +15,8 @@ import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleListCellRenderer
-import com.intellij.ui.components.JBCheckBox
-import com.intellij.ui.components.JBLabel
-import com.intellij.ui.components.JBRadioButton
-import com.intellij.ui.components.JBTextArea
-import com.intellij.ui.components.JBTextField
+import com.intellij.ui.components.*
 import com.intellij.ui.dsl.builder.*
-import com.intellij.ui.layout.selected
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -164,7 +159,7 @@ class JujutsuConfigurable(
             // status.connect wiring below). So a status change mid-session (e.g. editing the
             // path and clicking Apply without closing Settings) opens this group but may still
             // show stale wording until Settings is reopened.
-            val status = JjAvailabilityChecker.getInstance(project).status.value
+            val status = project.jjAvailabilityStatus.cachedValue
             val isUpgrade = installHelpIsUpgradeFor(status)
             val detectedMethod = detectedInstallMethodFor(status)
             // jj-idea-258c: folded in from the former standalone "Feature Availability" group —
@@ -237,7 +232,7 @@ class JujutsuConfigurable(
         // DslConfigurableBase before createPanel() runs in the real Settings dialog); the initial
         // `expanded = false` above already covers that case with a one-time snapshot.
         disposable?.let { parent ->
-            JjAvailabilityChecker.getInstance(project).status.connect(parent) { status ->
+            project.jjAvailabilityStatus.connect(parent) { status ->
                 if (installHelpIsUpgradeFor(status)) {
                     installGroupRow.expanded = true
                 }
@@ -845,8 +840,7 @@ class JujutsuConfigurable(
         val newPath = appSettings.state.jjExecutablePath
         if (newPath != previousPath) {
             previousPath = newPath
-            val checker = JjAvailabilityChecker.getInstance(project)
-            checker.recheck()
+            project.jjAvailabilityStatus.invalidate()
             // Directly trigger downstream refresh — initializedRoots.invalidate() alone
             // may produce data-class-equal repos (same project+directory), suppressing the
             // change notification. Explicitly refreshing workingCopies and logRefresh
@@ -997,6 +991,7 @@ class JujutsuConfigurable(
                             JujutsuBundle.message("settings.log.revset.test.error.single", errorMsg)
                         )
                     }
+
                     ambiguous != null -> {
                         val (repo, result) = ambiguous
                         val errorMsg = JujutsuBundle.message(
@@ -1007,6 +1002,7 @@ class JujutsuConfigurable(
                         diffbaseError = errorMsg
                         showRevsetResult(diffbaseValidationLabel, false, errorMsg)
                     }
+
                     else -> {
                         diffbaseError = null
                         showRevsetResult(
@@ -1091,7 +1087,7 @@ class JujutsuConfigurable(
                             // If the tested path matches the currently applied path,
                             // trigger a recheck so the plugin picks up an upgraded binary
                             if (path == appSettings.state.jjExecutablePath) {
-                                JjAvailabilityChecker.getInstance(project).recheck()
+                                project.jjAvailabilityStatus.invalidate()
                             }
                         } else {
                             showValidationResult(
