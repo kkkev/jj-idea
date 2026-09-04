@@ -146,6 +146,27 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     fun customDiffbaseRevset(repo: JujutsuRepository) =
         state.repositoryOverrides[repo.directory.path]?.customDiffbaseRevset ?: state.customDiffbaseRevset
 
+    /**
+     * Sets (or, with `strategy = null`, clears) a per-repo diff-base override — used by the "Set
+     * Diff Base" quick action (jj-idea-g1io) so it stays the same source of truth as the settings
+     * row above. Unlike [JujutsuConfigurable]'s repo panel (which writes [RepositoryConfig]
+     * directly), this is the single entry point for programmatic callers.
+     *
+     * [strategy] is written verbatim, including [DiffbaseStrategy.WORKING_COPY_PARENT] — picking
+     * "Working copy parent" from the action means "this repo uses @-", which must be recorded as
+     * an explicit override so it wins over a non-default project-level setting.
+     */
+    fun setDiffbase(repo: JujutsuRepository, strategy: DiffbaseStrategy?, customRevset: String? = null) {
+        val path = repo.directory.path
+        val current = state.repositoryOverrides[path] ?: RepositoryConfig()
+        val updated = current.copy(diffbaseStrategy = strategy, customDiffbaseRevset = customRevset)
+        if (updated.isEmpty()) {
+            state.repositoryOverrides.remove(path)
+        } else {
+            state.repositoryOverrides[path] = updated
+        }
+    }
+
     companion object {
         const val DEFAULT_LOG_WINDOW_ID = "default"
 

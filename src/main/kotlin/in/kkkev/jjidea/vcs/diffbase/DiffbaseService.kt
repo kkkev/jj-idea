@@ -24,6 +24,14 @@ import java.util.concurrent.atomic.AtomicBoolean
  * never disagree on the base revision (jj-idea-fwea / GitHub #43). Disagreement there is
  * what causes annotation misalignment: IntelliJ's `UpToDateLineNumberProvider` maps editor
  * lines to annotation lines *through* the LineStatusTracker diff.
+ *
+ * What those two consult is written by two places, both funneled through
+ * [in.kkkev.jjidea.settings.JujutsuSettings.setDiffbase]-style calls followed by
+ * [notifyDiffbaseChanged]: Settings → Version Control → Jujutsu's Diff Base group
+ * ([in.kkkev.jjidea.settings.JujutsuConfigurable]),
+ * for a permanent per-project/per-repo default, and the "Set Diff Base" quick action
+ * ([in.kkkev.jjidea.actions.diffbase.SetDiffbaseAction]) for a fast, task-driven switch
+ * (jj-idea-g1io / GitHub #43) — see [notifyDiffbaseChanged] for why every writer must call it.
  */
 @Service(Service.Level.PROJECT)
 class DiffbaseService(private val project: Project) {
@@ -85,23 +93,22 @@ class DiffbaseService(private val project: Project) {
         val strategy = settings.diffbaseStrategy(repo)
         val revset = strategy.revset(settings.customDiffbaseRevset(repo)) ?: return null
 
-        // limit = 2 (not 1): a second match is exactly what distinguishes "resolves to exactly
-        // one revision" from "resolves ambiguously" without an unbounded jj log.
-        val result = repo.logService.getLog(revset = Expression(revset), limit = 2, quiet = true)
-        val entries = result.getOrNull().orEmpty()
-        when {
-            entries.isEmpty() -> {
+        when (val result = resolveExactlyOne(repo, revset)) {
+            is ResolveResult.None -> {
                 log.info("Diff base revset '$revset' resolved to nothing for ${repo.directory.path}")
                 return null
             }
-            entries.size > 1 -> {
-                log.info("Diff base revset '$revset' resolved ambiguously (2+ revisions) for ${repo.directory.path}")
+            is ResolveResult.Ambiguous -> {
+                log.info(
+                    "Diff base revset '$revset' resolved ambiguously (${result.count}+ revisions) for ${repo.directory.path}"
+                )
                 return null
             }
+            is ResolveResult.Single -> {
+                cache[path] = result.id
+                return result.id
+            }
         }
-        val entry = entries.first()
-        cache[path] = entry.id
-        return entry.id
     }
 
     /**
@@ -133,5 +140,36 @@ class DiffbaseService(private val project: Project) {
 
     companion object {
         fun getInstance(project: Project): DiffbaseService = project.service()
+    }
+}
+
+/** Outcome of [resolveExactlyOne]: a diff base must resolve to exactly one revision. */
+sealed interface ResolveResult {
+    data class Single(val id: ChangeId) : ResolveResult
+    data object None : ResolveResult
+    data class Ambiguous(val count: Int) : ResolveResult
+}
+
+/**
+ * Resolves [revset] to a single revision, off the EDT. A diff base needs exactly one revision,
+ * unlike the log view's revset, so no match or an ambiguous match are both reported distinctly
+ * rather than treated the same as success — mirrors jj's own single-revision commands (`jj edit`,
+ * `jj file annotate -r`), which refuse rather than guess.
+ *
+ * Shared by [DiffbaseService.resolve] (the cached hot path) and
+ * [in.kkkev.jjidea.actions.diffbase.SetDiffbaseAction] (one-shot validation before writing a new
+ * custom-revset override), so the two can't drift on what "resolves cleanly" means. The settings
+ * panel's own Test button ([in.kkkev.jjidea.settings.JujutsuConfigurable.testDiffbaseRevset]) uses
+ * a lower-level primitive to surface jj's raw stderr per repo, but applies this same rule.
+ */
+fun resolveExactlyOne(repo: JujutsuRepository, revset: String): ResolveResult {
+    // limit = 2 (not 1): a second match is exactly what distinguishes "resolves to exactly one
+    // revision" from "resolves ambiguously" without an unbounded jj log.
+    val result = repo.logService.getLog(revset = Expression(revset), limit = 2, quiet = true)
+    val entries = result.getOrNull().orEmpty()
+    return when {
+        entries.isEmpty() -> ResolveResult.None
+        entries.size > 1 -> ResolveResult.Ambiguous(entries.size)
+        else -> ResolveResult.Single(entries.first().id)
     }
 }

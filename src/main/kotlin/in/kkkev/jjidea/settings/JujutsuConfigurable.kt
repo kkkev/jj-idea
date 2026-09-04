@@ -383,6 +383,19 @@ class JujutsuConfigurable(
                     )
                 }
                 row {
+                    radioButton(JujutsuBundle.message("settings.diffbase.previous"))
+                        .bindSelected(
+                            { settings.state.diffbaseStrategy == DiffbaseStrategy.PREVIOUS_COMMIT },
+                            { if (it) settings.state.diffbaseStrategy = DiffbaseStrategy.PREVIOUS_COMMIT }
+                        )
+                    contextHelp(
+                        JujutsuBundle.message(
+                            "settings.diffbase.previous.help",
+                            DiffbaseStrategy.PREVIOUS_COMMIT_REVSET
+                        )
+                    )
+                }
+                row {
                     diffbaseCustomOption = radioButton(JujutsuBundle.message("settings.diffbase.custom"))
                         .bindSelected(
                             { settings.state.diffbaseStrategy == DiffbaseStrategy.CUSTOM_REVSET },
@@ -1019,6 +1032,7 @@ class JujutsuConfigurable(
     private fun diffbaseStrategyLabel(strategy: DiffbaseStrategy): String = when (strategy) {
         DiffbaseStrategy.WORKING_COPY_PARENT -> JujutsuBundle.message("settings.diffbase.workingcopy")
         DiffbaseStrategy.IMMUTABLE_ANCESTOR -> JujutsuBundle.message("settings.diffbase.immutable")
+        DiffbaseStrategy.PREVIOUS_COMMIT -> JujutsuBundle.message("settings.diffbase.previous")
         DiffbaseStrategy.CUSTOM_REVSET -> JujutsuBundle.message("settings.diffbase.custom")
     }
 

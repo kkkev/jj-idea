@@ -15,6 +15,12 @@ class DiffbaseStrategyTest {
     }
 
     @Test
+    fun `PREVIOUS_COMMIT revset is the grandparent floored at the latest immutable ancestor`() {
+        DiffbaseStrategy.PREVIOUS_COMMIT.revset("ignored") shouldBe
+            "latest(@-- | latest(ancestors(@-) & immutable()))"
+    }
+
+    @Test
     fun `CUSTOM_REVSET revset returns the trimmed custom revset`() {
         DiffbaseStrategy.CUSTOM_REVSET.revset("  trunk()  ") shouldBe "trunk()"
     }

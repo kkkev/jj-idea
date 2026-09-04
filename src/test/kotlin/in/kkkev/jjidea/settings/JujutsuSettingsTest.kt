@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.settings
 
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import io.kotest.matchers.maps.shouldNotContainKey
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -183,6 +184,84 @@ class JujutsuSettingsTest {
         val settings = JujutsuSettings()
         settings.loadState(JujutsuSettingsState(customDiffbaseRevset = "trunk()"))
         settings.customDiffbaseRevset(mockRepo("/repo")) shouldBe "trunk()"
+    }
+
+    // ── setDiffbase writer (jj-idea-g1io) ────────────────────────────────────────
+
+    @Test
+    fun `setDiffbase writes a per-repo override that diffbaseStrategy then returns`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState(diffbaseStrategy = DiffbaseStrategy.WORKING_COPY_PARENT))
+        val repo = mockRepo("/repo")
+
+        settings.setDiffbase(repo, DiffbaseStrategy.IMMUTABLE_ANCESTOR)
+
+        settings.diffbaseStrategy(repo) shouldBe DiffbaseStrategy.IMMUTABLE_ANCESTOR
+    }
+
+    @Test
+    fun `setDiffbase with WORKING_COPY_PARENT writes an explicit override, beating a non-default project setting`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState(diffbaseStrategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR))
+        val repo = mockRepo("/repo")
+
+        settings.setDiffbase(repo, DiffbaseStrategy.WORKING_COPY_PARENT)
+
+        settings.diffbaseStrategy(repo) shouldBe DiffbaseStrategy.WORKING_COPY_PARENT
+    }
+
+    @Test
+    fun `setDiffbase writes the custom revset alongside CUSTOM_REVSET`() {
+        val settings = JujutsuSettings()
+        settings.loadState(JujutsuSettingsState())
+        val repo = mockRepo("/repo")
+
+        settings.setDiffbase(repo, DiffbaseStrategy.CUSTOM_REVSET, "trunk()")
+
+        settings.diffbaseStrategy(repo) shouldBe DiffbaseStrategy.CUSTOM_REVSET
+        settings.customDiffbaseRevset(repo) shouldBe "trunk()"
+    }
+
+    @Test
+    fun `setDiffbase with null strategy clears an otherwise-empty per-repo override`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                repositoryOverrides = mutableMapOf(
+                    "/repo" to RepositoryConfig(
+                        diffbaseStrategy = DiffbaseStrategy.CUSTOM_REVSET,
+                        customDiffbaseRevset = "trunk()"
+                    )
+                )
+            )
+        )
+        val repo = mockRepo("/repo")
+
+        settings.setDiffbase(repo, null)
+
+        settings.state.repositoryOverrides shouldNotContainKey "/repo"
+    }
+
+    @Test
+    fun `setDiffbase with null strategy preserves other fields of a non-empty override`() {
+        val settings = JujutsuSettings()
+        settings.loadState(
+            JujutsuSettingsState(
+                repositoryOverrides = mutableMapOf(
+                    "/repo" to RepositoryConfig(
+                        logChangeLimit = 42,
+                        diffbaseStrategy = DiffbaseStrategy.CUSTOM_REVSET,
+                        customDiffbaseRevset = "trunk()"
+                    )
+                )
+            )
+        )
+        val repo = mockRepo("/repo")
+
+        settings.setDiffbase(repo, null)
+
+        settings.state.repositoryOverrides["/repo"]?.logChangeLimit shouldBe 42
+        settings.state.repositoryOverrides["/repo"]?.diffbaseStrategy shouldBe null
     }
 
     // ── disableIgnoredFileScanning resolver (jj-idea-ixju) ──────────────────────

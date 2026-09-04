@@ -129,6 +129,11 @@
     <action id="Jujutsu.ResolveAllConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveAllConflictsAction"/>
 
+    <!-- Vcs.Import is a transparent (non-popup) NonEmptyActionGroup embedded directly inside
+         Vcs.MainMenu (see VcsActions.xml in the platform) - this is exactly where
+         Git/Mercurial/Subversion register their own "init" actions (e.g. Git.Init in
+         git4idea's intellij.vcs.git.backend.xml), kept separate from their product-specific
+         submenu (Git.Menu, see Jujutsu.MainMenuGroup below) - matched here for consistency. -->
     <action id="Jujutsu.Init" class="in.kkkev.jjidea.actions.top.InitAction">
       <add-to-group group-id="Vcs.Import"/>
       <add-to-group group-id="Vcs.Operations.Popup.NonVcsAware" relative-to-action="Start.Use.Vcs"
@@ -143,9 +148,25 @@
     <!-- Stage 1 of the undo roadmap (jj-idea-v9zp): persistent "Undo <last action>" entry that
          survives a dismissed undo balloon. Presentation names the operation - see
          UndoLastOperationAction's KDoc. -->
-    <action id="Jujutsu.UndoLastOperation" class="in.kkkev.jjidea.actions.undo.UndoLastOperationAction">
-      <add-to-group group-id="Vcs.MainMenu" anchor="last"/>
-    </action>
+    <action id="Jujutsu.UndoLastOperation" class="in.kkkev.jjidea.actions.undo.UndoLastOperationAction"/>
+
+    <!-- Quick action to change the diff base for gutter markers/Annotate (jj-idea-g1io, GitHub #43),
+         in addition to the permanent per-project/per-repo setting in Settings > Version Control > Jujutsu. -->
+    <action id="Jujutsu.SetDiffBase" class="in.kkkev.jjidea.actions.diffbase.SetDiffbaseAction"/>
+
+    <!-- "Jujutsu" submenu in the VCS main menu (jj-idea-g1io follow-up), gathering the plugin's
+         product-specific operations - matching Git.Menu's own placement exactly
+         (VcsGlobalGroup, anchored after the Vcs.Specific marker other VCS plugins' submenus use
+         the same anchor for) so "Jujutsu" sits in the same section as "Git". Jujutsu.Init is
+         deliberately NOT referenced here, for the same reason Git.Init isn't a child of
+         Git.Menu - it already has its own placement above (Vcs.Import), consistent with every
+         other VCS integration. -->
+    <group id="Jujutsu.MainMenuGroup" text="Jujutsu" class="in.kkkev.jjidea.actions.JujutsuMainMenuGroup"
+           popup="true">
+      <reference ref="Jujutsu.UndoLastOperation"/>
+      <reference ref="Jujutsu.SetDiffBase"/>
+      <add-to-group group-id="VcsGlobalGroup" anchor="after" relative-to-action="Vcs.Specific"/>
+    </group>
 
     <!-- Describe working copy: Ctrl+K replacement for Jujutsu projects -->
     <action id="Jujutsu.DescribeWorkingCopy"
@@ -252,6 +273,7 @@
       <reference ref="Jujutsu.CompareBeforeWithBranch"/>
       <separator/>
       <reference ref="Annotate"/>
+      <reference ref="Jujutsu.SetDiffBase"/>
       <action id="Jujutsu.ShowFileHistory" class="in.kkkev.jjidea.actions.file.ShowFileHistoryAction"/>
       <action id="Jujutsu.ShowHistoryForSelection"
               class="in.kkkev.jjidea.actions.file.ShowFileHistoryForSelectionAction"/>

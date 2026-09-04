@@ -31,7 +31,7 @@ Components whose blast radius exceeds their own package:
 |---|---|
 | `ui/components/TextCanvas.kt`, `LogEntryText.kt`, `HtmlTextCanvas.kt`, `UnbreakableContent.kt`, `AtomicHtmlView.kt`, `HtmlIcons.kt`, `Linkifier.kt` | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-BOOKMARK](#mt-bookmark) |
 | Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details) |
-| `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff) |
+| `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff), [MT-DIFFBASE](#mt-diffbase) (quick action's "Choose revision...") |
 | Shared commit picker (`ui/components/CommitPickerPanel.kt`, `ui/components/LogSearchField.kt`, used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split), [MT-BOOKMARK](#mt-bookmark), [MT-LOG-FILTER](#mt-log-filter) |
 | `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
@@ -41,6 +41,8 @@ Components whose blast radius exceeds their own package:
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
 | `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
 | `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
+| `actions/diffbase/SetDiffbaseAction.kt` (quick action, jj-idea-g1io) | [MT-DIFFBASE](#mt-diffbase), [MT-CTXMENU](#mt-ctxmenu) (shares `RevisionSelectorPopup`), [MT-CROSS](#mt-cross) (multi-repo submenu) |
+| `actions/JujutsuMainMenuGroup.kt` ("Jujutsu" submenu in `Vcs.MainMenu`) | [MT-DIFFBASE](#mt-diffbase) |
 
 ## Fixtures
 
@@ -1786,8 +1788,8 @@ verify it once per surface it's referenced from, not three times independently:
 
 **Custom diff base for gutter markers and Annotate (jj-idea-fwea, GitHub #43)**
 
-**Code:** `vcs/diffbase/`, `settings/DiffbaseStrategy.kt`, `settings/JujutsuConfigurable.kt` (Diff Base group + per-repo override)
-**Also re-run:** MT-DIFF (Annotate is the other consumer of the diff base); MT-SETTINGS (the settings group itself)
+**Code:** `vcs/diffbase/`, `settings/DiffbaseStrategy.kt`, `settings/JujutsuConfigurable.kt` (Diff Base group + per-repo override), `actions/diffbase/SetDiffbaseAction.kt` (quick action, jj-idea-g1io), `actions/JujutsuMainMenuGroup.kt` (VCS-menu submenu)
+**Also re-run:** MT-DIFF (Annotate is the other consumer of the diff base); MT-SETTINGS (the settings group itself); MT-CTXMENU (the quick action's "Pin to Revision..." shares `RevisionSelectorPopup`); MT-WORKINGCOPY (gutter markers); MT-CROSS (multi-repo submenu)
 
 Requires a repo with at least one immutable ancestor and a few mutable commits above it (e.g.
 `jj new trunk()` a couple of times) so "latest immutable ancestor" differs visibly from `@-`.
@@ -1795,12 +1797,17 @@ Requires a repo with at least one immutable ancestor and a few mutable commits a
 - [ ] Settings → Version Control → Jujutsu → **Diff Base** defaults to "Working copy parent
       (default)" on a fresh install; gutter markers and Annotate behave exactly as before this
       feature existed
-- [ ] jj-idea-fwea: the "Working copy parent" and "Latest immutable ancestor" radio buttons show
-      a "(?)" icon after the label — hovering (or focusing) it shows the underlying revset
-      (`@-` / `latest(ancestors(@-) & immutable())`); the labels themselves stay short, no raw
-      revset text visible without hovering
+- [ ] jj-idea-fwea: the "Working copy parent", "Latest immutable ancestor" and "Previous commit"
+      radio buttons show a "(?)" icon after the label — hovering (or focusing) it shows the
+      underlying revset (`@-` / `latest(ancestors(@-) & immutable())` /
+      `latest(@-- | latest(ancestors(@-) & immutable()))`); the labels themselves stay short, no
+      raw revset text visible without hovering
 - [ ] Select "Latest immutable ancestor (trunk)", click Apply — without touching the editor,
       every open file's gutter markers expand to the full diff vs trunk (not just vs `@-`)
+- [ ] jj-idea-g1io: select "Previous commit (grandparent)", click Apply — gutter markers narrow
+      to the last two commits' worth of change. `jj edit` onto a change directly on trunk (no
+      mutable grandparent) and re-check — it falls back to trunk, not past it, into immutable
+      history
 - [ ] Annotate the same file (Jujutsu → Annotate). **Alignment check:** every blame line lines
       up with the correct source line; lines changed anywhere in the stack read as
       unattributed, not shifted onto the wrong line — this is the bug this feature exists to
@@ -1818,7 +1825,7 @@ Requires a repo with at least one immutable ancestor and a few mutable commits a
       ancestor" run), switch the setting back to "Working copy parent" and click Apply —
       *without* closing the editor or manually re-running Annotate, the gutter's blame updates
       in place to the new base and stays correctly aligned (no line showing the wrong change's
-      author). Repeat switching between all three strategies with the gutter left open each
+      author). Repeat switching between all four strategies with the gutter left open each
       time — each switch is reflected immediately, never requiring a close/reopen to correct
       itself
 - [ ] Multi-repo project: set a per-repo override (Repository Settings → the repo's group →
@@ -1834,6 +1841,65 @@ Requires a repo with at least one immutable ancestor and a few mutable commits a
       crash); an ignored or unversioned file gets no gutter markers and no error; a file opened
       from the log or File History (a historical version) is unaffected; the **Local Changes** /
       **Working copy** panel keeps showing changes vs `@-` regardless of this setting
+
+**Quick action (jj-idea-g1io, GitHub #43)**
+
+The reporter asked for a fast, task-driven way to switch the diff base, in addition to the
+settings row above. It writes the same per-repo setting, always as an explicit per-repo override
+(even in a single-repo project) — so it and the settings row can never disagree, but also so the
+project-level radios in Settings can read "Working copy parent" while a repo's real base is
+something else; only the repo's own "Repository Settings" group shows the truth (jj-idea-4tcf
+would add a live indicator here).
+
+The popup deliberately splits "pick a revision" into two entries rather than one: **"Custom
+revset..."** saves a typed expression (e.g. `trunk()`) verbatim, re-resolved on every future diff
+base change, while **"Pin to Revision..."** freezes to whatever concrete commit the picked
+bookmark/tag/change resolves to right now. Reusing a single picker for both used to silently
+convert a typed expression into a frozen commit id once its own background resolution caught up —
+confirm that's no longer possible (below).
+
+- [ ] **VCS main menu** — "Initialise Jujutsu Repository" is a loose top-level entry (via the
+      platform's `Vcs.Import` group), same as Git/Mercurial/Subversion's own "init" actions —
+      confirm it appears exactly once, not duplicated
+- [ ] **VCS main menu → "Jujutsu"** — a submenu (pin icon) containing "Undo `<last action>`" and
+      "Set Diff Base", sitting in the **same section as the "Git" submenu** (both are `VcsGlobalGroup`
+      entries anchored after the `Vcs.Specific` marker) — with a Git-colocated or separate Git
+      project open, confirm "Jujutsu" and "Git" appear adjacent to each other, not in different
+      parts of the menu. "Initialise Jujutsu Repository" is deliberately **not** inside this
+      submenu, matching Git.Init not being inside Git.Menu either
+- [ ] In a project with **no jj repo yet**, the "Jujutsu" submenu is entirely absent (nothing left
+      in it needs to be reachable before a repo exists — only "Initialise Jujutsu Repository"
+      does, and it has its own placement above); "Initialise Jujutsu Repository" itself stays
+      reachable via the VCS menu, the VCS Operations popup, and the tool window's "Create
+      Repository" button, same as always
+- [ ] "Set Diff Base" opens a popup listing "Working copy parent", "Latest immutable ancestor",
+      "Previous commit", "Custom revset...", "Pin to Revision...", and "Configure in Settings..."
+      — a checkmark marks the repo's current strategy
+- [ ] Pick "Latest immutable ancestor" from the popup — the popup **closes immediately** (not a
+      checkbox that stays open), open editors' gutter markers widen to the full diff vs trunk
+      right away, and reopening the popup shows the checkmark moved to "Latest immutable
+      ancestor", not stuck on the old entry
+- [ ] "Custom revset..." with no override yet active opens an input dialog with an empty field;
+      type `trunk()`, OK — gutters/Annotate rebase onto trunk; reopening the popup shows a
+      trailing "Custom: `trunk()`" row, checked, and Settings → Version Control → Jujutsu shows
+      the repo's "Override diff base" row checked with "Custom revset" and `trunk()` **verbatim**
+      (not a resolved change id) — re-run this after letting the field sit idle for a couple of
+      seconds before confirming, to specifically catch the frozen-commit-id regression this fix
+      targets
+- [ ] Reopen "Custom revset..." — the dialog is now pre-filled with the active revset (`trunk()`)
+- [ ] Type an invalid revset (e.g. `zz(`) into "Custom revset..." — an error dialog appears and
+      the diff base is unchanged; type one that resolves to more than one revision (e.g.
+      `heads(mutable())`) — a distinct "resolves to N revisions" error, also unchanged
+- [ ] "Pin to Revision..." opens the familiar revision picker (search, bookmarks/tags, free-form
+      revset) — picking a bookmark rebases the gutters onto its **current** resolved commit; the
+      popup then shows "Custom: `<bookmark>`" checked
+- [ ] Annotate the file (Jujutsu → Annotate) after each switch — blame lines stay aligned with
+      source lines (same alignment check as MT-DIFFBASE's main flow)
+- [ ] **Editor context menu** → Jujutsu → "Set Diff Base" reaches the same popup
+- [ ] **Multi-repo project**, VCS menu → Jujutsu → "Set Diff Base" with no file/editor in context
+      — one submenu per repository (named by repo); setting one repo's base leaves the other
+      repo's untouched
+- [ ] "Configure in Settings..." opens Settings → Version Control → Jujutsu
 
 ### MT-CONFLICT
 
