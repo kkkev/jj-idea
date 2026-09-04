@@ -10,7 +10,7 @@ import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
 import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
 import com.intellij.ui.NewUI
-import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
+import `in`.kkkev.jjidea.vcs.isJujutsu
 
 /**
  * Status-bar fallback for [in.kkkev.jjidea.ui.toolbar.JujutsuBookmarkToolbarWidget], for the cases
@@ -32,7 +32,7 @@ class JujutsuBookmarkStatusBarWidgetFactory : StatusBarWidgetFactory {
     override fun getDisplayName() = "Jujutsu Bookmark"
 
     override fun isAvailable(project: Project) =
-        (NewUI.isEnabled() || isEnabledByDefault()) && project.possibleJujutsuVcs != null
+        (NewUI.isEnabled() || isEnabledByDefault()) && project.isJujutsu
 
     override fun isEnabledByDefault(): Boolean {
         if (NewUI.isEnabled()) {

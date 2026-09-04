@@ -4,7 +4,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.openapi.wm.StatusBarWidgetFactory
-import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
+import `in`.kkkev.jjidea.vcs.isJujutsu
 
 class JujutsuStatusBarWidgetFactory : StatusBarWidgetFactory {
     companion object {
@@ -13,7 +13,7 @@ class JujutsuStatusBarWidgetFactory : StatusBarWidgetFactory {
 
     override fun getId() = ID
     override fun getDisplayName() = "Jujutsu Working Copy"
-    override fun isAvailable(project: Project) = project.possibleJujutsuVcs != null
+    override fun isAvailable(project: Project) = project.isJujutsu
     override fun isEnabledByDefault() = true
     override fun createWidget(project: Project) = JujutsuStatusBarWidget(project)
     override fun disposeWidget(widget: StatusBarWidget) = widget.dispose()

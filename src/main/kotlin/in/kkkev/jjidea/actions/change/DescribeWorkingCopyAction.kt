@@ -10,7 +10,7 @@ import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
-import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
+import `in`.kkkev.jjidea.vcs.isJujutsu
 
 /**
  * Opens a dialog to edit the description of the working copy (@).
@@ -22,7 +22,7 @@ class DescribeWorkingCopyAction : DumbAwareAction(
     null
 ) {
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabledAndVisible = e.project?.possibleJujutsuVcs != null
+        e.presentation.isEnabledAndVisible = e.project.isJujutsu
     }
 
     override fun actionPerformed(e: AnActionEvent) {

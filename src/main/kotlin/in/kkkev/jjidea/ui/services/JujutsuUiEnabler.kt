@@ -6,20 +6,26 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
 import com.intellij.ui.content.ContentManagerEvent
 import com.intellij.ui.content.ContentManagerListener
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
+import `in`.kkkev.jjidea.ui.statusbar.JujutsuBookmarkStatusBarWidgetFactory
+import `in`.kkkev.jjidea.ui.statusbar.JujutsuStatusBarWidgetFactory
 import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 
 /**
- * Service that enables/disables Jujutsu tool windows based on VCS roots.
+ * Service that enables/disables Jujutsu UI surfaces based on VCS roots: tool windows, log tab
+ * suppression, and (since jj-idea-0hw4) the status-bar widgets, whose
+ * [com.intellij.openapi.wm.StatusBarWidgetFactory.isAvailable] result the platform caches and
+ * only re-queries on an explicit [StatusBarWidgetsManager.updateWidget] call.
  *
- * Subscribes to VCS configuration changes and shows/hides the JJ log tab and
- * working copy window based on whether any JJ roots are configured.
+ * Subscribes to VCS configuration changes and shows/hides the JJ log tab, working copy window,
+ * and status-bar widgets based on whether any JJ roots are configured.
  *
  * Log suppression rules:
  * - All roots are JJ: Show JJ log, suppress native log
@@ -27,7 +33,7 @@ import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
  * - No JJ roots: Hide JJ log, show native log
  */
 @Service(Service.Level.PROJECT)
-class ToolWindowEnabler(private val project: Project) : Disposable {
+class JujutsuUiEnabler(private val project: Project) : Disposable {
     private val log = Logger.getInstance(javaClass)
     private var suppressorListener: ContentManagerListener? = null
 
@@ -54,6 +60,19 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
             ToolWindowManager.getInstance(project)
                 .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
                 ?.isAvailable = hasJjRoots
+
+            // Re-query isAvailable() for the status-bar widgets: their factories gate on
+            // Project.isJujutsu (backed by this same initialisedRepositories state), but
+            // StatusBarWidgetFactory.isAvailable is cached by the platform and only re-checked
+            // on an explicit updateWidget call — see JujutsuStatusBarWidgetFactory and
+            // JujutsuBookmarkStatusBarWidgetFactory. Single-arg Class overload deliberately, not
+            // updateWidget(factory): the latter compiles to an updateWidget$default bridge
+            // missing on 2025.1/2025.2 (verifyPlugin flags it as a COMPATIBILITY_PROBLEM). No
+            // pre-check against the @ApiStatus.Internal StatusBarWidgetSettings — updateWidget
+            // already checks it internally.
+            val statusBarWidgetsManager = project.service<StatusBarWidgetsManager>()
+            statusBarWidgetsManager.updateWidget(JujutsuStatusBarWidgetFactory::class.java)
+            statusBarWidgetsManager.updateWidget(JujutsuBookmarkStatusBarWidgetFactory::class.java)
 
             when {
                 hasJjRoots && allRootsAreJj -> {
@@ -163,6 +182,6 @@ class ToolWindowEnabler(private val project: Project) : Disposable {
     }
 
     companion object {
-        fun getInstance(project: Project): ToolWindowEnabler = project.service()
+        fun getInstance(project: Project): JujutsuUiEnabler = project.service()
     }
 }

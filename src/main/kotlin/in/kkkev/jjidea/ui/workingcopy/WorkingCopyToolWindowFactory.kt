@@ -27,7 +27,7 @@ class WorkingCopyToolWindowFactory : ToolWindowFactory, DumbAware {
 
     // Check for .jj directory directly - this is a quick filesystem check that's safe on EDT
     // and works before VCS configuration is fully loaded.
-    // The ToolWindowEnabler and JujutsuStateModel will handle dynamic updates later.
+    // The JujutsuUiEnabler and JujutsuStateModel will handle dynamic updates later.
     override fun shouldBeAvailable(project: Project) =
         project.guessProjectDir()?.let { JujutsuRootChecker.isJujutsuRoot(it) } ?: false
 }

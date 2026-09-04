@@ -10,7 +10,7 @@ import `in`.kkkev.jjidea.actions.bookmark.bookmarkActionGroup
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkWidgetText
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
+import `in`.kkkev.jjidea.vcs.isJujutsu
 
 /**
  * Main-toolbar bookmark widget: shows the bookmark(s) on `@` (or the nearest ancestor bookmark
@@ -34,7 +34,7 @@ class JujutsuBookmarkToolbarWidget : ExpandableComboAction(), DumbAware {
 
     override fun update(e: AnActionEvent) {
         val project = e.project
-        if (project == null || project.possibleJujutsuVcs == null) {
+        if (project == null || !project.isJujutsu) {
             e.presentation.isEnabledAndVisible = false
             return
         }

@@ -1211,6 +1211,9 @@ toolbar itself is hidden or unavailable.
 - [ ] With the main toolbar visible (New UI default), the bookmark status-bar widget is **not**
       shown — only the main-toolbar widget is
 - [ ] Non-jj project: neither the main-toolbar widget nor the status-bar fallback appears
+- [ ] jj-idea-0hw4 (GitHub #100): in that non-jj project, run **Jujutsu → Init** — the
+      main-toolbar widget (or its status-bar fallback, per the current toolbar-visibility
+      setting) appears immediately, without restarting the IDE
 - [ ] jj-idea-z5uu (GitHub #95): the status-bar fallback's padding, text colour, hover fill, and
       pressed fill all match a stock status-bar widget (e.g. the encoding widget) at rest, on
       hover, and while the mouse button is held down — check in both a light and a dark theme;
@@ -1403,7 +1406,7 @@ selection does nothing; right-click for actions.
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/ToolWindowEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
@@ -1651,6 +1654,9 @@ wrong and here's how to fix it."
 
 #### Status Bar Widget (Switch Working Copy)
 
+- [ ] jj-idea-0hw4 (GitHub #100): open a plain Git or no-VCS project (no `.jj` root) — the
+  Jujutsu working-copy status-bar widget does not appear; running **Jujutsu → Init** in that
+  project makes it appear immediately, without restarting the IDE
 - [ ] jj-idea-fmrj: click the Jujutsu widget in the IDE status bar to open the "Switch Working
   Copy" popup, in a repo with at least one local bookmark and one tag
 - [ ] Hover a bookmark or tag row — tooltip shows the bookmark/tag chip (icon + name, correct

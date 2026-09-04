@@ -50,7 +50,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *                                                  ├─→ references / workingCopies / closestBookmarks / gitRemotes
  *                                                  │      .invalidate()
  *                                                  ├─→ logRefresh.notify()
- *                                                  └─→ ToolWindowEnabler (connects separately)
+ *                                                  └─→ JujutsuUiEnabler (connects separately)
  *
  * VFS (working-copy file / .gitignore /  ─→ 300ms debounce ─→ scheduleRepositoryRefresh():
  *      external jj op via op_heads)                            invalidateRepositoryState()
@@ -79,7 +79,7 @@ import java.util.concurrent.atomic.AtomicInteger
  *    first scan (roots → repositories cascade)
  * 3. initialisedRepositories change cascades to watchOpHeads + references/workingCopies/gitRemotes
  *    + logRefresh
- * 4. ToolWindowEnabler connects to initialisedRepositories separately
+ * 4. JujutsuUiEnabler connects to initialisedRepositories separately
  *
  * Note: [SimpleNotifiableState] does NOT auto-invalidate on construction.
  * Callers must call [invalidate] explicitly to trigger the first load.

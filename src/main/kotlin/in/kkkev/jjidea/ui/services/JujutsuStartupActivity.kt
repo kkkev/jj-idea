@@ -12,12 +12,12 @@ import `in`.kkkev.jjidea.setup.JjUserConfigChecker
 import `in`.kkkev.jjidea.util.runInBackground
 
 /**
- * Bootstraps the Jujutsu state model and tool window management on project open.
+ * Bootstraps the Jujutsu state model and UI enablement on project open.
  *
- * Initializing [ToolWindowEnabler] triggers [JujutsuStateModel][`in`.kkkev.jjidea.jj.JujutsuStateModel]
+ * Initializing [JujutsuUiEnabler] triggers [JujutsuStateModel][`in`.kkkev.jjidea.jj.JujutsuStateModel]
  * construction (via [stateModel][`in`.kkkev.jjidea.jj.stateModel]), which subscribes to IDE events
- * and fires the initial root scan. ToolWindowEnabler then connects to the root state to manage
- * tool window visibility and log tab suppression.
+ * and fires the initial root scan. JujutsuUiEnabler then connects to the root state to manage
+ * tool window visibility, status-bar widget availability, and log tab suppression.
  *
  * Also initializes [JjAvailabilityChecker] to monitor jj availability and notify users
  * of issues (not found, wrong version, invalid path).
@@ -26,7 +26,7 @@ class JujutsuStartupActivity : ProjectActivity {
     private val log = Logger.getInstance(javaClass)
 
     override suspend fun execute(project: Project) {
-        ToolWindowEnabler.getInstance(project)
+        JujutsuUiEnabler.getInstance(project)
 
         // Wait for the repository cache to be populated before returning. IntelliJ activates VCS
         // (triggering annotation/diff providers) only after all ProjectActivity instances complete,
@@ -40,8 +40,8 @@ class JujutsuStartupActivity : ProjectActivity {
         JujutsuSettings.getInstance(project)
 
         // Direct new users to the Working copy tool window (jj-idea-jqpe). Runs via its own
-        // runLater, so it's queued behind ToolWindowEnabler's own runLater (triggered above by
-        // ToolWindowEnabler.getInstance(project)), ensuring tool window availability is settled.
+        // runLater, so it's queued behind JujutsuUiEnabler's own runLater (triggered above by
+        // JujutsuUiEnabler.getInstance(project)), ensuring tool window availability is settled.
         WorkingCopySignpost.signpostIfNeeded(project)
 
         // Non-intrusive, once-per-install sponsor ask after sustained use (jj-idea-z1ld). Also
