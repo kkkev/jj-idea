@@ -13,3 +13,9 @@ verbatim at GA, condensed into a handful of user-facing bullets.
 
 - Added a "Preview features" section to Settings, gated behind an access code, for trying
   unfinished features early.
+- Drag and Drop: dragging a commit onto another commit now rebases it there — drop on the middle
+  of a row to rebase onto it, or near the top/bottom edge to insert it just after/before that
+  commit. Applies immediately, with an Undo option in the notification that appears.
+- Drag and Drop: dragging onto a row you can't actually drop on (a different repository, a commit
+  that would create a cycle, an immutable commit) now reliably shows a "can't drop here" indicator
+  on that row, instead of an inconsistent or missing cursor change.

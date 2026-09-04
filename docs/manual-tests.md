@@ -282,16 +282,14 @@ here" without a hand cursor implying a left-click action that doesn't exist.
 
 #### Drag and drop - core infrastructure (jj-idea-6jvh)
 
-This bead ships only the drag-and-drop *infrastructure* (payload/target model, y-aware zone
-hit-test, guards, indicator painting) with no operational drop handler wired in — no gesture bead
-(rebase-by-drag, etc.) has landed yet, so **no drop should ever actually apply**. What's
-verifiable here is the gesture *shell*: dragging initiates, the zone indicator tracks the pointer
-correctly, and every drop is uniformly rejected.
+This bead shipped the drag-and-drop *infrastructure* (payload/target model, y-aware zone hit-test,
+guards, indicator painting). jj-idea-8fxs (see the next subsection) wired the first real drop
+handler — commit-onto-commit rebase — so gestures other than that one still uniformly reject.
 
 - [ ] Pressing and dragging from a commit row starts a drag gesture (the cursor changes to a
-      drag/reject cursor); releasing anywhere does **not** change the log or repository state
-- [ ] Dragging over the top ~5px of a row shows no drop indicator and a reject cursor (no
-      performer is wired up yet, so every position is currently rejected)
+      drag/reject or drop cursor as appropriate); releasing over an unwired operation (e.g. a
+      copy-modifier drag, or dropping a commit on a bookmark chip) does **not** change the log or
+      repository state
 - [ ] Dragging near the bottom edge of a long log (more rows than fit the viewport) auto-scrolls
       the table as the pointer approaches the edge (`SmoothAutoScroller`)
 - [ ] Regression: with drag-and-drop installed, single-click select, Shift+click range,
@@ -2418,11 +2416,45 @@ that test can't (a live dialog, and the per-repo group, which needs a real proje
 - [ ] With no access code entered and no `-Djjidea.preview.dragAndDrop` system property: open the
       Jujutsu log and try to drag a commit row — nothing initiates, no drag cursor, no indicator
 - [ ] Enter a valid access code in Settings → Preview features, tick Drag and Drop, click Apply,
-      then **restart the IDE** (or reopen the project) — dragging a commit row now initiates (it
-      still rejects every drop with no indicator, since no gesture has landed yet)
+      then **restart the IDE** (or reopen the project) — dragging a commit row now initiates
 - [ ] Untick Drag and Drop (or clear the code) and restart again — dragging stops initiating
 - [ ] Launch with `-Djjidea.preview.dragAndDrop=true` and no access code — dragging initiates
       (the dev/CI escape hatch)
+
+#### Commit → commit rebase by drag (jj-idea-8fxs)
+
+The headline drag gesture: dropping a dragged commit row (or multi-selection) onto another row's
+centre band runs `jj rebase --onto`; the top/bottom bands run `-A`/`-B`. Applies immediately, no
+confirmation dialog, with an undo balloon on success. `RebaseSourceMode` is always `-r` (only the
+dragged commit(s) move) — choosing `-s`/`-b` from a drag is a future bead (jj-idea-j8ij); use the
+`Rebase...` dialog for those in the meantime.
+
+**Code:** `ui/dnd/DropPerformers.kt`, `ui/log/JujutsuLogTableDnD.kt`, `actions/change/rebaseAction.kt`
+
+- [ ] Drag a mutable commit onto another's **centre** band → row outline, tooltip "Rebase &lt;id&gt;
+      onto &lt;id&gt;", release applies; confirm the new parent with `jj log` in a terminal
+- [ ] Drag onto the **top** band → thin band outline, tooltip "...inserting after..."; confirm with
+      `jj log` that it landed **visually above** the destination — the top/bottom ↔ `-A`/`-B`
+      mapping is deliberately non-identity (`ui/dnd/DropTarget.kt`) and was a shipped bug once
+- [ ] Drag onto the **bottom** band → lands visually below (`-B`)
+- [ ] Each successful drop shows an undo balloon; clicking its Undo link reverts the graph to its
+      prior shape. Dismiss a balloon on a separate drop and use the persistent Undo Last Operation
+      action instead — same effect
+- [ ] Drag a multi-row selection (Shift/Ctrl-click first) — all selected commits rebase together
+- [ ] Hold the copy modifier while dragging a commit — reject cursor, **no** indicator (the
+      duplicate gesture isn't wired until jj-idea-p6nb)
+- [ ] Drag onto an immutable commit, or onto a descendant of the dragged commit (a cycle) — a
+      **filled** (not outlined) reject indicator on that row, reject cursor if it lands; drop does
+      nothing. Hover slowly and confirm the filled indicator is reliably visible every time you're
+      over that row - not just an occasional flicker (jj-idea-ymuu: the native reject cursor alone
+      was not reliable feedback; this filled indicator is the fix, painted the same reliable way as
+      the allowed-drop outline rather than depending on the cursor)
+- [ ] In a multi-root project, drag a commit from one repo's row onto a row from a different repo
+      in the same unified log — same filled reject indicator, same reliability check as above
+- [ ] Drag a commit onto itself, or onto another member of the same multi-selection — reject
+      cursor with **no** indicator at all (deliberately silent, not the same bug as above)
+- [ ] Regression: the existing **Rebase...** dialog action (context menu / toolbar) also now shows
+      an undo balloon on success — confirm the dialog itself is otherwise unchanged
 
 ### MT-CROSS
 

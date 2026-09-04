@@ -8,6 +8,8 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.rebase.RebaseDialog
+import `in`.kkkev.jjidea.ui.rebase.RebaseSpec
+import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 
 private val rebaseLog = Logger.getInstance("in.kkkev.jjidea.actions.change.rebaseAction")
 
@@ -34,12 +36,23 @@ internal fun performRebase(project: Project, repo: JujutsuRepository, entries: L
     if (!dialog.showAndGet()) return
 
     val spec = dialog.result ?: return
-    repo.commandExecutor
+    executeRebase(project, repo, spec)
+}
+
+/**
+ * Runs `jj rebase` for [spec] with undo tracking and an undo balloon on success. Shared by
+ * [performRebase] (dialog path) and [in.kkkev.jjidea.ui.dnd.DropPerformers] (drag-and-drop path,
+ * jj-idea-8fxs) - one wiring path for both means the dialog action also gains the undo balloon it
+ * didn't have before, which is accepted rather than adding an opt-in flag to avoid that.
+ */
+internal fun executeRebase(project: Project, repo: JujutsuRepository, spec: RebaseSpec) {
+    repo.commandExecutor.withUndoTracking()
         .createCommand { rebase(spec.revisions, spec.destinations, spec.sourceMode, spec.destinationMode) }
         .onSuccess {
             repo.invalidate(select = spec.revisions.first(), vfsChanged = true)
             rebaseLog.info("Rebased ${spec.revisions} onto ${spec.destinations}")
         }
         .onFailure { tellUser(project, "log.action.rebase.error") }
+        .withUndoBalloon(project, repo, "log.action.rebase.undo")
         .executeAsync()
 }
