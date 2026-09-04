@@ -8,7 +8,6 @@ import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
@@ -16,7 +15,6 @@ import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
-import java.awt.Graphics
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.MouseAdapter
@@ -88,7 +86,6 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
         var onClick: (() -> Unit)? = null
         private val content = TextCanvasPanel()
         private val arrow = JLabel(" ▾")
-        private var hovered = false
         private var entry: LogEntry? = null
 
         /** The [StatusBar]'s live component width — read by [WidgetTextLayout.budget] (jj-idea-6nas). */
@@ -99,31 +96,39 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
             }
 
         init {
-            border = JBUI.Borders.empty(0, 4)
+            // Platform status-bar chrome, not hand-picked colours (jj-idea-z5uu, GitHub #95):
+            // this panel is a direct, non-JLabel child of the status bar's right panel, so
+            // IdeStatusBarImpl already paints the correct hover/pressed background for it
+            // (WidgetEffectRenderer.paintBackground, called from paintChildren before this
+            // panel ever paints itself) - painting our own here would only overpaint it, and
+            // used to do so with the wrong-direction .darker() shade in dark themes. Setting
+            // Widget.border() explicitly, rather than leaving it null for wrapCustomStatusBarWidget
+            // to install, keeps renderTruncated's insets-based budget correct from the first layout.
+            border = JBUI.CurrentTheme.StatusBar.Widget.border()
             isOpaque = false
+            // `content` is a plain JPanel (TextCanvasPanel) and defaults to isOpaque=true, unlike
+            // TruncatingLeftRightLayout's TextCanvasPanel children which set this explicitly for
+            // the same reason: WidgetEffectRenderer.applyEffect sets this outer panel's own
+            // `background` field to Widget.HOVER_BACKGROUND on hover start, but never resets it
+            // on hover end (it only clears the WIDGET_EFFECT_KEY client property, since stock
+            // widgets are expected to key their paint off that, not off getBackground()) - so
+            // once `content` is opaque, it paints that dangling colour as a permanent box behind
+            // the text after the very first hover, even while nothing is hovered (jj-idea-z5uu).
+            content.isOpaque = false
+            // Swing gives JPanel/JLabel their own LookAndFeel-installed foreground on
+            // construction, which shadows a foreground set only on this outer panel - so
+            // Widget.FOREGROUND has to be applied to each leaf that actually paints text too
+            // (content's SimpleColoredComponents have no foreground of their own and inherit
+            // dynamically from `content`, per Component.getForeground()).
+            foreground = JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND
+            content.foreground = JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND
+            arrow.foreground = JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND
             add(content, BorderLayout.CENTER)
             add(arrow, BorderLayout.EAST)
             cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
             addMouseListener(object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) = onClick?.invoke() ?: Unit
-                override fun mouseEntered(e: MouseEvent) {
-                    hovered = true
-                    repaint()
-                }
-
-                override fun mouseExited(e: MouseEvent) {
-                    hovered = false
-                    repaint()
-                }
             })
-        }
-
-        override fun paintComponent(g: Graphics) {
-            if (hovered) {
-                g.color = UIUtil.getPanelBackground().darker()
-                g.fillRect(0, 0, width, height)
-            }
-            super.paintComponent(g)
         }
 
         /**

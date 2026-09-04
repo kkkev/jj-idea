@@ -1211,6 +1211,10 @@ toolbar itself is hidden or unavailable.
 - [ ] With the main toolbar visible (New UI default), the bookmark status-bar widget is **not**
       shown — only the main-toolbar widget is
 - [ ] Non-jj project: neither the main-toolbar widget nor the status-bar fallback appears
+- [ ] jj-idea-z5uu (GitHub #95): the status-bar fallback's padding, text colour, hover fill, and
+      pressed fill all match a stock status-bar widget (e.g. the encoding widget) at rest, on
+      hover, and while the mouse button is held down — check in both a light and a dark theme;
+      dark theme hover must go **lighter**, not darker
 
 #### Advance Bookmark (jj-idea-l7wd, GitHub #61)
 
@@ -1660,6 +1664,10 @@ wrong and here's how to fix it."
   label ellipsizes and other status bar widgets (line/column, encoding, memory, notifications)
   stay visible, both at full window width and after shrinking the IDE window to ~900px; hovering
   the widget's tooltip still shows the full, untruncated description
+- [ ] jj-idea-z5uu (GitHub #95): the widget's padding, text colour, hover fill, and pressed fill
+  all match a stock status-bar widget (e.g. the encoding widget) at rest, on hover, and while
+  the mouse button is held down — check in both a light and a dark theme; dark theme hover must
+  go **lighter**, not darker
 
 ### MT-DIFF
 

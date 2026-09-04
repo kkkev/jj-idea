@@ -7,14 +7,12 @@ import com.intellij.openapi.wm.CustomStatusBarWidget
 import com.intellij.openapi.wm.StatusBar
 import com.intellij.openapi.wm.StatusBarWidget
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkActionGroup
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkWidgetText
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
-import java.awt.Graphics
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.JComponent
@@ -80,11 +78,18 @@ class JujutsuBookmarkStatusBarWidget(private val project: Project) : CustomStatu
         var onClick: (() -> Unit)? = null
         private val label = JLabel()
         private val arrow = JLabel(" ▾")
-        private var hovered = false
 
         init {
-            border = JBUI.Borders.empty(0, 4)
+            // Platform status-bar chrome, not hand-picked colours (jj-idea-z5uu, GitHub #95) -
+            // see JujutsuStatusBarWidget.WidgetPanel's init for why no hover is painted here.
+            border = JBUI.CurrentTheme.StatusBar.Widget.border()
             isOpaque = false
+            // Swing gives JLabel its own LookAndFeel-installed foreground on construction, which
+            // shadows a foreground set only on this outer panel (see JujutsuStatusBarWidget
+            // .WidgetPanel's init) - so Widget.FOREGROUND has to be applied to each label too.
+            foreground = JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND
+            label.foreground = JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND
+            arrow.foreground = JBUI.CurrentTheme.StatusBar.Widget.FOREGROUND
             label.icon = JujutsuIcons.Bookmark
             add(label, BorderLayout.CENTER)
             add(arrow, BorderLayout.EAST)
@@ -92,26 +97,8 @@ class JujutsuBookmarkStatusBarWidget(private val project: Project) : CustomStatu
             addMouseListener(
                 object : MouseAdapter() {
                     override fun mouseClicked(e: MouseEvent) = onClick?.invoke() ?: Unit
-
-                    override fun mouseEntered(e: MouseEvent) {
-                        hovered = true
-                        repaint()
-                    }
-
-                    override fun mouseExited(e: MouseEvent) {
-                        hovered = false
-                        repaint()
-                    }
                 }
             )
-        }
-
-        override fun paintComponent(g: Graphics) {
-            if (hovered) {
-                g.color = UIUtil.getPanelBackground().darker()
-                g.fillRect(0, 0, width, height)
-            }
-            super.paintComponent(g)
         }
 
         fun update(text: String) {
