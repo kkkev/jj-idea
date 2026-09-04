@@ -49,5 +49,11 @@ data class JujutsuApplicationSettingsState(
     // upgrade nudge has already been shown for, e.g. "0.38.0|BOOKMARK_ADVANCE". Empty means
     // never shown. Keyed on both halves so the nudge reappears when the user's jj version
     // changes AND when a plugin update newly gates a feature at the same jj version.
-    var featureNudgeShownKey: String = ""
+    var featureNudgeShownKey: String = "",
+    // jj-idea-vpvz: the preview-feature access code as entered in Settings; validated offline
+    // against in.kkkev.jjidea.preview.AccessCode. Empty means no code entered.
+    var previewAccessCode: String = "",
+    // jj-idea-vpvz: comma-separated PreviewFeature ids the user has opted into, only meaningful
+    // while previewAccessCode validates. See in.kkkev.jjidea.preview.PreviewEntitlement.
+    var enabledPreviewFeatures: String = ""
 )

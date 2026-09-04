@@ -7,6 +7,8 @@ import com.intellij.ide.dnd.DnDSupport
 import com.intellij.ide.dnd.SmoothAutoScroller
 import com.intellij.openapi.Disposable
 import com.intellij.ui.awt.RelativeRectangle
+import `in`.kkkev.jjidea.preview.PreviewEntitlement
+import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
 import `in`.kkkev.jjidea.ui.dnd.DropOperation
@@ -37,8 +39,15 @@ import java.awt.Rectangle
  * with no performer, every drop is rejected with an empty reason and no indicator ever paints -
  * dragging is initiable (so the reject cursor and [SmoothAutoScroller] wiring are exercisable) but
  * nothing is ever droppable, so no gesture looks available before it actually is.
+ *
+ * Guarded behind [PreviewFeature.DRAG_AND_DROP] (jj-idea-vpvz): installs nothing at all - no
+ * `DnDSupport`, no drag ever initiates - unless the feature is enabled. Guarded here, at install
+ * time, not per-drop, so a disabled preview feature costs nothing at drag time and can't
+ * half-work; a toggle change needs the table re-created (e.g. an IDE restart) to take effect.
  */
 internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
+    if (!PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) return
+
     val hysteresis = ZoneHysteresis()
     var dragContext: DragContext? = null
     val performer = DropPerformers.forLogTable(project)

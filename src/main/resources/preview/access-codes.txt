@@ -1,0 +1,6 @@
+# Preview access codes: one salted SHA-256 hash per line (in.kkkev.jjidea.preview.AccessCode).
+# Lines starting with '#' and blank lines are ignored.
+#
+# To invite a new tester or rotate a code, add or replace a line here - no code change needed.
+# The plaintext code is never stored in the repo; keep it in your own notes.
+b7091443896512500e8c6e66c026c38f334d98fd30769b3acf6b30e0913aea1e

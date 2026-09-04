@@ -1,0 +1,4 @@
+# Test-only fixture for AccessCodeTest - shadows the real resource on the test classpath.
+# Plaintext codes (for the test's own reference): "valid-code-1234", "second-valid-code".
+83b60d35202a80c50198d04a7aa85d68c53ffc4a21f9c884f5c25bb33a42afb6
+999a1589bfc574dac3abe65f61707242d9912611528ae5dd9a42d424f7575009

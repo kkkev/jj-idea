@@ -60,12 +60,13 @@ jobs:
           if [ -n "$SOURCE_CHANGED" ]; then
             echo "Source code changed, checking changelog..."
 
-            # Check if CHANGELOG.md was updated
-            CHANGELOG_CHANGED=$(git diff --name-only $BASE_SHA ${{ github.sha }} -- 'CHANGELOG.md' | head -1)
+            # Check if CHANGELOG.md or the preview-changelog holding file was updated
+            CHANGELOG_CHANGED=$(git diff --name-only $BASE_SHA ${{ github.sha }} -- 'CHANGELOG.md' 'docs/preview-changelog.md' | head -1)
 
             if [ -z "$CHANGELOG_CHANGED" ]; then
               echo "::error::Source code changed but CHANGELOG.md was not updated."
-              echo "::error::Please add an entry to the [Unreleased] section of CHANGELOG.md."
+              echo "::error::Please add an entry to the [Unreleased] section of CHANGELOG.md"
+              echo "::error::(or, for a preview-gated feature, to docs/preview-changelog.md)."
               echo "::error::If this change doesn't need a changelog entry (refactoring, tests, etc.),"
               echo "::error::add [skip changelog] to your commit message."
               exit 1

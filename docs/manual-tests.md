@@ -2303,7 +2303,7 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 **Settings panel**
 
 **Code:** `settings/JujutsuConfigurable.kt`, `settings/JujutsuSettings.kt`, `settings/JujutsuSettingsState.kt`, `settings/JujutsuApplicationSettings.kt`
-**Also re-run:** MT-DIFFBASE (its Diff Base group and per-repo override live in this same panel)
+**Also re-run:** MT-DIFFBASE (its Diff Base group and per-repo override live in this same panel); MT-DND (its Preview features group is checked there too)
 
 - [ ] JJ executable path can be configured, including via the file picker
 - [ ] Auto-refresh toggle, change ID format preference (short/long), and log change limit
@@ -2393,6 +2393,36 @@ that test can't (a live dialog, and the per-repo group, which needs a real proje
       revset expression" and "Override ignored-file scanning default" rows read correctly with
       their field/checkbox stacked under the label, the Test button is fully visible, and Apply
       still persists every override (identity, limit, revset, context window, ignore-scan)
+
+#### Preview features (jj-idea-vpvz)
+
+- [ ] Open **Settings → Version Control → Jujutsu**: a **Preview features** group appears at the
+      bottom of the panel, below **Support**, with only an "Access code:" field and a one-line
+      explanation — no feature
+      names anywhere
+- [ ] Enter an invalid code, click Apply: no feature list appears; nothing crashes
+- [ ] Enter a valid access code, click Apply, then reopen Settings (or the panel) — a checkbox
+      for each preview feature (currently "Drag and Drop") appears under the code field, each
+      with a comment noting it's unfinished and that reopening the IDE is needed for a toggle
+      change to take effect
+- [ ] Clear the code and click Apply, reopen Settings — the feature checkboxes disappear again
+
+→ see MT-DND below for the effect of the toggle on the log table
+
+### MT-DND
+
+**Drag-and-drop preview gating (jj-idea-vpvz)**
+
+**Code:** `preview/PreviewFeature.kt`, `preview/PreviewEntitlement.kt`, `preview/AccessCode.kt`, `ui/log/JujutsuLogTableDnD.kt`
+
+- [ ] With no access code entered and no `-Djjidea.preview.dragAndDrop` system property: open the
+      Jujutsu log and try to drag a commit row — nothing initiates, no drag cursor, no indicator
+- [ ] Enter a valid access code in Settings → Preview features, tick Drag and Drop, click Apply,
+      then **restart the IDE** (or reopen the project) — dragging a commit row now initiates (it
+      still rejects every drop with no indicator, since no gesture has landed yet)
+- [ ] Untick Drag and Drop (or clear the code) and restart again — dragging stops initiating
+- [ ] Launch with `-Djjidea.preview.dragAndDrop=true` and no access code — dragging initiates
+      (the dev/CI escape hatch)
 
 ### MT-CROSS
 

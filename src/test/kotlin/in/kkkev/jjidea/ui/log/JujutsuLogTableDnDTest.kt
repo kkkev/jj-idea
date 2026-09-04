@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.ide.dnd.SmoothAutoScroller
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
@@ -17,17 +18,24 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.awt.Cursor
 import java.awt.Point
 import java.awt.event.MouseEvent
 
+private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
+
 /**
  * Platform-level coverage for [dropTargetAt] against a real, laid-out [JujutsuLogTable] (jj-idea-6jvh):
  * real pixel geometry (row height, `getCellRect`) rather than the pure [in.kkkev.jjidea.ui.dnd.DropZonesTest]
  * math, plus design section 2's per-row-not-per-gap correctness trap. Also checks installing DnD
  * doesn't disturb the table's existing mouse-driven behaviour, mirroring [JujutsuLogTableBookmarkClickTest].
+ *
+ * [installDragAndDrop] is gated behind `PreviewFeature.DRAG_AND_DROP` (jj-idea-vpvz), so every test
+ * that needs DnD actually installed sets [PREVIEW_PROPERTY] via [BeforeEach]; the gating itself is
+ * covered by `installing drag-and-drop does nothing when the preview feature is off` below.
  */
 @Tag("platform")
 @TestApplication
@@ -37,11 +45,17 @@ class JujutsuLogTableDnDTest {
     private val repo = mockk<JujutsuRepository>(relaxed = true)
     private var table: JujutsuLogTable? = null
 
+    @BeforeEach
+    fun enablePreview() {
+        System.setProperty(PREVIEW_PROPERTY, "true")
+    }
+
     // Same teardown as JujutsuLogTableBookmarkClickTest, to avoid a flaky LeakHunter retained
     // -Project report (jj-idea-q49j): drain stateModel's fire-and-forget loaders and clear the
     // static ToolTipManager registration installIconAwareTooltip left behind.
     @AfterEach
     fun cleanUp() {
+        System.clearProperty(PREVIEW_PROPERTY)
         table?.let {
             it.dispatchEvent(MouseEvent(it, MouseEvent.MOUSE_EXITED, System.currentTimeMillis(), 0, -1, -1, 0, false))
         }
@@ -186,5 +200,29 @@ class JujutsuLogTableDnDTest {
         )
 
         table.cursor shouldBe Cursor.getDefaultCursor()
+    }
+
+    @Test
+    fun `installing drag-and-drop does nothing when the preview feature is off`() {
+        System.clearProperty(PREVIEW_PROPERTY)
+        val a = entry("aaaaaaaa")
+
+        val table = tableWith(listOf(a))
+
+        // DnDManager is a no-op in tests (HeadlessDnDManager), so registerSource/registerTarget
+        // leave no observable trace - but installDragAndDrop's last statement,
+        // SmoothAutoScroller.installDropTargetAsNecessary, sets this client property directly on
+        // the component regardless, making it a reliable signal that the function's body ran (or,
+        // as asserted here, didn't).
+        table.getClientProperty(SmoothAutoScroller.ENABLED).shouldBeNull()
+    }
+
+    @Test
+    fun `installing drag-and-drop runs its full body when the preview feature is on`() {
+        val a = entry("aaaaaaaa")
+
+        val table = tableWith(listOf(a))
+
+        table.getClientProperty(SmoothAutoScroller.ENABLED) shouldBe true
     }
 }

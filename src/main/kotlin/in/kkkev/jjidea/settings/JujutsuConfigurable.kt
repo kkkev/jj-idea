@@ -25,6 +25,8 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.jj.cli.Config
 import `in`.kkkev.jjidea.jj.cli.config
 import `in`.kkkev.jjidea.jj.cli.rootlessConfig
+import `in`.kkkev.jjidea.preview.AccessCode
+import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -711,6 +713,39 @@ class JujutsuConfigurable(
             }
         }
 
+        group(JujutsuBundle.message("settings.group.preview")) {
+            row(JujutsuBundle.message("settings.preview.code.label")) {
+                textField()
+                    .bindText(appSettings.state::previewAccessCode)
+                    .columns(COLUMNS_SHORT)
+                    .comment(
+                        JujutsuBundle.message("settings.preview.code.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
+            }
+            // Which features are offered is decided once, when the panel opens: entering a new
+            // code and clicking Apply needs Settings reopened to reveal the feature list, the
+            // same "reopen/restart to take effect" tradeoff as the DnD install-time guard itself
+            // (in.kkkev.jjidea.ui.log.installDragAndDrop).
+            if (AccessCode.isValid(appSettings.state.previewAccessCode)) {
+                indent {
+                    for (feature in PreviewFeature.entries) {
+                        row {
+                            checkBox(feature.displayName)
+                                .bindSelected(
+                                    { isPreviewFeatureEnabled(feature) },
+                                    { setPreviewFeatureEnabled(feature, it) }
+                                )
+                                .comment(
+                                    JujutsuBundle.message("settings.preview.features.comment"),
+                                    maxLineLength = NARROW_COMMENT_WIDTH
+                                )
+                        }
+                    }
+                }
+            }
+        }
+
         // Load global identity values asynchronously
         loadGlobalIdentity()
     }
@@ -1050,6 +1085,19 @@ class JujutsuConfigurable(
 
     private fun defaultPushScope(): GitPushDialog.PushScope =
         GitPushDialog.parsePushScope(settings.state.defaultPushScope)
+
+    private fun isPreviewFeatureEnabled(feature: PreviewFeature): Boolean =
+        appSettings.state.enabledPreviewFeatures.split(",").map { it.trim() }.contains(feature.id)
+
+    private fun setPreviewFeatureEnabled(feature: PreviewFeature, enabled: Boolean) {
+        val ids = appSettings.state.enabledPreviewFeatures
+            .split(",")
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .toSet()
+        val updated = if (enabled) ids + feature.id else ids - feature.id
+        appSettings.state.enabledPreviewFeatures = updated.joinToString(",")
+    }
 
     private fun pushScopeLabel(scope: GitPushDialog.PushScope): String = when (scope) {
         GitPushDialog.PushScope.DEFAULT -> JujutsuBundle.message("dialog.git.push.scope.default")
