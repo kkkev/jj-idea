@@ -29,6 +29,7 @@ import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.JjAvailabilityChecker
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
@@ -239,38 +240,50 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     private fun subscribeToStateModel() {
         // workingCopies fires on EDT already (via invokeLater in SimpleNotifiableState)
-        project.stateModel.workingCopies.connect(this) { new ->
-            // Only update repo state if jj is available
-            val status = JjAvailabilityChecker.getInstance(project).status.value
-            if (status !is JjAvailabilityStatus.Available) return@connect
-
-            // Update UI based on whether we have any repos
-            val hasRepos = new.isNotEmpty()
-            val cardLayout = cardPanel.layout as CardLayout
-            if (!hasRepos) updateEmptyState()
-            cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
-
-            if (hasRepos) {
-                // Update the dropdown with available repos
-                val sortedRepos = new.map { it.value.repo }.sortedBy { it.displayName }
-                controlsPanel.updateAvailableRepositories(sortedRepos)
-
-                // Update controls if the current repo was updated
-                val currentRepo = controlsPanel.boundRepository
-                currentRepo?.let { repo -> controlsPanel.update(repo.workingCopy) }
-
-                // If no repo is bound, select the first one
-                if (currentRepo == null || new.none { it.value.repo == currentRepo }) {
-                    sortedRepos.firstOrNull()?.let { bindRepository(it) }
-                }
-                // Sync changes tree — handles the case where the panel was created after
-                // changeListUpdateDone already fired (ChangeListManager already has the data).
-                scheduleReloadChanges()
-            }
-        }
+        project.stateModel.workingCopies.connect(this) { new -> onWorkingCopiesChanged(new) }
 
         // Subscribe to change selection for programmatic repo selection
         project.stateModel.changeSelection.connect(this) { bindRepository(it.repo) }
+    }
+
+    /**
+     * Syncs the repo dropdown / bound repository / changes tree from a `workingCopies` update.
+     *
+     * Binding is deliberately *not* gated on jj availability (jj-idea-4d7p): [workingCopies] is
+     * non-empty only when jj has actually read the repos, so there's nothing to gate. It used to
+     * be — `if (status !is Available) return` — which silently dropped this update whenever the
+     * availability probe (a separate async check, started on project open) hadn't resolved yet.
+     * Since [in.kkkev.jjidea.util.SimpleNotifiableState] only republishes on change, a dropped
+     * update was never resent, leaving the panel permanently unbound (empty description, every
+     * toolbar button disabled) until the next real working-copy change came along. Card selection
+     * still defers to availability below, so the "not installed" card isn't clobbered while jj is
+     * unavailable.
+     */
+    internal fun onWorkingCopiesChanged(new: Map<String, LogEntry>) {
+        val hasRepos = new.isNotEmpty()
+        if (JjAvailabilityChecker.getInstance(project).status.value is JjAvailabilityStatus.Available) {
+            val cardLayout = cardPanel.layout as CardLayout
+            if (!hasRepos) updateEmptyState()
+            cardLayout.show(cardPanel, if (hasRepos) "content" else "empty")
+        }
+
+        if (hasRepos) {
+            // Update the dropdown with available repos
+            val sortedRepos = new.map { it.value.repo }.sortedBy { it.displayName }
+            controlsPanel.updateAvailableRepositories(sortedRepos)
+
+            // Update controls if the current repo was updated
+            val currentRepo = controlsPanel.boundRepository
+            currentRepo?.let { repo -> controlsPanel.update(repo.workingCopy) }
+
+            // If no repo is bound, select the first one
+            if (currentRepo == null || new.none { it.value.repo == currentRepo }) {
+                sortedRepos.firstOrNull()?.let { bindRepository(it) }
+            }
+            // Sync changes tree — handles the case where the panel was created after
+            // changeListUpdateDone already fired (ChangeListManager already has the data).
+            scheduleReloadChanges()
+        }
     }
 
     /** Binds [repo] as active for both [controlsPanel] and [changesTree], so they can't drift apart. */
@@ -278,6 +291,9 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         controlsPanel.boundRepository = repo
         changesTree.currentRepo = repo
     }
+
+    /** Test seam: the repository currently bound to [controlsPanel] (jj-idea-4d7p). */
+    internal val boundRepository: JujutsuRepository? get() = controlsPanel.boundRepository
 
     private fun subscribeToAvailabilityStatus() {
         val checker = JjAvailabilityChecker.getInstance(project)

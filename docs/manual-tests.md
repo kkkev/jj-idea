@@ -1408,6 +1408,10 @@ selection does nothing; right-click for actions.
 
 #### Working Copy Panel
 
+- [ ] jj-idea-4d7p: on a **freshly started IDE**, before touching anything, the description box is
+  already populated with `@`'s description (not just the grey placeholder), and every toolbar
+  button (New Change, Split, Squash, Abandon, Create Bookmark) is enabled rather than all greyed
+  out
 - [ ] Description text area shows current description
 - [ ] jj-idea-qa8i: clicking into the description text area, typing, and pressing Enter inserts
   a newline (does not do nothing or trigger another action)

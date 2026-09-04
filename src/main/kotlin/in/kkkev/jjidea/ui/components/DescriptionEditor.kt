@@ -46,6 +46,16 @@ class DescriptionEditor(
         get() = Description(commitMessage.comment)
         set(value) = commitMessage.setCommitMessage(value.actual)
 
+    /**
+     * Enables/disables the editor itself. Setting `isEnabled` on [component] is not enough:
+     * `CommitMessage` is a plain `JPanel` and Swing doesn't propagate enablement to children —
+     * only `EditorTextField.setEnabled` puts the embedded editor into viewer (read-only) mode
+     * (jj-idea-4d7p; the plain `JBTextArea` this replaced disabled correctly on its own).
+     */
+    fun setEnabled(enabled: Boolean) {
+        commitMessage.editorField.isEnabled = enabled
+    }
+
     /** Registers a listener for text changes, mirroring the old Swing `DocumentListener` usage. */
     fun addTextChangeListener(onChange: () -> Unit) {
         commitMessage.editorField.addDocumentListener(object : DocumentListener {

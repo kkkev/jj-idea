@@ -372,7 +372,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
     private fun updateForRepository(repo: JujutsuRepository?) {
         if (repo == null) {
             descriptionEditor.text = Description.EMPTY
-            descriptionEditor.component.isEnabled = false
+            descriptionEditor.setEnabled(false)
             currentChangeLabel.text = ""
             isDescriptionModified = false
             persistedDescription = Description.EMPTY
@@ -380,7 +380,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             return
         }
 
-        descriptionEditor.component.isEnabled = true
+        descriptionEditor.setEnabled(true)
 
         // Restore state from provider
         val state = stateProvider?.invoke(repo)
