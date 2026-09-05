@@ -278,6 +278,7 @@ class MoveBookmarkToChangeDialog(
         }
 
         selectFirstSelectable()
+        updateOkButton()
     }
 
     /**

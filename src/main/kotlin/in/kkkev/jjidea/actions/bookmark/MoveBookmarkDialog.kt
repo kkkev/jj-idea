@@ -309,6 +309,7 @@ class MoveBookmarkDialog(
         }
 
         selectFirstSelectable()
+        updateOkButton()
     }
 
     private fun selectFirstSelectable() {

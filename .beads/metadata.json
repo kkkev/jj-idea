@@ -2,6 +2,8 @@
   "database": "dolt",
   "backend": "dolt",
   "dolt_mode": "server",
+  "dolt_server_host": "127.0.0.1",
+  "dolt_server_port": 52555,
   "dolt_database": "beads_jj-idea",
   "project_id": "a3a8ff77-a643-400d-80cf-909b0bb17b7c",
   "last_bd_version": "0.52.0"
