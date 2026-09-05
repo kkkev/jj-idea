@@ -8,9 +8,13 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import java.awt.Component
 import java.util.concurrent.CancellationException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 
 private val log = Logger.getInstance("in.kkkev.jjidea.util.Tasks")
+
+private val saveAllDocumentsTimeoutMillis = TimeUnit.SECONDS.toMillis(10)
 
 /**
  * Saves all open documents before a command runs. Called as the first statement of both
@@ -18,31 +22,60 @@ private val log = Logger.getInstance("in.kkkev.jjidea.util.Tasks")
  * [in.kkkev.jjidea.jj.CommandExecutor.Command.executeWithProgress], on the calling thread - which
  * is a pooled thread for both callers.
  *
- * ## Modality (jj-idea-c4tp)
- * Posts with [ModalityState.any] rather than the default modality. `invokeAndWait` with default
- * modality only ever runs the posted runnable once no modal dialog is showing - if a modal is up
- * (e.g. the "Saving settings" dialog at shutdown, or any other plugin's modal), the pooled thread
- * calling this would otherwise park for the modal's entire lifetime, which is one of the hazards
- * behind that hang. Under [ModalityState.any], the runnable runs promptly even inside a modal, and
- * the existing [TransactionGuard.isWriteSafeModality] guard then no-ops the save - the same
- * "skip rather than save" outcome an EDT caller already gets inside a modal, just without the
- * indefinite park.
+ * ## Modality (jj-idea-c4tp, corrected by jj-idea-r5tx)
+ * c4tp posted this with [ModalityState.any] to stop a modal dialog (e.g. the "Saving settings"
+ * dialog at shutdown) from parking the calling pooled thread for the modal's entire lifetime.
+ * That broke saving in two ways (GH #106): [ModalityState.any] is never registered write-safe by
+ * [com.intellij.openapi.application.impl.TransactionGuardImpl.wrapLaterInvocation], so
+ * [TransactionGuard.isWritingAllowed] is `false` inside the posted runnable even with no modal
+ * showing, which both fails the old `isWriteSafeModality(current())` guard's premise and trips
+ * the platform's own write-safety assertion in `FileDocumentManagerImpl.saveAllDocuments`; and
+ * separately, [ModalityState.any] is documented as forbidden for VFS/PSI/project-model work, which
+ * a document save is - so the save could never legally run under it regardless.
+ *
+ * Instead, post with [ModalityState.nonModal] - which *is* write-safe - and bound the wait with a
+ * timeout rather than blocking indefinitely, preserving c4tp's "don't park behind a modal forever"
+ * property without borrowing `any()`. If already on the EDT (some callers reach this via
+ * [runLater]), save inline instead of re-queuing.
  */
 fun saveAllDocuments() {
     val app = ApplicationManager.getApplication()
     if (app.isDisposed) return
-    app.invokeAndWait(
+
+    if (app.isDispatchThread) {
+        saveIfWritingAllowed()
+        return
+    }
+
+    val latch = CountDownLatch(1)
+    app.invokeLater(
         {
-            if (TransactionGuard.getInstance().isWriteSafeModality(ModalityState.current())) {
-                app.runWriteIntentReadAction<Unit, Nothing> {
-                    FileDocumentManager.getInstance().saveAllDocuments()
-                }
-            } else {
-                log.info("saveAllDocuments skipped: modality ${ModalityState.current()} is not write-safe")
+            try {
+                saveIfWritingAllowed()
+            } finally {
+                latch.countDown()
             }
         },
-        ModalityState.any()
+        ModalityState.nonModal(),
+        app.disposed
     )
+    if (!latch.await(saveAllDocumentsTimeoutMillis, TimeUnit.MILLISECONDS)) {
+        log.warn(
+            "saveAllDocuments timed out after ${saveAllDocumentsTimeoutMillis}ms waiting for the EDT; " +
+                "proceeding without saving"
+        )
+    }
+}
+
+private fun saveIfWritingAllowed() {
+    val app = ApplicationManager.getApplication()
+    if (TransactionGuard.getInstance().isWritingAllowed()) {
+        app.runWriteIntentReadAction<Unit, Nothing> {
+            FileDocumentManager.getInstance().saveAllDocuments()
+        }
+    } else {
+        log.info("saveAllDocuments skipped: writing is not allowed in modality ${ModalityState.current()}")
+    }
 }
 
 private val capturedModality = ThreadLocal<ModalityState>()
