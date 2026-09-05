@@ -657,6 +657,9 @@ alongside one other repo works.
 - [ ] jj-idea-n3w1 (GitHub #46): the Describe dialog opens with the description field already
       focused; it's a real commit-message editor (spellcheck, subject-length inspection, Ctrl+E
       history popup), not a plain text box; Enter inserts a newline, Ctrl+Enter accepts
+- [ ] jj-idea-is97 (GitHub #76 regression): the Describe dialog's prompt reads "Enter description
+      for change \<short-id\>:" using the same short id shown in the log row, not the full
+      64-character change id
 - [ ] **Abandon** action removes change after confirmation
 - [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
 - [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there

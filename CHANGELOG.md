@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The log's Root filter can now exclude a repository, not just include one: click a root once to show only it, click again to hide just that one and show everything else, click a third time to clear it. A new "Select All"/"Select None" option at the top of the filter bulk-selects every root. Handy when you have many repositories open and only want to mute a couple of noisy ones rather than picking every other repo by hand. ([#96](https://github.com/kkkev/jj-idea/issues/96))
 
 ### Fixed
+- The Describe dialog's prompt now shows the short change id (matching the id shown everywhere else in the UI) instead of the full 64-character id. ([#76](https://github.com/kkkev/jj-idea/issues/76))
 - Split's per-file preview no longer shows the same content on both sides for a fully-ticked file: the right-hand "Child" pane now actually shows the child's content, matching its title, instead of duplicating the parent side and appearing to show no changes at all. ([#101](https://github.com/kkkev/jj-idea/issues/101))
 - Settings → Version Control → Jujutsu no longer shows a horizontal scrollbar in a multi-repo project with a per-repository diff-base override set.
 - The Installation Help section's command labels ("Homebrew:", "Cargo:", etc.) now have a comfortable gap before their command box instead of sitting flush against it, and several rows across the page take up less minimum width, reducing the chance of a horizontal scrollbar in a narrower Settings window.

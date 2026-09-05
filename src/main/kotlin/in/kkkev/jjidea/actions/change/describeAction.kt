@@ -22,6 +22,13 @@ fun describeAction(project: Project, logEntry: LogEntry?) =
     }
 
 /**
+ * The change id shown in the Describe prompt: deliberately the *short* id, matching every
+ * other id the UI displays. `ChangeId.toString()` yields the full id - right for `jj` CLI
+ * arguments (GitHub #76), wrong for display (GitHub #76 regression, jj-idea-is97).
+ */
+internal fun describePromptId(target: LogEntry) = target.id.short
+
+/**
  * Shared implementation behind [describeAction] (context-menu factory, fixed target) and
  * [DescribeChangeAction] (toolbar, reads its target dynamically from the log selection) - both
  * open the same "edit description" dialog and run the same `jj describe`.
@@ -37,7 +44,7 @@ internal fun performDescribe(project: Project, target: LogEntry) {
             project.requestDescription(
                 "dialog.describe.input",
                 Description(currentDescription.removeSuffix("\n")),
-                target.id
+                describePromptId(target)
             )
                 ?: return@onSuccess
         // If that was null, the user cancelled
