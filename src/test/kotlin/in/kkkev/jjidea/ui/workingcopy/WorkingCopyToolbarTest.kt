@@ -83,7 +83,7 @@ class WorkingCopyToolbarTest {
     }
 
     @Test
-    fun `with no bound repository Advance Bookmark Here is hidden, not just disabled`() {
+    fun `with no bound repository Advance Bookmark to Working Copy is hidden, not just disabled`() {
         val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val advanceAction = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
             .single { updated(it).text == JujutsuBundle.message("action.bookmark.advance.closest") }
@@ -92,7 +92,7 @@ class WorkingCopyToolbarTest {
     }
 
     @Test
-    fun `binding a repository makes the SAME Advance action instance show Advance Bookmark Here`() {
+    fun `binding a repository makes the SAME Advance action instance show Advance Bookmark to Working Copy`() {
         val panel = WorkingCopyControlsPanel(project.get()).also { Disposer.register(project.get(), it) }
         val advanceAction = panel.createActionToolbar(JPanel()).actionGroup.getChildren(null)
             .single { updated(it).text == JujutsuBundle.message("action.bookmark.advance.closest") }

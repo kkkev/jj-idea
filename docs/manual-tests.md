@@ -1172,7 +1172,7 @@ toolbar itself is hidden or unavailable.
 - [ ] `jj new` off a bookmarked change with nothing left ahead of it — label shows "\<name\> +1" (jj-idea-l7wd, GitHub #62), where `<name>` is the nearest ancestor bookmark and `+1` the number of changes since it; label is blank only when @ has no bookmark anywhere in its ancestry
 - [ ] Two bookmarks equally close to @ (e.g. either side of a merge) — label lists both names, comma-separated, before the shared `+N`
 - [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "foo" within ~300 ms, without saving a file or restarting (see MT-LOG-REFRESH); `jj new` afterwards updates it to "foo +1" the same way
-- [ ] Click the widget — dropdown opens with "Create Bookmark Here…", then "Advance Bookmark Here" at the top
+- [ ] Click the widget — dropdown opens with "Create Bookmark Here…", then "Advance Bookmark to Working Copy" at the top
 - [ ] Dropdown lists all local bookmarks in the repo (not just those on @, and including bookmarks beyond the log limit), each as a sub-menu
 - [ ] For a bookmark **on @**: sub-menu contains Advance, Rename…, Delete, Forget (no Move Here)
 - [ ] For a bookmark **not on @**: sub-menu contains Move…, Advance, Rename…, Delete, Forget
@@ -1194,9 +1194,9 @@ toolbar itself is hidden or unavailable.
 - [ ] Bookmark widget is present in the main toolbar (not hidden)
 - [ ] Label is blank regardless of which bookmarks exist (the "name +N" fallback only applies to a single-repo project — see jj-idea-1ra9 for the wrong-repo-ancestry bug this must not repeat)
 - [ ] Click the widget — dropdown shows one sub-menu **per repo**, named by repo display name
-- [ ] Each repo sub-menu contains the same structure as the single-repo dropdown: "Create Bookmark Here…", then "Advance Bookmark Here", then the repo's bookmark sub-menus
+- [ ] Each repo sub-menu contains the same structure as the single-repo dropdown: "Create Bookmark Here…", then "Advance Bookmark to Working Copy", then the repo's bookmark sub-menus
 - [ ] "Create Bookmark Here…" inside repo-a's sub-menu creates a bookmark at **repo-a's** working copy, not repo-b's (check via `jj bookmark list` in each repo)
-- [ ] `jj new` past every bookmark in repo-a only (repo-b still has one on @) — repo-a's "Advance Bookmark Here" is enabled and targets repo-a's nearest bookmark; repo-b's advances repo-b's bookmark, unaffected by repo-a
+- [ ] `jj new` past every bookmark in repo-a only (repo-b still has one on @) — repo-a's "Advance Bookmark to Working Copy" is enabled and targets repo-a's nearest bookmark; repo-b's advances repo-b's bookmark, unaffected by repo-a
 - [ ] Rename/Delete/Forget in repo-b's sub-menu affects only repo-b
 
 #### Status-bar fallback (jj-idea-cpno)
@@ -1224,14 +1224,14 @@ toolbar itself is hidden or unavailable.
 
 #### Advance Bookmark (jj-idea-l7wd, GitHub #61)
 
-- [ ] With exactly one bookmark closest to @: clicking "Advance Bookmark Here" moves it directly to @, no dialog — confirm via `jj bookmark list` or the updated log decoration
-- [ ] With two+ equidistant closest bookmarks (e.g. `jj new` off a merge of two bookmarked branches): clicking "Advance Bookmark Here" opens a picker dialog listing all of them, pre-checked; unchecking one and confirming advances only the checked ones
+- [ ] With exactly one bookmark closest to @: clicking "Advance Bookmark to Working Copy" moves it directly to @, no dialog — confirm via `jj bookmark list` or the updated log decoration
+- [ ] With two+ equidistant closest bookmarks (e.g. `jj new` off a merge of two bookmarked branches): clicking "Advance Bookmark to Working Copy" opens a picker dialog listing all of them, pre-checked; unchecking one and confirming advances only the checked ones
 - [ ] The per-bookmark "Advance … to Working Copy" action (in a bookmark's own sub-menu, or via right-click on its chip in the log) moves that specific bookmark to @ regardless of distance, without opening a picker
 - [ ] Advancing a bookmark that's already at @ is a no-op (no error)
-- [ ] With no bookmark anywhere in @'s ancestry: "Advance Bookmark Here" is visible but disabled, with a tooltip explaining there's nothing to advance
-- [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark Here" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one, and Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method (see also MT-WORKINGCOPY's "Version-Gated Feature Upgrade Nudge", jj-idea-sov0, for the startup balloon this same gating also surfaces)
-- [ ] The disabled reason is also appended to the menu item's own text, not just its tooltip (menus don't reliably show tooltips) — e.g. "Advance Bookmark Here (needs jj 0.39+)" or "Advance 'main' to Working Copy (needs jj 0.39+)"; with no bookmark anywhere in @'s ancestry, "Advance Bookmark Here (nothing to advance)"
-- [ ] jj-idea-xsa8 (GitHub #61): the same "Advance Bookmark Here" action is also available as an
+- [ ] With no bookmark anywhere in @'s ancestry: "Advance Bookmark to Working Copy" is visible but disabled, with a tooltip explaining there's nothing to advance
+- [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark to Working Copy" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one, and Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method (see also MT-WORKINGCOPY's "Version-Gated Feature Upgrade Nudge", jj-idea-sov0, for the startup balloon this same gating also surfaces)
+- [ ] The disabled reason is also appended to the menu item's own text, not just its tooltip (menus don't reliably show tooltips) — e.g. "Advance Bookmark to Working Copy (needs jj 0.39+)" or "Advance 'main' to Working Copy (needs jj 0.39+)"; with no bookmark anywhere in @'s ancestry, "Advance Bookmark to Working Copy (nothing to advance)"
+- [ ] jj-idea-xsa8 (GitHub #61): the same "Advance Bookmark to Working Copy" action is also available as an
       icon button in the Working Copy tool window's toolbar, alongside New Change/Split/Squash/
       Abandon/Create Bookmark/Set Tag (see MT-WORKINGCOPY) — clicking it there behaves identically
       to the bookmark widget's menu item, including the picker for equidistant bookmarks and
@@ -1252,7 +1252,7 @@ toolbar itself is hidden or unavailable.
       nearest bookmark shows a "Advance Bookmark" Yes/No confirmation naming the bookmark before
       moving it — Yes advances (and still shows the completion notification above), No/Escape
       leaves the bookmark untouched. This confirmation is specific to the toolbar's icon button —
-      clicking the same "Advance Bookmark Here" entry from the bookmark widget's dropdown menu or
+      clicking the same "Advance Bookmark to Working Copy" entry from the bookmark widget's dropdown menu or
       the log's right-click menu still advances immediately with **no** confirmation, since those
       are more deliberate two-step clicks than an icon-only toolbar button. The equidistant-
       candidates picker dialog (multiple close bookmarks) is unaffected either way — it already
@@ -1390,7 +1390,7 @@ selection does nothing; right-click for actions.
 - [ ] Right-click a remote bookmark → Track/Untrack, plus Filter/Navigate
 - [ ] Right-click a tag → Delete, plus Navigate (no Filter — tags aren't a log filter reference
   here)
-- [ ] Right-click the "@" node → Create Bookmark Here…, Advance Bookmark Here
+- [ ] Right-click the "@" node → Create Bookmark Here…, Advance Bookmark to Working Copy
 - [ ] With an issue-tracker pattern configured (Settings → Version Control → Issue Navigation) and
   a bookmark named e.g. `JIRA-123-fix-thing`: the `JIRA-123` portion of its label renders as a
   link (same styling as the log table/description) while the rest of the name doesn't; hovering it

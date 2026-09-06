@@ -127,10 +127,9 @@ class JujutsuBookmarksPanel(private val project: Project) : JPanel(BorderLayout(
                     val node = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode
                         ?: return
                     val group = actionGroupFor(node) ?: return
-                    ActionManager.getInstance()
-                        .createActionPopupMenu("Jujutsu.BookmarksPanel", group)
-                        .component
-                        .show(comp, x, y)
+                    val popupMenu = ActionManager.getInstance().createActionPopupMenu("Jujutsu.BookmarksPanel", group)
+                    popupMenu.setTargetComponent(tree)
+                    popupMenu.component.show(comp, x, y)
                 }
             }
         )

@@ -1,9 +1,11 @@
 package `in`.kkkev.jjidea.actions.bookmark
 
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
@@ -107,6 +109,26 @@ class AdvanceBookmarkAvailabilityTest {
         fun `null falls back to the generic wording`() {
             closestAdvanceTooltip(null) shouldBe
                 "Move the nearest bookmark forward to the working copy (jj bookmark advance)"
+        }
+    }
+
+    @Nested
+    inner class `closest-advance label text (jj-idea-0dq3, GitHub #104)` {
+        // A per-row log context menu makes "Here" read as "to this row" - jj bookmark advance
+        // always targets @, never the clicked row - so the label must name the working copy
+        // explicitly instead, matching the per-bookmark action's own "Advance 'x' to Working Copy".
+        @Test
+        fun `label names the working copy, not the generic 'Here' wording`() {
+            JujutsuBundle.message("action.bookmark.advance.closest") shouldBe "Advance Bookmark to Working Copy"
+            JujutsuBundle.message("action.bookmark.advance.closest") shouldNotContain "Here"
+        }
+
+        @Test
+        fun `disabled-reason suffixes also name the working copy`() {
+            JujutsuBundle.message("action.bookmark.advance.closest.disabled.none.suffix") shouldBe
+                "Advance Bookmark to Working Copy (nothing to advance)"
+            JujutsuBundle.message("action.bookmark.advance.closest.disabled.version", "0.39") shouldBe
+                "Advance Bookmark to Working Copy (needs jj 0.39+)"
         }
     }
 }

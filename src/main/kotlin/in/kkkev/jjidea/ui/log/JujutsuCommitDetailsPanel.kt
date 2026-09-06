@@ -114,9 +114,9 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
                     LogClickTarget.resolve(uri, project, currentEntries) ?: return
                 }
                 val actionGroup = JujutsuLogContextMenuActions.clickActionGroup(project, target)
-                ActionManager.getInstance()
-                    .createActionPopupMenu("JujutsuRefPopup", actionGroup)
-                    .component.show(metadataPane, e.x, e.y)
+                val popupMenu = ActionManager.getInstance().createActionPopupMenu("JujutsuRefPopup", actionGroup)
+                popupMenu.setTargetComponent(metadataPane)
+                popupMenu.component.show(metadataPane, e.x, e.y)
                 e.consume()
             }
         })
