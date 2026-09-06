@@ -17,18 +17,31 @@
 #
 # Usage: scripts/fixtures/fx-stress.sh [target-dir]
 # Takes a minute or so — this creates on the order of a thousand commits.
+#
+# Env knobs (jj-idea-2c8k, for measuring GitHub #69's post-write log refresh latency):
+# - SCALE=<n> (default 1): multiplies MAIN_LEN/DEEP_BRANCH_LEN/LONGBRANCH_LEN so the repo
+#   approaches a target commit count (e.g. SCALE=6 for ~7,000 commits) while keeping the
+#   documented branch shape. FEATURE_COUNT/HOTFIX_COUNT and the other topology constants are
+#   left alone, so this is not a linear commit-count multiplier.
+# - WITH_REMOTE=1 (default unset): pushes main + a few branch bookmarks to a bare repo created
+#   alongside $target, so `remote_bookmarks()` is non-empty. Plain `jj git init` leaves
+#   `remote_bookmarks()` empty, which makes `descendants(::remote_bookmarks())` (the
+#   `hasPushedAncestor` log-template predicate) trivially cheap to evaluate — measuring that
+#   predicate's cost against the fixture without this flag would understate it.
 
 set -euo pipefail
 
 target="${1:-/tmp/jj-stress-test}"
+scale="${SCALE:-1}"
+with_remote="${WITH_REMOTE:-}"
 
-MAIN_LEN=638
+MAIN_LEN=$((638 * scale))
 FEATURE_COUNT=20
 FEATURE_LEN=5
 LONGBRANCH_COUNT=5
-LONGBRANCH_LEN=27
+LONGBRANCH_LEN=$((27 * scale))
 DEEP_BRANCH_FORK_INDEX=50
-DEEP_BRANCH_LEN=200
+DEEP_BRANCH_LEN=$((200 * scale))
 HOTFIX_COUNT=5
 HOTFIX_LEN=2
 OCTOPUS_PARENT_COUNT=6
@@ -117,6 +130,21 @@ done
 
 jj new "$main_tip" >/dev/null
 
+if [[ -n "$with_remote" ]]; then
+  remote_dir="${target}-remote.git"
+  echo "Setting up git remote at $remote_dir (WITH_REMOTE)..."
+  rm -rf "$remote_dir"
+  git init --quiet --bare "$remote_dir"
+  jj git remote add origin "$remote_dir"
+  # Push main plus a sampling of the branch bookmarks, so remote_bookmarks() is non-empty and
+  # most of main's history (and several branch tips) become descendants of it — matching a
+  # real colocated repo, unlike a bare `jj git init` where remote_bookmarks() is empty.
+  jj git push \
+    --bookmark main --bookmark release-1.0 --bookmark release-2.0 \
+    --bookmark deep-branch --bookmark feature/1 --bookmark longbranch/1 \
+    >/dev/null
+fi
+
 total_commits=$(jj log -r 'all()' --no-graph -T 'commit_id ++ "\n"' | wc -l | tr -d ' ')
 total_heads=$(jj log -r 'heads(all())' --no-graph -T 'commit_id ++ "\n"' | wc -l | tr -d ' ')
 
@@ -125,3 +153,6 @@ echo "Stress-test repo created at $target"
 echo "$total_commits commits, $total_heads concurrent heads"
 echo "release-1.0/v1.0 and release-2.0 sit deep in main's history; main's ancestry is immutable"
 echo "Working copy is a fresh empty commit on top of main."
+if [[ -n "$with_remote" ]]; then
+  echo "Bookmarks pushed to a bare remote at $remote_dir (remote_bookmarks() is non-empty)."
+fi
