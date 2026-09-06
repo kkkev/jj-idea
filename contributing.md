@@ -433,6 +433,18 @@ event handlers, verify with `./gradlew runIde`.
 `./gradlew runIde --debug-jvm` to attach a debugger. All jj invocations are logged by
 `CliExecutor`.
 
+**Platform tests failing wholesale on missing actions**: if many `platformTest`s fail with
+`ActionManager.getAction("Jujutsu.…")` returning `null`, missing keymap bindings, or `null
+cannot be cast to non-null type …ActionGroup`, the plugin wasn't loaded into the test
+application at all. Check `.intellijPlatform/sandbox/<product>/log-test/idea.log` for a
+`dependent plugin 'Jujutsu VCS Integration' … excluded` chain — it names the real missing
+dependency (e.g. Groovy Scripting → a platform module IJPGP failed to resolve). The usual
+cause is a truncated `.intellijPlatform/layoutIndex/*.json`: compare its entry count against
+another workspace's index for the same cache key (filename), or just `rm -rf
+.intellijPlatform/layoutIndex` and re-run to force a fresh index of the shared IDE
+distribution. Most likely trigger: two `jj workspace` lanes (see the jj-parallel-lanes skill)
+running their first Gradle build at the same time against that shared distribution.
+
 ### Configuration
 
 `plugin.xml`:
