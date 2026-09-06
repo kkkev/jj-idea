@@ -2330,6 +2330,17 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 - [ ] (jj-idea-ye1x) In a **multi-repo** project, expand a repo's "Repository Settings" group and
       turn on "Override diff base for this repository" with "Custom revset" selected — no
       horizontal scrollbar appears on the settings panel
+- [ ] (jj-idea-i7fa) With a healthy, up-to-date jj configured, expand "Installation Help" —
+      wording reads as a neutral "up to date, update later with:" (not "if jj is not
+      installed…"), and the command rows show update commands (e.g. `brew upgrade jj`), not
+      install commands
+- [ ] (jj-idea-i7fa) With Settings still open, change the "JJ executable path:" field to an
+      older jj or a bogus path (e.g. `/bin/ls`) and click **Test**, without clicking Apply —
+      Installation Help's wording, gated-feature list, and command rows update in place to
+      preview the just-tested path immediately, before it's saved
+- [ ] (jj-idea-i7fa) Now click **Apply** on that same changed path — Installation Help still
+      reflects it (no flicker back to the previous path's wording), and other jj-availability
+      consumers (e.g. the Working Copy tool window) pick up the change too
 - [ ] (jj-idea-bslw, real fix in jj-idea-258c) Expand "Installation Help" — "Homebrew:"/"Cargo:"
       (or whichever methods are detected) have a comfortable, clearly visible gap before their
       command box, not sitting close to it. (jj-idea-bslw's first attempt — a Border on the

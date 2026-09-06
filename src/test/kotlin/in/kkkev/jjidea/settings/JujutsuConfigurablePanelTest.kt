@@ -6,7 +6,11 @@ import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.InstallMethod
+import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
+import `in`.kkkev.jjidea.jj.JjExecutableFinder
+import `in`.kkkev.jjidea.jj.JjVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
@@ -186,6 +190,81 @@ class JujutsuConfigurablePanelTest {
         walk(panel)
 
         texts.none { it.contains("Feature Availability") } shouldBe true
+    }
+
+    @Test
+    fun `Installation Help content rebuilds in place when status changes (jj-idea-i7fa)`() {
+        // Regression guard for jj-idea-i7fa: the group body used to be a one-shot snapshot at
+        // panel-build time and only installGroupRow.expanded reacted live. setInstallHelpStatusForTest
+        // exercises the same swap the real jjAvailabilityStatus.connect listener performs (that
+        // listener itself is unreachable here since `disposable` is null for a directly-built panel).
+        val configurable = JujutsuConfigurable(project.get())
+        val panel = configurable.createPanel()
+        configurable.expandInstallGroupForTest()
+
+        fun labelTexts(): List<String> {
+            val texts = mutableListOf<String>()
+            fun walk(c: java.awt.Component) {
+                (c as? javax.swing.JLabel)?.text?.let { texts += it }
+                if (c is java.awt.Container) c.components.forEach(::walk)
+            }
+            walk(panel)
+            return texts
+        }
+
+        configurable.setInstallHelpStatusForTest(JjAvailabilityStatus.NotFound(InstallMethod.allAvailable))
+        labelTexts().any { it == JujutsuBundle.message("settings.install.description") } shouldBe true
+
+        val gatedStatus = JjAvailabilityStatus.Available(
+            java.nio.file.Path.of("jj"),
+            JjVersion(0, 1, 0),
+            InstallMethod.Homebrew
+        )
+        configurable.setInstallHelpStatusForTest(gatedStatus)
+        val texts = labelTexts()
+        texts.any { it == JujutsuBundle.message("settings.install.description") } shouldBe false
+        texts.any { it == JujutsuBundle.message("settings.upgrade.description.features") } shouldBe true
+
+        panel.preferredSize.width shouldBeLessThanOrEqual JBUI.scale(WIDTH_BUDGET)
+    }
+
+    @Test
+    fun `testedStatusFor previews the tested path, not the saved one (jj-idea-i7fa)`() {
+        // Test can preview a path that hasn't been applied yet — testedStatusFor is what turns
+        // a Test-button ValidationResult into the JjAvailabilityStatus shape Installation Help's
+        // content builder expects, mirroring JjAvailabilityChecker's own resolution rules.
+        val configurable = JujutsuConfigurable(project.get())
+
+        val validExecutable = JjExecutableFinder.ValidatedExecutable(
+            java.nio.file.Path.of("/tmp/jj"),
+            JjVersion(0, 39, 0),
+            InstallMethod.Cargo
+        )
+        configurable.testedStatusFor(
+            "/tmp/jj",
+            JjExecutableFinder.ValidationResult.Valid(validExecutable)
+        ) shouldBe JjAvailabilityStatus.Available(validExecutable.path, validExecutable.version, InstallMethod.Cargo)
+
+        val tooOldExecutable = validExecutable.copy(version = JjVersion(0, 1, 0))
+        configurable.testedStatusFor(
+            "/tmp/jj",
+            JjExecutableFinder.ValidationResult.Valid(tooOldExecutable)
+        ) shouldBe JjAvailabilityStatus.VersionTooOld(
+            tooOldExecutable.path,
+            tooOldExecutable.version,
+            JjVersion.MINIMUM,
+            InstallMethod.Cargo,
+            InstallMethod.allAvailable
+        )
+
+        configurable.testedStatusFor(
+            "/bad/path",
+            JjExecutableFinder.ValidationResult.Invalid(JjExecutableFinder.InvalidReason.NOT_FOUND, "not found")
+        ) shouldBe JjAvailabilityStatus.InvalidPath(
+            "/bad/path",
+            JjExecutableFinder.InvalidReason.NOT_FOUND,
+            InstallMethod.allAvailable
+        )
     }
 
     @Test

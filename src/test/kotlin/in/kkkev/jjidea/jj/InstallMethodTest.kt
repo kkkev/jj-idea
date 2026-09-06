@@ -2,7 +2,9 @@ package `in`.kkkev.jjidea.jj
 
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import org.junit.jupiter.api.Test
 
 /**
@@ -21,6 +23,18 @@ class InstallMethodTest {
         InstallMethod.Cargo.installCommand shouldContain "cargo install"
         InstallMethod.Cargo.installCommand shouldContain "jj-cli"
         InstallMethod.Cargo.name shouldBe "Cargo"
+    }
+
+    @Test
+    fun `Cargo's upgrade command passes --force, unlike install`() {
+        // jj-idea-i7fa: `cargo install` refuses to overwrite an existing binary without --force
+        // ("binary `jj` already exists" error) — without it, re-running the install command to
+        // upgrade fails instead of upgrading. installCommand must NOT have it (a fresh install
+        // has nothing to overwrite, and --force would silently mask a name collision with an
+        // unrelated binary).
+        InstallMethod.Cargo.upgradeCommand shouldContain "--force"
+        InstallMethod.Cargo.installCommand shouldNotContain "--force"
+        InstallMethod.Cargo.upgradeCommand shouldNotBe InstallMethod.Cargo.installCommand
     }
 
     @Test

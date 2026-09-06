@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Settings → Version Control → Jujutsu's "Installation Help" no longer goes stale while Settings stays open: clicking Test now previews its wording, gated-feature list, and command rows against the path you just tested — even before clicking Apply — instead of only updating after reopening Settings. A fully up-to-date jj also now shows neutral "how to update later" wording and update commands, instead of "if jj is not installed, use...".
+- Installation Help's Cargo upgrade command now passes `--force`, instead of being identical to the install command — without it, `cargo install` refuses to overwrite an already-installed `jj` binary, so the shown command would have failed instead of upgrading.
+
 ## [0.8.15] - 2026-09-07
 
 ### Added

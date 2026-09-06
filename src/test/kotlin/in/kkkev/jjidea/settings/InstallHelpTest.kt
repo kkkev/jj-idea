@@ -11,16 +11,17 @@ import java.nio.file.Path
 /**
  * Tests for [installHelpIsUpgradeFor] and [detectedInstallMethodFor] — the pure decisions behind
  * Settings → Jujutsu's "Installation Help" group choosing install vs upgrade commands
- * (jj-idea-vwni). Before this, Scenario B (Available but gated on a JjFeature) fell through to
- * "install" commands even though jj was already installed — these tests guard against that
- * regressing.
+ * (jj-idea-vwni). Before jj-idea-vwni, Scenario B (Available but gated on a JjFeature) fell
+ * through to "install" commands even though jj was already installed. Before jj-idea-i7fa,
+ * a fully up-to-date jj (AllSupported) fell through the same way — these tests guard against
+ * both regressing: only a genuinely *unknown* jj version should ever show install commands.
  */
 class InstallHelpTest {
     @Test
-    fun `Available and up to date is not an upgrade`() {
+    fun `Available and up to date is still an upgrade (jj-idea-i7fa)`() {
         val status = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 39, 0), InstallMethod.Homebrew)
 
-        installHelpIsUpgradeFor(status) shouldBe false
+        installHelpIsUpgradeFor(status) shouldBe true
     }
 
     @Test

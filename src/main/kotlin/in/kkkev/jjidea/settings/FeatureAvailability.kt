@@ -54,16 +54,21 @@ internal fun featureAvailabilityFor(status: JjAvailabilityStatus): FeatureAvaila
 
 /**
  * Whether Settings → Jujutsu's "Installation Help" group should show upgrade commands instead
- * of install commands (jj-idea-vwni). True for both "jj is too old" cases — Scenario A
- * ([FeatureAvailability.BelowMinimum]) and Scenario B ([FeatureAvailability.Gated]) — since jj is
- * genuinely installed and just needs updating in both; showing "if jj is not installed, use..."
- * for Scenario B was actively wrong, not just unhelpful. Derived from [featureAvailabilityFor]
- * rather than re-deriving the Scenario A/B split, so the two decisions can't drift apart.
+ * of install commands (jj-idea-vwni, jj-idea-i7fa). True whenever jj's version is actually
+ * known — [FeatureAvailability.BelowMinimum], [FeatureAvailability.Gated], and
+ * [FeatureAvailability.AllSupported] all mean jj is genuinely installed, so "upgrade" is always
+ * the correct verb even when nothing needs upgrading yet. False only for
+ * [FeatureAvailability.Unknown] ([JjAvailabilityStatus.Checking]/`NotFound`/`InvalidPath`), where
+ * jj hasn't been found at all and install commands are what's actually needed. Derived from
+ * [featureAvailabilityFor] rather than re-deriving the underlying split, so the two decisions
+ * can't drift apart.
  */
 internal fun installHelpIsUpgradeFor(status: JjAvailabilityStatus): Boolean =
     when (featureAvailabilityFor(status)) {
-        is FeatureAvailability.Gated, is FeatureAvailability.BelowMinimum -> true
-        is FeatureAvailability.AllSupported, FeatureAvailability.Unknown -> false
+        is FeatureAvailability.Gated,
+        is FeatureAvailability.BelowMinimum,
+        is FeatureAvailability.AllSupported -> true
+        FeatureAvailability.Unknown -> false
     }
 
 /** The [InstallMethod] jj was actually found via, when known — both "too old" statuses carry one. */

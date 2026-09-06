@@ -140,7 +140,10 @@ sealed class InstallMethod(val name: String, val installCommand: String, val upg
         "cargo",
         SYSTEM_PATH + get(HOME, ".cargo", "bin"),
         "cargo install --locked --bin jj jj-cli",
-        "cargo install --locked --bin jj jj-cli"
+        // cargo install refuses to overwrite an existing binary without --force ("binary `jj`
+        // already exists" error) — without it, re-running the install command on an upgrade
+        // fails instead of upgrading.
+        "cargo install --locked --force --bin jj jj-cli"
     )
 
     // Linux

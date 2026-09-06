@@ -90,6 +90,10 @@ class JujutsuConfigurable(
     // have opened themselves.
     private lateinit var installGroupRow: CollapsibleRow
 
+    // jj-idea-i7fa: hosts buildInstallHelpContent()'s output so it can be swapped in place when
+    // jj-availability status changes, instead of being a one-shot snapshot from panel-build time.
+    private lateinit var installHelpPlaceholder: Placeholder
+
     // Global identity — backing properties for bindText(); async-loaded from jj config
     private var globalNameBinding = ""
     private var globalEmailBinding = ""
@@ -161,86 +165,28 @@ class JujutsuConfigurable(
         }
 
         installGroupRow = collapsibleGroup(JujutsuBundle.message("settings.group.install")) {
-            // Check current status to decide install vs upgrade, and which features (if any) are
-            // gated. This content is a one-shot snapshot at panel build time, not rebuilt on
-            // later status changes — only installGroupRow.expanded reacts live (see the
-            // status.connect wiring below). So a status change mid-session (e.g. editing the
-            // path and clicking Apply without closing Settings) opens this group but may still
-            // show stale wording until Settings is reopened.
-            val status = project.jjAvailabilityStatus.cachedValue
-            val isUpgrade = installHelpIsUpgradeFor(status)
-            val detectedMethod = detectedInstallMethodFor(status)
-            // jj-idea-258c: folded in from the former standalone "Feature Availability" group —
-            // Scenario A (BelowMinimum) deliberately excludes this list, same rule
-            // unsupportedFeatures(status) already encodes: it has its own balloon and
-            // JjNotInstalledPanel and must not be double-reported here.
-            val gatedFeatures = (featureAvailabilityFor(status) as? FeatureAvailability.Gated)?.features.orEmpty()
-
+            // jj-idea-i7fa: the body used to be a one-shot snapshot built here at panel-build
+            // time, so it went stale the moment status changed later (Test/Apply invalidate the
+            // status, but nothing rebuilt this content — only installGroupRow.expanded reacted
+            // live, via the status.connect wiring below). Hosting the real content in a
+            // placeholder cell lets that same listener swap it in place whenever status changes,
+            // without a second subscription.
             row {
-                val descriptionKey = if (gatedFeatures.isNotEmpty()) {
-                    "settings.upgrade.description.features"
-                } else if (isUpgrade) {
-                    "settings.upgrade.description"
-                } else {
-                    "settings.install.description"
-                }
-                label(JujutsuBundle.message(descriptionKey))
+                installHelpPlaceholder = placeholder().align(AlignX.FILL).resizableColumn()
             }
-
-            if (gatedFeatures.isNotEmpty()) {
-                indent {
-                    gatedFeatures.forEach { feature ->
-                        row {
-                            cell(featureLine(feature))
-                        }
-                    }
-                }
-            }
-            if (gatedFeatures.isNotEmpty()) {
-                row {
-                    label(JujutsuBundle.message("settings.upgrade.using"))
-                }
-            }
-
-            // Show upgrade for detected method first if applicable
-            if (isUpgrade &&
-                detectedMethod != null &&
-                detectedMethod !is InstallMethod.Manual &&
-                detectedMethod !is InstallMethod.Unknown
-            ) {
-                commandRow(detectedMethod.name, detectedMethod.upgradeCommand)
-            }
-
-            // Show all available methods (excluding Manual and the already-shown detected method for upgrades)
-            val methods = InstallMethod.allAvailable.filter {
-                it !is InstallMethod.Manual && !(isUpgrade && it == detectedMethod)
-            }
-            methods.forEach { method ->
-                val command = if (isUpgrade) method.upgradeCommand else method.installCommand
-                commandRow(method.name, command)
-            }
-
-            // Manual method just shows a message
-            if (InstallMethod.Manual in InstallMethod.allAvailable) {
-                row {
-                    comment(JujutsuBundle.message("settings.install.method.manual"))
-                }
-            }
-
-            row {
-                link(JujutsuBundle.message("settings.install.documentation")) {
-                    BrowserUtil.browse(InstallMethod.INSTALL_DOCS)
-                }
-            }
+            installHelpPlaceholder.component = buildInstallHelpContent(project.jjAvailabilityStatus.cachedValue)
         }.apply { expanded = false }
 
         // jj-idea-258c: auto-expand Installation Help the moment jj is gated or below minimum —
-        // never auto-collapse a group the user may already have opened themselves. `disposable`
-        // is null when a test builds the panel directly via createPanel() (it's set by
-        // DslConfigurableBase before createPanel() runs in the real Settings dialog); the initial
-        // `expanded = false` above already covers that case with a one-time snapshot.
+        // never auto-collapse a group the user may already have opened themselves. jj-idea-i7fa:
+        // also rebuild the group's content here, so an in-session status change (Test/Apply)
+        // updates the wording, gated-feature list, and command rows without reopening Settings.
+        // `disposable` is null when a test builds the panel directly via createPanel() (it's set
+        // by DslConfigurableBase before createPanel() runs in the real Settings dialog); the
+        // initial content set above already covers that case with a one-time snapshot.
         disposable?.let { parent ->
             project.jjAvailabilityStatus.connect(parent) { status ->
+                installHelpPlaceholder.component = buildInstallHelpContent(status)
                 if (installHelpIsUpgradeFor(status)) {
                     installGroupRow.expanded = true
                 }
@@ -804,6 +750,111 @@ class JujutsuConfigurable(
     }
 
     /**
+     * Turns a Test button result into the [JjAvailabilityStatus] shape [buildInstallHelpContent]
+     * expects (jj-idea-i7fa), so Test can preview Installation Help for a path that hasn't been
+     * applied yet — mirrors [JjAvailabilityChecker]'s own validateConfiguredPath, just fed a
+     * result already in hand instead of re-validating. `internal` (rather than `private`) purely
+     * as a test seam — [testExecutable] is the only real caller.
+     */
+    internal fun testedStatusFor(path: String, result: JjExecutableFinder.ValidationResult): JjAvailabilityStatus =
+        when (result) {
+            is JjExecutableFinder.ValidationResult.Valid -> {
+                val exe = result.executable
+                if (exe.version.meetsMinimum()) {
+                    JjAvailabilityStatus.Available(exe.path, exe.version, exe.installMethod)
+                } else {
+                    JjAvailabilityStatus.VersionTooOld(
+                        executablePath = exe.path,
+                        version = exe.version,
+                        minimumVersion = JjVersion.MINIMUM,
+                        installMethod = exe.installMethod,
+                        availableMethods = InstallMethod.allAvailable
+                    )
+                }
+            }
+
+            is JjExecutableFinder.ValidationResult.Invalid ->
+                JjAvailabilityStatus.InvalidPath(path, result.reason, InstallMethod.allAvailable)
+        }
+
+    /**
+     * Builds Installation Help's body (description, gated-feature list, and command rows) for
+     * [status] (jj-idea-i7fa). Hosted in [installHelpPlaceholder] rather than laid out directly
+     * inside the collapsibleGroup, so a later status change can rebuild it in place — see the
+     * status.connect wiring in [createPanel], and [testedStatusFor]/[testExecutable] for the
+     * Test-button path.
+     */
+    private fun buildInstallHelpContent(status: JjAvailabilityStatus): DialogPanel = panel {
+        val isUpgrade = installHelpIsUpgradeFor(status)
+        val detectedMethod = detectedInstallMethodFor(status)
+        // jj-idea-258c: folded in from the former standalone "Feature Availability" group —
+        // Scenario A (BelowMinimum) deliberately excludes this list, same rule
+        // unsupportedFeatures(status) already encodes: it has its own balloon and
+        // JjNotInstalledPanel and must not be double-reported here.
+        val availability = featureAvailabilityFor(status)
+        val gatedFeatures = (availability as? FeatureAvailability.Gated)?.features.orEmpty()
+
+        row {
+            // jj-idea-i7fa: keyed off featureAvailabilityFor directly (not the isUpgrade
+            // boolean) so all four cases are exhaustive and the wording can't drift out of sync
+            // with installHelpIsUpgradeFor's own decision.
+            val descriptionKey = when (availability) {
+                is FeatureAvailability.Gated -> "settings.upgrade.description.features"
+                is FeatureAvailability.BelowMinimum -> "settings.upgrade.description"
+                is FeatureAvailability.AllSupported -> "settings.upgrade.description.current"
+                FeatureAvailability.Unknown -> "settings.install.description"
+            }
+            label(JujutsuBundle.message(descriptionKey))
+        }
+
+        if (gatedFeatures.isNotEmpty()) {
+            indent {
+                gatedFeatures.forEach { feature ->
+                    row {
+                        cell(featureLine(feature))
+                    }
+                }
+            }
+        }
+        if (gatedFeatures.isNotEmpty()) {
+            row {
+                label(JujutsuBundle.message("settings.upgrade.using"))
+            }
+        }
+
+        // Show upgrade for detected method first if applicable
+        if (isUpgrade &&
+            detectedMethod != null &&
+            detectedMethod !is InstallMethod.Manual &&
+            detectedMethod !is InstallMethod.Unknown
+        ) {
+            commandRow(detectedMethod.name, detectedMethod.upgradeCommand)
+        }
+
+        // Show all available methods (excluding Manual and the already-shown detected method for upgrades)
+        val methods = InstallMethod.allAvailable.filter {
+            it !is InstallMethod.Manual && !(isUpgrade && it == detectedMethod)
+        }
+        methods.forEach { method ->
+            val command = if (isUpgrade) method.upgradeCommand else method.installCommand
+            commandRow(method.name, command)
+        }
+
+        // Manual method just shows a message
+        if (InstallMethod.Manual in InstallMethod.allAvailable) {
+            row {
+                comment(JujutsuBundle.message("settings.install.method.manual"))
+            }
+        }
+
+        row {
+            link(JujutsuBundle.message("settings.install.documentation")) {
+                BrowserUtil.browse(InstallMethod.INSTALL_DOCS)
+            }
+        }
+    }
+
+    /**
      * One "Advance Bookmark (needs jj 0.39.0)" line inside Installation Help's gated-feature
      * list (jj-idea-258c, folded in from the former standalone "Feature Availability" group).
      * The version clause is baked in as grey secondary text — matching the DSL's `comment()`
@@ -1212,11 +1263,6 @@ class JujutsuConfigurable(
                                     exe.path.toString()
                                 )
                             )
-                            // If the tested path matches the currently applied path,
-                            // trigger a recheck so the plugin picks up an upgraded binary
-                            if (path == appSettings.state.jjExecutablePath) {
-                                project.jjAvailabilityStatus.invalidate()
-                            }
                         } else {
                             showValidationResult(
                                 false,
@@ -1249,6 +1295,28 @@ class JujutsuConfigurable(
                         }
                         showValidationResult(false, message)
                     }
+                }
+
+                // jj-idea-i7fa: preview Installation Help against the *tested* path immediately,
+                // whether or not it's been applied yet — that's the whole point of Test, and
+                // Installation Help should react right along with the validation message instead
+                // of waiting for Apply.
+                val testedStatus = testedStatusFor(path, result)
+                installHelpPlaceholder.component = buildInstallHelpContent(testedStatus)
+                if (installHelpIsUpgradeFor(testedStatus)) {
+                    installGroupRow.expanded = true
+                }
+
+                // Also recheck the shared jjAvailabilityStatus service, so every other consumer
+                // (tool window, log refresh, etc.) picks up the change too — only when the tested
+                // path matches the currently *applied* path: JjAvailabilityChecker re-reads the
+                // saved path (not whatever's typed), so invalidating for a typed-but-unapplied
+                // path would just recompute the old path's status. Applying a changed path
+                // already invalidates on its own (see apply() below). NotifiableState.invalidate
+                // only republishes when the recomputed status actually differs, so this costs one
+                // background probe and no UI churn when nothing changed.
+                if (path == appSettings.state.jjExecutablePath) {
+                    project.jjAvailabilityStatus.invalidate()
                 }
             }
         }
@@ -1287,6 +1355,16 @@ class JujutsuConfigurable(
      */
     internal fun expandInstallGroupForTest() {
         installGroupRow.expanded = true
+    }
+
+    /**
+     * Test seam for jj-idea-i7fa's live-refresh regression guard: a test builds the panel via
+     * [createPanel] directly, where `disposable` is null, so the real
+     * `jjAvailabilityStatus.connect` listener (which drives this same swap) never runs. Mirrors
+     * that listener's body so the swap itself can be exercised synchronously.
+     */
+    internal fun setInstallHelpStatusForTest(status: JjAvailabilityStatus) {
+        installHelpPlaceholder.component = buildInstallHelpContent(status)
     }
 
     /** Creates a row with method name, monospace command in a box, and copy button. */
