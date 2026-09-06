@@ -310,6 +310,11 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         scope: CommandExecutor.ConfigScope?
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun configListDetailed(
+        key: String,
+        scope: CommandExecutor.ConfigScope?
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
     override fun configSetUser(
         scope: CommandExecutor.ConfigScope,
         key: String,

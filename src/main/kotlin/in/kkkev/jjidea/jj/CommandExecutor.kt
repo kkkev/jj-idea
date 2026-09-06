@@ -570,6 +570,15 @@ interface CommandExecutor {
     fun configList(key: String? = null, scope: ConfigScope? = null): CommandResult
 
     /**
+     * `config list` for a single key, rendered with provenance: which file the winning value
+     * came from. Used to show the user *why* an identity value is what it is (e.g. a
+     * `--when.repositories` scope) rather than just the value itself - see jj-idea-i0e6.
+     * @return Command result (stdout contains one delimited line per [CliExecutor]'s
+     * provenance template if the key resolves, blank if unset)
+     */
+    fun configListDetailed(key: String, scope: ConfigScope? = null): CommandResult
+
+    /**
      * Set a jj config value at user level.
      * @param scope Scope at which to set the config value
      * @param key Config key (e.g., "user.name", "user.email")

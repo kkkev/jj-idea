@@ -36,6 +36,7 @@ import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoredFilesService
 import java.awt.Font
 import java.awt.datatransfer.StringSelection
 import javax.swing.BoxLayout
+import javax.swing.JEditorPane
 import javax.swing.JPanel
 
 /**
@@ -119,7 +120,12 @@ class JujutsuConfigurable(
         val diffbaseCombo: ComboBox<DiffbaseStrategy>,
         val diffbaseRevsetField: JBTextField,
         val revsetValidationLabel: JBLabel = JBLabel(),
-        var revsetError: String? = null
+        var revsetError: String? = null,
+        // jj-idea-i0e6: filled in after the collapsibleGroup below builds them - a test seam
+        // (showEffectiveIdentityForTest) needs a way to reach these from outside the per-repo
+        // closure that creates them.
+        var effectiveIdentityRow: Row? = null,
+        var effectiveIdentityLabel: JEditorPane? = null
     )
 
     private val repoSettingsPanels = mutableListOf<RepoSettingsPanel>()
@@ -475,6 +481,11 @@ class JujutsuConfigurable(
                     }
                     val diffbaseRevsetField = JBTextField()
 
+                    // jj-idea-i0e6: read-only "In effect: ..." row, populated once the background
+                    // load below resolves something to show - see effectiveIdentityHtml.
+                    var effectiveIdentityRow: Row? = null
+                    var effectiveIdentityLabel: JEditorPane? = null
+
                     fun updateIdentityEnabled() {
                         nameField.isEnabled = identityCb.isSelected
                         emailField.isEnabled = identityCb.isSelected
@@ -559,11 +570,24 @@ class JujutsuConfigurable(
                         val config = repo.config
                         val name = config.repo[Config.Key.USER_NAME]
                         val email = config.repo[Config.Key.USER_EMAIL]
+
+                        // jj-idea-i0e6: what's actually in effect for this repo, e.g. a
+                        // `--when.repositories` scope - resolved via the repo's own executor
+                        // (unlike rootlessConfig, this one runs with a real working directory,
+                        // so scopes match correctly) and shown regardless of whether a repo-level
+                        // override above is also set.
+                        val effectiveName = config.effective.resolve(Config.Key.USER_NAME)
+                        val effectiveEmail = config.effective.resolve(Config.Key.USER_EMAIL)
+
                         runLater {
                             identityCb.isSelected = (name != null) || (email != null)
                             nameField.text = name
                             emailField.text = email
                             updateIdentityEnabled()
+
+                            val html = effectiveIdentityHtml(effectiveName, effectiveEmail)
+                            effectiveIdentityRow?.visible(html != null)
+                            if (html != null) effectiveIdentityLabel?.text = html
                         }
                     }
 
@@ -595,6 +619,15 @@ class JujutsuConfigurable(
                     repoSettingsPanels.add(repoPanel)
 
                     collapsibleGroup(repo.displayName) {
+                        // jj-idea-i0e6: hidden until the background load above resolves something
+                        // to show - a repo with no identity anywhere is already covered by the
+                        // "Configure Jujutsu User" notification, not this row.
+                        row {
+                            effectiveIdentityLabel = comment("", maxLineLength = NARROW_COMMENT_WIDTH).component
+                        }.also { it.visible(false) }.let { effectiveIdentityRow = it }
+                        repoPanel.effectiveIdentityRow = effectiveIdentityRow
+                        repoPanel.effectiveIdentityLabel = effectiveIdentityLabel
+
                         row { cell(identityCb) }
                         indent {
                             row(JujutsuBundle.message("settings.repo.identity.name.label")) {
@@ -751,7 +784,11 @@ class JujutsuConfigurable(
     }
 
     private fun loadGlobalIdentity() {
-        val config = rootlessConfig.effective
+        // jj-idea-i0e6: `.user`, not `.effective` - apply() below writes to user scope, so the
+        // fields must show what's actually at that scope rather than the cross-scope merged
+        // value (which could come from a repo or a `--when.repositories` scope neither read nor
+        // write here touches). Per-repo effective identity is shown separately, per repo group.
+        val config = rootlessConfig.user
         runInBackground {
             val name = config[Config.Key.USER_NAME]
             val email = config[Config.Key.USER_EMAIL]
@@ -780,6 +817,35 @@ class JujutsuConfigurable(
             "<html>• ${StringUtil.escapeXmlEntities(feature.displayName)} " +
                 "<span style='color:$greyHex'>${StringUtil.escapeXmlEntities(needs)}</span></html>"
         )
+    }
+
+    /**
+     * The per-repo "In effect: ..." row's HTML content - `null` when neither [name] nor [email]
+     * resolved, in which case the row stays hidden (see the [runInBackground] load above): a
+     * repo with no identity anywhere already gets the "Configure Jujutsu User" notification.
+     * The source file (if either resolved one) is rendered as a second, grey line - matching
+     * [featureLine]'s "grey secondary text via inline `<span>`" approach, since `comment()`'s own
+     * grey styling applies to the whole label, not just part of it.
+     */
+    private fun effectiveIdentityHtml(name: Config.Resolved?, email: Config.Resolved?): String? {
+        if (name == null && email == null) return null
+
+        val identity = when {
+            name != null && email != null -> "${name.value} <${email.value}>"
+            name != null -> name.value
+            else -> "<${email!!.value}>"
+        }
+        val effectiveLine = JujutsuBundle.message("settings.repo.identity.effective", identity)
+
+        val path = name?.path ?: email?.path
+        val sourceLine = path?.let {
+            val greyHex = String.format("#%06x", UIUtil.getContextHelpForeground().rgb and 0xFFFFFF)
+            "<br><span style='color:$greyHex'>" +
+                StringUtil.escapeXmlEntities(JujutsuBundle.message("settings.repo.identity.effective.source", it)) +
+                "</span>"
+        } ?: ""
+
+        return StringUtil.escapeXmlEntities(effectiveLine) + sourceLine
     }
 
     override fun isModified() = super.isModified() || repoSettingsDirty
@@ -1199,6 +1265,19 @@ class JujutsuConfigurable(
 
     /** Test seam for jj-idea-bwdk's panel-width regression guard. */
     internal fun showValidationResultForTest(message: String) = showValidationResult(false, message)
+
+    /**
+     * Test seam for jj-idea-i0e6's panel-width regression guard: the per-repo effective-identity
+     * row starts hidden with empty text (real content only arrives via the async background load
+     * in [createPanel]), so a synchronous width test needs a way to force it populated and
+     * visible.
+     */
+    internal fun showEffectiveIdentityForTest(html: String) {
+        repoSettingsPanels.forEach { panel ->
+            panel.effectiveIdentityRow?.visible(true)
+            panel.effectiveIdentityLabel?.text = html
+        }
+    }
 
     /**
      * Test seam for jj-idea-258c's label/field gap regression guard: a collapsed

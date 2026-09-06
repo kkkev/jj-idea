@@ -2395,6 +2395,29 @@ that test can't (a live dialog, and the per-repo group, which needs a real proje
       their field/checkbox stacked under the label, the Test button is fully visible, and Apply
       still persists every override (identity, limit, revset, context window, ignore-scan)
 
+#### Scoped user identity (jj-idea-i0e6, GitHub #89)
+
+→ automate: `CliExecutorConfigTest`, `ConfigResolveTest` cover the provenance parsing;
+`ScopedIdentityContractCliTest` covers the real-`jj` resolution and that the "Configure Jujutsu
+User" prompt stays quiet — the check below covers what only a live Settings dialog can show (the
+row's rendering and its interaction with the global fields and the override checkbox).
+
+This needs a real scoped `~/.config/jj/config.toml` (or an equivalent `--when.repositories` config
+file), which no automated test can supply — see contributing.md § Manual regression scope.
+
+- [ ] Add a `[[--scope]]` block to your jj user config (`jj config edit --user`) with
+      `--when.repositories = ["<path to a repo open in the IDE>"]` setting a `user.name`/
+      `user.email` different from your normal `[user]` table
+- [ ] Open **Settings → Version Control → Jujutsu**, expand that repo's **Repository Settings**
+      group — an "In effect: <scoped name> \<scoped email>" line appears above "Override user
+      identity", with a second, greyed line naming the config file the scope came from
+- [ ] The panel's top-level **User Identity** fields still show your normal, unscoped name/email
+      — not the scoped one — and Apply only ever changes that unscoped value
+- [ ] Remove the scope block and reopen Settings — the row now shows your normal identity instead
+      (or disappears entirely if neither is set at all)
+- [ ] With **only** the scope supplying an identity (no `[user]` table, no per-repo override): no
+      "Configure Jujutsu User" notification appears for that repo on IDE startup
+
 #### Preview features (jj-idea-vpvz)
 
 - [ ] Open **Settings → Version Control → Jujutsu**: a **Preview features** group appears at the

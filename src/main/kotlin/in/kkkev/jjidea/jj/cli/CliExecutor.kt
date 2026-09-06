@@ -7,6 +7,7 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.util.SystemProperties
 import com.intellij.util.containers.addAllIfNotNull
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
@@ -128,6 +129,27 @@ internal fun configGetArgs(key: String) =
 
 internal fun configListArgs(key: String?, scope: CommandExecutor.ConfigScope?) =
     JjInvocation(READ_ONLY, buildList { addAllIfNotNull("config", "list", scope?.param, key) })
+
+/**
+ * Delimiter between template fields below. `\u001f` (unit separator) rather than something
+ * printable - a config value could plausibly contain a comma, pipe, or tab, but never a raw
+ * control character.
+ */
+internal const val CONFIG_PROVENANCE_DELIMITER = "\u001f"
+
+/**
+ * Renders `name`, `value`, `source`, and `path` for the single winning entry of [key] (see
+ * `jj help -k templates` for the `config list` keywords). [Config.ScopedConfigImpl.resolve]
+ * parses this back apart - `value` comes through TOML-quoted, `path` is blank when the value
+ * has no backing file (e.g. a built-in default).
+ */
+private const val CONFIG_PROVENANCE_TEMPLATE =
+    "value ++ \"$CONFIG_PROVENANCE_DELIMITER\" ++ source ++ \"$CONFIG_PROVENANCE_DELIMITER\" ++ path ++ \"\\n\""
+
+internal fun configListDetailedArgs(key: String, scope: CommandExecutor.ConfigScope?) = JjInvocation(
+    READ_ONLY,
+    buildList { addAllIfNotNull("config", "list", scope?.param, key, "-T", CONFIG_PROVENANCE_TEMPLATE) }
+)
 
 /**
  * `jj config set`/`unset` never touch the operation log at all (verified: the op log head is
@@ -892,6 +914,9 @@ class CliExecutor(
     override fun configList(key: String?, scope: CommandExecutor.ConfigScope?) =
         execute(root, configListArgs(key, scope), warnOnFailure = false)
 
+    override fun configListDetailed(key: String, scope: CommandExecutor.ConfigScope?) =
+        execute(root, configListDetailedArgs(key, scope), warnOnFailure = false)
+
     override fun configSetUser(scope: CommandExecutor.ConfigScope, key: String, value: String) =
         execute(root, configSetUserArgs(scope, key, value))
 
@@ -1013,7 +1038,11 @@ class CliExecutor(
             .withParameters(args)
             .withCharset(StandardCharsets.UTF_8)
 
-        workingDir?.let { commandLine.setWorkDirectory(it.path) }
+        // jj-idea-i0e6: a rootless executor (workingDir == null) must not inherit the IDE
+        // process's own CWD - that would let `--when.repositories` scopes match whatever repo
+        // the IDE happened to be launched from. Pin it to the user's home directory instead,
+        // which is guaranteed to never match a repository scope.
+        commandLine.setWorkDirectory(workingDir?.path ?: SystemProperties.getUserHome())
 
         // Add color=never to avoid ANSI codes in output
         commandLine.environment["NO_COLOR"] = "1"

@@ -71,6 +71,24 @@ class JujutsuConfigurablePanelTest {
     }
 
     @Test
+    fun `settings panel fits within budget with the per-repo effective-identity row populated`() {
+        // jj-idea-i0e6: the row is hidden with empty text until the async background load in
+        // createPanel resolves something, so a synchronous test needs showEffectiveIdentityForTest
+        // to force it populated - with a realistic-length name, email, and config file path, the
+        // combination this row can actually render at its widest.
+        val repos = listOf(stubRepo(project.get(), "/repos/one", "agent-afe4e237c50ae6d6d"))
+        val configurable = JujutsuConfigurable(project.get(), repos)
+        val panel = configurable.createPanel()
+
+        configurable.showEffectiveIdentityForTest(
+            "In effect: A Reasonably Long Display Name &lt;a.reasonably.long.username@example-corp.com&gt;" +
+                "<br><span style='color:#888888'>(from /Users/example.user/.config/jj/config.toml)</span>"
+        )
+
+        panel.preferredSize.width shouldBeLessThanOrEqual JBUI.scale(WIDTH_BUDGET)
+    }
+
+    @Test
     fun `settings panel fits within budget with a per-repo custom diffbase override active`() {
         // jj-idea-fwea's per-repo diffbase override is the widest configuration this group can
         // reach: a combo plus a non-empty COLUMNS_MEDIUM revset field, both only laid out once

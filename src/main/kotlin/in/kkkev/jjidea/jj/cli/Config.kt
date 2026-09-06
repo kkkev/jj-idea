@@ -14,9 +14,21 @@ class Config(private val commandExecutor: CommandExecutor) {
         USER_EMAIL("user.email")
     }
 
+    /**
+     * A config value together with where it came from, for display - e.g. "Work Name, from a
+     * `--when.repositories` scope in ~/.config/jj/config.toml" (jj-idea-i0e6). [source] and
+     * [path] are `null` whenever provenance couldn't be determined (an older `jj` without the
+     * `config list -T` keywords used, unparseable output, or a value with no backing file such
+     * as a built-in default) - callers should degrade to showing [value] alone.
+     */
+    data class Resolved(val value: String, val source: String?, val path: String?)
+
     interface ScopedConfig {
         operator fun get(key: Key): String?
         operator fun set(key: Key, value: String?)
+
+        /** [get] plus provenance. `null` when [key] isn't set at all in this scope. */
+        fun resolve(key: Key): Resolved?
     }
 
     private inner class ScopedConfigImpl(private val scope: CommandExecutor.ConfigScope?) : ScopedConfig {
@@ -33,6 +45,22 @@ class Config(private val commandExecutor: CommandExecutor) {
             val result = commandExecutor.configGet(key.string)
             if (result !is CommandExecutor.CommandResult.Success) return null
             return result.stdout.trim().takeIf { it.isNotEmpty() }
+        }
+
+        override fun resolve(key: Key): Resolved? {
+            val value = get(key) ?: return null
+
+            // Provenance is best-effort: any failure or unexpected shape just means the caller
+            // shows `value` with no source/path, never a missing row.
+            val listing = commandExecutor.configListDetailed(key.string, scope)
+            if (listing !is CommandExecutor.CommandResult.Success) return Resolved(value, null, null)
+            // Not `.trim()` - the unit-separator delimiter counts as whitespace to
+            // `Character.isWhitespace`, so trimming can eat a trailing empty `path` field
+            // (a value with no backing file, e.g. a built-in default) along with it.
+            val fields = listing.stdout.lineSequence().firstOrNull()?.split(CONFIG_PROVENANCE_DELIMITER)
+            if (fields == null || fields.size < 3) return Resolved(value, null, null)
+            val (_, source, path) = fields
+            return Resolved(value, source.ifBlank { null }, path.ifBlank { null })
         }
 
         override fun set(key: Key, value: String?) {
