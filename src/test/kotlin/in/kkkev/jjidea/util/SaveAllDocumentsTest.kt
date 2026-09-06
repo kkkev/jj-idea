@@ -1,11 +1,11 @@
 package `in`.kkkev.jjidea.util
 
 import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.runReadActionBlocking
 import com.intellij.openapi.application.runWriteAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.impl.FileDocumentManagerBase
+import com.intellij.openapi.util.Computable
 import com.intellij.testFramework.LightVirtualFile
 import com.intellij.testFramework.LoggedErrorProcessor
 import com.intellij.testFramework.junit5.TestApplication
@@ -35,6 +35,13 @@ class SaveAllDocumentsTest {
         loggedAnything shouldBe false
     }
 
+    // runReadActionBlocking is 2026.x-only and runReadAction/ReadAction.compute are deprecated
+    // there; Application.runReadAction(Computable) is non-deprecated on the whole supported
+    // range (sinceBuild=251 .. 2026.2). See contributing.md § Platform API compatibility.
+    private fun isUnsaved(document: Document): Boolean =
+        ApplicationManager.getApplication()
+            .runReadAction(Computable { FileDocumentManager.getInstance().isDocumentUnsaved(document) })
+
     @Test
     fun `saveAllDocuments from a pooled thread does not log a write-unsafe error`() {
         assertNoErrorLogged { runInBackground { saveAllDocuments() }.get() }
@@ -55,10 +62,10 @@ class SaveAllDocumentsTest {
             runWriteAction { document.setText("edited") }
         }
 
-        runReadActionBlocking { FileDocumentManager.getInstance().isDocumentUnsaved(document) } shouldBe true
+        isUnsaved(document) shouldBe true
 
         runInBackground { saveAllDocuments() }.get()
 
-        runReadActionBlocking { FileDocumentManager.getInstance().isDocumentUnsaved(document) } shouldBe false
+        isUnsaved(document) shouldBe false
     }
 }
