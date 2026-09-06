@@ -8,9 +8,11 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
@@ -35,6 +37,12 @@ class JujutsuAuthorFilterComponentToggleTest {
     private val repo = mockk<JujutsuRepository>()
     private val alice = "alice@example.com"
     private val bob = "bob@example.com"
+
+    // stateModel.init fires fire-and-forget pooled-thread loaders that capture this fixture's
+    // project (see PlatformTestSupport.drainBackgroundLoads); drain them before projectFixture
+    // disposes the project, to avoid a flaky LeakHunter retained-Project report (jj-idea-q49j).
+    @AfterEach
+    fun drainStateModelLoads() = drainBackgroundLoads()
 
     private fun entry(changeId: String, authorEmail: String) = LogEntry(
         repo = repo,

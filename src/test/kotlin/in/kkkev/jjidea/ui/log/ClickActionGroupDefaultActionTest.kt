@@ -17,10 +17,12 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Tag as JupiterTag
 
@@ -43,6 +45,13 @@ class ClickActionGroupDefaultActionTest {
     private val projectFixture = projectFixture()
     private val project: Project get() = projectFixture.get()
     private val repo = mockk<JujutsuRepository>(relaxed = true)
+
+    // The checkmark tests read/write project.stateModel, whose init fires fire-and-forget
+    // pooled-thread loaders that capture this fixture's project (see
+    // PlatformTestSupport.drainBackgroundLoads); drain them before projectFixture disposes the
+    // project, to avoid a flaky LeakHunter retained-Project report (jj-idea-q49j).
+    @AfterEach
+    fun drainStateModelLoads() = drainBackgroundLoads()
 
     private fun entry() = LogEntry(
         repo = repo,
