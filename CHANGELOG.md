@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.15] - 2026-09-07
+
 ### Added
 - A new "Set Diff Base" quick action (VCS main menu → Jujutsu, and Jujutsu → Set Diff Base in the editor's right-click menu) for switching what editor gutter markers and Annotate compare against, without a trip to Settings — pick "Working copy parent", "Latest immutable ancestor (trunk)", "Previous commit (grandparent)", type a custom revset expression, or pin to any specific revision via a search popup. It writes the same setting as the Settings → Version Control → Jujutsu → Diff Base row, so the two never disagree. ([#43](https://github.com/kkkev/jj-idea/issues/43))
 - "Undo..." and "Set Diff Base" are now grouped under a "Jujutsu" submenu in the VCS main menu, in the same section as the "Git" submenu, instead of sitting as separate top-level items — "Initialise Jujutsu Repository" stays where it already was, alongside Git/Mercurial/Subversion's own "init" actions.
@@ -872,7 +874,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.14...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.15...HEAD
+[0.8.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.15
 [0.8.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.14
 [0.8.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.13
 [0.8.12]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.12
