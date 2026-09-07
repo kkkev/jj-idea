@@ -86,6 +86,25 @@ class BookmarkTreeModelTest {
     }
 
     @Test
+    fun `the reserved git pseudo-remote is hidden, but the same bookmark still shows under a real remote`() {
+        // jj-idea-j0zv, GitHub #48: "git" is jj's own view of a colocated repo's local Git refs,
+        // not a peer of real remotes like "origin" - every bookmark would otherwise appear a
+        // third time.
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(item("main"), item("main@git"), item("main@origin"))
+            )
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+
+        val categories = tree.filterIsInstance<BookmarkNode.Category>().map { it.displayName }
+        categories shouldBe listOf("Local", "origin")
+        val origin = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+        (origin.children.single() as BookmarkNode.Remote).item.bookmark.name.name shouldBe "main@origin"
+    }
+
+    @Test
     fun `tags land under their own category, also slash-grouped`() {
         val references = mapOf(
             repo to RepositoryReferences(tags = listOf(TagItem(Tag("v1/rc1"), changeId)))

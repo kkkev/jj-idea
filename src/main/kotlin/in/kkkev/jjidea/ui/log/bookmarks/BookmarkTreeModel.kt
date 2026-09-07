@@ -131,7 +131,19 @@ private fun buildRepoNodes(
         )
     }
 
-    val remoteNames = refs.bookmarks.filter { it.bookmark.isRemote }.map { it.bookmark.remote }.distinct().sorted()
+    // "git" is not a peer remote: it's jj's own view of a colocated repo's local Git refs
+    // (`jj git remote add git ...` fails with "reserved for local Git repository", and
+    // `jj git remote list` never lists it), so every bookmark in a colocated repo would
+    // otherwise appear here a third time alongside Local and its real remote(s)
+    // (jj-idea-j0zv, GitHub #48). Keyed on the literal name, not on absence from
+    // repo.cachedGitRemotes, which is deliberately non-blocking and empty when cold - that
+    // would transiently hide every remote category instead of just this one. An escape
+    // hatch to still show it lives in jj-idea-k5d7's settings gear.
+    val remoteNames = refs.bookmarks.filter { it.bookmark.isRemote }
+        .map { it.bookmark.remote }
+        .filter { it != "git" }
+        .distinct()
+        .sorted()
     for (remote in remoteNames) {
         val leaves = refs.bookmarks
             .filter { it.bookmark.isRemote && it.bookmark.remote == remote }
