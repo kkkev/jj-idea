@@ -4,9 +4,11 @@ import com.intellij.icons.AllIcons
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.Presentation
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.bookmarkTarget
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 
@@ -29,6 +31,49 @@ internal fun singleAdvanceAvailability(bookmark: Bookmark, featureSupported: Boo
 }
 
 /**
+ * Sets [presentation]'s enablement/text/description for advancing [bookmark] to `@` in [repo].
+ * Shared by [advanceBookmarkAction] (fixed-target factory) and [AdvanceBookmarkAction]
+ * (jj-idea-ib1i, registered/keymap-assignable) so the disabled-reason wording (jj version gating,
+ * deleted/remote bookmarks) is computed once.
+ */
+internal fun applySingleAdvancePresentation(presentation: Presentation, repo: JujutsuRepository, bookmark: Bookmark) {
+    val availability = singleAdvanceAvailability(bookmark, JjFeature.BOOKMARK_ADVANCE.isSupportedIn(repo.project))
+    presentation.isEnabled = availability.enabled
+    // A disabled menu item's tooltip is easy to miss (some platforms/menu styles never show it),
+    // so the reason is also appended to the visible text itself — same pattern as
+    // action.resolve.conflicts.needsEdit.
+    presentation.text = when (availability) {
+        SingleAdvanceAvailability.UNSUPPORTED_VERSION -> JujutsuBundle.message(
+            "action.bookmark.advance.disabled.version",
+            bookmark.name,
+            JjFeature.BOOKMARK_ADVANCE.minVersion
+        )
+
+        SingleAdvanceAvailability.NOT_APPLICABLE -> {
+            val key = if (bookmark.deleted) {
+                "action.bookmark.advance.disabled.deleted"
+            } else {
+                "action.bookmark.advance.disabled.remote"
+            }
+            JujutsuBundle.message(key, bookmark.name)
+        }
+
+        SingleAdvanceAvailability.ENABLED -> JujutsuBundle.message("action.bookmark.advance", bookmark.name)
+    }
+    presentation.description = when (availability) {
+        SingleAdvanceAvailability.UNSUPPORTED_VERSION ->
+            JjFeature.BOOKMARK_ADVANCE.disabledReasonIn(repo.project)
+                ?: JujutsuBundle.message("action.bookmark.advance.tooltip", bookmark.name)
+
+        else -> JujutsuBundle.message("action.bookmark.advance.tooltip", bookmark.name)
+    }
+}
+
+/** Advances [bookmark] to `@`. Shared by [advanceBookmarkAction] and [AdvanceBookmarkAction]. */
+internal fun performAdvanceBookmark(repo: JujutsuRepository, bookmark: Bookmark) =
+    advanceBookmarks(repo, listOf(bookmark.name))
+
+/**
  * Advance a specific, already-known bookmark to `@` (`jj bookmark advance <name>` — a positional
  * name always targets that exact bookmark, regardless of `revsets.bookmark-advance-from`).
  * Offered alongside a bookmark's other actions; see [localBookmarkActions] and jj-idea-reiz.
@@ -39,44 +84,39 @@ fun advanceBookmarkAction(repo: JujutsuRepository, bookmark: Bookmark): DumbAwar
         JujutsuBundle.message("action.bookmark.advance.tooltip", bookmark.name),
         AllIcons.Actions.Forward
     ) {
-        override fun update(e: AnActionEvent) {
-            val availability =
-                singleAdvanceAvailability(bookmark, JjFeature.BOOKMARK_ADVANCE.isSupportedIn(repo.project))
-            e.presentation.isEnabled = availability.enabled
-            // A disabled menu item's tooltip is easy to miss (some platforms/menu styles never
-            // show it), so the reason is also appended to the visible text itself — same pattern
-            // as action.resolve.conflicts.needsEdit.
-            e.presentation.text = when (availability) {
-                SingleAdvanceAvailability.UNSUPPORTED_VERSION -> JujutsuBundle.message(
-                    "action.bookmark.advance.disabled.version",
-                    bookmark.name,
-                    JjFeature.BOOKMARK_ADVANCE.minVersion
-                )
+        override fun update(e: AnActionEvent) = applySingleAdvancePresentation(e.presentation, repo, bookmark)
 
-                SingleAdvanceAvailability.NOT_APPLICABLE -> {
-                    val key = if (bookmark.deleted) {
-                        "action.bookmark.advance.disabled.deleted"
-                    } else {
-                        "action.bookmark.advance.disabled.remote"
-                    }
-                    JujutsuBundle.message(key, bookmark.name)
-                }
-
-                SingleAdvanceAvailability.ENABLED -> JujutsuBundle.message("action.bookmark.advance", bookmark.name)
-            }
-            e.presentation.description = when (availability) {
-                SingleAdvanceAvailability.UNSUPPORTED_VERSION ->
-                    JjFeature.BOOKMARK_ADVANCE.disabledReasonIn(repo.project)
-                        ?: JujutsuBundle.message("action.bookmark.advance.tooltip", bookmark.name)
-
-                else -> JujutsuBundle.message("action.bookmark.advance.tooltip", bookmark.name)
-            }
-        }
-
-        override fun actionPerformed(e: AnActionEvent) = advanceBookmarks(repo, listOf(bookmark.name))
+        override fun actionPerformed(e: AnActionEvent) = performAdvanceBookmark(repo, bookmark)
 
         override fun getActionUpdateThread() = ActionUpdateThread.EDT
     }
+
+/**
+ * Registered, keymap-assignable form of [advanceBookmarkAction] (jj-idea-ib1i, GitHub #48 split
+ * 1/3).
+ */
+class AdvanceBookmarkAction : DumbAwareAction(
+    JujutsuBundle.message("action.bookmark.advance.generic"),
+    JujutsuBundle.message("action.bookmark.advance.tooltip.generic"),
+    AllIcons.Actions.Forward
+) {
+    override fun update(e: AnActionEvent) {
+        val target = e.bookmarkTarget
+        if (target == null) {
+            e.presentation.isEnabled = false
+            e.presentation.text = JujutsuBundle.message("action.bookmark.advance.generic")
+            return
+        }
+        applySingleAdvancePresentation(e.presentation, target.repo, target.bookmark)
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val target = e.bookmarkTarget ?: return
+        performAdvanceBookmark(target.repo, target.bookmark)
+    }
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+}
 
 /**
  * Availability for the "advance whichever bookmark is closest" action

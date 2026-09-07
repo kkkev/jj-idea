@@ -9,8 +9,10 @@ import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.*
@@ -19,8 +21,15 @@ import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.bookmark.*
+import `in`.kkkev.jjidea.actions.change.duplicateChangeAction
+import `in`.kkkev.jjidea.actions.change.newChangeFromAction
+import `in`.kkkev.jjidea.actions.invokeEnterBoundAction
 import `in`.kkkev.jjidea.actions.tag.deleteTagAction
+import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.remoteEntriesFor
 import `in`.kkkev.jjidea.jj.stateModel
@@ -64,8 +73,17 @@ class JujutsuBookmarksPanel(
      * [onExpansionChanged].
      */
     private val expansionState: MutableMap<String, Boolean> = mutableMapOf(),
+    /**
+     * Resolves a bookmark's [ChangeKey] to the real [LogEntry] the log table already has loaded,
+     * so the panel can offer the log's change actions (New Change/Edit/Rebase/Duplicate,
+     * jj-idea-p35f) on a bookmark row without a second `jj log` invocation. Defaults to always
+     * missing (no change actions) for callers — tests included — that have no log table to ask.
+     * `null` (a bookmark whose change fell outside the loaded window) is a real, expected outcome,
+     * not an error: see [uiDataSnapshot].
+     */
+    private val entryLookup: (ChangeKey) -> LogEntry? = { null },
     private val onExpansionChanged: () -> Unit = {}
-) : JPanel(BorderLayout()), Disposable {
+) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val root = DefaultMutableTreeNode()
     private val treeModel = DefaultTreeModel(root)
     val tree = Tree(treeModel).apply {
@@ -98,6 +116,7 @@ class JujutsuBookmarksPanel(
         }
         installPopupHandler()
         installLinkHandler()
+        installDoubleClickHandler()
         tree.addTreeExpansionListener(
             object : TreeExpansionListener {
                 override fun treeExpanded(event: TreeExpansionEvent) = recordExpansion(event.path, true)
@@ -232,7 +251,13 @@ class JujutsuBookmarksPanel(
             object : PopupHandler() {
                 override fun invokePopup(comp: Component, x: Int, y: Int) {
                     val path = tree.getClosestPathForLocation(x, y) ?: return
-                    tree.selectionPath = path
+                    // Only collapse to a single-node selection when the click landed outside the
+                    // existing selection - a right-click inside an active Ctrl+Click multi-select
+                    // must not clobber it (mirrors JujutsuLogTable's double-click handler), so a
+                    // "New Change From These" issued from the menu still sees every selected row.
+                    if (tree.selectionPaths?.contains(path) != true) {
+                        tree.selectionPath = path
+                    }
                     val node = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode
                         ?: return
                     val group = actionGroupFor(node) ?: return
@@ -242,6 +267,26 @@ class JujutsuBookmarksPanel(
                 }
             }
         )
+    }
+
+    /**
+     * Double-click routes through whichever action is bound to Enter (default: navigate to the
+     * bookmark's change, `Jujutsu.Bookmark.Navigate`), mirroring `JujutsuLogTable`'s own handler
+     * (jj-idea-th9h) via the shared [invokeEnterBoundAction] helper — jj-idea-ib1i. A click that
+     * hits an issue-tracker link in the row keeps its existing behaviour (open in browser)
+     * instead.
+     */
+    private fun installDoubleClickHandler() {
+        object : DoubleClickListener() {
+            override fun onDoubleClick(e: MouseEvent): Boolean {
+                if (linkTargetAt(e.x, e.y) != null) return false
+                val path = tree.getClosestPathForLocation(e.x, e.y) ?: return false
+                if (tree.selectionPaths?.contains(path) != true) {
+                    tree.selectionPath = path
+                }
+                return invokeEnterBoundAction(tree)
+            }
+        }.installOn(tree)
     }
 
     /**
@@ -288,40 +333,148 @@ class JujutsuBookmarksPanel(
         return renderer.getFragmentTagAt(x - bounds.x) as? URI
     }
 
+    /** The selected tree paths' [BookmarkNode] leaves — the only kinds a selection can meaningfully act on. */
+    private fun selectedLeaves(): List<BookmarkNode> =
+        tree.selectionPaths
+            ?.mapNotNull { (it.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode }
+            .orEmpty()
+
+    /** [JujutsuDataKeys.BookmarkTarget]s for every selected local/remote bookmark leaf. */
+    private fun selectedBookmarkTargets(): List<JujutsuDataKeys.BookmarkTarget> =
+        selectedLeaves().mapNotNull { node ->
+            when (node) {
+                is BookmarkNode.Local -> JujutsuDataKeys.BookmarkTarget(node.repo, node.item.bookmark, node.item.id)
+                is BookmarkNode.Remote -> JujutsuDataKeys.BookmarkTarget(node.repo, node.item.bookmark, node.item.id)
+                else -> null
+            }
+        }
+
+    /**
+     * The selection's bookmark/tag leaves resolved to real [LogEntry]s via [entryLookup], or
+     * `null` if the selection has no such leaves, or resolution failed for any one of them — a
+     * partial resolution (some bookmarks outside the loaded log window) must never let a change
+     * action silently act on a subset of what's selected. See [uiDataSnapshot].
+     */
+    private fun selectedLogEntries(): List<LogEntry>? {
+        val leaves = selectedLeaves().filter {
+            it is BookmarkNode.Local || it is BookmarkNode.Remote || it is BookmarkNode.Tag
+        }
+        if (leaves.isEmpty()) return null
+        val resolved = leaves.mapNotNull { node ->
+            val (repo, id) = when (node) {
+                is BookmarkNode.Local -> node.repo to node.item.id
+                is BookmarkNode.Remote -> node.repo to node.item.id
+                is BookmarkNode.Tag -> node.repo to node.item.id
+                else -> return@mapNotNull null
+            }
+            id?.let { entryLookup(ChangeKey(repo, it)) }
+        }
+        return resolved.takeIf { it.size == leaves.size }
+    }
+
+    /**
+     * Publishes the tree's current selection as action data context (jj-idea-ib1i, jj-idea-p35f):
+     * [JujutsuDataKeys.BOOKMARK_TARGET]/[JujutsuDataKeys.BOOKMARK_TARGETS] for the registered
+     * per-bookmark actions (delete/forget/rename/advance/push/track/navigate/filter), and
+     * [JujutsuDataKeys.LOG_ENTRY]/[JujutsuDataKeys.LOG_ENTRIES] so the log's own registered change
+     * actions (`Jujutsu.NewChange`/`EditChange`/`RebaseChangeToolbar`) work unmodified from this
+     * panel, exactly as they do from the log table.
+     */
+    override fun uiDataSnapshot(sink: DataSink) {
+        val targets = selectedBookmarkTargets()
+        targets.singleOrNull()?.let { sink[JujutsuDataKeys.BOOKMARK_TARGET] = it }
+        targets.takeIf { it.isNotEmpty() }?.let { sink[JujutsuDataKeys.BOOKMARK_TARGETS] = it }
+
+        selectedLogEntries()?.let { entries ->
+            entries.singleOrNull()?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+            sink[JujutsuDataKeys.LOG_ENTRIES] = entries
+        }
+    }
+
+    /**
+     * Appends the log's own change actions (New Change/Edit/Rebase/Duplicate, jj-idea-p35f) for a
+     * bookmark row. The registered `Jujutsu.NewChange`/`EditChange`/`RebaseChangeToolbar` are the
+     * *same instances* the log toolbar uses (so IntelliJ can resolve and show a keymap shortcut
+     * hint, matching `JujutsuLogContextMenuActions`'s `liveSelection` path) and read the live
+     * selection [uiDataSnapshot] just published - they self-disable when [entries] is empty, with
+     * no extra guard needed here. The fixed-target "…From These"/Duplicate factories have no such
+     * data-context enablement, so they're only added once [entries] actually resolved to
+     * something to act on.
+     */
+    private fun MutableList<AnAction>.addChangeActions(repo: JujutsuRepository, entries: List<LogEntry>) {
+        add(Separator.create())
+        ActionManager.getInstance().getAction("Jujutsu.NewChange")?.let { add(it) }
+        if (entries.isNotEmpty()) add(newChangeFromAction(project, repo, entries))
+        ActionManager.getInstance().getAction("Jujutsu.EditChange")?.let { add(it) }
+        ActionManager.getInstance().getAction("Jujutsu.RebaseChangeToolbar")?.let { add(it) }
+        if (entries.isNotEmpty()) add(duplicateChangeAction(project, repo, entries))
+    }
+
+    /**
+     * Looks up a registered action by id, for use in this panel's own menus in place of the
+     * fixed-target factories in [in.kkkev.jjidea.actions.bookmark] - the *same instance* the
+     * Keymap settings page resolves a shortcut for, so it can show a hint here too (jj-idea-ib1i),
+     * exactly as [in.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.createActionGroup]'s
+     * `liveSelection` path already does for New Change/Edit/Rebase. Push stays on the
+     * fixed-target [pushBookmarkAction] submenu below - it's shared with call sites (the bookmark
+     * widget, the log's chip submenu) that never publish [JujutsuDataKeys.BOOKMARK_TARGET], so
+     * swapping it there would make Push silently disable itself in every *other* context instead.
+     */
+    private fun registeredAction(id: String): AnAction? = ActionManager.getInstance().getAction(id)
+
     private fun actionGroupFor(node: BookmarkNode): ActionGroup? = when (node) {
         is BookmarkNode.Local -> {
             val allBookmarks = project.stateModel.references.value[node.repo]?.bookmarks.orEmpty().map { it.bookmark }
+            val entries = selectedLogEntries().orEmpty()
             BackgroundActionGroup(
                 *buildList {
-                    addAll(
-                        localBookmarkActions(
+                    if (!node.onWorkingCopy) add(moveBookmarkToChangeAction(node.repo, node.item.bookmark))
+                    registeredAction("Jujutsu.Bookmark.Advance")?.let { add(it) }
+                    registeredAction("Jujutsu.Bookmark.Rename")?.let { add(it) }
+                    add(
+                        pushBookmarkAction(
                             node.repo,
                             node.item.bookmark,
-                            includeMoveToChange = !node.onWorkingCopy,
-                            remoteBookmarks = allBookmarks.remoteEntriesFor(node.item.bookmark.localName)
+                            allBookmarks.remoteEntriesFor(node.item.bookmark.localName)
                         )
                     )
+                    registeredAction("Jujutsu.Bookmark.Delete")?.let { add(it) }
+                    registeredAction("Jujutsu.Bookmark.Forget")?.let { add(it) }
                     add(Separator.create())
-                    add(filterLogToBookmarkAction(node.repo, node.item.bookmark.name.name))
-                    add(navigateLogToBookmarkAction(node.repo, node.item.id))
+                    registeredAction("Jujutsu.Bookmark.Filter")?.let { add(it) }
+                    registeredAction("Jujutsu.Bookmark.Navigate")?.let { add(it) }
+                    addChangeActions(node.repo, entries)
                 }.toTypedArray()
             )
         }
 
-        is BookmarkNode.Remote -> BackgroundActionGroup(
-            *buildList {
-                addAll(remoteBookmarkActions(node.repo, node.item.bookmark))
-                add(Separator.create())
-                add(filterLogToBookmarkAction(node.repo, node.item.bookmark.name.name))
-                add(navigateLogToBookmarkAction(node.repo, node.item.id))
-            }.toTypedArray()
-        )
+        is BookmarkNode.Remote -> {
+            val entries = selectedLogEntries().orEmpty()
+            BackgroundActionGroup(
+                *buildList {
+                    registeredAction("Jujutsu.Bookmark.ToggleTrack")?.let { add(it) }
+                    add(Separator.create())
+                    registeredAction("Jujutsu.Bookmark.Filter")?.let { add(it) }
+                    registeredAction("Jujutsu.Bookmark.Navigate")?.let { add(it) }
+                    addChangeActions(node.repo, entries)
+                }.toTypedArray()
+            )
+        }
 
-        is BookmarkNode.Tag -> BackgroundActionGroup(
-            deleteTagAction(node.repo, node.item.tag),
-            Separator.create(),
-            navigateLogToBookmarkAction(node.repo, node.item.id)
-        )
+        is BookmarkNode.Tag -> {
+            val entries = selectedLogEntries().orEmpty()
+            BackgroundActionGroup(
+                *buildList {
+                    add(deleteTagAction(node.repo, node.item.tag))
+                    add(Separator.create())
+                    add(navigateLogToBookmarkAction(node.repo, node.item.id))
+                    // Tags have no BOOKMARK_TARGET (they aren't bookmarks) so no Filter entry, but
+                    // they're still real refs onto a change - the log's change actions apply just
+                    // as well here as on a bookmark row (jj-idea-p35f follow-up).
+                    addChangeActions(node.repo, entries)
+                }.toTypedArray()
+            )
+        }
 
         is BookmarkNode.WorkingCopy -> {
             val wcEntry = project.stateModel.workingCopies.value.values.firstOrNull { it.repo == node.repo }

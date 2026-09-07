@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.bookmarkTarget
 import `in`.kkkev.jjidea.actions.git.GitPushDialog
 import `in`.kkkev.jjidea.actions.git.applyRemoteVisibility
 import `in`.kkkev.jjidea.actions.git.checkAndPush
@@ -15,6 +16,8 @@ import `in`.kkkev.jjidea.actions.git.noRemoteNotification
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Remote
+import `in`.kkkev.jjidea.jj.remoteEntriesFor
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
@@ -109,11 +112,53 @@ fun pushBookmarkAction(
     }
 
 /**
- * One-click "push to all remotes" entry (jj-idea-ndzp): pushes [bookmark] to every remote in
- * [perRemote] where [pushAvailability] says there's something to do, each via [checkAndPush] so
- * the usual dry-run confirmations still apply. Remotes already up to date are silently skipped —
- * a bookmark can be ahead on `github` but not `origin`, and this must not produce a redundant,
- * always-a-no-op push to `origin`.
+ * This bookmark's `(remote, remote-tracking-sibling)` pairs across every remote the repo knows
+ * about, resolved from the repo's own bookmark list (as [remoteEntriesFor] does) rather than a
+ * caller-supplied [remoteBookmarks] — the form [AdvanceBookmarkAction]-style registered actions
+ * need, since they only get a bare [in.kkkev.jjidea.actions.JujutsuDataKeys.BookmarkTarget], not
+ * a precomputed sibling list.
+ */
+private fun perRemoteBookmarks(repo: JujutsuRepository, bookmark: Bookmark): List<Pair<Remote, Bookmark?>> {
+    val allBookmarks = repo.project.stateModel.references.value[repo]?.bookmarks.orEmpty().map { it.bookmark }
+    val remoteBookmarks = allBookmarks.remoteEntriesFor(bookmark.localName)
+    return repo.cachedGitRemotes.map { gitRemote ->
+        Remote(gitRemote.name) to remoteBookmarks.find { it.remote == gitRemote.name }
+    }
+}
+
+/**
+ * Pushes [bookmark] to every remote in [perRemote] where [pushAvailability] says there's
+ * something to do, each via [checkAndPush] so the usual dry-run confirmations still apply.
+ * Remotes already up to date are silently skipped — a bookmark can be ahead on `github` but not
+ * `origin`, and this must not produce a redundant, always-a-no-op push to `origin`. Shared by
+ * [pushAllRemotesAction] (fixed-target factory) and [PushBookmarkToAllRemotesAction] (jj-idea-ib1i,
+ * registered/keymap-assignable).
+ */
+internal fun performPushToAllRemotes(
+    repo: JujutsuRepository,
+    bookmark: Bookmark,
+    perRemote: List<Pair<Remote, Bookmark?>>
+) {
+    runInBackground {
+        val data = GitPushDialog.loadDialogData(repo)
+        if (data.remotes.isEmpty()) {
+            runLater { noRemoteNotification(repo.project) }
+            return@runInBackground
+        }
+        val targets = perRemote.filter { (_, remoteBookmark) -> pushAvailability(bookmark, remoteBookmark).enabled }
+        runLater {
+            targets.forEach { (remote, _) ->
+                checkAndPush(
+                    GitPushDialog.GitPushSpec(repo, remote, bookmark, allBookmarks = false),
+                    repo.project
+                )
+            }
+        }
+    }
+}
+
+/**
+ * One-click "push to all remotes" entry (jj-idea-ndzp). See [performPushToAllRemotes].
  */
 private fun pushAllRemotesAction(
     repo: JujutsuRepository,
@@ -134,23 +179,43 @@ private fun pushAllRemotesAction(
         }
     }
 
-    override fun actionPerformed(e: AnActionEvent) {
-        runInBackground {
-            val data = GitPushDialog.loadDialogData(repo)
-            if (data.remotes.isEmpty()) {
-                runLater { noRemoteNotification(repo.project) }
-                return@runInBackground
-            }
-            val targets = perRemote.filter { (_, remoteBookmark) -> pushAvailability(bookmark, remoteBookmark).enabled }
-            runLater {
-                targets.forEach { (remote, _) ->
-                    checkAndPush(
-                        GitPushDialog.GitPushSpec(repo, remote, bookmark, allBookmarks = false),
-                        repo.project
-                    )
-                }
-            }
+    override fun actionPerformed(e: AnActionEvent) = performPushToAllRemotes(repo, bookmark, perRemote)
+
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+}
+
+/**
+ * Registered, keymap-assignable form of [pushAllRemotesAction] (jj-idea-ib1i, GitHub #48 split
+ * 1/3) — the keymap-friendly equivalent of the push submenu: pushes to every remote that has
+ * something to push rather than requiring a submenu pick, since a keyboard shortcut can't itself
+ * pick one remote from a variable-length list. Per-remote push stays a context-menu-only action
+ * (see [pushToRemoteAction]).
+ */
+class PushBookmarkToAllRemotesAction : DumbAwareAction(
+    JujutsuBundle.message("action.bookmark.push.all.generic"),
+    JujutsuBundle.message("action.bookmark.push.all.tooltip.generic"),
+    AllIcons.Vcs.Push
+) {
+    override fun update(e: AnActionEvent) {
+        val target = e.bookmarkTarget
+        if (target == null) {
+            e.presentation.isEnabled = false
+            e.presentation.text = JujutsuBundle.message("action.bookmark.push.all.generic")
+            return
         }
+        val anyEnabled = perRemoteBookmarks(target.repo, target.bookmark)
+            .any { (_, remoteBookmark) -> pushAvailability(target.bookmark, remoteBookmark).enabled }
+        e.presentation.isEnabled = anyEnabled
+        e.presentation.text = if (anyEnabled) {
+            JujutsuBundle.message("action.bookmark.push.all", target.bookmark.name)
+        } else {
+            JujutsuBundle.message("action.bookmark.push.all.disabled.upToDate", target.bookmark.name)
+        }
+    }
+
+    override fun actionPerformed(e: AnActionEvent) {
+        val target = e.bookmarkTarget ?: return
+        performPushToAllRemotes(target.repo, target.bookmark, perRemoteBookmarks(target.repo, target.bookmark))
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.EDT

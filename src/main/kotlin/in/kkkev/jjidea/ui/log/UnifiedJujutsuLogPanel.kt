@@ -62,7 +62,12 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     // the splitter's own width is a global PropertiesComponent key, matching git4idea's single
     // shared proportion key for its own splitter. bookmarksStripe stays visible even when
     // collapsed, so there's always something on screen to click back open.
-    private val bookmarksPanel = JujutsuBookmarksPanel(project, config.bookmarkNodeExpanded) { persistConfig() }
+    private val bookmarksPanel = JujutsuBookmarksPanel(
+        project,
+        config.bookmarkNodeExpanded,
+        entryLookup = { key -> logTable.logModel.entryFor(key) },
+        onExpansionChanged = { persistConfig() }
+    )
     private val bookmarksStripe = BookmarksStripeButton { setBookmarksPanelVisible(!config.bookmarksPanelVisible) }
     private val bookmarksSplitter: OnePixelSplitter
 

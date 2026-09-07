@@ -209,6 +209,26 @@
       <keyboard-shortcut first-keystroke="meta shift R" keymap="Mac OS X 10.5+"/>
     </action>
 
+    <!-- Bookmarks panel row actions (jj-idea-ib1i, GitHub #48 split 1/3): keymap-assignable
+         counterparts of the bookmarks panel's existing fixed-target actions, reading their
+         target from the panel's selection (JujutsuDataKeys.BOOKMARK_TARGET) via
+         JujutsuBookmarksPanel.uiDataSnapshot instead of a closure captured per row. No default
+         shortcuts except Navigate (Enter, shared with the log's Show Diff - only one of the two
+         is ever enabled at once, since each disables itself outside its own context) - the rest
+         are keymap-assignable but unbound by default, matching how the log's own per-row actions
+         (Delete/Forget/etc. have no toolbar/keyboard equivalent today either). -->
+    <action id="Jujutsu.Bookmark.Navigate" class="in.kkkev.jjidea.actions.bookmark.NavigateToBookmarkAction">
+      <keyboard-shortcut first-keystroke="ENTER" keymap="$default"/>
+    </action>
+    <action id="Jujutsu.Bookmark.Filter" class="in.kkkev.jjidea.actions.bookmark.FilterLogToBookmarkAction"/>
+    <action id="Jujutsu.Bookmark.Delete" class="in.kkkev.jjidea.actions.bookmark.DeleteBookmarkAction"/>
+    <action id="Jujutsu.Bookmark.Forget" class="in.kkkev.jjidea.actions.bookmark.ForgetBookmarkAction"/>
+    <action id="Jujutsu.Bookmark.Rename" class="in.kkkev.jjidea.actions.bookmark.RenameBookmarkAction"/>
+    <action id="Jujutsu.Bookmark.Advance" class="in.kkkev.jjidea.actions.bookmark.AdvanceBookmarkAction"/>
+    <action id="Jujutsu.Bookmark.ToggleTrack" class="in.kkkev.jjidea.actions.bookmark.ToggleTrackBookmarkAction"/>
+    <action id="Jujutsu.Bookmark.PushAllRemotes"
+            class="in.kkkev.jjidea.actions.bookmark.PushBookmarkToAllRemotesAction"/>
+
     <!-- Open custom Jujutsu log tab -->
     <action id="Jujutsu.OpenLogTab"
             class="in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction">

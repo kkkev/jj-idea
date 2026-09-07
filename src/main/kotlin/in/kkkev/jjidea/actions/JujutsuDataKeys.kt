@@ -3,6 +3,8 @@ package `in`.kkkev.jjidea.actions
 import com.intellij.openapi.actionSystem.DataKey
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.FilePath
+import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -52,4 +54,26 @@ object JujutsuDataKeys {
     val DIFF_CONTENT_INFO: Key<DiffContentInfo> = Key.create("Jujutsu.DiffContentInfo")
 
     data class DiffContentInfo(val repo: JujutsuRepository, val filePath: FilePath, val commitId: CommitId?)
+
+    /**
+     * A bookmark plus the repository it belongs to — the pair every registered bookmark action
+     * (jj-idea-ib1i) needs, since [Bookmark] itself carries no back-reference to its repo. Set by
+     * [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel.uiDataSnapshot] for the tree's
+     * current selection, so bookmark actions registered in plugin.xml (and therefore
+     * keymap-assignable) can read their target the same way log actions read [LOG_ENTRY].
+     */
+    @JvmField
+    val BOOKMARK_TARGET: DataKey<BookmarkTarget> = DataKey.create("Jujutsu.BookmarkTarget")
+
+    /** Multi-select analogue of [BOOKMARK_TARGET], mirroring [LOG_ENTRIES]. */
+    @JvmField
+    val BOOKMARK_TARGETS: DataKey<List<BookmarkTarget>> = DataKey.create("Jujutsu.BookmarkTargets")
+
+    /**
+     * [id] is the bookmark's own [BookmarkItem.id][in.kkkev.jjidea.jj.BookmarkItem.id] (`null` for
+     * a deleted bookmark, or one jj reports with no resolvable change) — carried alongside
+     * [bookmark] because [Bookmark] itself has no change-id field; needed by
+     * [NavigateToBookmarkAction][in.kkkev.jjidea.actions.bookmark.NavigateToBookmarkAction].
+     */
+    data class BookmarkTarget(val repo: JujutsuRepository, val bookmark: Bookmark, val id: ChangeId? = null)
 }

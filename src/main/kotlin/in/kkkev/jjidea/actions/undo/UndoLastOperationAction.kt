@@ -39,7 +39,11 @@ internal fun resolveUndoLastOperationPresentation(
  * pending record, or when more than one repository has one: this action has no repo picker, so an
  * ambiguous case is treated as "nothing to undo" rather than guessing.
  */
-class UndoLastOperationAction : DumbAwareAction(AllIcons.Actions.Undo) {
+class UndoLastOperationAction : DumbAwareAction(
+    JujutsuBundle.message("action.undo.last.none"),
+    JujutsuBundle.message("action.undo.last.disabled.description"),
+    AllIcons.Actions.Undo
+) {
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {

@@ -697,6 +697,8 @@ only for now.
 - [ ] Push, fetch, squash, split, bookmark, tag, resolve, file track/untrack, and config
       actions all behave exactly as before this change, and **none** of them show an undo
       balloon (only Abandon is wired up yet - jj-idea-t0iy extends this to the rest)
+- [ ] Settings → Keymap → search "Jujutsu" → **Undo Last Jujutsu Operation** shows that name,
+      not the raw action id `Jujutsu.UndoLastOperation`
 
 #### Duplicate Change (jj-idea-vu35)
 
@@ -1169,6 +1171,8 @@ toolbar itself is hidden or unavailable.
 #### Single-repo project
 
 - [ ] "\<name\>" label appears in the **main IDE toolbar** (not the log toolbar) when @ has a local bookmark
+- [ ] Settings → Keymap → search "Jujutsu" → **Jujutsu Bookmark** shows that name, not the raw
+      action id `Jujutsu.MainToolbarBookmarks`
 - [ ] `jj new` off a bookmarked change with nothing left ahead of it — label shows "\<name\> +1" (jj-idea-l7wd, GitHub #62), where `<name>` is the nearest ancestor bookmark and `+1` the number of changes since it; label is blank only when @ has no bookmark anywhere in its ancestry
 - [ ] Two bookmarks equally close to @ (e.g. either side of a merge) — label lists both names, comma-separated, before the shared `+N`
 - [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "foo" within ~300 ms, without saving a file or restarting (see MT-LOG-REFRESH); `jj new` afterwards updates it to "foo +1" the same way
@@ -1352,7 +1356,7 @@ one per affected remote.
 
 #### Bookmarks panel (jj-idea-b2ae, GitHub #48)
 
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`)
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`)
 
 A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
 git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
@@ -1395,7 +1399,7 @@ selection does nothing; right-click for actions.
   the currently loaded log window (triggers an expanding load, same as clicking a bookmark chip)
 - [ ] Right-click a remote bookmark → Track/Untrack, plus Filter/Navigate
 - [ ] Right-click a tag → Delete, plus Navigate (no Filter — tags aren't a log filter reference
-  here)
+  here), plus New Change/Edit/Rebase/Duplicate the same as a bookmark row (jj-idea-p35f follow-up)
 - [ ] Right-click the "@" node → Create Bookmark Here…, Advance Bookmark to Working Copy
 - [ ] With an issue-tracker pattern configured (Settings → Version Control → Issue Navigation) and
   a bookmark named e.g. `JIRA-123-fix-thing`: the `JIRA-123` portion of its label renders as a
@@ -1422,6 +1426,28 @@ selection does nothing; right-click for actions.
 - [ ] jj-idea-a7a7: the panel's toolbar has **Expand All** / **Collapse All** buttons that expand
   or collapse every group at once (including remote groups), and both toggles persist the same
   way manual clicks do
+- [ ] jj-idea-ib1i (GitHub #48 split 1/3): Settings → Keymap → search "Jujutsu" — Navigate to
+  Bookmark's Change, Filter Log to Bookmark, Delete/Forget/Rename/Advance/Push Bookmark to All
+  Remotes, and Track/Untrack Bookmark all appear and can be rebound
+- [ ] jj-idea-ib1i: right-clicking a bookmark row's actions (Delete/Forget/Rename/Advance/Push to
+  all remotes/Track-Untrack) show a keymap shortcut hint next to any that have been bound, the
+  same way New Change/Edit/Rebase do in the log
+- [ ] jj-idea-ib1i: double-clicking a bookmark row navigates the log to that bookmark's change
+  (same as "Navigate Log to Bookmark"); rebind Enter in Keymap settings to a different bound
+  action and confirm double-click follows the new binding
+- [ ] jj-idea-ib1i: double-clicking the linked portion of a bookmark name (issue-tracker pattern
+  configured) still opens the browser, not the Enter-bound action
+- [ ] jj-idea-ib1i: Ctrl+Click to select two bookmark rows, then right-click **inside** that
+  selection — the multi-selection is preserved (not collapsed to the row under the cursor)
+- [ ] jj-idea-p35f (GitHub #48 split 2/3): right-click a local or remote bookmark row — New
+  Change, New Change..., Edit Change, Rebase, and Duplicate all appear alongside the existing
+  bookmark actions, reusing the same New Change/Edit/Rebase instances as the log toolbar
+  (shortcut hints included)
+- [ ] jj-idea-p35f: Ctrl+Click two bookmark rows whose changes are both loaded in the log, then
+  "New Change From These" — creates a merge change with both as parents
+- [ ] jj-idea-p35f: select a bookmark whose change is **not** in the currently loaded log window
+  (e.g. a far-back bookmark in a filtered/paginated log) — New Change/Edit/Rebase/Duplicate show
+  disabled rather than acting on the wrong change
 
 ### MT-WORKINGCOPY
 

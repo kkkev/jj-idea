@@ -6,6 +6,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.wm.impl.ExpandableComboAction
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkActionGroup
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkWidgetText
 import `in`.kkkev.jjidea.jj.stateModel
@@ -30,6 +31,15 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
  * as the fallback, mirroring Git's `GitBranchWidget`.
  */
 class JujutsuBookmarkToolbarWidget : ExpandableComboAction(), DumbAware {
+    init {
+        // Static fallback so Settings > Keymap shows a real name instead of the action id -
+        // update() below overwrites this with the live bookmark text whenever the widget is
+        // actually shown, but Keymap resolves a shortcut against the template presentation set
+        // here, without ever calling update().
+        templatePresentation.text = JujutsuBundle.message("action.mainToolbar.bookmarks")
+        templatePresentation.description = JujutsuBundle.message("action.mainToolbar.bookmarks.tooltip")
+    }
+
     override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {

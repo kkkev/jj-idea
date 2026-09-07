@@ -4,7 +4,6 @@ import com.intellij.ide.DataManager
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.keymap.KeymapManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Condition
@@ -17,6 +16,7 @@ import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.invokeEnterBoundAction
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IssueLinkifier
@@ -28,7 +28,6 @@ import java.awt.*
 import java.awt.event.*
 import javax.swing.JTable
 import javax.swing.JViewport
-import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
 import javax.swing.event.ListSelectionEvent
@@ -321,7 +320,7 @@ class JujutsuLogTable(
                 val row = rowAtPoint(e.point)
                 if (row < 0) return false
                 if (!isRowSelected(row)) setRowSelectionInterval(row, row)
-                return invokeEnterBoundAction()
+                return invokeEnterBoundAction(this@JujutsuLogTable)
             }
         }.installOn(this)
 
@@ -540,36 +539,6 @@ class JujutsuLogTable(
         val popupMenu = ActionManager.getInstance().createActionPopupMenu("Jujutsu.LogTable", actionGroup)
         popupMenu.setTargetComponent(this)
         popupMenu.component.show(component, x, y)
-    }
-
-    /**
-     * Run the first enabled action bound to the Enter keystroke in the active keymap (default:
-     * Show Diff, `Jujutsu.ShowChangesDiff`), using this table as the context component so the
-     * action sees the current selection. Backs the double-click handler above — jj-idea-th9h.
-     *
-     * Uses [ActionManager.tryToExecute] — the same entry point the real Enter keypress goes
-     * through — rather than hand-building an [com.intellij.openapi.actionSystem.AnActionEvent],
-     * so update() (including background-thread update actions like Show Diff) and enablement
-     * checks run exactly as they would for a real keystroke. Tries the next Enter-bound action
-     * (if any) when one is disabled, since [ActionManager.tryToExecute] only checks the single
-     * action it's given.
-     */
-    private fun invokeEnterBoundAction(actionIds: List<String> = enterBoundActionIds()): Boolean {
-        val actionId = actionIds.firstOrNull() ?: return false
-        val action = ActionManager.getInstance().getAction(actionId)
-        if (action == null) {
-            return invokeEnterBoundAction(actionIds.drop(1))
-        }
-        val keyEvent = KeyEvent(this, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0, KeyEvent.VK_ENTER, '\r')
-        ActionManager.getInstance()
-            .tryToExecute(action, keyEvent, this, ActionPlaces.KEYBOARD_SHORTCUT, true)
-            .doWhenRejected(Runnable { invokeEnterBoundAction(actionIds.drop(1)) })
-        return true
-    }
-
-    private fun enterBoundActionIds(): List<String> {
-        val enter = KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0)
-        return KeymapManager.getInstance().activeKeymap.getActionIds(enter).toList()
     }
 
     /**
@@ -887,6 +856,15 @@ internal fun fitColumnWidths(available: Int, descMin: Int, fixed: List<FixedColu
 class JujutsuLogTableModel : AbstractTableModel() {
     private val entries = mutableListOf<LogEntry>()
     private val filteredEntries = mutableListOf<LogEntry>()
+
+    /**
+     * All currently-loaded entries keyed by [LogEntry.key] (unfiltered — a filtered-out entry is
+     * still a valid navigation/action target), rebuilt once per [setEntries] alongside [entries]
+     * itself. Backs [entryFor], the bookmarks panel's only way to turn a bookmark's [ChangeId]
+     * into a real [LogEntry] for change actions (New Change/Edit/Rebase/Duplicate, jj-idea-p35f)
+     * without a second `jj log` invocation. O(N) to build, O(1) per lookup.
+     */
+    private var entriesByKey: Map<ChangeKey, LogEntry> = emptyMap()
     private var filterText: String = ""
     private var useRegex: Boolean = false
     private var matchCase: Boolean = false
@@ -969,6 +947,9 @@ class JujutsuLogTableModel : AbstractTableModel() {
      */
     fun getEntry(row: Int): LogEntry? = if (row in filteredEntries.indices) filteredEntries[row] else null
 
+    /** Look up a loaded entry by its [ChangeKey], or `null` if it's outside the loaded window. */
+    fun entryFor(key: ChangeKey): LogEntry? = entriesByKey[key]
+
     /**
      * Returns a snapshot of the currently-visible (filtered) entries, in their current order.
      * Used by the panel to recompute the graph layout for the visible subset.
@@ -982,6 +963,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
     fun setEntries(newEntries: List<LogEntry>) {
         entries.clear()
         entries.addAll(newEntries)
+        entriesByKey = newEntries.associateBy { it.key }
         suppressFilterCallback = true
         try {
             applyFilter()
