@@ -67,7 +67,20 @@ data class LogWindowConfig(
      * [in.kkkev.jjidea.ui.log.bookmarks.BookmarksStripeButton]), so collapsing it doesn't make it
      * undiscoverable.
      */
-    var bookmarksPanelVisible: Boolean = true
+    var bookmarksPanelVisible: Boolean = true,
+    /**
+     * Per-node expansion state for the bookmarks panel tree (jj-idea-a7a7, GitHub #48), keyed by
+     * the `/`-joined [in.kkkev.jjidea.ui.log.bookmarks.BookmarkNode.displayName] path from the
+     * tree root (e.g. `"origin"`, or `"myrepo/origin/feature"` in a multi-repo project). Only
+     * entries that differ from the node's own default are stored — a remote category defaults to
+     * collapsed and Local/Tags default to expanded
+     * ([in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel] resolves the default when a key is
+     * absent) — so a name never explicitly toggled by the user still tracks a changing default.
+     * `JujutsuBookmarksPanel.rebuild()` applies this per-node instead of the old unconditional
+     * `TreeUtil.expandAll`, since a `DefaultTreeModel` structure-changed event (fired by every
+     * rebuild) resets all of Swing's own per-path expansion state.
+     */
+    var bookmarkNodeExpanded: MutableMap<String, Boolean> = mutableMapOf()
 ) {
     /**
      * Returns the subset of [allRepos] that this config selects.

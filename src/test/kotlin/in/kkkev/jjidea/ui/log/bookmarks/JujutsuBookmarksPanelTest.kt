@@ -61,4 +61,23 @@ class JujutsuBookmarksPanelTest {
         val panel = JujutsuBookmarksPanel(project.get())
         Disposer.dispose(panel)
     }
+
+    @Test
+    fun `a rebuild's own programmatic expand-collapse replay never triggers a settings write`() {
+        // jj-idea-a7a7 (GitHub #48): every rebuild() re-applies expansionState onto the tree from
+        // scratch (a DefaultTreeModel structure change resets Swing's own per-path expansion
+        // state), which fires the same TreeExpansionListener a user's own click does. Without the
+        // applyingExpansionState guard, every background state-model invalidation would spuriously
+        // call onExpansionChanged and persist to settings, even with nothing to persist.
+        var saveCount = 0
+        val panel = JujutsuBookmarksPanel(project.get(), mutableMapOf()) { saveCount++ }
+        try {
+            repeat(50) { panel.scheduleRebuild() }
+            panel.flushRebuildQueue()
+
+            saveCount shouldBe 0
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
 }

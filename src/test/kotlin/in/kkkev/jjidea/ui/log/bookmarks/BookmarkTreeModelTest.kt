@@ -25,7 +25,13 @@ class BookmarkTreeModelTest {
     private val otherRepo = mockk<JujutsuRepository> { every { displayName } returns "other" }
     private val changeId = ChangeId("qpvuntsm", "qp", 2)
 
-    private fun item(name: String) = BookmarkItem(Bookmark(name), changeId)
+    private fun item(
+        name: String,
+        tracked: Boolean = true,
+        conflict: Boolean = false,
+        aheadCount: Int = 0,
+        behindCount: Int = 0
+    ) = BookmarkItem(Bookmark(name, tracked = tracked, conflict = conflict, aheadCount = aheadCount, behindCount = behindCount), changeId)
 
     private fun refs(vararg names: String) = mapOf(repo to RepositoryReferences(bookmarks = names.map { item(it) }))
 
@@ -201,5 +207,117 @@ class BookmarkTreeModelTest {
         val leaves = local.children.filterIsInstance<BookmarkNode.Local>().associateBy { it.displayName }
         leaves.getValue("main").onWorkingCopy shouldBe true
         leaves.getValue("other").onWorkingCopy shouldBe false
+    }
+
+    // jj-idea-a7a7 (GitHub #48): remote categories collapse by default; roll-up counts surface a
+    // collapsed category's unsynced/diverged bookmarks.
+
+    @Test
+    fun `Local and Tags categories default to expanded, a remote category defaults to collapsed`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(item("main"), item("main@origin")),
+                tags = listOf(TagItem(Tag("v1"), changeId))
+            )
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+        val categories = tree.filterIsInstance<BookmarkNode.Category>().associateBy { it.displayName }
+
+        categories.getValue("Local").defaultExpanded() shouldBe true
+        categories.getValue("Tags").defaultExpanded() shouldBe true
+        categories.getValue("origin").defaultExpanded() shouldBe false
+    }
+
+    @Test
+    fun `a remote category rolls up ahead-behind counts and untracked-conflict status from its leaves`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(
+                    item("clean@origin"),
+                    item("ahead@origin", aheadCount = 2),
+                    item("behind@origin", behindCount = 3),
+                    item("untracked@origin", tracked = false)
+                )
+            )
+        )
+
+        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
+            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+
+        origin.rollup.aheadCount shouldBe 2
+        origin.rollup.behindCount shouldBe 3
+        origin.rollup.hasUnsynced shouldBe true
+        origin.rollup.isNotable shouldBe true
+    }
+
+    @Test
+    fun `a category with only clean tracked bookmarks has an empty, non-notable rollup`() {
+        val references = mapOf(repo to RepositoryReferences(bookmarks = listOf(item("main@origin"))))
+
+        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
+            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+
+        origin.rollup shouldBe BookmarkRollup.EMPTY
+        origin.rollup.isNotable shouldBe false
+    }
+
+    @Test
+    fun `rollup propagates up through nested prefix groups to the owning category`() {
+        val references = mapOf(
+            repo to RepositoryReferences(bookmarks = listOf(item("feature/a@origin", aheadCount = 1)))
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+        val origin = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+        val feature = origin.children.single() as BookmarkNode.Prefix
+
+        feature.rollup.aheadCount shouldBe 1
+        origin.rollup.aheadCount shouldBe 1
+    }
+
+    @Test
+    fun `rollup aggregation is a single O(B) fold, not a re-scan per node`() {
+        // Operation-count guard (CLAUDE.md Performance & Scale): a regression that re-walks every
+        // descendant leaf from each ancestor Category/Prefix, instead of folding each level's own
+        // already-computed child rollups (see buildBookmarkTree's KDoc), would still pass a
+        // correctness check at small N but is exactly what this larger, flat-and-nested mix of
+        // bookmark counts is sized to make slow.
+        val flatCount = 2_000
+        val nestedCount = 2_000
+        val flatDiverged = (0 until flatCount).map { i ->
+            item("flat$i@origin", aheadCount = if (i % 2 == 0) 1 else 0)
+        }
+        val nestedDiverged = (0 until nestedCount).map { i ->
+            item("group/nested$i@origin", behindCount = if (i % 2 == 0) 1 else 0)
+        }
+        val references = mapOf(repo to RepositoryReferences(bookmarks = flatDiverged + nestedDiverged))
+
+        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
+            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+        val group = origin.children.filterIsInstance<BookmarkNode.Prefix>().single { it.displayName == "group" }
+
+        // Every other bookmark in each half is diverged by 1, so the totals are exactly half of
+        // each half's count - correct only if every leaf is counted exactly once, at exactly one
+        // level of aggregation each (leaf -> Prefix -> Category, no double-counting).
+        group.rollup.behindCount shouldBe nestedCount / 2
+        origin.rollup.aheadCount shouldBe flatCount / 2
+        origin.rollup.behindCount shouldBe nestedCount / 2
+        origin.children.size shouldBe flatCount + 1 // flatCount leaves + the one "group" Prefix
+    }
+
+    @Test
+    fun `expansionPathKey joins a node's ancestry by displayName`() {
+        val references = mapOf(
+            repo to RepositoryReferences(bookmarks = listOf(item("feature/a@origin")))
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+        val origin = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+        val feature = origin.children.single() as BookmarkNode.Prefix
+
+        val originKey = origin.expansionPathKey("")
+        originKey shouldBe "origin"
+        feature.expansionPathKey(originKey) shouldBe "origin/feature"
     }
 }

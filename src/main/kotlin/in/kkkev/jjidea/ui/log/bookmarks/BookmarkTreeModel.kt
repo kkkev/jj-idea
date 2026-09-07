@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.log.bookmarks
 import com.intellij.ui.JBColor
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkWidgetText
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -30,6 +31,23 @@ import `in`.kkkev.jjidea.ui.common.JujutsuColors
  */
 enum class RefKind(val color: JBColor) { BOOKMARK(JujutsuColors.BOOKMARK), TAG(JujutsuColors.TAG) }
 
+/**
+ * Aggregates [Bookmark.aheadCount]/[Bookmark.behindCount]/untracked-or-conflicted status over a
+ * [BookmarkNode.Category] or [BookmarkNode.Prefix]'s descendant leaves, so a collapsed category
+ * can still surface "something in here needs attention" (jj-idea-a7a7, GitHub #48 Finding 4) —
+ * collapsing a remote category would otherwise hide the per-bookmark `↑n↓m` indicators entirely.
+ */
+data class BookmarkRollup(val aheadCount: Int = 0, val behindCount: Int = 0, val hasUnsynced: Boolean = false) {
+    val isNotable get() = aheadCount > 0 || behindCount > 0 || hasUnsynced
+
+    operator fun plus(other: BookmarkRollup) =
+        BookmarkRollup(aheadCount + other.aheadCount, behindCount + other.behindCount, hasUnsynced || other.hasUnsynced)
+
+    companion object {
+        val EMPTY = BookmarkRollup()
+    }
+}
+
 sealed interface BookmarkNode {
     val displayName: String
 
@@ -43,13 +61,23 @@ sealed interface BookmarkNode {
 
     interface WithRefKind {
         val refKind: RefKind
+
+        /** Rolled-up status of every bookmark leaf under this node — see [BookmarkRollup]. */
+        val rollup: BookmarkRollup
     }
 
-    /** A top-level kind: "Local", a remote's name, or "Tags". */
+    /**
+     * A top-level kind: "Local", a remote's name, or "Tags". [defaultExpanded] is `false` for a
+     * remote category (collapsed by default, jj-idea-a7a7) and `true` for Local/Tags — the actual
+     * per-node state a rebuild applies also considers any explicit user toggle recorded in
+     * [in.kkkev.jjidea.settings.LogWindowConfig.bookmarkNodeExpanded].
+     */
     data class Category(
         override val displayName: String,
         override val refKind: RefKind,
-        val children: List<BookmarkNode>
+        val children: List<BookmarkNode>,
+        val defaultExpanded: Boolean = true,
+        override val rollup: BookmarkRollup = BookmarkRollup.EMPTY
     ) :
         BookmarkNode, WithRefKind
 
@@ -57,7 +85,8 @@ sealed interface BookmarkNode {
     data class Prefix(
         override val displayName: String,
         override val refKind: RefKind,
-        val children: List<BookmarkNode>
+        val children: List<BookmarkNode>,
+        override val rollup: BookmarkRollup = BookmarkRollup.EMPTY
     ) :
         BookmarkNode, WithRefKind
 
@@ -87,6 +116,10 @@ sealed interface BookmarkNode {
  * [in.kkkev.jjidea.jj.JujutsuStateModel] for other consumers (the toolbar widget, the reference
  * filter), so this is O(1) in commits, working-tree files, and ignored files. Multi-root
  * multiplies by root count only through refs already fetched for each root.
+ *
+ * [BookmarkRollup] aggregation (jj-idea-a7a7) adds no separate pass: each [BookmarkNode.Category]/
+ * [BookmarkNode.Prefix] folds only its own direct children's already-computed rollups
+ * ([rollupOf]), so the total rollup work across the whole tree is still O(B), not O(B·depth).
  */
 fun buildBookmarkTree(
     references: Map<JujutsuRepository, RepositoryReferences>,
@@ -122,11 +155,13 @@ private fun buildRepoNodes(
                 BookmarkNode.Local(repo, item, name, item.bookmark.name.name in onWcNames)
             }
         }
+        val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
         add(
             BookmarkNode.Category(
                 JujutsuBundle.message("bookmarks.panel.local"),
                 RefKind.BOOKMARK,
-                buildPrefixTree(leaves, RefKind.BOOKMARK)
+                children,
+                rollup = rollupOf(children)
             )
         )
     }
@@ -148,20 +183,61 @@ private fun buildRepoNodes(
         val leaves = refs.bookmarks
             .filter { it.bookmark.isRemote && it.bookmark.remote == remote }
             .map { item -> RefPath(item.bookmark.localName) { name -> BookmarkNode.Remote(repo, item, name) } }
-        add(BookmarkNode.Category(remote, RefKind.BOOKMARK, buildPrefixTree(leaves, RefKind.BOOKMARK)))
+        val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
+        add(
+            BookmarkNode.Category(
+                remote,
+                RefKind.BOOKMARK,
+                children,
+                defaultExpanded = false,
+                rollup = rollupOf(children)
+            )
+        )
     }
 
     if (refs.tags.isNotEmpty()) {
         val leaves = refs.tags.map { item -> RefPath(item.tag.name) { name -> BookmarkNode.Tag(repo, item, name) } }
+        val children = buildPrefixTree(leaves, RefKind.TAG)
         add(
             BookmarkNode.Category(
                 JujutsuBundle.message("bookmarks.panel.tags"),
                 RefKind.TAG,
-                buildPrefixTree(leaves, RefKind.TAG)
+                children,
+                rollup = rollupOf(children)
             )
         )
     }
 }
+
+/** Sums [BookmarkRollup] contributions of every bookmark leaf reachable under [nodes]. */
+private fun rollupOf(nodes: List<BookmarkNode>): BookmarkRollup = nodes.fold(BookmarkRollup.EMPTY) { acc, n -> acc + n.leafRollup() }
+
+private fun BookmarkNode.leafRollup(): BookmarkRollup = when (this) {
+    is BookmarkNode.Local -> item.bookmark.toRollup()
+    is BookmarkNode.Remote -> item.bookmark.toRollup()
+    is BookmarkNode.WithRefKind -> rollup
+    is BookmarkNode.WorkingCopy, is BookmarkNode.Tag, is BookmarkNode.RepoGroup -> BookmarkRollup.EMPTY
+}
+
+private fun Bookmark.toRollup() = BookmarkRollup(aheadCount, behindCount, hasUnsynced = !tracked || conflict)
+
+/**
+ * Whether [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel] should expand this node absent
+ * an explicit user override recorded in
+ * [in.kkkev.jjidea.settings.LogWindowConfig.bookmarkNodeExpanded] — `false` only for a remote
+ * [BookmarkNode.Category] (jj-idea-a7a7, GitHub #48); every other node kind defaults to expanded,
+ * matching the pre-existing unconditional-expand behavior.
+ */
+fun BookmarkNode.defaultExpanded(): Boolean = (this as? BookmarkNode.Category)?.defaultExpanded ?: true
+
+/**
+ * The key [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel] persists this node's expansion
+ * state under: the `/`-joined [BookmarkNode.displayName] path from the tree root, e.g. `"origin"`
+ * for a single-repo project or `"myrepo/origin/feature"` under a [BookmarkNode.RepoGroup] and a
+ * `/`-grouped [BookmarkNode.Prefix].
+ */
+fun BookmarkNode.expansionPathKey(parentPath: String): String =
+    if (parentPath.isEmpty()) displayName else "$parentPath/$displayName"
 
 /** A ref pending placement in the `/`-grouped tree: its `/`-split name plus a leaf-node factory. */
 private class RefPath(fullName: String, val toLeaf: (displayName: String) -> BookmarkNode) {
@@ -188,7 +264,8 @@ private fun buildPrefixTree(refs: List<RefPath>, refKind: RefKind, offset: Int =
     }
 
     val prefixNodes = groups.map { (segment, children) ->
-        BookmarkNode.Prefix(segment, refKind, buildPrefixTree(children, refKind, offset + 1))
+        val childNodes = buildPrefixTree(children, refKind, offset + 1)
+        BookmarkNode.Prefix(segment, refKind, childNodes, rollup = rollupOf(childNodes))
     }
 
     return (prefixNodes + leaves)

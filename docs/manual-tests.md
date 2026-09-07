@@ -1352,7 +1352,7 @@ one per affected remote.
 
 #### Bookmarks panel (jj-idea-b2ae, GitHub #48)
 
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `ui/common/CommitTablePanel.kt` (`installLeftComponent`)
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`)
 
 A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
 git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
@@ -1370,6 +1370,12 @@ selection does nothing; right-click for actions.
   group (with `A`, `B` underneath) and `fix` (with `C` underneath) — not three flat top-level
   entries
 - [ ] A tracked `main@origin` appears under an `origin` group, itself `/`-grouped the same way
+- [ ] jj-idea-j0zv: in a **colocated** repo, no `git` group appears among the remote groups (only
+  real remotes like `origin`/`github`) — a bookmark tracked by both `@git` and a real remote still
+  appears correctly under the real remote
+- [ ] jj-idea-ita2: an **untracked** remote bookmark shows the untracked icon (not the tracked
+  one), and right-clicking it offers **Track**, not Untrack; a bookmark ahead/behind its remote
+  shows `↑n`/`↓m` on its leaf
 - [ ] Tags appear under their own "Tags" group, also `/`-grouped
 - [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
   or "main +3") — create/delete a bookmark and confirm both update together
@@ -1404,6 +1410,18 @@ selection does nothing; right-click for actions.
   own Local/remote/Tags structure; single-repo project has no such wrapper level
 - [ ] Type while the tree has focus — speed search jumps to/filters matching bookmark names
 - [ ] Restart the IDE — the panel's expanded/collapsed state is restored per log window
+- [ ] jj-idea-a7a7: with 2+ real remotes, each remote group starts **collapsed**; "Local" and
+  "Tags" start expanded, as before
+- [ ] jj-idea-a7a7: manually collapse "Local" and expand a remote group — restart the IDE (or
+  close/reopen the log tab) — both the manual collapse and the manual expand persist, per log
+  window (a second log window with a different layout is unaffected)
+- [ ] jj-idea-a7a7: with a remote group collapsed and one of its bookmarks ahead/behind or
+  untracked, the group's own row shows a roll-up `↑n`/`↓m` (or a plain dot if only untracked)
+  in the same divergence colour as the leaf chips; expanding the group hides the roll-up and
+  shows the normal per-bookmark indicators instead
+- [ ] jj-idea-a7a7: the panel's toolbar has **Expand All** / **Collapse All** buttons that expand
+  or collapse every group at once (including remote groups), and both toggles persist the same
+  way manual clicks do
 
 ### MT-WORKINGCOPY
 
