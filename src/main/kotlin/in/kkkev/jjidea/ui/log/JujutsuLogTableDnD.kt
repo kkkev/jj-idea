@@ -3,15 +3,25 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.ide.dnd.DnDAction
 import com.intellij.ide.dnd.DnDDragStartBean
 import com.intellij.ide.dnd.DnDEvent
+import com.intellij.ide.dnd.DnDImage
 import com.intellij.ide.dnd.DnDSupport
 import com.intellij.ide.dnd.SmoothAutoScroller
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.ColorUtil
 import com.intellij.ui.awt.RelativeRectangle
+import com.intellij.ui.render.RenderingUtil
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
+import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
+import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.appendSummary
+import `in`.kkkev.jjidea.ui.components.bookmarkIcon
+import `in`.kkkev.jjidea.ui.components.icon
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
 import `in`.kkkev.jjidea.ui.dnd.DropOperation
@@ -22,20 +32,25 @@ import `in`.kkkev.jjidea.ui.dnd.DropZone
 import `in`.kkkev.jjidea.ui.dnd.DropZones
 import `in`.kkkev.jjidea.ui.dnd.ZoneHysteresis
 import `in`.kkkev.jjidea.ui.dnd.resolveDropOperation
+import java.awt.AlphaComposite
 import java.awt.Graphics
+import java.awt.Graphics2D
 import java.awt.Point
 import java.awt.Rectangle
+import java.awt.image.BufferedImage
 import javax.swing.JComponent
 import javax.swing.JLayeredPane
 import javax.swing.SwingUtilities
 
 /**
  * Installs drag-and-drop on the log table (jj-idea-6jvh): a commit row (or the current selection,
- * if the drag started on a selected row) becomes a [DragPayload.Commit] source; every row is a
- * y-aware drop target resolved through [dropTargetAt]. The gesture vocabulary itself -
- * payload/target types, zone geometry, guards, dispatch - lives surface-agnostically under
- * `ui/dnd/`, per that package's doc; this file is only the log table's hit-tests and its
- * `DnDSupport` wiring, mirroring `JujutsuLogTableRenderers.installRenderers()`.
+ * if the drag started on a selected row) becomes a [DragPayload.Commit] source, and a bookmark/tag
+ * chip becomes a [DragPayload.BookmarkRef]/[DragPayload.TagRef] source (jj-idea-ibth, -vdwh), both
+ * resolved through [dragPayloadAt]; every row is a y-aware drop target resolved through
+ * [dropTargetAt]. The gesture vocabulary itself - payload/target types, zone geometry, guards,
+ * dispatch - lives surface-agnostically under `ui/dnd/`, per that package's doc; this file is only
+ * the log table's hit-tests and its `DnDSupport` wiring, mirroring
+ * `JujutsuLogTableRenderers.installRenderers()`.
  *
  * Built directly on `DnDSupport.createBuilder`, not `RowsDnDSupport` - see
  * `docs/design/jj-idea-6oeg-drag-and-drop-graph-ops.md` section 5 for why the platform's own
@@ -69,15 +84,12 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
 
     DnDSupport.createBuilder(this)
         .setBeanProvider { info ->
-            val row = rowAtPoint(info.point).takeIf { it >= 0 } ?: return@setBeanProvider null
-            val pressedEntry = logModel.getEntry(convertRowIndexToModel(row)) ?: return@setBeanProvider null
-            val entries = if (isRowSelected(row)) selectedEntries else listOf(pressedEntry)
-            if (entries.isEmpty()) return@setBeanProvider null
-            val payload = DragPayload.Commit(entries)
+            val payload = dragPayloadAt(info.point) ?: return@setBeanProvider null
             hysteresis.reset()
             dragContext = DragContext.forDrag(logModel.getFilteredEntries(), payload)
             DnDDragStartBean(payload)
         }
+        .setImageProvider { info -> dragPayloadAt(info.point)?.let { dragImage(it) } }
         .setTargetChecker { event ->
             event.hideHighlighter()
             when (val resolution = resolveLive(event, hysteresis, dragContext)) {
@@ -152,7 +164,7 @@ private fun JujutsuLogTable.resolveLive(
     val payload = event.attachedObject as? DragPayload ?: return null
     val context = dragContext ?: return null
     val point = event.relativePoint.getPoint(this)
-    val (row, target) = dropTargetAt(point, hysteresis) ?: return null
+    val (row, target) = dropTargetAt(point, hysteresis, payload) ?: return null
     val copy = event.action == DnDAction.COPY
     return resolveDrop(payload, target, row, copy, context)
 }
@@ -177,18 +189,64 @@ internal fun resolveDrop(
 }
 
 /**
- * Hit-test [point] (table-relative) to a `(row, DropTarget)` pair, applying [hysteresis] against
- * the row's zone geometry. Deliberately does not go through [JujutsuLogTable.clickTargetAt] - that
- * rebuilds a [LaidOutCell] on every call, which chip-payload hit-testing (jj-idea-ibth, -vdwh) can
- * afford to pay only once a chip drag is actually in flight; a plain commit-row drag never needs
- * it.
+ * The drag payload starting at [point] (table-relative): a bookmark/tag chip under the pointer
+ * (jj-idea-ibth, -vdwh) via [JujutsuLogTable.clickTargetAt], or - falling through, same as before
+ * those beads existed - the pressed row's selection as a [DragPayload.Commit]. Reusing
+ * `clickTargetAt` here (rather than a second chip hit-test) is the same reasoning
+ * [in.kkkev.jjidea.ui.log.JujutsuLogTable]'s hover-cue code already relies on: a mouse-driven pick
+ * only ever needs one `LaidOutCell` build per event.
+ */
+internal fun JujutsuLogTable.dragPayloadAt(point: Point): DragPayload? {
+    when (val click = clickTargetAt(point)) {
+        is BookmarkClick -> return DragPayload.BookmarkRef(click.entry, click.bookmark)
+        is TagClick -> return DragPayload.TagRef(click.entry, click.tag)
+        else -> Unit
+    }
+    val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null
+    val pressedEntry = logModel.getEntry(convertRowIndexToModel(row)) ?: return null
+    val entries = if (isRowSelected(row)) selectedEntries else listOf(pressedEntry)
+    if (entries.isEmpty()) return null
+    return DragPayload.Commit(entries)
+}
+
+/**
+ * Hit-test [point] (table-relative) to a `(row, DropTarget)` pair for a drag carrying [payload],
+ * applying [hysteresis] against the row's zone geometry.
+ *
+ * A [DragPayload.Commit] or [DragPayload.BookmarkRef] drag checks for a bookmark chip under
+ * [point] first (via [JujutsuLogTable.clickTargetAt]) - the commit->chip cell moves that bookmark
+ * (jj-idea-ibth) and the chip->chip cell is the push gesture (jj-idea-vdwh). This costs one
+ * [LaidOutCell] rebuild per mouse-move, the same the row's own hover-cue lookup already pays
+ * (`JujutsuLogTable.kt`'s `mouseMoved`), so it doesn't add a new order of work - see this
+ * function's scale note in the batch-2 design plan. A [DragPayload.TagRef] never resolves to a
+ * chip target (only [DropTarget.CommitRow] pairs with a tag, per `resolveDropOperation`), so it
+ * skips the chip hit-test entirely.
+ *
+ * Once a payload is known to be a bookmark/tag chip and the point isn't over a *different* chip,
+ * the whole row resolves to [DropTarget.CommitRow] regardless of edge-band position - a chip drag
+ * has no gap-based operation, and letting the edge bands still flip [DropZone] would flicker the
+ * drop indicator for no operational reason.
  *
  * `internal` (not `private`) so [JujutsuLogTableDnDTest] can exercise the zone geometry against a
  * live, laid-out table directly, without needing to drive a real `DnDEvent`.
  */
-internal fun JujutsuLogTable.dropTargetAt(point: Point, hysteresis: ZoneHysteresis): Pair<Int, DropTarget>? {
+internal fun JujutsuLogTable.dropTargetAt(
+    point: Point,
+    hysteresis: ZoneHysteresis,
+    payload: DragPayload
+): Pair<Int, DropTarget>? {
     val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null
     val entry = logModel.getEntry(convertRowIndexToModel(row)) ?: return null
+
+    if (payload is DragPayload.Commit || payload is DragPayload.BookmarkRef) {
+        (clickTargetAt(point) as? BookmarkClick)?.let { chip ->
+            return row to DropTarget.RefChip(chip.entry, chip.bookmark)
+        }
+    }
+    if (payload is DragPayload.BookmarkRef || payload is DragPayload.TagRef) {
+        return row to DropTarget.CommitRow(entry)
+    }
+
     val rowRect = getCellRect(row, 0, true)
     val dy = point.y - rowRect.y
     val band = DropZones.bandFor(rowHeight)
@@ -198,6 +256,79 @@ internal fun JujutsuLogTable.dropTargetAt(point: Point, hysteresis: ZoneHysteres
         DropZone.INSERT_BEFORE, DropZone.INSERT_AFTER -> DropTarget.Gap(entry, zone)
     }
     return row to target
+}
+
+/**
+ * A small "chip" image following the cursor for the duration of the drag - the same treatment
+ * `ChangesTreeDnDSupport` gives a file drag in the Project view (`DnDAwareTree.getDragImage`,
+ * which this mirrors, since that helper is `Tree`-only and can't be reused directly on a
+ * [JujutsuLogTable]). Without this, only the OS cursor itself indicates a drag is happening -
+ * reported as missing feedback compared to the Project view's file drag.
+ *
+ * Built from a [FragmentRecordingCanvas] rendered through [TextCanvasPanel], the same
+ * icon+styled-text vocabulary the log table's own rows and [MoveBookmarkDialog]'s list use - a
+ * single commit's id gets the usual bold-unique-prefix/grey-remainder treatment
+ * (`TextCanvas.append(ChangeId)`) rather than a plain unstyled short id.
+ *
+ * Returns `null` for a payload kind with no natural single-line label yet ([DragPayload.Files],
+ * [DragPayload.WorkingCopyRef]) - the platform falls back to no image (cursor only) rather than
+ * this throwing or guessing at a label.
+ *
+ * `internal` (not `private`) so [JujutsuLogTableDnDTest] can exercise it directly.
+ */
+internal fun JujutsuLogTable.dragImage(payload: DragPayload): DnDImage? {
+    if (payload is DragPayload.WorkingCopyRef || payload is DragPayload.Files) return null
+
+    val canvas = FragmentRecordingCanvas()
+    canvas.foreground(RenderingUtil.getForeground(this)) {
+        when (payload) {
+            is DragPayload.Commit -> {
+                val entries = payload.entries
+                if (entries.size == 1) {
+                    val entry = entries.single()
+                    append(entry.id)
+                    append(" ")
+                    appendSummary(entry.description)
+                } else {
+                    append("${entries.size} commits")
+                }
+            }
+            is DragPayload.BookmarkRef -> {
+                append(icon(bookmarkIcon(payload.bookmark)))
+                append(" ")
+                append(payload.bookmark.name.name)
+            }
+            is DragPayload.TagRef -> {
+                append(icon(JujutsuIcons::Tag))
+                append(" ")
+                append(payload.tag.name)
+            }
+            is DragPayload.WorkingCopyRef, is DragPayload.Files -> Unit // guarded above
+        }
+    }
+
+    val panel = TextCanvasPanel().apply {
+        isOpaque = true
+        background = RenderingUtil.getBackground(this@dragImage)
+        font = this@dragImage.font
+        border = JBUI.Borders.empty(2, 4)
+    }
+    panel.renderFrom(canvas)
+    panel.size = panel.preferredSize
+    // renderFrom only adds child components - nothing has positioned them within the panel's
+    // bounds yet, unlike a real ListCellRenderer (whose containing JList validates it as part of
+    // the platform's own rendering pass before painting).
+    panel.doLayout()
+
+    val image = UIUtil.createImage(panel, panel.width, panel.height, BufferedImage.TYPE_INT_ARGB)
+    val g2 = image.graphics as Graphics2D
+    g2.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.7f)
+    panel.paint(g2)
+    g2.dispose()
+
+    // Places the whole label up-and-left of the cursor (cursor sits at its bottom-right corner),
+    // the same offset ChangesTreeDnDSupport.createDragImage uses.
+    return DnDImage(image, Point(-image.getWidth(null), -image.getHeight(null)))
 }
 
 /**

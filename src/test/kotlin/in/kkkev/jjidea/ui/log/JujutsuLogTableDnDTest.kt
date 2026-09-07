@@ -5,25 +5,29 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.ui.dnd.DragPayload
 import `in`.kkkev.jjidea.ui.dnd.DropTarget
 import `in`.kkkev.jjidea.ui.dnd.DropZone
 import `in`.kkkev.jjidea.ui.dnd.ZoneHysteresis
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.awt.Cursor
 import java.awt.Point
 import java.awt.event.MouseEvent
+import org.junit.jupiter.api.Tag as JupiterTag
 
 private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
 
@@ -37,7 +41,7 @@ private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
  * that needs DnD actually installed sets [PREVIEW_PROPERTY] via [BeforeEach]; the gating itself is
  * covered by `installing drag-and-drop does nothing when the preview feature is off` below.
  */
-@Tag("platform")
+@JupiterTag("platform")
 @TestApplication
 @RunInEdt
 class JujutsuLogTableDnDTest {
@@ -90,7 +94,8 @@ class JujutsuLogTableDnDTest {
         val b = entry("bbbbbbbb")
         val table = tableWith(listOf(a, b))
 
-        val (row, target) = table.dropTargetAt(pointInRow(table, 0, 0), ZoneHysteresis())!!
+        val payload = DragPayload.Commit(listOf(a))
+        val (row, target) = table.dropTargetAt(pointInRow(table, 0, 0), ZoneHysteresis(), payload)!!
 
         row shouldBe 0
         target.shouldNotBeNull()
@@ -104,7 +109,9 @@ class JujutsuLogTableDnDTest {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
 
-        val (_, target) = table.dropTargetAt(pointInRow(table, 0, table.rowHeight / 2), ZoneHysteresis())!!
+        val payload = DragPayload.Commit(listOf(a))
+        val point = pointInRow(table, 0, table.rowHeight / 2)
+        val (_, target) = table.dropTargetAt(point, ZoneHysteresis(), payload)!!
 
         target.shouldNotBeNull()
         target as DropTarget.CommitRow
@@ -116,7 +123,9 @@ class JujutsuLogTableDnDTest {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
 
-        val (_, target) = table.dropTargetAt(pointInRow(table, 0, table.rowHeight - 1), ZoneHysteresis())!!
+        val payload = DragPayload.Commit(listOf(a))
+        val point = pointInRow(table, 0, table.rowHeight - 1)
+        val (_, target) = table.dropTargetAt(point, ZoneHysteresis(), payload)!!
 
         target.shouldNotBeNull()
         target as DropTarget.Gap
@@ -135,7 +144,8 @@ class JujutsuLogTableDnDTest {
         val b = entry("bbbbbbbb")
         val table = tableWith(listOf(a, b))
 
-        val (row, target) = table.dropTargetAt(pointInRow(table, 1, 0), ZoneHysteresis())!!
+        val payload = DragPayload.Commit(listOf(b))
+        val (row, target) = table.dropTargetAt(pointInRow(table, 1, 0), ZoneHysteresis(), payload)!!
 
         row shouldBe 1
         target.shouldNotBeNull()
@@ -149,7 +159,7 @@ class JujutsuLogTableDnDTest {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
 
-        table.dropTargetAt(Point(10, 5000), ZoneHysteresis()).shouldBeNull()
+        table.dropTargetAt(Point(10, 5000), ZoneHysteresis(), DragPayload.Commit(listOf(a))).shouldBeNull()
     }
 
     @Test
@@ -225,4 +235,59 @@ class JujutsuLogTableDnDTest {
 
         table.getClientProperty(SmoothAutoScroller.ENABLED) shouldBe true
     }
+
+    // region dragImage
+
+    @Test
+    fun `dragImage for a single commit produces a non-empty image`() {
+        val a = entry("aaaaaaaa")
+        val table = tableWith(listOf(a))
+
+        val image = table.dragImage(DragPayload.Commit(listOf(a)))
+
+        image.shouldNotBeNull()
+        image.image.getWidth(null) shouldBeGreaterThan 0
+        image.image.getHeight(null) shouldBeGreaterThan 0
+    }
+
+    @Test
+    fun `dragImage for a multi-commit selection also produces a non-empty image`() {
+        val a = entry("aaaaaaaa")
+        val b = entry("bbbbbbbb")
+        val table = tableWith(listOf(a, b))
+
+        val image = table.dragImage(DragPayload.Commit(listOf(a, b)))
+
+        image.shouldNotBeNull()
+    }
+
+    @Test
+    fun `dragImage for a bookmark chip produces a non-empty image`() {
+        val a = entry("aaaaaaaa")
+        val table = tableWith(listOf(a))
+
+        val image = table.dragImage(DragPayload.BookmarkRef(a, Bookmark("main")))
+
+        image.shouldNotBeNull()
+    }
+
+    @Test
+    fun `dragImage for a tag chip produces a non-empty image`() {
+        val a = entry("aaaaaaaa")
+        val table = tableWith(listOf(a))
+
+        val image = table.dragImage(DragPayload.TagRef(a, Tag("v1")))
+
+        image.shouldNotBeNull()
+    }
+
+    @Test
+    fun `dragImage for a working-copy marker is null - no natural single-line label yet`() {
+        val a = entry("aaaaaaaa")
+        val table = tableWith(listOf(a))
+
+        table.dragImage(DragPayload.WorkingCopyRef(a)).shouldBeNull()
+    }
+
+    // endregion
 }

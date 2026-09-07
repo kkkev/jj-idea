@@ -209,7 +209,7 @@ class JujutsuLogTable(
                     // can itself contain a linkified issue reference (jj-idea-vrmv), where only
                     // that inner fragment should look interactive.
                     val newCol = columnAtPoint(e.point)
-                    val target = clickTargetAt(e)
+                    val target = clickTargetAt(e.point)
                     val showsHoverCue = target?.hasHoverCue == true
                     cursor = if (showsHoverCue) {
                         Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
@@ -294,7 +294,7 @@ class JujutsuLogTable(
             object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
-                    when (val target = clickTargetAt(e) ?: return) {
+                    when (val target = clickTargetAt(e.point) ?: return) {
                         is MoreRefsClick -> showMoreRefsPopup(e.component, e.x, e.y, target)
                         else -> target.performDefaultAction(project)
                     }
@@ -310,7 +310,7 @@ class JujutsuLogTable(
         // keep their existing single-click behaviour instead of triggering the Enter action.
         object : DoubleClickListener() {
             override fun onDoubleClick(e: MouseEvent): Boolean {
-                if (clickTargetAt(e) != null) return false
+                if (clickTargetAt(e.point) != null) return false
                 val viewColumn = columnAtPoint(e.point)
                 if (viewColumn >= 0 &&
                     convertColumnIndexToModel(viewColumn) == JujutsuLogTableModel.COLUMN_ROOT_GUTTER
@@ -329,7 +329,7 @@ class JujutsuLogTable(
             object : PopupHandler() {
                 override fun invokePopup(comp: Component, x: Int, y: Int) {
                     val syntheticEvent = MouseEvent(this@JujutsuLogTable, 0, 0, 0, x, y, 1, false)
-                    when (val target = clickTargetAt(syntheticEvent)) {
+                    when (val target = clickTargetAt(syntheticEvent.point)) {
                         null -> showContextMenu(comp, x, y)
                         is MoreRefsClick -> showMoreRefsPopup(comp, x, y, target)
                         else -> {
@@ -454,18 +454,22 @@ class JujutsuLogTable(
     }
 
     /**
-     * Return the [LogClickTarget] under [e] (a bookmark/tag chip, a "+N more" overflow chip —
-     * jj-idea-w61m, or an author/committer name — jj-idea-iesq), or null if the event is not over
-     * a clickable element. Handles the Decorations column (SCC-based), the graph+description
-     * column (fragment canvas), and the Author/Committer columns (name-width hit-test).
+     * Return the [LogClickTarget] under [point] (table-relative — a bookmark/tag chip, a "+N more"
+     * overflow chip — jj-idea-w61m, or an author/committer name — jj-idea-iesq), or null if the
+     * point is not over a clickable element. Handles the Decorations column (SCC-based), the
+     * graph+description column (fragment canvas), and the Author/Committer columns (name-width
+     * hit-test).
+     *
+     * `internal` (not `private`) so `ui/log/JujutsuLogTableDnD.kt` (jj-idea-ibth, -vdwh) can reuse
+     * this as the chip hit-test for drag payloads/targets, rather than rebuilding it.
      */
-    private fun clickTargetAt(e: MouseEvent): LogClickTarget? {
-        val row = rowAtPoint(e.point).takeIf { it >= 0 } ?: return null
-        val col = columnAtPoint(e.point).takeIf { it >= 0 } ?: return null
+    internal fun clickTargetAt(point: Point): LogClickTarget? {
+        val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null
+        val col = columnAtPoint(point).takeIf { it >= 0 } ?: return null
         val modelRow = convertRowIndexToModel(row)
         val entry = logModel.getEntry(modelRow) ?: return null
         val cellRect = getCellRect(row, col, false)
-        val localX = e.x - cellRect.x
+        val localX = point.x - cellRect.x
         val modelCol = convertColumnIndexToModel(col)
         if (modelCol == JujutsuLogTableModel.COLUMN_AUTHOR || modelCol == JujutsuLogTableModel.COLUMN_COMMITTER) {
             val frc = getFontMetrics(font).fontRenderContext

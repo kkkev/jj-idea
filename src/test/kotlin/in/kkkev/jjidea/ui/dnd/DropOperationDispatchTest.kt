@@ -125,6 +125,16 @@ class DropOperationDispatchTest {
     }
 
     @Test
+    fun `a BookmarkRef onto its own row is a no-op - null`() {
+        resolveDropOperation(
+            DragPayload.BookmarkRef(a, Bookmark("main")),
+            DropTarget.CommitRow(a),
+            copy = false
+        )
+            .shouldBeNull()
+    }
+
+    @Test
     fun `a local BookmarkRef onto its remote RefChip is a Push`() {
         val local = Bookmark("main")
         val remote = Bookmark("main@origin")
@@ -135,6 +145,7 @@ class DropOperationDispatchTest {
         op as DropOperation.Push
         op.bookmark shouldBe local
         op.remote shouldBe "origin"
+        op.entry shouldBe b
     }
 
     @Test
@@ -170,6 +181,11 @@ class DropOperationDispatchTest {
         op as DropOperation.MoveTag
         op.tag shouldBe tag
         op.destination shouldBe b
+    }
+
+    @Test
+    fun `a TagRef onto its own row is a no-op - null`() {
+        resolveDropOperation(DragPayload.TagRef(a, Tag("v1")), DropTarget.CommitRow(a), copy = false).shouldBeNull()
     }
 
     @Test

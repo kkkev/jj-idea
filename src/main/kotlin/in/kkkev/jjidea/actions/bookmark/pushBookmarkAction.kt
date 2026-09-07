@@ -244,26 +244,36 @@ private fun pushToRemoteAction(
         }
     }
 
-    override fun actionPerformed(e: AnActionEvent) {
-        runInBackground {
-            val data = GitPushDialog.loadDialogData(repo)
-            if (data.remotes.isEmpty()) {
-                runLater { noRemoteNotification(repo.project) }
-                return@runInBackground
-            }
-            runLater {
-                val dialog = GitPushDialog(
-                    repo.project,
-                    mapOf(repo to data),
-                    repo,
-                    initialBookmark = bookmark,
-                    initialRemote = remote
-                )
-                if (!dialog.showAndGet()) return@runLater
-                checkAndPush(dialog.result ?: return@runLater, repo.project)
-            }
-        }
-    }
+    override fun actionPerformed(e: AnActionEvent) = openPushDialogFor(repo, bookmark, remote)
 
     override fun getActionUpdateThread() = ActionUpdateThread.EDT
+}
+
+/**
+ * Opens [GitPushDialog] pre-filled with [bookmark]/[remote] and runs [checkAndPush] on
+ * confirmation. Shared by [pushToRemoteAction] and [in.kkkev.jjidea.ui.dnd.DropPerformers]'s
+ * drag-and-drop path (jj-idea-vdwh, a local bookmark chip dropped on its own `name@remote`
+ * chip) - both must always go through the dialog's review step, since mutating a remote is not
+ * something to fire with no confirmation (this docstring's own point, restated on
+ * [pushBookmarkAction] above).
+ */
+internal fun openPushDialogFor(repo: JujutsuRepository, bookmark: Bookmark, remote: Remote) {
+    runInBackground {
+        val data = GitPushDialog.loadDialogData(repo)
+        if (data.remotes.isEmpty()) {
+            runLater { noRemoteNotification(repo.project) }
+            return@runInBackground
+        }
+        runLater {
+            val dialog = GitPushDialog(
+                repo.project,
+                mapOf(repo to data),
+                repo,
+                initialBookmark = bookmark,
+                initialRemote = remote
+            )
+            if (!dialog.showAndGet()) return@runLater
+            checkAndPush(dialog.result ?: return@runLater, repo.project)
+        }
+    }
 }

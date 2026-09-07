@@ -47,8 +47,13 @@ sealed interface DropOperation {
         override val label get() = "Edit ${destination.id.short}"
     }
 
-    /** A local bookmark chip dragged onto its own `name@remote` chip - always dialog-gated, see design section 7. */
-    data class Push(val bookmark: Bookmark, val remote: String) : DropOperation {
+    /**
+     * A local bookmark chip dragged onto its own `name@remote` chip - always dialog-gated, see
+     * design section 7. [entry] is the row the `name@remote` chip lives on - carried only to name
+     * which repository the push runs in, the way [MoveBookmark.destination]/[MoveTag.destination]
+     * already do for their operations.
+     */
+    data class Push(val bookmark: Bookmark, val remote: String, val entry: LogEntry) : DropOperation {
         override val label get() = "Push ${bookmark.name} to $remote"
     }
 
@@ -96,17 +101,26 @@ fun resolveDropOperation(payload: DragPayload, target: DropTarget, copy: Boolean
     }
 
     is DragPayload.BookmarkRef -> when (target) {
-        is DropTarget.CommitRow -> DropOperation.MoveBookmark(payload.bookmark, target.entry)
+        // Dropped back on the row it already sits on - a no-op, not an operation (mirrors the
+        // deliberately-silent self-drop case DragContext.rejectionReason handles for a dragged
+        // commit).
+        is DropTarget.CommitRow -> if (target.entry.id == payload.entry.id) {
+            null
+        } else {
+            DropOperation.MoveBookmark(payload.bookmark, target.entry)
+        }
         is DropTarget.RefChip ->
             if (!payload.bookmark.name.isRemote && target.bookmark.name.isRemote) {
-                DropOperation.Push(payload.bookmark, target.bookmark.name.remote)
+                DropOperation.Push(payload.bookmark, target.bookmark.name.remote, target.entry)
             } else {
                 null
             }
         is DropTarget.Gap -> null
     }
 
-    is DragPayload.TagRef -> (target as? DropTarget.CommitRow)?.let { DropOperation.MoveTag(payload.tag, it.entry) }
+    is DragPayload.TagRef -> (target as? DropTarget.CommitRow)?.let {
+        if (it.entry.id == payload.entry.id) null else DropOperation.MoveTag(payload.tag, it.entry)
+    }
 
     is DragPayload.WorkingCopyRef ->
         (target as? DropTarget.CommitRow)?.let { DropOperation.EditWorkingCopy(it.entry) }

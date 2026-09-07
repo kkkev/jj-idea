@@ -2502,6 +2502,20 @@ file), which no automated test can supply — see contributing.md § Manual regr
 - [ ] Launch with `-Djjidea.preview.dragAndDrop=true` and no access code — dragging initiates
       (the dev/CI escape hatch)
 
+#### Drag image (mirrors the Project view's file drag)
+
+**Code:** `ui/log/JujutsuLogTableDnD.kt` (`dragImage`)
+
+- [ ] Dragging a commit row shows a small semi-transparent label following the cursor with the
+      commit's id and description (or "N commits" for a multi-selection), the same way dragging a
+      file in the Project view shows its name/icon
+- [ ] The id in that label is styled the same way it is everywhere else in the log (bold unique
+      prefix, grey remainder, coloured offset suffix on a divergent change) — not plain unstyled
+      text
+- [ ] Dragging a bookmark chip shows its name with the bookmark's own icon; dragging a tag chip
+      shows its name with the tag icon
+- [ ] The label stays attached to the cursor for the whole drag, not just at the start
+
 #### Commit → commit rebase by drag (jj-idea-8fxs)
 
 The headline drag gesture: dropping a dragged commit row (or multi-selection) onto another row's
@@ -2522,8 +2536,6 @@ dragged commit(s) move) — choosing `-s`/`-b` from a drag is a future bead (jj-
       prior shape. Dismiss a balloon on a separate drop and use the persistent Undo Last Operation
       action instead — same effect
 - [ ] Drag a multi-row selection (Shift/Ctrl-click first) — all selected commits rebase together
-- [ ] Hold the copy modifier while dragging a commit — reject cursor, **no** indicator (the
-      duplicate gesture isn't wired until jj-idea-p6nb)
 - [ ] Drag onto an immutable commit, or onto a descendant of the dragged commit (a cycle) — a
       **filled** (not outlined) reject indicator on that row, reject cursor if it lands; drop does
       nothing. Hover slowly and confirm the filled indicator is reliably visible every time you're
@@ -2536,6 +2548,88 @@ dragged commit(s) move) — choosing `-s`/`-b` from a drag is a future bead (jj-
       cursor with **no** indicator at all (deliberately silent, not the same bug as above)
 - [ ] Regression: the existing **Rebase...** dialog action (context menu / toolbar) also now shows
       an undo balloon on success — confirm the dialog itself is otherwise unchanged
+
+#### Copy-modifier drag to duplicate (jj-idea-p6nb)
+
+Same three zones as the plain rebase gesture above, but held with the platform's copy modifier —
+**Option (⌥) on macOS**, matching the Project view's file drag; Ctrl on Windows/Linux. (Ctrl also
+copies on macOS, but it's already bound to the secondary-click/context-menu convention there, so
+prefer Option.) Runs `jj duplicate` instead of `jj rebase`; the original commit(s) stay exactly
+where they were.
+
+**Code:** `ui/dnd/DropPerformers.kt`, `actions/change/duplicateOntoAction.kt`
+
+- [ ] Hold the copy modifier and drag a commit onto another's **centre** band → tooltip
+      "Duplicate &lt;id&gt; onto &lt;id&gt;", release applies; `jj log` shows both the original,
+      untouched, and a new duplicate as a child of the destination
+- [ ] Same with the **top**/**bottom** bands — the duplicate lands in the insert-before/after slot,
+      same non-identity top/bottom ↔ `-A`/`-B` mapping as plain rebase
+- [ ] Drag a multi-row selection with the copy modifier held — all selected commits duplicate
+      together, originals untouched
+- [ ] Each successful duplicate shows an undo balloon; Undo removes the new commit(s) and leaves
+      the originals as they were
+- [ ] Duplicate a commit onto an **immutable** destination — still allowed (unlike rebase, `jj
+      duplicate` never rewrites the dragged commit, so the "cannot rewrite an immutable commit"
+      guard does not apply to a copy-modifier drag)
+- [ ] Releasing the copy modifier mid-drag switches the tooltip/operation back to "Rebase..." for
+      the same pointer position, and vice versa when it's pressed
+- [ ] Regression: the existing **Duplicate Onto...** dialog action (context menu / toolbar) also
+      now shows an undo balloon on success — confirm the dialog itself is otherwise unchanged
+
+#### Drag a bookmark or tag chip onto a commit to move it (jj-idea-ibth)
+
+**Code:** `ui/dnd/DropOperation.kt`, `ui/dnd/DropPerformers.kt`, `ui/log/JujutsuLogTableDnD.kt`,
+`actions/bookmark/moveBookmarkAction.kt`, `actions/tag/setTagAction.kt`
+
+- [ ] Drag a bookmark chip from its row onto a different row's centre band → tooltip "Move
+      bookmark &lt;name&gt; to &lt;id&gt;", release applies immediately with an undo balloon;
+      confirm with `jj log` that the bookmark moved, and that the **selection follows the
+      bookmark to its new row**
+- [ ] Do the same for a tag chip → tooltip "Move tag &lt;name&gt; to &lt;id&gt;", same immediate
+      apply + undo balloon
+- [ ] Drag a bookmark forward onto a descendant — applies with no prompt (a plain forward move)
+- [ ] Drag a bookmark **backward** (onto an ancestor, or a row not reachable forward) — a "Move
+      Bookmark Backward?" confirm-and-retry prompt appears (the same one **Move Bookmark
+      Here...** shows for a backward move, reused verbatim, not reimplemented); confirming
+      applies the move with `-B`. Unlike the dialog's version of this prompt, the drag path
+      cannot pre-classify direction, so this appears for **any** deliberate backward/sideways
+      drag, not just a genuine race — the wording says so plainly and does not claim a dialog or
+      a race occurred
+- [ ] Move a bookmark forward, undo it (via the balloon or Undo Last Operation), then drag it
+      forward again to a genuinely different descendant of its (now-reverted) position — this
+      must apply cleanly with **no** backward-move prompt. If the prompt appears here, that's a
+      real bug (verified via raw `jj bookmark set` that jj itself does not misclassify this
+      sequence) — check with `jj log` first that the second target really is a descendant of the
+      bookmark's post-undo position before filing it
+- [ ] Drag a tag onto a revision where a differently-placed tag of the same name already exists —
+      the existing **Set Tag Here...** dialog's "tag already exists, move it?" prompt appears here
+      too; confirming applies with `--allow-move`
+- [ ] Drop a bookmark/tag chip back onto the **same row** it's already on (not onto another chip
+      on that row) — no indicator ever appears, drop is a silent no-op
+- [ ] Drag a bookmark/tag chip near a row's **top/bottom edge band** — still resolves to that row's
+      centre (no gap-based operation for a chip drag), no indicator flicker as the pointer nears
+      the edge
+- [ ] Drag a bookmark/tag chip across repositories in a multi-root project — filled reject
+      indicator, same as a commit drag
+
+#### Drag a local bookmark chip onto its remote chip to push (jj-idea-vdwh)
+
+**Code:** `ui/dnd/DropOperation.kt`, `ui/dnd/DropPerformers.kt`, `actions/bookmark/pushBookmarkAction.kt`
+
+- [ ] With a local bookmark ahead of a tracked `name@remote`, drag the local chip onto the remote
+      chip (same row or a different row) → tooltip "Push &lt;name&gt; to &lt;remote&gt;", release
+      opens **Git Push** pre-filled to "Specific bookmark" with that bookmark/remote already
+      selected — it never pushes without going through this dialog
+- [ ] Confirm the dialog's own force-push/deletion/untracked warnings still appear as usual before
+      the push runs
+- [ ] With the local bookmark already in sync with its remote (nothing ahead) — dragging local onto
+      `name@remote` shows no indicator; the degenerate "chips already coincide" case does nothing,
+      not a crash
+- [ ] Drag a **remote** chip (`name@origin`) onto the **local** chip (reverse direction) — no
+      indicator, not a push
+- [ ] With two remotes tracked, drag the local chip onto each remote's chip in turn — each opens
+      the dialog pre-filled to that specific remote
+- [ ] Cancel the pre-filled dialog — no push happens, no error
 
 ### MT-CROSS
 

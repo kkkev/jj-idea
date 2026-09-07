@@ -19,3 +19,15 @@ verbatim at GA, condensed into a handful of user-facing bullets.
 - Drag and Drop: dragging onto a row you can't actually drop on (a different repository, a commit
   that would create a cycle, an immutable commit) now reliably shows a "can't drop here" indicator
   on that row, instead of an inconsistent or missing cursor change.
+- Drag and Drop: holding the copy modifier (Option on macOS, Ctrl on Windows/Linux — the same key
+  that copies when dragging a file in the Project view) while dragging a commit now duplicates it
+  instead of rebasing it, leaving the original in place.
+- Drag and Drop: dragging a bookmark or tag chip onto another commit now moves it there, with the
+  same confirmation prompts as the existing bookmark/tag actions for a backward move or an
+  already-existing tag, and the selection follows the bookmark to its new commit.
+- Drag and Drop: dragging a local bookmark chip onto its own remote-tracking chip now opens the Git
+  Push dialog pre-filled with that bookmark and remote, ready to review before pushing.
+- Drag and Drop: dragging a commit, bookmark, or tag now shows a small label following the cursor
+  naming what's being dragged, the same way dragging a file in the Project view does — a dragged
+  commit's id keeps its usual styling (bold unique prefix, grey remainder) rather than showing as
+  plain text.

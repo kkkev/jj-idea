@@ -1,8 +1,15 @@
 package `in`.kkkev.jjidea.ui.dnd
 
 import com.intellij.openapi.project.Project
+import `in`.kkkev.jjidea.actions.bookmark.executeMove
+import `in`.kkkev.jjidea.actions.bookmark.openPushDialogFor
+import `in`.kkkev.jjidea.actions.change.executeDuplicate
 import `in`.kkkev.jjidea.actions.change.executeRebase
+import `in`.kkkev.jjidea.actions.tag.executeSetTag
+import `in`.kkkev.jjidea.jj.RebaseDestinationMode
 import `in`.kkkev.jjidea.jj.RebaseSourceMode
+import `in`.kkkev.jjidea.jj.Remote
+import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.rebase.RebaseSpec
 
 /**
@@ -13,8 +20,8 @@ import `in`.kkkev.jjidea.ui.rebase.RebaseSpec
  * [supports] is consulted on every mouse-move (via the log table's target checker) and must stay
  * O(1) - a type check against [operation], not any work toward performing it. [perform] does the
  * actual work and is called once, on drop. Splitting these (rather than a single nullable function)
- * exists so an operation this object doesn't yet handle - e.g. [DropOperation.Duplicate] before
- * jj-idea-p6nb lands - rejects cleanly with no indicator, instead of lighting up a tooltip for a
+ * exists so an operation this object doesn't yet handle - e.g. [DropOperation.SquashFiles] before
+ * jj-idea-yvry lands - rejects cleanly with no indicator, instead of lighting up a tooltip for a
  * drop that then does nothing on release.
  */
 interface DropPerformer {
@@ -26,34 +33,49 @@ interface DropPerformer {
 }
 
 /**
- * [forLogTable] wires the log table's drop operations to the command layer. jj-idea-8fxs (this
- * bead) wires [DropOperation.Rebase] to `jj rebase` with an undo balloon; every other
- * [DropOperation] variant is unwired here and named with the bead that will wire it.
+ * [forLogTable] wires the log table's drop operations to the command layer. jj-idea-8fxs wired
+ * [DropOperation.Rebase] to `jj rebase`; jj-idea-p6nb wires [DropOperation.Duplicate] to
+ * `jj duplicate`; jj-idea-ibth wires [DropOperation.MoveBookmark]/[DropOperation.MoveTag];
+ * jj-idea-vdwh wires [DropOperation.Push]. Every other [DropOperation] variant is unwired here and
+ * named with the bead that will wire it.
  */
 object DropPerformers {
     fun forLogTable(project: Project): DropPerformer = object : DropPerformer {
         override fun supports(operation: DropOperation): Boolean = when (operation) {
             is DropOperation.Rebase -> true
-            is DropOperation.Duplicate -> false // jj-idea-p6nb
-            is DropOperation.MoveBookmark -> false // jj-idea-ibth
-            is DropOperation.MoveTag -> false // jj-idea-vdwh
+            is DropOperation.Duplicate -> true
+            is DropOperation.MoveBookmark -> true
+            is DropOperation.MoveTag -> true
             is DropOperation.EditWorkingCopy -> false // jj-idea-pk2c
-            is DropOperation.Push -> false // jj-idea-ibth
+            is DropOperation.Push -> true
             is DropOperation.SquashFiles -> false // jj-idea-yvry
             is DropOperation.SplitFiles -> false // jj-idea-yvry
         }
 
         override fun perform(operation: DropOperation): Boolean = when (operation) {
             is DropOperation.Rebase -> {
-                val repo = operation.destination.repo
-                executeRebase(project, repo, operation.toRebaseSpec())
+                executeRebase(project, operation.destination.repo, operation.toRebaseSpec())
                 true
             }
-            is DropOperation.Duplicate -> false // jj-idea-p6nb
-            is DropOperation.MoveBookmark -> false // jj-idea-ibth
-            is DropOperation.MoveTag -> false // jj-idea-vdwh
+            is DropOperation.Duplicate -> {
+                val spec = operation.toDuplicateSpec()
+                executeDuplicate(project, operation.destination.repo, spec.revisions, spec.destinations, spec.mode)
+                true
+            }
+            is DropOperation.MoveBookmark -> {
+                val repo = operation.destination.repo
+                executeMove(repo, operation.bookmark, operation.destination.id, allowBackwards = false)
+                true
+            }
+            is DropOperation.MoveTag -> {
+                executeSetTag(operation.destination.repo, operation.tag, operation.destination.id, allowMove = false)
+                true
+            }
             is DropOperation.EditWorkingCopy -> false // jj-idea-pk2c
-            is DropOperation.Push -> false // jj-idea-ibth
+            is DropOperation.Push -> {
+                openPushDialogFor(operation.entry.repo, operation.bookmark, Remote(operation.remote))
+                true
+            }
             is DropOperation.SquashFiles -> false // jj-idea-yvry
             is DropOperation.SplitFiles -> false // jj-idea-yvry
         }
@@ -71,4 +93,27 @@ internal fun DropOperation.Rebase.toRebaseSpec() = RebaseSpec(
     destinations = listOf(destination.id),
     sourceMode = RebaseSourceMode.REVISION,
     destinationMode = mode
+)
+
+/**
+ * The `jj duplicate` counterpart of [RebaseSpec] - deliberately its own type rather than reusing
+ * [in.kkkev.jjidea.ui.duplicate.DuplicateDialog.DuplicateSpec], which carries only a destination
+ * and mode (the dialog already knows its own source revisions as a separate parameter); this one
+ * needs [revisions] alongside, the same shape [RebaseSpec] already carries for the same reason.
+ */
+internal data class DuplicateSpec(
+    val revisions: List<Revision>,
+    val destinations: List<Revision>,
+    val mode: RebaseDestinationMode
+)
+
+/**
+ * [DropOperation.Duplicate] carries the same `(sources, destination, mode)` shape as
+ * [DropOperation.Rebase], mapped the same way - `jj duplicate` just has no source-mode axis
+ * ([in.kkkev.jjidea.jj.CommandExecutor.duplicate] takes positional revisions, never `-s`/`-b`).
+ */
+internal fun DropOperation.Duplicate.toDuplicateSpec() = DuplicateSpec(
+    revisions = sources.map { it.id },
+    destinations = listOf(destination.id),
+    mode = mode
 )
