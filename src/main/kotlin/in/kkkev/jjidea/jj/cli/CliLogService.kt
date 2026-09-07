@@ -458,12 +458,25 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         /**
          * Template for bookmark list parsing.
-         * Fields: present, name, conflict, change_id (qualified), immutable
+         * Fields: present, name, conflict, tracked, ahead_count, behind_count, change_id (qualified), immutable
+         *
+         * tracked/ahead_count/behind_count added for jj-idea-ita2 (GitHub #48) — without them every
+         * [Bookmark] built here defaulted to tracked=true, ahead=behind=0 regardless of reality.
+         * This template's context is a single `CommitRef` per row covering both local and remote
+         * refs (unlike [localBookmarkTemplate]/[remoteBookmarkTemplate]'s two separate `.map()`
+         * expressions), and jj's own `tracked`/`tracking_ahead_count`/`tracking_behind_count`
+         * keywords error ("Not a tracked remote ref") on a local ref or an untracked remote ref, so
+         * each is guarded: `!remote || tracked` treats an untracked local ref as tracked (mirroring
+         * `if(b.remote(), b.tracked(), "true")` in [localBookmarkTemplate]), and the counts fall
+         * back to 0 unless the ref is both remote and tracked.
          */
         val bookmarkListTemplate = object : LogTemplate<BookmarkItem?>(
             booleanField("present"),
             stringField(TemplateParts.nameWithRemote()),
             booleanField("conflict"),
+            booleanField("!remote || tracked"),
+            singleField("if(remote && tracked, tracking_ahead_count.lower(), \"0\")") { it.toIntOrNull() ?: 0 },
+            singleField("if(remote && tracked, tracking_behind_count.lower(), \"0\")") { it.toIntOrNull() ?: 0 },
             singleField("if(present,${TemplateParts.qualifiedChangeId("normal_target")},\"\")") {
                 optionalChangeId.parse(it)
             },
@@ -473,11 +486,21 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 val present = fields[0].take(input) as Boolean
                 val name = fields[1].take(input) as String
                 val conflict = fields[2].take(input) as Boolean
-                val id = fields[3].take(input) as ChangeId?
-                val immutable = fields[4].take(input) as Boolean
+                val tracked = fields[3].take(input) as Boolean
+                val aheadCount = fields[4].take(input) as Int
+                val behindCount = fields[5].take(input) as Int
+                val id = fields[6].take(input) as ChangeId?
+                val immutable = fields[7].take(input) as Boolean
+                val bookmark = Bookmark(
+                    name,
+                    tracked = tracked,
+                    conflict = conflict,
+                    aheadCount = aheadCount,
+                    behindCount = behindCount
+                )
                 when {
-                    present && id != null -> BookmarkItem(Bookmark(name, conflict = conflict), id, immutable)
-                    !present -> BookmarkItem(Bookmark(name, deleted = true, conflict = conflict), null)
+                    present && id != null -> BookmarkItem(bookmark, id, immutable)
+                    !present -> BookmarkItem(bookmark.copy(deleted = true), null)
                     else -> null
                 }
             } catch (_: Exception) {

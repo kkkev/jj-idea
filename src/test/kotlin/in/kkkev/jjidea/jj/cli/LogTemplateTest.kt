@@ -388,7 +388,7 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses present bookmark`() {
-        val fields = listOf("true", "main", "false", "qpvuntsm~q~", "false")
+        val fields = listOf("true", "main", "false", "true", "0", "0", "qpvuntsm~q~", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark shouldBe Bookmark("main", conflict = false)
@@ -398,7 +398,7 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses present immutable bookmark`() {
-        val fields = listOf("true", "main", "false", "qpvuntsm~q~", "true")
+        val fields = listOf("true", "main", "false", "true", "0", "0", "qpvuntsm~q~", "true")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark shouldBe Bookmark("main", conflict = false)
@@ -408,7 +408,7 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses pending-delete bookmark`() {
-        val fields = listOf("false", "feature", "false", "", "false")
+        val fields = listOf("false", "feature", "false", "true", "0", "0", "", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.name shouldBe BookmarkName("feature")
@@ -419,7 +419,7 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses conflicted bookmark`() {
-        val fields = listOf("true", "main", "true", "qpvuntsm~q~", "false")
+        val fields = listOf("true", "main", "true", "true", "0", "0", "qpvuntsm~q~", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.conflict shouldBe true
@@ -429,13 +429,28 @@ class LogTemplateTest {
     @Test
     fun `bookmarkListTemplate parses remote-only untracked bookmark`() {
         // name arrives pre-formatted as "name@remote" by nameWithRemote(), as jj's `--all-remotes`
-        // output does for a bookmark with no local counterpart.
-        val fields = listOf("true", "feature@origin", "false", "qpvuntsm~q~", "false")
+        // output does for a bookmark with no local counterpart. Untracked, so ahead/behind are
+        // reported as 0 rather than erroring (jj-idea-ita2).
+        val fields = listOf("true", "feature@origin", "false", "false", "0", "0", "qpvuntsm~q~", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.name shouldBe BookmarkName("feature@origin")
         item.bookmark.isRemote shouldBe true
+        item.bookmark.tracked shouldBe false
         item.bookmark.deleted shouldBe false
         item.id shouldBe ChangeId("qpvuntsm", "q", null)
+    }
+
+    @Test
+    fun `bookmarkListTemplate parses tracked diverged remote bookmark`() {
+        // jj-idea-ita2 (GitHub #48): tracked/ahead/behind must reach the panel, not default to
+        // tracked=true/0/0 regardless of the actual `jj bookmark list` output.
+        val fields = listOf("true", "feature@origin", "false", "true", "2", "3", "qpvuntsm~q~", "false")
+        val item = bookmarkListTemplate.take(fields.iterator())
+
+        item!!.bookmark.tracked shouldBe true
+        item.bookmark.aheadCount shouldBe 2
+        item.bookmark.behindCount shouldBe 3
+        item.bookmark.isDiverged shouldBe true
     }
 }
