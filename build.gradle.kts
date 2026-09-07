@@ -257,6 +257,19 @@ ktlint {
     enableExperimentalRules = false
 }
 
+// ktlint's check/report tasks are @CacheableTask with @PathSensitive(RELATIVE) inputs, but
+// their outputs (results .bin and the text report) embed absolute file paths, which makes
+// those outputs non-relocatable. With org.gradle.caching=true and two jj-parallel-lanes
+// workspaces sharing ~/.gradle/caches/build-cache-1, identical sources in the two checkouts
+// share a cache key, so one lane restores the other's report — wrong paths, wrong verdict,
+// including a false PASS (jj-idea-sddr). Opt these tasks out; every other task stays cacheable.
+tasks.withType<org.jlleitschuh.gradle.ktlint.tasks.BaseKtLintCheckTask>().configureEach {
+    outputs.cacheIf { false }
+}
+tasks.withType<org.jlleitschuh.gradle.ktlint.tasks.GenerateReportsTask>().configureEach {
+    outputs.cacheIf { false }
+}
+
 // Capture IJPGP's test configuration before we override it for unit tests.
 // This must come before the tasks.test block below.
 val ijpgpTestTask = tasks.test.get()
