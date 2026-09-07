@@ -31,7 +31,10 @@ class BookmarkTreeModelTest {
         conflict: Boolean = false,
         aheadCount: Int = 0,
         behindCount: Int = 0
-    ) = BookmarkItem(Bookmark(name, tracked = tracked, conflict = conflict, aheadCount = aheadCount, behindCount = behindCount), changeId)
+    ) = BookmarkItem(
+        Bookmark(name, tracked = tracked, conflict = conflict, aheadCount = aheadCount, behindCount = behindCount),
+        changeId
+    )
 
     private fun refs(vararg names: String) = mapOf(repo to RepositoryReferences(bookmarks = names.map { item(it) }))
 

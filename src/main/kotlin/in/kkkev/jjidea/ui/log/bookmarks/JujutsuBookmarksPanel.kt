@@ -128,7 +128,11 @@ class JujutsuBookmarksPanel(
             object : AnAction(JujutsuBundle.message("bookmarks.panel.expandall"), null, AllIcons.Actions.Expandall) {
                 override fun actionPerformed(e: AnActionEvent) = treeExpander.expandAll()
             },
-            object : AnAction(JujutsuBundle.message("bookmarks.panel.collapseall"), null, AllIcons.Actions.Collapseall) {
+            object : AnAction(
+                JujutsuBundle.message("bookmarks.panel.collapseall"),
+                null,
+                AllIcons.Actions.Collapseall
+            ) {
                 override fun actionPerformed(e: AnActionEvent) = treeExpander.collapseAll()
             }
         )

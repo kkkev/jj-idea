@@ -26,8 +26,17 @@ rules that supplement it.
   surface, and report a **Manual regression scope** — the `MT-*` section IDs to re-run,
   derived per contributing.md § Manual regression scope as a deliverable.
 - Follow contributing.md's End of Task Checklist before declaring work done.
-- **When the user says "finish"**, run in order: `./gradlew check` → update `CHANGELOG.md`
-  (add a user-facing entry under `[Unreleased]`) → if this finish is cutting a GitHub
-  Release, add a short sponsor line to the release body → `jj describe` (write a commit
-  message for the working-copy change) → `bd export -o .beads/issues.jsonl` →
-  `jj bookmark set master` → then stop and ask for permission before any `jj git push`.
+- **When the user says "finish"**, run in order: `./gradlew check --no-build-cache` (the
+  `--no-build-cache` is required — see contributing.md § End of Task Checklist for why a
+  plain `./gradlew check` can pass locally while the same code fails on GitHub Actions) →
+  update `CHANGELOG.md` (add a user-facing entry under `[Unreleased]`) → if this finish is
+  cutting a GitHub Release, add a short sponsor line to the release body → `jj describe`
+  (write a commit message for the working-copy change) → `bd export -o .beads/issues.jsonl`
+  → `jj bookmark set master` → then stop and ask for permission before any `jj git push`.
+- **Before pushing a stack of multiple new commits (not just the tip), verify CI health on
+  GitHub for each one that was already pushed independently, not just the final state.**
+  `./gradlew check` passing once at the end of a session does not prove every commit in
+  between is independently green — only that the tip is. If commits were pushed
+  incrementally without re-running `./gradlew check --no-build-cache` before each push,
+  check `gh run list --branch master --limit <n>` for each pushed SHA before assuming the
+  branch is healthy.

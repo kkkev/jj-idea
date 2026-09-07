@@ -597,6 +597,9 @@ class JjStub(override val workDir: Path) : JjBackend {
                         field("true") // present (all stub bookmarks are local)
                         field(name) // nameWithRemote (no remotes in stub)
                         field("false") // conflict (no conflicts in stub)
+                        field("true") // tracked (local bookmarks are always considered tracked)
+                        field("0") // aheadCount (no remotes in stub)
+                        field("0") // behindCount (no remotes in stub)
                         field(qualifiedChangeId(change))
                         field(if (change.immutable) "true" else "false") // immutable
                     }

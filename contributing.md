@@ -647,7 +647,15 @@ When making changes that affect users (features, fixes, behavior changes):
 
 ## End of Task Checklist
 
-1. **Verify quality**: `./gradlew check`. Fix failures before proceeding.
+1. **Verify quality**: `./gradlew check --no-build-cache`. Fix failures before proceeding.
+   The `--no-build-cache` is required, not optional: `~/.gradle/gradle.properties` enables
+   `org.gradle.caching=true` machine-wide so the two `jj-parallel-lanes` workspaces can share
+   compiled output, but the ktlint plugin's report-writing tasks key their build-cache entries
+   on inputs that don't fully disambiguate between the two project checkouts. A concurrent (or
+   merely recent) build in the other lane can silently poison this project's `build/reports/`
+   with a stale or foreign result — including a spurious PASS that would otherwise mask a real
+   CI failure. If `check` ever reports a violation whose file path doesn't start with this
+   project's own root, that's this poisoning, not a real bug — `rm -rf build .gradle` and rerun.
 2. **Update beads**: close completed issues (`bd close <id1> <id2> ...`, with a comment
    if non-trivial); file new issues (`bug`/`task`/`feature`) for anything left unresolved.
 3. **Manual verification**: state the exact `./gradlew runIde` smoke steps for any

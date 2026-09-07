@@ -210,7 +210,10 @@ private fun buildRepoNodes(
 }
 
 /** Sums [BookmarkRollup] contributions of every bookmark leaf reachable under [nodes]. */
-private fun rollupOf(nodes: List<BookmarkNode>): BookmarkRollup = nodes.fold(BookmarkRollup.EMPTY) { acc, n -> acc + n.leafRollup() }
+private fun rollupOf(nodes: List<BookmarkNode>): BookmarkRollup =
+    nodes.fold(BookmarkRollup.EMPTY) { acc, n ->
+        acc + n.leafRollup()
+    }
 
 private fun BookmarkNode.leafRollup(): BookmarkRollup = when (this) {
     is BookmarkNode.Local -> item.bookmark.toRollup()
