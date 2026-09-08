@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.ui.dnd.ZoneHysteresis
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -40,7 +41,12 @@ private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
 @RunInEdt
 class JujutsuLogTableDnDChipTest {
     private val project = projectFixture()
-    private val repo = mockk<JujutsuRepository>(relaxed = true)
+
+    // The bookmark/tag chip's jjref:// URI embeds repo.directory.path (LogEntryText.kt's
+    // refUri) - an unstubbed relaxed mock returns "", which makes that URI unparseable (its
+    // regex requires a non-empty repo-path segment) and every chip hit-test silently miss.
+    // Same stub JujutsuLogTableChipIssueLinkTest/LaidOutCellTest/LogClickTargetTest already use.
+    private val repo = mockk<JujutsuRepository>(relaxed = true).also { every { it.directory.path } returns "/repo" }
     private var table: JujutsuLogTable? = null
 
     @BeforeEach
@@ -79,12 +85,10 @@ class JujutsuLogTableDnDChipTest {
 
     /**
      * A point inside [row]'s bookmark/tag chip, found by scanning [table.clickTargetAt] itself
-     * from the cell's right edge leftward - decorations are right-aligned (jj-idea-w61m), but a
-     * fixed guessed offset (as [JujutsuLogTableBookmarkClickTest.bookmarkChipPoint] uses) isn't
-     * reliable here: that test's assertions are soft enough (cursor/null-notification checks)
-     * that a miss still looks like a pass, and CI's headless font metrics were found to place the
-     * chip differently than local runs, breaking a fixed "-5px" guess outright. Scanning against
-     * the real hit-test is exact under any font metrics.
+     * from the cell's right edge leftward, rather than guessing a fixed offset (as
+     * [JujutsuLogTableBookmarkClickTest.bookmarkChipPoint] does - safe there only because that
+     * file's assertions are soft enough that a miss still looks like a pass). Scanning against the
+     * real hit-test is exact regardless of a chip's actual rendered width.
      */
     private fun chipPoint(table: JujutsuLogTable, row: Int): Point {
         val col = table.convertColumnIndexToView(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
