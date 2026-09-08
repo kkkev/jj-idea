@@ -117,6 +117,18 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
+    override fun getLogHeads(revset: Revset): Result<List<ChangeId>> {
+        // Revset.Default means "omit -r, let jj's own revsets.log config decide" - there's no
+        // revset syntax to wrap an *implicit* default in heads(...), only an explicit one.
+        // Callers needing the frontier-cursor's heads seed must resolve to a concrete revset
+        // first (see UnifiedJujutsuLogDataLoader) and treat Default as the "can't page" case.
+        if (revset == Revset.Default) {
+            return Result.failure(VcsException("getLogHeads requires an explicit revset, not the default"))
+        }
+        val headsRevset = Expression("heads($revset)")
+        return getLog(logTemplates.changeIdOnlyTemplate, headsRevset)
+    }
+
     override fun getBookmarks() = getRefs("bookmark", logTemplates.bookmarkListTemplate) {
         executor.bookmarkList(it)
     }
@@ -268,9 +280,20 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     }
 
     private fun <T> parse(template: LogTemplate<T>, logOutput: String): List<T> {
-        val fields = logOutput.trim().split(FIELD_SEPARATOR)
+        val trimmed = logOutput.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val fields = trimmed.split(FIELD_SEPARATOR)
+        // Every field's spec appends its own "\0" (SingleField.spec), so raw output always ends
+        // with a NUL terminator - split() therefore always yields exactly one spurious trailing
+        // empty element, regardless of template width. Harmless for a multi-field template (the
+        // resulting incomplete last chunk already fails the size check below), but for a
+        // single-field template (recordSize == 1) that trailing "" is itself a syntactically
+        // *complete*, spurious extra record - relying on the size-coincidence to filter it out
+        // silently breaks at width 1. Drop it explicitly instead (jj-idea-2c8k, found via
+        // getLogHeads's changeIdOnlyTemplate - the first width-1 template).
+        val withoutTrailingSeparatorArtifact = if (fields.last().isEmpty()) fields.dropLast(1) else fields
         val recordSize = template.count
-        return fields
+        return withoutTrailingSeparatorArtifact
             .chunked(recordSize)
             .filter { it.size == recordSize }
             .map { chunk -> template.take(chunk.iterator()) }
@@ -410,6 +433,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val basicLogTemplateWithoutPushedAncestor = buildBasicTemplate(includePushedAncestor = false)
         val fullLogTemplate = buildFullTemplate(basicLogTemplate)
         val fullLogTemplateWithoutPushedAncestor = buildFullTemplate(basicLogTemplateWithoutPushedAncestor)
+
+        /** Just the (offset-qualified) change id — for [getLogHeads]'s frontier-seed query. */
+        val changeIdOnlyTemplate = logTemplate(changeId) { changeId.take(it) }
 
         fun fileChangeStatusFor(filePath: FilePath) = singleField<FileChange.Status>(
             "diff.files().filter(|e| e.path().display() == \"${filePath.toString().escapeJjString()}\")" +
