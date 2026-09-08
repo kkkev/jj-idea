@@ -7,7 +7,9 @@ import com.intellij.openapi.components.Storage
 import com.intellij.openapi.project.Project
 import com.intellij.util.xmlb.XmlSerializerUtil
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
 
 /**
@@ -107,6 +109,16 @@ class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
 
     fun logRevset(repo: JujutsuRepository): String =
         state.repositoryOverrides[repo.directory.path]?.logRevset ?: state.logRevset
+
+    /**
+     * [logRevset] resolved to an actual [Revset]: blank means "omit -r, let jj's own
+     * `revsets.log` config decide" ([Revset.Default]); anything else is an explicit
+     * [Expression]. Used by [in.kkkev.jjidea.ui.log.UnifiedJujutsuLogDataLoader]'s paged-loading
+     * path, which (unlike [in.kkkev.jjidea.jj.RepoLogCache.all]) needs the resolved [Revset]
+     * itself, not just the raw string, to seed and query [in.kkkev.jjidea.ui.log.PagedLogWindow].
+     */
+    fun resolvedLogRevset(repo: JujutsuRepository): Revset =
+        logRevset(repo).let { if (it.isBlank()) Revset.Default else Expression(it) }
 
     /**
      * Returns the ignored-file-scanning-disabled flag for a specific repository.

@@ -40,6 +40,7 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
         val passthroughs = HashSet<Passthrough<I>>()
         val passthroughLanesByEntry = HashMap<I, Map<I, Int>>(entries.size * 2)
         val reservedLanes = HashMap<I, Int>()
+        val elidedParentsByEntry = HashMap<I, Boolean>(entries.size * 2)
 
         // First pass: assign lanes, track children, manage passthroughs
         for ((rowIndex, entry) in entries.withIndex()) {
@@ -88,8 +89,13 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 // Parents not present in the loaded entry set (filtered/off-screen) get no
                 // lane/passthrough bookkeeping at all — a passthrough or reservation for
                 // them would never be terminated/consumed (their row never gets processed),
-                // leaking a lane for the rest of the graph.
-                val parentRow = rowByChangeId[parentId] ?: continue
+                // leaking a lane for the rest of the graph. Record that this entry has one,
+                // though (RowLayout.hasElidedParents), so a renderer can tell "off-screen
+                // parent" apart from "true root" instead of the two looking identical.
+                val parentRow = rowByChangeId[parentId] ?: run {
+                    elidedParentsByEntry[entry.current] = true
+                    continue
+                }
                 val isAdjacent = parentRow == rowIndex + 1
 
                 operationCount += childrenByParent[parentId]?.size ?: 0
@@ -141,8 +147,9 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 ?: emptyList()
             val parentLanes = entry.parents.mapNotNull { lanes[it] }
             val entryPassthroughLanes = passthroughLanesByEntry[entry.current] ?: emptyMap()
+            val hasElidedParents = elidedParentsByEntry[entry.current] ?: false
 
-            RowLayout(entry.current, lane, childLanes, parentLanes, entryPassthroughLanes)
+            RowLayout(entry.current, lane, childLanes, parentLanes, entryPassthroughLanes, hasElidedParents)
         }
 
         return GraphLayout(rows)

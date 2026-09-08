@@ -584,4 +584,45 @@ class LayoutCalculatorTest {
         layout.rows[3].lane shouldBe 2 // P3
         layout.rows[4].lane shouldBe 3 // P4
     }
+
+    // jj-idea-2c8k: hasElidedParents distinguishes "true root" from "parent not currently
+    // loaded" (a page/window boundary, or a bounded context/search expansion) - see
+    // docs/design/jj-idea-2c8k-paged-log-loading.md § "Graph rendering at page/window
+    // boundaries." Both previously rendered identically (no connector at all).
+    @Test
+    fun `a row whose parent is absent from the loaded set is flagged hasElidedParents, unlike a true root`() {
+        val entries = listOf(
+            GraphEntry(A, listOf("not-loaded")), // A's parent isn't in the loaded set
+            GraphEntry(B, emptyList()) // B is a genuine root - no parent at all
+        )
+        val layout = calculator.calculate(entries)
+
+        layout.rows[0].hasElidedParents shouldBe true
+        layout.rows[0].parentLanes shouldBe emptyList() // unchanged: still no lane for the elided parent
+        layout.rows[1].hasElidedParents shouldBe false
+    }
+
+    @Test
+    fun `a row with all parents loaded is not flagged, even with multiple parents`() {
+        val entries = listOf(
+            GraphEntry(A, listOf(B, C)),
+            GraphEntry(B, emptyList()),
+            GraphEntry(C, emptyList())
+        )
+        val layout = calculator.calculate(entries)
+
+        layout.rows[0].hasElidedParents shouldBe false
+    }
+
+    @Test
+    fun `a merge with one loaded and one elided parent is flagged`() {
+        val entries = listOf(
+            GraphEntry(A, listOf(B, "not-loaded")),
+            GraphEntry(B, emptyList())
+        )
+        val layout = calculator.calculate(entries)
+
+        layout.rows[0].hasElidedParents shouldBe true
+        layout.rows[0].parentLanes shouldBe listOf(0) // the loaded parent (B) still gets its lane
+    }
 }

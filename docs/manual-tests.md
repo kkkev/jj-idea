@@ -333,9 +333,10 @@ handler — commit-onto-commit rebase — so gestures other than that one still 
       FX-STRESS; set Settings → Version Control → Jujutsu → Log Limit to 200 so several
       branches fall out of view; apply an author or date filter to shrink the visible set
       further; confirm tree lines never cross over unrelated commits or share a lane
-      (dropped edges to filtered-out ancestors are expected and tracked separately as
-      `jj-idea-hlu3`, not a bug here); clear the filter and confirm the graph restores
-      immediately without a manual Refresh
+      (a commit whose parent is filtered out shows a wiggly line down from its circle
+      instead of a real connector — jj-idea-2c8k's minimal stub; a true nearest-visible-
+      ancestor connector is still tracked separately as `jj-idea-hlu3`, not a bug here);
+      clear the filter and confirm the graph restores immediately without a manual Refresh
 - [ ] Hovering that row's tooltip lists every bookmark, including the ones collapsed
       behind "+N more" (jj-idea-w61m), wrapping the bookmark list across multiple lines
       and showing the full description without being clipped by the screen edge; if the
@@ -639,6 +640,51 @@ alongside one other repo works.
 - [ ] jj-idea-c4tp: open a large repo's log, click Refresh, then close the project while it is
       still loading → project closes promptly (no multi-minute stall); idea.log shows the load
       being cancelled rather than running to completion
+
+#### Paged log loading (jj-idea-2c8k, GitHub #69, early access)
+
+**Code:** `ui/log/PagedLogWindow.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt`,
+`ui/common/CommitTablePanel.kt`, `ui/log/graph/LayoutCalculator.kt`
+
+See docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated (and
+not-yet-validated) boundaries. Enable via Settings → Version Control → Jujutsu → Log →
+"Load log in pages (early access)". Use FX-STRESS's `SCALE=6 WITH_REMOTE=1` fixture
+(`jj-stress-test`, ~5,952 commits) for a repo large enough that the difference from the
+non-paged behavior is perceptible.
+
+- [ ] With the flag **on**, open the log: loads fast, showing the first page (page size = the
+      "Changes to show" setting); the status strip below the table stays hidden the whole time
+      (no "Showing N changes" message in this mode — the scrollbar already says there's more)
+- [ ] On a wide multi-branch repo (e.g. FX-STRESS), rows whose parent didn't make it into any
+      loaded page show a wiggly line down from the commit circle instead of nothing (which would
+      look like a true root) — same treatment as the filtering case above
+- [ ] Scroll to the bottom of the loaded rows: more history loads in automatically before you
+      reach the literal end (eager one-page-ahead prefetch); scrolling repeatedly keeps loading
+      further pages at a consistent, flat pace — not slowing down page over page; the viewport
+      stays where you scrolled to (does not jump back up to the selected/`@` row) each time a new
+      page loads
+- [ ] Right-click → **New Change** (or **Describe**, **Squash**, **Abandon**): appears/updates
+      at the top effectively immediately, regardless of how many pages you've scrolled through
+- [ ] After scrolling several pages deep, perform a write near `@`: still fast, and the
+      previously-scrolled-to deeper pages remain visible/unaffected
+- [ ] Perform a write whose effect lands on a commit deep in history you haven't scrolled to
+      (e.g. move a bookmark via a picker to an off-screen commit): it's still found/selected
+      correctly (falls back to the existing loadContext/GitHub #76 mechanism), even though
+      slower than the common case
+- [ ] After scrolling several pages deep, click toolbar **Refresh**: confirm the scroll depth /
+      total loaded row count is preserved (not collapsed back to one page), and total time is
+      proportional to pages loaded, not instant (deliberate — Explicit Refresh re-verifies
+      everything currently loaded, it doesn't just reload page 1)
+- [ ] Toggle the flag **off**: behavior reverts to today's full-reload shape (confirms the flag
+      actually gates the new code path), including the status strip reappearing with the old
+      "Showing N of limit — change the limit in Settings" message once the log is truncated
+- [ ] Click a bookmark/reference filter entry that's currently off-screen (explicit navigation,
+      not a data refresh): the viewport still scrolls to make it visible, unlike the loadMore
+      case above — confirms the scroll-suppression fix didn't break real navigation
+- [ ] Raise "Changes to show" to a large value (e.g. 5,000) with the flag on: the *first* page
+      load and each subsequent scroll-triggered page cost what a fetch of that size costs, but a
+      write near `@` stays fast (post-write refresh only ever touches page 1, independent of
+      page size)
 
 ### MT-CTXMENU
 

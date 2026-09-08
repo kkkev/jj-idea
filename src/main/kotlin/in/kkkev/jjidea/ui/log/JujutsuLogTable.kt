@@ -573,7 +573,7 @@ class JujutsuLogTable(
         }
         logModel.setEntries(entries)
         pendingSelection?.let {
-            if (selectEntry(it.repo, it.revision)) {
+            if (selectEntry(it.repo, it.revision, scrollIntoView = pendingSelectionIsExplicit)) {
                 pendingSelection = null
                 expansionPending = false
                 // pendingSelectionIsExplicit stays true: if a concurrent loadCommits later
@@ -600,13 +600,19 @@ class JujutsuLogTable(
     }
 
     /**
-     * Select an entry in the table by repo and revision, scrolling it into view.
+     * Select an entry in the table by repo and revision, optionally scrolling it into view.
      * Matches by repo to ensure correct selection in multi-root.
      *
      * @param repo The repository containing the entry
      * @param revision The revision to select ([ChangeId] or [WorkingCopy])
+     * @param scrollIntoView Whether to scroll the row into view once selected. Defaults to `true`
+     * for explicit navigation ([requestSelection]). [setEntries] passes `false` when merely
+     * carrying an unchanged selection through a data refresh (e.g. jj-idea-2c8k's `loadMore()`),
+     * so that a selection the user isn't actively navigating to doesn't yank the viewport back to
+     * it - found via manual testing where scrolling to trigger a new page jumped the viewport back
+     * up to the still-selected `@` every time.
      */
-    private fun selectEntry(repo: JujutsuRepository, revision: Revision): Boolean {
+    private fun selectEntry(repo: JujutsuRepository, revision: Revision, scrollIntoView: Boolean = true): Boolean {
         val rowIndex = when (revision) {
             is ChangeId -> (0 until logModel.rowCount).firstOrNull { row ->
                 val entry = logModel.getEntry(row)
@@ -625,7 +631,9 @@ class JujutsuLogTable(
         } ?: return false
 
         setRowSelectionInterval(rowIndex, rowIndex)
-        scrollRectToVisible(rowRectPreservingHorizontalScroll(getCellRect(rowIndex, 0, true), visibleRect))
+        if (scrollIntoView) {
+            scrollRectToVisible(rowRectPreservingHorizontalScroll(getCellRect(rowIndex, 0, true), visibleRect))
+        }
         log.info("Selected entry at row $rowIndex ($repo:$revision)")
         return true
     }

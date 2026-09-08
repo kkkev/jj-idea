@@ -19,11 +19,14 @@ import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.LazyActionById
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.preview.PreviewEntitlement
+import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
+import java.awt.Point
 import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.JComponent
@@ -155,10 +158,36 @@ abstract class CommitTablePanel<D>(
         add(createToolbar(), BorderLayout.NORTH)
 
         // Add table scroll pane in the center
-        add(ScrollPaneFactory.createScrollPane(logTable), BorderLayout.CENTER)
+        add(createLogScrollPane(), BorderLayout.CENTER)
 
         // Add status bar at the bottom (hidden by default)
         add(statusBar, BorderLayout.SOUTH)
+    }
+
+    /**
+     * Scroll pane for [logTable], with a "load more" trigger for jj-idea-2c8k's paged log
+     * loading — no-op ([in.kkkev.jjidea.ui.common.DataLoader.loadMore]'s default) for loaders
+     * that don't page. Listens on the *viewport* itself (not the scrollbar's `BoundedRangeModel`
+     * — the viewport's own change event guarantees `viewPosition`/`extentSize` already reflect
+     * the new state when the listener runs, where the scrollbar model's isn't guaranteed to have
+     * been synced to the viewport yet). Fires on scrolling *and* on the table growing after a
+     * previous [DataLoader.loadMore] completes — the same listener naturally re-checks both —
+     * once the last visible row is within one page size of what's loaded, so the next page is
+     * fetched before the user reaches the bottom rather than after — see
+     * docs/design/jj-idea-2c8k-paged-log-loading.md § "When to load more".
+     */
+    private fun createLogScrollPane() = ScrollPaneFactory.createScrollPane(logTable).also { scrollPane ->
+        scrollPane.viewport.addChangeListener {
+            val viewport = scrollPane.viewport
+            val lastVisibleRow = logTable.rowAtPoint(
+                Point(0, viewport.viewPosition.y + viewport.extentSize.height - 1)
+            )
+            if (lastVisibleRow < 0) return@addChangeListener
+            val pageSize = JujutsuSettings.getInstance(project).state.logChangeLimit
+            if (lastVisibleRow >= logTable.rowCount - pageSize) {
+                dataLoader.loadMore()
+            }
+        }
     }
 
     private fun createToolbar() = JPanel(BorderLayout()).apply {
@@ -320,7 +349,7 @@ abstract class CommitTablePanel<D>(
     ) {
         override fun actionPerformed(e: AnActionEvent) {
             log.info("Refresh action triggered")
-            dataLoader.refresh()
+            dataLoader.forceRefresh()
         }
     }
 
@@ -515,9 +544,20 @@ abstract class CommitTablePanel<D>(
     }
 
     /**
-     * Update the status bar to indicate when the log is truncated by the limit.
+     * Update the status bar to indicate when the log is truncated by a hard limit and offer a
+     * way to raise it. With jj-idea-2c8k's paged loading enabled, more history is always just a
+     * scroll away, so there is nothing useful to say here - the scrollbar itself already
+     * communicates "there's more," and a permanent "showing N changes" strip below the table was
+     * found to be pointless noise in manual testing; the status bar stays hidden entirely in that
+     * mode. [limit] is the *page size* in paged mode, not a true total cap (more loads on demand —
+     * see [in.kkkev.jjidea.ui.log.PagedLogWindow]), which is exactly why the truncation message
+     * below (written for the non-paged, hard-limit case) would be actively wrong there.
      */
     protected fun updateStatusBar(entryCount: Int, limit: Int) {
+        if (PreviewEntitlement.getInstance().isEnabled(PreviewFeature.PAGED_LOG_LOAD)) {
+            statusBar.isVisible = false
+            return
+        }
         if (entryCount < limit) {
             statusBar.isVisible = false
             return
@@ -621,6 +661,15 @@ abstract class CommitTablePanel<D>(
     /**
      * Refresh the file history. Clears any active navigation-expansion so the log returns
      * to the configured revset/limit view.
+     *
+     * Bound to [in.kkkev.jjidea.jj.JujutsuStateModel.logRefresh] (`UnifiedJujutsuLogPanel`'s
+     * `setupStateListener`), which fires after **every write**, not just an explicit user
+     * Refresh click — so this must call [in.kkkev.jjidea.ui.common.DataLoader.refresh] (the
+     * cheap, page-1-only path for a paged loader), not [in.kkkev.jjidea.ui.common.DataLoader
+     * .forceRefresh] (paged re-verification of every loaded page). Calling `forceRefresh()`
+     * here would fire it after every single write, defeating the entire point of jj-idea-2c8k
+     * (GitHub #69) — found via manual testing after this bug shipped. The toolbar's explicit
+     * Refresh action (below) is the only caller that should use `forceRefresh()`.
      */
     fun refresh() {
         log.info("Refreshing log entries")

@@ -69,4 +69,15 @@ interface LogService {
      * @return List of tags with their associated change IDs
      */
     fun getTags(): Result<List<TagItem>>
+
+    /**
+     * Get the heads (commits with no children) of [revset] — the seed for
+     * [in.kkkev.jjidea.ui.log.UnifiedJujutsuLogDataLoader]'s paged-loading frontier cursor. A single,
+     * cheap, unrestricted query (independent of repo size) so the frontier's completeness invariant
+     * — every branch has a guaranteed entry point — holds from the first page. See
+     * docs/design/jj-idea-2c8k-paged-log-loading.md for the full mechanism.
+     * @param revset Revset to compute heads of (default: "all()")
+     * @return List of change IDs at the heads of [revset], in jj's own returned order
+     */
+    fun getLogHeads(revset: Revset = Expression.ALL): Result<List<ChangeId>>
 }

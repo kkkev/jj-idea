@@ -5,6 +5,7 @@ import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.util.measurePerf
+import `in`.kkkev.jjidea.util.splitByComma
 import `in`.kkkev.jjidea.vcs.getChildPath
 import kotlinx.datetime.Instant
 import org.jetbrains.annotations.TestOnly
@@ -552,6 +553,3 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         internal fun resetBackendCapabilityCache() = pushedAncestorUnsupported.clear()
     }
 }
-
-fun <T> String.splitByComma(transform: (String) -> T) =
-    if (this.isEmpty()) emptyList() else this.split(",").map(transform)

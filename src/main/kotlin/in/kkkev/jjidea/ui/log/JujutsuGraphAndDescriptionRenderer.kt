@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.components.*
 import java.awt.*
+import java.awt.geom.Path2D
 import java.net.URI
 import javax.swing.JPanel
 import javax.swing.JTable
@@ -38,6 +39,8 @@ class JujutsuGraphAndDescriptionRenderer(
         private val ROW_HEIGHT = JBValue.UIInteger("Jujutsu.Graph.rowHeight", 22)
         private val COMMIT_RADIUS = JBValue.UIInteger("Jujutsu.Graph.commitRadius", 4)
         internal val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Graph.horizontalPadding", 4)
+        private val ELIDED_WAVE_AMPLITUDE = JBValue.UIInteger("Jujutsu.Graph.elidedWaveAmplitude", 2)
+        private val ELIDED_WAVE_LENGTH = JBValue.UIInteger("Jujutsu.Graph.elidedWaveLength", 6)
 
         // Lane colors - must match CommitGraphBuilder colors for consistent coloring
         private val LANE_COLORS =
@@ -54,6 +57,18 @@ class JujutsuGraphAndDescriptionRenderer(
 
         /** Get the color for a specific lane */
         fun colorForLane(lane: Int) = LANE_COLORS[lane % LANE_COLORS.size]
+
+        /**
+         * True when [node] draws no downward connector at all (no parent is in the loaded page)
+         * but isn't actually a repository root - the case that should get a wiggly elided-parent
+         * stub instead of silently looking like history just stops here (jj-idea-2c8k round 3;
+         * see also jj-idea-hlu3/jj-idea-xi58 for the fuller nearest-visible-ancestor treatment).
+         * A mixed merge (one parent loaded, one elided) already draws a real connector in
+         * [GraphNode.lane], so it's deliberately excluded here - handling it needs a free lane
+         * for the stub, left to jj-idea-hlu3.
+         */
+        internal fun shouldDrawElidedStub(node: GraphNode): Boolean =
+            node.hasElidedParents && node.parentLanes.isEmpty()
     }
 
     /** Lazily computed per-row passthrough lanes derived from entries' passthroughLanes */
@@ -261,7 +276,34 @@ class JujutsuGraphAndDescriptionRenderer(
             val commitY = height / 2
 
             drawLinesToParents(g2d, node, commitX, commitY, row, startX, laneWidth)
+            if (shouldDrawElidedStub(node)) drawElidedParentStub(g2d, node, commitX, commitY)
             drawCommitCircle(g2d, node, commitX, commitY)
+        }
+
+        /**
+         * Draws a continuous wiggly line from just below the commit circle to the row's bottom
+         * edge, indicating "history continues here but hasn't loaded" rather than a true root -
+         * echoing the `~` jj uses for elision in `jj log`, but as an unbroken wave instead of a
+         * dash pattern (jj-idea-2c8k). Stays within [node]'s own lane so [textStartX] and
+         * [JujutsuLogTableRenderers.graphTextStartX]'s column-width math are unaffected.
+         */
+        private fun drawElidedParentStub(g2d: Graphics2D, node: GraphNode, commitX: Int, commitY: Int) {
+            val commitRadius = COMMIT_RADIUS.get()
+            val amplitude = ELIDED_WAVE_AMPLITUDE.get().toFloat()
+            val wavelength = ELIDED_WAVE_LENGTH.get().toFloat()
+            val startY = commitY + commitRadius
+
+            val path = Path2D.Float()
+            path.moveTo(commitX.toDouble(), startY.toDouble())
+            var y = startY
+            while (y <= height) {
+                val x = commitX + amplitude * kotlin.math.sin(2 * Math.PI.toFloat() * (y - startY) / wavelength)
+                path.lineTo(x.toDouble(), y.toDouble())
+                y++
+            }
+
+            g2d.color = node.color
+            g2d.draw(path)
         }
 
         private fun drawPassThroughLines(g2d: Graphics2D, graphStartX: Int, laneWidth: Int) {
