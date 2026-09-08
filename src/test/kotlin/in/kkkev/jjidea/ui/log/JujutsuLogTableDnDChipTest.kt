@@ -77,13 +77,24 @@ class JujutsuLogTableDnDChipTest {
         return table
     }
 
-    /** A point over the graph+description cell, right at its right edge - where a lone chip
-     * renders (jj-idea-w61m: decorations are right-aligned), mirroring
-     * [JujutsuLogTableBookmarkClickTest.bookmarkChipPoint]. */
+    /**
+     * A point inside [row]'s bookmark/tag chip, found by scanning [table.clickTargetAt] itself
+     * from the cell's right edge leftward - decorations are right-aligned (jj-idea-w61m), but a
+     * fixed guessed offset (as [JujutsuLogTableBookmarkClickTest.bookmarkChipPoint] uses) isn't
+     * reliable here: that test's assertions are soft enough (cursor/null-notification checks)
+     * that a miss still looks like a pass, and CI's headless font metrics were found to place the
+     * chip differently than local runs, breaking a fixed "-5px" guess outright. Scanning against
+     * the real hit-test is exact under any font metrics.
+     */
     private fun chipPoint(table: JujutsuLogTable, row: Int): Point {
         val col = table.convertColumnIndexToView(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
         val cellRect = table.getCellRect(row, col, false)
-        return Point(cellRect.x + cellRect.width - 5, cellRect.y + cellRect.height / 2)
+        val y = cellRect.y + cellRect.height / 2
+        for (x in (cellRect.x + cellRect.width - 1) downTo cellRect.x) {
+            val point = Point(x, y)
+            if (table.clickTargetAt(point).let { it is BookmarkClick || it is TagClick }) return point
+        }
+        error("No bookmark/tag chip found in row $row")
     }
 
     private fun rowStartPoint(table: JujutsuLogTable, row: Int): Point {
