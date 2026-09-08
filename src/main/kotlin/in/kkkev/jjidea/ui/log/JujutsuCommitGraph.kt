@@ -33,7 +33,9 @@ data class GraphNode(
     val childLanes: List<Int> = emptyList(),
     val passthroughLanes: Map<ChangeKey, Int> = emptyMap(),
     /** Optional row highlight for preview (e.g., source/destination highlighting in rebase dialog). */
-    val highlightColor: Color? = null
+    val highlightColor: Color? = null,
+    /** See [in.kkkev.jjidea.ui.log.graph.RowLayout.hasElidedParents]. */
+    val hasElidedParents: Boolean = false
 )
 
 /**
@@ -94,7 +96,8 @@ class CommitGraphBuilder {
                     color = colorForLane(row.lane),
                     parentLanes = row.parentLanes,
                     childLanes = row.childLanes,
-                    passthroughLanes = row.passthroughLanes
+                    passthroughLanes = row.passthroughLanes,
+                    hasElidedParents = row.hasElidedParents
                 )
             }
         }

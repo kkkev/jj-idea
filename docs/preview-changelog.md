@@ -13,6 +13,13 @@ verbatim at GA, condensed into a handful of user-facing bullets.
 
 - Added a "Preview features" section to Settings, gated behind an access code, for trying
   unfinished features early.
+- Load log in pages: the log now loads a page at a time instead of reloading the whole
+  configured limit on every change, so operations like New Change stay fast regardless of how
+  much history is loaded, and scrolling loads more history on demand. Off by default.
+- Load log in pages: scrolling to load more history no longer jumps the viewport back up to the
+  current selection.
+- Load log in pages: removed the "Showing N changes — scroll for more" status message — there's
+  nothing useful left to say once scrolling always loads more.
 - Drag and Drop: dragging a commit onto another commit now rebases it there — drop on the middle
   of a row to rebase onto it, or near the top/bottom edge to insert it just after/before that
   commit. Applies immediately, with an Undo option in the notification that appears.
