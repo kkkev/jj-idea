@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.actions.bookmark
 
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.VcsException
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -12,6 +13,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.jj.commandResult
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -126,5 +128,71 @@ class MoveBookmarkDirectionTest {
         result.find { it.first.id.full == "ancestorfull" }!!.second shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
         // Candidate ids must never appear on the revset - only the bookmark's current position does.
         revsetUsed().toString() shouldBe "currentfull::"
+    }
+
+    /**
+     * jj-idea-27b4: a failed ancestor-revset query (e.g. a stale workspace) used to be silently
+     * swallowed into `emptySet()`, misclassifying every candidate - including genuinely forward
+     * ones - as backward/sideways. It must now throw instead, so the caller can offer the
+     * stale-workspace remedy rather than showing the wrong direction.
+     */
+    @Test
+    fun `MoveBookmarkDialog throws instead of defaulting to backward when the ancestor query fails`() {
+        val target = changeId("targetfull")
+        val ancestorBookmark = BookmarkItem(Bookmark("main"), changeId("ancestorfull"))
+
+        val executor = object : CommandExecutor by mockk(relaxed = true) {
+            override fun log(
+                revset: Revset,
+                template: String?,
+                filePaths: List<FilePath>,
+                limit: Int?,
+                quiet: Boolean
+            ): CommandExecutor.CommandResult = commandResult(1, "", "Error: Could not read working copy's operation.")
+        }
+
+        val logService = mockk<LogService>()
+        every { logService.getBookmarks() } returns Result.success(listOf(ancestorBookmark))
+
+        val repo = mockk<JujutsuRepository>()
+        every { repo.commandExecutor } returns executor
+        every { repo.logService } returns logService
+
+        shouldThrow<VcsException> { MoveBookmarkDialog.loadData(repo, target) }
+    }
+
+    /**
+     * jj-idea-27b4: same fix as above, for [MoveBookmarkToChangeDialog]'s descendant-revset query.
+     */
+    @Test
+    fun `MoveBookmarkToChangeDialog throws instead of defaulting to backward when the descendant query fails`() {
+        val currentId = changeId("currentfull")
+        val bookmark = Bookmark("main")
+        val bookmarkItem = BookmarkItem(bookmark, currentId)
+
+        val repo = mockk<JujutsuRepository>()
+        fun entry(full: String) = LogEntry(repo, changeId(full), CommitId(full), "desc")
+
+        val executor = object : CommandExecutor by mockk(relaxed = true) {
+            override fun log(
+                revset: Revset,
+                template: String?,
+                filePaths: List<FilePath>,
+                limit: Int?,
+                quiet: Boolean
+            ): CommandExecutor.CommandResult = commandResult(1, "", "Error: Could not read working copy's operation.")
+        }
+
+        val logService = mockk<LogService>()
+        every { logService.getBookmarks() } returns Result.success(listOf(bookmarkItem))
+
+        val logCache = mockk<LogCache>()
+        every { logCache.all } returns listOf(entry("descfull"), entry("ancestorfull"))
+
+        every { repo.commandExecutor } returns executor
+        every { repo.logService } returns logService
+        every { repo.logCache } returns logCache
+
+        shouldThrow<VcsException> { MoveBookmarkToChangeDialog.loadData(repo, bookmark) }
     }
 }

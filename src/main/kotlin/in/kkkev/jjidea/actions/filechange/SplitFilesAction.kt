@@ -12,13 +12,15 @@ import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
+import `in`.kkkev.jjidea.jj.whenWorkingCopyAvailable
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
 /** Resolves the [LogEntry] a file-change split action should operate on. */
-internal fun resolveSplitEntry(e: AnActionEvent): LogEntry? = e.logEntry ?: e.singleRepoForFiles?.workingCopy
+internal fun resolveSplitEntry(e: AnActionEvent): LogEntry? =
+    e.logEntry ?: e.singleRepoForFiles?.whenWorkingCopyAvailable { it }
 
 /**
  * Shared implementation for the two file-change split entry points ([SplitFilesAction] and
@@ -29,7 +31,7 @@ internal fun resolveSplitEntry(e: AnActionEvent): LogEntry? = e.logEntry ?: e.si
  * KDoc for the semantic difference).
  */
 internal fun performFileSplit(project: Project, entry: LogEntry, selectedFiles: Set<FilePath>, newParent: Boolean) {
-    runInBackground {
+    entry.repo.runRecoverableInBackground(retry = { performFileSplit(project, entry, selectedFiles, newParent) }) {
         val changes = ChangeService.loadChanges(entry)
 
         runLater {

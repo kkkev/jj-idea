@@ -8,18 +8,19 @@ import `in`.kkkev.jjidea.actions.bookmarkTarget
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
 /** Runs `jj bookmark untrack`/`track`. Shared by [toggleTrackBookmarkAction] and [ToggleTrackBookmarkAction]. */
 internal fun performToggleTrack(repo: JujutsuRepository, bookmark: Bookmark) {
     if (bookmark.tracked) {
-        repo.commandExecutor.createCommand { bookmarkUntrack(bookmark.name) }
+        repo.createCommand { bookmarkUntrack(bookmark.name) }
             .onSuccess { repo.invalidate() }
             .onFailure { tellUser(repo.project, "action.bookmark.untrack.error") }
             .executeAsync()
     } else {
-        repo.commandExecutor.createCommand { bookmarkTrack(listOf(bookmark.name)) }
+        repo.createCommand { bookmarkTrack(listOf(bookmark.name)) }
             .onSuccess { repo.invalidate() }
             .onFailure { tellUser(repo.project, "action.bookmark.track.error") }
             .executeAsync()

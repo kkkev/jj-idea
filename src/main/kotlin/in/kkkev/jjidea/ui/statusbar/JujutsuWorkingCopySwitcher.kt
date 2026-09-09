@@ -82,16 +82,14 @@ object JujutsuWorkingCopySwitcher {
                     runLater {
                         when (chooseSwitchMode(project, resolved)) {
                             SwitchMode.EDIT -> {
-                                repo.commandExecutor
-                                    .createCommand { edit(resolved.commitId) }
+                                repo.createCommand { edit(resolved.commitId) }
                                     .onSuccess { repo.invalidate(select = resolved.commitId, vfsChanged = true) }
                                     .onFailure { tellUser(project, "statusbar.switch.edit.error") }
                                     .executeAsync()
                             }
 
                             SwitchMode.NEW -> {
-                                repo.commandExecutor
-                                    .createCommand { new(Description.EMPTY, listOf(resolved.commitId)) }
+                                repo.createCommand { new(Description.EMPTY, listOf(resolved.commitId)) }
                                     .onSuccess { repo.invalidate(select = WorkingCopy, vfsChanged = true) }
                                     .onFailure { tellUser(project, "statusbar.switch.new.error") }
                                     .executeAsync()

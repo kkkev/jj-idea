@@ -322,6 +322,16 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     fun unreadableRepositories(): List<JujutsuRepository> =
         initialisedRepositories.value.values.filter { JujutsuRepositoryHealth.isUnreadable(it.directory.path) }
 
+    /**
+     * Like [unreadableRepositories], but paired with *why* — jj-idea-b65g, so the Working Copy
+     * tool window's empty state can offer "Update Stale Workspace" instead of the generic
+     * "Retry" when every unreadable repo is merely stale.
+     */
+    fun unhealthyRepositories(): List<Pair<JujutsuRepository, RepositoryHealth>> =
+        initialisedRepositories.value.values.mapNotNull { repo ->
+            JujutsuRepositoryHealth.healthFor(repo.directory.path)?.let { repo to it }
+        }
+
     private fun scheduleRepositoryRefresh() {
         repositoryStateAlarm.cancelAllRequests()
         repositoryStateAlarm.addRequest({
@@ -602,7 +612,8 @@ internal fun loadWorkingCopies(
     project: Project,
     repos: Collection<JujutsuRepository>,
     log: Logger,
-    notifyUnreadable: (Project, JujutsuRepository, String) -> Unit = JujutsuNotifications::notifyUnreadableRoot
+    notifyUnreadable: (Project, JujutsuRepository, RepositoryHealth) -> Unit =
+        JujutsuNotifications::notifyUnreadableRoot
 ) = repos.mapNotNull { repo ->
     try {
         repo.logCache[WorkingCopy].also {
@@ -614,8 +625,9 @@ internal fun loadWorkingCopies(
         }
     } catch (e: VcsException) {
         log.warn("Could not read working copy for ${repo.directory.path}", e)
-        JujutsuRepositoryHealth.markUnreadable(repo.directory.path, e.message.orEmpty())
-        notifyUnreadable(project, repo, e.message.orEmpty())
+        val health = classifyRepositoryFailure(e.message.orEmpty())
+        JujutsuRepositoryHealth.mark(repo.directory.path, health)
+        notifyUnreadable(project, repo, health)
         null
     }
 }.associateBy { it.repo.directory.path }

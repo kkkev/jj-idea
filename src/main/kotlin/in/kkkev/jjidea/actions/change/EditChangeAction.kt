@@ -8,6 +8,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 
 /**
@@ -41,8 +42,7 @@ class EditChangeAction : DumbAwareAction(
         val jujutsuRoot = target.repo
         val id = target.id
 
-        jujutsuRoot.commandExecutor
-            .createCommand { edit(id) }
+        jujutsuRoot.createCommand { edit(id) }
             .onSuccess {
                 // The edited change becomes the working copy - select it
                 jujutsuRoot.invalidate(select = id, vfsChanged = true)

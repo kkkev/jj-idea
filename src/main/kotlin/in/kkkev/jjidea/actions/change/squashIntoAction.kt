@@ -10,14 +10,15 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
 import `in`.kkkev.jjidea.ui.squash.SquashIntoSpec
 import `in`.kkkev.jjidea.ui.squash.SquashMode
 import `in`.kkkev.jjidea.ui.squash.loadSquashFileData
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.relativeTo
@@ -36,15 +37,18 @@ fun squashIntoAction(
     repo: JujutsuRepository?,
     sources: List<LogEntry>
 ) = nullAndDumbAwareAction(repo, "log.action.squash.into", JujutsuIcons.Squash) {
-    runInBackground {
-        val changes = ChangeService.loadChanges(sources)
-        runLater {
-            val dialog = SquashIntoDialog(project, target, SquashMode.PickDestination(sources), changes)
-            if (!dialog.showAndGet()) return@runLater
-            val spec = dialog.result ?: return@runLater
-            executeSquashInto(project, target, sources, spec)
+    fun openDialog() {
+        target.runRecoverableInBackground(retry = ::openDialog) {
+            val changes = ChangeService.loadChanges(sources)
+            runLater {
+                val dialog = SquashIntoDialog(project, target, SquashMode.PickDestination(sources), changes)
+                if (!dialog.showAndGet()) return@runLater
+                val spec = dialog.result ?: return@runLater
+                executeSquashInto(project, target, sources, spec)
+            }
         }
     }
+    openDialog()
 }
 
 /**
@@ -80,18 +84,17 @@ private fun executeSquashIntoFilePaths(
     val workingCopyIsSource = sources.any { it.isWorkingCopy }
     val deleteAndMove = spec.deleteEmptyAndMoveWorkingCopy
     val editDestinationAfter = workingCopyIsSource && deleteAndMove
-    repo.commandExecutor
-        .createCommand {
-            val result = squashInto(
-                spec.sources,
-                spec.destination,
-                spec.filePaths,
-                spec.description,
-                keepEmptied = !deleteAndMove
-            )
-            if (result !is CommandExecutor.CommandResult.Success) return@createCommand result
-            if (editDestinationAfter) edit(spec.destination) else result
-        }
+    repo.createCommand {
+        val result = squashInto(
+            spec.sources,
+            spec.destination,
+            spec.filePaths,
+            spec.description,
+            keepEmptied = !deleteAndMove
+        )
+        if (result !is CommandExecutor.CommandResult.Success) return@createCommand result
+        if (editDestinationAfter) edit(spec.destination) else result
+    }
         .onSuccess {
             val selectId: Revision = if (deleteAndMove) spec.destination else sources.first().id
             repo.invalidate(select = selectId, vfsChanged = true)
@@ -119,7 +122,9 @@ private fun executeSquashIntoInteractive(
     val deleteAndMove = spec.deleteEmptyAndMoveWorkingCopy
     val editDestinationAfter = workingCopyIsSource && deleteAndMove
 
-    runInBackground {
+    repo.runRecoverableInBackground(
+        retry = { executeSquashIntoInteractive(project, repo, sources, spec, hunkSelection) }
+    ) {
         val perFileContent = hunkSelection.buildPerFileContent().toMutableMap()
 
         // The dialog's preview cache is populated lazily (only for files the user clicked to

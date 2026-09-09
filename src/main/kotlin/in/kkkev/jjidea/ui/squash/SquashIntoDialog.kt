@@ -13,12 +13,12 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.diffedit.HunkPickerLabels
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.*
 import `in`.kkkev.jjidea.ui.components.CommitPickerPanel
 import `in`.kkkev.jjidea.ui.components.DescriptionEditor
 import `in`.kkkev.jjidea.ui.rebase.RebaseSimulator
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
@@ -467,7 +467,7 @@ class SquashIntoDialog(
             fileSelection.setChanges(emptyList())
             return
         }
-        runInBackground {
+        repo.runRecoverableInBackground(retry = ::reloadChangesForSelection) {
             val loaded = ChangeService.loadChanges(sources)
             runLater { if (loadGeneration == gen) fileSelection.setChanges(loaded) }
         }

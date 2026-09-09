@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.services.withUndoBalloon
@@ -26,8 +27,7 @@ fun setTagAction(entry: LogEntry?) =
  * confirm-and-retry flow below verbatim, same as the dialog path does.
  */
 internal fun executeSetTag(repo: JujutsuRepository, tag: Tag, targetId: ChangeId, allowMove: Boolean) {
-    repo.commandExecutor.withUndoTracking()
-        .createCommand { tagSet(tag, targetId, allowMove) }
+    repo.createUndoTrackedCommand { tagSet(tag, targetId, allowMove) }
         .onSuccess { repo.invalidate() }
         .onFailure {
             if (!allowMove && exitCode == 1 && stderr.contains("allow-move")) {

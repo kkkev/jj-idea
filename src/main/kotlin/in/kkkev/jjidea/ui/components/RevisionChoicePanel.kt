@@ -16,9 +16,9 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RepositoryReferences
 import `in`.kkkev.jjidea.jj.RevisionExpression
 import `in`.kkkev.jjidea.jj.TagItem
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -212,7 +212,7 @@ abstract class RevisionChoicePanel(
     fun loadData() {
         val version = ++loadVersion
         resolveQueue?.cancelAllUpdates()
-        runInBackground {
+        repo.runRecoverableInBackground(retry = ::loadData) {
             val entries = repo.logCache.all
             val query = filter.query
             val items = buildItems(filter).toMutableList()

@@ -21,7 +21,9 @@ import `in`.kkkev.jjidea.jj.JjFeature
 import `in`.kkkev.jjidea.jj.JjVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.OperationId
+import `in`.kkkev.jjidea.jj.RepositoryHealth
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.jj.updateStaleWorkspace
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
 import java.awt.datatransfer.StringSelection
@@ -95,13 +97,14 @@ object JujutsuNotifications {
 
     /**
      * Show a notification that a repository's `.jj` directory exists but jj could not read it —
-     * a broken/stale store, a moved repo, or one created by an incompatible jj version
-     * (jj-idea-9ife). Includes an action to reconfigure the VCS mapping; there's no "Initialize"
-     * action since re-running init won't repair an already-broken repo.
+     * either a stale workspace (jj-idea-b65g, [RepositoryHealth.Stale] — offers one-click
+     * `jj workspace update-stale`) or a broken/moved store / incompatible jj version
+     * (jj-idea-9ife, [RepositoryHealth.Unreadable] — offers reconfiguring the VCS mapping instead,
+     * since re-running init won't repair an already-broken repo).
      *
      * Only shows once per root per session to avoid notification spam.
      */
-    fun notifyUnreadableRoot(project: Project, repo: JujutsuRepository, detail: String) {
+    fun notifyUnreadableRoot(project: Project, repo: JujutsuRepository, health: RepositoryHealth) {
         val rootPath = repo.directory.path
 
         // Only notify once per root
@@ -109,22 +112,87 @@ object JujutsuNotifications {
             return
         }
 
-        val notification = NotificationGroupManager.getInstance()
-            .getNotificationGroup(GROUP_ID)
-            .createNotification(
-                JujutsuBundle.message("notification.unreadable.title"),
-                JujutsuBundle.message("notification.unreadable.content", repo.displayName, detail),
-                NotificationType.WARNING
-            )
+        val notification = when (health) {
+            is RepositoryHealth.Stale -> NotificationGroupManager.getInstance()
+                .getNotificationGroup(GROUP_ID)
+                .createNotification(
+                    JujutsuBundle.message("notification.stale.title"),
+                    JujutsuBundle.message("notification.stale.content", repo.displayName, health.detail),
+                    NotificationType.WARNING
+                ).apply {
+                    addExpiringAction("notification.stale.action.update") {
+                        notifiedUnreadableRoots.remove(rootPath)
+                        updateStaleWorkspace(project, repo)
+                    }
+                    addExpiringAction("notification.stale.action.retry") {
+                        notifiedUnreadableRoots.remove(rootPath)
+                        project.stateModel.invalidateRepositoryState()
+                    }
+                }
 
-        notification.addExpiringAction("notification.unreadable.action.retry") {
-            notifiedUnreadableRoots.remove(rootPath)
-            project.stateModel.invalidateRepositoryState()
+            is RepositoryHealth.Unreadable -> NotificationGroupManager.getInstance()
+                .getNotificationGroup(GROUP_ID)
+                .createNotification(
+                    JujutsuBundle.message("notification.unreadable.title"),
+                    JujutsuBundle.message("notification.unreadable.content", repo.displayName, health.detail),
+                    NotificationType.WARNING
+                ).apply {
+                    addExpiringAction("notification.unreadable.action.retry") {
+                        notifiedUnreadableRoots.remove(rootPath)
+                        project.stateModel.invalidateRepositoryState()
+                    }
+                    addExpiringAction("notification.unreadable.action.settings") {
+                        notifiedUnreadableRoots.remove(rootPath)
+                        project.showVcsMappingsSettings()
+                    }
+                }
         }
 
-        notification.addExpiringAction("notification.unreadable.action.settings") {
-            notifiedUnreadableRoots.remove(rootPath)
-            project.showVcsMappingsSettings()
+        notification.notify(project)
+    }
+
+    /**
+     * Show a notification that a user-initiated operation on [repo] couldn't proceed because its
+     * working copy is unavailable ([WorkingCopyUnavailableException] - jj-idea-b65g), offering
+     * [health]'s remedy and calling [retry] once the user completes it - so the operation the user
+     * actually asked for (e.g. Advance Bookmark) completes instead of just refreshing state. See
+     * [in.kkkev.jjidea.jj.runRecoverable], and contrast with [notifyUnreadableRoot] above, whose
+     * "Retry"/"Update Stale Workspace" actions only refresh background state with nothing further
+     * to re-run.
+     *
+     * Unlike [notifyUnreadableRoot] this is not deduplicated per root - it fires once per failed
+     * user action, which is inherently already rate-limited by the user re-triggering the action.
+     */
+    fun notifyWorkingCopyUnavailable(
+        project: Project,
+        repo: JujutsuRepository,
+        health: RepositoryHealth,
+        retry: () -> Unit
+    ) {
+        val notification = when (health) {
+            is RepositoryHealth.Stale -> NotificationGroupManager.getInstance()
+                .getNotificationGroup(GROUP_ID)
+                .createNotification(
+                    JujutsuBundle.message("notification.stale.title"),
+                    JujutsuBundle.message("notification.stale.content", repo.displayName, health.detail),
+                    NotificationType.WARNING
+                ).apply {
+                    addExpiringAction("notification.stale.action.update") {
+                        updateStaleWorkspace(project, repo, onRepaired = retry)
+                    }
+                    addExpiringAction("notification.stale.action.retry") { retry() }
+                }
+
+            is RepositoryHealth.Unreadable -> NotificationGroupManager.getInstance()
+                .getNotificationGroup(GROUP_ID)
+                .createNotification(
+                    JujutsuBundle.message("notification.unreadable.title"),
+                    JujutsuBundle.message("notification.unreadable.content", repo.displayName, health.detail),
+                    NotificationType.WARNING
+                ).apply {
+                    addExpiringAction("notification.unreadable.action.retry") { retry() }
+                    addExpiringAction("notification.unreadable.action.settings") { project.showVcsMappingsSettings() }
+                }
         }
 
         notification.notify(project)

@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.vcs.FileStatus
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.committed.CommittedChangesTreeBrowser
 import `in`.kkkev.jjidea.vcs.getChildPath
@@ -23,8 +24,13 @@ object ChangeService {
     fun loadChanges(entry: LogEntry): List<Change> {
         val repo = entry.repo
         val fileChanges = repo.logService.getFileChanges(entry).getOrElse { error ->
-            // This can happen when a commit is removed during loading (e.g., abandon, empty commit auto-removed).
-            // Log at info level since this is an expected scenario, not a programming error.
+            // A stale workspace (jj-idea-27b4) must surface with its remedy, not disappear as an
+            // empty diff - re-thrown as a VcsException so callers using runRecoverableInBackground
+            // classify and offer it. Anything else can legitimately mean the commit was removed
+            // during loading (abandon, empty commit auto-removed) - an expected race, not a bug -
+            // so it stays a log line and an empty diff, same as before.
+            val health = classifyRepositoryFailure(error.message.orEmpty())
+            if (health is RepositoryHealth.Stale) throw VcsException(error.message, error)
             log.info("Error loading changes for ${entry.id}: ${error.message}")
             emptyList()
         }

@@ -9,7 +9,9 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog
@@ -58,17 +60,20 @@ fun splitAction(
     project: Project,
     entry: LogEntry?
 ) = nullAndDumbAwareAction(entry, "log.action.split", JujutsuIcons.Split) {
-    runInBackground {
-        val changes = ChangeService.loadChanges(target)
+    fun openDialog() {
+        target.repo.runRecoverableInBackground(retry = ::openDialog) {
+            val changes = ChangeService.loadChanges(target)
 
-        runLater {
-            val dialog = SplitDialog(project, target, changes)
-            if (!dialog.showAndGet()) return@runLater
+            runLater {
+                val dialog = SplitDialog(project, target, changes)
+                if (!dialog.showAndGet()) return@runLater
 
-            val spec = dialog.result ?: return@runLater
-            executeSplit(project, target, spec)
+                val spec = dialog.result ?: return@runLater
+                executeSplit(project, target, spec)
+            }
         }
     }
+    openDialog()
 }
 
 internal fun executeSplit(project: Project, target: LogEntry, spec: SplitSpec) {
@@ -168,8 +173,7 @@ private fun onSplitSuccess(project: Project, target: LogEntry, spec: SplitSpec, 
     val remainingId = if (spec.insertBefore != null) target.id else parseRemainingChangeId(stderr)
 
     if (remainingId != null) {
-        target.repo.commandExecutor
-            .createCommand { describe(remainingDesc, remainingId) }
+        target.repo.createCommand { describe(remainingDesc, remainingId) }
             .onSuccess {
                 target.repo.invalidate(select = target.id, vfsChanged = true)
                 project.saveDescriptionToHistory(remainingDesc)

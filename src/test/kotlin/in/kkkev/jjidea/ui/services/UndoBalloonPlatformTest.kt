@@ -36,7 +36,7 @@ class UndoBalloonPlatformTest {
     /** Runs the wrapped action, then pumps the EDT queue so the deferred [notify] call executes. */
     private fun runWithBalloon(result: CommandResult): List<Notification> {
         val notified = mutableListOf<Notification>()
-        CommandExecutor.Command(commandExecutor, action = { result })
+        CommandExecutor.Command(repo, commandExecutor, action = { result })
             .withUndoBalloon(project, repo, "log.action.abandon.undo") { _, r, op, label ->
                 notified += Notification(r, op, label)
             }

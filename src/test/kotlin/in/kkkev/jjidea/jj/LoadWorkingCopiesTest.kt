@@ -28,7 +28,7 @@ class LoadWorkingCopiesTest {
     // don't leak state into each other.
     @AfterEach
     fun clearHealthCache() {
-        listOf("/healthy", "/broken", "/a", "/b").forEach(JujutsuRepositoryHealth::markReadable)
+        listOf("/healthy", "/broken", "/a", "/b", "/stale").forEach(JujutsuRepositoryHealth::markReadable)
     }
 
     /** A readable repo at [path]: `logCache[WorkingCopy]` returns a [LogEntry] pointing back at this same repo. */
@@ -64,10 +64,10 @@ class LoadWorkingCopiesTest {
     fun `a repo whose working copy can't be read is skipped, not thrown, notified once, and marked unreadable`() {
         val healthy = readableRepoAt("/healthy")
         val broken = unreadableRepoAt("/broken", VcsException("Error from jj log: Internal error: broken repo"))
-        val notified = mutableListOf<Triple<Project, JujutsuRepository, String>>()
+        val notified = mutableListOf<Triple<Project, JujutsuRepository, RepositoryHealth>>()
 
-        val result = loadWorkingCopies(project, listOf(healthy, broken), log) { p, r, detail ->
-            notified.add(Triple(p, r, detail))
+        val result = loadWorkingCopies(project, listOf(healthy, broken), log) { p, r, health ->
+            notified.add(Triple(p, r, health))
         }
 
         result shouldContainKey "/healthy"
@@ -75,8 +75,33 @@ class LoadWorkingCopiesTest {
         result.size shouldBe 1
         notified.size shouldBe 1
         notified.single().second shouldBe broken
+        notified.single().third.shouldBe(RepositoryHealth.Unreadable("Error from jj log: Internal error: broken repo"))
         JujutsuRepositoryHealth.isUnreadable("/broken").shouldBeTrue()
         JujutsuRepositoryHealth.isUnreadable("/healthy").shouldBeFalse()
+    }
+
+    @Test
+    fun `a stale-workspace error classifies as Stale with its operation id, not the generic unreadable message`() {
+        val stale = unreadableRepoAt(
+            "/stale",
+            VcsException(
+                "Error from jj log: Error: The working copy is stale (not updated since operation 41f49686aa8e).\n" +
+                    "Hint: Run `jj workspace update-stale` to update it."
+            )
+        )
+        val notified = mutableListOf<RepositoryHealth>()
+
+        val result = loadWorkingCopies(project, listOf(stale), log) { _, _, health -> notified.add(health) }
+
+        result shouldNotContainKey "/stale"
+        notified.single().shouldBe(
+            RepositoryHealth.Stale(
+                "Error from jj log: Error: The working copy is stale (not updated since operation 41f49686aa8e).\n" +
+                    "Hint: Run `jj workspace update-stale` to update it.",
+                "41f49686aa8e"
+            )
+        )
+        JujutsuRepositoryHealth.healthFor("/stale").shouldBe(notified.single())
     }
 
     @Test

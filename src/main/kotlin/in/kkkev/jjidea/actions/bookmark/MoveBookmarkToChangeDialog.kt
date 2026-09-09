@@ -2,8 +2,8 @@ package `in`.kkkev.jjidea.actions.bookmark
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBList
@@ -17,6 +17,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
@@ -24,7 +25,6 @@ import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.icon
 import `in`.kkkev.jjidea.ui.log.entryCanvas
 import `in`.kkkev.jjidea.ui.log.fetchSearchResults
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -290,7 +290,7 @@ class MoveBookmarkToChangeDialog(
     private fun searchWholeRepo() {
         val revset = searchField.revset() ?: return
         val settings = JujutsuSettings.getInstance(repo.project)
-        runInBackground(ModalityState.any()) {
+        repo.runRecoverableInBackground(retry = ::searchWholeRepo, modalityState = ModalityState.any()) {
             val found = fetchSearchResults(listOf(repo), revset) { settings.logChangeLimit(it) }[repo] ?: emptyList()
             val alreadyKnown = classified.mapTo(mutableSetOf()) { it.first.id } + listOfNotNull(currentId)
             val newEntries = found.filter { it.id !in alreadyKnown }
@@ -355,10 +355,8 @@ class MoveBookmarkToChangeDialog(
     }
 
     companion object {
-        private val log = Logger.getInstance(MoveBookmarkToChangeDialog::class.java)
-
         fun show(repo: JujutsuRepository, bookmark: Bookmark, onSelected: (ChangeId, Boolean) -> Unit) {
-            runInBackground {
+            repo.runRecoverableInBackground(retry = { show(repo, bookmark, onSelected) }) {
                 val currentId = currentBookmarkTarget(repo, bookmark)
                 val entries = repo.logCache.all
                 val classified = classifyAgainstBookmark(repo, currentId, entries.filter { it.id != currentId })
@@ -372,15 +370,22 @@ class MoveBookmarkToChangeDialog(
             }
         }
 
-        /** The bookmark's current target change id, or null if the bookmark doesn't exist yet. */
+        /**
+         * The bookmark's current target change id, or null if the bookmark doesn't exist yet.
+         * @throws VcsException if bookmarks can't be loaded at all (jj-idea-27b4) - distinct from
+         * "no such bookmark", which is a legitimate null, not a failure.
+         */
         private fun currentBookmarkTarget(repo: JujutsuRepository, bookmark: Bookmark): ChangeId? =
-            repo.logService.getBookmarks().getOrNull()?.find { it.bookmark.name == bookmark.name }?.id
+            repo.logService.getBookmarks().getOrThrow().find { it.bookmark.name == bookmark.name }?.id
 
         /**
          * Classifies [candidates] against [currentId]: descendants of the bookmark's current
          * target → FORWARD (the bookmark would advance); everything else → BACKWARD_OR_SIDEWAYS.
          * Shared by [loadData] (the initial load) and [searchWholeRepo] (jj-idea-tq4b, classifying
          * commits found outside the loaded log window).
+         * @throws VcsException if the descendant revset query fails (jj-idea-27b4) - a stale
+         * workspace fails exactly this way, and silently defaulting every candidate to
+         * backward/sideways (as this used to) would misreport a genuinely forward move.
          */
         private fun classifyAgainstBookmark(
             repo: JujutsuRepository,
@@ -400,12 +405,10 @@ class MoveBookmarkToChangeDialog(
                 revset = revset,
                 template = "${TemplateParts.changeIdWithOffset()} ++ \"\\n\""
             )
-            val forwardIds = if (result is CommandExecutor.CommandResult.Success) {
-                result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-            } else {
-                log.warn("Descendant revset query '$revset' failed: ${result.stderr}")
-                emptySet()
+            if (result !is CommandExecutor.CommandResult.Success) {
+                throw VcsException("Error from jj log: ${result.stderr}")
             }
+            val forwardIds = result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
 
             return candidates.map { entry ->
                 val direction = if (entry.id.full in forwardIds) {

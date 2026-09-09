@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RebaseDestinationMode
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.duplicate.DuplicateDialog
 import `in`.kkkev.jjidea.ui.services.withUndoBalloon
@@ -45,8 +46,7 @@ internal fun executeDuplicate(
     destinations: List<Revision>,
     mode: RebaseDestinationMode
 ) {
-    repo.commandExecutor.withUndoTracking()
-        .createCommand { duplicate(revisions, destinations, mode) }
+    repo.createUndoTrackedCommand { duplicate(revisions, destinations, mode) }
         .onSuccess {
             repo.invalidate(vfsChanged = true)
             duplicateLog.info("Duplicated $revisions onto $destinations")

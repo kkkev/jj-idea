@@ -4,8 +4,11 @@ import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RepositoryHealth
+import `in`.kkkev.jjidea.jj.classifyRepositoryFailure
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 
 /**
  * Loads file history data in the background and updates the table model on EDT.
@@ -32,6 +35,17 @@ class JujutsuFileHistoryDataLoader(
             onSuccess = {
                 panel.onDataLoaded(entries)
                 log.info("Updated with ${entries.size} history entries")
+            },
+            onError = { e ->
+                // jj-idea-27b4: a stale workspace used to fall through to the default onError
+                // (a bare log.warn), leaving the history tab silently empty. Offer the same
+                // remedy every other action does, with retry re-running this load.
+                val health = classifyRepositoryFailure(e.message.orEmpty())
+                if (health is RepositoryHealth.Stale) {
+                    JujutsuNotifications.notifyWorkingCopyUnavailable(repo.project, repo, health) { load() }
+                } else {
+                    log.warn("Background task failed: ${e.message}", e)
+                }
             }
         )
     }

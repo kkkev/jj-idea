@@ -218,19 +218,41 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      * repo looks identical to no VCS mapping at all, with no way to tell why or to retry.
      */
     private fun updateEmptyState() {
-        val unreadable = project.stateModel.unreadableRepositories()
-        if (unreadable.isEmpty()) {
-            emptyStateLabel.text = JujutsuBundle.message("workingcopy.empty.message")
-            emptyStateLink.setHyperlinkText(JujutsuBundle.message("workingcopy.empty.link"))
-            emptyStateLinkAction = { project.showVcsMappingsSettings() }
-        } else {
-            emptyStateLabel.text = if (unreadable.size == 1) {
-                JujutsuBundle.message("workingcopy.empty.unreadable.message", unreadable.single().displayName)
-            } else {
-                JujutsuBundle.message("workingcopy.empty.unreadable.message.multiple", unreadable.size)
+        val unhealthy = project.stateModel.unhealthyRepositories()
+        emptyStateLabel.text = when {
+            unhealthy.isEmpty() -> JujutsuBundle.message("workingcopy.empty.message")
+
+            unhealthy.all { (_, health) -> health is RepositoryHealth.Stale } ->
+                if (unhealthy.size == 1) {
+                    JujutsuBundle.message("workingcopy.empty.stale.message", unhealthy.single().first.displayName)
+                } else {
+                    JujutsuBundle.message("workingcopy.empty.stale.message.multiple", unhealthy.size)
+                }
+
+            unhealthy.size == 1 ->
+                JujutsuBundle.message("workingcopy.empty.unreadable.message", unhealthy.single().first.displayName)
+
+            else -> JujutsuBundle.message("workingcopy.empty.unreadable.message.multiple", unhealthy.size)
+        }
+
+        val allStale = unhealthy.isNotEmpty() && unhealthy.all { (_, health) -> health is RepositoryHealth.Stale }
+        emptyStateLink.setHyperlinkText(
+            when {
+                unhealthy.isEmpty() -> JujutsuBundle.message("workingcopy.empty.link")
+                allStale -> JujutsuBundle.message("workingcopy.empty.stale.link")
+                else -> JujutsuBundle.message("workingcopy.empty.unreadable.link")
             }
-            emptyStateLink.setHyperlinkText(JujutsuBundle.message("workingcopy.empty.unreadable.link"))
-            emptyStateLinkAction = { project.stateModel.invalidateRepositoryState() }
+        )
+        emptyStateLinkAction = when {
+            unhealthy.isEmpty() -> {
+                { project.showVcsMappingsSettings() }
+            }
+            allStale -> {
+                { unhealthy.forEach { (repo, _) -> updateStaleWorkspace(project, repo) } }
+            }
+            else -> {
+                { project.stateModel.invalidateRepositoryState() }
+            }
         }
     }
 
@@ -268,9 +290,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             val sortedRepos = new.map { it.value.repo }.sortedBy { it.displayName }
             controlsPanel.updateAvailableRepositories(sortedRepos)
 
-            // Update controls if the current repo was updated
+            // Update controls if the current repo was updated. Reads straight from `new` rather
+            // than the throwing `repo.workingCopy` (jj-idea-b65g) - the bound repo can be absent
+            // from it (e.g. its workspace just went stale) while other repos are still healthy.
             val currentRepo = controlsPanel.boundRepository
-            currentRepo?.let { repo -> controlsPanel.update(repo.workingCopy) }
+            currentRepo?.let { repo -> new[repo.directory.path]?.let(controlsPanel::update) }
 
             // If no repo is bound, select the first one
             if (currentRepo == null || new.none { it.value.repo == currentRepo }) {
@@ -382,7 +406,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     override fun uiDataSnapshot(sink: DataSink) {
         sink[VcsDataKeys.CHANGES] = changesTree.selectedChanges.toTypedArray()
-        controlsPanel.boundRepository?.workingCopy?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+        controlsPanel.boundRepository?.whenWorkingCopyAvailable { sink[JujutsuDataKeys.LOG_ENTRY] = it }
         sink[DiffDataKeys.EDITOR_TAB_DIFF_PREVIEW] = diffPreview
     }
 

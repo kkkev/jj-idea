@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.rebase.RebaseDialog
@@ -46,8 +47,7 @@ internal fun performRebase(project: Project, repo: JujutsuRepository, entries: L
  * didn't have before, which is accepted rather than adding an opt-in flag to avoid that.
  */
 internal fun executeRebase(project: Project, repo: JujutsuRepository, spec: RebaseSpec) {
-    repo.commandExecutor.withUndoTracking()
-        .createCommand { rebase(spec.revisions, spec.destinations, spec.sourceMode, spec.destinationMode) }
+    repo.createUndoTrackedCommand { rebase(spec.revisions, spec.destinations, spec.sourceMode, spec.destinationMode) }
         .onSuccess {
             repo.invalidate(select = spec.revisions.first(), vfsChanged = true)
             rebaseLog.info("Rebased ${spec.revisions} onto ${spec.destinations}")

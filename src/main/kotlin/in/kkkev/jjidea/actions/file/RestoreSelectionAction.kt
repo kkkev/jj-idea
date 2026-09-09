@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.actions.restorePaths
 import `in`.kkkev.jjidea.actions.singleRepoForRestore
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 
 /**
@@ -49,7 +50,7 @@ class RestoreSelectionAction : DumbAwareAction(
             return
         }
 
-        repo.commandExecutor.createCommand {
+        repo.createCommand {
             restore(filePaths, WorkingCopy.parent)
         }
             .onSuccess {

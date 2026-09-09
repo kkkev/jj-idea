@@ -9,10 +9,11 @@ import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
+import `in`.kkkev.jjidea.jj.whenWorkingCopyAvailable
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
 import `in`.kkkev.jjidea.ui.squash.SquashMode
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 
 /**
@@ -43,7 +44,7 @@ class SquashFilesAction : DumbAwareAction(
         val entry = resolveEntry(e) ?: return
         val preSelectedFiles = e.filePaths.toSet()
 
-        runInBackground {
+        entry.repo.runRecoverableInBackground(retry = { actionPerformed(e) }) {
             val changes = ChangeService.loadChanges(entry)
             val candidateParents = entry.parentIds.mapNotNull { entry.repo.getLogEntry(it) }
                 .filter { !it.immutable }
@@ -63,5 +64,5 @@ class SquashFilesAction : DumbAwareAction(
         }
     }
 
-    private fun resolveEntry(e: AnActionEvent) = e.logEntry ?: e.singleRepoForFiles?.workingCopy
+    private fun resolveEntry(e: AnActionEvent) = e.logEntry ?: e.singleRepoForFiles?.whenWorkingCopyAvailable { it }
 }

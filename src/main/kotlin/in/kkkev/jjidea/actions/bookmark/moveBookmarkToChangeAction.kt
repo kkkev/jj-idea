@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.util.runLater
 
@@ -28,7 +29,7 @@ private fun executeMoveToChange(
     changeId: ChangeId,
     allowBackwards: Boolean
 ) {
-    repo.commandExecutor.createCommand { bookmarkSet(bookmark.name, changeId, allowBackwards) }
+    repo.createCommand { bookmarkSet(bookmark.name, changeId, allowBackwards) }
         .onSuccess { repo.invalidate() }
         .onFailure {
             if (!allowBackwards && exitCode == 1 && stderr.contains("backwards or sideways")) {

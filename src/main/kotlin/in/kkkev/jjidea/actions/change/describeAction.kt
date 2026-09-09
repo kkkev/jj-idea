@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.actions.requestDescription
 import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
@@ -35,9 +36,8 @@ internal fun describePromptId(target: LogEntry) = target.id.short
  */
 internal fun performDescribe(project: Project, target: LogEntry) {
     val jujutsuRoot = target.repo
-    val commandExecutor = jujutsuRoot.commandExecutor
 
-    commandExecutor.createCommand {
+    jujutsuRoot.createCommand {
         log(target.id, "description")
     }.onSuccess { currentDescription ->
         val newDescription =
@@ -48,7 +48,7 @@ internal fun performDescribe(project: Project, target: LogEntry) {
             )
                 ?: return@onSuccess
         // If that was null, the user cancelled
-        commandExecutor.createCommand { describe(newDescription, target.id) }
+        jujutsuRoot.createCommand { describe(newDescription, target.id) }
             .onSuccess {
                 jujutsuRoot.invalidate()
                 project.saveDescriptionToHistory(newDescription)

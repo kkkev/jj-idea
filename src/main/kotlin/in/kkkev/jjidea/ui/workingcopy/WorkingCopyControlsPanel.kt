@@ -64,7 +64,9 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
                 // Update dropdown selection without triggering callback
                 updateDropdownSelection(value)
             }
-            value?.let { update(it.workingCopy) }
+            // Null-safe (jj-idea-b65g): a just-bound repo whose workspace is stale/unreadable has
+            // no entry yet, and this setter isn't a user-initiated operation worth retrying.
+            value?.whenWorkingCopyAvailable(::update)
         }
 
     // Track whether description has been modified since last load
@@ -432,8 +434,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         val repo = boundRepository ?: return
         val description = Description(descriptionEditor.text.actual.trim())
 
-        repo.commandExecutor
-            .createCommand { describe(description) }
+        repo.createCommand { describe(description) }
             .onSuccess {
                 persistedDescription = description
                 isDescriptionModified = false
@@ -454,7 +455,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
         val repo = boundRepository ?: return
         val description = project.requestDescription("dialog.newchange.input") ?: return
 
-        repo.commandExecutor.createCommand {
+        repo.createCommand {
             new(description = description)
         }.onSuccess {
             persistedDescription = Description.EMPTY

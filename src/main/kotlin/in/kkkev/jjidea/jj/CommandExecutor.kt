@@ -7,6 +7,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.util.saveAllDocuments
@@ -218,6 +219,15 @@ interface CommandExecutor {
      * @return Command result
      */
     fun edit(revision: Revision): CommandResult
+
+    /**
+     * Repairs a stale workspace (jj-idea-b65g) by bringing its on-disk working copy back in line
+     * with the repo's current operation. See [in.kkkev.jjidea.jj.cli.workspaceUpdateStaleArgs]
+     * for why this is classified [in.kkkev.jjidea.jj.cli.Reversibility.IRREVERSIBLE]: reverting it
+     * would simply re-stale the workspace, so no undo affordance should ever be offered for it.
+     * @return Command result
+     */
+    fun workspaceUpdateStale(): CommandResult
 
     /**
      * Duplicate one or more changes (identical copies with new change IDs).
@@ -631,6 +641,15 @@ interface CommandExecutor {
     fun withUndoTracking(): CommandExecutor = this
 
     data class Command(
+        /**
+         * The repo this command runs against, if any. Null only for the rootless case (e.g.
+         * [in.kkkev.jjidea.actions.top.InitAction]'s `jj git init` on a directory with no
+         * [JujutsuRepository] yet - nothing to be "stale" before it's even a repo) - see
+         * [createCommand] (the bare [CommandExecutor] factory, kept for that case) vs.
+         * [JujutsuRepository.createCommand]. A null [repo] simply skips the stale-workspace
+         * intercept in [handleResult] and always calls [onFailure] directly.
+         */
+        val repo: JujutsuRepository?,
         val commandExecutor: CommandExecutor,
         val action: CommandExecutor.() -> CommandResult,
         val onSuccess: (String) -> Unit = {},
@@ -651,7 +670,15 @@ interface CommandExecutor {
 
         fun onFailure(callback: CommandResult.Failure.() -> Unit) = copy(onFailure = callback)
 
-        private fun handleResult(result: CommandResult) {
+        /**
+         * Classifies [result] before ever reaching the call site's own [onFailure] - a failure
+         * caused by a stale workspace (jj-idea-b65g/jj-idea-27b4) gets the "Update Stale
+         * Workspace" remedy instead of whatever generic/mis-parsing failure handling the call
+         * site wrote (raw-stderr dialog, or worse - e.g. [in.kkkev.jjidea.actions.bookmark.BookmarkNameDialog]
+         * mis-reading any exit-1 failure as a name conflict). [retry] re-runs this exact `Command`
+         * once the user applies the remedy.
+         */
+        private fun handleResult(result: CommandResult, retry: () -> Unit) {
             runLater {
                 when (result) {
                     is CommandResult.Success -> {
@@ -659,7 +686,14 @@ interface CommandExecutor {
                         result.onSuccessResult()
                     }
 
-                    is CommandResult.Failure -> onFailure(result)
+                    is CommandResult.Failure -> {
+                        val health = repo?.let { classifyRepositoryFailure(result.message) }
+                        if (repo != null && health is RepositoryHealth.Stale) {
+                            JujutsuNotifications.notifyWorkingCopyUnavailable(repo.project, repo, health, retry)
+                        } else {
+                            onFailure(result)
+                        }
+                    }
                 }
             }
         }
@@ -667,7 +701,7 @@ interface CommandExecutor {
         fun executeAsync() {
             saveAllDocuments()
             runInBackground {
-                handleResult(commandExecutor.action())
+                handleResult(commandExecutor.action()) { executeAsync() }
             }
         }
 
@@ -676,11 +710,33 @@ interface CommandExecutor {
             object : Task.Backgroundable(project, title, false) {
                 override fun run(indicator: ProgressIndicator) {
                     indicator.isIndeterminate = true
-                    handleResult(commandExecutor.action())
+                    handleResult(commandExecutor.action()) { executeWithProgress(project, title) }
                 }
             }.queue()
         }
     }
 
-    fun createCommand(action: CommandExecutor.() -> CommandResult): Command = Command(this, action)
+    /**
+     * Builds a [Command] with no [JujutsuRepository] - only for the rootless case where one
+     * doesn't exist yet (e.g. [in.kkkev.jjidea.actions.top.InitAction]'s `jj git init`). Prefer
+     * [JujutsuRepository.createCommand] whenever a repo exists, so the stale-workspace intercept
+     * in [Command.handleResult] applies.
+     */
+    fun createCommand(action: CommandExecutor.() -> CommandResult): Command = Command(null, this, action)
 }
+
+/** Builds a [CommandExecutor.Command] against [this] repo's own executor. */
+fun JujutsuRepository.createCommand(
+    action: CommandExecutor.() -> CommandExecutor.CommandResult
+): CommandExecutor.Command = CommandExecutor.Command(this, commandExecutor, action)
+
+/**
+ * Like [createCommand], but runs against [CommandExecutor.withUndoTracking]'s wrapped executor -
+ * for a command whose [CommandExecutor.CommandResult.Success.Reversible.operation] needs to be
+ * resolved (e.g. to offer an undo balloon), replacing the old
+ * `repo.commandExecutor.withUndoTracking().createCommand { ... }` chain now that [createCommand]
+ * requires a [JujutsuRepository], not a bare [CommandExecutor].
+ */
+fun JujutsuRepository.createUndoTrackedCommand(
+    action: CommandExecutor.() -> CommandExecutor.CommandResult
+): CommandExecutor.Command = CommandExecutor.Command(this, commandExecutor.withUndoTracking(), action)

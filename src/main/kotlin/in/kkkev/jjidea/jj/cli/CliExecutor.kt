@@ -93,6 +93,15 @@ internal fun abandonArgs(revision: Revision) = JjInvocation(REVERSIBLE, "abandon
 
 internal fun editArgs(revision: Revision) = JjInvocation(REVERSIBLE, "edit", revision)
 
+/**
+ * `jj workspace update-stale` (jj-idea-b65g) repairs a stale workspace by bringing its on-disk
+ * working copy back in line with the repo's current operation. Classified [IRREVERSIBLE]: its
+ * effect is entirely local to this workspace's own working-copy state, not the shared `repo`
+ * scope `jj op revert --what repo` inverts, and reverting it would simply re-stale the
+ * workspace it just repaired.
+ */
+internal fun workspaceUpdateStaleArgs() = JjInvocation(IRREVERSIBLE, "workspace", "update-stale")
+
 internal fun tagListArgs(template: String? = null) = JjInvocation(
     READ_ONLY,
     buildList {
@@ -720,6 +729,8 @@ class CliExecutor(
     override fun abandon(revision: Revision): CommandExecutor.CommandResult = execute(root, abandonArgs(revision))
 
     override fun edit(revision: Revision): CommandExecutor.CommandResult = execute(root, editArgs(revision))
+
+    override fun workspaceUpdateStale(): CommandExecutor.CommandResult = execute(root, workspaceUpdateStaleArgs())
 
     override fun duplicate(
         revisions: List<Revision>,

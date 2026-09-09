@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
@@ -65,7 +66,7 @@ class NewChangeAction : DumbAwareAction(
         val project = e.project ?: return
         val target = resolveNewChangeTarget(e.logEntries) ?: return
 
-        target.repo.commandExecutor.createCommand {
+        target.repo.createCommand {
             new(description = Description.EMPTY, parentRevisions = target.parents)
         }.onSuccess {
             // The new change becomes the working copy - select it

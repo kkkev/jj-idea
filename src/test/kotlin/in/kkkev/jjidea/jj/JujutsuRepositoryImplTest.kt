@@ -5,9 +5,11 @@ import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.util.NotifiableState
+import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 
 /**
@@ -22,6 +24,10 @@ import org.junit.jupiter.api.Test
 class JujutsuRepositoryImplTest {
     private val directoryPath = "/repo"
     private val filePath = LocalFilePath("/repo/src/Main.kt", false)
+
+    // JujutsuRepositoryHealth is a process-global cache; clear what this file writes.
+    @AfterEach
+    fun clearHealthCache() = JujutsuRepositoryHealth.markReadable(directoryPath)
 
     private fun repoWithWorkingCopy(workingCopyId: ChangeId?): JujutsuRepositoryImpl {
         val directory = mockk<VirtualFile> {
@@ -76,5 +82,33 @@ class JujutsuRepositoryImplTest {
         val revision = repo.createContentRevision(filePath, ChangeId("anything", "anything", null))
 
         revision.shouldBeInstanceOf<ContentLogEntryImpl>()
+    }
+
+    @Test
+    fun `workingCopy throws WorkingCopyUnavailableException carrying the recorded health when absent from the map`() {
+        JujutsuRepositoryHealth.mark(directoryPath, RepositoryHealth.Stale("stale detail", "abc123"))
+        val repo = repoWithWorkingCopy(workingCopyId = null)
+
+        val thrown = runCatching { repo.workingCopy }.exceptionOrNull()
+
+        thrown.shouldBeInstanceOf<WorkingCopyUnavailableException>()
+        (thrown as WorkingCopyUnavailableException).repo shouldBe repo
+        thrown.health shouldBe RepositoryHealth.Stale("stale detail", "abc123")
+    }
+
+    @Test
+    fun `whenWorkingCopyAvailable returns null instead of throwing, when the working copy is unavailable`() {
+        JujutsuRepositoryHealth.mark(directoryPath, RepositoryHealth.Unreadable("broken"))
+        val repo = repoWithWorkingCopy(workingCopyId = null)
+
+        repo.whenWorkingCopyAvailable { it } shouldBe null
+    }
+
+    @Test
+    fun `whenWorkingCopyAvailable returns the working copy when it is available`() {
+        val workingCopyId = ChangeId("wc", "wc", null)
+        val repo = repoWithWorkingCopy(workingCopyId)
+
+        repo.whenWorkingCopyAvailable { it.id } shouldBe workingCopyId
     }
 }

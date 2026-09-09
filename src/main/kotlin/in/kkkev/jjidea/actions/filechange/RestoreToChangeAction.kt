@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.actions.restorePaths
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.vcs.filePath
 
@@ -69,7 +70,7 @@ class RestoreToChangeAction : DumbAwareAction(
             return
         }
 
-        repo.commandExecutor.createCommand {
+        repo.createCommand {
             restore(filePaths, changeId)
         }
             .onSuccess {

@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 
 fun deleteTagAction(repo: JujutsuRepository, tag: Tag) = nullAndDumbAwareAction(
@@ -24,7 +25,7 @@ fun deleteTagAction(repo: JujutsuRepository, tag: Tag) = nullAndDumbAwareAction(
         return@nullAndDumbAwareAction
     }
 
-    repo.commandExecutor.createCommand { tagDelete(tag) }
+    repo.createCommand { tagDelete(tag) }
         .onSuccess {
             repo.invalidate()
             log.info("Deleted tag ${tag.name}")

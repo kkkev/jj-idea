@@ -16,47 +16,57 @@ import org.junit.jupiter.api.Test
 class BookmarkNameDialogTest {
     @Nested
     inner class `Error code mapping` {
+        /**
+         * Mirrors [in.kkkev.jjidea.actions.bookmark.BookmarkNameDialog.doOKAction]'s current
+         * classification (jj-idea-27b4): exit 2 is clap's own parse/usage error; exit 1 is
+         * "already exists" only when jj's stderr actually says so (verified wording: "Bookmark
+         * already exists: &lt;name&gt;"), never from the exit code alone - a stale workspace, an
+         * invalid revision, or any other exit-1 failure must not be misreported as a name
+         * conflict.
+         */
+        private fun classify(exitCode: Int, stderr: String) = when {
+            exitCode == 2 -> "dialog.bookmark.create.error.incorrect.format"
+            stderr.contains("already exists", ignoreCase = true) -> "dialog.bookmark.create.error.already.exists"
+            else -> "dialog.bookmark.create.error.unknown"
+        }
+
         @Test
-        fun `exit code 1 maps to already exists error`() {
+        fun `exit code 1 with 'already exists' in stderr maps to already exists error`() {
             val failedNames = mutableMapOf<BookmarkName, String>()
             val bookmark = BookmarkName("main")
-            val exitCode = 1
 
-            failedNames[bookmark] = when (exitCode) {
-                1 -> "dialog.bookmark.create.error.already.exists"
-                2 -> "dialog.bookmark.create.error.incorrect.format"
-                else -> "dialog.bookmark.create.error.unknown"
-            }
+            failedNames[bookmark] = classify(1, "Error: Bookmark already exists: main")
 
             failedNames[bookmark] shouldBe "dialog.bookmark.create.error.already.exists"
         }
 
         @Test
-        fun `exit code 2 maps to incorrect format error`() {
+        fun `exit code 1 with unrelated stderr does not map to already exists error`() {
+            val failedNames = mutableMapOf<BookmarkName, String>()
+            val bookmark = BookmarkName("main")
+
+            // Verified empirically: `jj bookmark create x -r nonexistent_rev` also exits 1.
+            failedNames[bookmark] = classify(1, "Error: Revision `nonexistent_rev` doesn't exist")
+
+            failedNames[bookmark] shouldBe "dialog.bookmark.create.error.unknown"
+        }
+
+        @Test
+        fun `exit code 2 maps to incorrect format error regardless of stderr`() {
             val failedNames = mutableMapOf<BookmarkName, String>()
             val bookmark = BookmarkName("invalid name")
-            val exitCode = 2
 
-            failedNames[bookmark] = when (exitCode) {
-                1 -> "dialog.bookmark.create.error.already.exists"
-                2 -> "dialog.bookmark.create.error.incorrect.format"
-                else -> "dialog.bookmark.create.error.unknown"
-            }
+            failedNames[bookmark] = classify(2, "error: invalid value 'invalid name'")
 
             failedNames[bookmark] shouldBe "dialog.bookmark.create.error.incorrect.format"
         }
 
         @Test
-        fun `unexpected exit code maps to unknown error`() {
+        fun `unexpected exit code with unrelated stderr maps to unknown error`() {
             val failedNames = mutableMapOf<BookmarkName, String>()
             val bookmark = BookmarkName("test")
-            val exitCode = 99
 
-            failedNames[bookmark] = when (exitCode) {
-                1 -> "dialog.bookmark.create.error.already.exists"
-                2 -> "dialog.bookmark.create.error.incorrect.format"
-                else -> "dialog.bookmark.create.error.unknown"
-            }
+            failedNames[bookmark] = classify(99, "Error: something else")
 
             failedNames[bookmark] shouldBe "dialog.bookmark.create.error.unknown"
         }

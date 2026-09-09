@@ -9,6 +9,7 @@ import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 import `in`.kkkev.jjidea.util.runLater
@@ -37,8 +38,7 @@ internal fun executeMove(
     targetId: ChangeId,
     allowBackwards: Boolean
 ) {
-    repo.commandExecutor.withUndoTracking()
-        .createCommand { bookmarkSet(bookmark.name, targetId, allowBackwards) }
+    repo.createUndoTrackedCommand { bookmarkSet(bookmark.name, targetId, allowBackwards) }
         .onSuccess { repo.invalidate(select = targetId) }
         .onFailure {
             if (!allowBackwards && exitCode == 1 && stderr.contains("backwards or sideways")) {

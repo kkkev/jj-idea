@@ -1453,7 +1453,7 @@ selection does nothing; right-click for actions.
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
@@ -1601,6 +1601,62 @@ equally-weighted group of their own.
   behavior)
 - [ ] Break two repos' stores in the same project — the notification message pluralizes
   ("N Jujutsu repositories could not be read")
+
+#### Stale Workspace (jj-idea-b65g, jj-idea-27b4)
+
+Genuinely staling a workspace requires more than advancing the op head from another workspace —
+jj's own working-copy auto-recovery silently absorbs that case. Force it instead by corrupting the
+workspace's local operation pointer:
+
+```bash
+jj workspace add ../ws2   # from the sandbox repo
+cd ../ws2
+python3 -c '
+path = ".jj/working_copy/checkout"
+with open(path, "rb") as f:
+    data = bytearray(f.read())
+data[2] = (data[2] + 1) % 256
+with open(path, "wb") as f:
+    f.write(data)
+'
+jj status   # confirm: "Error: Could not read working copy's operation." + the update-stale hint
+```
+Re-run the same command (safe to repeat) any time you need to re-stale it, including after
+**Update Stale Workspace** has just repaired it. Open `../ws2` as its own IDE project.
+
+**Known gap:** Annotate still reports a stale workspace as a raw error in the platform's own
+"Annotate" Messages-tool-window tab, not the notification below — a fix attempt didn't pan out
+and was reverted rather than shipped half-working.
+
+- [ ] **Expected:** no red "IDE Internal Error" balloon and no "Uncaught exception" background
+  warning; instead, a WARNING notification **"Jujutsu Workspace Is Stale"** appears, with
+  **Update Stale Workspace** and **Retry** actions
+- [ ] The Working copy tool window's empty state shows the stale-specific message (not the
+  generic "could not be read" text) with its own **Update Stale Workspace** link
+- [ ] While stale: open the Working copy tool window's toolbar and context menus, and the
+  changes tree — every action is simply disabled/hidden, with no uncaught exception
+- [ ] Click **Update Stale Workspace** (on the notification or the empty-state link) — it runs
+  `jj workspace update-stale` and the tool window/Log repopulate on their own within ~1s, with
+  no manual Retry/re-scan needed
+- [ ] Trigger **Advance Bookmark**, **Rename Bookmark**, **Create Bookmark**, **Move Bookmark**,
+  **Set Tag**, or **Git → Push** while the workspace is stale — each shows the
+  **Update Stale Workspace**/**Retry** notification (not a crash, and not a wrong message like
+  "bookmark already exists"), and clicking **Update Stale Workspace** both repairs the workspace
+  *and* completes the action that was interrupted (the bookmark actually advances/renames/moves,
+  the push dialog actually opens)
+- [ ] Open the **Squash**, **Squash Into**, **Rebase**, **Duplicate**, or **New Change** dialog
+  while stale — the commit picker shows the stale notification instead of silently staying empty
+  or freezing; **Update Stale Workspace** repairs it and the picker populates
+- [ ] Open the **Move Bookmark** dialog while stale — it does not silently mislabel every
+  candidate as "backward/sideways"; it shows the stale notification instead
+- [ ] Open **Show History** on a file while stale — shows the notification, not a silently empty
+  history table
+- [ ] In a multi-repo project, stale only one repo's workspace — the other repo's Working
+  copy/Log data is unaffected, and repo-root icons in the changes tree still render correctly
+  for both (no freeze scrolling a large changes tree while one repo is stale)
+- [ ] With the workspace healthy again, deliberately create a **real** bookmark name conflict
+  (create a bookmark with a name that already exists) — confirm it still shows the correct
+  "already exists" message (the exit-code fix must not regress the true-positive case)
 
 #### Standard Commit Tool Window Suppression (jj-idea-wb5l)
 

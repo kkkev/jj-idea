@@ -49,7 +49,7 @@ fun Project.possibleJujutsuRepositoryFor(file: VirtualFile): JujutsuRepository? 
  */
 fun Project.possibleLogEntryFor(file: VirtualFile): LogEntry? =
     file.getUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY)
-        ?: possibleJujutsuRepositoryFor(file)?.workingCopy
+        ?: possibleJujutsuRepositoryFor(file)?.whenWorkingCopyAvailable { it }
 
 fun Project.jujutsuRepositoryFor(file: VirtualFile) = possibleJujutsuRepositoryFor(file)
     ?: throw VcsException(JujutsuBundle.getMessage("vcs.error.no.root", file))

@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.logEntries
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.actions.uniqueRepo
+import `in`.kkkev.jjidea.jj.runRecoverable
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -51,31 +52,39 @@ class GitPushAction : DumbAwareAction(
         // invoked from the plain VCS menu) falls back to changeTargetsFor's own @/@- default,
         // scoped to initialRepo.
         val changeRepo = if (logEntries.isEmpty()) initialRepo else logEntries.uniqueRepo
-        val changeTargets = changeRepo?.let { changeTargetsFor(it, logEntries) }.orEmpty()
 
-        runInBackground {
-            val allData = GitPushDialog.loadAllDialogData(repos)
-            if (allData.values.all { it.remotes.isEmpty() }) {
-                runLater { noRemoteNotification(project) }
-                return@runInBackground
-            }
+        // Wrapped in runRecoverable (jj-idea-b65g): changeTargetsFor reads changeRepo.workingCopy,
+        // which throws if changeRepo's workspace is stale - offer the remedy and re-run the whole
+        // action once it's applied, rather than silently dropping this Push invocation.
+        runRecoverable(project) {
+            val changeTargets = changeRepo?.let { changeTargetsFor(it, logEntries) }.orEmpty()
 
-            val defaultScope = GitPushDialog.parsePushScope(JujutsuSettings.getInstance(project).state.defaultPushScope)
+            runInBackground {
+                val allData = GitPushDialog.loadAllDialogData(repos)
+                if (allData.values.all { it.remotes.isEmpty() }) {
+                    runLater { noRemoteNotification(project) }
+                    return@runInBackground
+                }
 
-            runLater {
-                val dialog = GitPushDialog(
-                    project,
-                    allData,
-                    initialRepo,
-                    changeTargets = changeTargets,
-                    changeTargetsRepo = changeRepo,
-                    defaultScope = defaultScope
+                val defaultScope = GitPushDialog.parsePushScope(
+                    JujutsuSettings.getInstance(project).state.defaultPushScope
                 )
-                if (!dialog.showAndGet()) return@runLater
 
-                val spec = dialog.result ?: return@runLater
+                runLater {
+                    val dialog = GitPushDialog(
+                        project,
+                        allData,
+                        initialRepo,
+                        changeTargets = changeTargets,
+                        changeTargetsRepo = changeRepo,
+                        defaultScope = defaultScope
+                    )
+                    if (!dialog.showAndGet()) return@runLater
 
-                checkAndPush(spec, project)
+                    val spec = dialog.result ?: return@runLater
+
+                    checkAndPush(spec, project)
+                }
             }
         }
     }

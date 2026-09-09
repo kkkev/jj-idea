@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 
 /**
@@ -17,8 +18,7 @@ fun duplicateChangeAction(
     entries: List<LogEntry>
 ) = nullAndDumbAwareAction(repo, "log.action.duplicate", AllIcons.Actions.Copy) {
     val revisions = entries.map { it.id }
-    target.commandExecutor
-        .createCommand { duplicate(revisions) }
+    target.createCommand { duplicate(revisions) }
         .onSuccess {
             target.invalidate()
             log.info("Duplicated $revisions")

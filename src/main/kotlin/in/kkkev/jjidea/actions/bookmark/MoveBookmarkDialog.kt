@@ -1,9 +1,9 @@
 package `in`.kkkev.jjidea.actions.bookmark
 
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBCheckBox
@@ -18,11 +18,11 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.ui.components.icon
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.AlphaComposite
 import java.awt.BorderLayout
@@ -356,10 +356,8 @@ class MoveBookmarkDialog(
     }
 
     companion object {
-        private val log = Logger.getInstance(MoveBookmarkDialog::class.java)
-
         fun show(repo: JujutsuRepository, targetId: ChangeId, onSelected: (Bookmark, Boolean) -> Unit) {
-            runInBackground {
+            repo.runRecoverableInBackground(retry = { show(repo, targetId, onSelected) }) {
                 val classified = loadData(repo, targetId)
                 runLater {
                     val dlg = MoveBookmarkDialog(repo.project, classified)
@@ -371,11 +369,14 @@ class MoveBookmarkDialog(
             }
         }
 
+        /**
+         * @throws VcsException if bookmarks or the forward/backward classification's ancestor
+         * revset query can't be loaded (jj-idea-27b4) - a stale workspace fails exactly this way,
+         * and silently defaulting every candidate to backward/sideways (as this used to) would
+         * misreport a genuinely forward move.
+         */
         fun loadData(repo: JujutsuRepository, targetId: ChangeId): List<ClassifiedBookmark> {
-            val bookmarks = repo.logService.getBookmarks().getOrElse {
-                log.warn("Failed to load bookmarks for move dialog", it)
-                return emptyList()
-            }
+            val bookmarks = repo.logService.getBookmarks().getOrThrow()
             val candidates = BookmarkClassifier.eligible(bookmarks, targetId)
             val revset = BookmarkClassifier.ancestorRevset(candidates, targetId)
                 ?: return candidates.map { ClassifiedBookmark(it, MoveDirection.BACKWARD_OR_SIDEWAYS) }
@@ -384,12 +385,10 @@ class MoveBookmarkDialog(
                 revset = revset,
                 template = "${TemplateParts.changeIdWithOffset()} ++ \"\\n\""
             )
-            val forwardIds = if (result is CommandExecutor.CommandResult.Success) {
-                result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-            } else {
-                log.warn("Ancestor revset query '$revset' failed: ${result.stderr}")
-                emptySet()
+            if (result !is CommandExecutor.CommandResult.Success) {
+                throw VcsException("Error from jj log: ${result.stderr}")
             }
+            val forwardIds = result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             return BookmarkClassifier.classify(candidates, forwardIds)
         }
     }

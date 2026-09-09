@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.ignore.JujutsuIgnoreService
@@ -106,7 +107,7 @@ class TrackedToggleAction : ToggleAction(
 
         val progressTitleKey = if (state) "progress.file.track" else "progress.file.untrack"
 
-        repo.commandExecutor.createCommand { if (state) fileTrack(toChange) else fileUntrack(toChange) }
+        repo.createCommand { if (state) fileTrack(toChange) else fileUntrack(toChange) }
             .onSuccessResult {
                 repo.invalidate(vfsChanged = true)
                 JujutsuIgnoredFilesService.getInstance(project).invalidate(repo)

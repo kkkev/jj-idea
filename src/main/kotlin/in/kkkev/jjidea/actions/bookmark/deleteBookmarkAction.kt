@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.actions.bookmarkTarget
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 
@@ -33,7 +34,7 @@ internal fun performDeleteBookmark(repo: JujutsuRepository, bookmark: Bookmark) 
         return
     }
 
-    repo.commandExecutor.createCommand { bookmarkDelete(bookmark.name) }
+    repo.createCommand { bookmarkDelete(bookmark.name) }
         .onSuccess {
             repo.invalidate()
             log.info("Deleted bookmark ${bookmark.name}")

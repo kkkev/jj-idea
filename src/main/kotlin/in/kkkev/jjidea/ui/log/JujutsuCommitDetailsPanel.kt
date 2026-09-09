@@ -9,6 +9,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.components.JBScrollPane
@@ -19,12 +20,15 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RepositoryHealth
+import `in`.kkkev.jjidea.jj.classifyRepositoryFailure
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
 import `in`.kkkev.jjidea.ui.common.changesTreeToolbar
 import `in`.kkkev.jjidea.ui.common.sameChangesAndStatuses
 import `in`.kkkev.jjidea.ui.components.*
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import kotlinx.datetime.Instant
@@ -218,18 +222,41 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
                         changesTree.invokeAfterRefresh { changesTree.treeExpander.expandAll() }
                     }
                 }
-            } catch (e: Exception) {
-                // This can happen when a commit is removed (e.g., by abandon, or empty commit auto-removed).
-                // Treat this as "no commit selected" rather than an error.
-                val ids = entries.joinToString { it.id.toString() }
-                log.info("Change(s) $ids no longer exist (likely abandoned or auto-removed): ${e.message}")
-                runLater {
-                    if (currentEntries == entries) {
-                        currentEntries = emptyList()
-                        showEmptyState()
-                        changesTree.setChangesToDisplay(emptyList())
+            } catch (e: VcsException) {
+                // A stale workspace (jj-idea-27b4) must offer its remedy, not be silently
+                // mistaken for "commit removed" below - checked first since WorkingCopyUnavailableException
+                // and ChangeService's re-thrown stale failure are both VcsExceptions.
+                val health = classifyRepositoryFailure(e.message.orEmpty())
+                if (health is RepositoryHealth.Stale) {
+                    val repo = entries.firstOrNull()?.repo
+                    runLater {
+                        if (repo != null) {
+                            JujutsuNotifications.notifyWorkingCopyUnavailable(repo.project, repo, health) {
+                                loadChanges(entries)
+                            }
+                        }
                     }
+                } else {
+                    logRemoved(entries, e)
                 }
+            } catch (e: Exception) {
+                logRemoved(entries, e)
+            }
+        }
+    }
+
+    /**
+     * Treats a load failure as "the commit no longer exists" (abandon, empty commit
+     * auto-removed) - the pre-existing, non-stale interpretation of [loadChanges] failing.
+     */
+    private fun logRemoved(entries: List<LogEntry>, e: Exception) {
+        val ids = entries.joinToString { it.id.toString() }
+        log.info("Change(s) $ids no longer exist (likely abandoned or auto-removed): ${e.message}")
+        runLater {
+            if (currentEntries == entries) {
+                currentEntries = emptyList()
+                showEmptyState()
+                changesTree.setChangesToDisplay(emptyList())
             }
         }
     }

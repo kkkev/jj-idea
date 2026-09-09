@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.newchange.NewChangeDialog
@@ -28,7 +29,7 @@ fun newChangeFromAction(project: Project, repo: JujutsuRepository?, targetEntrie
         if (!dialog.showAndGet()) return@nullAndDumbAwareAction
         val spec = dialog.result ?: return@nullAndDumbAwareAction
 
-        target.commandExecutor.createCommand {
+        target.createCommand {
             new(spec.description, spec.parents, spec.destinationMode, spec.edit)
         }.onSuccess {
             // edit=true (the default) moves the working copy to the new change, so select it;

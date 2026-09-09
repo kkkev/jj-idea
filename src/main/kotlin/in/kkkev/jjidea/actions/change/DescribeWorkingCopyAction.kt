@@ -8,6 +8,7 @@ import `in`.kkkev.jjidea.actions.requestDescription
 import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 import `in`.kkkev.jjidea.vcs.isJujutsu
@@ -28,16 +29,15 @@ class DescribeWorkingCopyAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val repo = project.initialisedJujutsuRepositories.firstOrNull() ?: return
-        val commandExecutor = repo.commandExecutor
 
-        commandExecutor.createCommand {
+        repo.createCommand {
             log(WorkingCopy, "description")
         }.onSuccess { currentDescription ->
             val newDescription = project.requestDescription(
                 "dialog.describe.workingcopy.input",
                 Description(currentDescription.removeSuffix("\n"))
             ) ?: return@onSuccess
-            commandExecutor.createCommand { describe(newDescription) }
+            repo.createCommand { describe(newDescription) }
                 .onSuccess {
                     repo.invalidate()
                     project.saveDescriptionToHistory(newDescription)

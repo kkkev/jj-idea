@@ -170,7 +170,14 @@ data class JujutsuRepositoryImpl(
 
     override val workingCopy: LogEntry
         get() = project.stateModel.workingCopies.value[directory.path]
-            ?: throw VcsException("Working copy not found for $this")
+            ?: throw WorkingCopyUnavailableException(
+                this,
+                JujutsuRepositoryHealth.healthFor(directory.path)
+                    // Absent from both maps means the initial load simply hasn't completed yet
+                    // (not a failure jj reported) - still surface it as Unreadable so callers have
+                    // a uniform RepositoryHealth to branch on.
+                    ?: RepositoryHealth.Unreadable(JujutsuBundle.message("workingcopy.notyetloaded"))
+            )
 
     override fun createDiffSideFor(fileAtVersion: FileAtVersion?): DiffSide =
         DiffSideImpl(fileAtVersion?.let(this::getVirtualFile))

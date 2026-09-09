@@ -12,6 +12,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.log.CommitGraphBuilder
 import `in`.kkkev.jjidea.ui.log.GraphNode
@@ -114,15 +115,17 @@ class CommitPickerPanel(
         // Swing tooltip, which paints chip <img> markup as a broken image (jj-idea-2md7).
         installIconAwareTableTooltip(table, project)
 
-        if (autoLoad) {
-            runInBackground(ModalityState.any()) {
-                val loaded = repo.logCache.all
-                runLater {
-                    if (disposed) return@runLater
-                    entries = loaded
-                    applyReload()
-                    onInitialLoad()
-                }
+        if (autoLoad) loadEntries()
+    }
+
+    private fun loadEntries() {
+        repo.runRecoverableInBackground(retry = ::loadEntries, modalityState = ModalityState.any()) {
+            val loaded = repo.logCache.all
+            runLater {
+                if (disposed) return@runLater
+                entries = loaded
+                applyReload()
+                onInitialLoad()
             }
         }
     }

@@ -13,7 +13,9 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.runRecoverable
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
@@ -36,8 +38,7 @@ internal fun performFetch(spec: GitFetchDialog.GitFetchSpec, project: Project) {
             spec.remote != null -> spec.remote.name
             else -> repo.gitRemotes.firstOrNull()?.name ?: repo.displayName
         }
-        repo.commandExecutor
-            .createCommand { gitFetch(spec.remote, spec.allRemotes) }
+        repo.createCommand { gitFetch(spec.remote, spec.allRemotes) }
             .onSuccess {
                 repo.invalidate(vfsChanged = true)
                 log.info("Fetched for ${repo.displayName}")
@@ -106,23 +107,30 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?, entries: List<LogE
                 return@runInBackground
             }
 
-            val changeTargets = changeTargetsFor(target, entries)
-            val defaultScope = GitPushDialog.parsePushScope(JujutsuSettings.getInstance(project).state.defaultPushScope)
-
-            runLater {
-                val dialog = GitPushDialog(
-                    project,
-                    mapOf(target to data),
-                    target,
-                    changeTargets = changeTargets,
-                    changeTargetsRepo = target,
-                    defaultScope = defaultScope
+            // Wrapped in runRecoverable (jj-idea-b65g): changeTargetsFor reads target.workingCopy,
+            // which throws if target's workspace is stale - offer the remedy and reopen the
+            // dialog once it's applied, rather than dropping this Push invocation on the floor.
+            runRecoverable(project) {
+                val changeTargets = changeTargetsFor(target, entries)
+                val defaultScope = GitPushDialog.parsePushScope(
+                    JujutsuSettings.getInstance(project).state.defaultPushScope
                 )
-                if (!dialog.showAndGet()) return@runLater
 
-                val spec = dialog.result ?: return@runLater
+                runLater {
+                    val dialog = GitPushDialog(
+                        project,
+                        mapOf(target to data),
+                        target,
+                        changeTargets = changeTargets,
+                        changeTargetsRepo = target,
+                        defaultScope = defaultScope
+                    )
+                    if (!dialog.showAndGet()) return@runLater
 
-                checkAndPush(spec, project, revision)
+                    val spec = dialog.result ?: return@runLater
+
+                    checkAndPush(spec, project, revision)
+                }
             }
         }
     }
@@ -211,16 +219,15 @@ private fun trackAndPush(
 }
 
 private fun performPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Revision?) {
-    spec.repo.commandExecutor
-        .createCommand {
-            gitPush(
-                spec.remote,
-                spec.bookmark,
-                spec.allBookmarks,
-                changeRevisions = spec.changeRevisions,
-                revision = revision
-            )
-        }
+    spec.repo.createCommand {
+        gitPush(
+            spec.remote,
+            spec.bookmark,
+            spec.allBookmarks,
+            changeRevisions = spec.changeRevisions,
+            revision = revision
+        )
+    }
         .onSuccessResult {
             spec.repo.invalidate()
             log.info("Pushed for ${spec.repo.displayName}")

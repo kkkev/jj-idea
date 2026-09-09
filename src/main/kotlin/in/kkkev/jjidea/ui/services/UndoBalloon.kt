@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.OperationId
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.util.runLater
 
@@ -47,7 +48,7 @@ fun CommandExecutor.Command.withUndoBalloon(
  * [in.kkkev.jjidea.actions.undo.UndoLastOperationAction] so both go through one path.
  */
 fun performUndo(project: Project, repo: JujutsuRepository, operation: OperationId) {
-    repo.commandExecutor.createCommand { opRevert(operation) }
+    repo.createCommand { opRevert(operation) }
         .onSuccess {
             repo.invalidate(select = WorkingCopy, vfsChanged = true)
             JujutsuUndoService.getInstance(project).clearIfCurrent(repo, operation)

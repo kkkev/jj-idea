@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 
 abstract class BookmarkNameDialog(private val repo: JujutsuRepository, private val actionType: String) :
@@ -45,17 +46,27 @@ abstract class BookmarkNameDialog(private val repo: JujutsuRepository, private v
         ValidationInfo(JujutsuBundle.message(it, bookmark), nameField)
     }
 
-    override fun doOKAction() = repo.commandExecutor
-        .createCommand { execute(this) }
+    override fun doOKAction() = repo.createCommand { execute(this) }
         .onSuccess {
             repo.invalidate()
             onSuccess()
             super.doOKAction()
         }.onFailure {
-            failedNames[bookmark] = when (exitCode) {
-                1 -> "dialog.bookmark.$actionType.error.already.exists"
-                2 -> "dialog.bookmark.$actionType.error.incorrect.format"
-                else -> "dialog.bookmark.$actionType.error.unknown"
+            // jj exits 1 for essentially every runtime error, not just a name conflict (verified:
+            // e.g. `jj bookmark create x -r nonexistent_rev` also exits 1) - jj-idea-27b4. Reading
+            // stderr for the actual wording ("Bookmark already exists: <name>", verified against jj
+            // 0.44) instead of trusting exitCode alone stops misattributing every other exit-1
+            // failure as a name conflict. Exit 2 is reliably clap's own parse/usage error.
+            failedNames[bookmark] = when {
+                exitCode == 2 -> "dialog.bookmark.$actionType.error.incorrect.format"
+                stderr.contains(
+                    "already exists",
+                    ignoreCase = true
+                ) -> "dialog.bookmark.$actionType.error.already.exists"
+                else -> {
+                    log.warn("Failed to $actionType bookmark '${bookmark.name}': $stderr")
+                    "dialog.bookmark.$actionType.error.unknown"
+                }
             }
         }
         .executeAsync()

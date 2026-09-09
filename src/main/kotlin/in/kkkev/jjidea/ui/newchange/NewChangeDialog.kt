@@ -8,12 +8,12 @@ import com.intellij.ui.OnePixelSplitter
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
+import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.ui.common.createSourcePanel
 import `in`.kkkev.jjidea.ui.common.createVerticalPanel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.duplicate.validPlacementModes
 import `in`.kkkev.jjidea.ui.rebase.RebasePreviewPanel
-import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -112,7 +112,11 @@ class NewChangeDialog(
 
         init()
 
-        runInBackground(ModalityState.any()) {
+        loadRepoEntries()
+    }
+
+    private fun loadRepoEntries() {
+        repo.runRecoverableInBackground(retry = ::loadRepoEntries, modalityState = ModalityState.any()) {
             val entries = repo.logCache.all
             runLater {
                 if (!isDisposed) {
