@@ -210,37 +210,20 @@ private fun TextCanvas.overflowChip(entry: LogEntry, hidden: List<RefChip>) {
 
 /**
  * Compute the x-offset where the description text area begins for [row], mirroring
- * [JujutsuGraphAndDescriptionRenderer]'s private `textStartX()` exactly, but without its
- * per-renderer-instance passthrough-lane cache (jj-idea-91qf) - this runs once per discrete mouse
- * click (via `JujutsuLogTable.clickTargetAt`), not on every cell repaint, so recomputing row
- * passthroughs here (O(rows)) doesn't hit the same hot path the render-time cache protects.
+ * [JujutsuGraphAndDescriptionRenderer]'s private `textStartX()` exactly - both now delegate to
+ * [GraphEdgeIndex.rightmostLane] (jj-idea-sc8m), replacing what used to be two independently
+ * hand-rolled passes over the same passthrough-lane geometry. This one builds its own index per
+ * call rather than sharing the renderer's cached instance - it runs once per discrete mouse click
+ * (via `JujutsuLogTable.clickTargetAt`), not on every cell repaint, so it doesn't hit the same hot
+ * path the render-time cache protects.
  */
 internal fun graphTextStartX(row: Int, model: JujutsuLogTableModel, graphNodes: Map<ChangeKey, GraphNode>): Int {
     val entry = model.getEntry(row) ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
-    val graphNode = graphNodes[entry.key] ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
+    graphNodes[entry.key] ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
     val laneWidth = JujutsuGraphAndDescriptionRenderer.LANE_WIDTH.get()
     val horizontalPadding = JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
 
-    val rowByKey = HashMap<ChangeKey, Int>()
-    for (r in 0 until model.rowCount) {
-        model.getEntry(r)?.let { rowByKey[it.key] = r }
-    }
-    val activeLanes = mutableSetOf(graphNode.lane)
-    for (r in 0 until row) {
-        val prevEntry = model.getEntry(r) ?: continue
-        val prevNode = graphNodes[prevEntry.key] ?: continue
-        for ((parentKey, lane) in prevNode.passthroughLanes) {
-            val parentRow = rowByKey[parentKey] ?: continue
-            if (row in (r + 1) until parentRow) activeLanes.add(lane)
-        }
-        if (prevEntry.parentKeys.contains(entry.key)) activeLanes.add(prevNode.lane)
-    }
-    for (parentLane in graphNode.parentLanes) {
-        if (parentLane != graphNode.lane) activeLanes.add(parentLane)
-    }
-    graphNode.stubLane?.let { activeLanes.add(it) }
-
-    val rightmostLane = activeLanes.maxOrNull() ?: graphNode.lane
+    val rightmostLane = GraphEdgeIndex.build(model.getFilteredEntries(), graphNodes).rightmostLane(row)
     return horizontalPadding + (rightmostLane + 1) * laneWidth
 }
 
