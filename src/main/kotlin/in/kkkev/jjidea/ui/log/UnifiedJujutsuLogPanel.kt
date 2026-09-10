@@ -186,7 +186,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             if (filtered.size == model.getAllEntries().size) {
                 fullGraphNodes
             } else {
-                graphBuilder.buildGraph(filtered)
+                graphBuilder.buildGraph(filtered, model.getAllEntries())
             }
         logTable.updateGraph(graph)
     }

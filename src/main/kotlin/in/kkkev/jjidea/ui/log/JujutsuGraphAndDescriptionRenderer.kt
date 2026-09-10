@@ -6,6 +6,7 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.components.*
+import `in`.kkkev.jjidea.ui.log.graph.ParentState
 import java.awt.*
 import java.awt.geom.Path2D
 import java.net.URI
@@ -59,16 +60,21 @@ class JujutsuGraphAndDescriptionRenderer(
         fun colorForLane(lane: Int) = LANE_COLORS[lane % LANE_COLORS.size]
 
         /**
-         * True when [node] draws no downward connector at all (no parent is in the loaded page)
-         * but isn't actually a repository root - the case that should get a wiggly elided-parent
-         * stub instead of silently looking like history just stops here (jj-idea-2c8k round 3;
-         * see also jj-idea-hlu3/jj-idea-xi58 for the fuller nearest-visible-ancestor treatment).
-         * A mixed merge (one parent loaded, one elided) already draws a real connector in
-         * [GraphNode.lane], so it's deliberately excluded here - handling it needs a free lane
-         * for the stub, left to jj-idea-hlu3.
+         * The state to paint a stub for, or null when [node] has no unresolved parent at all.
+         * [ParentState.NOT_LOADED] (a paged-window boundary, or beyond a non-paged limit) gets a
+         * faded straight stub; [ParentState.HIDDEN] (genuinely elided/filtered, jj's `~`) keeps
+         * the wiggle. When a row mixes both (rare - e.g. a merge with two unresolved parents of
+         * different states), NOT_LOADED wins: it's the actionable one (click to load), where
+         * HIDDEN's target needs the filter cleared first (jj-idea-hlu3).
          */
-        internal fun shouldDrawElidedStub(node: GraphNode): Boolean =
-            node.hasElidedParents && node.parentLanes.isEmpty()
+        internal fun stubStateToDraw(node: GraphNode): ParentState? {
+            val states = node.unresolvedParents.values
+            return when {
+                states.isEmpty() -> null
+                ParentState.NOT_LOADED in states -> ParentState.NOT_LOADED
+                else -> ParentState.HIDDEN
+            }
+        }
     }
 
     /** Lazily computed per-row passthrough lanes derived from entries' passthroughLanes */
@@ -229,6 +235,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 for (parentLane in graphNode.parentLanes) {
                     if (parentLane != graphNode.lane) activeLanes.add(parentLane)
                 }
+                graphNode.stubLane?.let { activeLanes.add(it) }
             }
 
             val rightmostLane = activeLanes.maxOrNull() ?: graphNode.lane
@@ -276,33 +283,48 @@ class JujutsuGraphAndDescriptionRenderer(
             val commitY = height / 2
 
             drawLinesToParents(g2d, node, commitX, commitY, row, startX, laneWidth)
-            if (shouldDrawElidedStub(node)) drawElidedParentStub(g2d, node, commitX, commitY)
+            stubStateToDraw(node)?.let { state ->
+                val stubLane = node.stubLane ?: node.lane
+                val stubX = startX + laneWidth / 2 + stubLane * laneWidth
+                drawElidedParentStub(g2d, colorForLane(stubLane), stubX, commitY, state)
+            }
             drawCommitCircle(g2d, node, commitX, commitY)
         }
 
         /**
-         * Draws a continuous wiggly line from just below the commit circle to the row's bottom
-         * edge, indicating "history continues here but hasn't loaded" rather than a true root -
-         * echoing the `~` jj uses for elision in `jj log`, but as an unbroken wave instead of a
-         * dash pattern (jj-idea-2c8k). Stays within [node]'s own lane so [textStartX] and
-         * [JujutsuLogTableRenderers.graphTextStartX]'s column-width math are unaffected.
+         * Draws an unresolved-parent stub from just below the commit circle to the row's bottom
+         * edge: a continuous wiggle for [ParentState.HIDDEN], echoing the `~` jj uses for
+         * elision in `jj log` (jj-idea-2c8k); a faded straight line for [ParentState.NOT_LOADED]
+         * - "the line continues, we just haven't drawn the rest" rather than a deliberate skip
+         * (jj-idea-xi58). [stubX] is [node]'s own lane unless a mixed merge needed a free lane
+         * of its own ([GraphNode.stubLane], jj-idea-1pgy).
          */
-        private fun drawElidedParentStub(g2d: Graphics2D, node: GraphNode, commitX: Int, commitY: Int) {
+        private fun drawElidedParentStub(g2d: Graphics2D, color: Color, stubX: Int, commitY: Int, state: ParentState) {
             val commitRadius = COMMIT_RADIUS.get()
-            val amplitude = ELIDED_WAVE_AMPLITUDE.get().toFloat()
-            val wavelength = ELIDED_WAVE_LENGTH.get().toFloat()
             val startY = commitY + commitRadius
 
+            if (state == ParentState.NOT_LOADED) {
+                val composite = g2d.composite
+                g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f)
+                g2d.color = color
+                g2d.drawLine(stubX, startY, stubX, height)
+                g2d.composite = composite
+                return
+            }
+
+            val amplitude = ELIDED_WAVE_AMPLITUDE.get().toFloat()
+            val wavelength = ELIDED_WAVE_LENGTH.get().toFloat()
+
             val path = Path2D.Float()
-            path.moveTo(commitX.toDouble(), startY.toDouble())
+            path.moveTo(stubX.toDouble(), startY.toDouble())
             var y = startY
             while (y <= height) {
-                val x = commitX + amplitude * kotlin.math.sin(2 * Math.PI.toFloat() * (y - startY) / wavelength)
+                val x = stubX + amplitude * kotlin.math.sin(2 * Math.PI.toFloat() * (y - startY) / wavelength)
                 path.lineTo(x.toDouble(), y.toDouble())
                 y++
             }
 
-            g2d.color = node.color
+            g2d.color = color
             g2d.draw(path)
         }
 
