@@ -353,6 +353,53 @@ handler — commit-onto-commit rebase — so gestures other than that one still 
       (jj-idea-lm3o); each sub-menu is labelled with the same colored bookmark
       (tracked/plain) or tag glyph its own chip would show
 
+#### Long-edge navigation (jj-idea-sc8m)
+
+Reuse FX-STRESS with `SCALE=6 WITH_REMOTE=1` and the paged log flag on, per MT-LOG-REFRESH's
+"Paged log loading" fixture below.
+
+- [ ] Hovering a long line whose child (upper) end is visible always points **down**, toward
+      the invisible parent; hovering one whose parent (lower) end is visible always points
+      **up**, toward the invisible child — direction never depends on where within the row
+      you point, only on which end is actually off-screen
+- [ ] When *both* ends are off-screen (e.g. scrolled to the middle of a very long branch),
+      direction instead depends on which half of the **viewport** the row falls in: rows in
+      the top half point up, rows in the bottom half point down. Moving the mouse gradually
+      from one visible row to the next changes direction **at most once**, at a single
+      stable transition row near the viewport's middle — not back and forth per row, and
+      not depending on where within a row you point
+- [ ] Whichever direction is active thickens the side of the line that *is* the navigation
+      target and shows a directional resize cursor (↑/↓); the side that isn't the target
+      stays plain/normal weight (not a dimmed or translucent overlay) — the tooltip names
+      the target commit and how many rows up/down it is
+- [ ] When one end is visible, the thickened treatment runs the **entire** way to that end's
+      own commit circle, with no gap or thin segment beforehand - including where the
+      connector is a diagonal (e.g. into/out of a merge commit), not just a plain vertical
+- [ ] Scroll the log (mouse wheel, scrollbar, keyboard) while hovering a long edge without
+      moving the mouse: the thickened span/direction updates to match the new viewport
+      immediately, instead of staying stuck at the position from before you scrolled
+- [ ] No stray extra vertical segments appear anywhere else in the graph while hovering - a
+      merge with 3+ parents is the sharpest test: hover each of its connector lines
+      individually and confirm nothing appears in an unrelated lane, and that the thickened
+      treatment stops exactly at a visible end's circle rather than bleeding into whatever
+      unrelated edge happens to reuse that lane immediately below/above it
+- [ ] Hovering a **faded straight stub** (a `NOT_LOADED` unresolved parent) shows a
+      directional-down cursor and a "Parent not loaded yet — click to load" tooltip
+      (a stub has no child-ward direction to offer, so it's always "down"); clicking it
+      loads and scrolls to reveal that parent, exactly as if you had scrolled to trigger
+      the load
+- [ ] Apply a filter that hides an ancestor so its row shows the **wiggly line**
+      (`HIDDEN`, jj-idea-xi58) — hovering it shows a tooltip naming what's hidden but the
+      cursor stays the plain arrow (not a directional cursor), and clicking it does nothing
+      (clearing the filter is the only way to reveal it, per jj-idea-hlu3)
+- [ ] A short edge whose both ends are already on screen gets no hover treatment at all —
+      the graph looks exactly as it did before this feature
+- [ ] Double-clicking a long edge navigates the same way a single click does, instead of
+      also triggering the row's Enter-bound action (e.g. Show Diff)
+- [ ] Confirm the graph column's text indent (where the description starts) looks
+      unchanged from before this change, on both a linear history and a wide multi-branch
+      view
+
 #### Graph layout under filtering (jj-idea-7jkr)
 
 → automate: jj-idea-2k2b (layout re-alignment under filtering is a deterministic
@@ -664,6 +711,9 @@ non-paged behavior is perceptible.
       loaded page show a **faded straight line** down from the commit circle instead of nothing
       (which would look like a true root) — distinct from the wiggle used for the filtering case
       above (jj-idea-xi58: a paged-window boundary isn't elision, it just hasn't loaded yet)
+- [ ] Clicking that faded straight line loads and reveals the missing parent, scrolling to it
+      once it arrives — see MT-LOG-GRAPH's "Long-edge navigation" (jj-idea-sc8m) subsection for
+      the full hover/click behavior
 - [ ] Scroll to the bottom of the loaded rows: more history loads in automatically before you
       reach the literal end (eager one-page-ahead prefetch); scrolling repeatedly keeps loading
       further pages at a consistent, flat pace — not slowing down page over page; the viewport

@@ -30,6 +30,7 @@ import javax.swing.JTable
 import javax.swing.JViewport
 import javax.swing.ListSelectionModel
 import javax.swing.event.ChangeEvent
+import javax.swing.event.ChangeListener
 import javax.swing.event.ListSelectionEvent
 import javax.swing.event.TableColumnModelEvent
 import javax.swing.event.TableColumnModelListener
@@ -68,6 +69,18 @@ class JujutsuLogTable(
         private set
     var hoveredLinkCol: Int = -1
         private set
+
+    // The long graph edge currently under the pointer (jj-idea-sc8m: hover-to-preview,
+    // click-to-navigate for an edge whose other end is off-viewport, or an unresolved-parent
+    // stub with no other end at all). Read by JujutsuGraphAndDescriptionRenderer to thicken the
+    // hovered span and swap in the edge's own tooltip.
+    var hoveredEdge: HoveredEdge? = null
+        private set
+
+    // Last mouse position seen by mouseMoved, null once the pointer has left the table
+    // (mouseExited) - kept so a scroll-triggered refreshHoverState (no new mouse event of its own)
+    // can re-evaluate the long-edge hover at the same screen position.
+    private var lastMousePoint: Point? = null
 
     // Root gutter state: true = expanded (shows repo name), false = collapsed (just colored strip).
     // Defaults to expanded for discoverability (GitHub #10); restored/persisted per-tab via
@@ -190,40 +203,43 @@ class JujutsuLogTable(
         addMouseMotionListener(
             object : MouseMotionAdapter() {
                 override fun mouseMoved(e: MouseEvent) {
-                    val newRow = rowAtPoint(e.point)
-                    if (newRow != hoveredRow) {
-                        val oldRow = hoveredRow
-                        hoveredRow = newRow
-                        if (oldRow >= 0) repaintRow(oldRow)
-                        if (newRow >= 0) repaintRow(newRow)
-                    }
-                    // Show hand cursor over a clickable element (author/committer name, or the
-                    // "+N more" overflow chip), and underline it (only it - jj-idea-iesq) while
-                    // the pointer is over it. Computed once and reused for both, rather than
-                    // calling clickTargetAt twice per move.
-                    //
-                    // Bookmark/tag chips deliberately do NOT get a hover cue (jj-idea-wkcz):
-                    // clickTargetAt still resolves them (right-click still works, via
-                    // clickActionGroup), but they have no left-click action, so hinting
-                    // "clickable" here would be misleading - and it'd clash visually once a chip
-                    // can itself contain a linkified issue reference (jj-idea-vrmv), where only
-                    // that inner fragment should look interactive.
-                    val newCol = columnAtPoint(e.point)
-                    val target = clickTargetAt(e.point)
-                    val showsHoverCue = target?.hasHoverCue == true
-                    cursor = if (showsHoverCue) {
-                        Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-                    } else {
-                        Cursor.getDefaultCursor()
-                    }
-                    val newHoveredLinkRow = if (showsHoverCue) newRow else -1
-                    val newHoveredLinkCol = if (showsHoverCue) newCol else -1
-                    if (newHoveredLinkRow != hoveredLinkRow || newHoveredLinkCol != hoveredLinkCol) {
-                        val oldLinkRow = hoveredLinkRow
-                        hoveredLinkRow = newHoveredLinkRow
-                        hoveredLinkCol = newHoveredLinkCol
-                        if (oldLinkRow >= 0) repaintRow(oldLinkRow)
-                        if (newHoveredLinkRow >= 0) repaintRow(newHoveredLinkRow)
+                    lastMousePoint = e.point
+                    refreshHoverState(e.point)
+                }
+            }
+        )
+
+        // Long-edge hover (jj-idea-sc8m) depends on the viewport, not just the pointer: scrolling
+        // without moving the mouse changes which end of an edge counts as visible (and, for a
+        // both-ends-off-screen edge, which side of the new viewport the hover row falls in), so the
+        // thickened span/direction would otherwise go stale until the next mouseMoved. Re-run the
+        // same hover logic at the last known pointer position whenever the enclosing viewport
+        // scrolls - mirrors installHideOnScroll's viewport (re)binding in IconAwareTooltip.kt.
+        run {
+            var boundViewport: JViewport? = null
+            val onScroll = ChangeListener { lastMousePoint?.let { refreshHoverState(it) } }
+            fun rebind() {
+                val viewport = parent as? JViewport
+                if (viewport === boundViewport) return
+                boundViewport?.removeChangeListener(onScroll)
+                boundViewport = viewport
+                viewport?.addChangeListener(onScroll)
+            }
+            addHierarchyListener { e ->
+                if (e.changeFlags and HierarchyEvent.PARENT_CHANGED.toLong() != 0L) rebind()
+            }
+            rebind()
+        }
+
+        // Clear the long-edge hover (jj-idea-sc8m) when the pointer leaves the table entirely -
+        // mouseMoved above only ever narrows/moves it, never fires once the pointer is gone.
+        addMouseListener(
+            object : MouseAdapter() {
+                override fun mouseExited(e: MouseEvent) {
+                    lastMousePoint = null
+                    hoveredEdge?.let { old ->
+                        hoveredEdge = null
+                        repaintRows(old.span)
                     }
                 }
             }
@@ -235,7 +251,10 @@ class JujutsuLogTable(
         installIconAwareTableTooltip(
             this,
             project,
-            isEnabled = { JujutsuSettings.getInstance(project).state.showLogHoverTooltip }
+            isEnabled = { JujutsuSettings.getInstance(project).state.showLogHoverTooltip },
+            // A long edge's own tooltip (jj-idea-sc8m) depends on which lane is hovered, not just
+            // the (row, column) cellKeyAt already tracks - two edges can share a cell.
+            extraKeyAt = { graphEdgeHoverAt(it)?.let { hovered -> hovered.lane to hovered.edge } }
         )
 
         // Handle clicks on the gutter column to toggle expansion
@@ -294,6 +313,14 @@ class JujutsuLogTable(
             object : MouseAdapter() {
                 override fun mouseClicked(e: MouseEvent) {
                     if (e.button != MouseEvent.BUTTON1 || e.clickCount != 1) return
+                    // Long-edge navigation (jj-idea-sc8m) takes priority over the graph gutter's
+                    // own dead space - clickTargetAt never resolves anything there anyway (see its
+                    // doc), so this can't shadow an existing click target.
+                    graphEdgeHoverAt(e.point)?.takeIf { it.navigable }?.let { hovered ->
+                        requestSelection(hovered.targetKey)
+                        e.consume()
+                        return
+                    }
                     when (val target = clickTargetAt(e.point) ?: return) {
                         is MoreRefsClick -> showMoreRefsPopup(e.component, e.x, e.y, target)
                         else -> target.performDefaultAction(project)
@@ -306,11 +333,13 @@ class JujutsuLogTable(
         // Route double-click through whichever action is bound to Enter (default: Show Diff,
         // jj-idea-th9h). Mirrors IntelliJ's own EditorTabPreview pattern: Enter and double-click
         // invoke the same action rather than a bespoke double-click setting, so rebinding Enter
-        // in Keymap settings changes double-click behaviour too. Ref chips and the root gutter
-        // keep their existing single-click behaviour instead of triggering the Enter action.
+        // in Keymap settings changes double-click behaviour too. Ref chips, the root gutter, and a
+        // long graph edge (jj-idea-sc8m, which already navigates on the first click above) keep
+        // their existing single-click behaviour instead of triggering the Enter action.
         object : DoubleClickListener() {
             override fun onDoubleClick(e: MouseEvent): Boolean {
                 if (clickTargetAt(e.point) != null) return false
+                if (graphEdgeHoverAt(e.point)?.navigable == true) return false
                 val viewColumn = columnAtPoint(e.point)
                 if (viewColumn >= 0 &&
                     convertColumnIndexToModel(viewColumn) == JujutsuLogTableModel.COLUMN_ROOT_GUTTER
@@ -496,6 +525,110 @@ class JujutsuLogTable(
         return LogClickTarget.resolve(uri, project, listOf(entry))
     }
 
+    // Built once per graph update (invalidated in updateGraph, same lifetime as the renderer's own
+    // instance-private index) so graphEdgeHoverAt below is O(1) per mouse move rather than
+    // rebuilding the whole row/lane pass on every event (jj-idea-sc8m's scale requirement).
+    private var edgeIndexCache: GraphEdgeIndex? = null
+
+    private fun edgeIndex(): GraphEdgeIndex =
+        edgeIndexCache ?: GraphEdgeIndex.build(logModel.getFilteredEntries(), graphNodes).also { edgeIndexCache = it }
+
+    /**
+     * The long graph edge (jj-idea-sc8m) under [point] (table-relative), or null when the point
+     * isn't in the graph gutter, isn't over any edge, or the edge there isn't "long" (both ends
+     * already on screen). Deliberately separate from [clickTargetAt]: that function is reused by
+     * [in.kkkev.jjidea.ui.log.JujutsuLogTableDnD] and by the double-click/popup handlers below, all
+     * of which key off "non-null means suppress default behaviour" - folding the graph gutter into
+     * it would change those semantics for space that was previously always null.
+     */
+    internal fun graphEdgeHoverAt(point: Point): HoveredEdge? {
+        val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null
+        val col = columnAtPoint(point).takeIf { it >= 0 } ?: return null
+        val modelRow = convertRowIndexToModel(row)
+        if (convertColumnIndexToModel(col) != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) return null
+        val cellRect = getCellRect(row, col, false)
+        val localX = point.x - cellRect.x
+        val textStart = graphTextStartX(modelRow, logModel, graphNodes)
+        if (localX >= textStart) return null
+
+        val startX = JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
+        val laneWidth = JujutsuGraphAndDescriptionRenderer.LANE_WIDTH.get()
+        val index = edgeIndex()
+        val lane = index.laneAt(localX, startX, laneWidth) ?: return null
+        return index.hoveredEdgeAt(modelRow, lane, visibleModelRows())
+    }
+
+    /** The range of model rows currently visible in the viewport, for [graphEdgeHoverAt]'s
+     * long/short classification. Only called with a non-empty table (see [graphEdgeHoverAt]). */
+    private fun visibleModelRows(): IntRange {
+        val rect = visibleRect
+        val topView = rowAtPoint(Point(rect.x, rect.y)).takeIf { it >= 0 } ?: 0
+        val bottomView = rowAtPoint(Point(rect.x, rect.y + rect.height - 1)).takeIf { it >= 0 } ?: (rowCount - 1)
+        return convertRowIndexToModel(topView)..convertRowIndexToModel(bottomView)
+    }
+
+    /**
+     * Re-evaluate every hover cue at [point] and update cursor/repaint state accordingly - the
+     * body of `mouseMoved`, pulled out so a viewport scroll (no new mouse event of its own) can
+     * re-run it at [lastMousePoint] too (jj-idea-sc8m: a long edge's span/direction depends on the
+     * viewport, so scrolling without moving the mouse would otherwise leave it stale).
+     */
+    private fun refreshHoverState(point: Point) {
+        val newRow = rowAtPoint(point)
+        if (newRow != hoveredRow) {
+            val oldRow = hoveredRow
+            hoveredRow = newRow
+            if (oldRow >= 0) repaintRow(oldRow)
+            if (newRow >= 0) repaintRow(newRow)
+        }
+        // Show hand cursor over a clickable element (author/committer name, or the "+N more"
+        // overflow chip), and underline it (only it - jj-idea-iesq) while the pointer is over it.
+        // Computed once and reused for both, rather than calling clickTargetAt twice per move.
+        //
+        // Bookmark/tag chips deliberately do NOT get a hover cue (jj-idea-wkcz): clickTargetAt
+        // still resolves them (right-click still works, via clickActionGroup), but they have no
+        // left-click action, so hinting "clickable" here would be misleading - and it'd clash
+        // visually once a chip can itself contain a linkified issue reference (jj-idea-vrmv),
+        // where only that inner fragment should look interactive.
+        val newCol = columnAtPoint(point)
+        val target = clickTargetAt(point)
+        val showsHoverCue = target?.hasHoverCue == true
+
+        // Long-edge hover (jj-idea-sc8m): only reachable in the graph gutter, where clickTargetAt
+        // above always returns null (it only resolves text/chip fragments), so the two hover cues
+        // never compete for the cursor.
+        val newHoveredEdge = graphEdgeHoverAt(point)
+        if (newHoveredEdge != hoveredEdge) {
+            val oldEdge = hoveredEdge
+            hoveredEdge = newHoveredEdge
+            oldEdge?.let { repaintRows(it.span) }
+            newHoveredEdge?.let { repaintRows(it.span) }
+        }
+
+        // A navigable edge gets a directional resize-style cursor (↑/↓, jj-idea-sc8m) instead of
+        // the generic hand cursor other clickable elements use - AWT's N/S_RESIZE_CURSOR glyphs
+        // already look like up/down arrows on every platform, for free. Direction itself comes
+        // from GraphEdgeIndex.hoveredEdgeAt, not from where within the row the pointer sits - see
+        // its doc for why.
+        cursor = when {
+            newHoveredEdge?.navigable == true && newHoveredEdge.direction == EdgeDirection.UP ->
+                Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR)
+            newHoveredEdge?.navigable == true ->
+                Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
+            showsHoverCue -> Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+            else -> Cursor.getDefaultCursor()
+        }
+        val newHoveredLinkRow = if (showsHoverCue) newRow else -1
+        val newHoveredLinkCol = if (showsHoverCue) newCol else -1
+        if (newHoveredLinkRow != hoveredLinkRow || newHoveredLinkCol != hoveredLinkCol) {
+            val oldLinkRow = hoveredLinkRow
+            hoveredLinkRow = newHoveredLinkRow
+            hoveredLinkCol = newHoveredLinkCol
+            if (oldLinkRow >= 0) repaintRow(oldLinkRow)
+            if (newHoveredLinkRow >= 0) repaintRow(newHoveredLinkRow)
+        }
+    }
+
     /**
      * Show a popup listing the refs collapsed behind a "+N more" chip; each opens its usual ref
      * action menu, labelled with the same coloured bookmark/tag glyph its own chip would show
@@ -648,8 +781,16 @@ class JujutsuLogTable(
         repaint(rect)
     }
 
+    /** Repaint every row in [rows] (model indices) - used for a hovered long edge's whole visible
+     * span (jj-idea-sc8m), bounded by the viewport since [rows] is already clamped to it. */
+    private fun repaintRows(rows: IntRange) {
+        for (row in rows) repaintRow(row)
+    }
+
     fun updateGraph(nodes: Map<ChangeKey, GraphNode>) {
         graphNodes = nodes
+        edgeIndexCache = null
+        hoveredEdge = null
         // Refresh combined graph+description column rendering with column manager
         // Find the column by model index, not view index
         for (i in 0 until columnModel.columnCount) {

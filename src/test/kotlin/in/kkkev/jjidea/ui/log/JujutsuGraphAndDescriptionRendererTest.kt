@@ -70,4 +70,32 @@ class JujutsuGraphAndDescriptionRendererTest {
             )
         ) shouldBe ParentState.NOT_LOADED
     }
+
+    // stubTargetFor (jj-idea-sc8m) is stubStateToDraw's sibling, returning the target parent key
+    // alongside the state - GraphEdgeIndex needs the key to record the stub as a navigable edge.
+
+    @Test
+    fun `stubTargetFor returns null for a true root`() {
+        stubTargetFor(node(parentLanes = emptyList(), unresolvedParents = emptyMap())) shouldBe null
+    }
+
+    @Test
+    fun `stubTargetFor pairs the single unresolved parent with its state`() {
+        stubTargetFor(
+            node(parentLanes = emptyList(), unresolvedParents = mapOf(parentKey("a") to ParentState.NOT_LOADED))
+        ) shouldBe (parentKey("a") to ParentState.NOT_LOADED)
+    }
+
+    @Test
+    fun `stubTargetFor prefers the NOT_LOADED parent when mixed`() {
+        stubTargetFor(
+            node(
+                parentLanes = listOf(0),
+                unresolvedParents = mapOf(
+                    parentKey("a") to ParentState.HIDDEN,
+                    parentKey("b") to ParentState.NOT_LOADED
+                )
+            )
+        ) shouldBe (parentKey("b") to ParentState.NOT_LOADED)
+    }
 }

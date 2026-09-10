@@ -42,6 +42,7 @@ class JujutsuGraphAndDescriptionRenderer(
         internal val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Graph.horizontalPadding", 4)
         private val ELIDED_WAVE_AMPLITUDE = JBValue.UIInteger("Jujutsu.Graph.elidedWaveAmplitude", 2)
         private val ELIDED_WAVE_LENGTH = JBValue.UIInteger("Jujutsu.Graph.elidedWaveLength", 6)
+        private val EDGE_HOVER_STROKE_WIDTH = JBValue.Float(2.6f)
 
         // Lane colors - must match CommitGraphBuilder colors for consistent coloring
         private val LANE_COLORS =
@@ -65,44 +66,31 @@ class JujutsuGraphAndDescriptionRenderer(
          * faded straight stub; [ParentState.HIDDEN] (genuinely elided/filtered, jj's `~`) keeps
          * the wiggle. When a row mixes both (rare - e.g. a merge with two unresolved parents of
          * different states), NOT_LOADED wins: it's the actionable one (click to load), where
-         * HIDDEN's target needs the filter cleared first (jj-idea-hlu3).
+         * HIDDEN's target needs the filter cleared first (jj-idea-hlu3). Delegates to
+         * [stubTargetFor] (jj-idea-sc8m), which [GraphEdgeIndex] also needs the target key from.
          */
-        internal fun stubStateToDraw(node: GraphNode): ParentState? {
-            val states = node.unresolvedParents.values
-            return when {
-                states.isEmpty() -> null
-                ParentState.NOT_LOADED in states -> ParentState.NOT_LOADED
-                else -> ParentState.HIDDEN
-            }
-        }
+        internal fun stubStateToDraw(node: GraphNode): ParentState? = stubTargetFor(node)?.second
+
+        /** The x-coordinate of [lane]'s centerline, given the graph's [startX] and [laneWidth] -
+         * the one formula every paint site and the long-edge hit test (jj-idea-sc8m) share. */
+        internal fun laneX(lane: Int, startX: Int, laneWidth: Int) = startX + laneWidth / 2 + lane * laneWidth
     }
 
-    /** Lazily computed per-row passthrough lanes derived from entries' passthroughLanes */
-    private var rowPassthroughCache: Map<Int, Set<Int>>? = null
+    /**
+     * Lazily built once per renderer instance (a fresh renderer is installed on every graph
+     * update - see [JujutsuLogTable.updateGraph] - so this needs no invalidation logic, same
+     * lifetime the old `rowPassthroughCache` had). Replaces that field plus
+     * [in.kkkev.jjidea.ui.log.graphTextStartX]'s separate uncached pass with one shared index
+     * (jj-idea-sc8m) - also the seam the long-edge hover/click hit test reads from
+     * ([JujutsuLogTable.graphEdgeHoverAt]).
+     */
+    private var edgeIndexCache: GraphEdgeIndex? = null
 
-    private fun getRowPassthroughs(model: JujutsuLogTableModel): Map<Int, Set<Int>> {
-        rowPassthroughCache?.let { return it }
-
-        val rowByKey = mutableMapOf<ChangeKey, Int>()
-        for (row in 0 until model.rowCount) {
-            val entry = model.getEntry(row) ?: continue
-            rowByKey[entry.key] = row
-        }
-
-        val result = mutableMapOf<Int, MutableSet<Int>>()
-        for (row in 0 until model.rowCount) {
-            val entry = model.getEntry(row) ?: continue
-            val node = graphNodes[entry.key] ?: continue
-            for ((parentKey, lane) in node.passthroughLanes) {
-                val parentRow = rowByKey[parentKey] ?: continue
-                for (r in (row + 1) until parentRow) {
-                    result.getOrPut(r) { mutableSetOf() }.add(lane)
-                }
-            }
-        }
-
-        rowPassthroughCache = result
-        return result
+    internal fun edgeIndex(model: JujutsuLogTableModel): GraphEdgeIndex {
+        edgeIndexCache?.let { return it }
+        val index = GraphEdgeIndex.build(model.getFilteredEntries(), graphNodes)
+        edgeIndexCache = index
+        return index
     }
 
     override fun getTableCellRendererComponent(
@@ -123,11 +111,23 @@ class JujutsuGraphAndDescriptionRenderer(
         private val row: Int,
         private val column: Int,
         private val isSelected: Boolean,
-        isHovered: Boolean,
+        private val isHovered: Boolean,
         private val mousePos: Point?
     ) : JPanel(null) {
         private val entry = (table.model as? JujutsuLogTableModel)?.getEntry(row)
         private val graphNode = entry?.let { graphNodes[it.key] }
+
+        /**
+         * The long edge currently under the pointer anywhere in the table (jj-idea-sc8m) - null
+         * for the Split/Squash/Rebase/Duplicate picker tables, which aren't [JujutsuLogTable] and
+         * so never set this. Deliberately *not* gated to this row being the hovered one (unlike
+         * [hoveredLinkTarget]'s single-cell text hover): a long edge's thickened span covers many
+         * rows, so every row's panel needs the same shared reference and does its own `row in
+         * span` check - gating this to `isHovered` (an earlier bug) meant only the exact row under
+         * the mouse ever saw it, so thickening never covered more than one row.
+         */
+        private val hoveredEdge: HoveredEdge? = (table as? JujutsuLogTable)?.hoveredEdge
+
         private val textPanel = TruncatingLeftRightLayout().apply {
             isOpaque = false
         }
@@ -144,8 +144,40 @@ class JujutsuGraphAndDescriptionRenderer(
             add(textPanel)
 
             entry?.let { e ->
-                toolTipText = buildTooltip(e)
+                toolTipText = hoveredEdgeTooltip() ?: buildTooltip(e)
                 configureTextPanel(e)
+            }
+        }
+
+        /**
+         * Tooltip for [hoveredEdge], replacing the row's usual [buildTooltip] while a long edge is
+         * hovered (jj-idea-sc8m): names the target for an already-loaded parent/child, explains
+         * "not loaded yet - click to load" for a [ParentState.NOT_LOADED] stub, or "hidden by the
+         * current filter" (no click hint - [HoveredEdge.navigable] is false) for [ParentState.HIDDEN].
+         * Gated to [isHovered] (unlike [hoveredEdge] itself, which every row's panel shares) since a
+         * tooltip is a single-cell affordance - only the row actually under the mouse should show one.
+         */
+        private fun hoveredEdgeTooltip(): String? {
+            val hovered = hoveredEdge?.takeIf { isHovered } ?: return null
+            val model = table.model as? JujutsuLogTableModel ?: return null
+            return htmlString(linkifier = linkifier) {
+                when (hovered.edge.state) {
+                    ParentState.NOT_LOADED -> append("Parent not loaded yet — click to load")
+                    ParentState.HIDDEN -> {
+                        append("Hidden by the current filter")
+                        model.entryFor(hovered.edge.parent)?.let { target ->
+                            append("\n")
+                            appendSummary(target.description)
+                        }
+                    }
+                    null -> {
+                        val target = model.entryFor(hovered.targetKey) ?: return@htmlString
+                        val targetRow = edgeIndex(model).rowOf(hovered.targetKey)
+                        appendSummary(target.description)
+                        val way = if (hovered.direction == EdgeDirection.DOWN) "down" else "up"
+                        targetRow?.let { append("\n${kotlin.math.abs(it - row)} rows $way") }
+                    }
+                }
             }
         }
 
@@ -221,24 +253,8 @@ class JujutsuGraphAndDescriptionRenderer(
             val laneWidth = LANE_WIDTH.get()
             val horizontalPadding = HORIZONTAL_PADDING.get()
 
-            // Compute rightmost active lane to position text after the graph
             val model = table.model as? JujutsuLogTableModel
-            val activeLanes = mutableSetOf(graphNode.lane)
-            model?.let { m ->
-                val entry = m.getEntry(row) ?: return@let
-                getRowPassthroughs(m)[row]?.let { activeLanes.addAll(it) }
-                for (prevRow in 0 until row) {
-                    val prevEntry = m.getEntry(prevRow) ?: continue
-                    val prevNode = graphNodes[prevEntry.key] ?: continue
-                    if (prevEntry.parentKeys.contains(entry.key)) activeLanes.add(prevNode.lane)
-                }
-                for (parentLane in graphNode.parentLanes) {
-                    if (parentLane != graphNode.lane) activeLanes.add(parentLane)
-                }
-                graphNode.stubLane?.let { activeLanes.add(it) }
-            }
-
-            val rightmostLane = activeLanes.maxOrNull() ?: graphNode.lane
+            val rightmostLane = model?.let { edgeIndex(it).rightmostLane(row) } ?: graphNode.lane
             return horizontalPadding + (rightmostLane + 1) * laneWidth
         }
 
@@ -279,16 +295,49 @@ class JujutsuGraphAndDescriptionRenderer(
 
             drawPassThroughLines(g2d, startX, laneWidth)
 
-            val commitX = startX + laneWidth / 2 + node.lane * laneWidth
+            val commitX = laneX(node.lane, startX, laneWidth)
             val commitY = height / 2
 
             drawLinesToParents(g2d, node, commitX, commitY, row, startX, laneWidth)
-            stubStateToDraw(node)?.let { state ->
+            stubTargetFor(node)?.let { (parentKey, state) ->
                 val stubLane = node.stubLane ?: node.lane
-                val stubX = startX + laneWidth / 2 + stubLane * laneWidth
-                drawElidedParentStub(g2d, colorForLane(stubLane), stubX, commitY, state)
+                val stubX = laneX(stubLane, startX, laneWidth)
+                val stubEdge = GraphEdge(child = entry.key, parent = parentKey, state = state)
+                drawElidedParentStub(g2d, colorForLane(stubLane), stubX, commitY, state, isHoveredEdge(stubEdge))
             }
             drawCommitCircle(g2d, node, commitX, commitY)
+        }
+
+        /**
+         * Whether [edge] (the specific connector/passthrough segment about to be drawn, not just a
+         * lane number) is the one currently hovered - comparing by edge identity, not by lane,
+         * matters right at a hovered edge's endpoint row: a lane is freed and often immediately
+         * reused there by a *different*, unrelated edge (e.g. the dot's own separate connector to
+         * its own parent), and comparing lanes alone would bleed the thickened/emphasized
+         * treatment into that unrelated segment past the circle where the hovered edge actually
+         * ends (jj-idea-sc8m round 3).
+         */
+        private fun isHoveredEdge(edge: GraphEdge?) = edge != null && edge == hoveredEdge?.edge
+
+        /** Whether [edge] should paint with the thickened hover stroke: it's the hovered edge, and
+         * this row is on [HoveredEdge.emphasized]'s (the [HoveredEdge.direction]) side of the pivot.
+         * The other side paints as plain, full-opacity, normal-width - not a dimmed/translucent
+         * overlay, which visually muddied the line instead of reading as a clean de-emphasis. */
+        private fun isEmphasizedEdge(edge: GraphEdge?) = isHoveredEdge(edge) && hoveredEdge?.emphasized(row) == true
+
+        private fun strokeForEdge(edge: GraphEdge?): Stroke =
+            if (isEmphasizedEdge(edge)) BasicStroke(EDGE_HOVER_STROKE_WIDTH.getFloat()) else BasicStroke(1f)
+
+        /** Draws one connector/passthrough segment with [strokeForEdge] applied and restored, so
+         * callers don't each hand-roll the save/apply/restore dance. [edge] is the specific
+         * [GraphEdge] this segment belongs to (see [isHoveredEdge] for why that matters, not just
+         * the lane it's drawn in). */
+        private fun drawLaneLine(g2d: Graphics2D, edge: GraphEdge?, color: Color, x1: Int, y1: Int, x2: Int, y2: Int) {
+            val originalStroke = g2d.stroke
+            g2d.color = color
+            g2d.stroke = strokeForEdge(edge)
+            g2d.drawLine(x1, y1, x2, y2)
+            g2d.stroke = originalStroke
         }
 
         /**
@@ -297,11 +346,21 @@ class JujutsuGraphAndDescriptionRenderer(
          * elision in `jj log` (jj-idea-2c8k); a faded straight line for [ParentState.NOT_LOADED]
          * - "the line continues, we just haven't drawn the rest" rather than a deliberate skip
          * (jj-idea-xi58). [stubX] is [node]'s own lane unless a mixed merge needed a free lane
-         * of its own ([GraphNode.stubLane], jj-idea-1pgy).
+         * of its own ([GraphNode.stubLane], jj-idea-1pgy). [thickened] applies the long-edge hover
+         * stroke (jj-idea-sc8m) when this stub is the one currently hovered.
          */
-        private fun drawElidedParentStub(g2d: Graphics2D, color: Color, stubX: Int, commitY: Int, state: ParentState) {
+        private fun drawElidedParentStub(
+            g2d: Graphics2D,
+            color: Color,
+            stubX: Int,
+            commitY: Int,
+            state: ParentState,
+            thickened: Boolean
+        ) {
             val commitRadius = COMMIT_RADIUS.get()
             val startY = commitY + commitRadius
+            val originalStroke = g2d.stroke
+            if (thickened) g2d.stroke = BasicStroke(EDGE_HOVER_STROKE_WIDTH.getFloat())
 
             if (state == ParentState.NOT_LOADED) {
                 val composite = g2d.composite
@@ -309,6 +368,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 g2d.color = color
                 g2d.drawLine(stubX, startY, stubX, height)
                 g2d.composite = composite
+                g2d.stroke = originalStroke
                 return
             }
 
@@ -326,16 +386,17 @@ class JujutsuGraphAndDescriptionRenderer(
 
             g2d.color = color
             g2d.draw(path)
+            g2d.stroke = originalStroke
         }
 
         private fun drawPassThroughLines(g2d: Graphics2D, graphStartX: Int, laneWidth: Int) {
             val model = table.model as? JujutsuLogTableModel ?: return
-            val rowPT = getRowPassthroughs(model)[row] ?: return
+            val index = edgeIndex(model)
+            val rowPT = index.passthroughLanes(row)
 
             for (lane in rowPT) {
-                val passX = graphStartX + laneWidth / 2 + lane * laneWidth
-                g2d.color = colorForLane(lane)
-                g2d.drawLine(passX, 0, passX, height)
+                val passX = laneX(lane, graphStartX, laneWidth)
+                drawLaneLine(g2d, index.edgeAt(row, lane), colorForLane(lane), passX, 0, passX, height)
             }
         }
 
@@ -375,9 +436,9 @@ class JujutsuGraphAndDescriptionRenderer(
                     val passThroughLane = prevNode.passthroughLanes[currentEntry.key]
                     val connectionLane = passThroughLane
                         ?: if (childHasMultipleParents) node.lane else childLane
-                    val connectionX = graphStartX + laneWidth / 2 + connectionLane * laneWidth
-                    g2d.color = colorForLane(connectionLane)
-                    g2d.drawLine(connectionX, 0, commitX, commitY)
+                    val connectionX = laneX(connectionLane, graphStartX, laneWidth)
+                    val edge = GraphEdge(child = prevEntry.key, parent = currentEntry.key, state = null)
+                    drawLaneLine(g2d, edge, colorForLane(connectionLane), connectionX, 0, commitX, commitY)
                 }
             }
 
@@ -389,9 +450,10 @@ class JujutsuGraphAndDescriptionRenderer(
                 val passThroughLane = node.passthroughLanes[parentKey]
                 val targetLane = passThroughLane
                     ?: if (childHasMultipleParents && parentLane != node.lane) parentLane else node.lane
-                val targetX = graphStartX + laneWidth / 2 + targetLane * laneWidth
-                g2d.color = if (targetLane == node.lane) node.color else colorForLane(targetLane)
-                g2d.drawLine(commitX, commitY, targetX, height)
+                val targetX = laneX(targetLane, graphStartX, laneWidth)
+                val edge = GraphEdge(child = currentEntry.key, parent = parentKey, state = null)
+                val lineColor = if (targetLane == node.lane) node.color else colorForLane(targetLane)
+                drawLaneLine(g2d, edge, lineColor, commitX, commitY, targetX, height)
             }
         }
 

@@ -273,17 +273,23 @@ internal fun tableCellTooltipHtml(table: JTable, point: Point): String? {
  *
  * [isEnabled] is consulted on every show, not just at install time, so a live settings toggle (the
  * log table's `showLogHoverTooltip`, jj-idea-tknb) applies without needing to reinstall.
+ *
+ * [extraKeyAt] folds extra state into the cell key that [cellKeyAt] alone can't see - e.g. the
+ * hovered graph lane within one wide graph+description cell (jj-idea-sc8m's long-edge tooltip),
+ * so moving between two edges inside the same (row, column) still counts as a new cell and
+ * re-renders instead of leaving the previous edge's tooltip stuck.
  */
 internal fun installIconAwareTableTooltip(
     table: JTable,
     project: Project,
     isEnabled: () -> Boolean = { true },
-    host: TooltipHost = PlatformTooltipHost
+    host: TooltipHost = PlatformTooltipHost,
+    extraKeyAt: (Point) -> Any? = { null }
 ): IdeTooltip {
     val tooltip = installIconAwareTooltip(
         owner = table,
         project = project,
-        cellKeyAt = { table.rowAtPoint(it) to table.columnAtPoint(it) },
+        cellKeyAt = { Triple(table.rowAtPoint(it), table.columnAtPoint(it), extraKeyAt(it)) },
         htmlAt = { point -> if (isEnabled()) tableCellTooltipHtml(table, point) else null },
         host = host
     )
