@@ -6,7 +6,19 @@ package `in`.kkkev.jjidea.ui.log.graph
  * @see <a href="../../../../../../../docs/LOG_GRAPH_ALGORITHM.md">Log Graph Algorithm</a>
  */
 interface LayoutCalculator<I : Any> {
-    fun calculate(entries: List<GraphEntry<I>>): GraphLayout<I>
+    /**
+     * @param allIds ids known to be loaded even if not laid out in [entries] (e.g. the full page
+     *   before a filter is applied). Defaults to just [entries]'s own ids, so a caller with no
+     *   filter concept gets every unresolved parent classified [ParentState.NOT_LOADED] as
+     *   before. A parent missing from [entries] but present in [allIds] is [ParentState.HIDDEN]
+     *   instead - loaded, but filtered out of what's being laid out.
+     */
+    fun calculate(
+        entries: List<GraphEntry<I>>,
+        allIds: Set<I> = entries.mapTo(HashSet()) {
+            it.current
+        }
+    ): GraphLayout<I>
 }
 
 private data class ChildInfo<I : Any>(val id: I, val lane: Int)
@@ -27,7 +39,7 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
     var operationCount: Long = 0
         private set
 
-    override fun calculate(entries: List<GraphEntry<I>>): GraphLayout<I> {
+    override fun calculate(entries: List<GraphEntry<I>>, allIds: Set<I>): GraphLayout<I> {
         operationCount = 0
 
         // Pre-compute row index for each entry (needed to determine if parent is adjacent)
@@ -40,7 +52,8 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
         val passthroughs = HashSet<Passthrough<I>>()
         val passthroughLanesByEntry = HashMap<I, Map<I, Int>>(entries.size * 2)
         val reservedLanes = HashMap<I, Int>()
-        val elidedParentsByEntry = HashMap<I, Boolean>(entries.size * 2)
+        val unresolvedParentsByEntry = HashMap<I, MutableMap<I, ParentState>>()
+        val stubLaneByEntry = HashMap<I, Int>()
 
         // First pass: assign lanes, track children, manage passthroughs
         for ((rowIndex, entry) in entries.withIndex()) {
@@ -86,14 +99,15 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
 
             operationCount += entry.parents.size
             for (parentId in entry.parents) {
-                // Parents not present in the loaded entry set (filtered/off-screen) get no
+                // Parents not present in the laid-out entry set (filtered/off-screen) get no
                 // lane/passthrough bookkeeping at all — a passthrough or reservation for
                 // them would never be terminated/consumed (their row never gets processed),
-                // leaking a lane for the rest of the graph. Record that this entry has one,
-                // though (RowLayout.hasElidedParents), so a renderer can tell "off-screen
-                // parent" apart from "true root" instead of the two looking identical.
+                // leaking a lane for the rest of the graph. Record why, though
+                // (RowLayout.unresolvedParents), so a renderer can tell "off-screen parent"
+                // apart from "true root", and NOT_LOADED apart from HIDDEN.
                 val parentRow = rowByChangeId[parentId] ?: run {
-                    elidedParentsByEntry[entry.current] = true
+                    val state = if (parentId in allIds) ParentState.HIDDEN else ParentState.NOT_LOADED
+                    unresolvedParentsByEntry.getOrPut(entry.current) { mutableMapOf() }[parentId] = state
                     continue
                 }
                 val isAdjacent = parentRow == rowIndex + 1
@@ -131,6 +145,18 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 }
             }
 
+            // A row with at least one unresolved parent AND at least one loaded parent (mixed
+            // merge, jj-idea-1pgy) already draws a real connector in `lane` - the stub needs a
+            // free lane of its own, scoped to this row only (not reserved, not a passthrough,
+            // so nothing leaks to the rest of the graph - the exact hazard `usedLanes`/
+            // `reservedLanes` above guard against). A row with no loaded parent at all can keep
+            // using its own (otherwise-unused) lane, matching the pre-jj-idea-1pgy stub position.
+            val unresolvedHere = unresolvedParentsByEntry[entry.current]
+            if (!unresolvedHere.isNullOrEmpty() && entry.parents.any { rowByChangeId.containsKey(it) }) {
+                operationCount += usedLanes.size
+                stubLaneByEntry[entry.current] = firstFreeLane(usedLanes)
+            }
+
             lanes[entry.current] = lane
             passthroughs.addAll(newPassthroughs)
             if (newPassthroughs.isNotEmpty()) {
@@ -147,9 +173,10 @@ class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
                 ?: emptyList()
             val parentLanes = entry.parents.mapNotNull { lanes[it] }
             val entryPassthroughLanes = passthroughLanesByEntry[entry.current] ?: emptyMap()
-            val hasElidedParents = elidedParentsByEntry[entry.current] ?: false
+            val unresolvedParents = unresolvedParentsByEntry[entry.current] ?: emptyMap()
+            val stubLane = stubLaneByEntry[entry.current]
 
-            RowLayout(entry.current, lane, childLanes, parentLanes, entryPassthroughLanes, hasElidedParents)
+            RowLayout(entry.current, lane, childLanes, parentLanes, entryPassthroughLanes, unresolvedParents, stubLane)
         }
 
         return GraphLayout(rows)

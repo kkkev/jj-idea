@@ -585,21 +585,30 @@ class LayoutCalculatorTest {
         layout.rows[4].lane shouldBe 3 // P4
     }
 
-    // jj-idea-2c8k: hasElidedParents distinguishes "true root" from "parent not currently
-    // loaded" (a page/window boundary, or a bounded context/search expansion) - see
-    // docs/design/jj-idea-2c8k-paged-log-loading.md § "Graph rendering at page/window
-    // boundaries." Both previously rendered identically (no connector at all).
+    // jj-idea-xi58: unresolvedParents distinguishes "true root" from "parent not currently
+    // loaded" (a page/window boundary, or a bounded context/search expansion) from "parent
+    // loaded but filtered out" - see
+    // docs/design/jj-idea-hlu3-xi58-elided-ancestor-rendering.md. All three previously rendered
+    // identically (no connector at all).
     @Test
-    fun `a row whose parent is absent from the loaded set is flagged hasElidedParents, unlike a true root`() {
+    fun `a row whose parent is absent from the loaded set is flagged NOT_LOADED, unlike a true root`() {
         val entries = listOf(
             GraphEntry(A, listOf("not-loaded")), // A's parent isn't in the loaded set
             GraphEntry(B, emptyList()) // B is a genuine root - no parent at all
         )
         val layout = calculator.calculate(entries)
 
-        layout.rows[0].hasElidedParents shouldBe true
-        layout.rows[0].parentLanes shouldBe emptyList() // unchanged: still no lane for the elided parent
-        layout.rows[1].hasElidedParents shouldBe false
+        layout.rows[0].unresolvedParents shouldBe mapOf("not-loaded" to ParentState.NOT_LOADED)
+        layout.rows[0].parentLanes shouldBe emptyList() // unchanged: still no lane for the unresolved parent
+        layout.rows[1].unresolvedParents shouldBe emptyMap()
+    }
+
+    @Test
+    fun `a row whose parent is in allIds but not laid out is flagged HIDDEN`() {
+        val entries = listOf(GraphEntry(A, listOf("filtered-out")))
+        val layout = calculator.calculate(entries, allIds = setOf(A, "filtered-out"))
+
+        layout.rows[0].unresolvedParents shouldBe mapOf("filtered-out" to ParentState.HIDDEN)
     }
 
     @Test
@@ -611,18 +620,45 @@ class LayoutCalculatorTest {
         )
         val layout = calculator.calculate(entries)
 
-        layout.rows[0].hasElidedParents shouldBe false
+        layout.rows[0].unresolvedParents shouldBe emptyMap()
     }
 
     @Test
-    fun `a merge with one loaded and one elided parent is flagged`() {
+    fun `a merge with one loaded and one not-loaded parent is flagged and gets its own stub lane`() {
         val entries = listOf(
             GraphEntry(A, listOf(B, "not-loaded")),
             GraphEntry(B, emptyList())
         )
         val layout = calculator.calculate(entries)
 
-        layout.rows[0].hasElidedParents shouldBe true
+        layout.rows[0].unresolvedParents shouldBe mapOf("not-loaded" to ParentState.NOT_LOADED)
         layout.rows[0].parentLanes shouldBe listOf(0) // the loaded parent (B) still gets its lane
+        layout.rows[0].lane shouldBe 0
+        layout.rows[0].stubLane shouldBe 1 // free lane, distinct from the row's own lane
+    }
+
+    @Test
+    fun `a row with no loaded parent at all needs no separate stub lane`() {
+        val entries = listOf(GraphEntry(A, listOf("not-loaded")))
+        val layout = calculator.calculate(entries)
+
+        layout.rows[0].stubLane shouldBe null
+    }
+
+    @Test
+    fun `a mixed merge's stub lane avoids a passthrough already occupying this row`() {
+        // Head's connector to its distant parent P occupies lane 0 as a passthrough through
+        // A's row; A's own lane is 1 (lane 0 already taken); the stub for A's not-loaded
+        // parent must skip both.
+        val entries = listOf(
+            GraphEntry("Head", listOf("P")),
+            GraphEntry(A, listOf("P", "not-loaded")),
+            GraphEntry("P", listOf("distant"))
+        )
+        val layout = calculator.calculate(entries)
+
+        val aRow = layout.rows[1]
+        aRow.unresolvedParents shouldBe mapOf("not-loaded" to ParentState.NOT_LOADED)
+        aRow.stubLane shouldBe 2 // lanes 0 (passthrough) and 1 (A's own lane) are taken
     }
 }
