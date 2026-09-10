@@ -332,11 +332,16 @@ handler — commit-onto-commit rebase — so gestures other than that one still 
 - [ ] Stress-test repo, many concurrent branches (`jj-idea-1ojh`, `jj-idea-5i6i`): run
       FX-STRESS; set Settings → Version Control → Jujutsu → Log Limit to 200 so several
       branches fall out of view; apply an author or date filter to shrink the visible set
-      further; confirm tree lines never cross over unrelated commits or share a lane
-      (a commit whose parent is filtered out shows a wiggly line down from its circle
-      instead of a real connector — jj-idea-2c8k's minimal stub; a true nearest-visible-
-      ancestor connector is still tracked separately as `jj-idea-hlu3`, not a bug here);
-      clear the filter and confirm the graph restores immediately without a manual Refresh
+      further; confirm tree lines never cross over unrelated commits or share a lane; a
+      commit whose parent is beyond the log limit (not loaded at all) shows a **faded
+      straight line** down from its circle instead of a real connector, while a commit
+      whose parent is loaded but hidden by the active filter shows a **wiggly line**
+      instead (jj-idea-xi58 - the two are now visually distinct; a true nearest-visible-
+      ancestor connector for the filtered case is still tracked separately as
+      `jj-idea-hlu3`, not a bug here); a merge with one loaded parent and one
+      unresolved parent shows its real connector plus a stub in its own lane, not just
+      the real connector (jj-idea-1pgy); clear the filter and confirm the graph restores
+      immediately without a manual Refresh
 - [ ] Hovering that row's tooltip lists every bookmark, including the ones collapsed
       behind "+N more" (jj-idea-w61m), wrapping the bookmark list across multiple lines
       and showing the full description without being clipped by the screen edge; if the
@@ -656,8 +661,9 @@ non-paged behavior is perceptible.
       "Changes to show" setting); the status strip below the table stays hidden the whole time
       (no "Showing N changes" message in this mode — the scrollbar already says there's more)
 - [ ] On a wide multi-branch repo (e.g. FX-STRESS), rows whose parent didn't make it into any
-      loaded page show a wiggly line down from the commit circle instead of nothing (which would
-      look like a true root) — same treatment as the filtering case above
+      loaded page show a **faded straight line** down from the commit circle instead of nothing
+      (which would look like a true root) — distinct from the wiggle used for the filtering case
+      above (jj-idea-xi58: a paged-window boundary isn't elision, it just hasn't loaded yet)
 - [ ] Scroll to the bottom of the loaded rows: more history loads in automatically before you
       reach the literal end (eager one-page-ahead prefetch); scrolling repeatedly keeps loading
       further pages at a consistent, flat pace — not slowing down page over page; the viewport

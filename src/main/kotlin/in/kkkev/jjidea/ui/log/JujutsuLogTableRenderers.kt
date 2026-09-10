@@ -238,6 +238,7 @@ internal fun graphTextStartX(row: Int, model: JujutsuLogTableModel, graphNodes: 
     for (parentLane in graphNode.parentLanes) {
         if (parentLane != graphNode.lane) activeLanes.add(parentLane)
     }
+    graphNode.stubLane?.let { activeLanes.add(it) }
 
     val rightmostLane = activeLanes.maxOrNull() ?: graphNode.lane
     return horizontalPadding + (rightmostLane + 1) * laneWidth
