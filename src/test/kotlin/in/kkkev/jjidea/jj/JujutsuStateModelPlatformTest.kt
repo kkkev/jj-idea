@@ -1,17 +1,21 @@
 package `in`.kkkev.jjidea.jj
 
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 @Tag("platform")
 @TestApplication
@@ -85,6 +89,29 @@ class JujutsuStateModelPlatformTest {
         } finally {
             Disposer.dispose(disposable)
         }
+    }
+
+    // Pins the actual production dispatch behind refreshVfsInBackground's default `dispatch`
+    // argument, which the unit-level InvalidateVfsScaleTest can't observe since it injects its
+    // own seam. Regresses jj-idea-nuk0 / GitHub #113: markDirtyAndRefresh's recursive walk used
+    // to run synchronously on the EDT caller here.
+    @Test
+    fun `refreshVfsInBackground's default dispatch runs markDirty off the EDT`() {
+        val edtThread = Thread.currentThread()
+        var markDirtyThread: Thread? = null
+        val latch = CountDownLatch(1)
+
+        refreshVfsInBackground(
+            directory = mockk<VirtualFile>(),
+            markDirty = {
+                markDirtyThread = Thread.currentThread()
+                latch.countDown()
+            }
+        )
+        latch.await(5, TimeUnit.SECONDS) shouldBe true
+
+        markDirtyThread shouldNotBe null
+        markDirtyThread shouldNotBe edtThread
     }
 
     @Test

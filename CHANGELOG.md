@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Settings → Keymap showed the raw action id instead of a real name for the main-toolbar bookmark widget (`Jujutsu.MainToolbarBookmarks`) and "Undo Last Jujutsu Operation" (`Jujutsu.UndoLastOperation`).
 - Settings → Version Control → Jujutsu's "Installation Help" no longer goes stale while Settings stays open: clicking Test now previews its wording, gated-feature list, and command rows against the path you just tested — even before clicking Apply — instead of only updating after reopening Settings. A fully up-to-date jj also now shows neutral "how to update later" wording and update commands, instead of "if jj is not installed, use...".
 - Installation Help's Cargo upgrade command now passes `--force`, instead of being identical to the install command — without it, `cargo install` refuses to overwrite an already-installed `jj` binary, so the shown command would have failed instead of upgrading.
+- Every mutating command (New Change, Edit, Abandon, Rebase, Squash, Split, Duplicate Onto, Restore, Undo, resolving a merge conflict, switching working copies) could briefly freeze the UI on a large repository, tripping IntelliJ's "slow operation may freeze UI" assertion — the post-command VFS refresh's recursive directory walk ran synchronously on the EDT despite requesting an async refresh; it now runs on a background thread. ([#113](https://github.com/kkkev/jj-idea/issues/113))
 
 ## [0.8.15] - 2026-09-07
 

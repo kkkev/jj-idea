@@ -633,11 +633,31 @@ internal fun loadWorkingCopies(
 }.associateBy { it.repo.directory.path }
 
 /**
+ * Marks [directory] dirty and schedules an async VFS refresh, off the caller's thread.
+ *
+ * [VfsUtil.markDirtyAndRefresh]'s `async` flag only defers the *refresh session*: the
+ * recursive `markDirtyRecursively` walk (and its symlink resolution, which reaches
+ * `FSRecordsImpl.update`) runs synchronously on the calling thread, which is the EDT for
+ * every `CommandExecutor.handleResult` -> `runLater` caller (see [invalidate]). That walk is
+ * O(files under the repo root), so on a large repo it froze the UI and tripped
+ * `SlowOperations.assertSlowOperationsAreAllowed` (jj-idea-nuk0, GitHub #113).
+ *
+ * [dispatch] and [markDirty] are seams for tests; production callers take the defaults.
+ */
+internal fun refreshVfsInBackground(
+    directory: VirtualFile,
+    dispatch: (() -> Unit) -> Unit = { runInBackground(action = it) },
+    markDirty: (VirtualFile) -> Unit = { VfsUtil.markDirtyAndRefresh(true, true, true, it) }
+) = dispatch { markDirty(directory) }
+
+/**
  * Invalidate cached repository state and optionally request a change selection.
  *
  * @param select The revision to select after refresh, or null for no selection change.
  * @param vfsChanged Whether to refresh IntelliJ's VFS from disk. Set to true for operations
  *   that change working copy files (edit, new, abandon, rebase, squash, split, fetch).
+ * @param refreshVfs How to perform that VFS refresh when [vfsChanged] is true; a seam for
+ *   tests, see [refreshVfsInBackground].
  *
  * Use cases:
  * - `invalidate()` - just refresh, no selection change
@@ -645,9 +665,13 @@ internal fun loadWorkingCopies(
  * - `invalidate(WorkingCopy)` - refresh and select working copy (e.g., after `jj new`)
  * - `invalidate(bookmark)` - refresh and select a bookmark
  */
-fun JujutsuRepository.invalidate(select: Revision? = null, vfsChanged: Boolean = false) {
+fun JujutsuRepository.invalidate(
+    select: Revision? = null,
+    vfsChanged: Boolean = false,
+    refreshVfs: (VirtualFile) -> Unit = { refreshVfsInBackground(it) }
+) {
     if (vfsChanged) {
-        VfsUtil.markDirtyAndRefresh(true, true, true, directory)
+        refreshVfs(directory)
     }
     logCache.clear()
     val stateModel = project.stateModel
