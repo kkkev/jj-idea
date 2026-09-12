@@ -67,14 +67,23 @@ fun saveAllDocuments() {
     }
 }
 
+/**
+ * On platform 2025.1, [TransactionGuard.isWritingAllowed] itself asserts the write-intent lock
+ * is held (`ApplicationImpl.assertWriteIntentLockAcquired`) - calling it from a raw EDT dispatch
+ * that hasn't acquired that lock throws, even though the call is only a check, not a write. Later
+ * platform versions don't assert this. Acquiring the lock via [runWriteIntentReadAction] before
+ * calling [TransactionGuard.isWritingAllowed] (rather than after, as before) satisfies 2025.1's
+ * assertion on every platform version, since real EDT dispatch already holds this lock in
+ * practice and nested acquisition is a no-op.
+ */
 private fun saveIfWritingAllowed() {
     val app = ApplicationManager.getApplication()
-    if (TransactionGuard.getInstance().isWritingAllowed()) {
-        app.runWriteIntentReadAction<Unit, Nothing> {
+    app.runWriteIntentReadAction<Unit, Nothing> {
+        if (TransactionGuard.getInstance().isWritingAllowed()) {
             FileDocumentManager.getInstance().saveAllDocuments()
+        } else {
+            log.info("saveAllDocuments skipped: writing is not allowed in modality ${ModalityState.current()}")
         }
-    } else {
-        log.info("saveAllDocuments skipped: writing is not allowed in modality ${ModalityState.current()}")
     }
 }
 
