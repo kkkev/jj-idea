@@ -2014,6 +2014,37 @@ confirm that's no longer possible (below).
 
 - [ ] `file.txt` appears in the Working Copy panel with red (MERGED_WITH_CONFLICTS) status
 - [ ] All three marker styles (git, snapshot, diff) correctly mark the file as conflicted
+- [ ] Under each marker style, "Resolve Conflicts…" shows correctly-oriented, commit-labelled
+      panes (see "Rebase conflict pane orientation and titles" below) — not just that the file is
+      detected as conflicted
+
+#### Rebase conflict pane orientation and titles (GitHub #112, jj-idea-l192)
+
+A rebase conflict's two sides are asymmetric — one is the commit you rebased onto (jj calls this
+the "destination"), the other is your own moved commit — and which one jj renders as full content
+vs. a diff from base varies per conflict, not per operation. "Resolve Conflicts…" now reads jj's
+own per-side label out of the conflict markers to decide which side is "Yours", instead of
+guessing from marker layout.
+
+Set up: `base` → `my change`; separately, `base` → `modified externally`; then rebase `my change`
+onto `modified externally` so it conflicts.
+
+- [ ] Opening "Resolve Conflicts…" on the conflicted file shows **your own change on the left**
+      pane and **the commit you rebased onto on the right**, titled with jj's own commit +
+      description text (e.g. `ulmlywnv "my change" (rebased revision)`), not "Yours"/"Theirs"
+- [ ] Repeat with a **descendant** of the rebased commit also conflicted (rebase a small stack,
+      not just one commit) — the orientation is the same as above for every conflicted commit in
+      the stack, not just the one directly targeted by the rebase
+- [ ] Try all three of `ui.conflict-marker-style` (`diff`, `git`, `snapshot`) — orientation and
+      titles are correct under `diff` and `git`; under `snapshot` (no commit info in the markers)
+      the panes fall back to plain **"Side #1"** / **"Side #2"** titles, content unaffected
+- [ ] A **merge** conflict (two arbitrary commits combined, not a rebase) and a **squash**
+      conflict still show today's unswapped ordering — confirm neither reads backwards now that
+      rebase conflicts do reorient
+- [ ] In the platform's native multi-file merge dialog (Commit tool window, if enabled) for the
+      same rebase conflict, bulk **"Accept Yours"** and the interactive dialog's left pane resolve
+      to the **same content** — confirm with `jj status`/file content after each — and likewise
+      for **"Accept Theirs"** and the right pane
 
 #### Modify/delete conflicts (jj-idea-x283)
 

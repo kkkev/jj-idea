@@ -6,12 +6,11 @@ import com.intellij.diff.merge.MergeResult
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
-import com.intellij.openapi.vcs.merge.MergeData
-import com.intellij.openapi.vcs.merge.MergeProvider
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
+import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
 import `in`.kkkev.jjidea.jj.conflict.conflictRegistry
 import java.nio.file.Files
 
@@ -71,9 +70,9 @@ import java.nio.file.Files
  */
 class JujutsuConflictResolver(
     private val project: Project,
-    private val mergeProvider: MergeProvider,
-    private val resolveOne: (VirtualFile, MergeData) -> ByteArray? = { file, data ->
-        defaultResolveOne(project, file, data)
+    private val mergeProvider: JujutsuMergeProvider,
+    private val resolveOne: (VirtualFile, ExtractedConflict) -> ByteArray? = { file, conflict ->
+        defaultResolveOne(project, file, conflict)
     },
     private val writeResolved: (VirtualFile, ByteArray) -> Unit = { file, bytes ->
         Files.write(file.toNioPath(), bytes)
@@ -94,13 +93,13 @@ class JujutsuConflictResolver(
      */
     fun resolve(files: List<VirtualFile>) {
         for (file in files) {
-            val mergeData = try {
-                mergeProvider.loadRevisions(file)
+            val conflict = try {
+                mergeProvider.loadConflict(file)
             } catch (_: VcsException) {
                 continue // Already resolved (or no conflict markers found) - nothing to do.
             }
 
-            val resolved = resolveOne(file, mergeData) ?: return // Cancelled: stop the queue.
+            val resolved = resolveOne(file, conflict) ?: return // Cancelled: stop the queue.
 
             if (resolved.isEmpty() && conflictInfoFor(file)?.isModifyDelete == true) {
                 deleteResolved(file)
@@ -114,10 +113,11 @@ class JujutsuConflictResolver(
     }
 
     private companion object {
-        fun defaultResolveOne(project: Project, file: VirtualFile, mergeData: MergeData): ByteArray? {
+        fun defaultResolveOne(project: Project, file: VirtualFile, conflict: ExtractedConflict): ByteArray? {
             // Scratch document, never the real file's - see class doc for why that matters.
             val outputDocument = EditorFactory.getInstance().createDocument("")
             var resolved: ByteArray? = null
+            val mergeData = conflict.mergeData
 
             val request = DiffRequestFactory.getInstance().createMergeRequest(
                 project,
@@ -127,9 +127,12 @@ class JujutsuConflictResolver(
                     .map { String(it, Charsets.UTF_8) },
                 JujutsuBundle.message("dialog.resolve.conflict.title", file.name),
                 listOf(
-                    JujutsuBundle.message("merge.column.yours"),
+                    // jj's own commit + role label (GitHub #112) when it has one, e.g.
+                    // `ulmlywnv c280fd5d "my change" (rebased revision)`; falls back to a plain
+                    // side number for markers with no commit identity (snapshot style).
+                    conflict.currentTitle ?: JujutsuBundle.message("merge.column.side1"),
                     JujutsuBundle.message("merge.column.result"),
-                    JujutsuBundle.message("merge.column.theirs")
+                    conflict.lastTitle ?: JujutsuBundle.message("merge.column.side2")
                 )
             ) { result ->
                 if (result != MergeResult.CANCEL) {

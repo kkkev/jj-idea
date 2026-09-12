@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
+import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
 import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -35,7 +36,15 @@ class JujutsuMergeProvider(
     }
 ) : MergeProvider2 {
     // Called on a background thread by the merge framework
-    override fun loadRevisions(file: VirtualFile): MergeData {
+    override fun loadRevisions(file: VirtualFile): MergeData = loadConflict(file).mergeData
+
+    /**
+     * Like [loadRevisions], but also returns jj's own label for whichever side landed in
+     * [MergeData.CURRENT]/[MergeData.LAST] (GitHub #112) - used for merge-pane titles
+     * ([JujutsuConflictResolver]) and to keep [acceptFilesRevisions]'s `:ours`/`:theirs` mapping
+     * consistent with a reoriented dialog.
+     */
+    fun loadConflict(file: VirtualFile): ExtractedConflict {
         // The extractor handles all three jj conflict marker styles (snapshot, diff, git).
         // For the working copy, createContentRevision reads the file from disk directly.
         val bytes = repoFor(file)
@@ -97,10 +106,10 @@ class JujutsuMergeProvider(
         // where the chosen side is the deletion, `:ours`/`:theirs` actually remove the file,
         // whereas writing its (empty) bytes would leave behind an empty file instead.
         override fun acceptFilesRevisions(files: List<VirtualFile>, resolution: MergeSession.Resolution) {
-            val tool = when (resolution) {
-                MergeSession.Resolution.AcceptedYours -> ":ours"
-                MergeSession.Resolution.AcceptedTheirs -> ":theirs"
-                else -> return
+            if (resolution != MergeSession.Resolution.AcceptedYours &&
+                resolution != MergeSession.Resolution.AcceptedTheirs
+            ) {
+                return
             }
             val failures = mutableListOf<Pair<VirtualFile, String>>()
             for (file in files) {
@@ -109,6 +118,7 @@ class JujutsuMergeProvider(
                     failures += file to JujutsuBundle.message("merge.resolve.noRepo")
                     continue
                 }
+                val tool = toolFor(file, resolution)
                 val relativePath = file.path.removePrefix(repo.directory.path).removePrefix("/")
                 val result = repo.commandExecutor.resolve(listOf(relativePath), tool)
                 if (result is CommandExecutor.CommandResult.Failure) {
@@ -116,6 +126,25 @@ class JujutsuMergeProvider(
                 }
             }
             if (failures.isNotEmpty()) reportFailures(failures)
+        }
+
+        /**
+         * "Yours" isn't always jj's side #1 - a rebase conflict's panes may be reoriented so the
+         * user's own change is "Yours" even when it's jj's side #2 (GitHub #112, see
+         * [ExtractedConflict.currentIsJjSide1]). Without this, this bulk accept path would pick
+         * the opposite side from what the interactive dialog just showed for the same file.
+         * Falls back to the literal `:ours`/`:theirs` mapping when the file can no longer be
+         * extracted (e.g. already resolved externally).
+         */
+        private fun toolFor(file: VirtualFile, resolution: MergeSession.Resolution): String {
+            val currentIsJjSide1 = try {
+                loadConflict(file).currentIsJjSide1
+            } catch (_: VcsException) {
+                true
+            }
+            val acceptingCurrent = resolution == MergeSession.Resolution.AcceptedYours
+            val acceptingJjSide1 = acceptingCurrent == currentIsJjSide1
+            return if (acceptingJjSide1) ":ours" else ":theirs"
         }
 
         private fun reportFailures(failures: List<Pair<VirtualFile, String>>) {

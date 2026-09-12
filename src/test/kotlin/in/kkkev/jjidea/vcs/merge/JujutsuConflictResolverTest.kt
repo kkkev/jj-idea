@@ -3,9 +3,10 @@ package `in`.kkkev.jjidea.vcs.merge
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.merge.MergeData
-import com.intellij.openapi.vcs.merge.MergeProvider
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
+import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -21,17 +22,27 @@ import org.junit.jupiter.api.Test
  */
 class JujutsuConflictResolverTest {
     private val project = mockk<Project>()
-    private val mergeProvider = mockk<MergeProvider>(relaxed = true)
+    private val mergeProvider = mockk<JujutsuMergeProvider>(relaxed = true)
 
-    private fun mergeData(current: String = "ours", original: String = "base", theirs: String = "theirs") =
-        MergeData().also {
+    private fun conflict(
+        current: String = "ours",
+        original: String = "base",
+        theirs: String = "theirs",
+        currentTitle: String? = null,
+        lastTitle: String? = null
+    ) = ExtractedConflict(
+        mergeData = MergeData().also {
             it.CURRENT = current.toByteArray(Charsets.UTF_8)
             it.ORIGINAL = original.toByteArray(Charsets.UTF_8)
             it.LAST = theirs.toByteArray(Charsets.UTF_8)
-        }
+        },
+        currentTitle = currentTitle,
+        lastTitle = lastTitle,
+        currentIsJjSide1 = true
+    )
 
     private fun resolverWith(
-        resolveOne: (VirtualFile, MergeData) -> ByteArray?,
+        resolveOne: (VirtualFile, ExtractedConflict) -> ByteArray?,
         writeResolved: MutableMap<VirtualFile, ByteArray> = mutableMapOf(),
         deleted: MutableList<VirtualFile> = mutableListOf(),
         conflictInfoFor: (VirtualFile) -> ConflictInfo? = { null }
@@ -47,7 +58,7 @@ class JujutsuConflictResolverTest {
     @Test
     fun `cancel on the only file - writes nothing and does not mark resolved`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        every { mergeProvider.loadConflict(file) } returns conflict()
 
         val (resolver, written) = resolverWith(resolveOne = { _, _ -> null })
 
@@ -61,21 +72,21 @@ class JujutsuConflictResolverTest {
     fun `cancel on the first of two files - stops before the second file is touched`() {
         val file1 = mockk<VirtualFile>()
         val file2 = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file1) } returns mergeData()
-        every { mergeProvider.loadRevisions(file2) } returns mergeData()
+        every { mergeProvider.loadConflict(file1) } returns conflict()
+        every { mergeProvider.loadConflict(file2) } returns conflict()
 
         val (resolver, written) = resolverWith(resolveOne = { _, _ -> null })
 
         resolver.resolve(listOf(file1, file2))
 
         written shouldBe emptyMap()
-        verify(exactly = 0) { mergeProvider.loadRevisions(file2) }
+        verify(exactly = 0) { mergeProvider.loadConflict(file2) }
     }
 
     @Test
     fun `resolved - writes the resolved bytes and marks the file resolved`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        every { mergeProvider.loadConflict(file) } returns conflict()
         val resolvedBytes = "merged content".toByteArray(Charsets.UTF_8)
 
         val (resolver, written) = resolverWith(resolveOne = { _, _ -> resolvedBytes })
@@ -89,9 +100,9 @@ class JujutsuConflictResolverTest {
     @Test
     fun `accept yours - writes CURRENT content`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData(current = "ours wins")
+        every { mergeProvider.loadConflict(file) } returns conflict(current = "ours wins")
 
-        val (resolver, written) = resolverWith(resolveOne = { _, data -> data.CURRENT })
+        val (resolver, written) = resolverWith(resolveOne = { _, data -> data.mergeData.CURRENT })
 
         resolver.resolve(listOf(file))
 
@@ -101,9 +112,9 @@ class JujutsuConflictResolverTest {
     @Test
     fun `accept theirs - writes LAST content`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData(theirs = "theirs wins")
+        every { mergeProvider.loadConflict(file) } returns conflict(theirs = "theirs wins")
 
-        val (resolver, written) = resolverWith(resolveOne = { _, data -> data.LAST })
+        val (resolver, written) = resolverWith(resolveOne = { _, data -> data.mergeData.LAST })
 
         resolver.resolve(listOf(file))
 
@@ -111,11 +122,11 @@ class JujutsuConflictResolverTest {
     }
 
     @Test
-    fun `already resolved - loadRevisions throws - file is skipped, later files still processed`() {
+    fun `already resolved - loadConflict throws - file is skipped, later files still processed`() {
         val alreadyResolved = mockk<VirtualFile>()
         val stillConflicted = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(alreadyResolved) } throws VcsException("no conflict markers")
-        every { mergeProvider.loadRevisions(stillConflicted) } returns mergeData()
+        every { mergeProvider.loadConflict(alreadyResolved) } throws VcsException("no conflict markers")
+        every { mergeProvider.loadConflict(stillConflicted) } returns conflict()
         val resolvedBytes = "resolved".toByteArray(Charsets.UTF_8)
 
         val (resolver, written) = resolverWith(resolveOne = { _, _ -> resolvedBytes })
@@ -131,8 +142,8 @@ class JujutsuConflictResolverTest {
     fun `two files - both resolved - each written and marked resolved once`() {
         val file1 = mockk<VirtualFile>()
         val file2 = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file1) } returns mergeData()
-        every { mergeProvider.loadRevisions(file2) } returns mergeData()
+        every { mergeProvider.loadConflict(file1) } returns conflict()
+        every { mergeProvider.loadConflict(file2) } returns conflict()
         val bytes1 = "one".toByteArray(Charsets.UTF_8)
         val bytes2 = "two".toByteArray(Charsets.UTF_8)
 
@@ -145,6 +156,48 @@ class JujutsuConflictResolverTest {
         written shouldBe mapOf(file1 to bytes1, file2 to bytes2)
         verify(exactly = 1) { mergeProvider.conflictResolvedForFile(file1) }
         verify(exactly = 1) { mergeProvider.conflictResolvedForFile(file2) }
+    }
+
+    // -------------------------------------------------------------------------
+    // GitHub #112: pane titles follow jj's own commit labels, with a fallback when absent.
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `titles from the extracted conflict reach resolveOne`() {
+        val file = mockk<VirtualFile>()
+        every { mergeProvider.loadConflict(file) } returns
+            conflict(
+                currentTitle = "my change (rebased revision)",
+                lastTitle = "modified externally (rebase destination)"
+            )
+        var seen: ExtractedConflict? = null
+
+        val (resolver, _) = resolverWith(resolveOne = { _, data ->
+            seen = data
+            null
+        })
+
+        resolver.resolve(listOf(file))
+
+        seen?.currentTitle shouldBe "my change (rebased revision)"
+        seen?.lastTitle shouldBe "modified externally (rebase destination)"
+    }
+
+    @Test
+    fun `null titles are passed through unchanged - the dialog applies the Side #1-2 fallback`() {
+        val file = mockk<VirtualFile>()
+        every { mergeProvider.loadConflict(file) } returns conflict(currentTitle = null, lastTitle = null)
+        var seen: ExtractedConflict? = null
+
+        val (resolver, _) = resolverWith(resolveOne = { _, data ->
+            seen = data
+            null
+        })
+
+        resolver.resolve(listOf(file))
+
+        seen?.currentTitle.shouldBeNull()
+        seen?.lastTitle.shouldBeNull()
     }
 
     // -------------------------------------------------------------------------
@@ -161,7 +214,7 @@ class JujutsuConflictResolverTest {
     @Test
     fun `empty result on a modify-delete conflict - deletes the file instead of writing it`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        every { mergeProvider.loadConflict(file) } returns conflict()
         val deleted = mutableListOf<VirtualFile>()
 
         val (resolver, written) = resolverWith(
@@ -180,7 +233,7 @@ class JujutsuConflictResolverTest {
     @Test
     fun `empty result on a content-only conflict - still writes the empty bytes`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        every { mergeProvider.loadConflict(file) } returns conflict()
         val deleted = mutableListOf<VirtualFile>()
 
         val (resolver, written) = resolverWith(
@@ -198,7 +251,7 @@ class JujutsuConflictResolverTest {
     @Test
     fun `empty result with unknown conflict shape - writes the empty bytes`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        every { mergeProvider.loadConflict(file) } returns conflict()
         val deleted = mutableListOf<VirtualFile>()
 
         val (resolver, written) = resolverWith(
@@ -216,7 +269,7 @@ class JujutsuConflictResolverTest {
     @Test
     fun `non-empty result on a modify-delete conflict - still writes the content`() {
         val file = mockk<VirtualFile>()
-        every { mergeProvider.loadRevisions(file) } returns mergeData()
+        every { mergeProvider.loadConflict(file) } returns conflict()
         val deleted = mutableListOf<VirtualFile>()
         val resolvedBytes = "kept content".toByteArray(Charsets.UTF_8)
 
