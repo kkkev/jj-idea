@@ -1149,6 +1149,7 @@ state/routing logic, not rendering)
 #### Validation
 - [ ] With nothing ticked → OK is disabled with a message to move at least one file to the child
 - [ ] With everything ticked (no overrides) → OK is disabled with a message that at least one file must remain in the parent
+- [ ] With nothing ticked but one file partially picked via "Pick Hunks…" → OK is **enabled**; splitting produces a child with just those hunks (GitHub #117)
 
 #### Whole-file fast path
 - [ ] With no partial hunk selection (all files fully ticked or unticked) → split completes via file-level `jj split` (no diff-editor overhead); verify via log that both commits have the expected files

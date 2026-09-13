@@ -142,6 +142,67 @@ class SplitDialogTest {
     }
 
     @Test
+    fun `validation passes with nothing ticked but one file partially picked (GitHub #117)`() {
+        val authChange = change("src/Auth.kt")
+        val loggerChange = change("src/Logger.kt")
+        val changes = listOf(authChange, loggerChange)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes)
+        waitForRefresh(dialog.fileSelection)
+
+        // Nothing ticked, but Auth.kt has a genuine partial hunk pick - applyPickedContent
+        // deliberately leaves the tick alone for a partial, so this is exactly the state a
+        // hunks-only split produces.
+        val authPath = LocalFilePath("src/Auth.kt", false)
+        dialog.setFirstCommitOverrideForTest(authPath, "partial content\n")
+
+        dialog.fileSelection.includedChanges.size shouldBe 0
+        dialog.doValidateForTest() shouldBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `hunks-only split passes every file as the fileset and carries the picked remainder`() {
+        val authChange = change("src/Auth.kt")
+        val loggerChange = change("src/Logger.kt")
+        val changes = listOf(authChange, loggerChange)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes)
+        waitForRefresh(dialog.fileSelection)
+
+        val authPath = LocalFilePath("src/Auth.kt", false)
+        dialog.setFirstCommitOverrideForTest(authPath, "partial content\n")
+
+        dialog.performOKForTest()
+        val result = dialog.result
+
+        result shouldNotBe null
+        result!!.hunkSelection shouldNotBe null
+        // Nothing ticked means nothing is removed from the parent's fileset.
+        result.filePaths.toSet() shouldBe setOf(authChange.filePath, loggerChange.filePath)
+        val authContent = result.hunkSelection!!.files.first { it.filePath == authPath }.content
+        authContent shouldBe "partial content\n"
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent mode still rejects an empty selection even with an override present`() {
+        val authChange = change("src/Auth.kt")
+        val changes = listOf(authChange)
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes, newParent = true)
+        waitForRefresh(dialog.fileSelection)
+
+        // Pick Hunks is hidden in newParent mode, but exercise the seam directly to confirm
+        // isPartialSplit stays mode-gated even if an override somehow existed.
+        val authPath = LocalFilePath("src/Auth.kt", false)
+        dialog.setFirstCommitOverrideForTest(authPath, "partial content\n")
+
+        dialog.doValidateForTest() shouldNotBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
     fun `override injected for test produces non-null hunkSelection`() {
         val changes = listOf(change("src/Auth.kt"), change("src/Logger.kt"))
         val source = createEntry("src1", description = "desc")

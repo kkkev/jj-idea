@@ -542,11 +542,25 @@ class SplitDialog(
 
     // ---- Validation ----
 
+    /**
+     * True when any file has a hunk-picked parent-remainder override — see [applyPickedContent].
+     * A genuine partial pick deliberately leaves the tick untouched (see [applyPickedContent]'s
+     * KDoc), so this is the only signal that a hunks-only selection (nothing ticked, but a file
+     * partially picked via "Pick Hunks…") actually has something to split off.
+     *
+     * Never true in [newParent] mode ("Pick Hunks…" is hidden there), so a hunks-only selection
+     * can't rescue an otherwise-empty `-B` split.
+     */
+    private val isPartialSplit: Boolean get() = !newParent && firstCommitOverrides.isNotEmpty()
+
     override fun doValidate(): ValidationInfo? {
         val included = fileSelection.includedChanges // ticked = moving to the new commit
         val total = allChanges.size
 
-        if (included.isEmpty()) {
+        // Nothing ticked is only truly empty if there's also no partial hunk pick - a
+        // hunks-only split (GitHub #117) leaves every tick untouched but has real content
+        // to move via firstCommitOverrides.
+        if (included.isEmpty() && !isPartialSplit) {
             val key = when {
                 newParent -> "dialog.split.validation.new.empty"
                 parallelCheckBox.isSelected -> "dialog.split.validation.child.empty.parallel"
@@ -581,7 +595,7 @@ class SplitDialog(
             allChanges.map { it.filePath }.filter { it !in tickedPaths }
         }
 
-        val hunkSelection: HunkSelection? = if (!newParent && firstCommitOverrides.isNotEmpty()) {
+        val hunkSelection: HunkSelection? = if (isPartialSplit) {
             // Build the parent-remainder content for every changed file.
             // newParent mode never reaches here - "Pick Hunks…" is hidden in that mode.
             // Deletion-manifest handling is deferred here (isDeletion always false) - see
