@@ -43,6 +43,12 @@ class JujutsuMergeProvider(
      * [MergeData.CURRENT]/[MergeData.LAST] (GitHub #112) - used for merge-pane titles
      * ([JujutsuConflictResolver]) and to keep [acceptFilesRevisions]'s `:ours`/`:theirs` mapping
      * consistent with a reoriented dialog.
+     *
+     * Deliberately working-copy scoped, unlike
+     * [in.kkkev.jjidea.vcs.diff.JujutsuConflictDiffRequestProvider]'s read-only conflict diff for
+     * an arbitrary revision (GitHub #119, jj-idea-ct7e): resolving a conflict writes to disk, so
+     * it only ever makes sense for `@` (see `resolveConflictsAvailability`'s `NEEDS_EDIT` state
+     * for every other commit) - there is no working-copy-independent equivalent to reuse here.
      */
     fun loadConflict(file: VirtualFile): ExtractedConflict {
         // The extractor handles all three jj conflict marker styles (snapshot, diff, git).

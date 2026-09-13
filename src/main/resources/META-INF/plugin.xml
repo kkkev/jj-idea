@@ -116,6 +116,11 @@
          strict no-op on every other diff viewer by HunkArrowDiffExtension.HUNK_PICKER_SESSION. -->
     <diff.DiffExtension implementation="in.kkkev.jjidea.diffedit.HunkArrowDiffExtension"/>
 
+    <!-- Reads a conflicted Change's three-way content from its own revision instead of the
+         platform default (working copy on disk) - GitHub #119, jj-idea-ct7e. -->
+    <openapi.vcs.changes.actions.diff.ChangeDiffRequestProvider
+        implementation="in.kkkev.jjidea.vcs.diff.JujutsuConflictDiffRequestProvider"/>
+
     <!-- Custom diff base for editor gutter change markers (jj-idea-fwea, GitHub #43). No-op
          (isTrackedFile returns false) unless a custom diff base is configured. -->
     <openapi.vcs.impl.LocalLineStatusTrackerProvider

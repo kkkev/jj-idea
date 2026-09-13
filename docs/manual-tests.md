@@ -53,7 +53,7 @@ directory as a project in the plugin IDE (`./gradlew runIde`).
 | ID | Script | Creates |
 |---|---|---|
 | FX-STACK | `scripts/fixtures/fx-stack.sh [target-dir]` | Linear stack base → A → B → C (@ = C), for squash testing |
-| FX-CONFLICT | `scripts/fixtures/fx-conflict.sh [target-dir] [marker-style]` | A content conflict on `file.txt` (change A rebased onto change B, working copy on the conflict); `marker-style` is `git` (default), `snapshot`, or `diff` — rerun with a different style against the same repo to test all three |
+| FX-CONFLICT | `scripts/fixtures/fx-conflict.sh [target-dir] [marker-style] [wc-position]` | A content conflict on `file.txt` (change A rebased onto change B); `marker-style` is `git` (default), `snapshot`, or `diff` — rerun with a different style against the same repo to test all three. `wc-position` is `conflicted` (default, working copy on the conflict) or `sibling` (working copy on change B, a clean commit unrelated to the conflict — GitHub #119 / jj-idea-ct7e's repro position) |
 | FX-MD-CONFLICT | `scripts/fixtures/fx-md-conflict.sh [target-dir]` | A modify/delete conflict on `a.txt` — one side deletes the file entirely, so "accept" on that side must remove it from disk, not leave an empty file; a different case from FX-CONFLICT's content conflict |
 | FX-STRESS | `scripts/fixtures/fx-stress.sh [target-dir]` | A ~1084-commit repo with ~26 concurrent heads (main trunk, 20 short feature branches, 5 long branches, a 200-commit deep-branch, an octopus-merge, a hotfix/* cluster), for log-graph/filter stress testing. Reused as `jj-stress-test` by MT-LOG-GRAPH's stress bullet and its "Graph layout under filtering" subsection, and by MT-LOG-FILTER's Reference filter fixture — don't build a separate throwaway multi-branch repo for those, this one already has far more lanes than any of them need |
 
@@ -2007,9 +2007,9 @@ confirm that's no longer possible (below).
 
 **Conflict resolution**
 
-**Code:** `jj/conflict/`, `vcs/merge/JujutsuConflictResolver.kt`, `vcs/merge/JujutsuMergeProvider.kt`, `ui/common/JujutsuConflictsNode.kt`, `actions/file/ResolveSelectedConflictsAction.kt`, `actions/file/ResolveAllConflictsAction.kt`, `actions/change/resolveConflictsAction.kt`, `actions/change/resolveConflictsAvailability.kt`
+**Code:** `jj/conflict/`, `vcs/merge/JujutsuConflictResolver.kt`, `vcs/merge/JujutsuMergeProvider.kt`, `vcs/diff/JujutsuConflictDiffRequestProvider.kt`, `ui/common/JujutsuConflictsNode.kt`, `actions/file/ResolveSelectedConflictsAction.kt`, `actions/file/ResolveAllConflictsAction.kt`, `actions/change/resolveConflictsAction.kt`, `actions/change/resolveConflictsAvailability.kt`
 **Fixture:** FX-CONFLICT (content conflicts), FX-MD-CONFLICT (modify/delete conflicts)
-**Also re-run:** MT-CROSS (multi-repo scoping)
+**Also re-run:** MT-CROSS (multi-repo scoping); MT-DIFF-PREVIEW, MT-LOG-DETAILS, MT-WORKINGCOPY (`JujutsuConflictDiffRequestProvider` is consumed via the shared preview-tab helper those sections cover)
 
 #### Detection
 
@@ -2158,6 +2158,37 @@ Use the same conflict setup above. The test repo has a conflicted commit that is
 - [ ] Selecting the **conflicted historical commit** in the log: conflicted file appears in the details panel with red (MERGED_WITH_CONFLICTS) status
 - [ ] Selecting the **conflicted historical commit**: "Resolve Conflicts… (edit this change first)" is **visible but disabled** in the details panel context menu (jj-idea-sm1s: resolution requires this commit to become the working copy first)
 - [ ] Selecting the **working copy commit** (empty, inherits conflict): "Resolve Conflicts…" **is visible and enabled** in the details panel context menu and opens the merge tool for the inherited conflicted files
+
+#### Conflict diff for a non-working-copy commit (GitHub #119, jj-idea-ct7e)
+
+Use FX-CONFLICT with `wc-position=sibling` (`scripts/fixtures/fx-conflict.sh /tmp/fx-conflict git sibling`)
+so `@` is `change-b`, a clean commit unrelated to the conflict on `change-a` — the position the
+report was filed from.
+
+- [ ] Select `change-a` in the log; double-click `file.txt` in the details panel → a **three-pane**
+      diff opens showing change A's own conflict, titled with jj's commit labels where available
+      (not "Yours"/"Theirs", not an error balloon reading "Could not extract conflict data")
+- [ ] Left and right panes are **not** identical and match `jj file show -r change-a file.txt`'s
+      markers, not the (unrelated) working copy content
+- [ ] Re-run the fixture with `wc-position=conflicted` (`@` = `change-a` itself): same three panes,
+      unchanged from before this fix
+- [ ] From the `conflicted` state, run `jj new change-a` so `@` inherits the conflict as an empty
+      child, then open `change-a`'s diff from the log → still shows change A's own conflict
+- [ ] With `@` on `change-a` (`conflicted` mode), additionally give the working copy its own,
+      different conflict on the same path (e.g. `jj new`, rebase something else onto `@-` to
+      conflict `file.txt` again), then open `change-a`'s diff from the log → shows **change A's**
+      sides, not `@`'s
+- [ ] Working Copy panel: double-click a file conflicted in `@` itself → three panes as before
+      (this surface is unaffected — it was already correct)
+- [ ] Repeat the first bullet under all three `ui.conflict-marker-style` values (`git`, `snapshot`,
+      `diff`); under `snapshot` the panes fall back to plain **"Side #1"**/**"Side #2"** titles
+      (see the marker-style bullet under "Rebase conflict pane orientation and titles" above),
+      content still correct
+- [ ] Scroll a conflicted file's diff, let the log auto-refresh (~300ms debounce): the scroll
+      position is **not** reset (the diff-request cache identity this relies on is the same one
+      jj-idea-q6vn fixed for ordinary diffs)
+- [ ] "Resolve Conflicts…" on `change-a` from this state is still visible-but-disabled (unaffected
+      — resolution remains working-copy-only, see "Log row context menu" below)
 
 #### Log row context menu
 
