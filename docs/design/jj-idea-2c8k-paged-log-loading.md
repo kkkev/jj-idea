@@ -157,11 +157,15 @@ induction from the all-heads seed; each page only moves ids from `ancestors(fron
    install into `pagedWindowByRepo` touch shared state, so only those two points are locked
    (a small residual lost-update race between them and a concurrent `refresh()`/`loadMore()` is
    accepted as low-probability and non-corrupting, not worth a full ordered multi-lock protocol
-   given the time budget). **Testing gap, noted rather than silently left implicit:** no
-   automated test exercises this race — it would need either a platformTest or substantial
-   mocking of `JujutsuSettings`/`ApplicationManager` to construct a real
-   `UnifiedJujutsuLogDataLoader`, which this fix's turnaround time didn't allow. Worth adding if
-   this loader ever gets easier to construct in isolation.
+   given the time budget). **Testing gap, closed by jj-idea-5gof:** `PagedLogLoaderConcurrencyTest`
+   (a platformTest — constructing a real `UnifiedJujutsuLogDataLoader` needs a live `Application`
+   for `PreviewEntitlement`'s field initializer and for real pooled-thread/EDT dispatch, but
+   `JujutsuSettings`/repos/`LogService`/`LogCache` are all mockable via existing patterns, no
+   production refactor needed) fires rapid `refresh()`/`loadMore()` calls against a fake chain
+   repo and asserts, via an in-flight counter around the fake `LogService.getLog`, that no two
+   fetches against the same repo's window ever overlap; plus per-repo independence, `loadMore`'s
+   tryLock-skip, and the stale-candidate-filter race on a fetch failure. Verified to actually catch
+   a regression by temporarily removing the lock and confirming the test fails.
 
    **Round 3: the same `ConcurrentModificationException` was reported again after this fix
    shipped.** Confirmed to be a **stale `runIde` sandbox build**, not a regression: the running
@@ -331,7 +335,8 @@ page-1 splice from shifting the viewport under the user either. `./gradlew check
 covered by permanent tests (`PagedLogWindowTest`, `PagedLogWindowContractTest`,
 `LayoutCalculatorTest`, `JujutsuGraphAndDescriptionRendererTest`,
 `JujutsuLogTableScrollPreservationTest`, `ViewportAnchorTest`,
-`JujutsuLogTableModelRowOfScaleTest`), not just the one-off scratch scripts used during design.
+`JujutsuLogTableModelRowOfScaleTest`, `PagedLogLoaderConcurrencyTest`), not just the one-off
+scratch scripts used during design.
 Remaining open items are cross-referenced from "The paint treatment for an elided parent" above
 and the cross-bead plan for `jj-idea-hlu3`/`jj-idea-xi58`.
 

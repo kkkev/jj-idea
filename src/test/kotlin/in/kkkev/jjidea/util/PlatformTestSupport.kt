@@ -16,6 +16,11 @@ import com.intellij.util.ui.UIUtil
  * There's no observable "done" signal for the loaders, so this is a fixed, bounded pump rather
  * than true quiescence detection — good enough to make the race far less likely, with the CI
  * retry (jj-idea-q49j) as the reliable safety net.
+ *
+ * Don't swap this for polling `AppExecutorUtil.getAppExecutorService()`'s `ThreadPoolExecutor`
+ * for `activeCount == 0` as a "real" done signal: that pool also runs the platform's own periodic
+ * background chores, so it's rarely fully idle — a wait-for-idle loop there tends to burn its
+ * entire budget on every call, multiplied across this function's 15+ callers.
  */
 fun drainBackgroundLoads(
     timeoutMillis: Long = 1_000
