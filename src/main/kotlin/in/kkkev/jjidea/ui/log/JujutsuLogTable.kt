@@ -704,7 +704,9 @@ class JujutsuLogTable(
                 pendingSelection = ChangeKey(it.repo, it.id)
             }
         }
+        val anchor = captureViewportAnchor()
         logModel.setEntries(entries)
+        restoreViewportAnchor(anchor)
         pendingSelection?.let {
             if (selectEntry(it.repo, it.revision, scrollIntoView = pendingSelectionIsExplicit)) {
                 pendingSelection = null
@@ -733,6 +735,29 @@ class JujutsuLogTable(
     }
 
     /**
+     * Captures the top-visible row's identity and scroll offset before a [setEntries] model swap,
+     * so [restoreViewportAnchor] can keep it in the same pixel position afterward even if a
+     * `refresh()` page-1 splice shifted its row index (jj-idea-wrza). `null` when there's no row
+     * at the viewport top or the viewport is already pinned to the top - see [ViewportAnchors.capture].
+     */
+    private fun captureViewportAnchor(): ViewportAnchor? {
+        val viewY = visibleRect.y
+        val row = rowAtPoint(Point(0, viewY)).takeIf { it >= 0 } ?: return null
+        val key = logModel.getEntry(row)?.key
+        return ViewportAnchors.capture(key, viewY, getCellRect(row, 0, true).y)
+    }
+
+    /** Restores [anchor] after a [setEntries] model swap - a no-op if the anchor row is gone
+     * (abandoned/filtered out) or the restored position matches what's already visible. */
+    private fun restoreViewportAnchor(anchor: ViewportAnchor?) {
+        if (anchor == null) return
+        val row = logModel.rowOf(anchor.key) ?: return
+        val newY = ViewportAnchors.restoredY(anchor, getCellRect(row, 0, true).y)
+        val v = visibleRect
+        if (newY != v.y) scrollRectToVisible(Rectangle(v.x, newY, v.width, v.height))
+    }
+
+    /**
      * Select an entry in the table by repo and revision, optionally scrolling it into view.
      * Matches by repo to ensure correct selection in multi-root.
      *
@@ -747,10 +772,7 @@ class JujutsuLogTable(
      */
     private fun selectEntry(repo: JujutsuRepository, revision: Revision, scrollIntoView: Boolean = true): Boolean {
         val rowIndex = when (revision) {
-            is ChangeId -> (0 until logModel.rowCount).firstOrNull { row ->
-                val entry = logModel.getEntry(row)
-                entry?.repo == repo && entry.id == revision
-            }
+            is ChangeId -> logModel.rowOf(ChangeKey(repo, revision))
 
             WorkingCopy -> (0 until logModel.rowCount).firstOrNull { row ->
                 val entry = logModel.getEntry(row)
@@ -1018,6 +1040,14 @@ class JujutsuLogTableModel : AbstractTableModel() {
      * without a second `jj log` invocation. O(N) to build, O(1) per lookup.
      */
     private var entriesByKey: Map<ChangeKey, LogEntry> = emptyMap()
+
+    /**
+     * View-row index of each currently-filtered entry, rebuilt alongside [filteredEntries] in
+     * [rebuildFilteredEntries]. Backs [rowOf], an O(1) replacement for the linear scan
+     * [JujutsuLogTable.selectEntry] used to do over [getRowCount]/[getEntry], and the viewport
+     * anchor's post-update row lookup (jj-idea-wrza).
+     */
+    private var filteredRowByKey: Map<ChangeKey, Int> = emptyMap()
     private var filterText: String = ""
     private var useRegex: Boolean = false
     private var matchCase: Boolean = false
@@ -1102,6 +1132,10 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
     /** Look up a loaded entry by its [ChangeKey], or `null` if it's outside the loaded window. */
     fun entryFor(key: ChangeKey): LogEntry? = entriesByKey[key]
+
+    /** View-row index of [key] in the currently filtered list, or `null` if it's filtered out or
+     * not loaded. O(1) (map lookup), rebuilt each time [rebuildFilteredEntries] runs. */
+    fun rowOf(key: ChangeKey): Int? = filteredRowByKey[key]
 
     /**
      * Returns a snapshot of the currently-visible (filtered) entries, in their current order.
@@ -1271,6 +1305,9 @@ class JujutsuLogTableModel : AbstractTableModel() {
                 matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths && matchesRoot
             }
         )
+        filteredRowByKey = buildMap(filteredEntries.size) {
+            filteredEntries.forEachIndexed { row, entry -> put(entry.key, row) }
+        }
 
         if (!suppressFilterCallback) onFilterApplied?.invoke()
         fireTableDataChanged()
@@ -1282,6 +1319,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
     fun clear() {
         entries.clear()
         filteredEntries.clear()
+        filteredRowByKey = emptyMap()
         fireTableDataChanged()
     }
 }

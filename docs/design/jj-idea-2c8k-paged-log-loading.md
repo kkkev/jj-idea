@@ -215,11 +215,20 @@ induction from the all-heads seed; each page only moves ids from `ancestors(fron
     carried-over selection (paging, or any other refresh) no longer forces the viewport back,
     while `requestSelection()`'s explicit navigation (the only place that sets
     `pendingSelectionIsExplicit = true`) still scrolls as before. `refresh()`'s page-1 splice (not
-    `loadMore()`) can still shift row indices under a fixed viewport pixel position if a new
-    commit appears at top — out of scope here since it wasn't the reported symptom (`loadMore()`
-    only ever appends rows after everything currently loaded); a fuller viewport-anchor mechanism
-    (capture top-visible row's `ChangeKey` + pixel offset, restore by looking it up post-update)
-    would be needed if that turns out to matter in practice.
+    `loadMore()`) could still shift row indices under a fixed viewport pixel position if a new
+    commit appeared at top — out of scope at the time since it wasn't the reported symptom
+    (`loadMore()` only ever appends rows after everything currently loaded). **Fixed in
+    jj-idea-wrza** with the viewport-anchor mechanism this item originally sketched:
+    `JujutsuLogTable.setEntries()` now captures the top-visible row's `ChangeKey` and its pixel
+    offset from the viewport top (`captureViewportAnchor`) before `logModel.setEntries(entries)`
+    runs, then looks the same key up afterward via the model's new O(1) `rowOf` map
+    (`restoreViewportAnchor`) and re-scrolls to the same pixel offset — a no-op when nothing
+    shifted, and left alone entirely when the anchor row is gone (abandoned/filtered out) or the
+    viewport was already pinned to the top (so a newly-prepended commit stays visible instead of
+    being scrolled past). Runs before the `pendingSelection` block, so an explicit
+    `requestSelection()` navigation still wins and scrolls to its own target regardless of what
+    the anchor would have done. The pure capture/restore arithmetic lives in `ViewportAnchor.kt`,
+    separate from the Swing wiring, mirroring jj-idea-sc8m's `GraphEdgeIndex` split.
 
 ## Validation matrix
 
@@ -316,13 +325,15 @@ Implemented: `PagedLogWindow`, `LogService.getLogHeads`, the loader's `refresh()
 per-repo `ReentrantLock` serialization, the `LayoutCalculator`/`GraphNode` `hasElidedParents` data
 field and the renderer's wiggly-stub paint treatment for the all-elided case, and the
 `selectEntry(scrollIntoView)` fix so a merely carried-over selection no longer yanks the viewport
-back on `loadMore()`. `./gradlew check` and `platformTest` pass with no regressions; the
-validation matrix above and the bugs list are all covered by permanent tests
-(`PagedLogWindowTest`, `PagedLogWindowContractTest`, `LayoutCalculatorTest`,
-`JujutsuGraphAndDescriptionRendererTest`, `JujutsuLogTableScrollPreservationTest`), not just the
-one-off scratch scripts used during design. Remaining open items are cross-referenced from "The
-paint treatment for an elided parent" above and the cross-bead plan for `jj-idea-hlu3`/
-`jj-idea-xi58`.
+back on `loadMore()`, and (jj-idea-wrza) the viewport-anchor mechanism that keeps a `refresh()`
+page-1 splice from shifting the viewport under the user either. `./gradlew check` and
+`platformTest` pass with no regressions; the validation matrix above and the bugs list are all
+covered by permanent tests (`PagedLogWindowTest`, `PagedLogWindowContractTest`,
+`LayoutCalculatorTest`, `JujutsuGraphAndDescriptionRendererTest`,
+`JujutsuLogTableScrollPreservationTest`, `ViewportAnchorTest`,
+`JujutsuLogTableModelRowOfScaleTest`), not just the one-off scratch scripts used during design.
+Remaining open items are cross-referenced from "The paint treatment for an elided parent" above
+and the cross-bead plan for `jj-idea-hlu3`/`jj-idea-xi58`.
 
 ## The paint treatment for an elided parent (resolved for the all-elided case)
 

@@ -99,4 +99,88 @@ class JujutsuLogTableScrollPreservationTest {
 
         scrollPane.viewport.viewPosition shouldNotBe scrolledPosition
     }
+
+    /**
+     * Regression tests for jj-idea-wrza: `refresh()`'s page-1 splice can insert/remove rows above
+     * the current scroll position (unlike `loadMore()`, which only ever appends below it). The
+     * fix is a viewport anchor - [JujutsuLogTable.setEntries] now captures the top-visible row's
+     * [ChangeKey] and pixel offset beforehand and restores the same relationship afterward, even
+     * though the row's index shifted.
+     */
+    @Test
+    fun `a row prepended above the scrolled position shifts the viewport, not the content under it`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+
+        // Scroll exactly to row 30's top - the anchor's pixel offset is 0.
+        scrollPane.viewport.viewPosition = java.awt.Point(0, table.getCellRect(30, 0, true).y)
+
+        // A refresh whose fresh page 1 found one new commit: everything shifts down by one row.
+        table.setEntries(listOf(entry("new0")) + entries)
+
+        // Row 30's entry is now at row 31 - the viewport should have followed it down exactly
+        // one row, so it's still sitting at this row's top with the same zero offset.
+        scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, table.getCellRect(31, 0, true).y)
+    }
+
+    @Test
+    fun `a row removed above the scrolled position shifts the viewport up to match`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+
+        scrollPane.viewport.viewPosition = java.awt.Point(0, table.getCellRect(30, 0, true).y)
+
+        // A refresh whose fresh page 1 no longer has the old row 0 (e.g. abandoned elsewhere).
+        table.setEntries(entries.drop(1))
+
+        // Row 30's entry is now at row 29 - the viewport should have followed it up.
+        scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, table.getCellRect(29, 0, true).y)
+    }
+
+    @Test
+    fun `a viewport already pinned to the top stays there so a newly prepended row is visible`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+
+        // Already at the very top.
+        scrollPane.viewport.viewPosition = java.awt.Point(0, 0)
+
+        table.setEntries(listOf(entry("new0")) + entries)
+
+        scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, 0)
+    }
+
+    @Test
+    fun `anchor row no longer present after the update leaves the viewport alone`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+
+        scrollPane.viewport.viewPosition = java.awt.Point(0, table.getCellRect(30, 0, true).y)
+        val scrolledPosition = scrollPane.viewport.viewPosition
+
+        // Row 30's own entry is gone (e.g. abandoned) - nothing else moved above it.
+        table.setEntries(entries.filterIndexed { index, _ -> index != 30 })
+
+        scrollPane.viewport.viewPosition shouldBe scrolledPosition
+    }
+
+    @Test
+    fun `explicit requestSelection still wins over the anchor once its target loads`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+
+        // Navigate to a target that isn't loaded yet (the sc8m/GitHub #76 load-and-reveal path):
+        // selectEntry fails to find it, so pendingSelectionIsExplicit stays true with no scroll.
+        table.requestSelection(ChangeKey(repo, ChangeId("target", "target", null)))
+
+        // The user keeps browsing (or the anchor from a prior refresh left them here) while the
+        // target loads in the background.
+        scrollPane.viewport.viewPosition = java.awt.Point(0, table.getCellRect(30, 0, true).y)
+
+        // The target arrives, prepended as the new row 0. Without the explicit-selection override,
+        // the anchor would just follow row 30's entry to its new index (31) and stay there.
+        table.setEntries(listOf(entry("target")) + entries)
+
+        scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, table.getCellRect(0, 0, true).y)
+    }
 }
