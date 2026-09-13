@@ -721,6 +721,11 @@ non-paged behavior is perceptible.
       page loads
 - [ ] Right-click → **New Change** (or **Describe**, **Squash**, **Abandon**): appears/updates
       at the top effectively immediately, regardless of how many pages you've scrolled through
+- [ ] jj-idea-wrza: scroll several pages deep, then run a write that adds a commit at the top
+      (`jj new` in a terminal, or the right-click actions above) — the rows under the viewport
+      stay put (no slide by a row) even though a commit was spliced in far above them. Repeat
+      scrolled to the very top: the new commit appears at row 0 and is visible, rather than the
+      viewport holding its old pixel position and hiding it
 - [ ] After scrolling several pages deep, perform a write near `@`: still fast, and the
       previously-scrolled-to deeper pages remain visible/unaffected
 - [ ] Perform a write whose effect lands on a commit deep in history you haven't scrolled to
