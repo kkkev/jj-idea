@@ -97,6 +97,42 @@ fun List<Bookmark>.grouped(): List<BookmarkGroup> =
 fun List<Bookmark>.remoteEntriesFor(localName: String): List<Bookmark> =
     filter { it.isRemote && it.localName == localName }
 
+/**
+ * `git` is not a peer remote: it's jj's own view of a colocated repo's local Git refs (`jj git
+ * remote add git ...` fails with "reserved for local Git repository"), so it must be excluded
+ * wherever remotes are enumerated for display or aggregation — see
+ * [in.kkkev.jjidea.ui.log.bookmarks.buildBookmarkTree] (jj-idea-j0zv, GitHub #48) and
+ * [withDivergenceFrom] below.
+ */
+const val GIT_PSEUDO_REMOTE = "git"
+
+/**
+ * Derives this local bookmark's own ahead/behind divergence from its tracked remote-tracking
+ * rows (jj-idea-we1n, GitHub #110) — [Bookmark.aheadCount]/[Bookmark.behindCount] as parsed from
+ * `jj bookmark list` are always 0/0 for a local ref (`bookmarkListTemplate` can't ask jj's
+ * `tracking_ahead_count`/`tracking_behind_count` keywords about a local ref directly — they error
+ * "Not a tracked remote ref" — so it only ever populates them for remote rows).
+ *
+ * jj reports those counts from the *remote's* own perspective (confirmed against `jj bookmark
+ * list`'s own text, e.g. `@origin (behind by 1 commits)` for a local bookmark that is 1 commit
+ * ahead), so the local bookmark's ahead/behind are the remote row's counts **swapped**.
+ *
+ * [remotes] should be every entry sharing this bookmark's [Bookmark.localName]; entries that are
+ * themselves local, untracked, or the [GIT_PSEUDO_REMOTE] pseudo-remote are ignored. With more
+ * than one real tracked remote, this takes the max ahead and max behind across them rather than
+ * summing — summing would double-count the same local commits when multiple remotes are behind
+ * by an overlapping range. That collapses distinct per-remote divergence into one number; a
+ * per-remote notation (e.g. `master @origin1 ↑2 @origin2 ↑5`) is tracked separately as a
+ * follow-up and out of scope here. Returns this bookmark unchanged if it is itself remote, or if
+ * there is no tracked non-git remote to derive from.
+ */
+fun Bookmark.withDivergenceFrom(remotes: List<Bookmark>): Bookmark {
+    if (isRemote) return this
+    val tracked = remotes.filter { it.isRemote && it.remote != GIT_PSEUDO_REMOTE && it.tracked }
+    if (tracked.isEmpty()) return this
+    return copy(aheadCount = tracked.maxOf { it.behindCount }, behindCount = tracked.maxOf { it.aheadCount })
+}
+
 @JvmInline
 value class Remote(val name: String) {
     override fun toString() = name

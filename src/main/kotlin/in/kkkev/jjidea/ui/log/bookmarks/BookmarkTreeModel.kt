@@ -6,10 +6,12 @@ import `in`.kkkev.jjidea.actions.bookmark.bookmarkWidgetText
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
+import `in`.kkkev.jjidea.jj.GIT_PSEUDO_REMOTE
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RepositoryReferences
 import `in`.kkkev.jjidea.jj.TagItem
+import `in`.kkkev.jjidea.jj.withDivergenceFrom
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 
 /**
@@ -150,9 +152,21 @@ private fun buildRepoNodes(
 
     val localBookmarks = refs.bookmarks.filterNot { it.bookmark.isRemote }
     if (localBookmarks.isNotEmpty()) {
+        // Built once, not per leaf below (jj-idea-we1n, GitHub #110): a local bookmark's own
+        // Bookmark.aheadCount/behindCount always arrive as 0/0 from the CLI template (it can't
+        // ask jj about a local ref's tracking counts directly), so they're derived here from the
+        // already-fetched remote-tracking rows sharing the same localName — see
+        // Bookmark.withDivergenceFrom.
+        val remotesByLocalName = refs.bookmarks.asSequence()
+            .map { it.bookmark }
+            .filter { it.isRemote && it.remote != GIT_PSEUDO_REMOTE }
+            .groupBy { it.localName }
         val leaves = localBookmarks.map { item ->
+            val withDivergence = item.copy(
+                bookmark = item.bookmark.withDivergenceFrom(remotesByLocalName[item.bookmark.localName].orEmpty())
+            )
             RefPath(item.bookmark.localName) { name ->
-                BookmarkNode.Local(repo, item, name, item.bookmark.name.name in onWcNames)
+                BookmarkNode.Local(repo, withDivergence, name, item.bookmark.name.name in onWcNames)
             }
         }
         val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
@@ -176,7 +190,7 @@ private fun buildRepoNodes(
     // hatch to still show it lives in jj-idea-k5d7's settings gear.
     val remoteNames = refs.bookmarks.filter { it.bookmark.isRemote }
         .map { it.bookmark.remote }
-        .filter { it != "git" }
+        .filter { it != GIT_PSEUDO_REMOTE }
         .distinct()
         .sorted()
     for (remote in remoteNames) {

@@ -340,6 +340,24 @@ class LogServiceIntegrationTest {
             bookmarks shouldHaveSize 2
             bookmarks.map { it.bookmark.name.name }.toSet() shouldBe setOf("alpha", "beta")
         }
+
+        @Test
+        fun `conflicted bookmark is returned, not dropped`() {
+            // jj-idea-5r0g (GitHub #110): a conflicted/divergent bookmark's normal_target used to
+            // resolve to no commit, which the CLI template's catch-all silently turned into a
+            // dropped row — the bookmark vanished from getBookmarks() (and so from the bookmarks
+            // panel) while the log table, which reads conflict state differently, still showed it.
+            stub.describe("First")
+            stub.newChange("Second")
+            stub.makeBookmarkConflicted("conflicted", "@-", "@")
+
+            val bookmarks = logService.getBookmarks().getOrThrow()
+
+            bookmarks shouldHaveSize 1
+            bookmarks[0].bookmark.name.name shouldBe "conflicted"
+            bookmarks[0].bookmark.conflict shouldBe true
+            bookmarks[0].id.shouldNotBeNull()
+        }
     }
 
     /**

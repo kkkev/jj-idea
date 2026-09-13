@@ -10,6 +10,7 @@ interface JjBackend {
     fun describe(message: String)
     fun newChange(message: String = "")
     fun bookmarkCreate(name: String)
+    fun makeBookmarkConflicted(name: String, revisionA: String, revisionB: String)
     fun split(message: String, filePaths: List<String>, revision: String = "@")
     fun renameFile(from: String, to: String)
     fun addGitRemote(name: String, url: String)

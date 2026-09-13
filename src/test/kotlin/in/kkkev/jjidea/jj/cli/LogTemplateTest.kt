@@ -5,6 +5,7 @@ import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
 
@@ -342,10 +343,34 @@ class LogTemplateTest {
 
     @Test
     fun `tagListTemplate returns null for empty name`() {
-        val fields = listOf("false", "", "", "false")
+        val fields = listOf("false", "", "", "")
         val item = tagListTemplate.take(fields.iterator())
 
         item shouldBe null
+    }
+
+    @Test
+    fun `tagListTemplate parses pending-delete tag`() {
+        val fields = listOf("false", "v1.0", "", "")
+        val item = tagListTemplate.take(fields.iterator())
+
+        item!!.tag shouldBe Tag("v1.0")
+        item.id shouldBe null
+        item.immutable shouldBe false
+    }
+
+    @Test
+    fun `tagListTemplate parses conflicted tag with multiple added targets`() {
+        // jj-idea-5r0g (GitHub #110): a conflicted tag's `normal_target` resolves to no commit,
+        // so the template reads `added_targets` instead — one comma-joined qualified id per
+        // target. Must not be dropped the way `normal_target` silently was.
+        val fields = listOf("true", "v1.0", "qpvuntsm~q~,mzvwutvl~m~", "false,true")
+        val item = tagListTemplate.take(fields.iterator())
+
+        item shouldNotBe null
+        item!!.tag shouldBe Tag("v1.0")
+        item.id shouldBe ChangeId("qpvuntsm", "q", null)
+        item.immutable shouldBe false
     }
 
     @Test
@@ -408,7 +433,7 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses pending-delete bookmark`() {
-        val fields = listOf("false", "feature", "false", "true", "0", "0", "", "false")
+        val fields = listOf("false", "feature", "false", "true", "0", "0", "", "")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.name shouldBe BookmarkName("feature")
@@ -418,10 +443,17 @@ class LogTemplateTest {
     }
 
     @Test
-    fun `bookmarkListTemplate parses conflicted bookmark`() {
-        val fields = listOf("true", "main", "true", "true", "0", "0", "qpvuntsm~q~", "false")
+    fun `bookmarkListTemplate parses conflicted bookmark with multiple added targets`() {
+        // jj-idea-5r0g (GitHub #110): a conflicted/divergent bookmark's `normal_target` resolves
+        // to no commit, so the template reads `added_targets` instead — the same list jj's own
+        // `bar (conflicted): + x + y` display shows, comma-joined as qualified ids. Previously
+        // this bookmark vanished entirely (its `normal_target`-based id field parsed to a literal
+        // `<Error: No Commit available>` string, throwing inside ChangeId's constructor, which the
+        // template's catch-all turned into a dropped row).
+        val fields = listOf("true", "main", "true", "true", "0", "0", "qpvuntsm~q~,mzvwutvl~m~", "false,false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
+        item shouldNotBe null
         item!!.bookmark.conflict shouldBe true
         item.id shouldBe ChangeId("qpvuntsm", "q", null)
     }

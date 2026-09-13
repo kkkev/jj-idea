@@ -1464,7 +1464,7 @@ one per affected remote.
 
 #### Bookmarks panel (jj-idea-b2ae, GitHub #48)
 
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`)
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`)
 
 A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
 git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
@@ -1488,6 +1488,25 @@ selection does nothing; right-click for actions.
 - [ ] jj-idea-ita2: an **untracked** remote bookmark shows the untracked icon (not the tracked
   one), and right-clicking it offers **Track**, not Untrack; a bookmark ahead/behind its remote
   shows `↑n`/`↓m` on its leaf
+- [ ] jj-idea-we1n (GitHub #110): a **local** bookmark ahead of its tracked remote also shows
+  `↑n`/`↓m` on its own leaf under Local (not just on the `@origin` leaf) — advance the local
+  bookmark past its remote (e.g. `jj bookmark set <name> -r <newer-rev>` without pushing) and
+  confirm the Local leaf picks up `↑1`
+- [ ] jj-idea-5r0g (GitHub #110): a conflicted/divergent local bookmark still appears under Local
+  with the same red conflict icon the log table shows for it, instead of disappearing from the
+  panel. To force a conflict in a sandbox repo, create the bookmark on a **third** revision — a
+  common ancestor of the two you're about to diverge it to, not either one of them itself (if the
+  bookmark already targets `<rev-a>` when you capture `$OP`, the first `set` below is a no-op —
+  "Nothing changed." — and jj never records it as a real operation, so there's nothing for the
+  second `set` to diverge from and no conflict results):
+  ```sh
+  jj bookmark create conflicted-bm -r <common-ancestor-rev>
+  OP=$(jj op log --no-graph --limit 1 -T 'id.short()')
+  jj bookmark set conflicted-bm -r <rev-a> --allow-backwards --at-op "$OP"
+  jj bookmark set conflicted-bm -r <rev-b> --allow-backwards --at-op "$OP"
+  ```
+  `jj bookmark list` should print `conflicted-bm (conflicted):` with two `+` targets (`<rev-a>`
+  and `<rev-b>`) before you check the panel.
 - [ ] Tags appear under their own "Tags" group, also `/`-grouped
 - [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
   or "main +3") — create/delete a bookmark and confirm both update together

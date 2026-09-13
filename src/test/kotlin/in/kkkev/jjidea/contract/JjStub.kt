@@ -55,6 +55,16 @@ class JjStub(override val workDir: Path) : JjBackend {
         check(result.isSuccess) { "jj bookmark create failed: ${result.stderr}" }
     }
 
+    override fun makeBookmarkConflicted(name: String, revisionA: String, revisionB: String) {
+        // Real jj gets here via two operations racing to move the same bookmark to different
+        // targets (see jj-idea-5r0g's `--at-op` recipe). The stub instead directly puts [name]
+        // on two changes' bookmark lists, which `cmdBookmarkList` below groups back into one
+        // conflicted row — cheaper to set up and produces the same `jj bookmark list` shape.
+        changes.forEach { it.bookmarks.remove(name) }
+        resolveOne(revisionA).bookmarks.add(name)
+        resolveOne(revisionB).bookmarks.add(name)
+    }
+
     override fun split(message: String, filePaths: List<String>, revision: String) {
         val args = mutableListOf("split", "-r", revision, "-m", message)
         args.addAll(filePaths)
@@ -586,27 +596,38 @@ class JjStub(override val workDir: Path) : JjBackend {
 
     private fun cmdBookmarkList(args: List<String>): JjBackend.Result {
         val template = args.flagValue("-T") ?: throw StubError("bookmark list requires -T")
-        val allBookmarks = changes.filter { !it.abandoned }
+        // Grouped by name, not one row per (name, change) pair: a name normally lands on exactly
+        // one change, but makeBookmarkConflicted deliberately puts it on two — matching real jj,
+        // which still shows a conflicted/divergent ref as a single row with multiple targets
+        // (`added_targets`), not two rows.
+        val grouped = changes.filter { !it.abandoned }
             .flatMap { c -> c.bookmarks.map { name -> name to c } }
-            .sortedBy { it.first }
+            .groupBy({ it.first }, { it.second })
+            .toSortedMap()
 
         val output = buildString {
-            for ((name, change) in allBookmarks) {
+            for ((name, targets) in grouped) {
                 when {
                     isFullBookmarkTemplate(template) -> {
                         field("true") // present (all stub bookmarks are local)
                         field(name) // nameWithRemote (no remotes in stub)
-                        field("false") // conflict (no conflicts in stub)
+                        field(if (targets.size > 1) "true" else "false") // conflict
                         field("true") // tracked (local bookmarks are always considered tracked)
                         field("0") // aheadCount (no remotes in stub)
                         field("0") // behindCount (no remotes in stub)
-                        field(qualifiedChangeId(change))
-                        field(if (change.immutable) "true" else "false") // immutable
+                        field(targets.joinToString(",") { qualifiedChangeId(it) }) // added_targets
+                        field(targets.joinToString(",") { if (it.immutable) "true" else "false" })
+                    }
+
+                    isConflictOnlyBookmarkTemplate(template) -> {
+                        field(name)
+                        field(if (targets.size > 1) "true" else "false") // conflict
+                        field(targets.joinToString(",") { qualifiedChangeId(it) }) // added_targets
                     }
 
                     isBookmarkTemplate(template) -> {
                         field(name)
-                        field(qualifiedChangeId(change))
+                        field(qualifiedChangeId(targets.first()))
                     }
 
                     else -> throw StubError("Unknown bookmark template")
@@ -1003,7 +1024,8 @@ class JjStub(override val workDir: Path) : JjBackend {
         return String.format("%040x", id.toBigInteger())
     }
 
-    private fun isFullBookmarkTemplate(template: String) = "present" in template && "normal_target" in template
+    private fun isFullBookmarkTemplate(template: String) = "present" in template && "added_targets" in template
+    private fun isConflictOnlyBookmarkTemplate(template: String) = "added_targets" in template && "present" !in template
     private fun isBookmarkTemplate(template: String) = "normal_target" in template
 
     private fun StringBuilder.field(value: String) {

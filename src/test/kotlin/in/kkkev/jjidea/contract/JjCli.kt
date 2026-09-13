@@ -57,6 +57,41 @@ class JjCli(override val workDir: Path) : JjBackend {
         check(result.isSuccess) { "jj bookmark create failed: ${result.stderr}" }
     }
 
+    override fun makeBookmarkConflicted(name: String, revisionA: String, revisionB: String) {
+        // Mirrors what actually produces a conflicted/divergent bookmark: two operations racing
+        // to move the same bookmark to different targets (e.g. concurrent `jj bookmark set` from
+        // two workspaces). Verified by hand in scratch repos on jj 0.37/0.39/0.44: two
+        // `bookmark set --at-op` calls pinned to the SAME operation only diverge into a real
+        // conflict if BOTH are genuine state changes away from that operation's bookmark target —
+        // a `set` that doesn't change the target is silently a no-op (jj writes no new operation
+        // for it on 0.37), so the pre-op baseline must differ from both revisionA and revisionB.
+        // A fresh empty commit guarantees that. revisionA/revisionB are resolved to concrete
+        // change ids *before* that commit is created, since they may be relative revsets (e.g.
+        // `@`) that would otherwise silently start pointing at the new baseline commit itself.
+        val resolvedA = resolveChangeId(revisionA)
+        val resolvedB = resolveChangeId(revisionB)
+
+        val baseline = run("new", "-m", "jj-idea test baseline for $name")
+        check(baseline.isSuccess) { "jj new (conflict baseline) failed: ${baseline.stderr}" }
+        val create = run("bookmark", "create", name)
+        check(create.isSuccess) { "jj bookmark create failed: ${create.stderr}" }
+
+        val op = run("op", "log", "--no-graph", "--limit", "1", "-T", "id.short()")
+        check(op.isSuccess) { "jj op log failed: ${op.stderr}" }
+        val opId = op.stdout.trim()
+
+        val first = run("bookmark", "set", name, "-r", resolvedA, "--allow-backwards", "--at-op", opId)
+        check(first.isSuccess) { "jj bookmark set (first target) failed: ${first.stderr}" }
+        val second = run("bookmark", "set", name, "-r", resolvedB, "--allow-backwards", "--at-op", opId)
+        check(second.isSuccess) { "jj bookmark set (second target) failed: ${second.stderr}" }
+    }
+
+    private fun resolveChangeId(revision: String): String {
+        val result = run("log", "--no-graph", "-r", revision, "-T", "change_id.short()")
+        check(result.isSuccess) { "Failed to resolve revision '$revision': ${result.stderr}" }
+        return result.stdout.trim()
+    }
+
     override fun renameFile(from: String, to: String) {
         val src = workDir.resolve(from)
         val dst = workDir.resolve(to)

@@ -328,15 +328,10 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
-        fun <T> optional(field: SingleField<T>) = singleField(field.spec) {
-            if (it.isEmpty()) null else field.parse(it)
-        }
-
         val changeId = singleField(TemplateParts.qualifiedChangeId()) {
             val (full, short, offset) = it.split("~")
             ChangeId(full, short, offset)
         }
-        val optionalChangeId = optional(changeId)
         val commitId = singleField(TemplateParts.commitId()) {
             val (full, short) = it.split("~")
             CommitId(full, short)
@@ -461,22 +456,35 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         /**
          * Template for tag list parsing.
-         * Fields: present, name, change_id (qualified), immutable
-         * Note: jj tag list exposes `normal_target` (same as bookmarks) since jj 0.37+.
+         * Fields: present, name, change_ids (comma-joined, qualified), immutable flags (comma-joined)
+         * Note: jj tag list exposes `normal_target`/`added_targets` (same as bookmarks) since jj 0.37+.
+         *
+         * Uses `added_targets` rather than `normal_target`: on a conflicted/divergent ref,
+         * `normal_target` resolves to no commit and jj renders every sub-expression evaluated on
+         * it as the literal text `<Error: No Commit available>`, which then fails to parse as a
+         * [ChangeId] (see [bookmarkListTemplate]'s identical note) — `take()`'s catch-all swallows
+         * that exception and silently drops the whole tag. `added_targets` is the list jj's own
+         * `tag (conflicted): + x + y` display uses; it has one element for a normal tag and is
+         * empty for a pending-delete (`present == false`) row, so the earlier `if(present, …)`
+         * guards are no longer needed.
          */
         val tagListTemplate = object : LogTemplate<TagItem?>(
             booleanField("present"),
             stringField("name"),
-            singleField("if(present,${TemplateParts.qualifiedChangeId("normal_target")},\"\")") {
-                optionalChangeId.parse(it)
+            singleField("""added_targets.map(|c| ${TemplateParts.qualifiedChangeId("c")}).join(",")""") {
+                it.splitByComma { id -> changeId.parse(id) }
             },
-            singleField("""if(present, if(normal_target.immutable(), "true", "false"), "false")""") { it.toBoolean() }
+            singleField("""added_targets.map(|c| if(c.immutable(), "true", "false")).join(",")""") {
+                it.splitByComma { b -> b.toBoolean() }
+            }
         ) {
             override fun take(input: Iterator<String>): TagItem? = try {
                 val present = fields[0].take(input) as Boolean
                 val name = fields[1].take(input) as String
-                val id = fields[2].take(input) as ChangeId?
-                val immutable = fields[3].take(input) as Boolean
+                val ids = fields[2].take(input) as List<*>
+                val immutables = fields[3].take(input) as List<*>
+                val id = ids.firstOrNull() as ChangeId?
+                val immutable = immutables.firstOrNull() as Boolean? ?: false
                 if (name.isNotEmpty()) TagItem(Tag(name), id, immutable) else null
             } catch (_: Exception) {
                 null
@@ -485,7 +493,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
 
         /**
          * Template for bookmark list parsing.
-         * Fields: present, name, conflict, tracked, ahead_count, behind_count, change_id (qualified), immutable
+         * Fields: present, name, conflict, tracked, ahead_count, behind_count, change_ids
+         * (comma-joined, qualified), immutable flags (comma-joined)
          *
          * tracked/ahead_count/behind_count added for jj-idea-ita2 (GitHub #48) — without them every
          * [Bookmark] built here defaulted to tracked=true, ahead=behind=0 regardless of reality.
@@ -496,6 +505,17 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
          * each is guarded: `!remote || tracked` treats an untracked local ref as tracked (mirroring
          * `if(b.remote(), b.tracked(), "true")` in [localBookmarkTemplate]), and the counts fall
          * back to 0 unless the ref is both remote and tracked.
+         *
+         * Targets use `added_targets` rather than `normal_target` (jj-idea-5r0g, GitHub #110): on a
+         * conflicted/divergent bookmark, `normal_target` resolves to no commit, and jj renders
+         * every sub-expression evaluated on it — including inside `if(present, …)` — as the literal
+         * text `<Error: No Commit available>`. That text then fails `ChangeId`'s offset parse, the
+         * `catch (_: Exception) { null }` below swallows the exception, and the whole bookmark
+         * silently vanished from the panel even though the log table (which reads `b.conflict()`
+         * off the per-commit template, not this one) still showed it. `added_targets` is the exact
+         * list jj's own `bar (conflicted): + x + y` display uses; it has one element for a normal
+         * bookmark and is empty for a pending-delete (`present == false`) row, so the earlier
+         * `if(present, …)` guards on the target fields are no longer needed.
          */
         val bookmarkListTemplate = object : LogTemplate<BookmarkItem?>(
             booleanField("present"),
@@ -504,10 +524,12 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             booleanField("!remote || tracked"),
             singleField("if(remote && tracked, tracking_ahead_count.lower(), \"0\")") { it.toIntOrNull() ?: 0 },
             singleField("if(remote && tracked, tracking_behind_count.lower(), \"0\")") { it.toIntOrNull() ?: 0 },
-            singleField("if(present,${TemplateParts.qualifiedChangeId("normal_target")},\"\")") {
-                optionalChangeId.parse(it)
+            singleField("""added_targets.map(|c| ${TemplateParts.qualifiedChangeId("c")}).join(",")""") {
+                it.splitByComma { id -> changeId.parse(id) }
             },
-            singleField("""if(present, if(normal_target.immutable(), "true", "false"), "false")""") { it.toBoolean() }
+            singleField("""added_targets.map(|c| if(c.immutable(), "true", "false")).join(",")""") {
+                it.splitByComma { b -> b.toBoolean() }
+            }
         ) {
             override fun take(input: Iterator<String>): BookmarkItem? = try {
                 val present = fields[0].take(input) as Boolean
@@ -516,8 +538,10 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 val tracked = fields[3].take(input) as Boolean
                 val aheadCount = fields[4].take(input) as Int
                 val behindCount = fields[5].take(input) as Int
-                val id = fields[6].take(input) as ChangeId?
-                val immutable = fields[7].take(input) as Boolean
+                val ids = fields[6].take(input) as List<*>
+                val immutables = fields[7].take(input) as List<*>
+                val id = ids.firstOrNull() as ChangeId?
+                val immutable = immutables.firstOrNull() as Boolean? ?: false
                 val bookmark = Bookmark(
                     name,
                     tracked = tracked,

@@ -22,6 +22,16 @@ abstract class BookmarkContractTest {
         fields.run { singleField(TemplateParts.qualifiedChangeId("normal_target")) { it } }
     ).joinToString(" ++ ") { it.spec }
 
+    // Mirrors CliLogService's real bookmarkListTemplate targets field (jj-idea-5r0g): unlike
+    // normal_target above, added_targets stays parseable for a conflicted/divergent bookmark.
+    private val conflictSpec = listOf(
+        fields.run { singleField(TemplateParts.nameWithRemote()) { it } },
+        fields.run { booleanField("conflict") },
+        fields.run {
+            singleField("""added_targets.map(|c| ${TemplateParts.qualifiedChangeId("c")}).join(",")""") { it }
+        }
+    ).joinToString(" ++ ") { it.spec }
+
     @BeforeEach
     fun setUp() {
         jj = createBackend(tempDir)
@@ -77,7 +87,41 @@ abstract class BookmarkContractTest {
         names shouldBe setOf("alpha", "beta")
     }
 
+    @Test
+    fun `conflicted bookmark reports conflict and multiple added_targets`() {
+        // jj-idea-5r0g (GitHub #110): pins jj's real output shape for a conflicted/divergent
+        // bookmark, which is what CliLogService.bookmarkListTemplate now reads via
+        // `added_targets` instead of `normal_target` (see conflictSpec above).
+        jj.describe("First")
+        jj.newChange("Second")
+        jj.makeBookmarkConflicted("conflicted-bm", "@-", "@")
+
+        val result = jj.run("bookmark", "list", "-T", conflictSpec)
+        result.isSuccess shouldBe true
+
+        val allFields = result.stdout.trim().split("\u0000")
+        // A conflicted local bookmark that fails to export cleanly to a colocated repo's Git
+        // backing store (as this one always will, since neither target is a descendant of the
+        // other) also surfaces a <name>@git row even without --all-remotes - filtered out here
+        // the same way production code filters the git pseudo-remote (jj-idea-j0zv).
+        val records = allFields.chunked(FIELDS_PER_CONFLICT_BOOKMARK)
+            .filter { it.size == FIELDS_PER_CONFLICT_BOOKMARK }
+            .filter { it[0] == "conflicted-bm" }
+
+        records.size shouldBe 1
+        records[0][0] shouldBe "conflicted-bm"
+        records[0][1] shouldBe "true"
+        val targets = records[0][2].split(",")
+        targets.size shouldBe 2
+        targets.forEach { target ->
+            val parts = target.split("~")
+            parts.size shouldBe 3
+            parts[0].length shouldBeGreaterThan 0
+        }
+    }
+
     companion object {
         private const val FIELDS_PER_BOOKMARK = 2
+        private const val FIELDS_PER_CONFLICT_BOOKMARK = 3
     }
 }
