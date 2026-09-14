@@ -94,8 +94,21 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 
 **Log table selection, navigation, and row interaction**
 
-**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch)
+**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch), `ui/log/JujutsuCustomLogTabManager.kt`, `actions/top/OpenJujutsuLogTabAction.kt`
 **Also re-run:** MT-LOG-DETAILS (issue-tracker link rendering is shared with the details panel)
+
+#### Entry points (jj-idea-biqp, GitHub #118)
+
+- [ ] With the Version Control tool window closed/hidden, **VCS → Jujutsu → Open Jujutsu Log**
+      opens it, focused on the Jujutsu log tab
+- [ ] With the log tab already open but the tool window hidden (e.g. another tool window has
+      focus, or it was collapsed), re-invoking **Open Jujutsu Log** (from the menu, the VCS
+      Operations popup, or its keymap shortcut if bound) brings the tool window to the front and
+      selects the tab — it does not create a second/duplicate log tab
+- [ ] The VCS Operations popup (Ctrl/Cmd+`) shows "Open Jujutsu Log" near the top of the Jujutsu
+      section
+- [ ] In a plain Git (non-jj) project, the "Jujutsu" VCS submenu is absent and the VCS Operations
+      popup shows only Git's entries — no "Open Jujutsu Log" leaks in
 
 #### Selection & navigation
 

@@ -60,7 +60,17 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
      * On first run creates a default window via [JujutsuSettings.ensureDefaultWindow].
      * Already-open tabs are skipped (dedup by config id). The default window is selected.
      */
-    fun openCustomLogTab() {
+    /**
+     * Opens (or restores) all persisted log windows.
+     *
+     * @param activate when true, also brings the tool window to the front and focuses the
+     *   selected tab - used for explicit user invocation (e.g. [in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction],
+     *   GitHub #118: with the window merely hidden rather than closed, re-running the action
+     *   otherwise appears to do nothing). Left false for the automatic callers in
+     *   [in.kkkev.jjidea.ui.services.JujutsuUiEnabler] (startup / roots-changed), matching
+     *   [in.kkkev.jjidea.ui.services.WorkingCopySignpost]'s deliberate no-focus-steal behaviour.
+     */
+    fun openCustomLogTab(activate: Boolean = false) {
         log.info("Opening Jujutsu log tab(s)")
 
         runInBackground {
@@ -84,7 +94,10 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
                     }
                     // Select the default window (or first available)
                     val defaultTab = openTabs[JujutsuSettings.DEFAULT_LOG_WINDOW_ID] ?: openTabs.values.firstOrNull()
-                    defaultTab?.let { changesViewContentManager.setSelectedContent(it.content) }
+                    defaultTab?.let {
+                        changesViewContentManager.setSelectedContent(it.content)
+                        if (activate) activateToolWindowFor(it.content)
+                    }
                 }
 
                 log.info("Jujutsu log tab(s) opened successfully")
@@ -165,7 +178,12 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
         val handle = openTabs[JujutsuSettings.DEFAULT_LOG_WINDOW_ID] ?: openTabs.values.firstOrNull() ?: return
         val changesViewContentManager = ChangesViewContentManager.getInstance(project)
         changesViewContentManager.setSelectedContent(handle.content)
-        ChangesViewContentManager.getToolWindowFor(project, handle.content.displayName)?.activate(null)
+        activateToolWindowFor(handle.content)
+    }
+
+    /** Brings the tool window hosting [content] to the front and focuses it. */
+    private fun activateToolWindowFor(content: Content) {
+        ChangesViewContentManager.getToolWindowFor(project, content.displayName)?.activate(null)
     }
 
     /**

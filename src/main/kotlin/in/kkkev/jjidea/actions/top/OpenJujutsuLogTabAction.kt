@@ -20,7 +20,7 @@ class OpenJujutsuLogTabAction : DumbAwareAction(
 ) {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        JujutsuCustomLogTabManager.getInstance(project).openCustomLogTab()
+        JujutsuCustomLogTabManager.getInstance(project).openCustomLogTab(activate = true)
     }
 
     override fun update(e: AnActionEvent) = with(e.presentation) {

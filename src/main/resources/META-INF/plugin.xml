@@ -159,6 +159,24 @@
          in addition to the permanent per-project/per-repo setting in Settings > Version Control > Jujutsu. -->
     <action id="Jujutsu.SetDiffBase" class="in.kkkev.jjidea.actions.diffbase.SetDiffbaseAction"/>
 
+    <!-- Open custom Jujutsu log tab (GitHub #118: no way back once the log tool window is
+         closed/hidden, short of Find Action). Defined here (rather than down with the other
+         log-tab actions below) so Jujutsu.MainMenuGroup's <reference> to it, just below,
+         resolves - plugin.xml <reference> elements need their target action already registered.
+         Referenced (not added via VcsGroup, which would pull in the full StandardVcsGroup
+         requirement) from:
+          - Jujutsu.MainMenuGroup below, as its first child.
+          - Vcs.Operations.Popup.VcsAware, the section of the VCS Operations popup that renders
+            under the VCS-name separator when a context VCS is active. NOT
+            Vcs.Operations.Popup.NonVcsAware (where Jujutsu.Init lives, above) - that group's
+            own update() (VcsQuickListPopupAction$NonVcsAware) is visible only when the project
+            has *no* active VCS, so a real jj project would never show it there. -->
+    <action id="Jujutsu.OpenLogTab"
+            class="in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction">
+      <!-- Text and description are set in the action class constructor -->
+      <add-to-group group-id="Vcs.Operations.Popup.VcsAware" anchor="first"/>
+    </action>
+
     <!-- "Jujutsu" submenu in the VCS main menu (jj-idea-g1io follow-up), gathering the plugin's
          product-specific operations - matching Git.Menu's own placement exactly
          (VcsGlobalGroup, anchored after the Vcs.Specific marker other VCS plugins' submenus use
@@ -168,6 +186,7 @@
          other VCS integration. -->
     <group id="Jujutsu.MainMenuGroup" text="Jujutsu" class="in.kkkev.jjidea.actions.JujutsuMainMenuGroup"
            popup="true">
+      <reference ref="Jujutsu.OpenLogTab"/>
       <reference ref="Jujutsu.UndoLastOperation"/>
       <reference ref="Jujutsu.SetDiffBase"/>
       <add-to-group group-id="VcsGlobalGroup" anchor="after" relative-to-action="Vcs.Specific"/>
@@ -233,13 +252,6 @@
     <action id="Jujutsu.Bookmark.ToggleTrack" class="in.kkkev.jjidea.actions.bookmark.ToggleTrackBookmarkAction"/>
     <action id="Jujutsu.Bookmark.PushAllRemotes"
             class="in.kkkev.jjidea.actions.bookmark.PushBookmarkToAllRemotesAction"/>
-
-    <!-- Open custom Jujutsu log tab -->
-    <action id="Jujutsu.OpenLogTab"
-            class="in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction">
-      <!-- Text and description are set in the action class constructor -->
-      <!-- Not added to VcsGroup to avoid StandardVcsGroup requirement -->
-    </action>
 
     <!--
       Open a new Jujutsu log tab with a default name and all repositories.
