@@ -78,7 +78,8 @@ class JujutsuLogTableIssueLinkTest {
         val cellRect = cellRect(table, row)
         val entry = table.logModel.getEntry(row)!!
         val frc = table.getFontMetrics(table.font).fontRenderContext
-        val textStart = graphTextStartX(row, table.logModel, table.graphNodes)
+        val index = GraphEdgeIndex.build(table.logModel.getFilteredEntries(), table.graphNodes)
+        val textStart = graphTextStartX(row, table.logModel, table.graphNodes, index)
         val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
         val laidOut = LaidOutCell.forRow(
             entry,
@@ -114,7 +115,8 @@ class JujutsuLogTableIssueLinkTest {
     fun `hovering plain description text before the reference shows the default cursor`() {
         val table = tableWith(listOf(entry("Fixes JIRA-123 now")))
         val cellRect = cellRect(table, 0)
-        val textStart = graphTextStartX(0, table.logModel, table.graphNodes)
+        val index = GraphEdgeIndex.build(table.logModel.getFilteredEntries(), table.graphNodes)
+        val textStart = graphTextStartX(0, table.logModel, table.graphNodes, index)
         val point = Point(cellRect.x + textStart + 2, cellRect.y + cellRect.height / 2)
 
         moveMouseTo(table, point)

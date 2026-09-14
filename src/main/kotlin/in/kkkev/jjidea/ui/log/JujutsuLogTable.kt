@@ -77,6 +77,11 @@ class JujutsuLogTable(
     var hoveredEdge: HoveredEdge? = null
         private set
 
+    // The renderer currently installed on the graph column (set in updateGraph, same lifetime as
+    // its own edgeIndexCache) - lets edgeIndex() below share that one cache instead of keeping a
+    // second, separately-built index alive per graph update (jj-idea-a0wp).
+    private var graphRenderer: JujutsuGraphAndDescriptionRenderer? = null
+
     // Last mouse position seen by mouseMoved, null once the pointer has left the table
     // (mouseExited) - kept so a scroll-triggered refreshHoverState (no new mouse event of its own)
     // can re-evaluate the long-edge hover at the same screen position.
@@ -507,7 +512,7 @@ class JujutsuLogTable(
         if (modelCol != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) return null
         val frc = getFontMetrics(font).fontRenderContext
         val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
-        val textStart = graphTextStartX(modelRow, logModel, graphNodes)
+        val textStart = graphTextStartX(modelRow, logModel, graphNodes, edgeIndex())
         val laidOut = LaidOutCell.forRow(
             entry,
             cellRect.width,
@@ -525,13 +530,13 @@ class JujutsuLogTable(
         return LogClickTarget.resolve(uri, project, listOf(entry))
     }
 
-    // Built once per graph update (invalidated in updateGraph, same lifetime as the renderer's own
-    // instance-private index) so graphEdgeHoverAt below is O(1) per mouse move rather than
-    // rebuilding the whole row/lane pass on every event (jj-idea-sc8m's scale requirement).
-    private var edgeIndexCache: GraphEdgeIndex? = null
-
+    // Delegates to the installed renderer's own cache (built once per graph update, invalidated in
+    // updateGraph) so graphEdgeHoverAt/clickTargetAt are O(1) per mouse move rather than rebuilding
+    // the whole row/lane pass on every event (jj-idea-sc8m's scale requirement) - and so there is
+    // only ever one such index alive per graph, not a second copy independently cached here
+    // (jj-idea-a0wp: this field used to build its own, right alongside the renderer's).
     private fun edgeIndex(): GraphEdgeIndex =
-        edgeIndexCache ?: GraphEdgeIndex.build(logModel.getFilteredEntries(), graphNodes).also { edgeIndexCache = it }
+        graphRenderer?.edgeIndex(logModel) ?: GraphEdgeIndex.build(logModel.getFilteredEntries(), graphNodes)
 
     /**
      * The long graph edge (jj-idea-sc8m) under [point] (table-relative), or null when the point
@@ -548,12 +553,12 @@ class JujutsuLogTable(
         if (convertColumnIndexToModel(col) != JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) return null
         val cellRect = getCellRect(row, col, false)
         val localX = point.x - cellRect.x
-        val textStart = graphTextStartX(modelRow, logModel, graphNodes)
+        val index = edgeIndex()
+        val textStart = graphTextStartX(modelRow, logModel, graphNodes, index)
         if (localX >= textStart) return null
 
         val startX = JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
         val laneWidth = JujutsuGraphAndDescriptionRenderer.LANE_WIDTH.get()
-        val index = edgeIndex()
         val lane = index.laneAt(localX, startX, laneWidth) ?: return null
         return index.hoveredEdgeAt(modelRow, lane, visibleModelRows())
     }
@@ -811,21 +816,17 @@ class JujutsuLogTable(
 
     fun updateGraph(nodes: Map<ChangeKey, GraphNode>) {
         graphNodes = nodes
-        edgeIndexCache = null
         hoveredEdge = null
-        // Refresh combined graph+description column rendering with column manager
-        // Find the column by model index, not view index
-        for (i in 0 until columnModel.columnCount) {
-            val column = columnModel.getColumn(i)
-            if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-                column.cellRenderer = JujutsuGraphAndDescriptionRenderer(
-                    graphNodes,
-                    columnManager,
-                    IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
-                )
-                break
-            }
-        }
+        // Refresh combined graph+description column rendering with column manager. The renderer
+        // builds its own GraphEdgeIndex lazily and caches it for its lifetime (jj-idea-sc8m) -
+        // keeping a reference here lets edgeIndex() above share that one cache (jj-idea-a0wp)
+        // instead of this table separately rebuilding a second copy.
+        graphRenderer = JujutsuGraphAndDescriptionRenderer(
+            graphNodes,
+            columnManager,
+            IssueLinkifier(IssueNavigationConfiguration.getInstance(project))
+        )
+        setGraphRenderer(graphRenderer!!)
         repaint()
     }
 

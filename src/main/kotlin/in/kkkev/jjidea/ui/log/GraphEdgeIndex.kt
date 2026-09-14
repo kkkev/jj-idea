@@ -14,6 +14,10 @@ data class GraphEdge(val child: ChangeKey, val parent: ChangeKey, val state: Par
  * it's chosen. */
 enum class EdgeDirection { UP, DOWN }
 
+/** One connector's endpoint at a specific row/lane - [edge] plus which [lane] it occupies there,
+ * as returned by [GraphEdgeIndex.incomingEdges]/[GraphEdgeIndex.outgoingEdges]. */
+data class RowEdge(val lane: Int, val edge: GraphEdge)
+
 /**
  * A [GraphEdge] currently under the pointer - see [GraphEdgeIndex.hoveredEdgeAt] for how
  * [direction] is decided. [span] is the edge's full visible extent clamped to the viewport - the
@@ -46,6 +50,10 @@ data class HoveredEdge(
  * seam for long-edge hover/click hit-testing: [edgeAt] resolves a lane click to the edge occupying
  * it, [hoveredEdgeAt] additionally classifies it as long-or-not against a viewport.
  *
+ * [incomingEdges]/[outgoingEdges]/[stubEdgeAt] additionally let a row's paint (jj-idea-a0wp) read
+ * every edge touching that row directly off the index instead of rescanning the whole graph above
+ * it - see their docs.
+ *
  * Built once via [build] and reused for the lifetime of one rendered graph (no invalidation logic
  * needed - a fresh index is built alongside every fresh [GraphNode] map, exactly like the
  * renderer's old per-instance cache).
@@ -53,6 +61,10 @@ data class HoveredEdge(
 class GraphEdgeIndex private constructor(
     private val rowOfKey: Map<ChangeKey, Int>,
     private val edgesByRow: Map<Int, Map<Int, GraphEdge>>,
+    private val incomingByRow: Map<Int, List<RowEdge>>,
+    private val outgoingByRow: Map<Int, List<RowEdge>>,
+    private val stubByRow: Map<Int, RowEdge>,
+    private val passthroughLanesByRow: Map<Int, Set<Int>>,
     private val rightmostLaneByRow: Map<Int, Int>,
     private val ownLaneByRow: Map<Int, Int>,
     val operationCount: Long
@@ -63,6 +75,22 @@ class GraphEdgeIndex private constructor(
     fun edgeAt(row: Int, lane: Int): GraphEdge? = edgesByRow[row]?.get(lane)
 
     /**
+     * Every real edge arriving at [row] from a child row above it (`prevRow -> row`) - i.e. [row]
+     * is the *parent* end. Lets a row's paint draw its incoming connectors in O(incident edges)
+     * instead of [JujutsuGraphAndDescriptionRenderer]'s old `drawLinesToParents`, which rescanned
+     * every row above the current one on every paint (jj-idea-a0wp) purely to find these.
+     */
+    fun incomingEdges(row: Int): List<RowEdge> = incomingByRow[row] ?: emptyList()
+
+    /** Every real edge leaving [row] towards one of its own parents (`row -> parentRow`) - i.e.
+     * [row] is the *child* end. The outgoing counterpart to [incomingEdges]. */
+    fun outgoingEdges(row: Int): List<RowEdge> = outgoingByRow[row] ?: emptyList()
+
+    /** The unresolved-parent stub at [row] ([GraphNode.stubLane] or the row's own lane), or null
+     * when [row] has no unresolved parent - the paint-time equivalent of [stubTargetFor]. */
+    fun stubEdgeAt(row: Int): RowEdge? = stubByRow[row]
+
+    /**
      * Lanes with a plain vertical passthrough line drawn through [row] - i.e. [row] is strictly
      * between the edge's child and parent rows, not one of its own endpoints. An endpoint row
      * paints a diagonal instead (`drawLinesToParents`), never a plain vertical - excluding it here
@@ -71,12 +99,7 @@ class GraphEdgeIndex private constructor(
      * (the pre-jj-idea-sc8m check) missed this case and painted a spurious extra vertical line
      * alongside the real diagonal at the merge row.
      */
-    fun passthroughLanes(row: Int): Set<Int> {
-        val edges = edgesByRow[row] ?: return emptySet()
-        return edges.filterValues { edge ->
-            edge.state == null && rowOfKey[edge.child] != row && rowOfKey[edge.parent] != row
-        }.keys
-    }
+    fun passthroughLanes(row: Int): Set<Int> = passthroughLanesByRow[row] ?: emptySet()
 
     /** The rightmost lane active at [row] - used to place the text column after the graph. */
     fun rightmostLane(row: Int): Int = rightmostLaneByRow[row] ?: (ownLaneByRow[row] ?: 0)
@@ -170,6 +193,9 @@ class GraphEdgeIndex private constructor(
             val spanByRowLane = HashMap<Int, MutableMap<Int, Int>>() // row -> lane -> span length of edge occupying it
             val ownLaneByRow = HashMap<Int, Int>(entries.size * 2)
             val rightmostLaneByRow = HashMap<Int, Int>(entries.size * 2)
+            val incomingByRow = HashMap<Int, MutableList<RowEdge>>()
+            val outgoingByRow = HashMap<Int, MutableList<RowEdge>>()
+            val stubByRow = HashMap<Int, RowEdge>()
 
             fun place(row: Int, lane: Int, edge: GraphEdge, span: Int) {
                 val existingSpan = spanByRowLane.getOrPut(row) { mutableMapOf() }[lane]
@@ -201,6 +227,11 @@ class GraphEdgeIndex private constructor(
                         ?: if (childHasMultipleParents && parentNode.lane != node.lane) parentNode.lane else node.lane
                     val edge = GraphEdge(child = key, parent = parentKey, state = null)
                     val span = parentRow - row
+                    // Recorded once per edge, not per row it spans - what a row's own paint
+                    // (jj-idea-a0wp) needs is "which edges touch my row as an endpoint", not the
+                    // full passthrough span (that's edgesByRow/passthroughLanesByRow's job below).
+                    outgoingByRow.getOrPut(row) { mutableListOf() }.add(RowEdge(lane, edge))
+                    incomingByRow.getOrPut(parentRow) { mutableListOf() }.add(RowEdge(lane, edge))
                     for (r in row..parentRow) {
                         // The actual scale-sensitive work: one increment per row this edge's span touches.
                         operationCount++
@@ -213,14 +244,30 @@ class GraphEdgeIndex private constructor(
                 stubTargetFor(node)?.let { (parentKey, state) ->
                     operationCount++
                     val stubLane = node.stubLane ?: node.lane
-                    place(row, stubLane, GraphEdge(child = key, parent = parentKey, state = state), span = 0)
+                    val stubEdge = GraphEdge(child = key, parent = parentKey, state = state)
+                    stubByRow[row] = RowEdge(stubLane, stubEdge)
+                    place(row, stubLane, stubEdge, span = 0)
                     markActive(row, stubLane)
                 }
+            }
+
+            // Passthrough classification depends on which edge ultimately won each (row, lane) -
+            // decided over the whole loop above (longest-span-wins, see place()) - so it's derived
+            // in one post-pass over the final edgesByRow rather than tracked incrementally. Bounded
+            // by the same total placement count the main loop already paid for.
+            val passthroughLanesByRow = edgesByRow.mapValues { (row, lanes) ->
+                lanes.filterValues { edge ->
+                    edge.state == null && rowOfKey[edge.child] != row && rowOfKey[edge.parent] != row
+                }.keys
             }
 
             return GraphEdgeIndex(
                 rowOfKey = rowOfKey,
                 edgesByRow = edgesByRow,
+                incomingByRow = incomingByRow,
+                outgoingByRow = outgoingByRow,
+                stubByRow = stubByRow,
+                passthroughLanesByRow = passthroughLanesByRow,
                 rightmostLaneByRow = rightmostLaneByRow,
                 ownLaneByRow = ownLaneByRow,
                 operationCount = operationCount
@@ -230,9 +277,12 @@ class GraphEdgeIndex private constructor(
 }
 
 /**
- * The unresolved parent [stubTargetFor] should draw a stub for, paired with its [ParentState]
- * (matching [JujutsuGraphAndDescriptionRenderer.stubStateToDraw]'s NOT_LOADED-wins precedence),
- * or null when [node] has no unresolved parent at all.
+ * The unresolved parent a row should draw a stub for, paired with its [ParentState], or null when
+ * [node] has no unresolved parent at all. [ParentState.NOT_LOADED] (a paged-window boundary, or
+ * beyond a non-paged limit) gets a faded straight stub; [ParentState.HIDDEN] (genuinely
+ * elided/filtered, jj's `~`) keeps the wiggle. When a row mixes both (rare - e.g. a merge with two
+ * unresolved parents of different states), NOT_LOADED wins: it's the actionable one (click to
+ * load), where HIDDEN's target needs the filter cleared first (jj-idea-hlu3).
  */
 internal fun stubTargetFor(node: GraphNode): Pair<ChangeKey, ParentState>? {
     val notLoaded = node.unresolvedParents.entries.firstOrNull { it.value == ParentState.NOT_LOADED }

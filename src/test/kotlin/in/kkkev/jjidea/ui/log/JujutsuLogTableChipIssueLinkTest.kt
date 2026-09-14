@@ -79,7 +79,8 @@ class JujutsuLogTableChipIssueLinkTest {
         val entry = table.logModel.getEntry(row)!!
         val frc = table.getFontMetrics(table.font).fontRenderContext
         val linkifier = IssueLinkifier(IssueNavigationConfiguration.getInstance(table.project))
-        val textStart = graphTextStartX(row, table.logModel, table.graphNodes)
+        val index = GraphEdgeIndex.build(table.logModel.getFilteredEntries(), table.graphNodes)
+        val textStart = graphTextStartX(row, table.logModel, table.graphNodes, index)
         return LaidOutCell.forRow(
             entry,
             cellRect.width,

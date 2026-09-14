@@ -44,7 +44,7 @@ class JujutsuGraphAndDescriptionRenderer(
         private val ELIDED_WAVE_LENGTH = JBValue.UIInteger("Jujutsu.Graph.elidedWaveLength", 6)
         private val EDGE_HOVER_STROKE_WIDTH = JBValue.Float(2.6f)
 
-        // Lane colors - must match CommitGraphBuilder colors for consistent coloring
+        // Lane colors - the single source of truth GraphNode.color derives from (jj-idea-a0wp).
         private val LANE_COLORS =
             listOf(
                 JBColor(0x4285F4, 0x6AA1FF), // Blue
@@ -59,17 +59,6 @@ class JujutsuGraphAndDescriptionRenderer(
 
         /** Get the color for a specific lane */
         fun colorForLane(lane: Int) = LANE_COLORS[lane % LANE_COLORS.size]
-
-        /**
-         * The state to paint a stub for, or null when [node] has no unresolved parent at all.
-         * [ParentState.NOT_LOADED] (a paged-window boundary, or beyond a non-paged limit) gets a
-         * faded straight stub; [ParentState.HIDDEN] (genuinely elided/filtered, jj's `~`) keeps
-         * the wiggle. When a row mixes both (rare - e.g. a merge with two unresolved parents of
-         * different states), NOT_LOADED wins: it's the actionable one (click to load), where
-         * HIDDEN's target needs the filter cleared first (jj-idea-hlu3). Delegates to
-         * [stubTargetFor] (jj-idea-sc8m), which [GraphEdgeIndex] also needs the target key from.
-         */
-        internal fun stubStateToDraw(node: GraphNode): ParentState? = stubTargetFor(node)?.second
 
         /** The x-coordinate of [lane]'s centerline, given the graph's [startX] and [laneWidth] -
          * the one formula every paint site and the long-edge hit test (jj-idea-sc8m) share. */
@@ -250,12 +239,9 @@ class JujutsuGraphAndDescriptionRenderer(
 
         private fun textStartX(): Int {
             val graphNode = this.graphNode ?: return HORIZONTAL_PADDING.get()
-            val laneWidth = LANE_WIDTH.get()
-            val horizontalPadding = HORIZONTAL_PADDING.get()
-
             val model = table.model as? JujutsuLogTableModel
-            val rightmostLane = model?.let { edgeIndex(it).rightmostLane(row) } ?: graphNode.lane
-            return horizontalPadding + (rightmostLane + 1) * laneWidth
+                ?: return HORIZONTAL_PADDING.get() + (graphNode.lane + 1) * LANE_WIDTH.get()
+            return graphTextStartX(row, model, graphNodes, edgeIndex(model))
         }
 
         override fun doLayout() {
@@ -291,18 +277,17 @@ class JujutsuGraphAndDescriptionRenderer(
 
         private fun drawGraph(g2d: Graphics2D, node: GraphNode, startX: Int, laneWidth: Int) {
             val model = table.model as? JujutsuLogTableModel ?: return
-            val entry = model.getEntry(row) ?: return
+            model.getEntry(row) ?: return
 
             drawPassThroughLines(g2d, startX, laneWidth)
 
             val commitX = laneX(node.lane, startX, laneWidth)
             val commitY = height / 2
 
-            drawLinesToParents(g2d, node, commitX, commitY, row, startX, laneWidth)
-            stubTargetFor(node)?.let { (parentKey, state) ->
-                val stubLane = node.stubLane ?: node.lane
+            drawLinesToParents(g2d, commitX, commitY, row, startX, laneWidth)
+            edgeIndex(model).stubEdgeAt(row)?.let { (stubLane, stubEdge) ->
                 val stubX = laneX(stubLane, startX, laneWidth)
-                val stubEdge = GraphEdge(child = entry.key, parent = parentKey, state = state)
+                val state = stubEdge.state ?: return@let
                 drawElidedParentStub(g2d, colorForLane(stubLane), stubX, commitY, state, isHoveredEdge(stubEdge))
             }
             drawCommitCircle(g2d, node, commitX, commitY)
@@ -412,9 +397,16 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
+        /**
+         * Draws every connector touching [currentRow] as an endpoint - incoming from a child row
+         * above (top edge to this row's commit circle) and outgoing to a parent row below (commit
+         * circle to bottom edge) - reading both straight off [edgeIndex], which already computed
+         * this exact lane geometry once in [GraphEdgeIndex.build]. Previously rescanned every row
+         * from 0 to `currentRow` on every paint to find incoming edges (O(row index) per row,
+         * O(visible rows × total rows) per repaint) - jj-idea-a0wp.
+         */
         private fun drawLinesToParents(
             g2d: Graphics2D,
-            node: GraphNode,
             commitX: Int,
             commitY: Int,
             currentRow: Int,
@@ -422,38 +414,16 @@ class JujutsuGraphAndDescriptionRenderer(
             laneWidth: Int
         ) {
             val model = table.model as? JujutsuLogTableModel ?: return
-            val currentEntry = model.getEntry(currentRow) ?: return
+            val index = edgeIndex(model)
 
-            for (prevRow in 0 until currentRow) {
-                val prevEntry = model.getEntry(prevRow) ?: continue
-                val prevNode = graphNodes[prevEntry.key] ?: continue
-
-                val parentIndex = prevEntry.parentKeys.indexOf(currentEntry.key)
-                if (parentIndex >= 0) {
-                    val childLane = prevNode.lane
-                    val childHasMultipleParents = prevNode.parentLanes.size > 1
-
-                    val passThroughLane = prevNode.passthroughLanes[currentEntry.key]
-                    val connectionLane = passThroughLane
-                        ?: if (childHasMultipleParents) node.lane else childLane
-                    val connectionX = laneX(connectionLane, graphStartX, laneWidth)
-                    val edge = GraphEdge(child = prevEntry.key, parent = currentEntry.key, state = null)
-                    drawLaneLine(g2d, edge, colorForLane(connectionLane), connectionX, 0, commitX, commitY)
-                }
+            for ((connectionLane, edge) in index.incomingEdges(currentRow)) {
+                val connectionX = laneX(connectionLane, graphStartX, laneWidth)
+                drawLaneLine(g2d, edge, colorForLane(connectionLane), connectionX, 0, commitX, commitY)
             }
 
-            val childHasMultipleParents = node.parentLanes.size > 1
-
-            for (parentKey in currentEntry.parentKeys) {
-                val parentLane = graphNodes[parentKey]?.lane ?: continue
-
-                val passThroughLane = node.passthroughLanes[parentKey]
-                val targetLane = passThroughLane
-                    ?: if (childHasMultipleParents && parentLane != node.lane) parentLane else node.lane
+            for ((targetLane, edge) in index.outgoingEdges(currentRow)) {
                 val targetX = laneX(targetLane, graphStartX, laneWidth)
-                val edge = GraphEdge(child = currentEntry.key, parent = parentKey, state = null)
-                val lineColor = if (targetLane == node.lane) node.color else colorForLane(targetLane)
-                drawLaneLine(g2d, edge, lineColor, commitX, commitY, targetX, height)
+                drawLaneLine(g2d, edge, colorForLane(targetLane), commitX, commitY, targetX, height)
             }
         }
 

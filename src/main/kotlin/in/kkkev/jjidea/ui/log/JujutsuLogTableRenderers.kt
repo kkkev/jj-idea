@@ -209,21 +209,26 @@ private fun TextCanvas.overflowChip(entry: LogEntry, hidden: List<RefChip>) {
 // (jj-idea-alew), built once per row and shared by painting and hit-testing alike.
 
 /**
- * Compute the x-offset where the description text area begins for [row], mirroring
- * [JujutsuGraphAndDescriptionRenderer]'s private `textStartX()` exactly - both now delegate to
- * [GraphEdgeIndex.rightmostLane] (jj-idea-sc8m), replacing what used to be two independently
- * hand-rolled passes over the same passthrough-lane geometry. This one builds its own index per
- * call rather than sharing the renderer's cached instance - it runs once per discrete mouse click
- * (via `JujutsuLogTable.clickTargetAt`), not on every cell repaint, so it doesn't hit the same hot
- * path the render-time cache protects.
+ * Compute the x-offset where the description text area begins for [row] - shared by
+ * [JujutsuGraphAndDescriptionRenderer]'s own `textStartX()` (paint/layout) and
+ * [JujutsuLogTable]'s click/hover hit-testing, both reading [GraphEdgeIndex.rightmostLane] off the
+ * one [index] the caller already has cached (jj-idea-sc8m built it once per graph update
+ * specifically so nothing downstream would rebuild it; this used to take an uncached
+ * `GraphEdgeIndex.build(...)` per call instead, silently defeating that cache on every mouse-move
+ * and scroll tick - jj-idea-a0wp).
  */
-internal fun graphTextStartX(row: Int, model: JujutsuLogTableModel, graphNodes: Map<ChangeKey, GraphNode>): Int {
+internal fun graphTextStartX(
+    row: Int,
+    model: JujutsuLogTableModel,
+    graphNodes: Map<ChangeKey, GraphNode>,
+    index: GraphEdgeIndex
+): Int {
     val entry = model.getEntry(row) ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
     graphNodes[entry.key] ?: return JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
     val laneWidth = JujutsuGraphAndDescriptionRenderer.LANE_WIDTH.get()
     val horizontalPadding = JujutsuGraphAndDescriptionRenderer.HORIZONTAL_PADDING.get()
 
-    val rightmostLane = GraphEdgeIndex.build(model.getFilteredEntries(), graphNodes).rightmostLane(row)
+    val rightmostLane = index.rightmostLane(row)
     return horizontalPadding + (rightmostLane + 1) * laneWidth
 }
 

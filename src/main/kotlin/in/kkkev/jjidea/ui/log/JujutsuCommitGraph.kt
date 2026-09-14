@@ -1,7 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.ui.JBColor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -29,7 +28,6 @@ import java.awt.Color
  */
 data class GraphNode(
     val lane: Int,
-    val color: Color,
     val parentLanes: List<Int> = emptyList(),
     val childLanes: List<Int> = emptyList(),
     val passthroughLanes: Map<ChangeKey, Int> = emptyMap(),
@@ -39,7 +37,13 @@ data class GraphNode(
     val unresolvedParents: Map<ChangeKey, ParentState> = emptyMap(),
     /** See [in.kkkev.jjidea.ui.log.graph.RowLayout.stubLane]. */
     val stubLane: Int? = null
-)
+) {
+    /** Always [lane]'s color - there is no case where a node's line color differs from its own
+     * lane's, so this is derived rather than a separate field callers could pass out of sync with
+     * [lane] (jj-idea-a0wp: [CommitGraphBuilder] used to carry its own byte-identical copy of
+     * [JujutsuGraphAndDescriptionRenderer]'s lane palette just to compute this once). */
+    val color: Color get() = JujutsuGraphAndDescriptionRenderer.colorForLane(lane)
+}
 
 /**
  * Interface for entries that can be laid out in a commit graph.
@@ -63,21 +67,7 @@ interface GraphableEntry {
 class CommitGraphBuilder {
     private val log = Logger.getInstance(javaClass)
 
-    // Graph colors with light/dark theme variants for good contrast
-    private val colors: List<Color> = listOf(
-        JBColor(0x4285F4, 0x6AA1FF), // Blue
-        JBColor(0xEA4335, 0xFF6B5E), // Red
-        JBColor(0xC99700, 0xE0B800), // Yellow (darker for light theme visibility)
-        JBColor(0x34A853, 0x5DCD73), // Green
-        JBColor(0xFF6D00, 0xFF8A3D), // Orange
-        JBColor(0x9C27B0, 0xC25ED0), // Purple
-        JBColor(0x00ACC1, 0x4DD0E1), // Cyan
-        JBColor(0x689F38, 0x8BC34A) // Light green (darker for light theme)
-    )
-
     private val layoutCalculator = LayoutCalculatorImpl<ChangeKey>()
-
-    private fun colorForLane(lane: Int): Color = colors[lane % colors.size]
 
     /**
      * Build graph layout for [entries], with no filter concept - every unresolved parent is
@@ -109,7 +99,6 @@ class CommitGraphBuilder {
             layout.rows.associate { row ->
                 row.id to GraphNode(
                     lane = row.lane,
-                    color = colorForLane(row.lane),
                     parentLanes = row.parentLanes,
                     childLanes = row.childLanes,
                     passthroughLanes = row.passthroughLanes,

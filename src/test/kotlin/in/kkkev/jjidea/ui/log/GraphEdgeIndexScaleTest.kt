@@ -95,4 +95,31 @@ class GraphEdgeIndexScaleTest {
 
         index.operationCount shouldBeLessThan (20L * n * width)
     }
+
+    @Test
+    fun `per-row paint work is independent of row offset`() {
+        // The regression this guards (jj-idea-a0wp): the renderer's old drawLinesToParents scanned
+        // every row above the one being painted, purely to find incoming edges - so repainting a
+        // row near the bottom of a long log did ~n times more work than one near the top. That
+        // scan is gone; incomingEdges/passthroughLanes must now cost the same near either end.
+        val n = 20_000
+        val width = 8
+        val entries = (0 until n).map { i -> entry(i, if (i + width < n) listOf(i + width) else emptyList()) }
+        val nodes = CommitGraphBuilder().buildGraph(entries)
+        val index = GraphEdgeIndex.build(entries, nodes)
+
+        fun windowWork(range: IntRange): Long =
+            range.sumOf { r -> (index.incomingEdges(r).size + index.passthroughLanes(r).size).toLong() }
+
+        val windowSize = 40
+        val topWork = windowWork(0 until windowSize)
+        val bottomWork = windowWork((n - windowSize) until n)
+
+        // The old O(row index) scan would make bottomWork ~n/windowSize times topWork (here,
+        // ~500x) even though both windows touch the same bounded number of active lanes. Both
+        // must instead stay within the same O(windowSize * width) bound regardless of offset.
+        val bound = 20L * windowSize * width
+        topWork shouldBeLessThan bound
+        bottomWork shouldBeLessThan bound
+    }
 }

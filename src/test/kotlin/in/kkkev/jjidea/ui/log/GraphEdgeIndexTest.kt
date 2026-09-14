@@ -263,6 +263,96 @@ class GraphEdgeIndexTest {
         index.hoveredEdgeAt(row = 0, lane = 3, visibleRows = 0..0).shouldBeNull()
     }
 
+    /**
+     * Brute-force replica of the renderer's pre-jj-idea-a0wp `drawLinesToParents` - a plain
+     * `0 until row` / `parentKeys` scan computing the same lane formula [GraphEdgeIndex.build]
+     * now computes once and records both directions. Independent of [GraphEdgeIndex] itself (it
+     * only reads [GraphNode]/[LogEntry] fields), so agreement with [GraphEdgeIndex.incomingEdges]/
+     * [GraphEdgeIndex.outgoingEdges] pins jj-idea-a0wp's rewrite as a pure refactor, not just a
+     * self-consistency check.
+     */
+    private fun bruteForceEdges(
+        entries: List<LogEntry>,
+        nodes: Map<ChangeKey, GraphNode>
+    ): Pair<Map<Int, List<RowEdge>>, Map<Int, List<RowEdge>>> {
+        val rowOfKey = entries.withIndex().associate { (row, e) -> e.key to row }
+        val incoming = HashMap<Int, MutableList<RowEdge>>()
+        val outgoing = HashMap<Int, MutableList<RowEdge>>()
+
+        for ((row, entry) in entries.withIndex()) {
+            val node = nodes[entry.key] ?: continue
+            val childHasMultipleParents = node.parentLanes.size > 1
+            for (parentKey in entry.parentKeys) {
+                val parentNode = nodes[parentKey] ?: continue
+                val parentRow = rowOfKey[parentKey] ?: continue
+                val passThroughLane = node.passthroughLanes[parentKey]
+                val lane = passThroughLane
+                    ?: if (childHasMultipleParents && parentNode.lane != node.lane) parentNode.lane else node.lane
+                val edge = GraphEdge(child = entry.key, parent = parentKey, state = null)
+                outgoing.getOrPut(row) { mutableListOf() }.add(RowEdge(lane, edge))
+                incoming.getOrPut(parentRow) { mutableListOf() }.add(RowEdge(lane, edge))
+            }
+        }
+        return incoming to outgoing
+    }
+
+    private fun assertIncomingOutgoingMatchBruteForce(entries: List<LogEntry>, allEntries: List<LogEntry> = entries) {
+        val nodes = CommitGraphBuilder().buildGraph(entries, allEntries)
+        val index = GraphEdgeIndex.build(entries, nodes)
+        val (incoming, outgoing) = bruteForceEdges(entries, nodes)
+
+        entries.indices.forEach { row ->
+            index.incomingEdges(row) shouldBe (incoming[row] ?: emptyList())
+            index.outgoingEdges(row) shouldBe (outgoing[row] ?: emptyList())
+        }
+    }
+
+    @Test
+    fun `incoming and outgoing edges match a brute-force scan - linear chain`() {
+        assertIncomingOutgoingMatchBruteForce(
+            listOf(entry("a", listOf("b")), entry("b", listOf("c")), entry("c"))
+        )
+    }
+
+    @Test
+    fun `incoming and outgoing edges match a brute-force scan - fork (two children, one parent)`() {
+        val p = entry("p")
+        assertIncomingOutgoingMatchBruteForce(listOf(entry("a", listOf("p")), entry("b", listOf("p")), p))
+    }
+
+    @Test
+    fun `incoming and outgoing edges match a brute-force scan - pure merge with a reordered second parent`() {
+        // m's second parent (p1) sorts before its first (p0) in row order - exercises the
+        // non-adjacent-first-parent / later-reserved-lane path.
+        assertIncomingOutgoingMatchBruteForce(
+            listOf(entry("m", listOf("p0", "p1")), entry("p1"), entry("filler"), entry("p0"))
+        )
+    }
+
+    @Test
+    fun `incoming and outgoing edges match a brute-force scan - fork+merge`() {
+        // m merges p (which also has another child, c) - a Fork+Merge parent, not a Pure Merge.
+        val p = entry("p")
+        assertIncomingOutgoingMatchBruteForce(
+            listOf(entry("m", listOf("p", "other")), entry("c", listOf("p")), p, entry("other"))
+        )
+    }
+
+    @Test
+    fun `incoming and outgoing edges match a brute-force scan - non-adjacent parent opens a passthrough`() {
+        assertIncomingOutgoingMatchBruteForce(
+            listOf(entry("a", listOf("d")), entry("b"), entry("c"), entry("d"))
+        )
+    }
+
+    @Test
+    fun `incoming and outgoing edges match a brute-force scan - mixed merge with a stub`() {
+        assertIncomingOutgoingMatchBruteForce(
+            entries = listOf(entry("m", listOf("p", "missing")), entry("p")),
+            allEntries = listOf(entry("m", listOf("p", "missing")), entry("p"))
+        )
+    }
+
     @Test
     fun `emphasized marks the side of the pivot row towards the navigation target`() {
         // A pivot at row 5 pointing DOWN: rows at or below 5 (towards the parent) are emphasized,

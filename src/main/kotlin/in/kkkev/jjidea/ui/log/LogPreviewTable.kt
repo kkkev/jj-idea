@@ -20,13 +20,19 @@ internal fun JTable.hideAllButGraphColumn() {
     }
 }
 
-/** (Re)installs [JujutsuGraphAndDescriptionRenderer] for [graphNodes] on the graph column. */
-internal fun JTable.setGraphRenderer(graphNodes: Map<ChangeKey, GraphNode>) {
+/** (Re)installs [renderer] on the graph column - shared by [JujutsuLogTable.updateGraph], which
+ * also keeps a reference to what it installs (jj-idea-a0wp). */
+internal fun JTable.setGraphRenderer(renderer: JujutsuGraphAndDescriptionRenderer) {
     for (i in 0 until columnModel.columnCount) {
         val column = columnModel.getColumn(i)
         if (column.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION) {
-            column.cellRenderer = JujutsuGraphAndDescriptionRenderer(graphNodes)
+            column.cellRenderer = renderer
             break
         }
     }
 }
+
+/** Convenience overload: builds a bare [JujutsuGraphAndDescriptionRenderer] for [graphNodes] (no
+ * column manager or linkifier - the picker/preview tables this is for show only the graph). */
+internal fun JTable.setGraphRenderer(graphNodes: Map<ChangeKey, GraphNode>) =
+    setGraphRenderer(JujutsuGraphAndDescriptionRenderer(graphNodes))
