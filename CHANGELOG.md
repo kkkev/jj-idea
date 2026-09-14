@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.16] - 2026-09-14
+
 ### Added
 - Hovering a graph line whose other end (a distant ancestor/descendant, or a parent that hasn't loaded yet) is off-screen thickens the whole line and shows a directional cursor pointing toward it, plus a tooltip naming the target and how many rows up/down it is; if only one end is off-screen it always points there, and if both ends are off-screen which one it points to instead depends on which half of the visible log you're looking at. Clicking jumps there, loading it first if needed. A line hidden by the current filter shows the same tooltip but has no click action, since revealing it needs the filter cleared first.
 - In a colocated repo, the bookmarks panel no longer shows a `git` remote group alongside your real remotes — it was jj's own view of the colocated repo's local Git refs, not a peer remote, and made every bookmark appear a third time. Remote groups also now start collapsed by default (Local and Tags are unaffected), with expand/collapse persisted per log window; a collapsed group with an ahead/behind or untracked bookmark inside shows a roll-up indicator so you don't lose visibility into what's unsynced. New Expand All/Collapse All buttons in the panel's toolbar. ([#48](https://github.com/kkkev/jj-idea/issues/48), [#111](https://github.com/kkkev/jj-idea/issues/111))
@@ -901,7 +903,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.15...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.16...HEAD
+[0.8.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.16
 [0.8.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.15
 [0.8.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.14
 [0.8.13]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.13
