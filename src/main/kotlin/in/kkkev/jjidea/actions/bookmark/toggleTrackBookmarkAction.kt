@@ -16,13 +16,13 @@ import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 internal fun performToggleTrack(repo: JujutsuRepository, bookmark: Bookmark) {
     if (bookmark.tracked) {
         repo.createCommand { bookmarkUntrack(bookmark.name) }
-            .onSuccess { repo.invalidate() }
-            .onFailure { tellUser(repo.project, "action.bookmark.untrack.error") }
+            .onSuccess { invalidate() }
+            .onFailure { tellUser("action.bookmark.untrack.error") }
             .executeAsync()
     } else {
         repo.createCommand { bookmarkTrack(listOf(bookmark.name)) }
-            .onSuccess { repo.invalidate() }
-            .onFailure { tellUser(repo.project, "action.bookmark.track.error") }
+            .onSuccess { invalidate() }
+            .onFailure { tellUser("action.bookmark.track.error") }
             .executeAsync()
     }
 }

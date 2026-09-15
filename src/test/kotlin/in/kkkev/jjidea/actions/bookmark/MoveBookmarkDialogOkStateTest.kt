@@ -4,15 +4,8 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
-import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.BookmarkItem
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.*
 import io.kotest.matchers.shouldBe
-import io.mockk.every
-import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
@@ -68,11 +61,9 @@ class MoveBookmarkDialogOkStateTest {
 
     @Test
     fun `Move to Change OK is enabled immediately when a forward-movable change is preselected`() {
-        val repo = mockk<JujutsuRepository>(relaxed = true)
-        every { repo.project } returns project.get()
-        val entry = createEntry(repo, "fwd1")
+        val entry = createEntry(mockRepo(project.get()), "fwd1")
 
-        val dialog = MoveBookmarkToChangeDialog(repo, listOf(entry to MoveDirection.FORWARD), currentId = null)
+        val dialog = MoveBookmarkToChangeDialog(mockRepo(project.get()), listOf(entry to MoveDirection.FORWARD), currentId = null)
 
         dialog.isOKActionEnabled shouldBe true
         disposeDialog(dialog)
@@ -80,12 +71,10 @@ class MoveBookmarkDialogOkStateTest {
 
     @Test
     fun `Move to Change OK is disabled when only a backward-or-sideways change is available`() {
-        val repo = mockk<JujutsuRepository>(relaxed = true)
-        every { repo.project } returns project.get()
-        val entry = createEntry(repo, "back1")
+        val entry = createEntry(mockRepo(project.get()), "back1")
 
         val dialog = MoveBookmarkToChangeDialog(
-            repo,
+            mockRepo(project.get()),
             listOf(entry to MoveDirection.BACKWARD_OR_SIDEWAYS),
             currentId = null
         )
@@ -96,10 +85,7 @@ class MoveBookmarkDialogOkStateTest {
 
     @Test
     fun `Move to Change OK is disabled when there are no candidate changes`() {
-        val repo = mockk<JujutsuRepository>(relaxed = true)
-        every { repo.project } returns project.get()
-
-        val dialog = MoveBookmarkToChangeDialog(repo, emptyList(), currentId = null)
+        val dialog = MoveBookmarkToChangeDialog(mockRepo(project.get()), emptyList(), currentId = null)
 
         dialog.isOKActionEnabled shouldBe false
         disposeDialog(dialog)

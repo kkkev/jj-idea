@@ -70,8 +70,8 @@ class NewChangeAction : DumbAwareAction(
             new(description = Description.EMPTY, parentRevisions = target.parents)
         }.onSuccess {
             // The new change becomes the working copy - select it
-            target.repo.invalidate(select = WorkingCopy, vfsChanged = true)
-        }.onFailure { tellUser(project, "log.action.new.error") }
+            invalidate(select = WorkingCopy, vfsChanged = true)
+        }.onFailure { tellUser("log.action.new.error") }
             .executeAsync()
     }
 

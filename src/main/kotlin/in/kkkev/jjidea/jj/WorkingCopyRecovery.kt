@@ -50,8 +50,8 @@ fun runRecoverable(project: Project, block: () -> Unit) {
  * [onError] (default: a generic visible error notification) on the EDT.
  *
  * Covers the raw `commandExecutor.log(...)`/`logService.getBookmarks()`/`repo.logCache[...]`-style
- * reads that bypass [CommandExecutor.Command] entirely (dialog data loaders, candidate pickers),
- * which the central stale intercept in [CommandExecutor.Command.executeAsync] can't reach.
+ * reads that bypass [CommandExecutor.WithRepo] entirely (dialog data loaders, candidate pickers),
+ * which the central stale intercept in [CommandExecutor.WithRepo.executeAsync] can't reach.
  */
 fun JujutsuRepository.runRecoverableInBackground(
     retry: () -> Unit = {},
@@ -93,9 +93,9 @@ fun JujutsuRepository.runRecoverableInBackground(
 fun updateStaleWorkspace(project: Project, repo: JujutsuRepository, onRepaired: () -> Unit = {}) {
     repo.createCommand { workspaceUpdateStale() }
         .onSuccess {
-            repo.invalidate(vfsChanged = true)
+            invalidate(vfsChanged = true)
             onRepaired()
         }
-        .onFailure { tellUser(project, "notification.stale.error") }
+        .onFailure { tellUser("notification.stale.error") }
         .executeAsync()
 }

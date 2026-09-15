@@ -36,9 +36,9 @@ internal fun performDeleteBookmark(repo: JujutsuRepository, bookmark: Bookmark) 
 
     repo.createCommand { bookmarkDelete(bookmark.name) }
         .onSuccess {
-            repo.invalidate()
+            invalidate()
             log.info("Deleted bookmark ${bookmark.name}")
-        }.onFailure { tellUser(repo.project, "action.bookmark.delete.error") }
+        }.onFailure { tellUser("action.bookmark.delete.error") }
         .executeAsync()
 }
 

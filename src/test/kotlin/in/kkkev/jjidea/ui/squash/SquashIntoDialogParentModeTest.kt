@@ -11,14 +11,13 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.mockRepo
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
-import `in`.kkkev.jjidea.ui.squash.SquashMode
 import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
@@ -121,14 +120,13 @@ class SquashIntoDialogParentModeTest {
         candidates: List<LogEntry>,
         changes: List<Change> = emptyList()
     ) = SquashIntoDialog(
-        project.get(),
         source.repo,
         SquashMode.PickDestination(listOf(source), candidates),
         changes
     )
 
     private fun createEntry(id: String, description: String = "") = LogEntry(
-        repo = mockk(relaxed = true),
+        repo = mockRepo(project.get()),
         id = ChangeId(id, id),
         commitId = CommitId(id, id),
         underlyingDescription = description

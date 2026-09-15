@@ -40,10 +40,10 @@ internal fun performFetch(spec: GitFetchDialog.GitFetchSpec, project: Project) {
         }
         repo.createCommand { gitFetch(spec.remote, spec.allRemotes) }
             .onSuccess {
-                repo.invalidate(vfsChanged = true)
-                log.info("Fetched for ${repo.displayName}")
+                invalidate(vfsChanged = true)
+                log.info("Fetched for $displayName")
             }
-            .onFailure { tellUser(project, "action.git.fetch.error") }
+            .onFailure { tellUser("action.git.fetch.error") }
             .executeWithProgress(project, JujutsuBundle.message("progress.git.fetch", remoteLabel))
     }
 }
@@ -234,11 +234,11 @@ private fun performPush(spec: GitPushDialog.GitPushSpec, project: Project, revis
             JujutsuNotifications.notify(
                 project,
                 JujutsuBundle.message("action.git.push.success.title"),
-                pushSuccessMessage(stdout, stderr),
+                pushSuccessMessage(result.stdout, result.stderr),
                 NotificationType.INFORMATION
             )
         }
-        .onFailure { tellUser(project, "action.git.push.error") }
+        .onFailure { tellUser("action.git.push.error") }
         .executeWithProgress(project, JujutsuBundle.message("progress.git.push"))
 }
 

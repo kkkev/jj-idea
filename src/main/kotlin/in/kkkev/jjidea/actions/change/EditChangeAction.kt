@@ -39,15 +39,14 @@ class EditChangeAction : DumbAwareAction(
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
         val target = editableEntry(e.logEntry) ?: return
-        val jujutsuRoot = target.repo
         val id = target.id
 
-        jujutsuRoot.createCommand { edit(id) }
+        target.repo.createCommand { edit(id) }
             .onSuccess {
                 // The edited change becomes the working copy - select it
-                jujutsuRoot.invalidate(select = id, vfsChanged = true)
+                invalidate(select = id, vfsChanged = true)
                 log.info("Edited change $id")
-            }.onFailure { tellUser(project, "log.action.edit.error") }
+            }.onFailure { tellUser("log.action.edit.error") }
             .executeAsync()
     }
 

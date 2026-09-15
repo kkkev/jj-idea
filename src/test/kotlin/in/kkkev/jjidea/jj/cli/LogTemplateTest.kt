@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Test
  * Tests for LogTemplate integration and parsing
  */
 class LogTemplateTest {
-    private val cliLogService = CliLogService(mockRepo)
+    private val cliLogService = CliLogService(mockRepo())
     private val basicLogTemplate = cliLogService.logTemplates.basicLogTemplate
     private val fullLogTemplate = cliLogService.logTemplates.fullLogTemplate
 

@@ -5,12 +5,11 @@ import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.rebase.RebaseDialog
 import `in`.kkkev.jjidea.ui.rebase.RebaseSpec
-import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 
 private val rebaseLog = Logger.getInstance("in.kkkev.jjidea.actions.change.rebaseAction")
 
@@ -34,10 +33,9 @@ fun rebaseAction(
  */
 internal fun performRebase(project: Project, repo: JujutsuRepository, entries: List<LogEntry>) {
     val dialog = RebaseDialog(project, repo, entries)
-    if (!dialog.showAndGet()) return
-
-    val spec = dialog.result ?: return
-    executeRebase(project, repo, spec)
+    if (dialog.showAndGet()) {
+        dialog.result?.let { spec -> executeRebase(repo, spec) }
+    }
 }
 
 /**
@@ -49,18 +47,13 @@ internal fun performRebase(project: Project, repo: JujutsuRepository, entries: L
  * that. [undoLabelKey] lets Move Up/Down show "Move" rather than "Rebase" in the undo balloon,
  * even though the underlying command - and its error message - are still a plain rebase.
  */
-internal fun executeRebase(
-    project: Project,
-    repo: JujutsuRepository,
-    spec: RebaseSpec,
-    undoLabelKey: String = "log.action.rebase.undo"
-) {
-    repo.createUndoTrackedCommand { rebase(spec.revisions, spec.destinations, spec.sourceMode, spec.destinationMode) }
+internal fun executeRebase(repo: JujutsuRepository, spec: RebaseSpec, undoLabelKey: String = "log.action.rebase.undo") {
+    repo.createCommand { rebase(spec.revisions, spec.destinations, spec.sourceMode, spec.destinationMode) }
         .onSuccess {
-            repo.invalidate(select = spec.revisions.first(), vfsChanged = true)
+            invalidate(select = spec.revisions.first(), vfsChanged = true)
             rebaseLog.info("Rebased ${spec.revisions} onto ${spec.destinations}")
         }
-        .onFailure { tellUser(project, "log.action.rebase.error") }
-        .withUndoBalloon(project, repo, undoLabelKey)
+        .onFailure { tellUser("log.action.rebase.error") }
+        .addUndoTracking(undoLabelKey)
         .executeAsync()
 }

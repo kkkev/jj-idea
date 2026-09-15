@@ -27,9 +27,9 @@ fun deleteTagAction(repo: JujutsuRepository, tag: Tag) = nullAndDumbAwareAction(
 
     repo.createCommand { tagDelete(tag) }
         .onSuccess {
-            repo.invalidate()
+            invalidate()
             log.info("Deleted tag ${tag.name}")
         }
-        .onFailure { tellUser(repo.project, "action.tag.delete.error") }
+        .onFailure { tellUser("action.tag.delete.error") }
         .executeAsync()
 }

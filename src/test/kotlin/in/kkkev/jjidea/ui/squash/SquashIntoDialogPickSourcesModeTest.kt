@@ -10,14 +10,13 @@ import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.mockRepo
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
@@ -26,9 +25,6 @@ import org.junit.jupiter.api.Test
 @RunInEdt
 class SquashIntoDialogPickSourcesModeTest {
     private val project = projectFixture()
-
-    // All entries share the same repo so repoEntries filtering works correctly.
-    private val repo = mockk<JujutsuRepository>(relaxed = true)
 
     @Test
     fun `working copy is pre-selected and seeds description`() {
@@ -257,7 +253,6 @@ class SquashIntoDialogPickSourcesModeTest {
         destination: LogEntry,
         candidates: List<LogEntry>
     ) = SquashIntoDialog(
-        project.get(),
         destination.repo,
         SquashMode.PickSources(destination, candidates),
         emptyList()
@@ -268,7 +263,7 @@ class SquashIntoDialogPickSourcesModeTest {
         description: String = "desc",
         isWorkingCopy: Boolean = false
     ) = LogEntry(
-        repo = repo,
+        repo = mockRepo(project.get()),
         id = ChangeId(id, id),
         commitId = CommitId(id, id),
         underlyingDescription = description,

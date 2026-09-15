@@ -35,12 +35,12 @@ fun newChangeFromAction(project: Project, repo: JujutsuRepository?, targetEntrie
             // edit=true (the default) moves the working copy to the new change, so select it;
             // edit=false leaves @ where it was, so just refresh without changing the selection.
             if (spec.edit) {
-                target.invalidate(select = WorkingCopy, vfsChanged = true)
+                invalidate(select = WorkingCopy, vfsChanged = true)
             } else {
-                target.invalidate(vfsChanged = true)
+                invalidate(vfsChanged = true)
             }
             project.saveDescriptionToHistory(spec.description)
             log.info("Created new change from ${spec.parents} with description: ${spec.description}")
-        }.onFailure { tellUser(project, "log.action.new.error") }
+        }.onFailure { tellUser("log.action.new.error") }
             .executeAsync()
     }

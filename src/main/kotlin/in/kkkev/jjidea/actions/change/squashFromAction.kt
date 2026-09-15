@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.actions.change
 
-import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
@@ -18,21 +17,19 @@ import `in`.kkkev.jjidea.util.runLater
  *
  * The destination must be mutable.
  */
-fun squashFromAction(
-    project: Project,
-    destination: LogEntry?
-) = nullAndDumbAwareAction(destination, "log.action.squash.from", JujutsuIcons.Squash) {
-    runLater {
-        val dialog = SquashIntoDialog(project, target.repo, SquashMode.PickSources(target), emptyList())
-        if (!dialog.showAndGet()) return@runLater
-        val spec = dialog.result ?: return@runLater
-        val specSourceIds = spec.sources.toSet()
-        fun squash() {
-            target.repo.runRecoverableInBackground(retry = ::squash) {
-                val sourceEntries = target.repo.logCache.all.filter { it.id in specSourceIds }
-                executeSquashInto(project, target.repo, sourceEntries, spec)
+fun squashFromAction(destination: LogEntry?) =
+    nullAndDumbAwareAction(destination, "log.action.squash.from", JujutsuIcons.Squash) {
+        runLater {
+            val dialog = SquashIntoDialog(target.repo, SquashMode.PickSources(target), emptyList())
+            if (!dialog.showAndGet()) return@runLater
+            val spec = dialog.result ?: return@runLater
+            val specSourceIds = spec.sources.toSet()
+            fun squash() {
+                target.repo.runRecoverableInBackground(retry = ::squash) {
+                    val sourceEntries = target.repo.logCache.all.filter { it.id in specSourceIds }
+                    executeSquashInto(target.repo, sourceEntries, spec)
+                }
             }
+            squash()
         }
-        squash()
     }
-}

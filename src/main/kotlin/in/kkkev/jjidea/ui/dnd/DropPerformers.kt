@@ -54,7 +54,7 @@ object DropPerformers {
 
         override fun perform(operation: DropOperation): Boolean = when (operation) {
             is DropOperation.Rebase -> {
-                executeRebase(project, operation.destination.repo, operation.toRebaseSpec())
+                executeRebase(operation.destination.repo, operation.toRebaseSpec())
                 true
             }
             is DropOperation.Duplicate -> {

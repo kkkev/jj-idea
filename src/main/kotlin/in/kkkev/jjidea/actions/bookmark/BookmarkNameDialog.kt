@@ -48,7 +48,7 @@ abstract class BookmarkNameDialog(private val repo: JujutsuRepository, private v
 
     override fun doOKAction() = repo.createCommand { execute(this) }
         .onSuccess {
-            repo.invalidate()
+            invalidate()
             onSuccess()
             super.doOKAction()
         }.onFailure {

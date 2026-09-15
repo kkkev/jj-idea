@@ -37,7 +37,7 @@ class JujutsuRepositoryImplTest {
             every { value } returns workingCopyId?.let {
                 mapOf(
                     directoryPath to LogEntry(
-                        repo = mockRepo,
+                        repo = mockRepo(),
                         id = it,
                         commitId = CommitId("commit-${it.full}"),
                         underlyingDescription = "",

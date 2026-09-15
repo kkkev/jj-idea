@@ -443,7 +443,8 @@ object JujutsuNotifications {
      * (e.g. "Abandon"), matching the roadmap's requirement that an undo affordance says what it
      * targets rather than acting as a blind "Undo" button.
      */
-    fun notifyUndoable(project: Project, repo: JujutsuRepository, operation: OperationId, description: String) {
+    fun notifyUndoable(repo: JujutsuRepository, operation: OperationId, description: String) {
+        val project = repo.project
         val notification = NotificationGroupManager.getInstance()
             .getNotificationGroup(GROUP_ID)
             .createNotification(

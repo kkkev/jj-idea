@@ -24,7 +24,7 @@ class JujutsuContentRevisionsTest {
 
     @Test
     fun `ContentLogEntryImpl instances are equal for the same repo, path and change id`() {
-        val repo = mockRepo
+        val repo = mockRepo()
         val filePath = path("src/Main.kt")
 
         val first = ContentLogEntryImpl(repo, filePath, changeIdA)
@@ -36,7 +36,7 @@ class JujutsuContentRevisionsTest {
 
     @Test
     fun `ContentLogEntryImpl instances differ when the change id differs`() {
-        val repo = mockRepo
+        val repo = mockRepo()
         val filePath = path("src/Main.kt")
 
         ContentLogEntryImpl(repo, filePath, changeIdA) shouldNotBe ContentLogEntryImpl(repo, filePath, changeIdB)
@@ -44,7 +44,7 @@ class JujutsuContentRevisionsTest {
 
     @Test
     fun `ContentLogEntryImpl instances differ when the path differs`() {
-        val repo = mockRepo
+        val repo = mockRepo()
 
         ContentLogEntryImpl(repo, path("src/A.kt"), changeIdA) shouldNotBe
             ContentLogEntryImpl(repo, path("src/B.kt"), changeIdA)
@@ -52,7 +52,7 @@ class JujutsuContentRevisionsTest {
 
     @Test
     fun `MergeParentContentRevision instances are equal for the same repo, path and merge parent`() {
-        val repo = mockRepo
+        val repo = mockRepo()
         val filePath = path("src/Main.kt")
         val mergeParentOf = MergeParentOf(changeIdA)
 
@@ -75,7 +75,7 @@ class JujutsuContentRevisionsTest {
     fun `ContentLogEntryImpl is never confused with CurrentContentRevision`() {
         val filePath = path("src/Main.kt")
 
-        val logEntryRevision = ContentLogEntryImpl(mockRepo, filePath, changeIdA)
+        val logEntryRevision = ContentLogEntryImpl(mockRepo(), filePath, changeIdA)
 
         logEntryRevision.shouldBeInstanceOf<ContentLogEntryImpl>()
         (logEntryRevision == CurrentContentRevision(filePath)) shouldBe false

@@ -4,14 +4,8 @@ import com.intellij.icons.AllIcons
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.RebaseDestinationMode
-import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
-import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.duplicate.DuplicateDialog
-import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 
 private val duplicateLog = Logger.getInstance("in.kkkev.jjidea.actions.change.duplicateOntoAction")
 
@@ -46,12 +40,12 @@ internal fun executeDuplicate(
     destinations: List<Revision>,
     mode: RebaseDestinationMode
 ) {
-    repo.createUndoTrackedCommand { duplicate(revisions, destinations, mode) }
+    repo.createCommand { duplicate(revisions, destinations, mode) }
         .onSuccess {
-            repo.invalidate(vfsChanged = true)
+            invalidate(vfsChanged = true)
             duplicateLog.info("Duplicated $revisions onto $destinations")
         }
-        .onFailure { tellUser(project, "log.action.duplicate.error") }
-        .withUndoBalloon(project, repo, "log.action.duplicate.undo")
+        .onFailure { tellUser("log.action.duplicate.error") }
+        .addUndoTracking("log.action.duplicate.undo")
         .executeAsync()
 }

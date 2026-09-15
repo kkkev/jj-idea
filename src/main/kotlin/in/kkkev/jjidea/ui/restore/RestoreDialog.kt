@@ -11,11 +11,10 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
-import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -41,6 +40,7 @@ import javax.swing.JPanel
  */
 private val Change.allPaths: List<FilePath>
     get() = listOfNotNull(beforeRevision?.file, afterRevision?.file).distinct()
+
 class RestoreDialog(
     project: Project,
     private val targetLabel: String,
@@ -133,13 +133,9 @@ class RestoreDialog(
  * handling.
  *
  * On confirmation, runs `jj restore` scoped to exactly the ticked files and invokes [onRestored] so
- * each call site keeps its own post-restore refresh behavior. Uses [createUndoTrackedCommand] +
- * [withUndoBalloon] (rather than the plain [in.kkkev.jjidea.jj.createCommand] every other
- * mutating action used before jj-idea-t0iy) so a restore - a content-discarding op with no other
- * in-app undo path - gets the inline "Undo" balloon immediately, ahead of that bead's wider rollout.
+ * each call site keeps its own post-restore refresh behaviour.
  */
 internal fun performRestore(
-    project: Project,
     repo: JujutsuRepository,
     revision: Revision,
     targetLabel: String,
@@ -152,7 +148,6 @@ internal fun performRestore(
     repo.runRecoverableInBackground(
         retry = {
             performRestore(
-                project,
                 repo,
                 revision,
                 targetLabel,
@@ -167,6 +162,8 @@ internal fun performRestore(
         val changes = loadChanges()
 
         runLater {
+            val project = repo.project
+
             if (changes.isEmpty()) {
                 JujutsuNotifications.notify(
                     project,
@@ -182,10 +179,10 @@ internal fun performRestore(
                 val paths = dialog.result.orEmpty()
                 if (paths.isEmpty()) return@runLater
 
-                repo.createUndoTrackedCommand { restore(paths, revision) }
+                repo.createCommand { restore(paths, revision) }
                     .onSuccess { onRestored(paths) }
-                    .onFailure { tellUser(project, errorMessageKey) }
-                    .withUndoBalloon(project, repo, undoLabelKey)
+                    .onFailure { tellUser(errorMessageKey) }
+                    .addUndoTracking(undoLabelKey)
                     .executeAsync()
             }
         }

@@ -14,10 +14,10 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.mockRepo
 import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
-import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.util.concurrent.atomic.AtomicInteger
@@ -51,7 +51,6 @@ class SquashPreviewScaleTest {
         val source = createEntry("src1", description = "desc")
         val parent = createEntry("par1", description = "")
         val dialog = SquashIntoDialog(
-            project.get(),
             source.repo,
             SquashMode.PickDestination(listOf(source), listOf(parent)),
             changes
@@ -123,7 +122,6 @@ class SquashPreviewScaleTest {
         val source = createEntry("src1", description = "desc")
         val parent = createEntry("par1", description = "")
         val dialog = SquashIntoDialog(
-            project.get(),
             source.repo,
             SquashMode.PickDestination(listOf(source), listOf(parent)),
             changes
@@ -167,7 +165,7 @@ class SquashPreviewScaleTest {
     }
 
     private fun createEntry(id: String, description: String = "") = LogEntry(
-        repo = mockk(relaxed = true),
+        repo = mockRepo(project.get()),
         id = ChangeId(id, id),
         commitId = CommitId(id, id),
         underlyingDescription = description

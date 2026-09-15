@@ -7,9 +7,8 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
-import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 
 /**
  * Abandon change action.
@@ -49,11 +48,11 @@ fun abandonChangeAction(project: Project, entry: LogEntry?) = nullAndDumbAwareAc
     val repo = target.repo
     val selectAfter = if (target.isWorkingCopy) WorkingCopy else target.parentIds.firstOrNull() ?: WorkingCopy
 
-    repo.createUndoTrackedCommand { abandon(target.id) }
+    repo.createCommand { abandon(target.id) }
         .onSuccess {
-            repo.invalidate(select = selectAfter, vfsChanged = true)
+            invalidate(select = selectAfter, vfsChanged = true)
             log.info("Abandoned change ${target.id}")
-        }.onFailure { tellUser(project, "log.action.abandon.error") }
-        .withUndoBalloon(project, repo, "log.action.abandon.undo")
+        }.onFailure { tellUser("log.action.abandon.error") }
+        .addUndoTracking("log.action.abandon.undo")
         .executeAsync()
 }

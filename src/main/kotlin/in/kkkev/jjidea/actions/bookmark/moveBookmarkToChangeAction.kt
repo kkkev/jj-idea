@@ -30,12 +30,12 @@ private fun executeMoveToChange(
     allowBackwards: Boolean
 ) {
     repo.createCommand { bookmarkSet(bookmark.name, changeId, allowBackwards) }
-        .onSuccess { repo.invalidate() }
+        .onSuccess { invalidate() }
         .onFailure {
-            if (!allowBackwards && exitCode == 1 && stderr.contains("backwards or sideways")) {
+            if (!allowBackwards && result.exitCode == 1 && stderr.contains("backwards or sideways")) {
                 runLater { promptRaceBackwards(repo.project, repo, bookmark, changeId) }
             } else {
-                tellUser(repo.project, "action.bookmark.moveTo.error")
+                tellUser("action.bookmark.moveTo.error")
             }
         }
         .executeAsync()

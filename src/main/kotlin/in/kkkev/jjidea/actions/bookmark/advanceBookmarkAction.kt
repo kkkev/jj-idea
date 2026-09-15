@@ -266,14 +266,14 @@ private fun advanceBookmarks(repo: JujutsuRepository, names: List<BookmarkName>)
     val target = repo.whenWorkingCopyAvailable { it.id.short } ?: "@"
     repo.createCommand { bookmarkAdvance(names) }
         .onSuccess {
-            repo.invalidate()
+            invalidate()
             JujutsuNotifications.notify(
-                repo.project,
+                project,
                 JujutsuBundle.message("action.bookmark.advance.success.title"),
                 JujutsuBundle.message("action.bookmark.advance.success.message", quotedNames(names), target),
                 NotificationType.INFORMATION
             )
         }
-        .onFailure { tellUser(repo.project, "action.bookmark.advance.error") }
+        .onFailure { tellUser("action.bookmark.advance.error") }
         .executeAsync()
 }

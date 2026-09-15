@@ -20,9 +20,9 @@ fun duplicateChangeAction(
     val revisions = entries.map { it.id }
     target.createCommand { duplicate(revisions) }
         .onSuccess {
-            target.invalidate()
+            invalidate()
             log.info("Duplicated $revisions")
         }
-        .onFailure { tellUser(project, "log.action.duplicate.error") }
+        .onFailure { tellUser("log.action.duplicate.error") }
         .executeAsync()
 }

@@ -109,7 +109,7 @@ class TrackedToggleAction : ToggleAction(
 
         repo.createCommand { if (state) fileTrack(toChange) else fileUntrack(toChange) }
             .onSuccessResult {
-                repo.invalidate(vfsChanged = true)
+                invalidate(vfsChanged = true)
                 JujutsuIgnoredFilesService.getInstance(project).invalidate(repo)
                 // Deliberately NOT invalidating JujutsuTrackedFilesService here - the optimistic
                 // write above is now confirmed correct for exactly these paths; wiping it would

@@ -40,25 +40,23 @@ class SquashFilesAction : DumbAwareAction(
     }
 
     override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
         val entry = resolveEntry(e) ?: return
         val preSelectedFiles = e.filePaths.toSet()
 
         entry.repo.runRecoverableInBackground(retry = { actionPerformed(e) }) {
             val changes = ChangeService.loadChanges(entry)
-            val candidateParents = entry.parentIds.mapNotNull { entry.repo.getLogEntry(it) }
+            val candidateParents = entry.parentIds.map { entry.repo.getLogEntry(it) }
                 .filter { !it.immutable }
 
             runLater {
                 val dialog = SquashIntoDialog(
-                    project,
                     entry.repo,
                     SquashMode.PickDestination(listOf(entry), candidateParents),
                     changes,
                     preSelectedFiles = preSelectedFiles
                 )
                 if (dialog.showAndGet()) {
-                    dialog.result?.let { executeSquashInto(project, entry.repo, listOf(entry), it) }
+                    dialog.result?.let { executeSquashInto(entry.repo, listOf(entry), it) }
                 }
             }
         }

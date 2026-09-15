@@ -34,9 +34,9 @@ internal fun performForgetBookmark(repo: JujutsuRepository, bookmark: Bookmark) 
 
     repo.createCommand { bookmarkForget(bookmark.name) }
         .onSuccess {
-            repo.invalidate()
+            invalidate()
             log.info("Forgot bookmark ${bookmark.name}")
-        }.onFailure { tellUser(repo.project, "action.bookmark.forget.error") }
+        }.onFailure { tellUser("action.bookmark.forget.error") }
         .executeAsync()
 }
 

@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.squash
 
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.util.Disposer
@@ -13,7 +12,6 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.diffedit.HunkPickerLabels
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.*
 import `in`.kkkev.jjidea.ui.components.CommitPickerPanel
@@ -84,15 +82,15 @@ fun mergeDescriptions(parent: String, source: String): String =
  * - [SquashMode.PickSources]: destination is fixed, user multi-selects sources.
  */
 class SquashIntoDialog(
-    private val project: Project,
     private val repo: JujutsuRepository,
     private val mode: SquashMode,
     changes: List<Change>,
     preSelectedFiles: Set<FilePath> = emptySet()
-) : DialogWrapper(project) {
+) : DialogWrapper(repo.project) {
     var result: SquashIntoSpec? = null
         private set
 
+    private val project = repo.project
     private val pickingSources = mode is SquashMode.PickSources
     private val hasPredefinedCandidates = mode.candidates != null
     private val sourceIds = (mode as? SquashMode.PickDestination)?.sources?.map { it.id }?.toSet() ?: emptySet()

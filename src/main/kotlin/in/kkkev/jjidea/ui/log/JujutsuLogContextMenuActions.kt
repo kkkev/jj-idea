@@ -1,40 +1,14 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.ide.BrowserUtil
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.KeepPopupOnPerform
-import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.addPopup
-import `in`.kkkev.jjidea.actions.bookmark.advanceClosestBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.createBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.localBookmarkActions
-import `in`.kkkev.jjidea.actions.bookmark.moveBookmarkAction
-import `in`.kkkev.jjidea.actions.bookmark.remoteBookmarkActions
-import `in`.kkkev.jjidea.actions.change.abandonChangeAction
-import `in`.kkkev.jjidea.actions.change.compareBeforeWithRevisionAction
-import `in`.kkkev.jjidea.actions.change.compareWithRevisionAction
-import `in`.kkkev.jjidea.actions.change.compareWithWorkingCopyAction
-import `in`.kkkev.jjidea.actions.change.copyDescriptionAction
-import `in`.kkkev.jjidea.actions.change.copyIdAction
-import `in`.kkkev.jjidea.actions.change.describeAction
-import `in`.kkkev.jjidea.actions.change.duplicateChangeAction
-import `in`.kkkev.jjidea.actions.change.duplicateOntoAction
-import `in`.kkkev.jjidea.actions.change.newChangeFromAction
-import `in`.kkkev.jjidea.actions.change.rebaseAction
-import `in`.kkkev.jjidea.actions.change.resolveConflictsAction
-import `in`.kkkev.jjidea.actions.change.splitAction
-import `in`.kkkev.jjidea.actions.change.squashAction
-import `in`.kkkev.jjidea.actions.change.squashFromAction
-import `in`.kkkev.jjidea.actions.change.squashIntoAction
-import `in`.kkkev.jjidea.actions.change.squashIntoSources
-import `in`.kkkev.jjidea.actions.change.squashableEntry
+import `in`.kkkev.jjidea.actions.bookmark.*
+import `in`.kkkev.jjidea.actions.change.*
 import `in`.kkkev.jjidea.actions.git.gitFetchAction
 import `in`.kkkev.jjidea.actions.git.gitPushAction
 import `in`.kkkev.jjidea.actions.git.openInRemoteGroup
@@ -148,8 +122,8 @@ object JujutsuLogContextMenuActions {
 
         add(squashAction(project, squashableEntry(entry)))
         val squashIntoSrcs = squashIntoSources(entries)
-        add(squashIntoAction(project, uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() }, squashIntoSrcs))
-        add(squashFromAction(project, entry?.takeIf { !it.immutable }))
+        add(squashIntoAction(uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() }, squashIntoSrcs))
+        add(squashFromAction(entry?.takeIf { !it.immutable }))
         add(splitAction(project, entry?.takeIf { !it.immutable }))
 
         addSeparator()
@@ -230,11 +204,13 @@ object JujutsuLogContextMenuActions {
                     }
                     actions.forEach(::add)
                 }
+
                 is TagClick -> {
                     add(FilterToReferenceAction(project, target.tag.name))
                     addSeparator()
                     add(deleteTagAction(target.repo, target.tag))
                 }
+
                 is PersonClick -> {
                     add(SendEmailAction(target.user))
                     if (target.canFilter) {
@@ -242,6 +218,7 @@ object JujutsuLogContextMenuActions {
                         add(FilterByAuthorAction(project, target.user))
                     }
                 }
+
                 is IssueLinkClick -> add(OpenIssueLinkAction(target.uri))
                 // jjc:// change-navigation links resolve their target LogEntry (may shell out to
                 // jj if it's outside the loaded window) and reuse the same menu a right-click on

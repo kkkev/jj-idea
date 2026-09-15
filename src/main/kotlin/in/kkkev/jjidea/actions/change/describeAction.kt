@@ -35,26 +35,23 @@ internal fun describePromptId(target: LogEntry) = target.id.short
  * open the same "edit description" dialog and run the same `jj describe`.
  */
 internal fun performDescribe(project: Project, target: LogEntry) {
-    val jujutsuRoot = target.repo
-
-    jujutsuRoot.createCommand {
+    target.repo.createCommand {
         log(target.id, "description")
     }.onSuccess { currentDescription ->
-        val newDescription =
-            project.requestDescription(
-                "dialog.describe.input",
-                Description(currentDescription.removeSuffix("\n")),
-                describePromptId(target)
-            )
-                ?: return@onSuccess
-        // If that was null, the user cancelled
-        jujutsuRoot.createCommand { describe(newDescription, target.id) }
-            .onSuccess {
-                jujutsuRoot.invalidate()
-                project.saveDescriptionToHistory(newDescription)
+        project.requestDescription(
+            "dialog.describe.input",
+            Description(currentDescription.removeSuffix("\n")),
+            describePromptId(target)
+        )?.let { newDescription ->
+            // If that was null, the user cancelled
+            createCommand { describe(newDescription, target.id) }
+                .onSuccess {
+                    invalidate()
+                    project.saveDescriptionToHistory(newDescription)
 
-                describeLog.info("Updated working copy description")
-            }.onFailure { tellUser(project, "log.action.describe.error") }
-            .executeAsync()
+                    describeLog.info("Updated working copy description")
+                }.onFailure { tellUser("log.action.describe.error") }
+                .executeAsync()
+        }
     }.executeAsync()
 }

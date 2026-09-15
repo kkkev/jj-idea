@@ -35,7 +35,6 @@ class RestoreSelectionAction : DumbAwareAction(
         val repo = e.singleRepoForRestore ?: return
 
         performRestore(
-            project = project,
             repo = repo,
             revision = WorkingCopy.parent,
             targetLabel = JujutsuBundle.message("dialog.restore.target.parent"),

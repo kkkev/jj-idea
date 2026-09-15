@@ -6,17 +6,13 @@ import com.intellij.testFramework.junit5.TestApplication
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.mockkObject
-import io.mockk.unmockkObject
-import io.mockk.verify
+import io.mockk.*
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
 /**
- * jj-idea-27b4: [CommandExecutor.Command] must classify a [CommandExecutor.CommandResult.Failure]
+ * jj-idea-27b4: [CommandExecutor.WithRepo] must classify a [CommandExecutor.CommandResult.Failure]
  * before ever reaching the call site's own `onFailure` - a stale-workspace failure gets the
  * "Update Stale Workspace" remedy ([JujutsuNotifications.notifyWorkingCopyUnavailable]) instead of
  * whatever generic/mis-parsing handling the call site wrote. This was the root cause behind
@@ -56,7 +52,7 @@ class CommandStaleInterceptTest {
         every { JujutsuNotifications.notifyWorkingCopyUnavailable(any(), any(), any(), any()) } returns Unit
         var onFailureCalled = false
 
-        CommandExecutor.Command(repo, mockk(), action = { staleFailure })
+        CommandExecutor.Command.WithRepo(repo, mockk(), action = { staleFailure })
             .onFailure { onFailureCalled = true }
             .executeAsync()
         drainBackgroundLoads()
@@ -81,7 +77,7 @@ class CommandStaleInterceptTest {
         }
         var runs = 0
 
-        CommandExecutor.Command(repo, mockk(), action = {
+        CommandExecutor.Command.WithRepo(repo, mockk(), action = {
             runs++
             staleFailure
         })
@@ -100,8 +96,8 @@ class CommandStaleInterceptTest {
         mockkObject(JujutsuNotifications)
         var failureSeen: CommandExecutor.CommandResult.Failure? = null
 
-        CommandExecutor.Command(repo, mockk(), action = { unrelatedFailure })
-            .onFailure { failureSeen = this }
+        CommandExecutor.Command.WithRepo(repo, mockk(), action = { unrelatedFailure })
+            .onFailure { failureSeen = this@onFailure.result }
             .executeAsync()
         drainBackgroundLoads()
 
@@ -114,7 +110,7 @@ class CommandStaleInterceptTest {
         mockkObject(JujutsuNotifications)
         var failureSeen: CommandExecutor.CommandResult.Failure? = null
 
-        CommandExecutor.Command(repo = null, commandExecutor = mockk(), action = { staleFailure })
+        CommandExecutor.Command.Bare(commandExecutor = mockk(), action = { staleFailure })
             .onFailure { failureSeen = this }
             .executeAsync()
         drainBackgroundLoads()

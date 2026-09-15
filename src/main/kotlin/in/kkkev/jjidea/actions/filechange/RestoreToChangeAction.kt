@@ -45,7 +45,6 @@ class RestoreToChangeAction : DumbAwareAction(
         val repo = entry.repo
 
         performRestore(
-            project = project,
             repo = repo,
             revision = changeId,
             targetLabel = changeId.short,

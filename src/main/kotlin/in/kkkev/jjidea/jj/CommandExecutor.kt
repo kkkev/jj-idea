@@ -7,7 +7,10 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications.notifyWorkingCopyUnavailable
+import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.util.saveAllDocuments
@@ -29,13 +32,13 @@ interface CommandExecutor {
      * - [Failure.Executed] separates a process that actually ran ([Failure.Exited],
      *   [Failure.TimedOut]) from one that never started ([Failure.NotLaunched]) — a timed-out
      *   process has real partial [Failure.Executed.stdout] but no real stderr (the process never
-     *   got to report anything), and a not-launched one has no streams at all. Both synthesize a
+     *   got to report anything), and a not-launched one has no streams at all. Both synthesise a
      *   diagnostic into [Failure.message] instead of pretending to have captured real output.
      */
     sealed interface CommandResult {
         /**
          * Kept readable on every result, matching the pre-sealed-hierarchy flat shape: jj prints
-         * non-fatal warnings to stderr even on exit 0 (see [Command.onSuccessResult]), and every
+         * non-fatal warnings to stderr even on exit 0 (see [Command.WithRepo.onSuccessResult]), and every
          * failure kind synthesizes something meaningful here even when no real stderr exists
          * (see [Failure.message], which aliases this on [Failure]).
          */
@@ -86,7 +89,7 @@ interface CommandExecutor {
 
             /**
              * Always-meaningful, user-facing diagnostic - what [tellUser] renders. For [Exited]
-             * this is the real stderr; for [TimedOut] and [NotLaunched] it is synthesized (and
+             * this is the real stderr; for [TimedOut] and [NotLaunched] it is synthesised (and
              * mirrored into [stderr] too, for source compatibility with pre-existing readers).
              */
             val message: String get() = stderr
@@ -449,7 +452,7 @@ interface CommandExecutor {
 
     /**
      * Squash a single source change into a destination interactively, using a diff editor tool —
-     * the squash analog of [splitInteractive]. Uses `jj squash --from <SRC> --into <DEST> --tool
+     * the squash equivalent of [splitInteractive]. Uses `jj squash --from <SRC> --into <DEST> --tool
      * <tool>` (implies `--interactive`), driven non-interactively by the IDE's diff-edit helper.
      * No filesets are passed - the staging tree built by [in.kkkev.jjidea.diffedit.DiffEditTool]
      * carries the selection, exactly as for [splitInteractive].
@@ -583,7 +586,7 @@ interface CommandExecutor {
      * `config list` for a single key, rendered with provenance: which file the winning value
      * came from. Used to show the user *why* an identity value is what it is (e.g. a
      * `--when.repositories` scope) rather than just the value itself - see jj-idea-i0e6.
-     * @return Command result (stdout contains one delimited line per [CliExecutor]'s
+     * @return Command result (stdout contains one delimited line per [in.kkkev.jjidea.jj.cli.CliExecutor]'s
      * provenance template if the key resolves, blank if unset)
      */
     fun configListDetailed(key: String, scope: ConfigScope? = null): CommandResult
@@ -640,60 +643,34 @@ interface CommandExecutor {
      */
     fun withUndoTracking(): CommandExecutor = this
 
-    data class Command(
-        /**
-         * The repo this command runs against, if any. Null only for the rootless case (e.g.
-         * [in.kkkev.jjidea.actions.top.InitAction]'s `jj git init` on a directory with no
-         * [JujutsuRepository] yet - nothing to be "stale" before it's even a repo) - see
-         * [createCommand] (the bare [CommandExecutor] factory, kept for that case) vs.
-         * [JujutsuRepository.createCommand]. A null [repo] simply skips the stale-workspace
-         * intercept in [handleResult] and always calls [onFailure] directly.
-         */
-        val repo: JujutsuRepository?,
-        val commandExecutor: CommandExecutor,
-        val action: CommandExecutor.() -> CommandResult,
-        val onSuccess: (String) -> Unit = {},
-        val onSuccessResult: CommandResult.Success.() -> Unit = {},
-        val onFailure: CommandResult.Failure.() -> Unit = {}
-    ) {
-        fun onSuccess(callback: (String) -> Unit) = copy(onSuccess = callback)
+    sealed interface Command<C : Command<C, CO>, CO : Context<C, CommandResult.Success>> {
+        val commandExecutor: CommandExecutor
+        val action: CommandExecutor.() -> CommandResult
+        val onSuccess: CO.(String) -> Unit
+        val onSuccessResult: CommandResult.Success.() -> Unit
+        val onFailure: CommandResult.Failure.() -> Unit
 
-        /**
-         * Like [onSuccess], but receives the full [CommandResult.Success] (including
-         * [CommandResult.Success.stderr]) instead of just stdout. Some jj subcommands print a
-         * non-fatal warning to stderr on an otherwise-successful (exit 0) run - e.g.
-         * `jj file untrack` on a path that's already untracked - which plain [onSuccess] can't
-         * see. Prefer this when a caller needs to surface such warnings; both callbacks run on
-         * success, so most callers only need one or the other.
-         */
-        fun onSuccessResult(callback: CommandResult.Success.() -> Unit) = copy(onSuccessResult = callback)
+        fun createContext(result: CommandResult.Success): CO
 
-        fun onFailure(callback: CommandResult.Failure.() -> Unit) = copy(onFailure = callback)
+        fun fireFailure(failure: CommandResult.Failure, retry: () -> Unit) = onFailure(failure)
 
         /**
          * Classifies [result] before ever reaching the call site's own [onFailure] - a failure
          * caused by a stale workspace (jj-idea-b65g/jj-idea-27b4) gets the "Update Stale
          * Workspace" remedy instead of whatever generic/mis-parsing failure handling the call
          * site wrote (raw-stderr dialog, or worse - e.g. [in.kkkev.jjidea.actions.bookmark.BookmarkNameDialog]
-         * mis-reading any exit-1 failure as a name conflict). [retry] re-runs this exact `Command`
+         * misreading any exit-1 failure as a name conflict). [retry] re-runs this exact `Command`
          * once the user applies the remedy.
          */
         private fun handleResult(result: CommandResult, retry: () -> Unit) {
             runLater {
                 when (result) {
                     is CommandResult.Success -> {
-                        onSuccess(result.stdout)
+                        onSuccess.invoke(createContext(result), result.stdout)
                         result.onSuccessResult()
                     }
 
-                    is CommandResult.Failure -> {
-                        val health = repo?.let { classifyRepositoryFailure(result.message) }
-                        if (repo != null && health is RepositoryHealth.Stale) {
-                            JujutsuNotifications.notifyWorkingCopyUnavailable(repo.project, repo, health, retry)
-                        } else {
-                            onFailure(result)
-                        }
-                    }
+                    is CommandResult.Failure -> fireFailure(result, retry)
                 }
             }
         }
@@ -714,29 +691,91 @@ interface CommandExecutor {
                 }
             }.queue()
         }
+
+        /**
+         * Command that acts against a repository. This is able to detect and heal failure scenarios such as a stale
+         * workspace.
+         */
+        data class WithRepo(
+            val repo: JujutsuRepository,
+            override val commandExecutor: CommandExecutor,
+            override val action: CommandExecutor.() -> CommandResult,
+            override val onSuccess: ContextWithRepo<CommandResult.Success>.(String) -> Unit = {},
+            override val onSuccessResult: CommandResult.Success.() -> Unit = {},
+            override val onFailure: CommandResult.Failure.() -> Unit = {}
+        ) : Command<WithRepo, ContextWithRepo<CommandResult.Success>> {
+            override fun createContext(result: CommandResult.Success) = ContextWithRepo(this, result)
+
+            fun onSuccess(callback: JujutsuRepository.(String) -> Unit): WithRepo =
+                copy(onSuccess = { callback.invoke(repo, it) })
+
+            /**
+             * Like [onSuccess], but receives the full [CommandResult.Success] (including
+             * [CommandResult.Success.stderr]) instead of just stdout. Some jj subcommands print a
+             * non-fatal warning to stderr on an otherwise-successful (exit 0) run - e.g.
+             * `jj file untrack` on a path that's already untracked - which plain [onSuccess] can't
+             * see. Prefer this when a caller needs to surface such warnings; both callbacks run on
+             * success, so most callers only need one or the other.
+             */
+            fun onSuccessResult(callback: ContextWithRepo<CommandResult.Success>.() -> Unit) = copy(onSuccessResult = {
+                callback(ContextWithRepo(this@WithRepo, this))
+            })
+
+            fun onFailure(callback: ContextWithRepo<CommandResult.Failure>.() -> Unit) = copy(onFailure = {
+                callback(ContextWithRepo(this@WithRepo, this))
+            })
+
+            fun addUndoTracking(
+                undoLabelKey: String,
+                notify: (JujutsuRepository, OperationId, String) -> Unit = JujutsuNotifications::notifyUndoable
+            ) = copy(commandExecutor = commandExecutor.withUndoTracking())
+                .withUndoBalloon(undoLabelKey, notify)
+
+            override fun fireFailure(failure: CommandResult.Failure, retry: () -> Unit) {
+                val health = classifyRepositoryFailure(failure.message)
+                when {
+                    health is RepositoryHealth.Stale -> notifyWorkingCopyUnavailable(repo.project, repo, health, retry)
+                    else -> super.fireFailure(failure, retry)
+                }
+            }
+        }
+
+        /**
+         * Simple bare command that does not act against an existing repository.
+         */
+        data class Bare(
+            override val commandExecutor: CommandExecutor,
+            override val action: CommandExecutor.() -> CommandResult,
+            override val onSuccess: Context<Bare, CommandResult.Success>.(String) -> Unit = {},
+            override val onSuccessResult: CommandResult.Success.() -> Unit = {},
+            override val onFailure: CommandResult.Failure.() -> Unit = {}
+        ) : Command<Bare, Context<Bare, CommandResult.Success>> {
+            fun onSuccess(callback: (String) -> Unit) = copy(onSuccess = { callback.invoke(it) })
+            fun onFailure(callback: CommandResult.Failure.() -> Unit) = copy(onFailure = callback)
+
+            override fun createContext(result: CommandResult.Success) = Context(this, result)
+        }
     }
 
     /**
-     * Builds a [Command] with no [JujutsuRepository] - only for the rootless case where one
-     * doesn't exist yet (e.g. [in.kkkev.jjidea.actions.top.InitAction]'s `jj git init`). Prefer
-     * [JujutsuRepository.createCommand] whenever a repo exists, so the stale-workspace intercept
-     * in [Command.handleResult] applies.
+     * Builds a bare [Command] - only for the rootless case where one doesn't exist yet (e.g.
+     * [in.kkkev.jjidea.actions.top.InitAction]'s `jj git init`). Prefer [JujutsuRepository.createCommand] whenever a
+     * repo exists, so the stale-workspace intercept takes place.
      */
-    fun createCommand(action: CommandExecutor.() -> CommandResult): Command = Command(null, this, action)
+    fun createCommand(action: CommandExecutor.() -> CommandResult) = Command.Bare(this, action)
+
+    open class Context<C : Command<C, *>, R : CommandResult>(val command: C, val result: R) {
+        val stderr = result.stderr
+    }
+
+    class ContextWithRepo<R : CommandResult>(command: Command.WithRepo, result: R) :
+        Context<Command.WithRepo, R>(command, result),
+        JujutsuRepository by command.repo {
+        fun tellUser(resourceKeyPrefix: String) = result.tellUser(project, resourceKeyPrefix)
+    }
 }
 
 /** Builds a [CommandExecutor.Command] against [this] repo's own executor. */
 fun JujutsuRepository.createCommand(
     action: CommandExecutor.() -> CommandExecutor.CommandResult
-): CommandExecutor.Command = CommandExecutor.Command(this, commandExecutor, action)
-
-/**
- * Like [createCommand], but runs against [CommandExecutor.withUndoTracking]'s wrapped executor -
- * for a command whose [CommandExecutor.CommandResult.Success.Reversible.operation] needs to be
- * resolved (e.g. to offer an undo balloon), replacing the old
- * `repo.commandExecutor.withUndoTracking().createCommand { ... }` chain now that [createCommand]
- * requires a [JujutsuRepository], not a bare [CommandExecutor].
- */
-fun JujutsuRepository.createUndoTrackedCommand(
-    action: CommandExecutor.() -> CommandExecutor.CommandResult
-): CommandExecutor.Command = CommandExecutor.Command(this, commandExecutor.withUndoTracking(), action)
+): CommandExecutor.Command.WithRepo = CommandExecutor.Command.WithRepo(this, commandExecutor, action)

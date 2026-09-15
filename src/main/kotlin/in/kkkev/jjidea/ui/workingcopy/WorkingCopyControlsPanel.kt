@@ -2,13 +2,7 @@ package `in`.kkkev.jjidea.ui.workingcopy
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionToolbar
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -27,12 +21,7 @@ import `in`.kkkev.jjidea.actions.saveDescriptionToHistory
 import `in`.kkkev.jjidea.actions.tag.setTagAction
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.ui.components.DescriptionEditor
-import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
-import `in`.kkkev.jjidea.ui.components.IssueLinkifier
-import `in`.kkkev.jjidea.ui.components.appendParents
-import `in`.kkkev.jjidea.ui.components.appendSummary
-import `in`.kkkev.jjidea.ui.components.htmlString
+import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.GridBagConstraints
@@ -45,8 +34,6 @@ import javax.swing.*
  * This panel is bound to a specific repository and updates when the bound repository changes.
  */
 class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayout()), Disposable {
-    private val log = Logger.getInstance(javaClass)
-
     /** Provider for per-repo description state */
     var stateProvider: ((JujutsuRepository) -> DescriptionState)? = null
 
@@ -439,7 +426,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
                 persistedDescription = description
                 isDescriptionModified = false
                 updateDescriptionLabel()
-                repo.invalidate()
+                invalidate()
                 project.saveDescriptionToHistory(description)
             }.onFailure {
                 JOptionPane.showMessageDialog(
@@ -462,7 +449,7 @@ class WorkingCopyControlsPanel(private val project: Project) : JPanel(BorderLayo
             descriptionEditor.text = Description.EMPTY
             isDescriptionModified = false
             updateDescriptionLabel()
-            repo.invalidate(select = WorkingCopy)
+            invalidate(select = WorkingCopy)
             project.saveDescriptionToHistory(description)
         }.onFailure {
             JOptionPane.showMessageDialog(

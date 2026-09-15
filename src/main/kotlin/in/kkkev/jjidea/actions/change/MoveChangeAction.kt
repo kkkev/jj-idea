@@ -93,7 +93,6 @@ sealed class MoveChangeAction(
     }
 
     override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
         val target = moveTarget(e.logEntry, e.logNeighbours, direction) ?: return
         val spec = RebaseSpec(
             revisions = listOf(target.entry.id),
@@ -102,7 +101,7 @@ sealed class MoveChangeAction(
             destinationMode = direction.destinationMode
         )
         log.info("Moving ${target.entry.id} $direction relative to ${target.neighbour.id}")
-        executeRebase(project, target.entry.repo, spec, undoLabelKey = "log.action.move.undo")
+        executeRebase(target.entry.repo, spec, undoLabelKey = "log.action.move.undo")
     }
 }
 

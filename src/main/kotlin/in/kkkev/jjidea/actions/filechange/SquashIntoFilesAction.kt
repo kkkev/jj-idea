@@ -11,7 +11,6 @@ import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.jj.whenWorkingCopyAvailable
-import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.squash.SquashIntoDialog
 import `in`.kkkev.jjidea.ui.squash.SquashMode
@@ -37,25 +36,22 @@ class SquashIntoFilesAction : DumbAwareAction(
     }
 
     override fun actionPerformed(e: AnActionEvent) {
-        val project = e.project ?: return
         val entry = resolveEntry(e) ?: return
         val preSelectedFiles = e.filePaths.toSet()
         val repo = entry.repo
-        val settings = JujutsuSettings.getInstance(project)
 
         repo.runRecoverableInBackground(retry = { actionPerformed(e) }) {
             val changes = ChangeService.loadChanges(entry)
 
             runLater {
                 val dialog = SquashIntoDialog(
-                    project,
                     repo,
                     SquashMode.PickDestination(listOf(entry)),
                     changes,
                     preSelectedFiles
                 )
                 if (dialog.showAndGet()) {
-                    dialog.result?.let { executeSquashInto(project, repo, listOf(entry), it) }
+                    dialog.result?.let { executeSquashInto(repo, listOf(entry), it) }
                 }
             }
         }

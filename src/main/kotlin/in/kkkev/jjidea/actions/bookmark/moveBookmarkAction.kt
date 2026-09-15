@@ -5,13 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
-import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
-import `in`.kkkev.jjidea.jj.invalidate
-import `in`.kkkev.jjidea.ui.services.withUndoBalloon
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.util.runLater
 
 fun moveBookmarkAction(entry: LogEntry?) = nullAndDumbAwareAction(
@@ -38,20 +32,20 @@ internal fun executeMove(
     targetId: ChangeId,
     allowBackwards: Boolean
 ) {
-    repo.createUndoTrackedCommand { bookmarkSet(bookmark.name, targetId, allowBackwards) }
-        .onSuccess { repo.invalidate(select = targetId) }
+    repo.createCommand { bookmarkSet(bookmark.name, targetId, allowBackwards) }
+        .onSuccess { invalidate(select = targetId) }
         .onFailure {
-            if (!allowBackwards && exitCode == 1 && stderr.contains("backwards or sideways")) {
+            if (!allowBackwards && result.exitCode == 1 && stderr.contains("backwards or sideways")) {
                 // Not necessarily a race - the drag gesture (jj-idea-ibth) never pre-classifies
                 // direction the way the dialog above does, so this also fires for a plain,
                 // deliberate backward/sideways drag. The message below must therefore stand on
                 // its own and not claim a dialog or a race that may not have happened.
                 runLater { promptBackwardMove(repo.project, repo, bookmark, targetId) }
             } else {
-                tellUser(repo.project, "action.bookmark.move.error")
+                tellUser("action.bookmark.move.error")
             }
         }
-        .withUndoBalloon(repo.project, repo, "action.bookmark.move.undo")
+        .addUndoTracking("action.bookmark.move.undo")
         .executeAsync()
 }
 

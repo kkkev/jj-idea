@@ -39,10 +39,10 @@ class DescribeWorkingCopyAction : DumbAwareAction(
             ) ?: return@onSuccess
             repo.createCommand { describe(newDescription) }
                 .onSuccess {
-                    repo.invalidate()
+                    invalidate()
                     project.saveDescriptionToHistory(newDescription)
                 }
-                .onFailure { tellUser(project, "dialog.describe.error") }
+                .onFailure { tellUser("dialog.describe.error") }
                 .executeAsync()
         }.executeAsync()
     }

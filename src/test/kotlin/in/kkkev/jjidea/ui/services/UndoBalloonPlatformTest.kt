@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test
 class UndoBalloonPlatformTest {
     private val undoService = JujutsuUndoService()
     private val project = mockk<Project> { every { getService(JujutsuUndoService::class.java) } returns undoService }
-    private val repo = mockk<JujutsuRepository>()
+    private val repo = mockk<JujutsuRepository>().also { r -> every { r.project } returns project }
     private val commandExecutor = mockk<CommandExecutor>()
 
     private data class Notification(val repo: JujutsuRepository, val operation: OperationId, val label: String)
@@ -36,8 +36,8 @@ class UndoBalloonPlatformTest {
     /** Runs the wrapped action, then pumps the EDT queue so the deferred [notify] call executes. */
     private fun runWithBalloon(result: CommandResult): List<Notification> {
         val notified = mutableListOf<Notification>()
-        CommandExecutor.Command(repo, commandExecutor, action = { result })
-            .withUndoBalloon(project, repo, "log.action.abandon.undo") { _, r, op, label ->
+        CommandExecutor.Command.WithRepo(repo, commandExecutor, action = { result })
+            .withUndoBalloon("log.action.abandon.undo") { r, op, label ->
                 notified += Notification(r, op, label)
             }
             .action(commandExecutor)

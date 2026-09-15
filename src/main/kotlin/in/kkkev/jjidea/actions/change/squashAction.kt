@@ -36,14 +36,13 @@ fun squashAction(project: Project, entry: LogEntry?) =
 
                 runLater {
                     val dialog = SquashIntoDialog(
-                        project,
                         target.repo,
                         SquashMode.PickDestination(listOf(target), candidateParents),
                         changes
                     )
                     if (!dialog.showAndGet()) return@runLater
                     val spec = dialog.result ?: return@runLater
-                    executeSquashInto(project, target.repo, listOf(target), spec)
+                    executeSquashInto(target.repo, listOf(target), spec)
                 }
             }
         }

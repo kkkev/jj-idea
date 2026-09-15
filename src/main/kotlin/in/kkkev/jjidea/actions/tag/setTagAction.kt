@@ -3,14 +3,8 @@ package `in`.kkkev.jjidea.actions.tag
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.Tag
-import `in`.kkkev.jjidea.jj.createUndoTrackedCommand
-import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
-import `in`.kkkev.jjidea.ui.services.withUndoBalloon
 import `in`.kkkev.jjidea.util.runLater
 
 fun setTagAction(entry: LogEntry?) =
@@ -27,16 +21,16 @@ fun setTagAction(entry: LogEntry?) =
  * confirm-and-retry flow below verbatim, same as the dialog path does.
  */
 internal fun executeSetTag(repo: JujutsuRepository, tag: Tag, targetId: ChangeId, allowMove: Boolean) {
-    repo.createUndoTrackedCommand { tagSet(tag, targetId, allowMove) }
-        .onSuccess { repo.invalidate() }
+    repo.createCommand { tagSet(tag, targetId, allowMove) }
+        .onSuccess { invalidate() }
         .onFailure {
-            if (!allowMove && exitCode == 1 && stderr.contains("allow-move")) {
+            if (!allowMove && result.exitCode == 1 && stderr.contains("allow-move")) {
                 runLater { promptMove(repo, tag, targetId) }
             } else {
-                tellUser(repo.project, "action.tag.set.error")
+                tellUser("action.tag.set.error")
             }
         }
-        .withUndoBalloon(repo.project, repo, "action.tag.set.undo")
+        .addUndoTracking("action.tag.set.undo")
         .executeAsync()
 }
 

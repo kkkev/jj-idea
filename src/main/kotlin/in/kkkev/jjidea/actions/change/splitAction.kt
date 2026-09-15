@@ -175,11 +175,11 @@ private fun onSplitSuccess(project: Project, target: LogEntry, spec: SplitSpec, 
     if (remainingId != null) {
         target.repo.createCommand { describe(remainingDesc, remainingId) }
             .onSuccess {
-                target.repo.invalidate(select = target.id, vfsChanged = true)
+                invalidate(select = target.id, vfsChanged = true)
                 project.saveDescriptionToHistory(remainingDesc)
                 splitLog.info("Split ${target.id} and described remaining $remainingId")
             }
-            .onFailure { tellUser(project, "log.action.split.error") }
+            .onFailure { tellUser("log.action.split.error") }
             .executeAsync()
     } else {
         splitLog.warn("Could not parse remaining change ID from split output: $stderr")

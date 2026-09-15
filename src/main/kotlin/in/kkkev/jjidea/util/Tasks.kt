@@ -18,8 +18,8 @@ private val saveAllDocumentsTimeoutMillis = TimeUnit.SECONDS.toMillis(10)
 
 /**
  * Saves all open documents before a command runs. Called as the first statement of both
- * [in.kkkev.jjidea.jj.CommandExecutor.Command.executeAsync] and
- * [in.kkkev.jjidea.jj.CommandExecutor.Command.executeWithProgress], on the calling thread - which
+ * [in.kkkev.jjidea.jj.CommandExecutor.WithRepo.executeAsync] and
+ * [in.kkkev.jjidea.jj.CommandExecutor.WithRepo.executeWithProgress], on the calling thread - which
  * is a pooled thread for both callers.
  *
  * ## Modality (jj-idea-c4tp, corrected by jj-idea-r5tx)
