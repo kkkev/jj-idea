@@ -5,7 +5,6 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VfsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -13,8 +12,9 @@ import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.actions.restorePaths
-import `in`.kkkev.jjidea.jj.createCommand
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.restore.performRestore
 import `in`.kkkev.jjidea.vcs.filePath
 
 /**
@@ -41,46 +41,27 @@ class RestoreToChangeAction : DumbAwareAction(
         val entry = e.logEntryForFile ?: return
         val filePaths = (e.restorePaths.takeUnless { it.isEmpty() } ?: e.file?.let { listOf(it.filePath) }) ?: return
 
-        val fileNames = filePaths.joinToString { it.name }
         val changeId = entry.id
         val repo = entry.repo
 
-        // Show confirmation dialog
-        val (title, message) = if (filePaths.size == 1) {
-            JujutsuBundle.message(
-                "action.restore.to.revision.confirm.title",
-                fileNames.first(),
-                changeId.short
-            ) to JujutsuBundle.message(
-                "action.restore.to.revision.confirm.message",
-                changeId.short
-            )
-        } else {
-            JujutsuBundle.message(
-                "action.restore.to.revision.confirm.title.multiple",
-                filePaths.size,
-                changeId.short
-            ) to JujutsuBundle.message(
-                "action.restore.to.revision.confirm.message.multiple",
-                filePaths.size,
-                changeId.short
-            )
-        }
-        if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
-            return
-        }
-
-        repo.createCommand {
-            restore(filePaths, changeId)
-        }
-            .onSuccess {
-                val files = filePaths.map(FilePath::getVirtualFile)
-                VfsUtil.markDirtyAndRefresh(false, false, true, *files.toTypedArray())
-                repo.invalidate()
-                log.info("Restored $fileNames to revision ${changeId.short}")
+        performRestore(
+            project = project,
+            repo = repo,
+            revision = changeId,
+            targetLabel = changeId.short,
+            preSelected = filePaths.toSet(),
+            errorMessageKey = "action.restore.to.revision.error",
+            undoLabelKey = "action.restore.to.revision.undo",
+            loadChanges = {
+                val changes = repo.logService.getFileChangesBetween(changeId, WorkingCopy).getOrNull().orEmpty()
+                buildChanges(project, changes, emptyList())
             }
-            .onFailure { tellUser(project, "action.restore.to.revision.error") }
-            .executeAsync()
+        ) { restored ->
+            val files = restored.map(FilePath::getVirtualFile)
+            VfsUtil.markDirtyAndRefresh(false, false, true, *files.toTypedArray())
+            repo.invalidate()
+            log.info("Restored ${restored.joinToString { it.name }} to revision ${changeId.short}")
+        }
     }
 
     override fun update(e: AnActionEvent) {

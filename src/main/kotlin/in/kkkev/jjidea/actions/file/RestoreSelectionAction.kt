@@ -5,14 +5,14 @@ import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbAwareAction
-import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.logEntryForFile
 import `in`.kkkev.jjidea.actions.restorePaths
 import `in`.kkkev.jjidea.actions.singleRepoForRestore
+import `in`.kkkev.jjidea.jj.ChangeService
 import `in`.kkkev.jjidea.jj.WorkingCopy
-import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.ui.restore.performRestore
 
 /**
  * Restores selected files to their state in the parent revision (@-).
@@ -31,34 +31,22 @@ class RestoreSelectionAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val filePaths = e.restorePaths
+        val preSelected = e.restorePaths.toSet()
         val repo = e.singleRepoForRestore ?: return
 
-        // Show confirmation dialog
-        val title = if (filePaths.size == 1) {
-            JujutsuBundle.message("action.restore.selection.confirm.title", filePaths.first().name)
-        } else {
-            JujutsuBundle.message("action.restore.selection.confirm.title", "${filePaths.size} files")
+        performRestore(
+            project = project,
+            repo = repo,
+            revision = WorkingCopy.parent,
+            targetLabel = JujutsuBundle.message("dialog.restore.target.parent"),
+            preSelected = preSelected,
+            errorMessageKey = "action.restore.selection.error",
+            undoLabelKey = "action.restore.selection.undo",
+            loadChanges = { ChangeService.loadChanges(repo.workingCopy) }
+        ) { restored ->
+            repo.invalidate(vfsChanged = true)
+            logger.info("Restored ${restored.size} file(s) to parent revision")
         }
-        val message = if (filePaths.size == 1) {
-            JujutsuBundle.message("action.restore.selection.confirm.single")
-        } else {
-            JujutsuBundle.message("action.restore.selection.confirm.multiple", filePaths.size)
-        }
-
-        if (Messages.showYesNoDialog(project, message, title, Messages.getWarningIcon()) != Messages.YES) {
-            return
-        }
-
-        repo.createCommand {
-            restore(filePaths, WorkingCopy.parent)
-        }
-            .onSuccess {
-                repo.invalidate(vfsChanged = true)
-                logger.info("Restored ${filePaths.size} file(s) to parent revision")
-            }
-            .onFailure { tellUser(project, "action.restore.selection.error") }
-            .executeAsync()
     }
 
     override fun getActionUpdateThread() = ActionUpdateThread.BGT

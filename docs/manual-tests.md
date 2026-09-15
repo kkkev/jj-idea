@@ -465,6 +465,11 @@ more lanes than the 3-4 needed here.
 - [ ] Right-click a change-id link whose target has since become invalid (e.g. abandon that
       commit via the CLI in another terminal, then right-click the now-stale link without
       refreshing) — shows an empty menu rather than throwing or crashing
+- [ ] jj-idea-g2p8 (GitHub #84): right-click one or more files in the changed-files list of a
+      **historical** commit's details panel → **Restore to This** opens the Restore dialog
+      (see MT-WORKINGCOPY's "Restore dialog" for the full checklist) listing the files that
+      differ between that commit and `@`, with the right-clicked file(s) pre-checked;
+      confirming restores exactly the checked files via `jj restore -f <that revision>`
 
 #### Issue-tracker links in descriptions (jj-idea-10fo)
 
@@ -792,10 +797,13 @@ non-paged behavior is perceptible.
 #### Undo (jj-idea-v9zp)
 
 **Code:** `ui/services/UndoBalloon.kt`, `ui/services/JujutsuUndoService.kt`,
-`actions/undo/UndoLastOperationAction.kt`, `actions/change/abandonChangeAction.kt`
+`actions/undo/UndoLastOperationAction.kt`, `actions/change/abandonChangeAction.kt`,
+`ui/restore/RestoreDialog.kt` (jj-idea-g2p8)
 
-Stage 1 of the undo roadmap (docs/design/undo-support-roadmap.md), wired to **Abandon**
-only for now.
+Stage 1 of the undo roadmap (docs/design/undo-support-roadmap.md). Wired to **Abandon**,
+**Duplicate Onto**, **Move Bookmark**, **Rebase** (drag-and-drop), **Set Tag**, and now
+**Restore**/**Restore to This** (jj-idea-g2p8) - the rest of jj-idea-t0iy's rollout is still
+pending, see the last bullet below.
 
 - [ ] Create a change, `jj new`, then **edit a file so the working copy is dirty** before
       abandoning (exercises the snapshot-op exclusion) → right-click → **Abandon** → confirm
@@ -814,11 +822,16 @@ only for now.
 - [ ] Settings → Version Control → Jujutsu → JJ executable path → point at a pinned older jj
       (`scripts/jj-install-version.sh 0.37.0`, then `~/.local/bin/jj-0.37`) → repeat the first
       three checks above — confirms the mechanism works at `JjVersion.MINIMUM`
-- [ ] Push, fetch, squash, split, bookmark, tag, resolve, file track/untrack, and config
-      actions all behave exactly as before this change, and **none** of them show an undo
-      balloon (only Abandon is wired up yet - jj-idea-t0iy extends this to the rest)
+- [ ] Push, fetch, squash, split, describe, resolve, file track/untrack, and config actions
+      all behave exactly as before this change, and **none** of them show an undo balloon
+      yet (jj-idea-t0iy extends this to the rest)
 - [ ] Settings → Keymap → search "Jujutsu" → **Undo Last Jujutsu Operation** shows that name,
       not the raw action id `Jujutsu.UndoLastOperation`
+- [ ] jj-idea-g2p8: modify a file, right-click → **Restore**, tick it in the dialog, confirm
+      → a balloon appears reading "Restore" with an inline **Undo** link; clicking it brings
+      the discarded content back and refreshes the working-copy tree
+- [ ] jj-idea-g2p8: same check for **Restore to This** from a historical commit's changed
+      files (see MT-LOG-DETAILS) → the balloon reads "Restore to This"
 
 #### Duplicate Change (jj-idea-vu35)
 
@@ -1593,7 +1606,7 @@ selection does nothing; right-click for actions.
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (jj-idea-g2p8, GitHub #84)
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
@@ -1639,6 +1652,26 @@ selection does nothing; right-click for actions.
 - [ ] Right-click shows context menu with file actions
 - [ ] jj-idea-lo7u: "Compare Before with Another Commit..." is **not** in that menu (working
       copy context — same as "Compare Before with Local")
+
+##### Restore dialog (jj-idea-g2p8, GitHub #84)
+
+- [ ] Modify 3+ files; right-click one in the changed-files tree → **Restore** opens a dialog
+      (not a plain Yes/No confirm) listing every changed file, with only the right-clicked
+      file checked
+- [ ] Tick an additional file before confirming → exactly the checked files revert to `@-`;
+      unchecked files are untouched
+- [ ] Untick every file → the OK button is disabled with a "check at least one file" message
+- [ ] Invoke Restore with nothing selected in the tree (or from the editor's Jujutsu →
+      Restore, single file) → dialog still opens, pre-checked, and can be widened to restore
+      other changed files too — no more single-file Yes/No shortcut
+- [ ] With a renamed file among the changes, checking it and confirming restores **both** the
+      old and new path (no orphaned file left at either location)
+- [ ] With a clean working copy (no pending changes), Restore shows a "Nothing to restore"
+      notification instead of opening an empty dialog
+- [ ] After confirming a restore, an undo balloon reading "Restore" appears with an inline
+      Undo link (see MT-WORKINGCOPY's Undo section, jj-idea-v9zp/jj-idea-g2p8) - clicking it
+      brings the discarded content back
+- [ ] See MT-LOG-DETAILS for the historical "Restore to This" variant of this same dialog
 - [ ] Select one or more files in the changed-files tree → the IDE's **Reformat Code**
       (Ctrl/Cmd+Alt+L) and **Optimize Imports** (Ctrl/Cmd+Alt+O) both act on the selected file(s),
       same as the built-in Git/Commit changes view (`JujutsuChangesTree.showsLocalFiles`)

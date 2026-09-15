@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Restore now opens a dialog listing every changed file, with your selection pre-checked but adjustable, instead of a plain Yes/No confirmation — applies to both "Restore" (working copy → parent revision) and "Restore to This" (working copy → a historical revision). A successful restore also now shows an undo balloon with an inline Undo link. ([#84](https://github.com/kkkev/jj-idea/issues/84))
+
 ## [0.8.16] - 2026-09-14
 
 ### Added
