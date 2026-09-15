@@ -1201,22 +1201,28 @@ confirmation dialogs.
 Setup: create a scratch jj repo with a file that has at least **two separate** hunks of changes
 (so partial selection is meaningful).
 
-Model: **ticking a file moves it to the new child commit**; unticked files stay in the
-parent. Nothing is ticked by default. "Pick Hunks…" opens a native **3-pane** diff — Before
-(fixed) | Parent (live) | Child (fixed) — with a directional arrow at each hunk's divider instead
-of a checkbox: a right arrow at a Before|Parent divider moves that hunk to the child; a left
-arrow at a Parent|Child divider moves it back. The Parent pane genuinely updates in place as you
-click, so you always see the actual resulting parent content, not just an inferred state — this
-replaced an earlier 2-pane checkbox picker (itself replacing the original 3-way *merge* widget)
-specifically so gnarlier, many-hunk splits have somewhere to see the live result while picking.
-The Parent pane is view-only (arrow clicks only, no direct typing) — deliberately, so the result
-is always a well-formed composition of Before/Child hunks. No "resolved" concept, so no
-merge-conflict confirmation dialogs anywhere in this picker.
+Model (jj-idea-8khi, GitHub #101 UX follow-up — identity-first wording, shared by every mode):
+**ticking a file moves it to a brand-new commit**; unticked files **stay on the source's own
+change ID and position**. Nothing is ticked by default. Only the new commit's *position* varies
+with mode: a child (default), a sibling (`--parallel`), or a parent (`-B`/"Split into New
+Parent"). "Pick Hunks…" opens a native **3-pane** diff — Before (fixed) | Stays (live) | New
+commit (fixed) — with a directional arrow at each hunk's divider instead of a checkbox: a right
+arrow at a Before|Stays divider moves that hunk to the new commit; a left arrow at a
+Stays|New-commit divider moves it back. The Stays pane genuinely updates in place as you click,
+so you always see the actual resulting content, not just an inferred state — this replaced an
+earlier 2-pane checkbox picker (itself replacing the original 3-way *merge* widget) specifically
+so gnarlier, many-hunk splits have somewhere to see the live result while picking. The Stays pane
+is view-only (arrow clicks only, no direct typing) — deliberately, so the result is always a
+well-formed composition of Before/New-commit hunks. No "resolved" concept, so no merge-conflict
+confirmation dialogs anywhere in this picker.
 
 #### Basic hunk selection (main dialog preview)
 - [ ] Right-click a mutable change → **Split…** → dialog shows changed-files list on the left (nothing ticked) and a native read-only diff preview on the right
-- [ ] Click a file in the list → right panel shows a native syntax-highlighted diff titled **"Parent (all changes)"** / **"Child (no changes)"**, with an **empty diff** (nothing ticked yet, so nothing moves)
-- [ ] Tick the file → titles switch to **"Parent (unchanged)"** / **"Child (all changes)"**, showing the **full diff** (the whole file's change moves to the child); untick → back to the "all changes"/"no changes" pair and empty diff
+- [ ] Under "Source", a muted note states the mode's shape: default mode reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new child commit created on top of it."
+- [ ] The note **word-wraps across multiple lines** and does **not** widen the left column or push the diff preview panel narrower — the splitter stays at its usual ~40/60 proportion regardless of note length (jj-idea-8khi follow-up: a plain, non-wrapping label here previously forced the column wide enough to fit the whole sentence on one line)
+- [ ] The change id embedded in the note and in both description labels renders with the same bold-prefix/grey-remainder styling used everywhere else in the plugin (log table, commit details, other dialogs' "Source" line) — not plain, equal-weight text
+- [ ] Click a file in the list → right panel shows a native syntax-highlighted diff titled **"Existing commit (all changes)"** / **"New commit (no changes)"** — "Existing commit"/"New commit" are the same consistent noun pair used everywhere in this dialog: the summary line, the hunk picker, and (via "Description for existing commit …"/"Description for new commit …") the description labels below (jj-idea-8khi follow-up: previously the preview/summary/hunk-picker used the bare word "Here" while the description label separately said "(keeps change ID)" — two different, mismatched names for the same side) — with an **empty diff** (nothing ticked yet, so nothing moves)
+- [ ] Tick the file → titles switch to **"…(no changes)"** / **"…(all changes)"** (the "no changes"/"all changes" pair flips sides — never "(unchanged)", which would wrongly imply the stays-side is literally the file's unmodified parent), showing the **full diff** (the whole file's change moves to the new commit); untick → back to the first pair and empty diff
 - [ ] Fully-ticked files show a filled checkbox; unticked show empty; partially-picked (see below) show a **half-checked** box
 - [ ] Directory nodes containing a partial file also show a half-checked box
 
@@ -1235,32 +1241,32 @@ the right-clicked files now tick **directly**, same as "Split into New Child".
 
 - [ ] Select one or more files, right-click → **Split into New Parent…** appears alongside **Split into New Child…**
 - [ ] Invoking it opens the dialog with exactly the selected files **ticked** — the same starting tick state as "Split into New Child", not inverted
-- [ ] Dialog title reads "Split into New Parent"; the ticked pane's header reads **"New commit (will become parent of &lt;shortid&gt;)"** and the unticked pane's header reads **"Stays here (keeps change ID &lt;shortid&gt;)"** — not "Parent"/"Child" wording, which would say the opposite of what happens in this mode, and explicit enough that which side becomes whose parent doesn't require inference
-- [ ] The **"Stays here"** description field is on top, **"New commit"** below — the reverse of "Split into New Child"'s order (Child on top, Parent below) — matching each side's actual position in the log: "Stays here" keeps the more-recent position, "New commit" becomes the older parent one row further down
+- [ ] Dialog title reads "Split into New Parent"; the note under "Source" reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new commit inserted below it."; above the ticked description editor, the label reads **"Description for new commit (parent of &lt;shortid&gt;)"**, and above the unticked one, **"Description for existing commit (&lt;shortid&gt;)"** — the same identity-first wording as the other two modes, with only the parenthetical spelling out that this mode makes the new commit the *parent* (jj-idea-8khi: one combined label per editor, not a separate header plus sub-label)
+- [ ] The **"Description for existing commit …"** block is on top, **"Description for new commit …"** below — the reverse of "Split into New Child"'s order (new-commit block on top, existing-commit block below) — matching each side's actual position in the log: the existing commit keeps the more-recent position, the new commit becomes the older parent one row further down
 - [ ] The "Create parallel commits" checkbox is **not shown** (mutually exclusive with `-B`)
 - [ ] "Pick Hunks…" is **not shown** (hunk-level partial selection isn't supported in this mode)
 - [ ] Split → via `jj log`/`jj show`: the ticked files land in a **new commit inserted as the parent** of the original; the original commit (unticked files) keeps its **own original change ID**, now with the new commit as its parent
-- [ ] Editing the "New commit" description field and splitting → the new commit gets that description (passed as `-m`); the "Stays here" field, if left unedited, leaves the original commit's description untouched
-- [ ] Editing the "Stays here" description field and splitting → after the split completes, the original commit's description updates to match (chained via a follow-up `jj describe` on the same, unchanged change ID)
-- [ ] **Splitting the working copy itself**: an info line under the source commit reads "The working copy (@) stays on <shortid>; the new commit becomes its parent" — after splitting, confirm `@` is still genuinely on the original change ID (not the new parent)
+- [ ] Editing the new-commit description field and splitting → the new commit gets that description (passed as `-m`); the existing-commit field, if left unedited, leaves the original commit's description untouched
+- [ ] Editing the existing-commit description field and splitting → after the split completes, the original commit's description updates to match (chained via a follow-up `jj describe` on the same, unchanged change ID)
+- [ ] **Splitting the working copy itself**: an info line under the source commit reads "The working copy (@) stays on the existing commit (<shortid>); the new commit becomes its parent" — after splitting, confirm `@` is still genuinely on the original change ID (not the new parent)
 - [ ] Compare: repeat "Split into New Child" on the working copy — its info line instead reads "The working copy (@) moves to the new commit", and after splitting `@` has genuinely moved
 - [ ] Selecting **every** changed file → dialog opens with every file ticked, which trips the "at least one file must stay here" validation (nothing would be left at the original change ID) — expected, not a bug
 - [ ] Selecting **no** files → ticking nothing trips "move at least one file to the new commit" — expected
 
 #### Hunk picking with the 3-pane arrow picker
-- [ ] Click **Pick Hunks…** → a dialog opens titled "Pick Hunks — <filename>" with **three** panes: Before | Parent (live) | Child
-- [ ] On a freshly-opened **unticked** file: Parent's text equals Child's; every hunk shows as a Before|Parent divider bar with a **right arrow**
-- [ ] Click a right arrow → that hunk's Parent content flips to Before's text (matching); the Before|Parent bar for that hunk disappears, and a **new** Parent|Child bar with a **left arrow** appears in its place
-- [ ] Click that left arrow → reverses back to a Before|Parent bar with a right arrow — confirm this is reversible any number of times, either direction, independently per hunk
-- [ ] **Try typing directly into the Parent pane** → rejected; it's view-only, arrow clicks are the only way to change it (a deliberate choice, so the result is always a clean composition of Before/Child hunks, never a hand-edited hybrid)
+- [ ] Click **Pick Hunks…** → a dialog opens titled "Pick Hunks — <filename>" with **three** panes: Before | Existing commit (live) | Moves to New commit — "Existing commit"/"New commit" are the same identity-first labels as the main dialog (jj-idea-8khi), not literally "Parent"/"Child"
+- [ ] On a freshly-opened **unticked** file: Existing commit's text equals the New-commit pane's; every hunk shows as a Before|Existing-commit divider bar with a **right arrow**
+- [ ] Click a right arrow → that hunk's Existing-commit content flips to Before's text (matching); the Before|Existing-commit bar for that hunk disappears, and a **new** Existing-commit|New-commit bar with a **left arrow** appears in its place
+- [ ] Click that left arrow → reverses back to a Before|Existing-commit bar with a right arrow — confirm this is reversible any number of times, either direction, independently per hunk
+- [ ] **Try typing directly into the Existing-commit pane** → rejected; it's view-only, arrow clicks are the only way to change it (a deliberate choice, so the result is always a clean composition of Before/New-commit hunks, never a hand-edited hybrid)
 - [ ] Click **Apply** with a mix of moved/unmoved hunks → dialog closes immediately with **no confirmation dialog of any kind** (the regression the original merge-widget picker had — a "Save changes and mark the conflict resolved anyway?" prompt used to fire here)
 - [ ] After Apply → file shows **half-checked** in the file list; summary shows "(N partial)"
 - [ ] **The file's tick state is unchanged by a partial pick** — if it was unticked before opening the picker, it's still unticked after a partial Apply
-- [ ] Moving every hunk to the child → Apply results in a **fully ticked** file (no half-check), same as ticking it directly
+- [ ] Moving every hunk to the new commit → Apply results in a **fully ticked** file (no half-check), same as ticking it directly
 - [ ] Moving no hunks (or reversing back to none) → Apply results in the file being **fully ticked or unticked** to match its starting state, with no partial override left over
 - [ ] Click **Cancel** → closes immediately with **no confirmation dialog**; file state (tick + any prior override) unchanged
-- [ ] **Reopen "Pick Hunks…" on a file with an existing partial selection** → the Parent pane opens already showing the exact prior split (the content itself resumes; no per-hunk state to reconstruct)
-- [ ] Split (linear) → child commit contains only the hunks left pointing at Child; parent has the rest
+- [ ] **Reopen "Pick Hunks…" on a file with an existing partial selection** → the Existing-commit pane opens already showing the exact prior split (the content itself resumes; no per-hunk state to reconstruct)
+- [ ] Split (linear) → new commit contains only the hunks left pointing at it; the existing commit has the rest
 - [ ] Log refreshes selecting the newly created change
 - [ ] **Global extension no-op check**: open any ordinary diff elsewhere (log → Show Diff, a working-copy file diff) — confirm **no arrows appear** and behavior is identical to before (the arrow overlay is registered as a plugin-wide `diff.DiffExtension`, gated to fire only inside this picker)
 
@@ -1269,20 +1275,62 @@ state/routing logic, not rendering)
 
 #### Descriptions
 - [ ] Both description fields are pre-populated with the source commit's description
-- [ ] Child description field appears **above** the parent field (matching the child's position above the parent in the log)
-- [ ] Editing the child description field updates the child commit; editing parent updates the parent
+- [ ] Each editor has exactly **one** label above it — "Description for new commit (child of
+      &lt;shortid&gt;)" / "Description for existing commit (&lt;shortid&gt;)" in the default mode
+      — not two stacked lines (jj-idea-8khi follow-up: a separate bold identity header plus a
+      near-duplicate plain sub-label like "New commit description" was noisy and repeated the
+      same fact twice)
+- [ ] "Existing commit" is the same name used for this side everywhere else in the dialog —
+      preview pane title, summary line, hunk picker — not a different phrase like the earlier
+      "(keeps change ID)", which read as a mismatched part of speech next to "New commit"
+      (jj-idea-8khi follow-up)
+- [ ] The label does **not** say anything like "(unchanged unless edited)" — considered and
+      dropped: it's implementation detail (whether a follow-up `jj describe` runs) that doesn't
+      change what to do, and the field's own pre-filled text already shows nothing will change
+      unless you touch it
+- [ ] New-commit description field appears **above** the existing-commit field (matching the new commit's position above the source in the log in the default, child mode)
+- [ ] Editing the new-commit description field updates the new commit; editing the existing-commit field updates the source commit
 - [ ] (jj-idea-n3w1, GitHub #46) Both fields are real commit-message editors, not plain text
       areas: typing a long subject line highlights it, misspellings get a spellcheck squiggle,
       and Enter inserts a newline rather than doing anything else
 
-#### Parallel split
-- [ ] Check "Create parallel commits" → header labels switch to "First" / "Second"
+#### Parallel split (jj-idea-8khi, GitHub #101 UX follow-up)
+- [ ] Check "Create parallel commits" → the ticked-side description label switches from
+      "Description for new commit (child of &lt;shortid&gt;)" to "Description for new commit
+      (sibling of &lt;shortid&gt;)"; the unticked-side label stays "Description for existing
+      commit (&lt;shortid&gt;)" — unchanged, since that side's meaning never varies by mode
+- [ ] The mode note under "Source" switches to "The existing commit (&lt;shortid&gt;) keeps its
+      change ID and position; ticked files move to a new commit created beside it. Any existing
+      children become merges of both." — confirm this happens **immediately** on toggling, not
+      just after some other event
+- [ ] With a file already selected in the preview, check "Create parallel commits" → the diff
+      preview's pane titles ("Existing commit"/"New commit") and the summary line below the file
+      tree relabel live too — wait, these two are already mode-invariant text, so nothing changes
+      there; confirm instead that the **description labels**, the **mode note**, and the
+      **working-copy note** (if splitting @) all update immediately, with no separate event
+      needed to trigger the refresh (jj-idea-o6sw's original bug: toggling only updated internal
+      label state, not the already-rendered preview/summary)
+- [ ] In parallel mode, a fully-ticked file's preview still reads "Existing commit (no changes)" /
+      "New commit (all changes)" — unaffected by the mode, since the preview always uses the
+      same "Existing commit"/"New commit" pair, never "(unchanged)" (which would wrongly imply a
+      parent relationship that doesn't exist between siblings)
+- [ ] Uncheck "Create parallel commits" again → description labels, note, preview and summary all revert live
+      to the child wording
+- [ ] **With an existing child of the split target**: split it in parallel mode → via `jj log`,
+      confirm the previously-existing child now has **two parents** (both new siblings) — it's
+      become a merge (verified against real jj 0.44 in
+      `MutatingCommandsContractCliTest`'s "split --parallel makes an existing child a merge of
+      both new siblings" contract test)
+- [ ] **Splitting the working copy itself in parallel mode**: the working-copy note (same text as
+      the default mode's — "The working copy (@) moves to the new commit") is accurate here too;
+      after splitting, confirm `@` is on the new **sibling**, not the side that kept the original
+      change ID (verified in the same contract test file, "split --parallel on the working copy…")
 - [ ] Split → two sibling commits created (not parent/child)
 
 #### Validation
-- [ ] With nothing ticked → OK is disabled with a message to move at least one file to the child
-- [ ] With everything ticked (no overrides) → OK is disabled with a message that at least one file must remain in the parent
-- [ ] With nothing ticked but one file partially picked via "Pick Hunks…" → OK is **enabled**; splitting produces a child with just those hunks (GitHub #117)
+- [ ] With nothing ticked → OK is disabled with a message to move at least one file to the new commit — same message in every mode (default, parallel, and "Split into New Parent")
+- [ ] With everything ticked (no overrides) → OK is disabled with a message that at least one file must stay here — same message in every mode
+- [ ] With nothing ticked but one file partially picked via "Pick Hunks…" → OK is **enabled**; splitting produces a new commit with just those hunks (GitHub #117)
 
 #### Whole-file fast path
 - [ ] With no partial hunk selection (all files fully ticked or unticked) → split completes via file-level `jj split` (no diff-editor overhead); verify via log that both commits have the expected files

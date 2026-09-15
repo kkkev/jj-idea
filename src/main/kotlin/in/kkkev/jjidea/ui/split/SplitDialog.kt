@@ -13,6 +13,7 @@ import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.diffedit.HunkPicker
 import `in`.kkkev.jjidea.diffedit.HunkPickerLabels
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -25,6 +26,9 @@ import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.ui.common.buildHunkSelection
 import `in`.kkkev.jjidea.ui.common.createSourcePanel
 import `in`.kkkev.jjidea.ui.components.DescriptionEditor
+import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
+import `in`.kkkev.jjidea.ui.components.append
+import `in`.kkkev.jjidea.ui.components.htmlText
 import `in`.kkkev.jjidea.util.GitDiffReverseApplier
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.BorderLayout
@@ -65,24 +69,24 @@ data class SplitSpec(
  *
  * Layout: left panel = changed-files list with file-level checkboxes + summary; right panel =
  * native read-only diff preview for the selected file + "Pick Hunks…" button. Description
- * fields (child on top, parent below — matching their order in the log) and options are at
- * the bottom.
+ * fields and options are at the bottom.
  *
- * Ticking a file moves it to the new **child** commit; leaving it unticked keeps it in the
- * **parent** (whole-file path). Nothing is ticked by default. "Pick Hunks…" opens IDEA's
- * merge window to move a subset of a file's hunks to the child, leaving the remainder in
- * the parent.
+ * **The tick has one meaning in every mode** (jj-idea-8khi, GitHub #101 UX follow-up): leaving a
+ * file unticked keeps it **on [sourceEntry]'s own change ID and position** ("Stays on …");
+ * ticking it moves it to a **brand-new commit** ("New commit …"). Only the new commit's
+ * *position* changes with mode - a child (default), a sibling (`--parallel`, jj rebases any
+ * existing children onto both siblings, turning them into merges), or a parent (`-B`/[newParent],
+ * jj-idea-tkog, GitHub #74). Nothing is ticked by default. "Pick Hunks…" opens IDEA's merge
+ * window to move a subset of a file's hunks to the new commit, leaving the remainder where it
+ * stays; disabled in [newParent] mode, where its content-polarity math hasn't been verified
+ * against `-B`.
  *
- * [newParent] (jj-idea-tkog, GitHub #74) switches the whole-file fast path to `jj split -B`
- * instead of the plain no-flag default: ticking a file now moves it to a **new commit inserted
- * as [sourceEntry]'s parent**, while unticked files **stay on [sourceEntry]'s own change ID and
- * location** - the polarity flip real jj applies once `-B`/`-A`/`-o` is given (verified against
- * jj 0.44: the fileset passed to `jj split` becomes the *new* commit under `-B`, whereas without
- * any placement flag it's the side that *keeps* the original identity). The "Parent"/"Child"
- * header/legend wording from the default mode would be backwards here, so [updateDynamicLabels]
- * switches to neutral "New commit"/"Stays here" wording instead when [newParent] is set. Hunk-level
- * partial selection ("Pick Hunks…") is disabled in this mode - its content-polarity math is tied
- * to the default mode's fileset-role assumption and hasn't been verified against `-B`.
+ * This identity-first wording is deliberately mode-invariant in the UI even though jj's own
+ * fileset-argument polarity is not: the fileset passed on the command line is whichever side
+ * *keeps* [sourceEntry]'s identity in the default and `--parallel` modes, but the side that
+ * becomes the *new* commit under `-B` (verified against jj 0.44 - see [MutatingCommandsContractTest]
+ * for the `--parallel` and `-B` contract tests this rests on). [updateDynamicLabels] and
+ * [doOKAction] are what translate the constant tick meaning into that varying fileset role.
  */
 class SplitDialog(
     private val project: Project,
@@ -138,14 +142,20 @@ class SplitDialog(
     }
 
     // --- Dynamic labels ---
-    internal val parentHeaderLabel = JLabel()
-    internal val childHeaderLabel = JLabel()
-    private val parentDescriptionLabel = JLabel()
-    private val childDescriptionLabel = JLabel()
+    // One label per description editor, not two (jj-idea-8khi follow-up): combines what was
+    // previously a bold identity header ("New commit (sibling of X)") plus a separate plain
+    // sub-label ("New commit description") into a single "Description for …" line - the two were
+    // redundant, and splitting one piece of information across two lines added noise rather than
+    // clarity. HTML panes, not JLabels, so the embedded change id renders with the same
+    // bold-prefix/grey-remainder styling used everywhere else in the plugin (setStyledText/
+    // TextCanvas.append(ChangeId)) instead of as plain text.
+    internal val parentHeaderLabel = IconAwareHtmlPane(project).apply { alignmentX = JLabel.LEFT_ALIGNMENT }
+    internal val childHeaderLabel = IconAwareHtmlPane(project).apply { alignmentX = JLabel.LEFT_ALIGNMENT }
 
-    // Short labels for the two commits; match the merge picker and summary wording.
-    internal var firstCommitLabel: String = legendLabel("dialog.split.legend.parent")
-    internal var secondCommitLabel: String = legendLabel("dialog.split.legend.child")
+    // Short labels for the two commits; match the merge picker and summary wording. Overwritten
+    // immediately by updateDynamicLabels() in init{} - these are just well-formed placeholders.
+    internal var firstCommitLabel: String = legendLabel("dialog.split.legend.stays")
+    internal var secondCommitLabel: String = legendLabel("dialog.split.legend.new")
 
     // --- Summary ---
     internal val summaryLabel = JBLabel().apply {
@@ -160,17 +170,29 @@ class SplitDialog(
 
     // --- Working-copy movement note (jj-idea-tkog) ---
     // Only shown when splitting the working copy itself, where which side @ ends up on isn't
-    // obvious: it stays on the original change ID in newParent mode, but moves to the new child
-    // commit in the default mode.
-    private val workingCopyNoteLabel = JBLabel().apply {
+    // obvious: it stays on the original change ID in newParent mode, but moves to the new commit
+    // otherwise - true of --parallel as well as the plain default, verified against real jj in
+    // MutatingCommandsContractCliTest's "split --parallel on the working copy…" test (jj-idea-8khi).
+    //
+    // An HTML pane, not a JLabel (jj-idea-8khi): word-wraps within the column instead of forcing
+    // it wider to fit the longest line, and lets the embedded change id use the same styling as
+    // everywhere else (see setStyledText). Text is set once at construction - unlike modeNoteLabel
+    // below, this note's mode (newParent or not) is fixed for the dialog's lifetime.
+    private val workingCopyNoteLabel = IconAwareHtmlPane(project).apply {
         foreground = JBUI.CurrentTheme.Label.disabledForeground()
         isVisible = sourceEntry.isWorkingCopy
         if (sourceEntry.isWorkingCopy) {
-            text = JujutsuBundle.message(
-                if (newParent) "dialog.split.wc.stays" else "dialog.split.wc.moves",
-                sourceEntry.id.short
-            )
+            setStyledText(if (newParent) "dialog.split.wc.stays" else "dialog.split.wc.moves", sourceEntry.id)
         }
+    }
+
+    // --- Mode note (jj-idea-8khi, GitHub #101 UX follow-up) ---
+    // States the one fact the identity-first labels can't carry: where the new commit lands, and
+    // (parallel only) that existing children become merges of both siblings. Always visible -
+    // there's always a mode to explain - text is set live by updateDynamicLabels(). An HTML pane
+    // for the same word-wrap/styling reasons as workingCopyNoteLabel above.
+    private val modeNoteLabel = IconAwareHtmlPane(project).apply {
+        foreground = JBUI.CurrentTheme.Label.disabledForeground()
     }
 
     // --- Test seam: injectable merge picker (avoids modal merge under tests) ---
@@ -181,7 +203,11 @@ class SplitDialog(
         title = JujutsuBundle.message(if (newParent) "dialog.split.title.newParent" else "dialog.split.title")
         setOKButtonText(JujutsuBundle.message("dialog.split.button"))
 
-        parallelCheckBox.addActionListener { updateDynamicLabels() }
+        parallelCheckBox.addActionListener {
+            updateDynamicLabels()
+            updateSummary()
+            previewController.currentFile?.let { previewController.refresh(it) }
+        }
         updateDynamicLabels()
 
         // Populate file selection panel.
@@ -236,10 +262,10 @@ class SplitDialog(
      * Load the split-off change's before/after content and file type for [change], off the EDT —
      * the [HunkPickPreviewController] loader.
      *
-     * The preview shows the **split-off change that moves to the child**: the right (Child) side
-     * is always the child's full content (the child is the tip, so it always holds the full
-     * original content — see [splitPreviewPanes]). The left (Parent) side reflects what
-     * **remains in the parent** — see [computePreviewLeftContent].
+     * The preview shows the **split-off change that moves to the new commit**: the right
+     * ("New commit") side is always its full content (it's the tip of the split, so it always
+     * holds the full original content — see [splitPreviewPanes]). The left ("Stays") side
+     * reflects what **remains on the original commit** — see [computePreviewLeftContent].
      */
     private fun loadFileContents(change: Change): FileContents? {
         val fp = change.filePath
@@ -354,46 +380,33 @@ class SplitDialog(
 
     // ---- Dynamic labels ----
 
+    /**
+     * One identity-first vocabulary in every mode (jj-idea-8khi, GitHub #101 UX follow-up):
+     * `parentHeaderLabel`/`parentDescriptionEditor` etc. keep their field names for the "stays"
+     * side and `child*` for the "new commit" side (matching [SplitSpec]'s existing terms), but
+     * the *text* they render no longer varies between "Parent"/"Child" and "First"/"Second" - see
+     * class KDoc. Only the new-commit header's parenthetical (child/sibling/parent of …) and the
+     * mode note's body vary with mode.
+     */
     private fun updateDynamicLabels() {
-        if (newParent) {
-            // Neutral wording: the ticked pane always ends up as the new commit here, and the
-            // unticked pane always keeps sourceEntry's own change ID - "Parent"/"Child" from the
-            // default mode would say the opposite of what actually happens (see class KDoc).
-            firstCommitLabel = legendLabel("dialog.split.legend.stays")
-            secondCommitLabel = legendLabel("dialog.split.legend.new")
+        firstCommitLabel = legendLabel("dialog.split.legend.stays")
+        secondCommitLabel = legendLabel("dialog.split.legend.new")
 
-            parentHeaderLabel.text = JujutsuBundle.message("dialog.split.stays.header", sourceEntry.id.short)
-            parentHeaderLabel.font = parentHeaderLabel.font.deriveFont(Font.BOLD)
+        parentHeaderLabel.setStyledText("dialog.split.stays.header", sourceEntry.id, bold = true)
 
-            childHeaderLabel.text = JujutsuBundle.message("dialog.split.new.header", sourceEntry.id.short)
-            childHeaderLabel.font = childHeaderLabel.font.deriveFont(Font.BOLD)
-
-            parentDescriptionLabel.text = JujutsuBundle.message("dialog.split.stays.description")
-            childDescriptionLabel.text = JujutsuBundle.message("dialog.split.new.description")
-            return
+        val newHeaderKey = when {
+            newParent -> "dialog.split.new.header.parent"
+            parallelCheckBox.isSelected -> "dialog.split.new.header.parallel"
+            else -> "dialog.split.new.header.child"
         }
+        childHeaderLabel.setStyledText(newHeaderKey, sourceEntry.id, bold = true)
 
-        val parallel = parallelCheckBox.isSelected
-
-        firstCommitLabel = legendLabel(if (parallel) "dialog.split.legend.second" else "dialog.split.legend.parent")
-        secondCommitLabel = legendLabel(if (parallel) "dialog.split.legend.first" else "dialog.split.legend.child")
-
-        parentHeaderLabel.text = JujutsuBundle.message(
-            if (parallel) "dialog.split.parent.header.parallel" else "dialog.split.parent.header"
-        )
-        parentHeaderLabel.font = parentHeaderLabel.font.deriveFont(Font.BOLD)
-
-        childHeaderLabel.text = JujutsuBundle.message(
-            if (parallel) "dialog.split.child.header.parallel" else "dialog.split.child.header"
-        )
-        childHeaderLabel.font = childHeaderLabel.font.deriveFont(Font.BOLD)
-
-        parentDescriptionLabel.text = JujutsuBundle.message(
-            if (parallel) "dialog.split.parent.description.parallel" else "dialog.split.parent.description"
-        )
-        childDescriptionLabel.text = JujutsuBundle.message(
-            if (parallel) "dialog.split.child.description.parallel" else "dialog.split.child.description"
-        )
+        val noteKey = when {
+            newParent -> "dialog.split.note.parent"
+            parallelCheckBox.isSelected -> "dialog.split.note.parallel"
+            else -> "dialog.split.note.child"
+        }
+        modeNoteLabel.setStyledText(noteKey, sourceEntry.id)
     }
 
     private fun updateSummary() {
@@ -463,6 +476,8 @@ class SplitDialog(
             workingCopyNoteLabel.alignmentX = JLabel.LEFT_ALIGNMENT
             add(workingCopyNoteLabel)
         }
+        modeNoteLabel.alignmentX = JLabel.LEFT_ALIGNMENT
+        add(modeNoteLabel)
         add(Box.createVerticalStrut(JBUI.scale(8)))
         add(createSectionLabel(JujutsuBundle.message("dialog.split.files")))
     }
@@ -484,8 +499,8 @@ class SplitDialog(
             border = JBUI.Borders.empty(8)
         }
 
-        val childBlock = descriptionBlock(childHeaderLabel, childDescriptionLabel, childDescriptionEditor)
-        val parentBlock = descriptionBlock(parentHeaderLabel, parentDescriptionLabel, parentDescriptionEditor)
+        val childBlock = descriptionBlock(childHeaderLabel, childDescriptionEditor)
+        val parentBlock = descriptionBlock(parentHeaderLabel, parentDescriptionEditor)
 
         if (newParent) {
             // parentHeaderLabel/parentDescriptionEditor is the *unticked* pane here, i.e. the
@@ -497,7 +512,9 @@ class SplitDialog(
             panel.add(Box.createVerticalStrut(JBUI.scale(6)))
             panel.add(childBlock)
         } else {
-            // Child description first — matches the child's position above the parent in the log.
+            // New-commit description first: matches its position above the stays-here side in
+            // the log when it's a child (default mode); an arbitrary but stable choice when it's
+            // a sibling (--parallel), which has no "above" position of its own.
             panel.add(childBlock)
             panel.add(Box.createVerticalStrut(JBUI.scale(6)))
             panel.add(parentBlock)
@@ -512,9 +529,8 @@ class SplitDialog(
         return panel
     }
 
-    private fun descriptionBlock(header: JLabel, description: JLabel, editor: DescriptionEditor): JPanel {
+    private fun descriptionBlock(header: JComponent, editor: DescriptionEditor): JPanel {
         header.alignmentX = JLabel.LEFT_ALIGNMENT
-        description.alignmentX = JLabel.LEFT_ALIGNMENT
         // CommitMessage scrolls itself - no JBScrollPane wrapper needed, unlike the old JBTextArea.
         editor.component.apply {
             alignmentX = JPanel.LEFT_ALIGNMENT
@@ -525,7 +541,6 @@ class SplitDialog(
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
             alignmentX = JPanel.LEFT_ALIGNMENT
             add(header)
-            add(description)
             add(editor.component)
         }
     }
@@ -559,22 +574,20 @@ class SplitDialog(
 
         // Nothing ticked is only truly empty if there's also no partial hunk pick - a
         // hunks-only split (GitHub #117) leaves every tick untouched but has real content
-        // to move via firstCommitOverrides.
+        // to move via firstCommitOverrides. Mode-independent messages (jj-idea-8khi): ticking
+        // always means "move to the new commit" and staying always means "stays here", in every
+        // mode - see class KDoc.
         if (included.isEmpty() && !isPartialSplit) {
-            val key = when {
-                newParent -> "dialog.split.validation.new.empty"
-                parallelCheckBox.isSelected -> "dialog.split.validation.child.empty.parallel"
-                else -> "dialog.split.validation.child.empty"
-            }
-            return ValidationInfo(JujutsuBundle.message(key), fileSelection.changesTree)
+            return ValidationInfo(
+                JujutsuBundle.message("dialog.split.validation.new.empty"),
+                fileSelection.changesTree
+            )
         }
         if (included.size == total && firstCommitOverrides.isEmpty()) {
-            val key = when {
-                newParent -> "dialog.split.validation.stays.empty"
-                parallelCheckBox.isSelected -> "dialog.split.validation.parent.empty.parallel"
-                else -> "dialog.split.validation.parent.empty"
-            }
-            return ValidationInfo(JujutsuBundle.message(key), fileSelection.changesTree)
+            return ValidationInfo(
+                JujutsuBundle.message("dialog.split.validation.stays.empty"),
+                fileSelection.changesTree
+            )
         }
         return null
     }
@@ -662,18 +675,62 @@ class SplitDialog(
 
     /** Current child description text (for testing). */
     internal val childDescriptionText: String get() = childDescriptionEditor.text.actual
+
+    /** Current mode note text (for testing). */
+    internal val modeNoteText: String get() = modeNoteLabel.text
+
+    /** The mode note's own component, to check it doesn't force a wide preferred size (for testing). */
+    internal val modeNoteComponent: JComponent get() = modeNoteLabel
 }
 
 /** Capitalize a legend bundle key value (e.g. "parent" → "Parent"). */
 private fun legendLabel(key: String) =
     JujutsuBundle.message(key).replaceFirstChar { it.uppercaseChar() }
 
+// The left column's approximate content budget: the dialog's own preferredSize is 960px (see
+// createCenterPanel), split via OnePixelSplitter(false, 0.4f) into a ~384px left column, minus
+// leftPanel's own left+right insets (8+4, see createCenterPanel). A plain JEditorPane/JLabel with
+// no explicit width reports its *unwrapped single-line* width as "preferred" - without this fixed
+// pixel width, the mode note's ~140-character sentence forces the whole left column wider to fit
+// it on one line (confirmed empirically: an unconstrained IconAwareHtmlPane here still reported
+// ~800px preferred width, not something HTML wrapping alone fixes).
+private const val LABEL_WIDTH_PX = 340
+
+/**
+ * Render [messageKey] (a bundle message with a single `{0}` placeholder for a change id) as HTML,
+ * substituting a fragment styled via [in.kkkev.jjidea.ui.components.append]'s bold-prefix/
+ * grey-remainder rendering - the same styling a change id gets everywhere else in the plugin
+ * (log table, commit details, other dialogs' "Source" panels) - instead of plain text
+ * (jj-idea-8khi, GitHub #101 UX follow-up). [bold] wraps the whole rendered text in `<b>`, for the
+ * header labels (which were plain bold-font `JLabel`s before this).
+ *
+ * Wrapped in a fixed-width `<div>` (see [LABEL_WIDTH_PX]) so the pane reports a bounded preferred
+ * width and wraps instead of forcing its column wider - the same technique the platform's own
+ * (deprecated) `ComponentPanelBuilder.createCommentComponent`/DSL `Row.comment` use internally.
+ * Header text is short enough to always fit on one line at this width; the note text is what
+ * actually needs to wrap.
+ *
+ * The bundle message itself is treated as raw HTML (not escaped), matching how those platform
+ * comment helpers treat comment text - safe here since these particular messages are plain
+ * English prose with no HTML metacharacters.
+ */
+private fun IconAwareHtmlPane.setStyledText(messageKey: String, id: ChangeId, bold: Boolean = false) {
+    val idFragment = htmlText { append(id) }
+    val message = JujutsuBundle.message(messageKey, idFragment)
+    val body = if (bold) "<b>$message</b>" else message
+    text = "<html><body><div style='width:${JBUI.scale(LABEL_WIDTH_PX)}px'>$body</div></body></html>"
+}
+
 /**
  * Describe the split state of [content] (relative to [baseContent]/[afterContent]) as a pair
- * of (parent title, child title) label fragments, for the main file preview's diff titles —
- * e.g. an untouched (unticked) file reads "Parent (all changes)" / "Child (no changes)"; a
- * fully-moved (ticked) file reads "Parent (unchanged)" / "Child (all changes)"; anything else
- * is "partial".
+ * of (left title, right title) label fragments, for the main file preview's diff titles —
+ * e.g. an untouched (unticked) file reads "Stays (all changes)" / "New commit (no changes)"; a
+ * fully-moved (ticked) file reads "Stays (no changes)" / "New commit (all changes)"; anything
+ * else is "partial". Mode-agnostic (jj-idea-8khi, GitHub #101 UX follow-up): the labels passed in
+ * already carry whatever mode-specific wording is needed, so this function no longer needs to
+ * know the mode itself - it previously distinguished "(unchanged)" (parent/child) from
+ * "(no changes)" (siblings, jj-idea-o6sw), a distinction the identity-first relabelling made
+ * moot everywhere.
  */
 internal fun describeSplitState(
     content: String,
@@ -683,28 +740,28 @@ internal fun describeSplitState(
     childLabel: String
 ): Pair<String, String> = when (content) {
     afterContent -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.parent.allChanges", parentLabel),
-        JujutsuBundle.message("dialog.split.hunks.child.noChanges", childLabel)
+        JujutsuBundle.message("dialog.split.hunks.allChanges", parentLabel),
+        JujutsuBundle.message("dialog.split.hunks.noChanges", childLabel)
     )
 
     baseContent -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.parent.unchanged", parentLabel),
-        JujutsuBundle.message("dialog.split.hunks.child.allChanges", childLabel)
+        JujutsuBundle.message("dialog.split.hunks.noChanges", parentLabel),
+        JujutsuBundle.message("dialog.split.hunks.allChanges", childLabel)
     )
 
     else -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.parent.partial", parentLabel),
-        JujutsuBundle.message("dialog.split.hunks.child.partial", childLabel)
+        JujutsuBundle.message("dialog.split.hunks.partial", parentLabel),
+        JujutsuBundle.message("dialog.split.hunks.partial", childLabel)
     )
 }
 
 /**
  * The (left, right) [DiffPane]s for the main file preview: left is [content] itself (the
- * parent-remainder — see [SplitDialog.computePreviewLeftContent]), right is always
- * [FileContents.after] (the child is the tip of the split, so it always holds the full original
- * content). Titles come from [describeSplitState], evaluated on the same [content] that decides
- * the left pane's text, so a pane's text and its own title can never disagree (jj-idea-jb2q,
- * GitHub #101).
+ * stays-side remainder — see [SplitDialog.computePreviewLeftContent]), right is always
+ * [FileContents.after] (the new commit is the tip of the split, so it always holds the full
+ * original content). Titles come from [describeSplitState], evaluated on the same [content] that
+ * decides the left pane's text, so a pane's text and its own title can never disagree
+ * (jj-idea-jb2q, GitHub #101).
  */
 internal fun splitPreviewPanes(
     content: String,

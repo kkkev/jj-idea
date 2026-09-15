@@ -8,6 +8,7 @@ import com.intellij.openapi.vcs.changes.SimpleContentRevision
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
@@ -16,9 +17,11 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.ui.common.FileContents
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.vcs.filePath
+import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -66,22 +69,83 @@ class SplitDialogTest {
         disposeDialog(dialog)
     }
 
+    // Identity-first wording is deliberately mode-invariant, and now uses one consistent noun
+    // pair ("existing commit" / "new commit") everywhere - description labels, preview titles,
+    // summary, hunk picker - instead of "(keeps change ID)" clashing with "New commit" as if they
+    // were different parts of speech (jj-idea-8khi follow-up, GitHub #101 UX). One label per
+    // description editor, not a header plus a sub-label: the two used to repeat the same
+    // "new commit"/"stays" framing.
     @Test
-    fun `dynamic labels switch when parallel toggled`() {
+    fun `dynamic labels stay identity-first when parallel toggled, only the parenthetical changes`() {
         val source = createEntry("src1", description = "desc")
         val dialog = SplitDialog(project.get(), source, emptyList())
 
-        // Default: linear mode
-        dialog.childHeaderLabel.text shouldContain "Child"
-        dialog.parentHeaderLabel.text shouldContain "Parent"
+        // Default: child mode
+        dialog.parentHeaderLabel.text shouldContain "Description for existing commit"
+        dialog.parentHeaderLabel.text shouldContain source.id.short
+        dialog.childHeaderLabel.text shouldContain "Description for new commit"
+        dialog.childHeaderLabel.text shouldContain "child of"
 
         // Toggle to parallel
         dialog.parallelCheckBox.isSelected = true
         dialog.parallelCheckBox.actionListeners.forEach { it.actionPerformed(null) }
         UIUtil.dispatchAllInvocationEvents()
 
-        dialog.childHeaderLabel.text shouldContain "First"
-        dialog.parentHeaderLabel.text shouldContain "Second"
+        dialog.parentHeaderLabel.text shouldContain "Description for existing commit"
+        dialog.parentHeaderLabel.text shouldContain source.id.short
+        dialog.childHeaderLabel.text shouldContain "Description for new commit"
+        dialog.childHeaderLabel.text shouldContain "sibling of"
+        dialog.childHeaderLabel.text shouldNotContain "child of"
+
+        disposeDialog(dialog)
+    }
+
+    // Regression coverage for jj-idea-o6sw (GitHub #101 follow-up): toggling parallel mode only
+    // recomputed the label fields — the already-rendered summary (and diff preview) kept stale
+    // wording until some other event (a tick change) happened to refresh them. With identity-first
+    // wording (jj-idea-8khi) the summary text itself no longer varies by mode, so this now checks
+    // that the mode note - which does vary - updates live instead.
+    @Test
+    fun `summary and mode note refresh live when parallel toggled`() {
+        val changes = listOf(change("src/Main.kt"))
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.summaryLabel.text shouldContain "New commit"
+        dialog.summaryLabel.text shouldContain "Existing commit"
+        dialog.modeNoteText shouldContain "child commit"
+        dialog.modeNoteText shouldNotContain "beside"
+
+        dialog.parallelCheckBox.isSelected = true
+        dialog.parallelCheckBox.actionListeners.forEach { it.actionPerformed(null) }
+        UIUtil.dispatchAllInvocationEvents()
+
+        dialog.summaryLabel.text shouldContain "New commit"
+        dialog.summaryLabel.text shouldContain "Existing commit"
+        dialog.modeNoteText shouldContain "beside"
+        dialog.modeNoteText shouldContain "merges"
+
+        disposeDialog(dialog)
+    }
+
+    // Regression coverage for the follow-up to jj-idea-8khi: the mode note used to be a plain
+    // JBLabel, which reports its preferred width as whatever a single unwrapped line needs - wide
+    // enough to force the whole left column of the dialog wider to fit it. It's now an HTML pane
+    // (IconAwareHtmlPane), which wraps instead.
+    @Test
+    fun `mode note wraps instead of forcing a wide preferred size`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList())
+
+        // Parallel mode has the longest note text ("...Any existing children become merges of
+        // both."). A plain JLabel would report a single-line preferred width well over 500px for
+        // this sentence at typical dialog font sizes.
+        dialog.parallelCheckBox.isSelected = true
+        dialog.parallelCheckBox.actionListeners.forEach { it.actionPerformed(null) }
+        UIUtil.dispatchAllInvocationEvents()
+
+        dialog.modeNoteComponent.preferredSize.width shouldBeLessThan JBUI.scale(500)
 
         disposeDialog(dialog)
     }
@@ -358,12 +422,25 @@ class SplitDialogTest {
         val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
 
         // childHeaderLabel is the ticked pane ("New commit"); parentHeaderLabel is the unticked
-        // pane ("Stays here") - see updateDynamicLabels' newParent branch.
-        dialog.childHeaderLabel.text shouldContain "New commit"
-        dialog.childHeaderLabel.text shouldContain "will become parent of"
+        // pane ("Description for existing commit …") - see updateDynamicLabels, and class KDoc
+        // for why the wording is identity-first and shared with the other two modes (jj-idea-8khi).
+        dialog.childHeaderLabel.text shouldContain "Description for new commit"
+        dialog.childHeaderLabel.text shouldContain "parent of"
         dialog.childHeaderLabel.text shouldContain source.id.short
-        dialog.parentHeaderLabel.text shouldContain "Stays here"
+        dialog.parentHeaderLabel.text shouldContain "Description for existing commit"
         dialog.parentHeaderLabel.text shouldContain source.id.short
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent mode note describes insertion below, not the parallel or child wording`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+
+        dialog.modeNoteText shouldContain "inserted below"
+        dialog.modeNoteText shouldContain source.id.short
+        dialog.modeNoteText shouldNotContain "sibling"
+        dialog.modeNoteText shouldNotContain "child commit"
         disposeDialog(dialog)
     }
 
@@ -447,7 +524,7 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `describeSplitState labels fully-ticked state as parent unchanged, child all changes`() {
+    fun `describeSplitState labels fully-ticked state as stays no changes, new commit all changes`() {
         val (parentTitle, childTitle) = describeSplitState(
             content = "before\n",
             baseContent = "before\n",
@@ -455,7 +532,8 @@ class SplitDialogTest {
             parentLabel = "Parent",
             childLabel = "Child"
         )
-        parentTitle shouldContain "unchanged"
+        parentTitle shouldContain "no changes"
+        parentTitle shouldNotContain "unchanged"
         childTitle shouldContain "all changes"
     }
 
@@ -489,7 +567,7 @@ class SplitDialogTest {
         left.text shouldBe "before\n"
         right.text shouldBe "after\n"
         left.text shouldNotBe right.text
-        left.title shouldContain "unchanged"
+        left.title shouldContain "no changes"
         right.title shouldContain "all changes"
     }
 
@@ -525,6 +603,34 @@ class SplitDialogTest {
         right.text shouldBe "after\n"
         left.title shouldContain "partial"
         right.title shouldContain "partial"
+    }
+
+    // describeSplitState/splitPreviewPanes are mode-agnostic (jj-idea-8khi, GitHub #101 UX
+    // follow-up): with identity-first labels shared by every mode, "unchanged" (which implied a
+    // literal parent/child relationship - jj-idea-o6sw's fix for siblings) is gone in favour of
+    // "no changes" everywhere, regardless of what caller passes as parentLabel/childLabel.
+    @Test
+    fun `describeSplitState never renders 'unchanged' - only 'no changes', 'all changes', or 'partial'`() {
+        val (staysAllChanges, newNoChanges) = describeSplitState(
+            content = "after\n",
+            baseContent = "before\n",
+            afterContent = "after\n",
+            parentLabel = "Second",
+            childLabel = "First"
+        )
+        staysAllChanges shouldContain "all changes"
+        newNoChanges shouldContain "no changes"
+
+        val (staysNoChanges, newAllChanges) = describeSplitState(
+            content = "before\n",
+            baseContent = "before\n",
+            afterContent = "after\n",
+            parentLabel = "Second",
+            childLabel = "First"
+        )
+        staysNoChanges shouldContain "no changes"
+        staysNoChanges shouldNotContain "unchanged"
+        newAllChanges shouldContain "all changes"
     }
 
     @Test

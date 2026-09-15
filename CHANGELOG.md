@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Restore now opens a dialog listing every changed file, with your selection pre-checked but adjustable, instead of a plain Yes/No confirmation — applies to both "Restore" (working copy → parent revision) and "Restore to This" (working copy → a historical revision). A successful restore also now shows an undo balloon with an inline Undo link. ([#84](https://github.com/kkkev/jj-idea/issues/84))
 
+### Fixed
+- Split's dialog now names the two resulting sides by what they *are* — "Existing commit"/"New commit" — consistently across the description labels, diff preview titles, summary line, and hunk picker, instead of a mix of DAG position ("Parent"/"Child"/"First"/"Second"/"Here") and a mismatched "(keeps change ID)" aside that only appeared on one of them; ticking a file now has the same meaning everywhere. The previous separate bold identity header and plain description sub-label above each description editor are combined into one label ("Description for existing commit (`<id>`)" / "Description for new commit (child of / sibling of / parent of `<id>`)"), dropping the redundant "(unchanged unless edited)" aside. A muted note under "Source" states the resulting shape, leading with the same "existing commit" naming, including that existing children become merges of both siblings in a parallel split, and word-wraps instead of forcing the dialog's left column wider. Every change id shown in these labels now uses the same bold-prefix/grey-remainder styling as the rest of the plugin. Toggling "Create parallel commits" also now relabels the description labels, note, and summary immediately, instead of only on the next file-tick. ([#101](https://github.com/kkkev/jj-idea/issues/101))
+
 ## [0.8.16] - 2026-09-14
 
 ### Added

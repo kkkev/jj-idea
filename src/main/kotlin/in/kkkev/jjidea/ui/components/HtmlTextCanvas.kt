@@ -14,9 +14,12 @@ fun htmlString(linkifier: Linkifier = Linkifier.None, builder: (TextCanvas.() ->
     htmlText(linkifier) { control("<html>", "</html>", builder) }
 
 /**
- * Create some inline HTML text, to be used inside an existing HTML document.
+ * Create some inline HTML text, to be used inside an existing HTML document - e.g. to build a
+ * styled fragment (such as [in.kkkev.jjidea.ui.components.append]'s change-id rendering) for
+ * substitution into a `{0}`-style bundle message before that message is wrapped as a whole
+ * document via [htmlString].
  */
-private fun htmlText(linkifier: Linkifier = Linkifier.None, builder: (TextCanvas.() -> Unit)) =
+fun htmlText(linkifier: Linkifier = Linkifier.None, builder: (TextCanvas.() -> Unit)) =
     HtmlTextCanvas(StringBuilder(), linkifier).apply(builder).sb.toString()
 
 private class HtmlTextCanvas(
