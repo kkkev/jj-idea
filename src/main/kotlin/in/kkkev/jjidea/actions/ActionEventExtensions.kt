@@ -27,6 +27,9 @@ val AnActionEvent.logEntry: LogEntry? get() = this.getData(JujutsuDataKeys.LOG_E
 /** The full multi-select log table selection, or empty if none (e.g. focus is outside the log table). */
 val AnActionEvent.logEntries: List<LogEntry> get() = this.getData(JujutsuDataKeys.LOG_ENTRIES) ?: emptyList()
 
+/** The row-adjacent entries around a single-row log selection, or `null` if none (see [JujutsuDataKeys.LOG_NEIGHBOURS]). */
+val AnActionEvent.logNeighbours: JujutsuDataKeys.LogNeighbours? get() = this.getData(JujutsuDataKeys.LOG_NEIGHBOURS)
+
 /** The single selected bookmark row in the bookmarks panel (jj-idea-ib1i), or `null` if none. */
 val AnActionEvent.bookmarkTarget: JujutsuDataKeys.BookmarkTarget? get() = this.getData(JujutsuDataKeys.BOOKMARK_TARGET)
 

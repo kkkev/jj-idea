@@ -133,6 +133,15 @@ object JujutsuLogContextMenuActions {
             add(rebaseAction(project, rebaseRepo, mutableEntries))
         }
 
+        // "Move Up"/"Move Down" (jj-idea-owje, GitHub #93): registered actions only - they read
+        // their neighbour from JujutsuDataKeys.LOG_NEIGHBOURS, which only the live log-table
+        // selection publishes, so there's no fixed-target factory equivalent for the
+        // liveSelection = false (link-menu) path.
+        if (liveSelection) {
+            ActionManager.getInstance().getAction("Jujutsu.MoveChangeUp")?.let { add(it) }
+            ActionManager.getInstance().getAction("Jujutsu.MoveChangeDown")?.let { add(it) }
+        }
+
         // Duplicate works on any change, including immutable ones
         add(duplicateChangeAction(project, uniqueRepo, entries))
         add(duplicateOntoAction(project, uniqueRepo, entries))

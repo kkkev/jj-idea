@@ -701,6 +701,21 @@ class JujutsuLogTable(
      */
     val selectedEntries get() = selectedRows.map(::convertRowIndexToModel).mapNotNull(logModel::getEntry)
 
+    /**
+     * The DAG neighbours (single child, single parent) of the single selected entry - backs
+     * [JujutsuDataKeys.LOG_NEIGHBOURS] (jj-idea-owje, GitHub #93). `null` when the selection
+     * isn't exactly one entry. Purely graph-based - no row/view-index arithmetic needed, unlike
+     * [selectedEntry] - since a multi-root log's display order doesn't reflect DAG adjacency
+     * (rows from unrelated repos interleave by timestamp).
+     */
+    private val selectedNeighbours: JujutsuDataKeys.LogNeighbours?
+        get() = selectedEntry?.let { e ->
+            JujutsuDataKeys.LogNeighbours(
+                singleChild = logModel.singleChildOf(e.key),
+                singleParent = e.parentIds.singleOrNull()?.let { logModel.entryFor(ChangeKey(e.repo, it)) }
+            )
+        }
+
     fun setEntries(entries: List<LogEntry>) {
         // Capture current selection for re-selection after model update,
         // but only if no explicit selection was requested (e.g., via changeSelection after edit/abandon).
@@ -961,6 +976,7 @@ class JujutsuLogTable(
     override fun uiDataSnapshot(sink: DataSink) {
         selectedEntry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
         selectedEntries.takeIf { it.isNotEmpty() }?.let { sink[JujutsuDataKeys.LOG_ENTRIES] = it }
+        selectedNeighbours?.let { sink[JujutsuDataKeys.LOG_NEIGHBOURS] = it }
     }
 
     override fun dispose() {
@@ -1041,6 +1057,14 @@ class JujutsuLogTableModel : AbstractTableModel() {
      * without a second `jj log` invocation. O(N) to build, O(1) per lookup.
      */
     private var entriesByKey: Map<ChangeKey, LogEntry> = emptyMap()
+
+    /**
+     * Repo-scoped parent -> children index over all currently-loaded entries (unfiltered, same
+     * convention as [entriesByKey]), rebuilt once per [setEntries] via [buildChildrenIndex].
+     * Backs [singleChildOf], the Move Up target resolution (jj-idea-owje, GitHub #93). O(N) to
+     * build, O(1) per lookup.
+     */
+    private var childrenByKey: Map<ChangeKey, List<LogEntry>> = emptyMap()
 
     /**
      * View-row index of each currently-filtered entry, rebuilt alongside [filteredEntries] in
@@ -1134,6 +1158,10 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /** Look up a loaded entry by its [ChangeKey], or `null` if it's outside the loaded window. */
     fun entryFor(key: ChangeKey): LogEntry? = entriesByKey[key]
 
+    /** The entry whose only parent is [key], or `null` if it has none or more than one loaded
+     * child - the Move Up target (jj-idea-owje). O(1) after [setEntries]'s O(N) index build. */
+    fun singleChildOf(key: ChangeKey): LogEntry? = childrenByKey[key]?.singleOrNull()
+
     /** View-row index of [key] in the currently filtered list, or `null` if it's filtered out or
      * not loaded. O(1) (map lookup), rebuilt each time [rebuildFilteredEntries] runs. */
     fun rowOf(key: ChangeKey): Int? = filteredRowByKey[key]
@@ -1152,6 +1180,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
         entries.clear()
         entries.addAll(newEntries)
         entriesByKey = newEntries.associateBy { it.key }
+        childrenByKey = buildChildrenIndex(newEntries)
         suppressFilterCallback = true
         try {
             applyFilter()

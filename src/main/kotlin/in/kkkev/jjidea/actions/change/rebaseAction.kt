@@ -42,17 +42,25 @@ internal fun performRebase(project: Project, repo: JujutsuRepository, entries: L
 
 /**
  * Runs `jj rebase` for [spec] with undo tracking and an undo balloon on success. Shared by
- * [performRebase] (dialog path) and [in.kkkev.jjidea.ui.dnd.DropPerformers] (drag-and-drop path,
- * jj-idea-8fxs) - one wiring path for both means the dialog action also gains the undo balloon it
- * didn't have before, which is accepted rather than adding an opt-in flag to avoid that.
+ * [performRebase] (dialog path), [in.kkkev.jjidea.ui.dnd.DropPerformers] (drag-and-drop path,
+ * jj-idea-8fxs), and [in.kkkev.jjidea.actions.change.MoveChangeAction] (Move Up/Down,
+ * jj-idea-owje) - one wiring path for all of them means the dialog action also gains the undo
+ * balloon it didn't have before, which is accepted rather than adding an opt-in flag to avoid
+ * that. [undoLabelKey] lets Move Up/Down show "Move" rather than "Rebase" in the undo balloon,
+ * even though the underlying command - and its error message - are still a plain rebase.
  */
-internal fun executeRebase(project: Project, repo: JujutsuRepository, spec: RebaseSpec) {
+internal fun executeRebase(
+    project: Project,
+    repo: JujutsuRepository,
+    spec: RebaseSpec,
+    undoLabelKey: String = "log.action.rebase.undo"
+) {
     repo.createUndoTrackedCommand { rebase(spec.revisions, spec.destinations, spec.sourceMode, spec.destinationMode) }
         .onSuccess {
             repo.invalidate(select = spec.revisions.first(), vfsChanged = true)
             rebaseLog.info("Rebased ${spec.revisions} onto ${spec.destinations}")
         }
         .onFailure { tellUser(project, "log.action.rebase.error") }
-        .withUndoBalloon(project, repo, "log.action.rebase.undo")
+        .withUndoBalloon(project, repo, undoLabelKey)
         .executeAsync()
 }

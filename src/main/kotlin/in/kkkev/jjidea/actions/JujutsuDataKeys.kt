@@ -31,6 +31,20 @@ object JujutsuDataKeys {
     val LOG_ENTRIES: DataKey<List<LogEntry>> = DataKey.create("Jujutsu.LogEntries")
 
     /**
+     * The DAG neighbours of a single-row selection - its single child and single parent, each
+     * `null` if it has none or more than one (mirrors [LOG_ENTRY]'s own single-selection scope).
+     * Backs Move Up/Down (jj-idea-owje, GitHub #93): moving a commit one position is
+     * `jj rebase -r <sel> -A <single child>` / `-B <single parent>`, a graph relationship, not
+     * display-row adjacency - a multi-root log interleaves unrelated repos' rows by timestamp,
+     * so "the row above/below" is not reliably a commit's parent or child.
+     */
+    @JvmField
+    val LOG_NEIGHBOURS: DataKey<LogNeighbours> = DataKey.create("Jujutsu.LogNeighbours")
+
+    /** @see LOG_NEIGHBOURS */
+    data class LogNeighbours(val singleChild: LogEntry?, val singleParent: LogEntry?)
+
+    /**
      * VirtualFile user-data: log entry pinned to a historical version opened by OpenRepositoryVersionAction.
      * Use [Project.possibleLogEntryFor] as the single access point rather than reading this key directly.
      */

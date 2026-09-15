@@ -960,6 +960,46 @@ Build a small stack `A → B → C` (three plain changes) for this section.
 - [ ] Right-clicking a `jjc://` change-navigation link (e.g. a parent reference in the commit
       details panel) still offers **New Change...** and it acts on the link's target
 
+#### Move Up / Move Down (jj-idea-owje, GitHub #93)
+
+Move Up/Down swap the selected commit with its single child/single parent **in the commit
+graph** — not whatever row happens to be adjacent on screen. Build a small stack
+`A → B → C → D` (four plain changes, `A` immutable - e.g. `jj config set --repo user.email a;
+jj new; jj new; jj new` then `jj bookmark create -r A base` and set the diff base / advance
+`main`/trunk over `A` so it becomes immutable) for the linear checks below, plus a small merge
+(`A → B`, `A → C`, `B,C → D`) for the branch/merge checks.
+
+- [ ] On the linear stack, select `B` or `C` and press Ctrl+Shift+Up (same on macOS - Cmd+Shift+Up
+      is deliberately **not** bound, see the plugin.xml comment on `Jujutsu.MoveChangeUp`) — it
+      swaps with its single child, the log reselects it in its new position, and `jj log` in a
+      terminal confirms the parent/child order now matches the table
+- [ ] Press it again — the commit keeps climbing one position per press
+- [ ] Ctrl+Shift+Down: moves the same commit back down
+- [ ] The undo balloon after a move reads "Move" (not "Rebase"); **Undo** restores the previous order
+- [ ] Select `D` (no child) — Move Up is disabled; select `A` (no parent) — Move Down is disabled
+- [ ] Select `B` (single parent immutable `A`) — Move Down (which would `jj rebase -r B -B A`,
+      rewriting the immutable commit) is disabled; Move Up remains enabled
+- [ ] Multi-select two rows — both Move Up and Move Down are disabled
+- [ ] Right-click a row: **Move Up**/**Move Down** appear near **Rebase...** in the context menu,
+      each showing its keyboard-shortcut hint
+- [ ] Focus the **editor** (not the log) and press Ctrl+Shift+Up/Down — the editor's own "Move
+      Statement Up/Down" still fires; it is not intercepted
+- [ ] On **macOS**, in the Commit/Local Changes file list, press Cmd+Shift+Up/Down — it still
+      extends the selection to include every change above/below (the platform's own
+      `EditorTextStartWithSelection`/`EditorTextEndWithSelection`, unaffected since Move Up/Down
+      is deliberately not bound to Cmd+Shift+Up/Down on macOS)
+- [ ] On the merge shape, select `A` (two children `B`/`C`) — Move Up is disabled (ambiguous
+      which child to swap with); select `D` (two parents) — Move Down is disabled
+- [ ] Select `B` (single child `D`, single parent `A`) — both directions enabled and each swap
+      lands where the graph predicts, confirmed via `jj log`
+- [ ] In a multi-root project, arrange two repos' commits so one repo's row displays directly
+      above/below a commit from the *other* repo (any timestamps that interleave will do) —
+      moving the first repo's commit must act on its own repo's child/parent (or disable if it
+      has none), never touch the adjacent row from the other repo
+- [ ] Apply a log filter that hides the selected commit's actual single child while leaving an
+      unrelated commit visually adjacent — Move Up still targets the real (hidden) child, not
+      the visible neighbour
+
 #### Compare with Working Copy (jj-idea-a6cz, jj-idea-vtdl)
 
 - [ ] Right-clicking a non-working-copy commit shows **Compare with Working Copy**

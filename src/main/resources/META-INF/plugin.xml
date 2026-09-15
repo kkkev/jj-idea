@@ -233,6 +233,32 @@
       <keyboard-shortcut first-keystroke="meta shift R" keymap="Mac OS X 10.5+"/>
     </action>
 
+    <!-- "Move Up"/"Move Down" (jj-idea-owje, GitHub #93): move the selected change one position
+         up/down the currently displayed log order - a keyboard-first complement to
+         drag-and-drop reordering. Context-menu only (no toolbar button, to keep the 4-button
+         toolbar uncluttered); shown next to Rebase in JujutsuLogContextMenuActions.
+
+         Deliberately only bound under "$default", with no Mac-specific meta-shift override:
+         "Mac OS X"/"Mac OS X 10.5+" both inherit from "$default" (see their own keymap XML),
+         so Ctrl+Shift+Up/Down already works unmodified on macOS too via that inheritance - no
+         separate entry needed. A Mac override of Cmd+Shift+Up/Down was tried first and reverted:
+         it collided with the platform's own EditorTextStartWithSelection/EditorTextEndWithSelection
+         (macOS System Shortcuts.xml), which is bound generically enough to fire as "select all
+         changes above/below including current" in list/tree contexts like the Local
+         Changes/Commit file list - a much worse collision than the one accepted below.
+
+         Ctrl+Shift+Up/Down (all platforms) soft-conflicts with the editor's built-in "Move
+         Statement Up/Down" - accepted, for the same reason as Jujutsu.EditChange's Recent
+         Locations conflict above: these actions disable outside the log table (no
+         LOG_NEIGHBOURS), so the editor action still wins everywhere except when a log row is
+         selected. -->
+    <action id="Jujutsu.MoveChangeUp" class="in.kkkev.jjidea.actions.change.MoveChangeUpAction">
+      <keyboard-shortcut first-keystroke="control shift UP" keymap="$default"/>
+    </action>
+    <action id="Jujutsu.MoveChangeDown" class="in.kkkev.jjidea.actions.change.MoveChangeDownAction">
+      <keyboard-shortcut first-keystroke="control shift DOWN" keymap="$default"/>
+    </action>
+
     <!-- Bookmarks panel row actions (jj-idea-ib1i, GitHub #48 split 1/3): keymap-assignable
          counterparts of the bookmarks panel's existing fixed-target actions, reading their
          target from the panel's selection (JujutsuDataKeys.BOOKMARK_TARGET) via
