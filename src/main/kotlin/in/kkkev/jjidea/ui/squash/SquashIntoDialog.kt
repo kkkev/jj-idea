@@ -35,9 +35,18 @@ import javax.swing.*
 sealed interface SquashMode {
     val candidates: List<LogEntry>?
 
+    /**
+     * [fixedDestination] distinguishes a single, gesture-chosen destination (e.g. a drag onto a
+     * specific commit, jj-idea-yvry) from the "pick among these parent candidates" flow
+     * [candidates] otherwise means ([in.kkkev.jjidea.actions.filechange.SquashFilesAction]'s use) -
+     * both restrict the picker to a predefined list, but only the parent-candidates flow is
+     * actually a "Squash into Parent" (see [SquashIntoDialog]'s title logic). Meaningless when
+     * [candidates] is null.
+     */
     data class PickDestination(
         val sources: List<LogEntry>,
-        override val candidates: List<LogEntry>? = null
+        override val candidates: List<LogEntry>? = null,
+        val fixedDestination: Boolean = false
     ) : SquashMode
 
     data class PickSources(
@@ -195,6 +204,8 @@ class SquashIntoDialog(
     init {
         title = when {
             pickingSources -> JujutsuBundle.message("dialog.squash.from.title")
+            (mode as? SquashMode.PickDestination)?.fixedDestination == true ->
+                JujutsuBundle.message("dialog.squash.into.commit.title")
             hasPredefinedCandidates -> JujutsuBundle.message("dialog.squash.into.parent.title")
             else -> JujutsuBundle.message("dialog.squash.into.title")
         }

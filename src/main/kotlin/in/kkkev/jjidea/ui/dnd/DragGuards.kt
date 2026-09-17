@@ -42,6 +42,7 @@ class DragContext private constructor(
         if (!copy && sourceHasImmutable && target !is DropTarget.RefChip) {
             return "Cannot rewrite an immutable commit"
         }
+        (payload as? DragPayload.Files)?.let { return filesRejectionReason(it, target) }
         return when (target) {
             // Keyed by the RebaseDestinationMode the zone will actually produce (toDestinationMode),
             // not by DropZone's own screen-position name - see toDestinationMode's doc for why
@@ -53,6 +54,30 @@ class DragContext private constructor(
             }
             is DropTarget.CommitRow, is DropTarget.RefChip -> null
         }
+    }
+
+    /**
+     * The [DragPayload.Files]-specific half of [rejectionReason] (jj-idea-yvry, -b2oi): a
+     * `CommitRow` squashes [files] into that row, a `Gap` splits them out - but only when the gap
+     * borders [DragPayload.Files.owner] itself, per design section 1's "a split is only meaningful
+     * at a gap bordering the files' own change". [resolveDropOperation]'s own owner check
+     * (`DropOperation.kt`) is the dispatch backstop for that same rule; this is what turns it into
+     * a *named* rejection the log table's [in.kkkev.jjidea.ui.log.RejectOverlay] can show, instead
+     * of the silent "no operation" a guardless reject produces.
+     */
+    private fun filesRejectionReason(files: DragPayload.Files, target: DropTarget): String? = when (target) {
+        is DropTarget.CommitRow -> when {
+            target.entry.id == files.owner.id -> "" // squashing into the owning change itself - a no-op
+            files.owner.immutable -> "Cannot rewrite an immutable commit"
+            target.entry.immutable -> "${target.entry.id.short} is immutable"
+            else -> null
+        }
+        is DropTarget.Gap -> when {
+            target.entry.id != files.owner.id -> "Files can only be split out next to their own change"
+            files.owner.immutable -> "Cannot rewrite an immutable commit"
+            else -> null
+        }
+        is DropTarget.RefChip -> null
     }
 
     private fun immutabilityReason(entry: LogEntry, invalidIds: Set<ChangeId>): String? =
@@ -73,13 +98,28 @@ class DragContext private constructor(
             } else {
                 emptySet()
             }
+            // invalidInsertBeforeIds/-AfterIds are only ever consulted by the Gap branch of a
+            // Commit drag's rejectionReason (a rebase insert) - BookmarkRef/TagRef/WorkingCopyRef
+            // never produce a Gap target, and Files has its own gap rule (filesRejectionReason).
+            // Skipping this pass for those payloads is what makes forDrag O(1) for them, not just
+            // "cheap" - see DragContextScaleTest / the Files-payload variant of it.
+            val invalidInsertBeforeIds = if (payload is DragPayload.Commit) {
+                invalidDestinationIds(allEntries, RebaseDestinationMode.INSERT_BEFORE)
+            } else {
+                emptySet()
+            }
+            val invalidInsertAfterIds = if (payload is DragPayload.Commit) {
+                invalidDestinationIds(allEntries, RebaseDestinationMode.INSERT_AFTER)
+            } else {
+                emptySet()
+            }
             return DragContext(
                 payload = payload,
                 sourceIds = sourceIds,
                 sourceHasImmutable = sourceHasImmutable,
                 cycleExcludedIds = cycleExcludedIds,
-                invalidInsertBeforeIds = invalidDestinationIds(allEntries, RebaseDestinationMode.INSERT_BEFORE),
-                invalidInsertAfterIds = invalidDestinationIds(allEntries, RebaseDestinationMode.INSERT_AFTER)
+                invalidInsertBeforeIds = invalidInsertBeforeIds,
+                invalidInsertAfterIds = invalidInsertAfterIds
             )
         }
     }

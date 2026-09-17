@@ -23,6 +23,7 @@ import `in`.kkkev.jjidea.ui.components.appendSummary
 import `in`.kkkev.jjidea.ui.components.bookmarkIcon
 import `in`.kkkev.jjidea.ui.components.icon
 import `in`.kkkev.jjidea.ui.dnd.DragContext
+import `in`.kkkev.jjidea.ui.dnd.DragContextHolder
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
 import `in`.kkkev.jjidea.ui.dnd.DropOperation
 import `in`.kkkev.jjidea.ui.dnd.DropPerformer
@@ -77,22 +78,39 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
     if (!PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) return
 
     val hysteresis = ZoneHysteresis()
-    var dragContext: DragContext? = null
+    val dragContextHolder = DragContextHolder()
     val performer = DropPerformers.forLogTable(project)
     val rejectOverlay = RejectOverlay()
     Disposer.register(parent) { rejectOverlay.dispose() }
+
+    // Shared by two different platform hooks, not just one: setDropEndedCallback maps to
+    // DnDSource.dragDropEnd, which only fires on the component that *started* the drag - for a
+    // drag that started in a different component's payload source (e.g.
+    // in.kkkev.jjidea.ui.common.installFilesDragSource since jj-idea-yvry), this table is never
+    // that source, so a RejectOverlay shown while hovering an invalid row would never be hidden -
+    // reported as the red background surviving a failed cross-component drop. setCleanUpOnLeaveCallback
+    // maps to DnDTarget.cleanUpOnLeave(), which DnDManagerImpl calls on *this table specifically*
+    // whenever it was the last-processed target: when the drag leaves the table for another
+    // component, and - via dragDropEnd's own explicit target.cleanUpOnLeave() call - whenever the
+    // drag ends at all, regardless of which component sourced it. Wiring both keeps the overlay
+    // reliably hidden either way; calling this twice on an end-of-drag over this table is harmless
+    // (rejectOverlay.hide() is idempotent).
+    val cleanUp = {
+        hysteresis.reset()
+        dragContextHolder.reset()
+        rejectOverlay.hide()
+    }
 
     DnDSupport.createBuilder(this)
         .setBeanProvider { info ->
             val payload = dragPayloadAt(info.point) ?: return@setBeanProvider null
             hysteresis.reset()
-            dragContext = DragContext.forDrag(logModel.getFilteredEntries(), payload)
             DnDDragStartBean(payload)
         }
         .setImageProvider { info -> dragPayloadAt(info.point)?.let { dragImage(it) } }
         .setTargetChecker { event ->
             event.hideHighlighter()
-            when (val resolution = resolveLive(event, hysteresis, dragContext)) {
+            when (val resolution = resolveLive(event, hysteresis, dragContextHolder)) {
                 is DropResolution.Allowed ->
                     if (performer.supports(resolution.operation)) {
                         rejectOverlay.hide()
@@ -122,16 +140,13 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
             false
         }
         .setDropHandlerWithResult { event ->
-            val resolution = resolveLive(event, hysteresis, dragContext) as? DropResolution.Allowed
+            val resolution = resolveLive(event, hysteresis, dragContextHolder) as? DropResolution.Allowed
                 ?: return@setDropHandlerWithResult false
             if (!performer.supports(resolution.operation)) return@setDropHandlerWithResult false
             performer.perform(resolution.operation)
         }
-        .setDropEndedCallback {
-            hysteresis.reset()
-            dragContext = null
-            rejectOverlay.hide()
-        }
+        .setDropEndedCallback { cleanUp() }
+        .setCleanUpOnLeaveCallback { cleanUp() }
         .setDisposableParent(parent)
         .install()
 
@@ -155,14 +170,21 @@ internal sealed interface DropResolution {
  * `null` if there is none at all (off any row, or no payload/drag in progress). Called from both
  * the target checker (every mouse-move) and the drop handler (once, on release) so the two can
  * never disagree about what a drop would do.
+ *
+ * [dragContextHolder] builds its [DragContext] from [event]'s own payload rather than one primed
+ * only by this table's bean provider (which never fires for a drag that started in a different
+ * component's payload source, e.g. [in.kkkev.jjidea.ui.common.installFilesDragSource] since
+ * jj-idea-yvry) - so a cross-component drag resolves here exactly like one that started on this
+ * table, and [DragContextHolder]'s memoisation still keeps the guard-state build to once per
+ * gesture rather than once per mouse-move.
  */
 private fun JujutsuLogTable.resolveLive(
     event: DnDEvent,
     hysteresis: ZoneHysteresis,
-    dragContext: DragContext?
+    dragContextHolder: DragContextHolder
 ): DropResolution? {
     val payload = event.attachedObject as? DragPayload ?: return null
-    val context = dragContext ?: return null
+    val context = dragContextHolder.forPayload(payload) { logModel.getFilteredEntries() }
     val point = event.relativePoint.getPoint(this)
     val (row, target) = dropTargetAt(point, hysteresis, payload) ?: return null
     val copy = event.action == DnDAction.COPY

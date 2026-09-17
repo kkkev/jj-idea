@@ -63,7 +63,12 @@ class MoveBookmarkDialogOkStateTest {
     fun `Move to Change OK is enabled immediately when a forward-movable change is preselected`() {
         val entry = createEntry(mockRepo(project.get()), "fwd1")
 
-        val dialog = MoveBookmarkToChangeDialog(mockRepo(project.get()), listOf(entry to MoveDirection.FORWARD), currentId = null)
+        val dialog =
+            MoveBookmarkToChangeDialog(
+                mockRepo(project.get()),
+                listOf(entry to MoveDirection.FORWARD),
+                currentId = null
+            )
 
         dialog.isOKActionEnabled shouldBe true
         disposeDialog(dialog)

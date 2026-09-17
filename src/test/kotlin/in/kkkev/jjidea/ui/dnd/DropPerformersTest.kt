@@ -15,16 +15,17 @@ import io.mockk.verify
 import org.junit.jupiter.api.Test
 
 /**
- * jj-idea-8fxs, -p6nb, -ibth, -vdwh: [DropPerformers.forLogTable]'s
+ * jj-idea-8fxs, -p6nb, -ibth, -vdwh, -yvry, -b2oi: [DropPerformers.forLogTable]'s
  * [DropOperation.Rebase]/[DropOperation.Duplicate]/[DropOperation.MoveBookmark]/
- * [DropOperation.MoveTag]/[DropOperation.Push] mappings, and the
- * [DropPerformer.supports]/[DropPerformer.perform] contract every gesture bead extends.
- * `executeRebase`/`executeDuplicate`/`executeMove`/`executeSetTag`/`openPushDialogFor`'s own
- * chains (undo tracking, the balloon, `executeAsync`, `runInBackground`) are manual-verified - see
- * each bead's design TESTS section - so `perform` is never actually invoked here for a wired
- * operation (it would need a live `ApplicationManager`, which a plain unit test doesn't have);
- * this only covers the pure mapping functions and the dispatch contract for the still-unwired
- * cells.
+ * [DropOperation.MoveTag]/[DropOperation.Push]/[DropOperation.SquashFiles]/
+ * [DropOperation.SplitFiles] mappings, and the [DropPerformer.supports]/[DropPerformer.perform]
+ * contract every gesture bead extends.
+ * `executeRebase`/`executeDuplicate`/`executeMove`/`executeSetTag`/`openPushDialogFor`/
+ * `performFileSquashInto`/`performFileSplit`'s own chains (undo tracking, the balloon,
+ * `executeAsync`, `runInBackground`, opening the pre-filled dialog) are manual-verified - see each
+ * bead's design TESTS section - so `perform` is never actually invoked here for a wired operation
+ * (it would need a live `ApplicationManager`, which a plain unit test doesn't have); this only
+ * covers the pure mapping functions and the dispatch contract for the still-unwired cells.
  */
 class DropPerformersTest {
     private val repo = mockk<JujutsuRepository>(relaxed = true)
@@ -46,13 +47,13 @@ class DropPerformersTest {
         DropOperation.Duplicate(listOf(a), b, RebaseDestinationMode.ONTO),
         DropOperation.MoveBookmark(Bookmark("main"), b),
         DropOperation.MoveTag(Tag("v1"), b),
-        DropOperation.Push(Bookmark("main"), "origin", b)
+        DropOperation.Push(Bookmark("main"), "origin", b),
+        DropOperation.SquashFiles(DragPayload.Files(a, listOf(mockk())), b),
+        DropOperation.SplitFiles(DragPayload.Files(a, listOf(mockk())), DropTarget.Gap(a, DropZone.INSERT_AFTER))
     )
 
     private val unwiredOperations: List<DropOperation> = listOf(
-        DropOperation.EditWorkingCopy(b),
-        DropOperation.SquashFiles(DragPayload.Files(a, listOf(mockk())), b),
-        DropOperation.SplitFiles(DragPayload.Files(a, listOf(mockk())), DropTarget.Gap(a, DropZone.INSERT_AFTER))
+        DropOperation.EditWorkingCopy(b)
     )
 
     private val allOperations: List<DropOperation> = wiredOperations + unwiredOperations
@@ -133,6 +134,30 @@ class DropPerformersTest {
         val op = DropOperation.Duplicate(listOf(a, c), b, RebaseDestinationMode.ONTO)
 
         op.toDuplicateSpec().revisions shouldBe listOf(a.id, c.id)
+    }
+
+    // endregion
+
+    // region toNewParent (jj-idea-b2oi)
+
+    @Test
+    fun `toNewParent maps the bottom band (INSERT_AFTER) to newParent = true - the split -B parent-side slot`() {
+        val op = DropOperation.SplitFiles(
+            DragPayload.Files(a, listOf(mockk())),
+            DropTarget.Gap(a, DropZone.INSERT_AFTER)
+        )
+
+        op.toNewParent() shouldBe true
+    }
+
+    @Test
+    fun `toNewParent maps the top band (INSERT_BEFORE) to newParent = false - the default new-child slot`() {
+        val op = DropOperation.SplitFiles(
+            DragPayload.Files(a, listOf(mockk())),
+            DropTarget.Gap(a, DropZone.INSERT_BEFORE)
+        )
+
+        op.toNewParent() shouldBe false
     }
 
     // endregion

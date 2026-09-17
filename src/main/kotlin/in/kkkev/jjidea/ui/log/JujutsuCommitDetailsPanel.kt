@@ -26,6 +26,7 @@ import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
 import `in`.kkkev.jjidea.ui.common.changesTreeToolbar
+import `in`.kkkev.jjidea.ui.common.installFilesDragSource
 import `in`.kkkev.jjidea.ui.common.sameChangesAndStatuses
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -141,6 +142,12 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         // working-copy entry, so a change's local file only actually matches what's on screen
         // when the selection includes `@` - see JujutsuChangesTree.showsLocalFiles' kdoc.
         changesTree.showsLocalFiles = { currentEntries.any { it.isWorkingCopy } }
+
+        // Files drag source for squash/split-by-drag (jj-idea-yvry, -b2oi). Only a single-commit
+        // selection has one unambiguous owning change to attach to the DragPayload.Files - a
+        // multi-commit selection shows the union of their changes with no single owner, so no
+        // drag starts (installFilesDragSource returns null from ownerFor).
+        changesTree.installFilesDragSource(this) { currentEntries.singleOrNull() }
 
         // Create splitter: changes on top, metadata on bottom
         splitter = OnePixelSplitter(true, 0.5f).apply {

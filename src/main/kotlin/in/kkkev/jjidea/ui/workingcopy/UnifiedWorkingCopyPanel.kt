@@ -30,12 +30,15 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
+import `in`.kkkev.jjidea.ui.common.installFilesDragSource
 import `in`.kkkev.jjidea.ui.common.sameChangesAndStatuses
 import `in`.kkkev.jjidea.ui.services.showVcsMappingsSettings
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
+import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import javax.swing.Box
@@ -402,6 +405,19 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
     private fun setupTreeInteractions() {
         changesTree.installHandlers()
+
+        // Files drag source for squash/split-by-drag (jj-idea-yvry, -b2oi). The owner is the
+        // bound repo's working copy - null if no repo is bound yet, its working copy is
+        // unavailable (jj-idea-b65g), or the selection reaches into another repo's changes (the
+        // "Other repositories" group changesTree.currentRepo demotes them into; a drag with no
+        // single owning repo shouldn't produce a Files payload at all).
+        changesTree.installFilesDragSource(this) { changes ->
+            val repo = controlsPanel.boundRepository ?: return@installFilesDragSource null
+            if (changes.any { project.possibleJujutsuRepositoryFor(it.filePath) != repo }) {
+                return@installFilesDragSource null
+            }
+            repo.whenWorkingCopyAvailable { it }
+        }
     }
 
     override fun uiDataSnapshot(sink: DataSink) {

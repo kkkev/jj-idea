@@ -38,3 +38,9 @@ verbatim at GA, condensed into a handful of user-facing bullets.
   naming what's being dragged, the same way dragging a file in the Project view does — a dragged
   commit's id keeps its usual styling (bold unique prefix, grey remainder) rather than showing as
   plain text.
+- Drag and Drop: dragging a file selection out of the changes tree (Working Copy panel or a
+  commit's details) onto another commit now opens the Squash dialog, pre-filled with those files
+  and that commit as the destination.
+- Drag and Drop: dragging a file selection just above or below its own change now opens the Split
+  dialog, pre-filled with those files moving into a new child or parent change; dropping on any
+  other change's gap shows a "can't drop here" indicator instead.

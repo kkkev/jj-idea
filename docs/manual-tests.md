@@ -3010,6 +3010,49 @@ where they were.
       the dialog pre-filled to that specific remote
 - [ ] Cancel the pre-filled dialog — no push happens, no error
 
+#### Files → commit squash, files → gap split (jj-idea-yvry, -b2oi)
+
+Dragging a file selection out of a changes tree is the first drag source outside the log table
+itself — the changes tree only ever *sources* a `Files` payload; the log table stays the only drop
+target, same `CommitRow`/`Gap` hit-test as every other payload. Squash is dialog-gated (it merges
+content and abandons the emptied source); split is dialog-gated the same way (it rewrites the
+source's content).
+
+**Code:** `ui/common/JujutsuChangesTreeDnD.kt`, `ui/dnd/DragGuards.kt` (`filesRejectionReason`),
+`ui/dnd/DropPerformers.kt`, `actions/filechange/SquashIntoFilesAction.kt`
+(`performFileSquashInto`), `actions/filechange/SplitFilesAction.kt` (`performFileSplit`)
+
+- [ ] With the preview feature off, select files in the Working Copy panel's changes tree and try
+      to drag them — nothing initiates, same as the log table with the feature off
+- [ ] With the feature on: select one or more files in the **Working Copy** panel's changes tree,
+      drag onto another mutable commit's **centre** band — tooltip names the squash, release opens
+      **Squash Into** pre-filled with those files ticked and that commit as the fixed destination
+      (not a free picker); confirm with `jj log`/`jj status` after accepting
+- [ ] Same drag from a **commit's own changes tree** (select a historical, non-`@` commit in the
+      log, drag files out of its details-panel changes tree) onto a different commit — same
+      pre-filled Squash dialog
+- [ ] Select files belonging to more than one commit at once in the commit-details tree (select
+      multiple commits in the log first) — no drag initiates (no single owning change)
+- [ ] Drag files onto their **own** owning commit's centre band — no indicator, silent no-op, no
+      dialog opens
+- [ ] Drag files onto an **immutable** destination — filled reject indicator, "&lt;id&gt; is
+      immutable"
+- [ ] With the owning commit itself immutable, drag its files anywhere — filled reject indicator,
+      "Cannot rewrite an immutable commit", both for a commit-row and a gap target
+- [ ] Drag files onto the owning commit's own **top or bottom** band — tooltip names the split,
+      release opens **Split** pre-filled with those files ticked: **bottom** band opens in "new
+      parent" mode (`jj split -B` — the ticked files become a new commit inserted as the owning
+      change's parent), **top** band opens in the default "new child" mode; confirm the resulting
+      commit's position with `jj log`
+- [ ] Drag files into a gap on any **other** commit (not their own) — filled reject indicator
+      reading "Files can only be split out next to their own change"; no dialog opens
+- [ ] Cancel either pre-filled dialog — no command runs, no error
+- [ ] Drag files from the Working Copy panel while a *different* repo is bound in a multi-root
+      project (select files that belong to another repo, if the tree's grouping allows it) — no
+      drag initiates for the other repo's files (no single owning repo)
+- [ ] Confirm neither drag source disturbs the changes tree's existing behaviour: double-click to
+      diff, right-click context menu, and the diff preview still work normally on the same tree
+
 ### MT-CROSS
 
 **Multi-repository, visual consistency, edge cases, and error handling**

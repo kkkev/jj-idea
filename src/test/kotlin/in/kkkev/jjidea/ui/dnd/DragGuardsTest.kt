@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.dnd
 
+import com.intellij.openapi.vcs.changes.Change
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
@@ -149,4 +150,96 @@ class DragGuardsTest {
 
         context.rejectionReason(DropTarget.CommitRow(b), copy = false).shouldBeNull()
     }
+
+    // region Files payload (jj-idea-yvry, -b2oi)
+
+    private val change = mockk<Change>(relaxed = true)
+
+    @Test
+    fun `files dropped onto their own owning change is a silent no-op`() {
+        val owner = entry("aaaaaaaa")
+        val files = DragPayload.Files(owner, listOf(change))
+        val context = DragContext.forDrag(listOf(owner), files)
+
+        context.rejectionReason(DropTarget.CommitRow(owner), copy = false) shouldBe ""
+    }
+
+    @Test
+    fun `files dropped onto a different mutable change is allowed - squash`() {
+        val owner = entry("aaaaaaaa")
+        val dest = entry("bbbbbbbb")
+        val files = DragPayload.Files(owner, listOf(change))
+        val context = DragContext.forDrag(listOf(owner, dest), files)
+
+        context.rejectionReason(DropTarget.CommitRow(dest), copy = false).shouldBeNull()
+    }
+
+    @Test
+    fun `files dropped onto an immutable destination is rejected - squash rewrites it`() {
+        val owner = entry("aaaaaaaa")
+        val immutableDest = entry("bbbbbbbb", immutable = true)
+        val files = DragPayload.Files(owner, listOf(change))
+        val context = DragContext.forDrag(listOf(owner, immutableDest), files)
+
+        val reason = context.rejectionReason(DropTarget.CommitRow(immutableDest), copy = false)
+
+        reason shouldBe "bbbbbbbb is immutable"
+    }
+
+    @Test
+    fun `files with an immutable owner cannot be squashed anywhere - squash rewrites the owner too`() {
+        val immutableOwner = entry("aaaaaaaa", immutable = true)
+        val dest = entry("bbbbbbbb")
+        val files = DragPayload.Files(immutableOwner, listOf(change))
+        val context = DragContext.forDrag(listOf(immutableOwner, dest), files)
+
+        val reason = context.rejectionReason(DropTarget.CommitRow(dest), copy = false)
+
+        reason shouldBe "Cannot rewrite an immutable commit"
+    }
+
+    @Test
+    fun `files dropped in a gap on their own change is allowed - split`() {
+        val owner = entry("aaaaaaaa")
+        val files = DragPayload.Files(owner, listOf(change))
+        val context = DragContext.forDrag(listOf(owner), files)
+
+        context.rejectionReason(DropTarget.Gap(owner, DropZone.INSERT_AFTER), copy = false).shouldBeNull()
+        context.rejectionReason(DropTarget.Gap(owner, DropZone.INSERT_BEFORE), copy = false).shouldBeNull()
+    }
+
+    @Test
+    fun `files dropped in a gap on a different change is rejected by name - the b2oi acceptance message`() {
+        val owner = entry("aaaaaaaa")
+        val other = entry("bbbbbbbb")
+        val files = DragPayload.Files(owner, listOf(change))
+        val context = DragContext.forDrag(listOf(owner, other), files)
+
+        val reason = context.rejectionReason(DropTarget.Gap(other, DropZone.INSERT_AFTER), copy = false)
+
+        reason shouldBe "Files can only be split out next to their own change"
+    }
+
+    @Test
+    fun `files with an immutable owner cannot be split either - split rewrites the owner`() {
+        val immutableOwner = entry("aaaaaaaa", immutable = true)
+        val files = DragPayload.Files(immutableOwner, listOf(change))
+        val context = DragContext.forDrag(listOf(immutableOwner), files)
+
+        val reason = context.rejectionReason(DropTarget.Gap(immutableOwner, DropZone.INSERT_AFTER), copy = false)
+
+        reason shouldBe "Cannot rewrite an immutable commit"
+    }
+
+    @Test
+    fun `files dropped onto a ref chip has no rejection - resolveDropOperation already yields no operation`() {
+        val owner = entry("aaaaaaaa")
+        val dest = entry("bbbbbbbb")
+        val files = DragPayload.Files(owner, listOf(change))
+        val context = DragContext.forDrag(listOf(owner, dest), files)
+
+        context.rejectionReason(DropTarget.RefChip(dest, Bookmark("main")), copy = false).shouldBeNull()
+    }
+
+    // endregion
 }
