@@ -190,12 +190,6 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcsBase) : ChangeProvider {
     }
 
     /**
-     * Parses `jj resolve -l` output. Each line is "<path>  <description>" with any amount
-     * of whitespace between path and description.
-     */
-    internal fun parseConflictPaths(output: String): Set<String> = ConflictInfoParser.parse(output).keys
-
-    /**
      * Parse a single status line
      * Format: "M path/to/file.txt" or "A path/to/file.txt", etc.
      */

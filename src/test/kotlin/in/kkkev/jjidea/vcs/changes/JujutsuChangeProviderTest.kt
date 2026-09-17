@@ -621,24 +621,6 @@ class JujutsuChangeProviderTest {
     }
 
     @Test
-    fun `parseConflictPaths parses jj resolve -l output`() {
-        val output =
-            """
-            gateway/lib/gatewaysnapshotvolatileservice.go 2-sided conflict
-            gateway/lib/gatewaywrapper.go       2-sided conflict
-            gateway/lib/snapshotworker.go       2-sided conflict including 1 deletion
-            """.trimIndent()
-
-        val paths = jcp.parseConflictPaths(output)
-
-        paths shouldBe setOf(
-            "gateway/lib/gatewaysnapshotvolatileservice.go",
-            "gateway/lib/gatewaywrapper.go",
-            "gateway/lib/snapshotworker.go"
-        )
-    }
-
-    @Test
     fun `collectTrackedAbsolutePaths - single file does not include summary lines`() {
         val output = statusOutput("M foo.txt")
         val paths = collectTrackedAbsolutePaths(output, repo)

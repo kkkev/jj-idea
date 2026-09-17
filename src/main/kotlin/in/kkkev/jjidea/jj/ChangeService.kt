@@ -5,6 +5,9 @@ import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.committed.CommittedChangesTreeBrowser
+import `in`.kkkev.jjidea.jj.conflict.ConflictInfo
+import `in`.kkkev.jjidea.jj.conflict.ConflictInfoParser
+import `in`.kkkev.jjidea.jj.conflict.conflictRegistry
 import `in`.kkkev.jjidea.vcs.getChildPath
 
 /**
@@ -36,7 +39,7 @@ object ChangeService {
         }
         // entry.hasConflict is populated from the jj log template and is more accurate than
         // checking fileChanges.isNotEmpty(): jj diff --summary silently omits conflicted files.
-        val conflictedPaths = if (entry.hasConflict) conflictedPathsFor(entry) else emptySet()
+        val conflictedPaths = if (entry.hasConflict) conflictInfosFor(entry).keys else emptySet()
         val fileChangePaths = fileChanges.map { it.filePath.path.removePrefix(repo.directory.path + "/") }.toSet()
         val regularChanges = fileChanges.map { fileChange ->
             val beforeContentRevision = fileChange.before?.let { before ->
@@ -64,11 +67,17 @@ object ChangeService {
         return regularChanges + missingConflictChanges
     }
 
-    private fun conflictedPathsFor(entry: LogEntry): Set<String> {
+    /**
+     * Runs `jj resolve --list -r <entry.id>`, parses it with [ConflictInfoParser] (rather than
+     * re-deriving paths from whitespace, which mis-parses a conflicted path containing a space),
+     * and caches the result in [in.kkkev.jjidea.jj.conflict.JujutsuConflictRegistry] under this
+     * revision so shape data (sides/deletions) is available to callers other than [loadChanges].
+     */
+    private fun conflictInfosFor(entry: LogEntry): Map<String, ConflictInfo> {
         val result = entry.repo.commandExecutor.resolveList(entry.id)
-        if (result !is CommandExecutor.CommandResult.Success || result.stdout.isBlank()) return emptySet()
-        return result.stdout.lines()
-            .mapNotNull { it.trim().split(Regex("\\s+")).firstOrNull()?.takeIf { p -> p.isNotEmpty() } }
-            .toSet()
+        if (result !is CommandExecutor.CommandResult.Success) return emptyMap()
+        val infos = ConflictInfoParser.parse(result.stdout)
+        entry.repo.project.conflictRegistry.replace(entry.repo.directory, infos.values, entry.id)
+        return infos
     }
 }
