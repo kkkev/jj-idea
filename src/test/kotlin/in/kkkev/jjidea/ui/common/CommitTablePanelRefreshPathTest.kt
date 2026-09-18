@@ -5,6 +5,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.AfterEach
@@ -77,6 +78,43 @@ class CommitTablePanelRefreshPathTest {
             // every loaded page) - that swap is what silently reintroduced GitHub #69's per-write
             // latency after this bead's fix first shipped.
             loader.calls shouldBe listOf("refresh")
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    /**
+     * Regression test for jj-idea-bbn3 (GitHub #115): the toolbar Refresh action used to call
+     * only [DataLoader.forceRefresh], which reloads log rows but never re-reads
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.references] /
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.workingCopies] /
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.closestBookmarks] — those are only refreshed via
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.invalidateRepositoryState]. Normally masked by the
+     * op_heads VFS watch auto-refreshing after any external jj operation, but that watch commonly
+     * doesn't fire on network-mounted repos, leaving manual Refresh as the only path — and it
+     * wasn't actually re-reading bookmarks/working copy. [CommitTablePanel.manualRefresh] must do
+     * both: force the log rows *and* invalidate repository state.
+     */
+    @Test
+    fun `manualRefresh re-reads repository state as well as log rows`() {
+        lateinit var loader: RecordingDataLoader
+        val panel = TestPanel(project.get()) { RecordingDataLoader().also { loader = it } }
+        try {
+            val stateModel = project.get().stateModel
+            // Construction itself triggers an initial load() - clear that before exercising the
+            // method under test, matching the sibling test above.
+            loader.calls.clear()
+            stateModel.closestBookmarks.hasLoaded shouldBe false
+
+            panel.manualRefresh()
+            drainBackgroundLoads()
+
+            // The toolbar's explicit Refresh is the one caller allowed to force a full page
+            // re-verification (see refresh()'s doc comment) ...
+            loader.calls shouldBe listOf("forceRefresh")
+            // ... and the one caller that re-reads repository state, so bookmarks/working copy
+            // don't stay stale for users whose op_heads watch never fires.
+            stateModel.closestBookmarks.hasLoaded shouldBe true
         } finally {
             Disposer.dispose(panel)
         }

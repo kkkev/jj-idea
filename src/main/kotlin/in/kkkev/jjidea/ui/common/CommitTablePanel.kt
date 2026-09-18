@@ -340,6 +340,21 @@ abstract class CommitTablePanel<D>(
     protected open fun onSearchSubmitted(text: String) {}
 
     /**
+     * The toolbar Refresh button's full behaviour: re-read the log rows *and* every state
+     * derived from the repo's current operation. Both are needed (GitHub #115 / jj-idea-bbn3)
+     * — [DataLoader.forceRefresh] only reloads rows, so bookmarks/working copy/closestBookmarks
+     * would stay stale for users whose op_heads VFS watch never fires (e.g. network drives),
+     * leaving manual Refresh as their only path to external changes but not actually
+     * re-reading them. Deliberately does *not* fire logRefresh itself: rows are already being
+     * reloaded here, and notifying would make every open log panel reload a second time.
+     */
+    internal fun manualRefresh() {
+        log.info("Refresh action triggered")
+        project.stateModel.invalidateRepositoryState()
+        dataLoader.forceRefresh()
+    }
+
+    /**
      * Refresh action - reload commits from all repositories.
      */
     private inner class RefreshAction : AnAction(
@@ -347,10 +362,7 @@ abstract class CommitTablePanel<D>(
         JujutsuBundle.message("log.action.refresh.tooltip"),
         AllIcons.Actions.Refresh
     ) {
-        override fun actionPerformed(e: AnActionEvent) {
-            log.info("Refresh action triggered")
-            dataLoader.forceRefresh()
-        }
+        override fun actionPerformed(e: AnActionEvent) = manualRefresh()
     }
 
     /**
@@ -669,7 +681,9 @@ abstract class CommitTablePanel<D>(
      * .forceRefresh] (paged re-verification of every loaded page). Calling `forceRefresh()`
      * here would fire it after every single write, defeating the entire point of jj-idea-2c8k
      * (GitHub #69) — found via manual testing after this bug shipped. The toolbar's explicit
-     * Refresh action (below) is the only caller that should use `forceRefresh()`.
+     * [manualRefresh] is the only caller that should use `forceRefresh()` — it's also the only
+     * caller that invalidates repository state (bookmarks/working copy/closestBookmarks), so
+     * this per-write path doesn't pick up an extra jj invocation per repo on every write.
      */
     fun refresh() {
         log.info("Refreshing log entries")

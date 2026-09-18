@@ -711,6 +711,30 @@ alongside one other repo works.
       still loading → project closes promptly (no multi-minute stall); idea.log shows the load
       being cancelled rather than running to completion
 
+**Manual refresh (jj-idea-bbn3, GitHub #115)**
+
+**Code:** `ui/common/CommitTablePanel.kt` (`manualRefresh`), `jj/JujutsuStateModel.kt`
+(`invalidateRepositoryState`)
+
+Under normal conditions this bug is invisible: the op_heads VFS watch (previous section)
+fires on essentially every jj operation and refreshes bookmarks/working-copy state before
+you'd ever click Refresh, masking the difference between `manualRefresh()` and the old
+`forceRefresh()`-only behavior. To exercise the fix, first kill the watch the reporter's
+network-drive repo effectively has dead: launch the sandbox IDE with
+`JAVA_TOOL_OPTIONS=-Didea.filewatcher.disabled=true ./gradlew runIde` (disables IntelliJ's
+native file watcher process — same failure mode, no `.jj/repo/op_heads` events ever
+delivered).
+
+- [ ] With the watcher disabled, run `jj bookmark create refresh-check` (or delete/move an
+      existing bookmark) in a terminal, and **don't refocus the IDE window** (frame-activation
+      refresh is a separate fallback path that would mask this too) — confirm the bookmark
+      chip, reference filter dropdown, and status-bar widget stay stale
+- [ ] Click toolbar **Refresh** — confirm all three now update
+- [ ] To confirm this bullet actually exercises the fix (rather than passing vacuously),
+      temporarily revert `manualRefresh()` to call only `dataLoader.forceRefresh()`, rebuild,
+      and re-run the same steps — Refresh should now reload log rows but leave the bookmark
+      stale; then restore the fix
+
 #### Paged log loading (jj-idea-2c8k, GitHub #69, early access)
 
 **Code:** `ui/log/PagedLogWindow.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt`,
