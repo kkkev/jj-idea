@@ -109,7 +109,6 @@ class UnifiedJujutsuLogDataLoader(
                 indicator.isIndeterminate = false
 
                 val latch = CountDownLatch(repos.size)
-                val deletedNamesByRepo = ConcurrentHashMap<JujutsuRepository, Set<String>>()
 
                 repos.forEachIndexed { index, repo ->
                     runInBackground {
@@ -127,13 +126,6 @@ class UnifiedJujutsuLogDataLoader(
                             val loadedEntries = loadFirstPageOrFallback(repo, settings)
                             entriesByRepo[repo] = loadedEntries
                             log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
-
-                            repo.logService.getBookmarks().onSuccess { bookmarkItems ->
-                                deletedNamesByRepo[repo] = bookmarkItems
-                                    .filter { it.bookmark.deleted && !it.bookmark.isRemote }
-                                    .map { it.bookmark.localName }
-                                    .toSet()
-                            }
                         } catch (e: ProcessCanceledException) {
                             log.info("Loading commits from $repo cancelled")
                         } catch (e: Exception) {
@@ -155,6 +147,7 @@ class UnifiedJujutsuLogDataLoader(
                     return@executeInBackground
                 }
 
+                val deletedNamesByRepo = deletedLocalNamesByRepo()
                 allEntries = topologicalSort(entriesByRepo.values.flatten())
                     .map { entry -> enrichWithDeletedBookmarks(entry, deletedNamesByRepo[entry.repo] ?: emptySet()) }
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
@@ -302,22 +295,46 @@ class UnifiedJujutsuLogDataLoader(
 
     /**
      * Rebuilds the merged (loaded + expansion + search) entry set for every repo, sorts it, and
-     * notifies the panel on EDT. Shared by [loadExpanding] and [searchWholeRepo] — both accumulate
+     * notifies the panel on EDT. The single choke point for every post-initial-load path
+     * ([loadMore], [refresh], [forceRefresh], [loadExpanding], [searchWholeRepo]) — all accumulate
      * additive per-repo buckets on top of [JujutsuRepository.logCache], never discarded except by
      * [clearExpansions] on an explicit Refresh. Must be called from a background thread, since it
      * reads [JujutsuRepository.logCache].
+     *
+     * Applies [enrichWithDeletedBookmarks] here too (jj-idea-lc43, GitHub #110) — [loadCommits]'s
+     * own application at its `allEntries` assignment only covers the very first load; every path
+     * that lands here (a paged "Load more", a post-write refresh, a search) would otherwise leave
+     * a remote-tracking row's post-deletion garbage ahead/behind count uncorrected.
+     * [deletedLocalNamesByRepo] is resolved once for every repo, not once per entry.
      */
     private fun mergeAndNotify() {
+        val deletedNamesByRepo = deletedLocalNamesByRepo()
         val allEntries = repositories().flatMap { r ->
             val regular = r.logCache.all
             val expanded = expansionEntriesByRepo[r] ?: emptyList()
             val searched = searchEntriesByRepo[r] ?: emptyList()
-            regular + expanded + searched
+            (regular + expanded + searched).map { entry ->
+                enrichWithDeletedBookmarks(entry, deletedNamesByRepo[r] ?: emptySet())
+            }
         }
         val merged = topologicalSort(allEntries.distinctBy { it.key })
         val data = Data(merged, graphBuilder.buildGraph(merged), lastLimit)
         runLater { notify(data) }
     }
+
+    /**
+     * Pending-deletion local bookmark names per repo, off the already-cached
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.references] state (BGT only — see
+     * [in.kkkev.jjidea.util.NotifiableState.immediateValue]). Fetched as a single whole-map read,
+     * not one [in.kkkev.jjidea.util.NotifiableState.immediateValue] call per repo: on a cold cache
+     * that accessor's synchronous load only sets its `hasLoaded` flag, not its cached `value` — a
+     * second call in the same pass would see `hasLoaded = true` and return the still-empty start
+     * value instead of the just-loaded data.
+     */
+    private fun deletedLocalNamesByRepo(): Map<JujutsuRepository, Set<String>> =
+        project.stateModel.references.immediateValue.mapValues { (_, refs) ->
+            refs.bookmarks.map { it.bookmark }.deletedLocalNames()
+        }
 
     override fun clearExpansions() {
         expansionEntriesByRepo.clear()
@@ -571,8 +588,15 @@ internal fun enrichWithDeletedBookmarks(entry: LogEntry, deletedNames: Set<Strin
     if (deletedNames.isEmpty()) return entry
     val remotes = entry.bookmarks.filter { it.isRemote && it.localName in deletedNames }
     if (remotes.isEmpty()) return entry
-    val injectedLocals = remotes.map { Bookmark(it.localName, tracked = true, deleted = true) }
-    val cleanedRemotes = remotes.map { it.copy(aheadCount = 0, behindCount = 0) }
+    // Idempotency (jj-idea-lc43): with mergeAndNotify() now also calling this, an entry that
+    // already got a local injected by an earlier pass (or that genuinely has both a live local
+    // and a stale remote-tracking row of the same name — jj allows that combination) must not
+    // grow a second deleted-local Bookmark for the same name.
+    val existingLocalNames = entry.bookmarks.filter { !it.isRemote }.mapTo(mutableSetOf()) { it.localName }
+    val injectedLocals = remotes.map { it.localName }.distinct()
+        .filter { it !in existingLocalNames }
+        .map { Bookmark(it, tracked = true, deleted = true) }
+    val cleanedRemotes = remotes.map { it.zeroedIfLocalDeleted(deletedNames) }
     val remaining = entry.bookmarks.filter { !it.isRemote || it.localName !in deletedNames }
     return entry.copy(bookmarks = remaining + injectedLocals + cleanedRemotes)
 }

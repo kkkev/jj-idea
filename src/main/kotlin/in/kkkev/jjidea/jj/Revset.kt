@@ -133,6 +133,25 @@ fun Bookmark.withDivergenceFrom(remotes: List<Bookmark>): Bookmark {
     return copy(aheadCount = tracked.maxOf { it.behindCount }, behindCount = tracked.maxOf { it.aheadCount })
 }
 
+/**
+ * Local bookmark names present only as a pending-deletion row: `jj bookmark delete foo` leaves
+ * `foo`'s local ref absent (no target) while `foo@origin` still exists, so `bookmarkListTemplate`
+ * parses it as `Bookmark(deleted = true)` with no matching target commit. See
+ * [zeroedIfLocalDeleted] for what this is used to correct.
+ */
+fun List<Bookmark>.deletedLocalNames(): Set<String> =
+    filterTo(mutableSetOf()) { it.deleted && !it.isRemote }.mapTo(mutableSetOf()) { it.localName }
+
+/**
+ * Zeroes the tracking counts jj reports for a remote-tracking row whose local side is absent
+ * (jj-idea-lc43, GitHub #110): with no local `foo` to measure from, jj's `tracking_ahead_count`
+ * for `foo@origin` is the distance from the *absent* local to the repo root — a huge number with
+ * no relation to real divergence — rather than erroring or reporting 0. Returns this bookmark
+ * unchanged unless it is itself a remote row whose [Bookmark.localName] is in [deletedLocalNames].
+ */
+fun Bookmark.zeroedIfLocalDeleted(deletedLocalNames: Set<String>): Bookmark =
+    if (isRemote && localName in deletedLocalNames) copy(aheadCount = 0, behindCount = 0) else this
+
 @JvmInline
 value class Remote(val name: String) {
     override fun toString() = name

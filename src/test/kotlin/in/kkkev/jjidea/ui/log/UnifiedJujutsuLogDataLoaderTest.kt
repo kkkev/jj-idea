@@ -89,6 +89,18 @@ class UnifiedJujutsuLogDataLoaderTest {
                 Bookmark("bar@origin", tracked = true, aheadCount = 0, behindCount = 0)
             )
         }
+
+        @Test
+        fun `is idempotent - a second application injects no duplicate local`() {
+            val remote = Bookmark("foo@origin", tracked = true, aheadCount = 42)
+            val e = entry(remote)
+            val once = enrichWithDeletedBookmarks(e, setOf("foo"))
+            val twice = enrichWithDeletedBookmarks(once, setOf("foo"))
+            twice.bookmarks.shouldContainExactlyInAnyOrder(
+                Bookmark("foo", tracked = true, deleted = true),
+                Bookmark("foo@origin", tracked = true, aheadCount = 0, behindCount = 0)
+            )
+        }
     }
 
     @Nested

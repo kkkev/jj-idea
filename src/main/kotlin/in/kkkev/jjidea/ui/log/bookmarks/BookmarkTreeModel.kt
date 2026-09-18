@@ -11,7 +11,9 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RepositoryReferences
 import `in`.kkkev.jjidea.jj.TagItem
+import `in`.kkkev.jjidea.jj.deletedLocalNames
 import `in`.kkkev.jjidea.jj.withDivergenceFrom
+import `in`.kkkev.jjidea.jj.zeroedIfLocalDeleted
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 
 /**
@@ -150,6 +152,12 @@ private fun buildRepoNodes(
     val wcLabel = bookmarkWidgetText(onWcNames, closest)
     if (wcLabel.isNotEmpty()) add(BookmarkNode.WorkingCopy(repo, wcLabel))
 
+    // Built once for the whole repo (jj-idea-lc43, GitHub #110): a remote row whose local side is
+    // pending-deletion carries a meaningless tracking_ahead_count from jj (see
+    // Bookmark.zeroedIfLocalDeleted) that must not leak into either the remote leaf below or the
+    // struck-through local leaf's derived divergence.
+    val deletedLocals = refs.bookmarks.map { it.bookmark }.deletedLocalNames()
+
     val localBookmarks = refs.bookmarks.filterNot { it.bookmark.isRemote }
     if (localBookmarks.isNotEmpty()) {
         // Built once, not per leaf below (jj-idea-we1n, GitHub #110): a local bookmark's own
@@ -160,6 +168,7 @@ private fun buildRepoNodes(
         val remotesByLocalName = refs.bookmarks.asSequence()
             .map { it.bookmark }
             .filter { it.isRemote && it.remote != GIT_PSEUDO_REMOTE }
+            .map { it.zeroedIfLocalDeleted(deletedLocals) }
             .groupBy { it.localName }
         val leaves = localBookmarks.map { item ->
             val withDivergence = item.copy(
@@ -196,6 +205,7 @@ private fun buildRepoNodes(
     for (remote in remoteNames) {
         val leaves = refs.bookmarks
             .filter { it.bookmark.isRemote && it.bookmark.remote == remote }
+            .map { item -> item.copy(bookmark = item.bookmark.zeroedIfLocalDeleted(deletedLocals)) }
             .map { item -> RefPath(item.bookmark.localName) { name -> BookmarkNode.Remote(repo, item, name) } }
         val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
         add(

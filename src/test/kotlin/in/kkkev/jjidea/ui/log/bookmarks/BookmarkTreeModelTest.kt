@@ -31,10 +31,18 @@ class BookmarkTreeModelTest {
         tracked: Boolean = true,
         conflict: Boolean = false,
         aheadCount: Int = 0,
-        behindCount: Int = 0
+        behindCount: Int = 0,
+        deleted: Boolean = false
     ) = BookmarkItem(
-        Bookmark(name, tracked = tracked, conflict = conflict, aheadCount = aheadCount, behindCount = behindCount),
-        changeId
+        Bookmark(
+            name,
+            tracked = tracked,
+            deleted = deleted,
+            conflict = conflict,
+            aheadCount = aheadCount,
+            behindCount = behindCount
+        ),
+        id = if (deleted) null else changeId
     )
 
     private fun refs(vararg names: String) = mapOf(repo to RepositoryReferences(bookmarks = names.map { item(it) }))
@@ -286,6 +294,82 @@ class BookmarkTreeModelTest {
 
         main.item.bookmark.conflict shouldBe true
         local.rollup.hasUnsynced shouldBe true
+    }
+
+    // jj-idea-lc43 (GitHub #110): when a local bookmark is pending deletion (`jj bookmark delete`)
+    // but its remote-tracking row still exists, jj reports that row's tracking_ahead_count as the
+    // distance from the absent local to the repo root - a huge, meaningless number - rather than
+    // the real divergence. Both the remote leaf and the struck-through local leaf's *derived*
+    // divergence must be zeroed instead of showing or propagating that garbage.
+
+    @Test
+    fun `a remote row whose local is pending-deletion has its counts zeroed`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(item("foo", deleted = true), item("foo@origin", aheadCount = 1000))
+            )
+        )
+
+        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
+            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+        val remote = origin.children.filterIsInstance<BookmarkNode.Remote>().single()
+
+        remote.item.bookmark.aheadCount shouldBe 0
+        remote.item.bookmark.behindCount shouldBe 0
+    }
+
+    @Test
+    fun `the struck-through local leaf derives zero divergence, not the swapped garbage count`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(item("foo", deleted = true), item("foo@origin", aheadCount = 1000))
+            )
+        )
+
+        val local = buildBookmarkTree(references, emptyMap(), emptyMap())
+            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "Local" }
+        val foo = local.children.filterIsInstance<BookmarkNode.Local>().single()
+
+        foo.item.bookmark.deleted shouldBe true
+        foo.item.bookmark.aheadCount shouldBe 0
+        foo.item.bookmark.behindCount shouldBe 0
+    }
+
+    @Test
+    fun `a pending-deletion row alone does not make its remote category notable`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(item("foo", deleted = true), item("foo@origin", aheadCount = 1000))
+            )
+        )
+
+        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
+            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+
+        origin.rollup.isNotable shouldBe false
+    }
+
+    @Test
+    fun `a live sibling bookmark on the same remote keeps its real counts`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(
+                    item("foo", deleted = true),
+                    item("foo@origin", aheadCount = 1000),
+                    item("bar"),
+                    item("bar@origin", behindCount = 3)
+                )
+            )
+        )
+
+        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
+            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+        val remotes = origin.children.filterIsInstance<BookmarkNode.Remote>().associateBy { it.displayName }
+
+        remotes.getValue("foo").item.bookmark.aheadCount shouldBe 0
+        remotes.getValue("bar").item.bookmark.behindCount shouldBe 3
+        origin.rollup.aheadCount shouldBe 0
+        origin.rollup.behindCount shouldBe 3
     }
 
     @Test
