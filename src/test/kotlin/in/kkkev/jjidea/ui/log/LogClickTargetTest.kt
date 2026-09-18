@@ -163,29 +163,29 @@ class LogClickTargetTest {
 
         @Test
         fun `a bookmark chip gets the ref background`() {
-            BookmarkClick(repo, e, Bookmark("main")).hoverCue shouldBe HoverCue.REF_BACKGROUND
+            BookmarkClick(e, Bookmark("main")).hoverCue shouldBe HoverCue.REF_BACKGROUND
         }
 
         @Test
         fun `a tag chip gets the ref background`() {
-            TagClick(repo, e, Tag("v1.0")).hoverCue shouldBe HoverCue.REF_BACKGROUND
+            TagClick(e, Tag("v1.0")).hoverCue shouldBe HoverCue.REF_BACKGROUND
         }
 
         @Test
         fun `a person click underlines as a real link`() {
-            val target = PersonClick(repo, e, VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
+            val target = PersonClick(e, VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
             target.hoverCue shouldBe HoverCue.REAL_LINK_UNDERLINE
         }
 
         @Test
         fun `a change navigation click underlines as a real link`() {
-            ChangeNavigationClick(repo, ChangeKey(repo, ChangeId("qpvuntsm", "qp"))).hoverCue shouldBe
+            ChangeNavigationClick(ChangeKey(repo, ChangeId("qpvuntsm", "qp"))).hoverCue shouldBe
                 HoverCue.REAL_LINK_UNDERLINE
         }
 
         @Test
         fun `the overflow chip gets the same background cue as a bookmark or tag chip`() {
-            MoreRefsClick(repo, e, emptyList()).hoverCue shouldBe HoverCue.REF_BACKGROUND
+            MoreRefsClick(e, emptyList()).hoverCue shouldBe HoverCue.REF_BACKGROUND
         }
     }
 
@@ -196,23 +196,23 @@ class LogClickTargetTest {
 
         @Test
         fun `a local bookmark shows the tracked glyph`() {
-            BookmarkClick(repo, e, Bookmark("main")).displayIcon shouldBe JujutsuIcons::BookmarkTracked
+            BookmarkClick(e, Bookmark("main")).displayIcon shouldBe JujutsuIcons::BookmarkTracked
         }
 
         @Test
         fun `an untracked remote bookmark shows the plain glyph`() {
             val bookmark = Bookmark("main@origin", tracked = false)
-            BookmarkClick(repo, e, bookmark).displayIcon shouldBe JujutsuIcons::Bookmark
+            BookmarkClick(e, bookmark).displayIcon shouldBe JujutsuIcons::Bookmark
         }
 
         @Test
         fun `a tag shows the tag glyph`() {
-            TagClick(repo, e, Tag("v1.0")).displayIcon shouldBe JujutsuIcons::Tag
+            TagClick(e, Tag("v1.0")).displayIcon shouldBe JujutsuIcons::Tag
         }
 
         @Test
         fun `a person click has no glyph`() {
-            val target = PersonClick(repo, e, VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
+            val target = PersonClick(e, VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
             target.displayIcon.shouldBeNull()
         }
     }

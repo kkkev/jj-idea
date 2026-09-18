@@ -413,7 +413,7 @@ class JujutsuLogTable(
         // CommitTablePanel's deferred, dedup'd selection listener rather than being fought here -
         // see the comment on the listener in CommitTablePanel.kt.
         logModel.withSelectionPreserved = { rebuild ->
-            val key = selectedEntry?.let { ChangeKey(it.repo, it.id) }
+            val key = selectedEntry?.key
             rebuild()
             if (key != null && !selectEntry(key.repo, key.revision)) {
                 clearSelection()
@@ -525,7 +525,7 @@ class JujutsuLogTable(
         )
         val uri = laidOut.linkTargetAt(localX) ?: return null
         if (uri.toString().contains("&kind=overflow&")) {
-            return MoreRefsClick(entry.repo, entry, laidOut.hidden)
+            return MoreRefsClick(entry, laidOut.hidden)
         }
         return LogClickTarget.resolve(uri, project, listOf(entry))
     }
@@ -712,7 +712,7 @@ class JujutsuLogTable(
         get() = selectedEntry?.let { e ->
             JujutsuDataKeys.LogNeighbours(
                 singleChild = logModel.singleChildOf(e.key),
-                singleParent = e.parentIds.singleOrNull()?.let { logModel.entryFor(ChangeKey(e.repo, it)) }
+                singleParent = e.parentKeys.singleOrNull()?.let { logModel.entryFor(it) }
             )
         }
 
@@ -721,7 +721,7 @@ class JujutsuLogTable(
         // but only if no explicit selection was requested (e.g., via changeSelection after edit/abandon).
         if (pendingSelection == null) {
             selectedEntry?.let {
-                pendingSelection = ChangeKey(it.repo, it.id)
+                pendingSelection = it.key
             }
         }
         val anchor = captureViewportAnchor()

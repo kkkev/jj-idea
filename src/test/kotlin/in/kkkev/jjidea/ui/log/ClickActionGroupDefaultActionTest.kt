@@ -65,7 +65,7 @@ class ClickActionGroupDefaultActionTest {
 
     @Test
     fun `bookmark chip menu leads with a DefaultClickAction that filters to the reference`() {
-        val target = BookmarkClick(repo, entry(), Bookmark("main"))
+        val target = BookmarkClick(entry(), Bookmark("main"))
 
         val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
 
@@ -74,7 +74,7 @@ class ClickActionGroupDefaultActionTest {
 
     @Test
     fun `tag chip menu leads with a DefaultClickAction that filters to the reference`() {
-        val target = TagClick(repo, entry(), Tag("v1"))
+        val target = TagClick(entry(), Tag("v1"))
 
         val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
 
@@ -83,7 +83,7 @@ class ClickActionGroupDefaultActionTest {
 
     @Test
     fun `author menu leads with a DefaultClickAction and also offers filter by author`() {
-        val target = PersonClick(repo, entry(), VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
+        val target = PersonClick(entry(), VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
 
         val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
 
@@ -93,7 +93,7 @@ class ClickActionGroupDefaultActionTest {
 
     @Test
     fun `committer menu has only the DefaultClickAction - no filter option`() {
-        val target = PersonClick(repo, entry(), VcsUserImpl("Bob", "bob@example.com"), canFilter = false)
+        val target = PersonClick(entry(), VcsUserImpl("Bob", "bob@example.com"), canFilter = false)
 
         val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
 
@@ -110,7 +110,7 @@ class ClickActionGroupDefaultActionTest {
     @Test
     fun `bookmark chip's Filter action is checked when it is the active reference filter`() {
         project.stateModel.activeReferenceFilter = "main"
-        val target = BookmarkClick(repo, entry(), Bookmark("main"))
+        val target = BookmarkClick(entry(), Bookmark("main"))
 
         val checked = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren().first()
 
@@ -120,7 +120,7 @@ class ClickActionGroupDefaultActionTest {
     @Test
     fun `bookmark chip's Filter action is unchecked when a different reference is active`() {
         project.stateModel.activeReferenceFilter = "other-bookmark"
-        val target = BookmarkClick(repo, entry(), Bookmark("main"))
+        val target = BookmarkClick(entry(), Bookmark("main"))
 
         val unchecked = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren().first()
 
@@ -130,7 +130,7 @@ class ClickActionGroupDefaultActionTest {
     @Test
     fun `tag chip's Filter action is checked when it is the active reference filter`() {
         project.stateModel.activeReferenceFilter = "v1"
-        val target = TagClick(repo, entry(), Tag("v1"))
+        val target = TagClick(entry(), Tag("v1"))
 
         val checked = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren().first()
 
@@ -140,7 +140,7 @@ class ClickActionGroupDefaultActionTest {
     @Test
     fun `Filter by author action is checked when this author is the active author filter`() {
         project.stateModel.activeAuthorFilter = setOf("alice@example.com")
-        val target = PersonClick(repo, entry(), VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
+        val target = PersonClick(entry(), VcsUserImpl("Alice", "alice@example.com"), canFilter = true)
 
         val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
 
@@ -150,7 +150,7 @@ class ClickActionGroupDefaultActionTest {
     @Test
     fun `no active filter leaves every toggle action unchecked`() {
         project.stateModel.activeReferenceFilter = ""
-        val target = BookmarkClick(repo, entry(), Bookmark("main"))
+        val target = BookmarkClick(entry(), Bookmark("main"))
 
         val unchecked = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren().first()
 
@@ -161,7 +161,7 @@ class ClickActionGroupDefaultActionTest {
     fun `change-id link menu reuses the resolved commit's log-row context menu`() {
         val changeId = ChangeId("qpvuntsm", "qp", 2)
         every { repo.getLogEntry(changeId as Revision) } returns entry()
-        val target = ChangeNavigationClick(repo, ChangeKey(repo, changeId))
+        val target = ChangeNavigationClick(ChangeKey(repo, changeId))
 
         val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
 
@@ -172,7 +172,7 @@ class ClickActionGroupDefaultActionTest {
     fun `change-id link menu is empty when the revision no longer resolves`() {
         val changeId = ChangeId("qpvuntsm", "qp", 2)
         every { repo.getLogEntry(changeId as Revision) } throws IllegalArgumentException("not found")
-        val target = ChangeNavigationClick(repo, ChangeKey(repo, changeId))
+        val target = ChangeNavigationClick(ChangeKey(repo, changeId))
 
         val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
 

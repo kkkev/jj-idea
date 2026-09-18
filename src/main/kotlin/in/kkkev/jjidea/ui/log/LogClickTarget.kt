@@ -8,7 +8,6 @@ import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
-import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.stateModel
@@ -62,7 +61,7 @@ sealed interface LogClickTarget {
             val m = CHANGE_URL_PARSER.matchEntire(uri.toString()) ?: return null
             val path = URLUtil.unescapePercentSequences(m.groupValues[1])
             val repo = project.possibleJujutsuRepositoryFor(VcsUtil.getFilePath(path, true)) ?: return null
-            return ChangeNavigationClick(repo, ChangeKey(repo, ChangeId(m.groupValues[2])))
+            return ChangeNavigationClick(ChangeKey(repo, ChangeId(m.groupValues[2])))
         }
 
         private fun resolveRef(uri: URI, entries: List<LogEntry>): LogClickTarget? {
@@ -72,8 +71,8 @@ sealed interface LogClickTarget {
             val name = URLDecoder.decode(m.groupValues[4], "UTF-8")
             return when (kind) {
                 "bookmark" -> entry.bookmarks.find { it.name.name == name }
-                    ?.let { BookmarkClick(entry.repo, entry, it) }
-                "tag" -> entry.tags.find { it.name == name }?.let { TagClick(entry.repo, entry, it) }
+                    ?.let { BookmarkClick(entry, it) }
+                "tag" -> entry.tags.find { it.name == name }?.let { TagClick(entry, it) }
                 else -> null
             }
         }
@@ -87,19 +86,23 @@ sealed interface LogClickTarget {
          */
         private fun personClickForEmail(email: String, entries: List<LogEntry>): PersonClick? {
             entries.firstNotNullOfOrNull { entry ->
-                entry.author?.takeIf { it.email == email }?.let { PersonClick(entry.repo, entry, it, canFilter = true) }
+                entry.author?.takeIf { it.email == email }?.let { PersonClick(entry, it, canFilter = true) }
             }?.let { return it }
             return entries.firstNotNullOfOrNull { entry ->
                 entry.committer?.takeIf { it.email == email }
-                    ?.let { PersonClick(entry.repo, entry, it, canFilter = false) }
+                    ?.let { PersonClick(entry, it, canFilter = false) }
             }
         }
     }
 }
 
-data class BookmarkClick(val repo: JujutsuRepository, val entry: LogEntry, val bookmark: Bookmark) : LogClickTarget
+data class BookmarkClick(val entry: LogEntry, val bookmark: Bookmark) : LogClickTarget {
+    val repo get() = entry.repo
+}
 
-data class TagClick(val repo: JujutsuRepository, val entry: LogEntry, val tag: Tag) : LogClickTarget
+data class TagClick(val entry: LogEntry, val tag: Tag) : LogClickTarget {
+    val repo get() = entry.repo
+}
 
 /**
  * The author or committer name column was clicked (jj-idea-iesq). [canFilter] is true only for
@@ -107,11 +110,12 @@ data class TagClick(val repo: JujutsuRepository, val entry: LogEntry, val tag: T
  * committer's email would silently never match.
  */
 data class PersonClick(
-    val repo: JujutsuRepository,
     val entry: LogEntry,
     val user: VcsUser,
     val canFilter: Boolean
-) : LogClickTarget
+) : LogClickTarget {
+    val repo get() = entry.repo
+}
 
 /**
  * The "+N more" overflow chip was clicked (jj-idea-w61m): [hidden] holds the bookmark/tag click
@@ -122,8 +126,9 @@ data class PersonClick(
  * [performDefaultAction]'s signature doesn't carry - callers special-case this variant before
  * calling it generically, exactly as they already did before this type existed.
  */
-data class MoreRefsClick(val repo: JujutsuRepository, val entry: LogEntry, val hidden: List<LogClickTarget>) :
-    LogClickTarget
+data class MoreRefsClick(val entry: LogEntry, val hidden: List<LogClickTarget>) : LogClickTarget {
+    val repo get() = entry.repo
+}
 
 /**
  * An issue-tracker reference (e.g. `JIRA-123`) linkified by
@@ -140,9 +145,11 @@ data class IssueLinkClick(val uri: URI) : LogClickTarget
  * was clicked - navigates the log/working-copy selection to [changeKey]. Unlike `jjref`/`http(s)`
  * links, this has no natural owning [LogEntry] in a multi-commit view (the change it points to,
  * e.g. a parent commit, need not be among the currently-displayed entries), so it carries only the
- * [repo] resolved from the URI's own embedded path.
+ * [changeKey] resolved from the URI's own embedded path - [repo] is just [ChangeKey.repo].
  */
-data class ChangeNavigationClick(val repo: JujutsuRepository, val changeKey: ChangeKey) : LogClickTarget
+data class ChangeNavigationClick(val changeKey: ChangeKey) : LogClickTarget {
+    val repo get() = changeKey.repo
+}
 
 /**
  * Whether [this] shows a hand cursor / underlines on hover (jj-idea-iesq). Bookmark/tag chips have

@@ -2,8 +2,8 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.diagnostic.Logger
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeIdentity
 import `in`.kkkev.jjidea.jj.ChangeKey
-import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
 import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
 import `in`.kkkev.jjidea.ui.log.graph.ParentState
@@ -48,13 +48,11 @@ data class GraphNode(
 /**
  * Interface for entries that can be laid out in a commit graph.
  * This allows testing without depending on full LogEntry with IntelliJ Platform classes.
- * Includes repo so that entries are unique, even across multiple repos.
+ * Extends [ChangeIdentity] so entries are unique even across multiple repos, adding only the
+ * parent-linkage a graph layout needs on top of plain repo-scoped identity.
  */
-interface GraphableEntry {
-    val repo: JujutsuRepository
-    val id: ChangeId
+interface GraphableEntry : ChangeIdentity {
     val parentIds: List<ChangeId>
-    val key: ChangeKey get() = ChangeKey(repo, id)
     val parentKeys: List<ChangeKey> get() = parentIds.map { ChangeKey(repo, it) }
 }
 

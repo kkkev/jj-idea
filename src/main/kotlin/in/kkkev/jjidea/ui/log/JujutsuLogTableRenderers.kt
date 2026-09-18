@@ -170,8 +170,8 @@ fun cappedDecorations(
 
     val hidden = hiddenUnits.map { unit ->
         when (val ref = unit.ref) {
-            is Bookmark -> BookmarkClick(entry.repo, entry, ref)
-            is Tag -> TagClick(entry.repo, entry, ref)
+            is Bookmark -> BookmarkClick(entry, ref)
+            is Tag -> TagClick(entry, ref)
             else -> error("Unexpected decoration ref type: $ref")
         }
     }
@@ -262,7 +262,7 @@ internal fun findPersonClickTarget(
     val rowFont = if (entry.isWorkingCopy) font.deriveFont(Font.BOLD) else font
     val nameWidth = rowFont.getStringBounds(user.name, frc).width
     if (localX < PERSON_CELL_LEFT_INSET || localX > PERSON_CELL_LEFT_INSET + nameWidth) return null
-    return PersonClick(entry.repo, entry, user, canFilter)
+    return PersonClick(entry, user, canFilter)
 }
 
 /**

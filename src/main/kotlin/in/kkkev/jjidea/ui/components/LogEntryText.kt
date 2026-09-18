@@ -196,7 +196,7 @@ fun TextCanvas.appendChangeTooltip(detail: ChangeDetail) {
 }
 
 fun TextCanvas.appendSummary(entry: LogEntry) {
-    append(ChangeKey(entry.repo, entry.id))
+    append(entry.key)
     append(" (")
     append(entry.commitId)
     append(")\n")
@@ -316,7 +316,7 @@ fun TextCanvas.appendTags(entry: LogEntry, suffix: String = "") {
 fun TextCanvas.appendParents(entry: LogEntry) = smaller {
     if (entry.parentIds.isNotEmpty()) {
         append(message("details.parents.label"))
-        append(entry.parentIds.map { ChangeKey(entry.repo, it) }, partBuilder = TextCanvas::append, prefix = " ")
+        append(entry.parentKeys, partBuilder = TextCanvas::append, prefix = " ")
     } else {
         append(message("details.parents.none"))
     }
