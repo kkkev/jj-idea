@@ -64,7 +64,7 @@ import javax.swing.tree.TreePath
  * same type-ahead search with far less machinery.
  */
 class JujutsuBookmarksPanel(
-    private val project: Project,
+    internal val project: Project,
     /**
      * Per-node expansion overrides, keyed by the `/`-joined path of [BookmarkNode.displayName]s
      * from the tree root (see [LogWindowConfig.bookmarkNodeExpanded]). Only entries that differ
@@ -82,6 +82,13 @@ class JujutsuBookmarksPanel(
      * not an error: see [uiDataSnapshot].
      */
     private val entryLookup: (ChangeKey) -> LogEntry? = { null },
+    /**
+     * Every currently-loaded entry across all repos, for [in.kkkev.jjidea.ui.dnd.DragContext]'s
+     * guard state when a [in.kkkev.jjidea.ui.dnd.DragPayload.Commit] is dragged from the log onto
+     * this panel (jj-idea-0rdm) - the same set the log table itself would build the guard from.
+     * Defaults to empty for callers with no log table to ask, matching [entryLookup]'s default.
+     */
+    internal val allEntries: () -> List<LogEntry> = { emptyList() },
     private val onExpansionChanged: () -> Unit = {}
 ) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val root = DefaultMutableTreeNode()
@@ -131,6 +138,10 @@ class JujutsuBookmarksPanel(
             workingCopies.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
             closestBookmarks.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
         }
+        // jj-idea-0rdm: bookmarks-panel drag source/target support (batch 4). This panel is its
+        // own disposable parent for the DnD registration, mirroring JujutsuLogTable's own
+        // installDragAndDrop(this) call.
+        installDragAndDrop(this)
         rebuild()
     }
 

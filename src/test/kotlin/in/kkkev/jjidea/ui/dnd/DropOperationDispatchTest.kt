@@ -89,7 +89,11 @@ class DropOperationDispatchTest {
     fun `a single Commit onto a RefChip moves that bookmark to the dragged commit`() {
         val bookmark = Bookmark("main")
 
-        val op = resolveDropOperation(DragPayload.Commit(listOf(a)), DropTarget.RefChip(b, bookmark), copy = false)
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a)),
+            DropTarget.RefChip(b.repo, b.id, bookmark),
+            copy = false
+        )
 
         op.shouldNotBeNull()
         op as DropOperation.MoveBookmark
@@ -101,7 +105,34 @@ class DropOperationDispatchTest {
     fun `a multi-commit selection onto a RefChip is undefined - null`() {
         val op = resolveDropOperation(
             DragPayload.Commit(listOf(a, b)),
-            DropTarget.RefChip(c, Bookmark("main")),
+            DropTarget.RefChip(c.repo, c.id, Bookmark("main")),
+            copy = false
+        )
+
+        op.shouldBeNull()
+    }
+
+    @Test
+    fun `a single Commit onto a TagChip moves that tag to the dragged commit (batch 4)`() {
+        val tag = Tag("v1")
+
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a)),
+            DropTarget.TagChip(b.repo, b.id, tag),
+            copy = false
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.MoveTag
+        op.tag shouldBe tag
+        op.destination shouldBe a
+    }
+
+    @Test
+    fun `a multi-commit selection onto a TagChip is undefined - null`() {
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a, b)),
+            DropTarget.TagChip(c.repo, c.id, Tag("v1")),
             copy = false
         )
 
@@ -116,7 +147,11 @@ class DropOperationDispatchTest {
     fun `a local BookmarkRef onto a CommitRow moves the bookmark there`() {
         val bookmark = Bookmark("main")
 
-        val op = resolveDropOperation(DragPayload.BookmarkRef(a, bookmark), DropTarget.CommitRow(b), copy = false)
+        val op = resolveDropOperation(
+            DragPayload.BookmarkRef(a.repo, a.id, bookmark),
+            DropTarget.CommitRow(b),
+            copy = false
+        )
 
         op.shouldNotBeNull()
         op as DropOperation.MoveBookmark
@@ -127,7 +162,7 @@ class DropOperationDispatchTest {
     @Test
     fun `a BookmarkRef onto its own row is a no-op - null`() {
         resolveDropOperation(
-            DragPayload.BookmarkRef(a, Bookmark("main")),
+            DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main")),
             DropTarget.CommitRow(a),
             copy = false
         )
@@ -139,13 +174,48 @@ class DropOperationDispatchTest {
         val local = Bookmark("main")
         val remote = Bookmark("main@origin")
 
-        val op = resolveDropOperation(DragPayload.BookmarkRef(a, local), DropTarget.RefChip(b, remote), copy = false)
+        val op = resolveDropOperation(
+            DragPayload.BookmarkRef(a.repo, a.id, local),
+            DropTarget.RefChip(b.repo, b.id, remote),
+            copy = false
+        )
 
         op.shouldNotBeNull()
         op as DropOperation.Push
         op.bookmark shouldBe local
         op.remote shouldBe "origin"
-        op.entry shouldBe b
+        op.repo shouldBe b.repo
+    }
+
+    @Test
+    fun `a Push resolves with no LogEntry for either side - the off-window bookmark case (jj-idea-3xab)`() {
+        // Neither id below belongs to any entry() built in this test class - a bookmarks-panel
+        // node's change can be outside the loaded log window, and Push must still resolve from
+        // repo+ChangeId identity alone, per DropTarget/DragPayload's whole point (batch 4).
+        val local = Bookmark("main")
+        val remote = Bookmark("main@origin")
+        val offWindowSource = ChangeId("dddddddd", "dddddddd", null)
+        val offWindowDest = ChangeId("eeeeeeee", "eeeeeeee", null)
+
+        val op = resolveDropOperation(
+            DragPayload.BookmarkRef(repo, offWindowSource, local),
+            DropTarget.RefChip(repo, offWindowDest, remote),
+            copy = false
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.Push
+        op.repo shouldBe repo
+    }
+
+    @Test
+    fun `a BookmarkRef onto a TagChip has no operation - null`() {
+        resolveDropOperation(
+            DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main")),
+            DropTarget.TagChip(b.repo, b.id, Tag("v1")),
+            copy = false
+        )
+            .shouldBeNull()
     }
 
     @Test
@@ -153,14 +223,18 @@ class DropOperationDispatchTest {
         val remote = Bookmark("main@origin")
         val local = Bookmark("main")
 
-        resolveDropOperation(DragPayload.BookmarkRef(a, remote), DropTarget.RefChip(b, local), copy = false)
+        resolveDropOperation(
+            DragPayload.BookmarkRef(a.repo, a.id, remote),
+            DropTarget.RefChip(b.repo, b.id, local),
+            copy = false
+        )
             .shouldBeNull()
     }
 
     @Test
     fun `a BookmarkRef onto a Gap has no operation - null`() {
         resolveDropOperation(
-            DragPayload.BookmarkRef(a, Bookmark("main")),
+            DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main")),
             DropTarget.Gap(b, DropZone.INSERT_BEFORE),
             copy = false
         )
@@ -175,7 +249,7 @@ class DropOperationDispatchTest {
     fun `a TagRef onto a CommitRow moves the tag there`() {
         val tag = Tag("v1")
 
-        val op = resolveDropOperation(DragPayload.TagRef(a, tag), DropTarget.CommitRow(b), copy = false)
+        val op = resolveDropOperation(DragPayload.TagRef(a.repo, a.id, tag), DropTarget.CommitRow(b), copy = false)
 
         op.shouldNotBeNull()
         op as DropOperation.MoveTag
@@ -185,12 +259,17 @@ class DropOperationDispatchTest {
 
     @Test
     fun `a TagRef onto its own row is a no-op - null`() {
-        resolveDropOperation(DragPayload.TagRef(a, Tag("v1")), DropTarget.CommitRow(a), copy = false).shouldBeNull()
+        resolveDropOperation(DragPayload.TagRef(a.repo, a.id, Tag("v1")), DropTarget.CommitRow(a), copy = false)
+            .shouldBeNull()
     }
 
     @Test
     fun `a TagRef onto a Gap has no operation - null`() {
-        resolveDropOperation(DragPayload.TagRef(a, Tag("v1")), DropTarget.Gap(b, DropZone.INSERT_AFTER), copy = false)
+        resolveDropOperation(
+            DragPayload.TagRef(a.repo, a.id, Tag("v1")),
+            DropTarget.Gap(b, DropZone.INSERT_AFTER),
+            copy = false
+        )
             .shouldBeNull()
     }
 
@@ -247,7 +326,14 @@ class DropOperationDispatchTest {
     fun `Files dropped on a RefChip has no operation - null`() {
         val files = DragPayload.Files(a, listOf(mockk<Change>()))
 
-        resolveDropOperation(files, DropTarget.RefChip(b, Bookmark("main")), copy = false).shouldBeNull()
+        resolveDropOperation(files, DropTarget.RefChip(b.repo, b.id, Bookmark("main")), copy = false).shouldBeNull()
+    }
+
+    @Test
+    fun `Files dropped on a TagChip has no operation - null`() {
+        val files = DragPayload.Files(a, listOf(mockk<Change>()))
+
+        resolveDropOperation(files, DropTarget.TagChip(b.repo, b.id, Tag("v1")), copy = false).shouldBeNull()
     }
 
     // endregion

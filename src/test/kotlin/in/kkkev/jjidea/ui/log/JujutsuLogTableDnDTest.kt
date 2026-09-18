@@ -266,7 +266,7 @@ class JujutsuLogTableDnDTest {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
 
-        val image = table.dragImage(DragPayload.BookmarkRef(a, Bookmark("main")))
+        val image = table.dragImage(DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main")))
 
         image.shouldNotBeNull()
     }
@@ -276,7 +276,7 @@ class JujutsuLogTableDnDTest {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
 
-        val image = table.dragImage(DragPayload.TagRef(a, Tag("v1")))
+        val image = table.dragImage(DragPayload.TagRef(a.repo, a.id, Tag("v1")))
 
         image.shouldNotBeNull()
     }

@@ -118,7 +118,8 @@ class JujutsuLogTableDnDChipTest {
 
         payload.shouldNotBeNull()
         payload as DragPayload.BookmarkRef
-        payload.entry shouldBe a
+        payload.repo shouldBe a.repo
+        payload.id shouldBe a.id
         payload.bookmark shouldBe bookmark
     }
 
@@ -132,7 +133,8 @@ class JujutsuLogTableDnDChipTest {
 
         payload.shouldNotBeNull()
         payload as DragPayload.TagRef
-        payload.entry shouldBe a
+        payload.repo shouldBe a.repo
+        payload.id shouldBe a.id
         payload.tag shouldBe tag
     }
 
@@ -178,8 +180,26 @@ class JujutsuLogTableDnDChipTest {
         row shouldBe 1
         target.shouldNotBeNull()
         target as DropTarget.RefChip
-        target.entry shouldBe b
+        target.repo shouldBe b.repo
+        target.id shouldBe b.id
         target.bookmark shouldBe bookmark
+    }
+
+    @Test
+    fun `dropping a Commit payload on a tag chip resolves to a TagChip target (batch 4)`() {
+        val tag = Tag("v1")
+        val a = entry("aaaaaaaa")
+        val b = entry("bbbbbbbb", tags = listOf(tag))
+        val table = tableWith(listOf(a, b))
+
+        val (row, target) = table.dropTargetAt(chipPoint(table, 1), ZoneHysteresis(), DragPayload.Commit(listOf(a)))!!
+
+        row shouldBe 1
+        target.shouldNotBeNull()
+        target as DropTarget.TagChip
+        target.repo shouldBe b.repo
+        target.id shouldBe b.id
+        target.tag shouldBe tag
     }
 
     @Test
@@ -188,13 +208,14 @@ class JujutsuLogTableDnDChipTest {
         val a = entry("aaaaaaaa", bookmarks = listOf(Bookmark("main")))
         val b = entry("bbbbbbbb", bookmarks = listOf(remote))
         val table = tableWith(listOf(a, b))
-        val payload = DragPayload.BookmarkRef(a, Bookmark("main"))
+        val payload = DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main"))
 
         val (_, target) = table.dropTargetAt(chipPoint(table, 1), ZoneHysteresis(), payload)!!
 
         target.shouldNotBeNull()
         target as DropTarget.RefChip
-        target.entry shouldBe b
+        target.repo shouldBe b.repo
+        target.id shouldBe b.id
         target.bookmark shouldBe remote
     }
 
@@ -206,7 +227,7 @@ class JujutsuLogTableDnDChipTest {
         val a = entry("aaaaaaaa")
         val b = entry("bbbbbbbb", bookmarks = listOf(Bookmark("main")))
         val table = tableWith(listOf(a, b))
-        val payload = DragPayload.TagRef(a, Tag("v1"))
+        val payload = DragPayload.TagRef(a.repo, a.id, Tag("v1"))
 
         val (_, target) = table.dropTargetAt(chipPoint(table, 1), ZoneHysteresis(), payload)!!
 
@@ -223,7 +244,7 @@ class JujutsuLogTableDnDChipTest {
     fun `a BookmarkRef payload over an edge band still resolves to CommitRow, never a Gap`() {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
-        val payload = DragPayload.BookmarkRef(a, Bookmark("main"))
+        val payload = DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main"))
         val topEdge = Point(table.getCellRect(0, 0, true).x + 10, table.getCellRect(0, 0, true).y)
 
         val (_, target) = table.dropTargetAt(topEdge, ZoneHysteresis(), payload)!!
@@ -237,7 +258,7 @@ class JujutsuLogTableDnDChipTest {
     fun `a TagRef payload over an edge band still resolves to CommitRow, never a Gap`() {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
-        val payload = DragPayload.TagRef(a, Tag("v1"))
+        val payload = DragPayload.TagRef(a.repo, a.id, Tag("v1"))
         val bottomEdge = Point(
             table.getCellRect(0, 0, true).x + 10,
             table.getCellRect(0, 0, true).y + table.rowHeight - 1

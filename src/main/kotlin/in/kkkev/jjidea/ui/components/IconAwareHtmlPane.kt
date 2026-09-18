@@ -59,6 +59,46 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     internal var hoveredIssueLinkUri: URI? = null
         private set
 
+    /**
+     * Whether the drag currently in progress (if any) started on a bookmark/tag chip - set on
+     * `MOUSE_PRESSED` in [processMouseEvent], read on `MOUSE_DRAGGED` in [processMouseMotionEvent]
+     * to suppress this pane's own text-selection drag for that gesture (jj-idea-4ji7, batch 4), so
+     * a chip can be dragged as a [in.kkkev.jjidea.ui.dnd.DragPayload.BookmarkRef]/
+     * [in.kkkev.jjidea.ui.dnd.DragPayload.TagRef] instead of extending the caret's selection.
+     */
+    private var dragStartedOnChip = false
+
+    /**
+     * Records whether a press lands on a chip ([refUriAt]), so [processMouseMotionEvent] knows
+     * whether to suppress this gesture's drag-select.
+     */
+    override fun processMouseEvent(e: MouseEvent) {
+        when (e.id) {
+            MouseEvent.MOUSE_PRESSED -> dragStartedOnChip = refUriAt(e.point) != null
+            MouseEvent.MOUSE_RELEASED -> dragStartedOnChip = false
+        }
+        super.processMouseEvent(e)
+    }
+
+    /**
+     * Consumes a `MOUSE_DRAGGED` event that started on a chip *before* delegating to
+     * [javax.swing.text.JTextComponent]'s own dispatch - `DefaultCaret.mouseDragged` (installed as
+     * a regular [java.awt.event.MouseMotionListener] well before this class's own `init` block
+     * runs any [addMouseMotionListener]) explicitly checks `!e.isConsumed()` before extending the
+     * selection, so consuming here - ahead of `super.processMouseMotionEvent` firing every
+     * registered listener including the caret's - is what actually suppresses it. This has no
+     * effect on the platform's own drag-gesture recognition for [in.kkkev.jjidea.ui.dnd]'s
+     * `DnDSupport`, which watches drags via the IDE glass pane rather than this component's local
+     * listener list. Normal text selection elsewhere in the pane (a press that didn't land on a
+     * chip) is untouched.
+     */
+    override fun processMouseMotionEvent(e: MouseEvent) {
+        if (dragStartedOnChip && e.id == MouseEvent.MOUSE_DRAGGED) {
+            e.consume()
+        }
+        super.processMouseMotionEvent(e)
+    }
+
     init {
         isOpaque = false
         addMouseMotionListener(

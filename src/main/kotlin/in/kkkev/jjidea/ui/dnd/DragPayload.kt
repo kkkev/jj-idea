@@ -2,6 +2,8 @@ package `in`.kkkev.jjidea.ui.dnd
 
 import com.intellij.openapi.vcs.changes.Change
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeIdentity
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
@@ -31,13 +33,17 @@ sealed interface DragPayload {
         override val repo get() = entries.first().repo
     }
 
-    data class BookmarkRef(val entry: LogEntry, val bookmark: Bookmark) : DragPayload {
-        override val repo get() = entry.repo
-    }
+    /**
+     * A bookmark being dragged, whether picked up from a log-table chip or a bookmarks-panel node
+     * (jj-idea-0rdm) - identity only, not a hydrated [LogEntry], since a panel node's change may
+     * fall outside the currently-loaded log window (the case jj-idea-3xab exists for).
+     */
+    data class BookmarkRef(override val repo: JujutsuRepository, override val id: ChangeId, val bookmark: Bookmark) :
+        DragPayload, ChangeIdentity
 
-    data class TagRef(val entry: LogEntry, val tag: Tag) : DragPayload {
-        override val repo get() = entry.repo
-    }
+    /** As [BookmarkRef], but for a tag. */
+    data class TagRef(override val repo: JujutsuRepository, override val id: ChangeId, val tag: Tag) :
+        DragPayload, ChangeIdentity
 
     data class WorkingCopyRef(val entry: LogEntry) : DragPayload {
         override val repo get() = entry.repo

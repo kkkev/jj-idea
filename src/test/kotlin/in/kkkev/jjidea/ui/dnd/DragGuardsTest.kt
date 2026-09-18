@@ -139,14 +139,14 @@ class DragGuardsTest {
             DragPayload.Commit(listOf(immutableSource))
         )
 
-        context.rejectionReason(DropTarget.RefChip(dest, Bookmark("main")), copy = false).shouldBeNull()
+        context.rejectionReason(DropTarget.RefChip(dest.repo, dest.id, Bookmark("main")), copy = false).shouldBeNull()
     }
 
     @Test
     fun `a non-Commit payload (bookmark ref) is never subject to the cycle or source-immutability checks`() {
         val a = entry("aaaaaaaa", immutable = true)
         val b = entry("bbbbbbbb")
-        val context = DragContext.forDrag(listOf(a, b), DragPayload.BookmarkRef(a, Bookmark("main")))
+        val context = DragContext.forDrag(listOf(a, b), DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main")))
 
         context.rejectionReason(DropTarget.CommitRow(b), copy = false).shouldBeNull()
     }
@@ -238,7 +238,7 @@ class DragGuardsTest {
         val files = DragPayload.Files(owner, listOf(change))
         val context = DragContext.forDrag(listOf(owner, dest), files)
 
-        context.rejectionReason(DropTarget.RefChip(dest, Bookmark("main")), copy = false).shouldBeNull()
+        context.rejectionReason(DropTarget.RefChip(dest.repo, dest.id, Bookmark("main")), copy = false).shouldBeNull()
     }
 
     // endregion

@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.dnd
 
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RebaseDestinationMode
 import `in`.kkkev.jjidea.jj.Tag
@@ -49,11 +50,11 @@ sealed interface DropOperation {
 
     /**
      * A local bookmark chip dragged onto its own `name@remote` chip - always dialog-gated, see
-     * design section 7. [entry] is the row the `name@remote` chip lives on - carried only to name
-     * which repository the push runs in, the way [MoveBookmark.destination]/[MoveTag.destination]
-     * already do for their operations.
+     * design section 7. [repo] is carried only to name which repository the push runs in, the way
+     * [MoveBookmark.destination]/[MoveTag.destination] already do for their operations - it no
+     * longer needs a [LogEntry], since the `name@remote` chip's row may not be loaded (jj-idea-3xab).
      */
-    data class Push(val bookmark: Bookmark, val remote: String, val entry: LogEntry) : DropOperation {
+    data class Push(val bookmark: Bookmark, val remote: String, val repo: JujutsuRepository) : DropOperation {
         override val label get() = "Push ${bookmark.name} to $remote"
     }
 
@@ -98,28 +99,29 @@ fun resolveDropOperation(payload: DragPayload, target: DropTarget, copy: Boolean
         is DropTarget.CommitRow -> rebaseOrDuplicate(payload.entries, target.entry, RebaseDestinationMode.ONTO, copy)
         is DropTarget.Gap -> rebaseOrDuplicate(payload.entries, target.entry, target.edge.toDestinationMode(), copy)
         is DropTarget.RefChip -> payload.entries.singleOrNull()?.let { DropOperation.MoveBookmark(target.bookmark, it) }
+        is DropTarget.TagChip -> payload.entries.singleOrNull()?.let { DropOperation.MoveTag(target.tag, it) }
     }
 
     is DragPayload.BookmarkRef -> when (target) {
         // Dropped back on the row it already sits on - a no-op, not an operation (mirrors the
         // deliberately-silent self-drop case DragContext.rejectionReason handles for a dragged
         // commit).
-        is DropTarget.CommitRow -> if (target.entry.id == payload.entry.id) {
+        is DropTarget.CommitRow -> if (target.id == payload.id) {
             null
         } else {
             DropOperation.MoveBookmark(payload.bookmark, target.entry)
         }
         is DropTarget.RefChip ->
             if (!payload.bookmark.name.isRemote && target.bookmark.name.isRemote) {
-                DropOperation.Push(payload.bookmark, target.bookmark.name.remote, target.entry)
+                DropOperation.Push(payload.bookmark, target.bookmark.name.remote, target.repo)
             } else {
                 null
             }
-        is DropTarget.Gap -> null
+        is DropTarget.Gap, is DropTarget.TagChip -> null
     }
 
     is DragPayload.TagRef -> (target as? DropTarget.CommitRow)?.let {
-        if (it.entry.id == payload.entry.id) null else DropOperation.MoveTag(payload.tag, it.entry)
+        if (it.id == payload.id) null else DropOperation.MoveTag(payload.tag, it.entry)
     }
 
     is DragPayload.WorkingCopyRef ->
@@ -134,7 +136,7 @@ fun resolveDropOperation(payload: DragPayload, target: DropTarget, copy: Boolean
         } else {
             null
         }
-        is DropTarget.RefChip -> null
+        is DropTarget.RefChip, is DropTarget.TagChip -> null
     }
 }
 

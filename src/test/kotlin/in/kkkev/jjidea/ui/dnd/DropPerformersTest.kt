@@ -47,7 +47,7 @@ class DropPerformersTest {
         DropOperation.Duplicate(listOf(a), b, RebaseDestinationMode.ONTO),
         DropOperation.MoveBookmark(Bookmark("main"), b),
         DropOperation.MoveTag(Tag("v1"), b),
-        DropOperation.Push(Bookmark("main"), "origin", b),
+        DropOperation.Push(Bookmark("main"), "origin", b.repo),
         DropOperation.SquashFiles(DragPayload.Files(a, listOf(mockk())), b),
         DropOperation.SplitFiles(DragPayload.Files(a, listOf(mockk())), DropTarget.Gap(a, DropZone.INSERT_AFTER))
     )
@@ -158,6 +158,17 @@ class DropPerformersTest {
         )
 
         op.toNewParent() shouldBe false
+    }
+
+    // endregion
+
+    // region Push (jj-idea-vdwh, -3xab)
+
+    @Test
+    fun `Push carries repo directly - no LogEntry needed, the off-window bookmark case (jj-idea-3xab)`() {
+        val op = DropOperation.Push(Bookmark("main"), "origin", repo)
+
+        op.repo shouldBe repo
     }
 
     // endregion

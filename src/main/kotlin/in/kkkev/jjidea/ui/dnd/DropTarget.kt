@@ -1,9 +1,12 @@
 package `in`.kkkev.jjidea.ui.dnd
 
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeIdentity
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RebaseDestinationMode
+import `in`.kkkev.jjidea.jj.Tag
 
 /**
  * Which of a row's three vertical zones a drop landed in
@@ -42,14 +45,19 @@ fun DropZone.toDestinationMode(): RebaseDestinationMode = when (this) {
 /**
  * Where a drag gesture is being dropped, independent of which payload is being dragged - the other
  * half of the payload/target model, see [DragPayload]'s doc.
+ *
+ * Only ever needs plain repo-scoped identity ([ChangeIdentity]) - [resolveDropOperation] and
+ * [DragContext.rejectionReason] read a target's [repo]/[id], never a hydrated commit, except
+ * [CommitRow]/[Gap]'s own rebase-destination and immutability needs, which keep their [LogEntry]
+ * directly. [RefChip]/[TagChip] carry identity without one, so a bookmarks-panel node whose change
+ * falls outside the currently-loaded log window is still a valid target (jj-idea-0rdm).
  */
-sealed interface DropTarget {
-    /** The row this target is anchored to - every variant is scoped to exactly one row's commit. */
-    val entry: LogEntry
-    val repo: JujutsuRepository get() = entry.repo
-
+sealed interface DropTarget : ChangeIdentity {
     /** The drop landed in [entry]'s centre band - "onto" this commit. */
-    data class CommitRow(override val entry: LogEntry) : DropTarget
+    data class CommitRow(val entry: LogEntry) : DropTarget {
+        override val repo get() = entry.repo
+        override val id get() = entry.id
+    }
 
     /**
      * The drop landed in [entry]'s top or bottom band, per [edge]. Bound **per row, not per visual
@@ -59,12 +67,19 @@ sealed interface DropTarget {
      * The top band of row N therefore always means [DropZone.INSERT_BEFORE] on [entry], regardless
      * of what happens to be drawn immediately above it.
      */
-    data class Gap(override val entry: LogEntry, val edge: DropZone) : DropTarget {
+    data class Gap(val entry: LogEntry, val edge: DropZone) : DropTarget {
+        override val repo get() = entry.repo
+        override val id get() = entry.id
+
         init {
             require(edge != DropZone.ONTO) { "Gap edge must be INSERT_BEFORE or INSERT_AFTER, not ONTO" }
         }
     }
 
-    /** A bookmark/tag chip, whether rendered as a log-table chip or a bookmarks-panel node. */
-    data class RefChip(override val entry: LogEntry, val bookmark: Bookmark) : DropTarget
+    /** A bookmark chip, whether rendered as a log-table chip or a bookmarks-panel node. */
+    data class RefChip(override val repo: JujutsuRepository, override val id: ChangeId, val bookmark: Bookmark) :
+        DropTarget
+
+    /** A tag chip, whether rendered as a log-table chip or a bookmarks-panel node. */
+    data class TagChip(override val repo: JujutsuRepository, override val id: ChangeId, val tag: Tag) : DropTarget
 }

@@ -149,6 +149,11 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         // drag starts (installFilesDragSource returns null from ownerFor).
         changesTree.installFilesDragSource(this) { currentEntries.singleOrNull() }
 
+        // Bookmark/tag chip drag source (jj-idea-4ji7, batch 4) - a chip anywhere in the metadata
+        // pane's (possibly multi-commit) HTML can be dragged, same as one in the log table or
+        // bookmarks panel.
+        metadataPane.installRefDragSource(this, project) { currentEntries }
+
         // Create splitter: changes on top, metadata on bottom
         splitter = OnePixelSplitter(true, 0.5f).apply {
             firstComponent = changesPanel

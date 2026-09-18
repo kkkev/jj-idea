@@ -44,3 +44,13 @@ verbatim at GA, condensed into a handful of user-facing bullets.
 - Drag and Drop: dragging a file selection just above or below its own change now opens the Split
   dialog, pre-filled with those files moving into a new child or parent change; dropping on any
   other change's gap shows a "can't drop here" indicator instead.
+- Drag and Drop: the bookmarks panel is now a drag source and drop target, matching the log — drag
+  a bookmark or tag from the panel onto a commit in the log to move it there, or drag a commit onto
+  a bookmark/tag in the panel to do the reverse. This also works for a bookmark whose change isn't
+  currently visible in the log.
+- Drag and Drop: dragging a local bookmark onto its own remote-tracking bookmark in the bookmarks
+  panel now opens the Git Push dialog pre-filled, the same as doing it from the log.
+- Drag and Drop: dragging a bookmark or tag chip out of the commit details panel now works the same
+  as dragging one from the log or the bookmarks panel.
+- Drag and Drop: dragging a commit onto a tag chip in the log now moves the tag there, matching
+  what already happened when dragging onto a bookmark chip.

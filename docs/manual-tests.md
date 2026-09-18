@@ -3014,6 +3014,9 @@ where they were.
       the edge
 - [ ] Drag a bookmark/tag chip across repositories in a multi-root project — filled reject
       indicator, same as a commit drag
+- [ ] Drag a **commit row** onto a **tag chip** (batch 4) → tooltip "Move tag &lt;name&gt; to
+      &lt;id&gt;", same immediate apply + undo balloon as dragging the tag chip itself - previously
+      this fell through to a plain rebase onto that row
 
 #### Drag a local bookmark chip onto its remote chip to push (jj-idea-vdwh)
 
@@ -3076,6 +3079,66 @@ source's content).
       drag initiates for the other repo's files (no single owning repo)
 - [ ] Confirm neither drag source disturbs the changes tree's existing behaviour: double-click to
       diff, right-click context menu, and the diff preview still work normally on the same tree
+
+#### Bookmarks panel as drag source and drop target (jj-idea-0rdm)
+
+The bookmarks panel becomes a second surface a bookmark/tag can be dragged from and to, in either
+direction with the log table. Identity is carried directly as repo + change id, not a hydrated log
+entry, so a bookmark whose change fell outside the loaded log window is still draggable/droppable -
+the case this bead exists for.
+
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`, `ui/dnd/DropTarget.kt`,
+`ui/dnd/DragPayload.kt`
+
+- [ ] Drag a local bookmark node from the panel onto a log commit row's centre band → tooltip names
+      the move, release applies with an undo balloon, same as dragging the log's own chip
+- [ ] Scroll or filter the log so a bookmark's change is **not currently loaded**, then drag that
+      bookmark from the panel onto a commit that *is* visible → the move still works
+- [ ] Drag a log commit row onto a bookmark node in the panel → same operation, reversed
+- [ ] Drag a log commit row onto a **tag** node in the panel → moves the tag there
+- [ ] Drag a tag node from the panel onto a log commit row → moves the tag there
+- [ ] A bookmark node with no target commit (deleted, or a pending-delete row) neither drags nor
+      accepts a drop - confirm with a bookmark you've just deleted but not yet refreshed away
+- [ ] In a multi-root project, drag a commit from one repo's log row onto another repo's bookmark
+      node in the panel (or vice versa) → filled reject indicator on the panel node, same
+      reliability check as the log table's own cross-repo case (hover slowly, confirm it doesn't
+      flicker away)
+- [ ] Drag a bookmark/tag node onto itself, or drop it back on the row it already sits on → no
+      indicator, silent no-op
+- [ ] Dragging a bookmark/tag node shows the same small cursor-following chip label the log table's
+      own chip drag shows
+- [ ] With the preview feature off, try dragging a node in the panel → nothing initiates
+
+#### Push by dragging local onto remote, within the panel (jj-idea-3xab)
+
+Complements jj-idea-vdwh for when the remote bookmark isn't visible as a log chip.
+
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`, `ui/dnd/DropOperation.kt`,
+`actions/bookmark/pushBookmarkAction.kt`
+
+- [ ] With a local bookmark ahead of a tracked remote, drag the local node in the panel onto its
+      `name@remote` node → tooltip names the push, release opens **Git Push** pre-filled to that
+      bookmark/remote — it never pushes without going through the dialog
+- [ ] This works even when the remote bookmark's commit isn't loaded in the log at all
+
+#### Bookmark/tag chip drag source in the commit details panel (jj-idea-4ji7)
+
+A bookmark or tag chip rendered in the metadata pane (bottom of the commit details panel) becomes
+draggable the same way a log or panel chip is - dragging from plain description/metadata text is
+unaffected.
+
+**Code:** `ui/components/IconAwareHtmlPaneDnD.kt`, `ui/components/IconAwareHtmlPane.kt`
+
+- [ ] Select a commit with a bookmark, drag its chip out of the details pane's metadata section
+      onto another commit in the log → moves the bookmark, same as any other chip drag
+- [ ] Same for a tag chip
+- [ ] Click-and-drag across plain description/metadata text in the same pane (not starting on a
+      chip) → normal text selection still works, unaffected
+- [ ] Start a drag on a chip, release, then drag across plain text elsewhere in the pane → normal
+      text selection works for that second gesture (confirms the suppression doesn't stick)
+- [ ] Right-click on a chip in this pane still shows its usual ref context menu (Move/Push/Delete/
+      etc.) - unaffected by the new drag source
+- [ ] With the preview feature off, try dragging a chip out of the details pane → nothing initiates
 
 ### MT-CROSS
 

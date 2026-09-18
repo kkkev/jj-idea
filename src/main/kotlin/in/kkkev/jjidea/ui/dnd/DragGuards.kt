@@ -37,9 +37,9 @@ class DragContext private constructor(
      */
     fun rejectionReason(target: DropTarget, copy: Boolean): String? {
         if (target.repo != payload.repo) return "Cannot drop across repositories"
-        if (target.entry.id in sourceIds) return ""
-        if (target.entry.id in cycleExcludedIds) return "That would create a cycle"
-        if (!copy && sourceHasImmutable && target !is DropTarget.RefChip) {
+        if (target.id in sourceIds) return ""
+        if (target.id in cycleExcludedIds) return "That would create a cycle"
+        if (!copy && sourceHasImmutable && target !is DropTarget.RefChip && target !is DropTarget.TagChip) {
             return "Cannot rewrite an immutable commit"
         }
         (payload as? DragPayload.Files)?.let { return filesRejectionReason(it, target) }
@@ -52,7 +52,7 @@ class DragContext private constructor(
                 RebaseDestinationMode.INSERT_AFTER -> immutabilityReason(target.entry, invalidInsertAfterIds)
                 RebaseDestinationMode.ONTO -> null
             }
-            is DropTarget.CommitRow, is DropTarget.RefChip -> null
+            is DropTarget.CommitRow, is DropTarget.RefChip, is DropTarget.TagChip -> null
         }
     }
 
@@ -77,7 +77,7 @@ class DragContext private constructor(
             files.owner.immutable -> "Cannot rewrite an immutable commit"
             else -> null
         }
-        is DropTarget.RefChip -> null
+        is DropTarget.RefChip, is DropTarget.TagChip -> null
     }
 
     private fun immutabilityReason(entry: LogEntry, invalidIds: Set<ChangeId>): String? =

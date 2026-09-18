@@ -1,9 +1,11 @@
 package `in`.kkkev.jjidea.ui.dnd
 
+import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Tag
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -55,6 +57,23 @@ class DragContextScaleTest {
         // proportional to n. 20 is a generous ceiling that still catches an accidental
         // per-destination or per-mouse-move rescan.
         counting.passCount shouldBeLessThan 20
+    }
+
+    @Test
+    fun `forDrag makes zero passes over the entry list for a BookmarkRef or TagRef payload (batch 4)`() {
+        // A bookmarks-panel drag (jj-idea-0rdm) carries a BookmarkRef/TagRef, never a Commit - only
+        // a Commit payload can create a DAG cycle or needs a source-immutability check
+        // (DragGuards.forDrag), so this must skip every pass the Commit case above pays for, not
+        // just bound it - the panel's own guard-state build must stay O(1) in commits regardless
+        // of how many entries the log has loaded (contributing.md § Performance & Scale).
+        val n = 100_000
+        val entries = (0 until n).map { entry("e$it") }
+        val counting = CountingEntryList(entries)
+
+        DragContext.forDrag(counting, DragPayload.BookmarkRef(repo, ChangeId("aaaaaaaa", "a"), Bookmark("main")))
+        DragContext.forDrag(counting, DragPayload.TagRef(repo, ChangeId("bbbbbbbb", "b"), Tag("v1")))
+
+        counting.passCount shouldBe 0
     }
 
     @Test

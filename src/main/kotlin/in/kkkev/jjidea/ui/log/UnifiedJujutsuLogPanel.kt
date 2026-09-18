@@ -66,6 +66,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         project,
         config.bookmarkNodeExpanded,
         entryLookup = { key -> logTable.logModel.entryFor(key) },
+        allEntries = { logTable.logModel.getFilteredEntries() },
         onExpansionChanged = { persistConfig() }
     )
     private val bookmarksStripe = BookmarksStripeButton { setBookmarksPanelVisible(!config.bookmarksPanelVisible) }

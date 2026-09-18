@@ -8,20 +8,16 @@ import com.intellij.ide.dnd.DnDSupport
 import com.intellij.ide.dnd.SmoothAutoScroller
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
-import com.intellij.ui.ColorUtil
 import com.intellij.ui.awt.RelativeRectangle
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
-import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.ui.components.appendSummary
-import `in`.kkkev.jjidea.ui.components.bookmarkIcon
-import `in`.kkkev.jjidea.ui.components.icon
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragContextHolder
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
@@ -31,17 +27,15 @@ import `in`.kkkev.jjidea.ui.dnd.DropPerformers
 import `in`.kkkev.jjidea.ui.dnd.DropTarget
 import `in`.kkkev.jjidea.ui.dnd.DropZone
 import `in`.kkkev.jjidea.ui.dnd.DropZones
+import `in`.kkkev.jjidea.ui.dnd.RejectOverlay
 import `in`.kkkev.jjidea.ui.dnd.ZoneHysteresis
+import `in`.kkkev.jjidea.ui.dnd.chipDragImage
 import `in`.kkkev.jjidea.ui.dnd.resolveDropOperation
 import java.awt.AlphaComposite
-import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Point
 import java.awt.Rectangle
 import java.awt.image.BufferedImage
-import javax.swing.JComponent
-import javax.swing.JLayeredPane
-import javax.swing.SwingUtilities
 
 /**
  * Installs drag-and-drop on the log table (jj-idea-6jvh): a commit row (or the current selection,
@@ -220,8 +214,8 @@ internal fun resolveDrop(
  */
 internal fun JujutsuLogTable.dragPayloadAt(point: Point): DragPayload? {
     when (val click = clickTargetAt(point)) {
-        is BookmarkClick -> return DragPayload.BookmarkRef(click.entry, click.bookmark)
-        is TagClick -> return DragPayload.TagRef(click.entry, click.tag)
+        is BookmarkClick -> return DragPayload.BookmarkRef(click.repo, click.entry.id, click.bookmark)
+        is TagClick -> return DragPayload.TagRef(click.repo, click.entry.id, click.tag)
         else -> Unit
     }
     val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null
@@ -235,9 +229,11 @@ internal fun JujutsuLogTable.dragPayloadAt(point: Point): DragPayload? {
  * Hit-test [point] (table-relative) to a `(row, DropTarget)` pair for a drag carrying [payload],
  * applying [hysteresis] against the row's zone geometry.
  *
- * A [DragPayload.Commit] or [DragPayload.BookmarkRef] drag checks for a bookmark chip under
- * [point] first (via [JujutsuLogTable.clickTargetAt]) - the commit->chip cell moves that bookmark
- * (jj-idea-ibth) and the chip->chip cell is the push gesture (jj-idea-vdwh). This costs one
+ * A [DragPayload.Commit] drag checks for a bookmark **or tag** chip under [point] first (via
+ * [JujutsuLogTable.clickTargetAt]) - the commit->chip cell moves that bookmark/tag (jj-idea-ibth,
+ * batch 4). A [DragPayload.BookmarkRef] drag checks only for a bookmark chip - the chip->chip cell
+ * is the push gesture (jj-idea-vdwh); a bookmark has no defined operation onto a tag chip
+ * (`resolveDropOperation`'s `RefChip` payload / `TagChip` target cell is empty). This costs one
  * [LaidOutCell] rebuild per mouse-move, the same the row's own hover-cue lookup already pays
  * (`JujutsuLogTable.kt`'s `mouseMoved`), so it doesn't add a new order of work - see this
  * function's scale note in the batch-2 design plan. A [DragPayload.TagRef] never resolves to a
@@ -260,9 +256,16 @@ internal fun JujutsuLogTable.dropTargetAt(
     val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null
     val entry = logModel.getEntry(convertRowIndexToModel(row)) ?: return null
 
-    if (payload is DragPayload.Commit || payload is DragPayload.BookmarkRef) {
+    if (payload is DragPayload.Commit) {
+        when (val click = clickTargetAt(point)) {
+            is BookmarkClick -> return row to DropTarget.RefChip(click.repo, click.entry.id, click.bookmark)
+            is TagClick -> return row to DropTarget.TagChip(click.repo, click.entry.id, click.tag)
+            else -> Unit
+        }
+    }
+    if (payload is DragPayload.BookmarkRef) {
         (clickTargetAt(point) as? BookmarkClick)?.let { chip ->
-            return row to DropTarget.RefChip(chip.entry, chip.bookmark)
+            return row to DropTarget.RefChip(chip.repo, chip.entry.id, chip.bookmark)
         }
     }
     if (payload is DragPayload.BookmarkRef || payload is DragPayload.TagRef) {
@@ -287,6 +290,9 @@ internal fun JujutsuLogTable.dropTargetAt(
  * [JujutsuLogTable]). Without this, only the OS cursor itself indicates a drag is happening -
  * reported as missing feedback compared to the Project view's file drag.
  *
+ * The [DragPayload.BookmarkRef]/[DragPayload.TagRef] cases delegate to [chipDragImage], shared
+ * with every other surface a bookmark/tag chip can be dragged from (batch 4); only the
+ * [DragPayload.Commit] case is log-table-specific, since a commit only ever drags from a row here.
  * Built from a [FragmentRecordingCanvas] rendered through [TextCanvasPanel], the same
  * icon+styled-text vocabulary the log table's own rows and [MoveBookmarkDialog]'s list use - a
  * single commit's id gets the usual bold-unique-prefix/grey-remainder treatment
@@ -299,33 +305,21 @@ internal fun JujutsuLogTable.dropTargetAt(
  * `internal` (not `private`) so [JujutsuLogTableDnDTest] can exercise it directly.
  */
 internal fun JujutsuLogTable.dragImage(payload: DragPayload): DnDImage? {
+    if (payload is DragPayload.BookmarkRef || payload is DragPayload.TagRef) {
+        return chipDragImage(RenderingUtil.getForeground(this), RenderingUtil.getBackground(this), font, payload)
+    }
     if (payload is DragPayload.WorkingCopyRef || payload is DragPayload.Files) return null
 
     val canvas = FragmentRecordingCanvas()
     canvas.foreground(RenderingUtil.getForeground(this)) {
-        when (payload) {
-            is DragPayload.Commit -> {
-                val entries = payload.entries
-                if (entries.size == 1) {
-                    val entry = entries.single()
-                    append(entry.id)
-                    append(" ")
-                    appendSummary(entry.description)
-                } else {
-                    append("${entries.size} commits")
-                }
-            }
-            is DragPayload.BookmarkRef -> {
-                append(icon(bookmarkIcon(payload.bookmark)))
-                append(" ")
-                append(payload.bookmark.name.name)
-            }
-            is DragPayload.TagRef -> {
-                append(icon(JujutsuIcons::Tag))
-                append(" ")
-                append(payload.tag.name)
-            }
-            is DragPayload.WorkingCopyRef, is DragPayload.Files -> Unit // guarded above
+        val entries = (payload as DragPayload.Commit).entries
+        if (entries.size == 1) {
+            val entry = entries.single()
+            append(entry.id)
+            append(" ")
+            appendSummary(entry.description)
+        } else {
+            append("${entries.size} commits")
         }
     }
 
@@ -371,74 +365,6 @@ private fun JujutsuLogTable.rowRect(row: Int): Rectangle {
     val rowRect = getCellRect(row, 0, true)
     rowRect.width = width
     return rowRect
-}
-
-/**
- * A "blocked" indicator painted entirely outside `DnDEvent`'s own highlighter mechanism - see
- * [show]'s doc for why. Lives for the duration of one `installDragAndDrop` call; [hide] is
- * idempotent and cheap to call on every mouse-move tick where nothing should be shown.
- */
-private class RejectOverlay {
-    private var panel: JComponent? = null
-
-    /**
-     * Paint a filled, error-colored rectangle at [rect] (table-relative) on top of [table] - a
-     * real guard rejection (cross-repo, cycle, immutable) needs its own reliable indicator,
-     * because the platform's native reject cursor turned out not to be one on its own
-     * (jj-idea-ymuu): in-app drag-over ticks are OS-coalesced, so a fast or even a deliberately
-     * slow drag across a rejected row could show nothing at all.
-     *
-     * This can't reuse [DnDEvent.setHighlighting] (as [highlight] does for allowed drops) the way
-     * a first attempt at this fix did: `DnDManagerImpl.updateCurrentEvent` unconditionally calls
-     * `hideCurrentHighlighter()` on every tick where the point differs and `isDropPossible()` is
-     * false (no `Highlighters.isVisibleExcept` guard, unlike the `isDropPossible() == true`
-     * branch) - the only thing re-queued afterward is a delayed, registry-gated
-     * (`ide.dnd.textHints`) `ERROR_TEXT` balloon, never the `RECTANGLE`/`FILLED_RECTANGLE` we just
-     * painted. So any highlighter set while `dropPossible` is false gets wiped by the platform
-     * itself on the very next tick, which is exactly the "flashes once, then never again" seen in
-     * manual testing. Painting our own component directly into the same layered pane
-     * (`Highlighters`' own components use) sidesteps that bookkeeping entirely.
-     */
-    fun show(table: JujutsuLogTable, rect: Rectangle) {
-        val layeredPane = SwingUtilities.getRootPane(table)?.layeredPane ?: return
-        val current = panel ?: RejectPanel().also {
-            panel = it
-            layeredPane.add(it, JLayeredPane.DRAG_LAYER)
-        }
-        if (current.parent !== layeredPane) {
-            current.parent?.remove(current)
-            layeredPane.add(current, JLayeredPane.DRAG_LAYER)
-        }
-        val topLeft = SwingUtilities.convertPoint(table, rect.location, layeredPane)
-        current.setBounds(topLeft.x, topLeft.y, rect.width, rect.height)
-        current.isVisible = true
-    }
-
-    fun hide() {
-        panel?.isVisible = false
-    }
-
-    /** Remove the overlay component from its layered pane for good - called when the table is disposed. */
-    fun dispose() {
-        panel?.let { it.parent?.remove(it) }
-        panel = null
-    }
-
-    private class RejectPanel : JComponent() {
-        init {
-            isOpaque = false
-        }
-
-        // Translucent fill (not the opaque errorBackgroundColor() itself) - a full-strength fill
-        // completely hid the row's own text underneath it, which defeats the point of an
-        // indicator that's supposed to name what's being rejected (jj-idea-ymuu follow-up).
-        override fun paintComponent(g: Graphics) {
-            g.color = ColorUtil.withAlpha(JBUI.CurrentTheme.Validator.errorBackgroundColor(), 0.55)
-            g.fillRect(0, 0, width, height)
-            g.color = JBUI.CurrentTheme.Validator.errorBorderColor()
-            g.drawRect(0, 0, width - 1, height - 1)
-        }
-    }
 }
 
 /**

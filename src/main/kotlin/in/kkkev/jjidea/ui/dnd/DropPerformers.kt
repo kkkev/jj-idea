@@ -77,7 +77,7 @@ object DropPerformers {
             }
             is DropOperation.EditWorkingCopy -> false // jj-idea-pk2c
             is DropOperation.Push -> {
-                openPushDialogFor(operation.entry.repo, operation.bookmark, Remote(operation.remote))
+                openPushDialogFor(operation.repo, operation.bookmark, Remote(operation.remote))
                 true
             }
             is DropOperation.SquashFiles -> {
