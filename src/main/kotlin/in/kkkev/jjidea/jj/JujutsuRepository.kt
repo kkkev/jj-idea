@@ -235,6 +235,10 @@ data class JujutsuRepositoryImpl(
  * [childRevision]. This is necessary because `jj file show -r <firstParent>` only returns the
  * first parent's content, not the merge parent tree jj diffs against.
  */
+/** [file]'s path relative to this repository's root, as jj CLI commands expect (no leading slash). */
+fun JujutsuRepository.relativePathOf(file: VirtualFile): String =
+    file.path.removePrefix(directory.path).removePrefix("/")
+
 fun JujutsuRepository.reconstructMergeParentContent(childRevision: Revision, filePath: FilePath): String {
     val afterContent = commandExecutor.show(filePath, childRevision).let {
         if (it is CommandExecutor.CommandResult.Success) it.stdout else ""

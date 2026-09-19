@@ -2408,12 +2408,54 @@ conflicted file reachable from the working copy).
 - [ ] `file.txt` disappears from the Working Copy panel's conflict list **automatically**, without pressing Refresh (jj-idea-3cvb: a stale conflict decoration used to survive even a manual Refresh)
 - [ ] Right-clicking `file.txt` again (now resolved): "Resolve Conflicts…" is **not visible**, and if triggered anyway does not throw
 
-#### Editor notification banner (jj-idea-aunm, GitHub #56)
+#### Editor notification banner (jj-idea-aunm, GitHub #56; live count + accept actions, jj-idea-lkrt)
 
-- [ ] Open `file.txt` in the editor: a warning-colored banner appears at the top with text like "This file has merge conflicts" and a **"Resolve"** action link
-- [ ] Clicking "Resolve" opens the merge tool for `file.txt` (same three-way merge tool as the other entry points)
-- [ ] Cancelling out of the merge tool from this entry point still **leaves conflict markers intact** (the GitHub #63 invariant)
-- [ ] After resolving `file.txt` via the banner (or via any other entry point while the file is open in the editor), the banner **disappears automatically**, without switching tabs or reopening the file
+Since jj-idea-lkrt, the static "This file has merge conflicts [Resolve]" banner is a
+model-accurate one: a live block count parsed from the editor document (not just
+`ChangeListManager`'s status), an **"Accept &lt;side label&gt;"** link per side using jj's own
+commit+role labels (GitHub #112), and a secondary **"Open Merge Tool"** link for the existing
+three-way merge tool. Both the heading and the side labels are kept deliberately short (a
+narrow editor split can't fit jj's full marker-header text plus three links on one line) - the
+full, untruncated side label and the "edit the markers directly" hint are both available as
+tooltips.
+
+- [ ] Open `file.txt` (2 conflict blocks) in the editor: a warning-colored banner appears at the
+      top with text "2 conflicts remaining:", an **"Accept &lt;side-1 label&gt;"** link, an
+      **"Accept &lt;side-2 label&gt;"** link, and an **"Open Merge Tool"** link
+- [ ] Hovering the banner's text shows a tooltip explaining that hand-editing the markers and
+      saving also works
+- [ ] Under `ui.conflict-marker-style = "git"` or `"diff"` with a rebase conflict, the accept
+      links read jj's own commit+description labels (e.g. `Accept ulmlywnv "my change" (re…`),
+      matching "Resolve Conflicts…"'s pane titles for the same file (see "Rebase conflict pane
+      orientation and titles" above)
+- [ ] With a long jj label (long description text, or the role-annotated rebase-conflict case
+      above), the accept link's text is **truncated with an ellipsis** rather than overflowing
+      the editor width - narrow the editor split to confirm the banner never wraps or gets
+      clipped by the platform itself; hovering the truncated link's tooltip shows the **full**
+      untruncated label
+- [ ] Under `ui.conflict-marker-style = "snapshot"` (no commit info in the markers), the accept
+      links fall back to **"Accept Side #1"** / **"Accept Side #2"** (short enough to never need
+      truncating)
+- [ ] Hand-edit one block's markers away (leaving one block remaining) and save: within ~1s
+      (no need to switch tabs or press Refresh) the banner text updates to "1 conflict
+      remaining:" — singular, count decremented
+- [ ] Hand-edit the last block's markers away: the banner **disappears** on its own, before any
+      jj snapshot happens (i.e. even before saving triggers a `jj status` refresh)
+- [ ] Undo the hand-edits so the file is back to 2 conflict blocks; click **"Accept &lt;side-1
+      label&gt;"**: `file.txt` on disk gets side #1's content with no markers, `jj status` shows
+      it resolved, and the banner disappears **without a manual Refresh**
+- [ ] Repeat, clicking **"Accept &lt;side-2 label&gt;"** on a freshly-conflicted file: resolves
+      to side #2's content instead
+- [ ] FX-MD-CONFLICT: clicking **Accept** on the side that is a deletion **removes the file**
+      from disk (`jj status` shows `D`), not an empty file — same invariant as the bulk
+      accept-yours/theirs path below
+- [ ] Clicking **"Open Merge Tool"** opens the same three-way merge tool as the other entry
+      points
+- [ ] Cancelling out of the merge tool from this entry point still **leaves conflict markers
+      intact** (the GitHub #63 invariant)
+- [ ] After resolving `file.txt` via any accept link, the merge tool, or any other entry point
+      while the file is open in the editor, the banner **disappears automatically**, without
+      switching tabs or reopening the file
 - [ ] Open a **non-conflicted** jj-tracked file: no banner appears
 - [ ] Mixed jj + Git project: opening a file with a **Git** conflict shows no jj banner (and vice versa)
 - [ ] Open a conflicted file that is **outside** any jj repo (e.g. an unrelated Git-only root in a multi-root project): no jj banner appears

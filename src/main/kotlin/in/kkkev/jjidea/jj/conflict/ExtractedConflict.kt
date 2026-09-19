@@ -24,4 +24,10 @@ data class ExtractedConflict(
     val currentTitle: String?,
     val lastTitle: String?,
     val currentIsJjSide1: Boolean
-)
+) {
+    /** The `jj resolve --tool` name that accepts the side shown as [currentTitle] ("Yours"). */
+    val toolForCurrent: String get() = if (currentIsJjSide1) ":ours" else ":theirs"
+
+    /** The `jj resolve --tool` name that accepts the side shown as [lastTitle] ("Theirs"). */
+    val toolForLast: String get() = if (currentIsJjSide1) ":theirs" else ":ours"
+}

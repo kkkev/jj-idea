@@ -19,6 +19,7 @@ import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
 import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
 import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.relativePathOf
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
@@ -125,8 +126,7 @@ class JujutsuMergeProvider(
                     continue
                 }
                 val tool = toolFor(file, resolution)
-                val relativePath = file.path.removePrefix(repo.directory.path).removePrefix("/")
-                val result = repo.commandExecutor.resolve(listOf(relativePath), tool)
+                val result = repo.commandExecutor.resolve(listOf(repo.relativePathOf(file)), tool)
                 if (result is CommandExecutor.CommandResult.Failure) {
                     failures += file to result.stderr.ifBlank { "exit ${result.exitCode}" }
                 }
@@ -143,14 +143,17 @@ class JujutsuMergeProvider(
          * extracted (e.g. already resolved externally).
          */
         private fun toolFor(file: VirtualFile, resolution: MergeSession.Resolution): String {
-            val currentIsJjSide1 = try {
-                loadConflict(file).currentIsJjSide1
+            val conflict = try {
+                loadConflict(file)
             } catch (_: VcsException) {
-                true
+                null
             }
             val acceptingCurrent = resolution == MergeSession.Resolution.AcceptedYours
-            val acceptingJjSide1 = acceptingCurrent == currentIsJjSide1
-            return if (acceptingJjSide1) ":ours" else ":theirs"
+            return when {
+                conflict == null -> if (acceptingCurrent) ":ours" else ":theirs"
+                acceptingCurrent -> conflict.toolForCurrent
+                else -> conflict.toolForLast
+            }
         }
 
         private fun reportFailures(failures: List<Pair<VirtualFile, String>>) {
