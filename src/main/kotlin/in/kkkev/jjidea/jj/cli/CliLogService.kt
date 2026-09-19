@@ -466,7 +466,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
          * that exception and silently drops the whole tag. `added_targets` is the list jj's own
          * `tag (conflicted): + x + y` display uses; it has one element for a normal tag and is
          * empty for a pending-delete (`present == false`) row, so the earlier `if(present, …)`
-         * guards are no longer needed.
+         * guards are no longer needed. jj-idea-bico: the full list is kept (not just the first
+         * element) so a conflicted/divergent tag's every target stays reachable, e.g. by drag.
          */
         val tagListTemplate = object : LogTemplate<TagItem?>(
             booleanField("present"),
@@ -481,11 +482,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             override fun take(input: Iterator<String>): TagItem? = try {
                 val present = fields[0].take(input) as Boolean
                 val name = fields[1].take(input) as String
-                val ids = fields[2].take(input) as List<*>
-                val immutables = fields[3].take(input) as List<*>
-                val id = ids.firstOrNull() as ChangeId?
-                val immutable = immutables.firstOrNull() as Boolean? ?: false
-                if (name.isNotEmpty()) TagItem(Tag(name), id, immutable) else null
+                val ids = (fields[2].take(input) as List<*>).filterIsInstance<ChangeId>()
+                val immutables = (fields[3].take(input) as List<*>).filterIsInstance<Boolean>()
+                if (name.isNotEmpty()) TagItem(Tag(name), ids, immutables) else null
             } catch (_: Exception) {
                 null
             }
@@ -516,6 +515,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
          * list jj's own `bar (conflicted): + x + y` display uses; it has one element for a normal
          * bookmark and is empty for a pending-delete (`present == false`) row, so the earlier
          * `if(present, …)` guards on the target fields are no longer needed.
+         *
+         * jj-idea-bico: the full target list is kept on [BookmarkItem] (not just its first
+         * element) so a conflicted/divergent bookmark's every target stays reachable, e.g. by drag.
          */
         val bookmarkListTemplate = object : LogTemplate<BookmarkItem?>(
             booleanField("present"),
@@ -538,10 +540,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 val tracked = fields[3].take(input) as Boolean
                 val aheadCount = fields[4].take(input) as Int
                 val behindCount = fields[5].take(input) as Int
-                val ids = fields[6].take(input) as List<*>
-                val immutables = fields[7].take(input) as List<*>
-                val id = ids.firstOrNull() as ChangeId?
-                val immutable = immutables.firstOrNull() as Boolean? ?: false
+                val ids = (fields[6].take(input) as List<*>).filterIsInstance<ChangeId>()
+                val immutables = (fields[7].take(input) as List<*>).filterIsInstance<Boolean>()
                 val bookmark = Bookmark(
                     name,
                     tracked = tracked,
@@ -550,8 +550,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                     behindCount = behindCount
                 )
                 when {
-                    present && id != null -> BookmarkItem(bookmark, id, immutable)
-                    !present -> BookmarkItem(bookmark.copy(deleted = true), null)
+                    present && ids.isNotEmpty() -> BookmarkItem(bookmark, ids, immutables)
+                    !present -> BookmarkItem(bookmark.copy(deleted = true), emptyList())
                     else -> null
                 }
             } catch (_: Exception) {

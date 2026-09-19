@@ -1645,6 +1645,9 @@ selection does nothing; right-click for actions.
   ```
   `jj bookmark list` should print `conflicted-bm (conflicted):` with two `+` targets (`<rev-a>`
   and `<rev-b>`) before you check the panel.
+- [ ] jj-idea-bico: `conflicted-bm` still renders as a **single** Local node (not two), and the
+  panel's right-click context-menu actions on it behave the same as on any other bookmark - this
+  change only makes every one of its targets reachable *by drag*, it doesn't split the node
 - [ ] Tags appear under their own "Tags" group, also `/`-grouped
 - [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
   or "main +3") — create/delete a bookmark and confirm both update together
@@ -3050,7 +3053,16 @@ where they were.
       the existing **Set Tag Here...** dialog's "tag already exists, move it?" prompt appears here
       too; confirming applies with `--allow-move`
 - [ ] Drop a bookmark/tag chip back onto the **same row** it's already on (not onto another chip
-      on that row) — no indicator ever appears, drop is a silent no-op
+      on that row) — for a **non-conflicted** bookmark/tag, no indicator ever appears, drop is a
+      silent no-op
+- [ ] jj-idea-bico: for a **conflicted/divergent** bookmark or tag, each of its targets has its own
+      chip on its own row (build one with the "conflicted-bm" recipe in MT-BOOKMARK's
+      jj-idea-5r0g item, above). Drag either chip onto the row it's already on — unlike the
+      non-conflicted case above, this **is** an operation: tooltip "Resolve bookmark &lt;name&gt;
+      to &lt;id&gt;" (bookmarks) or "Move tag &lt;name&gt; to &lt;id&gt;" (tags), release applies
+      with an undo balloon, and `jj bookmark list`/`jj log` afterwards shows a single,
+      unconflicted target. Repeat onto the **other** chip's row after undoing — it must resolve
+      there too, not silently no-op
 - [ ] Drag a bookmark/tag chip near a row's **top/bottom edge band** — still resolves to that row's
       centre (no gap-based operation for a chip drag), no indicator flicker as the pointer nears
       the edge
@@ -3147,6 +3159,12 @@ the case this bead exists for.
       flicker away)
 - [ ] Drag a bookmark/tag node onto itself, or drop it back on the row it already sits on → no
       indicator, silent no-op
+- [ ] jj-idea-bico: build a conflicted bookmark with the "conflicted-bm" recipe above
+      (MT-BOOKMARK's jj-idea-5r0g item), then in the panel drag its **single node** onto
+      `<rev-a>`'s log row and, separately (undo in between), onto `<rev-b>`'s row — **both** must
+      show the "Resolve bookmark conflicted-bm to &lt;id&gt;" tooltip and apply; neither direction
+      is allowed to silently no-op the way a single-target bookmark's self-drop does above.
+      Confirm with `jj bookmark list` that the conflict is actually gone afterwards
 - [ ] Dragging a bookmark/tag node shows the same small cursor-following chip label the log table's
       own chip drag shows
 - [ ] With the preview feature off, try dragging a node in the panel → nothing initiates

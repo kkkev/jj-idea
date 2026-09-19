@@ -8,7 +8,9 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
+import `in`.kkkev.jjidea.ui.dnd.bookmarkTargets
 import `in`.kkkev.jjidea.ui.dnd.chipDragImage
+import `in`.kkkev.jjidea.ui.dnd.tagTargets
 import `in`.kkkev.jjidea.ui.log.BookmarkClick
 import `in`.kkkev.jjidea.ui.log.LogClickTarget
 import `in`.kkkev.jjidea.ui.log.TagClick
@@ -60,7 +62,17 @@ fun IconAwareHtmlPane.installRefDragSource(parent: Disposable, project: Project,
  */
 internal fun IconAwareHtmlPane.refDragPayload(point: Point, project: Project, entries: List<LogEntry>): DragPayload? =
     when (val target = refUriAt(point)?.let { LogClickTarget.resolve(it, project, entries) }) {
-        is BookmarkClick -> DragPayload.BookmarkRef(target.repo, target.entry.id, target.bookmark)
-        is TagClick -> DragPayload.TagRef(target.repo, target.entry.id, target.tag)
+        is BookmarkClick -> DragPayload.BookmarkRef(
+            target.repo,
+            target.entry.id,
+            target.bookmark,
+            target.repo.bookmarkTargets(target.bookmark, target.entry.id)
+        )
+        is TagClick -> DragPayload.TagRef(
+            target.repo,
+            target.entry.id,
+            target.tag,
+            target.repo.tagTargets(target.tag, target.entry.id)
+        )
         else -> null
     }

@@ -46,7 +46,15 @@ class JujutsuLogTableDnDChipTest {
     // refUri) - an unstubbed relaxed mock returns "", which makes that URI unparseable (its
     // regex requires a non-empty repo-path segment) and every chip hit-test silently miss.
     // Same stub JujutsuLogTableChipIssueLinkTest/LaidOutCellTest/LogClickTargetTest already use.
-    private val repo = mockk<JujutsuRepository>(relaxed = true).also { every { it.directory.path } returns "/repo" }
+    // `.project` is stubbed to the real fixture project too - dragPayloadAt now reads bookmark/tag
+    // targets off it (jj-idea-bico), and a relaxed mock Project fails `Project.stateModel`'s
+    // `service()` call with a ClassCastException rather than returning something usable.
+    private val repo = mockk<JujutsuRepository>(relaxed = true).also {
+        every { it.directory.path } returns "/repo"
+        // `answers`, not `returns` - `project.get()` only resolves once the fixture framework has
+        // started, which isn't yet true while this field itself is being constructed.
+        every { it.project } answers { project.get() }
+    }
     private var table: JujutsuLogTable? = null
 
     @BeforeEach

@@ -29,8 +29,10 @@ import `in`.kkkev.jjidea.ui.dnd.DropZone
 import `in`.kkkev.jjidea.ui.dnd.DropZones
 import `in`.kkkev.jjidea.ui.dnd.RejectOverlay
 import `in`.kkkev.jjidea.ui.dnd.ZoneHysteresis
+import `in`.kkkev.jjidea.ui.dnd.bookmarkTargets
 import `in`.kkkev.jjidea.ui.dnd.chipDragImage
 import `in`.kkkev.jjidea.ui.dnd.resolveDropOperation
+import `in`.kkkev.jjidea.ui.dnd.tagTargets
 import java.awt.AlphaComposite
 import java.awt.Graphics2D
 import java.awt.Point
@@ -214,8 +216,18 @@ internal fun resolveDrop(
  */
 internal fun JujutsuLogTable.dragPayloadAt(point: Point): DragPayload? {
     when (val click = clickTargetAt(point)) {
-        is BookmarkClick -> return DragPayload.BookmarkRef(click.repo, click.entry.id, click.bookmark)
-        is TagClick -> return DragPayload.TagRef(click.repo, click.entry.id, click.tag)
+        is BookmarkClick -> return DragPayload.BookmarkRef(
+            click.repo,
+            click.entry.id,
+            click.bookmark,
+            click.repo.bookmarkTargets(click.bookmark, click.entry.id)
+        )
+        is TagClick -> return DragPayload.TagRef(
+            click.repo,
+            click.entry.id,
+            click.tag,
+            click.repo.tagTargets(click.tag, click.entry.id)
+        )
         else -> Unit
     }
     val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null

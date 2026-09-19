@@ -160,9 +160,12 @@ private fun JujutsuBookmarksPanel.resolveLive(
 internal fun JujutsuBookmarksPanel.dragPayloadAt(point: Point): DragPayload? {
     val path = tree.getPathForLocation(point.x, point.y) ?: return null
     return when (val node = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode) {
-        is BookmarkNode.Local -> node.item.id?.let { DragPayload.BookmarkRef(node.repo, it, node.item.bookmark) }
-        is BookmarkNode.Remote -> node.item.id?.let { DragPayload.BookmarkRef(node.repo, it, node.item.bookmark) }
-        is BookmarkNode.Tag -> node.item.id?.let { DragPayload.TagRef(node.repo, it, node.item.tag) }
+        is BookmarkNode.Local ->
+            node.item.id?.let { DragPayload.BookmarkRef(node.repo, it, node.item.bookmark, node.item.targets.toSet()) }
+        is BookmarkNode.Remote ->
+            node.item.id?.let { DragPayload.BookmarkRef(node.repo, it, node.item.bookmark, node.item.targets.toSet()) }
+        is BookmarkNode.Tag ->
+            node.item.id?.let { DragPayload.TagRef(node.repo, it, node.item.tag, node.item.targets.toSet()) }
         else -> null
     }
 }

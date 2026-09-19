@@ -369,6 +369,10 @@ class LogTemplateTest {
 
         item shouldNotBe null
         item!!.tag shouldBe Tag("v1.0")
+        // jj-idea-bico: every target is kept, not just the first.
+        item.targets shouldBe listOf(ChangeId("qpvuntsm", "q", null), ChangeId("mzvwutvl", "m", null))
+        item.immutables shouldBe listOf(false, true)
+        item.conflicted shouldBe true
         item.id shouldBe ChangeId("qpvuntsm", "q", null)
         item.immutable shouldBe false
     }
@@ -455,6 +459,10 @@ class LogTemplateTest {
 
         item shouldNotBe null
         item!!.bookmark.conflict shouldBe true
+        // jj-idea-bico: every target is kept, not just the first - both are reachable, e.g. by drag.
+        item.targets shouldBe listOf(ChangeId("qpvuntsm", "q", null), ChangeId("mzvwutvl", "m", null))
+        item.immutables shouldBe listOf(false, false)
+        item.conflicted shouldBe true
         item.id shouldBe ChangeId("qpvuntsm", "q", null)
     }
 

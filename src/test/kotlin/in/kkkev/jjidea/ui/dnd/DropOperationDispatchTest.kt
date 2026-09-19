@@ -170,6 +170,38 @@ class DropOperationDispatchTest {
     }
 
     @Test
+    fun `a conflicted BookmarkRef onto either of its own targets resolves it - jj-idea-bico`() {
+        // A conflicted bookmark has more than one target; re-pointing it at either one is a
+        // resolve, not the self-drop no-op a single-target bookmark hits.
+        val bookmark = Bookmark("main", conflict = true)
+        val payload = DragPayload.BookmarkRef(a.repo, a.id, bookmark, targets = setOf(a.id, b.id))
+
+        val ontoFirst = resolveDropOperation(payload, DropTarget.CommitRow(a), copy = false)
+        val ontoSecond = resolveDropOperation(payload, DropTarget.CommitRow(b), copy = false)
+
+        ontoFirst.shouldNotBeNull()
+        ontoFirst as DropOperation.MoveBookmark
+        ontoFirst.destination shouldBe a
+        ontoFirst.label shouldBe "Resolve bookmark main to ${a.id.short}"
+
+        ontoSecond.shouldNotBeNull()
+        ontoSecond as DropOperation.MoveBookmark
+        ontoSecond.destination shouldBe b
+    }
+
+    @Test
+    fun `a conflicted BookmarkRef onto a third row is still a plain resolve - move label unaffected`() {
+        val bookmark = Bookmark("main", conflict = true)
+        val payload = DragPayload.BookmarkRef(a.repo, a.id, bookmark, targets = setOf(a.id, b.id))
+
+        val op = resolveDropOperation(payload, DropTarget.CommitRow(c), copy = false)
+
+        op.shouldNotBeNull()
+        op as DropOperation.MoveBookmark
+        op.label shouldBe "Resolve bookmark main to ${c.id.short}"
+    }
+
+    @Test
     fun `a local BookmarkRef onto its remote RefChip is a Push`() {
         val local = Bookmark("main")
         val remote = Bookmark("main@origin")
@@ -261,6 +293,20 @@ class DropOperationDispatchTest {
     fun `a TagRef onto its own row is a no-op - null`() {
         resolveDropOperation(DragPayload.TagRef(a.repo, a.id, Tag("v1")), DropTarget.CommitRow(a), copy = false)
             .shouldBeNull()
+    }
+
+    @Test
+    fun `a conflicted TagRef onto either of its own targets resolves it - jj-idea-bico`() {
+        val tag = Tag("v1")
+        val payload = DragPayload.TagRef(a.repo, a.id, tag, targets = setOf(a.id, b.id))
+
+        val ontoFirst = resolveDropOperation(payload, DropTarget.CommitRow(a), copy = false)
+        val ontoSecond = resolveDropOperation(payload, DropTarget.CommitRow(b), copy = false)
+
+        ontoFirst.shouldNotBeNull()
+        (ontoFirst as DropOperation.MoveTag).destination shouldBe a
+        ontoSecond.shouldNotBeNull()
+        (ontoSecond as DropOperation.MoveTag).destination shouldBe b
     }
 
     @Test

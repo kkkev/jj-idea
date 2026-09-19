@@ -34,9 +34,18 @@ sealed interface DropOperation {
         override val label get() = rebaseLabel("Duplicate", sources, destination, mode)
     }
 
-    /** A bookmark or tag chip (or a dragged commit dropped onto one) moves [bookmark] to [destination]. */
+    /**
+     * A bookmark or tag chip (or a dragged commit dropped onto one) moves [bookmark] to
+     * [destination]. Labelled "Resolve" rather than "Move" when [bookmark] is conflicted
+     * (jj-idea-bico) - re-pointing a conflicted bookmark at one of its own targets is how a drag
+     * resolves it, not an ordinary move.
+     */
     data class MoveBookmark(val bookmark: Bookmark, val destination: LogEntry) : DropOperation {
-        override val label get() = "Move bookmark ${bookmark.name} to ${destination.id.short}"
+        override val label get() = if (bookmark.conflict) {
+            "Resolve bookmark ${bookmark.name} to ${destination.id.short}"
+        } else {
+            "Move bookmark ${bookmark.name} to ${destination.id.short}"
+        }
     }
 
     data class MoveTag(val tag: Tag, val destination: LogEntry) : DropOperation {
@@ -105,8 +114,10 @@ fun resolveDropOperation(payload: DragPayload, target: DropTarget, copy: Boolean
     is DragPayload.BookmarkRef -> when (target) {
         // Dropped back on the row it already sits on - a no-op, not an operation (mirrors the
         // deliberately-silent self-drop case DragContext.rejectionReason handles for a dragged
-        // commit).
-        is DropTarget.CommitRow -> if (target.id == payload.id) {
+        // commit). Only a no-op when that row is the bookmark's *sole* target: a conflicted
+        // bookmark has several, and re-pointing it at any one of them is a resolve, not a no-op
+        // (jj-idea-bico).
+        is DropTarget.CommitRow -> if (payload.targets == setOf(target.id)) {
             null
         } else {
             DropOperation.MoveBookmark(payload.bookmark, target.entry)
@@ -121,7 +132,8 @@ fun resolveDropOperation(payload: DragPayload, target: DropTarget, copy: Boolean
     }
 
     is DragPayload.TagRef -> (target as? DropTarget.CommitRow)?.let {
-        if (it.id == payload.id) null else DropOperation.MoveTag(payload.tag, it.entry)
+        // Same conflicted-target reasoning as DragPayload.BookmarkRef above (jj-idea-bico).
+        if (payload.targets == setOf(it.id)) null else DropOperation.MoveTag(payload.tag, it.entry)
     }
 
     is DragPayload.WorkingCopyRef ->

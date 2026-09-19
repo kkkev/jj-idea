@@ -39,8 +39,16 @@ class IconAwareHtmlPaneDnDTest {
 
     // refUri()'s host segment is the repo's directory path (URL-encoded) - an unstubbed relaxed
     // mock returns "", collapsing the URI's authority and making it unparseable. Same stub
-    // LogClickTargetTest/JujutsuLogTableDnDChipTest already use.
-    private val repo = mockk<JujutsuRepository>(relaxed = true).also { every { it.directory.path } returns "/repo" }
+    // LogClickTargetTest/JujutsuLogTableDnDChipTest already use. `.project` is stubbed to the real
+    // fixture project too - refDragPayload now reads bookmark/tag targets off it (jj-idea-bico),
+    // and a relaxed mock Project fails `Project.stateModel`'s `service()` call with a
+    // ClassCastException rather than returning something usable.
+    private val repo = mockk<JujutsuRepository>(relaxed = true).also {
+        every { it.directory.path } returns "/repo"
+        // `answers`, not `returns` - `project.get()` only resolves once the fixture framework has
+        // started, which isn't yet true while this field itself is being constructed.
+        every { it.project } answers { project.get() }
+    }
 
     @AfterEach
     fun cleanUp() {

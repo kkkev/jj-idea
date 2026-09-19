@@ -36,14 +36,26 @@ sealed interface DragPayload {
     /**
      * A bookmark being dragged, whether picked up from a log-table chip or a bookmarks-panel node
      * (jj-idea-0rdm) - identity only, not a hydrated [LogEntry], since a panel node's change may
-     * fall outside the currently-loaded log window (the case jj-idea-3xab exists for).
+     * fall outside the currently-loaded log window (the case jj-idea-3xab exists for). [id] is the
+     * target the gesture actually started from (what the cross-repo guard and the drag image use);
+     * [targets] is every target the bookmark currently has, which is more than one exactly when it
+     * is conflicted/divergent (jj-idea-bico) - [resolveDropOperation] reads it to decide whether
+     * dropping back onto one of those targets is a no-op or a legitimate resolve.
      */
-    data class BookmarkRef(override val repo: JujutsuRepository, override val id: ChangeId, val bookmark: Bookmark) :
-        DragPayload, ChangeIdentity
+    data class BookmarkRef(
+        override val repo: JujutsuRepository,
+        override val id: ChangeId,
+        val bookmark: Bookmark,
+        val targets: Set<ChangeId> = setOf(id)
+    ) : DragPayload, ChangeIdentity
 
     /** As [BookmarkRef], but for a tag. */
-    data class TagRef(override val repo: JujutsuRepository, override val id: ChangeId, val tag: Tag) :
-        DragPayload, ChangeIdentity
+    data class TagRef(
+        override val repo: JujutsuRepository,
+        override val id: ChangeId,
+        val tag: Tag,
+        val targets: Set<ChangeId> = setOf(id)
+    ) : DragPayload, ChangeIdentity
 
     data class WorkingCopyRef(val entry: LogEntry) : DragPayload {
         override val repo get() = entry.repo

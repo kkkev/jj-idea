@@ -101,6 +101,23 @@ class JujutsuBookmarksPanelDnDTest {
     }
 
     @Test
+    fun `dragging a conflicted local bookmark node carries every target - jj-idea-bico`() {
+        val idA = ChangeId("aaaaaaaa", "a")
+        val idB = ChangeId("bbbbbbbb", "b")
+        val bookmark = Bookmark("main", conflict = true)
+        val panel = panelWith(
+            BookmarkNode.Local(repoA, BookmarkItem(bookmark, listOf(idA, idB)), "main", onWorkingCopy = false)
+        )
+
+        val payload = panel.dragPayloadAt(rowPoint(panel, 0))
+
+        payload.shouldNotBeNull()
+        payload as DragPayload.BookmarkRef
+        payload.id shouldBe idA
+        payload.targets shouldBe setOf(idA, idB)
+    }
+
+    @Test
     fun `dragging a remote bookmark node picks up a BookmarkRef payload`() {
         val id = ChangeId("aaaaaaaa", "a")
         val bookmark = Bookmark("main@origin")
