@@ -97,6 +97,23 @@ class SplitDialogTest {
         dialog.childHeaderLabel.text shouldContain "sibling of"
         dialog.childHeaderLabel.text shouldNotContain "child of"
 
+        // Regression for jj-idea-luxb (GitHub #114): parallel mode used to call its two sides
+        // "First"/"Second", which the reporter found confusing wording for a split. That
+        // vocabulary was retired for good by jj-idea-8khi's identity-first rename - confirm it
+        // can't resurface in parallel mode specifically, including on the hunk picker's labels
+        // (firstCommitLabel/secondCommitLabel, fed to HunkPickerLabels.forSplit), which aren't
+        // covered by the header/summary assertions above.
+        dialog.parentHeaderLabel.text shouldNotContain "First"
+        dialog.parentHeaderLabel.text shouldNotContain "Second"
+        dialog.childHeaderLabel.text shouldNotContain "First"
+        dialog.childHeaderLabel.text shouldNotContain "Second"
+        dialog.summaryLabel.text shouldNotContain "First"
+        dialog.summaryLabel.text shouldNotContain "Second"
+        dialog.modeNoteText shouldNotContain "First"
+        dialog.modeNoteText shouldNotContain "Second"
+        dialog.firstCommitLabel shouldBe "Existing commit"
+        dialog.secondCommitLabel shouldBe "New commit"
+
         disposeDialog(dialog)
     }
 
