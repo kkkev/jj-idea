@@ -40,4 +40,20 @@ class CliExecutorResolveTest {
         resolveListArgs().reversibility shouldBe Reversibility.READ_ONLY
         resolveArgs(listOf("a.txt"), ":ours").reversibility shouldBe Reversibility.REVERSIBLE
     }
+
+    @Test
+    fun `resolveArgs - configArgs emitted as --config before the subcommand`() {
+        val configArgs = listOf("merge-tools.x.program=java")
+        resolveArgs(listOf("a.txt"), "jj-idea-merge-apply", configArgs = configArgs).args shouldBe
+            listOf(
+                "--config",
+                "merge-tools.x.program=java",
+                "resolve",
+                "-r",
+                "@",
+                "--tool",
+                "jj-idea-merge-apply",
+                "cwd:\"a.txt\""
+            )
+    }
 }

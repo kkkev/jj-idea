@@ -45,27 +45,29 @@ composes it rather than replacing it.
 |---|---|---|
 | Marker parser, all 3 styles + GitHub #112 side reorientation | `jj/conflict/JjMarkerConflictExtractor.kt` | `extract(ByteArray): ExtractedConflict?`. Handles git/snapshot/diff marker styles and rebase-conflict "Yours" reorientation. |
 | `jj resolve --list` line parser | `jj/conflict/ConflictInfo.kt` | `ConflictInfoParser.parse(stdout): Map<String, ConflictInfo>`; shape text (`"2-sided conflict including 1 deletion"`) preserved verbatim. |
-| Per-path conflict shape cache | `jj/conflict/JujutsuConflictRegistry.kt` | **Working-copy only** today — see gap below. |
+| Per-path conflict shape cache | `jj/conflict/JujutsuConflictRegistry.kt` | Revision-keyed as of jj-idea-cf2c's spike (see "Gaps found" below) — no longer working-copy only. |
 | #63-safe scratch-document merge tool | `vcs/merge/JujutsuConflictResolver.kt` | Kept as an accelerator (see "What stays as-is"). |
 | `MergeProvider2` + bulk `:ours`/`:theirs` | `vcs/merge/JujutsuMergeProvider.kt:114` `acceptFilesRevisions` | Routes through `jj resolve --tool` so modify/delete conflicts actually delete rather than leaving an empty file. |
 | Read a conflict at an arbitrary revision (read-only) | `vcs/diff/JujutsuConflictDiffRequestProvider.kt` | GitHub #119 / `jj-idea-ct7e`. The primitive S3/S4 below reuse for the write side. |
 | Single funnel all four resolve gestures route through | `actions/change/workingCopyConflicts.kt:30` `resolveConflicts(project, files)` | Log menu, file action, toolbar button, tree-node link, and the editor banner all call this. |
 | Editor banner | `ui/editor/JujutsuConflictEditorNotificationProvider.kt` | Today: static text + one "Resolve" link. S1 below extends this in place. |
 | "Merge Conflicts" tree node + toolbar button | `ui/common/JujutsuConflictsNode.kt`, `actions/file/ResolveAllConflictsAction.kt` | Unaffected by this design. |
-| Command wrappers, both already revision-parametrised | `jj/CommandExecutor.kt:365` `resolveList(revision)`, `:375` `resolve(paths, tool, revision)`; args at `jj/cli/CliExecutor.kt:377,380` | The CLI layer already supports everything S3/S4 need; nothing new to add there. |
+| Command wrappers, both already revision-parametrised | `jj/CommandExecutor.kt:368` `resolveList(revision)`, `:378` `resolve(paths, tool, revision, configArgs)`; args at `jj/cli/CliExecutor.kt:377,381` | The CLI layer already supports everything S3/S4 need; nothing new to add there. |
 
 ### Gaps found while surveying the above
 
-- **`jj/ChangeService.kt:68` `conflictedPathsFor` re-implements path extraction from `jj resolve
-  --list` by hand** instead of reusing `ConflictInfoParser.parse(...).keys` (which
-  `vcs/changes/JujutsuChangeProvider.kt:196` `parseConflictPaths` already does correctly), and it
-  discards the sides/deletions shape entirely. Net effect: `JujutsuConflictRegistry` — the only
-  place that shape data is cached — is **only ever populated for the working copy**, never for a
-  historical revision. Every design slice that wants shape data (modify/delete detection, a
-  Conflicts view row) at a non-`@` revision needs this fixed first.
+- ~~**`jj/ChangeService.kt:68` `conflictedPathsFor` re-implements path extraction from `jj
+  resolve --list` by hand** instead of reusing `ConflictInfoParser.parse(...).keys`, and
+  discards the sides/deletions shape entirely, so `JujutsuConflictRegistry` is only ever
+  populated for the working copy.~~ **Fixed since this was written** (found during the S4
+  spike, jj-idea-cf2c): `ChangeService.conflictInfosFor(entry)` now calls
+  `resolveList(entry.id)`, parses with `ConflictInfoParser`, and calls
+  `JujutsuConflictRegistry.replace(repoDir, infos.values, entry.id)`; the registry is
+  revision-keyed (`get(repoDir, file, revision)`, key `"${repoDir.path}@$revision"`). Shape
+  data off-`@` is available today — S3 (`jj-idea-qmws`) is no longer blocked on this.
 - **`actions/change/resolveConflictsAvailability.kt`'s `NEEDS_EDIT` state** exists purely because
   `JujutsuMergeProvider.loadConflict` is hard-coded to `WorkingCopy` (see its own doc comment,
-  `JujutsuMergeProvider.kt:47-51`) — a git-shaped "you can only resolve what's checked out"
+  `JujutsuMergeProvider.kt:48-52`) — a git-shaped "you can only resolve what's checked out"
   limitation. jj itself has no such restriction. Retiring this state is the single biggest UX
   unlock in this design (browsing history and fixing a conflict on a non-`@` commit without first
   checking it out) and is scoped as its own spike (see S4) because the interactive write-back path
@@ -161,7 +163,7 @@ deletion"`) rather than reconstructing that information from a platform-shaped `
 The key differentiator from the platform's `MultipleFileMergeDialog` (which this replaces as the
 *bulk* affordance, alongside the existing "Merge Conflicts" tree node for the working copy): a
 revision picker, so the view can show conflicts in **descendants and arbitrary other revisions**,
-not only `@`. `CommandExecutor.kt:365`'s doc comment on `resolveList` — "infrastructure for the
+not only `@`. `CommandExecutor.kt:368`'s doc comment on `resolveList` — "infrastructure for the
 future Conflicts tool window" — was written anticipating exactly this.
 
 Depends on the registry gap (above) being fixed first, since a useful non-`@` conflicts view needs
@@ -193,6 +195,128 @@ showing revisions far from `@`? The spike's job is to answer these with a workin
 written recommendation, which S3's bulk-action scope and any follow-on "resolve this conflict from
 the log, without checking it out first" feature both then build on.
 
+### S4 spike findings (jj-idea-cf2c)
+
+Verified against real jj 0.44 via `src/test/kotlin/in/kkkev/jjidea/contract/`
+`ResolveAtRevisionContractCliTest.kt` and `ResolveWriteBackContractCliTest.kt` (both pass;
+run with `./gradlew contractTest` — the `contract` tag is excluded from `check`/`test`).
+
+**Q1: does resolving at a non-`@` revision correctly propagate to descendants, and does the
+UI need to warn about it?**
+
+Yes, and yes, with a specific shape. Built `initial → change-a/change-b` (divergent edits to
+one line) → rebase `change-a` onto `change-b` (conflict) → `change-c → change-d` stacked on
+the conflicted `change-a`:
+
+- `jj resolve -r change-a --tool :ours file.txt` succeeds with `@` anywhere.
+- Both descendants are rewritten and their conflict clears (`conflict` template flag
+  `true → false` on `change-a`, `change-c`, and `change-d`).
+- **Change ids are stable across the rebase; commit ids are not** — confirmed
+  (`ResolveAtRevisionContractCliTest`'s first test asserts both). This matters for anything
+  in the plugin that keys UI state (selection, expansion) by commit id rather than change id
+  across a resolve.
+- **The decisive case**: when `@` is a descendant of the resolved revision, `@` itself is
+  silently rewritten and its on-disk working-copy file updated — `jj` prints "Working copy
+  (@) now at: ..." and the file content changes with no further action
+  (`ResolveAtRevisionContractCliTest`'s second test). This is `jj resolve -r`'s ordinary
+  descendant-rebase behavior, identical to what already happens on `jj rebase`/`jj squash`
+  today, but a resolve UI at a *browsed* revision is exactly the situation where the user's
+  attention is on a commit that **isn't** `@` — they could plausibly not expect their working
+  copy to move.
+
+**Recommendation**: the UI must distinguish two cases before committing to the action, not
+treat "resolve at revision X" as uniform:
+- `@` is **not** a descendant of X: no special warning needed beyond the ordinary "N
+  descendants will be rebased" notice already implicit in `jj resolve -r`'s own stderr.
+- `@` **is** a descendant of X (including `@` itself): the confirmation must say the working
+  copy will change — e.g. "This also updates your working copy" — since a browsed-revision
+  resolve action is the one place in the plugin where that could surprise a user who assumes
+  actions on a non-`@` row are scoped to that row. (This plugin has no jj-side way to
+  distinguish "independently conflicted" descendants from "inherited-only" ones without a
+  second `jj resolve --list -r` per descendant — out of scope for the warning text itself,
+  which only needs "does this touch `@`", answerable with one revset check,
+  e.g. `jj log -r 'X..@ & @'` / an `is_ancestor`-shaped query already available via existing
+  log data.)
+
+**Q2: does `JujutsuRepository.invalidate` correctly refresh a log view for revisions far
+from `@`?**
+
+Answered by code trace (`jj/JujutsuStateModel.kt:668` `invalidate` →
+`stateModel.logRefresh.notify(Unit)` → `UnifiedJujutsuLogPanel`'s
+`logRefresh.connect(this) { refresh() }` → `CommitTablePanel.refresh()` →
+`UnifiedJujutsuLogDataLoader.refresh()`), not a live `runIde` observation — the trace is
+unambiguous and self-documenting enough that a visual check wasn't run in this spike's
+timebox; flagged below as a gap rather than asserted as verified.
+
+**No — not for a revision on an already-loaded deep page, by design.** `refresh()` (the path
+`invalidate()` triggers) is documented at `CommitTablePanel.kt:672-683` and
+`UnifiedJujutsuLogDataLoader.kt:343-349` as a **deliberately cheap, page-1-only reconcile**:
+it re-fetches only page 1 and splices it ahead of whatever deeper pages were already loaded,
+*without* re-fetching those deeper pages. This is intentional (jj-idea-2c8k / GitHub #69):
+`forceRefresh()` — full paged re-verification of every loaded page — used to run on every
+`logRefresh` firing (i.e., after every write), which was too expensive; `refresh()` was
+introduced specifically to make the common "write happened, reconcile the log" path cheap,
+at the cost of not re-verifying rows already loaded on page 2+.
+
+Consequence for S4: **resolving a conflict on a revision whose row is on an already-loaded
+page 2+ leaves that row showing stale `hasConflict = true` state** until the user does an
+explicit toolbar Refresh (which calls `forceRefresh()`, re-verifying everything currently
+loaded) or scrolls past the loaded window and back. A resolve-from-the-log feature (S4/S3)
+therefore cannot rely on `invalidate()`'s existing `select` parameter or `logRefresh` alone
+to make its own effect visible for a revision beyond page 1 — it needs one of:
+- After a non-`@` resolve, call `forceRefresh()` (not just `invalidate()`) when the resolved
+  revision is known to be outside page 1 — the plugin already has this entry point
+  (`DataLoader.forceRefresh`), it's just never invoked from a per-write path today by design.
+- Or, narrower: patch just the resolved row's `hasConflict` in the already-loaded page's
+  cached entries in place, avoiding a re-fetch — more code, but preserves the "cheap
+  per-write path" property `refresh()` exists for.
+
+Separately, `invalidateRepositoryState()` (called by `invalidate()`) invalidates
+`workingCopies`, which drives `VcsDirtyScopeManager.dirDirtyRecursively()` — but the
+`MERGED_WITH_CONFLICTS` statuses `workingCopyConflicts.kt` reads come from
+`ChangeListManager`, which is disk/working-copy-derived. An off-`@` resolve doesn't touch
+disk at all when `@` isn't a descendant, so this machinery is a no-op for it either way —
+consistent with, not contradicting, the page-refresh finding above.
+
+**No test currently pins this splice-vs-full-refresh distinction for a mutated row on an
+already-loaded page** — `PagedLogWindowContractTest.kt` covers paging correctness (no
+missing/duplicate commits) but not a post-write content change on a deep page. Recommended
+as a required regression test for whichever issue implements the fix above.
+
+**Write-back mechanism recommendation**
+
+The ephemeral-merge-tool approach (`DiffEditTool.mergeToolConfigArgs` +
+`diffedit/MergeApplyMain.kt`, landed by this spike, mirroring the already-shipped
+`diffEditConfigArgs`/`HunkApplyMain` used by `jj split --tool`/`jj squash --interactive`) is
+confirmed to work end-to-end against real jj (`ResolveWriteBackContractCliTest`): stage
+resolved bytes to a temp file, register it as a one-shot `merge-tools.<name>` via `--config`,
+run `jj resolve -r <rev> --tool <name>`. No alternative (a scratch `jj new`/`jj squash
+--into` workspace) is needed — the merge-tool protocol already accepts an arbitrary
+`-r <rev>`, so there's no "scratch workspace" step to build. This is the recommended
+mechanism for the real S4 feature.
+
+**Sizing note for the real S4 feature**: this is not "thread a revision parameter through
+the existing interactive flow." Three structural obstacles, found while surveying for this
+spike:
+- `MergeProvider2.loadRevisions(VirtualFile)` has no revision slot and the platform
+  interface can't be extended to add one — an off-`@` interactive resolve has to be a
+  **second, log-shaped resolve flow** (a dialog/editor invoked from the log, not from
+  `MergeProvider2`), not an extension of the existing per-file merge dialog.
+- `JujutsuConflictResolver` writes resolved bytes straight to disk
+  (`Files.write`/`Files.deleteIfExists`) — meaningless off-`@`. The new flow needs the
+  merge-tool write-back above instead, not a parameter added to the existing writer.
+- Everything above `CommandExecutor` (`workingCopyConflicts.kt`, `resolveConflicts`, both
+  `NEEDS_EDIT`-gated actions) is `VirtualFile`-shaped with no revision dimension; none of it
+  is directly reusable for a revision-scoped flow without a parallel code path.
+
+**Verdict: go, with conditions.** Retiring `NEEDS_EDIT` is safe from jj's side (Q1) provided
+the UI adds the descendant/`@`-touches-working-copy warning above, and is safe from the log
+UI's side (Q2) only once the deep-page staleness gap is closed (or explicitly accepted with
+a documented "click Refresh to see it" caveat, which is a worse UX than fixing it). Neither
+blocker is large; both are now sized. Recommend filing S4 as its own beads issue (child of
+`jj-idea-n6fz`) scoped to: the log-shaped resolve flow, the `forceRefresh`-or-patch-in-place
+fix, and the descendant warning — with this section as its design input.
+
 ### S5 — Undo affordance
 
 Route S1's accept actions (and, if it ships, S2's per-block accepts once they trigger a snapshot)
@@ -221,3 +345,7 @@ This document's own claims are checkable without writing code:
 - The "gaps found" section names concrete code (`ChangeService.kt:68`,
   `resolveConflictsAvailability.kt`'s `NEEDS_EDIT`) that a reader can independently confirm rather
   than taking on faith.
+- The S4 spike findings are backed by two contract tests run against real jj 0.44
+  (`ResolveAtRevisionContractCliTest`, `ResolveWriteBackContractCliTest`) rather than asserted
+  from memory; the Q2 finding is a code trace, explicitly flagged as not visually confirmed via
+  `runIde` within the spike's timebox.

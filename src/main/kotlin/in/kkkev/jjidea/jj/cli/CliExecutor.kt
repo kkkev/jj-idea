@@ -377,10 +377,26 @@ internal fun squashArgs(
 internal fun resolveListArgs(revision: Revision = WorkingCopy) =
     JjInvocation(READ_ONLY, "resolve", "--list", "-r", revision.toString())
 
-/** Build the argument list for `jj resolve --tool <tool>`. */
-internal fun resolveArgs(paths: List<String>, tool: String, revision: Revision = WorkingCopy) = JjInvocation(
+/**
+ * Build the argument list for `jj resolve --tool <tool>`.
+ *
+ * [configArgs] are `NAME=VALUE` strings emitted as `--config NAME=VALUE` **before** the
+ * subcommand, matching [splitInteractiveArgs]/[squashIntoInteractiveArgs] - used to register an
+ * ephemeral 3-way merge tool (see `diffedit/DiffEditTool.kt`'s pattern) for the interactive
+ * write-back prototype in jj-idea-cf2c.
+ */
+internal fun resolveArgs(
+    paths: List<String>,
+    tool: String,
+    revision: Revision = WorkingCopy,
+    configArgs: List<String> = emptyList()
+) = JjInvocation(
     REVERSIBLE,
     buildList {
+        for (kv in configArgs) {
+            add("--config")
+            add(kv)
+        }
         add("resolve")
         add("-r")
         add(revision.toString())
@@ -681,8 +697,8 @@ class CliExecutor(
 
     override fun resolveList(revision: Revision) = execute(root, resolveListArgs(revision))
 
-    override fun resolve(paths: List<String>, tool: String, revision: Revision) =
-        execute(root, resolveArgs(paths, tool, revision))
+    override fun resolve(paths: List<String>, tool: String, revision: Revision, configArgs: List<String>) =
+        execute(root, resolveArgs(paths, tool, revision, configArgs))
 
     override fun diff(filePath: String) = execute(root, diffArgs(filePath))
 

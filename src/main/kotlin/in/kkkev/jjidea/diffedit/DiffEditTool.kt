@@ -116,6 +116,41 @@ object DiffEditTool {
     /** The TOML name for the ephemeral diff editor registered per split invocation. */
     const val TOOL_NAME = "jj-idea-hunk-apply"
 
+    /**
+     * Produce `--config NAME=VALUE` argument pairs that register a one-shot 3-way merge tool
+     * pointing at [MergeApplyMain] with [stagedFile] as the pre-computed resolved content.
+     *
+     * Prototype for jj-idea-cf2c (S4 spike): the interactive write-back path for
+     * `jj resolve --tool` has the same shape as [diffEditConfigArgs] but for
+     * `merge-tools.<name>.merge-args` (`$output`, not `$left`/`$right`) - see
+     * [MergeApplyMain]'s KDoc. Unlike [diffEditConfigArgs], no `ui.*` override is needed:
+     * `jj resolve --tool <name>` passes the tool name explicitly on the command line.
+     *
+     * The returned list has the form `["NAME1=VALUE1", "NAME2=VALUE2", ...]`.
+     * Each element should be prefixed with `--config` when passed to jj.
+     *
+     * @param toolName An ephemeral tool name (e.g. [MERGE_TOOL_NAME]).
+     * @param stagedFile Path to the file holding the already-resolved content.
+     */
+    fun mergeToolConfigArgs(toolName: String, stagedFile: Path): List<String> {
+        val java = discoverJavaExecutable()
+        val classpath = discoverClasspath()
+        val mainClass = "in.kkkev.jjidea.diffedit.MergeApplyMain"
+        val stagedPath = stagedFile.absolutePathString()
+
+        // jj runs: program merge-args, i.e. `java [merge-args]` — so merge-args must NOT
+        // repeat java. jj substitutes $output; MergeApplyMain signature: <stagedFile> <output>.
+        val mergeArgs = tomlArray(listOf("-cp", classpath, mainClass, stagedPath, "\$output"))
+
+        return listOf(
+            "merge-tools.$toolName.program=$java",
+            "merge-tools.$toolName.merge-args=$mergeArgs"
+        )
+    }
+
+    /** The TOML name for the ephemeral merge tool registered per interactive resolve. */
+    const val MERGE_TOOL_NAME = "jj-idea-merge-apply"
+
     // ---- classpath / JRE discovery ----
 
     /**

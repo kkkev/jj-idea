@@ -372,10 +372,19 @@ interface CommandExecutor {
      * `:ours` and `:theirs` correctly turn a modify/delete conflict into an actual file
      * deletion when the deleted side is chosen, unlike writing bytes directly to disk.
      * @param paths Paths relative to the repository root
-     * @param tool Tool name, e.g. `:ours` or `:theirs`
+     * @param tool Tool name, e.g. `:ours` or `:theirs`, or an ephemeral tool name registered
+     *   via [configArgs] (see `diffedit/DiffEditTool.kt`'s pattern for `jj split --tool`)
      * @param revision Revision to resolve in (default: working copy)
+     * @param configArgs `NAME=VALUE` pairs emitted as `--config NAME=VALUE` before the
+     *   subcommand, e.g. to register an ephemeral merge tool for interactive write-back
+     *   (jj-idea-cf2c)
      */
-    fun resolve(paths: List<String>, tool: String, revision: Revision = WorkingCopy): CommandResult
+    fun resolve(
+        paths: List<String>,
+        tool: String,
+        revision: Revision = WorkingCopy,
+        configArgs: List<String> = emptyList()
+    ): CommandResult
 
     /**
      * Rebase revisions onto a new destination.
