@@ -2,9 +2,11 @@ package `in`.kkkev.jjidea.ui.log.bookmarks
 
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkItem
+import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
 import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.DanglingHead
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RepositoryReferences
@@ -502,5 +504,67 @@ class BookmarkTreeModelTest {
         val originKey = origin.expansionPathKey("")
         originKey shouldBe "origin"
         feature.expansionPathKey(originKey) shouldBe "origin/feature"
+    }
+
+    // jj-idea-lig7 (GitHub #107): a visible head with no bookmark on it gets its own collapsible
+    // "Unbookmarked heads" category, sitting right after the "@" row and before Local.
+
+    @Test
+    fun `no dangling heads means no Unbookmarked heads category`() {
+        val tree = buildBookmarkTree(refs("main"), emptyMap(), emptyMap(), emptyMap())
+
+        tree.none { it is BookmarkNode.Category && it.displayName == "Unbookmarked heads" } shouldBe true
+    }
+
+    @Test
+    fun `dangling heads land in their own category, ordered by distance then id`() {
+        val closeHead = DanglingHead(
+            ChangeId("aaa", "aaa", null),
+            ClosestBookmarks(listOf(BookmarkName("main")), distance = 1, distanceCapped = false)
+        )
+        val farHead = DanglingHead(
+            ChangeId("bbb", "bbb", null),
+            ClosestBookmarks(listOf(BookmarkName("main")), distance = 5, distanceCapped = false)
+        )
+        val danglingHeads = mapOf(repo to listOf(farHead, closeHead))
+
+        val tree = buildBookmarkTree(refs("main"), emptyMap(), emptyMap(), danglingHeads)
+
+        val categories = tree.filterIsInstance<BookmarkNode.Category>().map { it.displayName }
+        categories shouldBe listOf("Unbookmarked heads", "Local")
+        val unbookmarked =
+            tree.filterIsInstance<BookmarkNode.Category>().first { it.displayName == "Unbookmarked heads" }
+        val leaves = unbookmarked.children.filterIsInstance<BookmarkNode.DanglingHead>()
+        leaves.map { it.id } shouldBe listOf(closeHead.id, farHead.id)
+        leaves[0].displayName shouldBe "main +1 aaa"
+    }
+
+    @Test
+    fun `the Unbookmarked heads category sits after the working copy row`() {
+        val commitId = CommitId("abc123def456", "ab")
+        val wcEntry = LogEntry(repo = repo, id = changeId, commitId = commitId, underlyingDescription = "")
+        val closest = ClosestBookmarks(listOf(BookmarkName("main")), distance = 3, distanceCapped = false)
+        val head = DanglingHead(ChangeId("aaa", "aaa", null), null)
+
+        val tree = buildBookmarkTree(
+            refs("main"),
+            mapOf(repo to wcEntry),
+            mapOf(repo to closest),
+            mapOf(repo to listOf(head))
+        )
+
+        tree[0] shouldBe tree.first { it is BookmarkNode.WorkingCopy }
+        tree[1] shouldBe tree.first { it is BookmarkNode.Category && it.displayName == "Unbookmarked heads" }
+    }
+
+    @Test
+    fun `a dangling head with no ancestor bookmark at all uses the no-bookmark fallback label`() {
+        val head = DanglingHead(ChangeId("aaa", "aaa", null), null)
+        val tree = buildBookmarkTree(refs(), emptyMap(), emptyMap(), mapOf(repo to listOf(head)))
+
+        val leaf =
+            tree.filterIsInstance<BookmarkNode.Category>().single().children.single() as BookmarkNode.DanglingHead
+        leaf.displayName shouldBe "(no bookmark) aaa"
+        leaf.closest shouldBe null
     }
 }

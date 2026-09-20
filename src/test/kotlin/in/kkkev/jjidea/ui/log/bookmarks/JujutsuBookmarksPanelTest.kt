@@ -6,6 +6,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkItem
@@ -14,6 +15,7 @@ import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -159,6 +161,40 @@ class JujutsuBookmarksPanelTest {
             JujutsuDataKeys.LOG_ENTRY.getData(dataContext) shouldBe null
         } finally {
             Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    // jj-idea-lig7 (GitHub #107): a dangling head has no BOOKMARK_TARGET (see selectedBookmarkTargets),
+    // so double-click must navigate directly rather than going through the registered
+    // Jujutsu.Bookmark.Navigate action, which would see nothing to act on.
+
+    @Test
+    fun `double-clicking a dangling head navigates the log directly to its change`() {
+        val repo = mockk<JujutsuRepository> {
+            every { displayName } returns "repo"
+            every { project } returns this@JujutsuBookmarksPanelTest.project.get()
+        }
+        val id = ChangeId("aaaaaaaa", "a")
+
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            selectLeaves(panel, BookmarkNode.DanglingHead(repo, id, null, "(no bookmark) a"))
+
+            val disposable = Disposer.newDisposable()
+            var selected: ChangeKey? = null
+            project.get().stateModel.changeSelection.connect(disposable) { selected = it }
+            try {
+                val bounds = panel.tree.getRowBounds(0)
+                val handled = panel.handleDoubleClick(bounds.x + 2, bounds.y + bounds.height / 2)
+                UIUtil.dispatchAllInvocationEvents()
+
+                handled shouldBe true
+                selected shouldBe ChangeKey(repo, id)
+            } finally {
+                Disposer.dispose(disposable)
+            }
+        } finally {
             Disposer.dispose(panel)
         }
     }

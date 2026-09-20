@@ -733,7 +733,10 @@ class JjStub(override val workDir: Path) : JjBackend {
         field("false") // conflict
         field(if (isEmpty) "true" else "false")
         field(if (change.immutable) "true" else "false")
-        if (includesPushedAncestor) field(if (change.hasPushedAncestor) "true" else "false")
+        if (includesPushedAncestor) {
+            field(if (change.hasPushedAncestor) "true" else "false")
+            field(if (isDanglingHead(change)) "true" else "false")
+        }
 
         if (isFullTemplate) {
             field(change.authorName)
@@ -744,6 +747,15 @@ class JjStub(override val workDir: Path) : JjBackend {
             field(change.timestamp.toString())
         }
     }
+
+    /**
+     * Stub equivalent of the plugin's `heads(all()) ~ (bookmarks() | remote_bookmarks())`
+     * predicate: a visible head (no other change has it as a parent) carrying no bookmark. The
+     * stub tracks only one bookmark list per change (no local/remote split), so any bookmark
+     * present disqualifies it either way.
+     */
+    private fun isDanglingHead(change: StubChange): Boolean =
+        change.bookmarks.isEmpty() && changes.none { change.commitId in it.parentIds }
 
     private fun formatParents(change: StubChange): String =
         change.parentIds.mapNotNull { pid ->

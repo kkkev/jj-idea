@@ -150,7 +150,7 @@ class ClosestBookmarksTest {
 
         service.revsets.map { it.toString() } shouldBe listOf(
             "heads(::@ & bookmarks())",
-            "heads(::@ & bookmarks())..@"
+            "descendants(heads(::@ & bookmarks())) & (heads(::@ & bookmarks())..@)"
         )
     }
 }

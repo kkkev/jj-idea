@@ -33,7 +33,8 @@ abstract class LogContractTest {
         fields.conflict,
         fields.empty,
         fields.immutable,
-        fields.hasPushedAncestor
+        fields.hasPushedAncestor,
+        fields.isDanglingHead
     ).joinToString(" ++ ") { it.spec }
 
     private val fullSpec = basicSpec + " ++ " +
@@ -115,7 +116,8 @@ abstract class LogContractTest {
             7 to "conflict",
             8 to "empty",
             9 to "immutable",
-            10 to "hasPushedAncestor"
+            10 to "hasPushedAncestor",
+            11 to "isDanglingHead"
         )
         booleanFields.forEach { (idx, name) ->
             fields[idx] shouldMatch Regex("true|false")
@@ -158,9 +160,9 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", fullSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        // Author timestamp at index 13, committer timestamp at index 16
-        val authorTs = fields[13]
-        val committerTs = fields[16]
+        // Author timestamp at index 14, committer timestamp at index 17
+        val authorTs = fields[14]
+        val committerTs = fields[17]
 
         authorTs.toLong() shouldBeGreaterThan 0L
         committerTs.toLong() shouldBeGreaterThan 0L
@@ -221,8 +223,22 @@ abstract class LogContractTest {
         fields[10] shouldBe "false"
     }
 
+    @Test
+    fun `isDanglingHead is true for an unbookmarked head and false once bookmarked`() {
+        jj.describe("Test")
+
+        fun danglingField() = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
+            .stdout.trim().split("\u0000")[11]
+
+        danglingField() shouldBe "true"
+
+        jj.bookmarkCreate("test-bookmark")
+
+        danglingField() shouldBe "false"
+    }
+
     companion object {
-        private const val BASIC_FIELD_COUNT = 11
-        private const val FULL_FIELD_COUNT = 17
+        private const val BASIC_FIELD_COUNT = 12
+        private const val FULL_FIELD_COUNT = 18
     }
 }

@@ -84,10 +84,23 @@ fun TextCanvas.appendDecorations(entry: LogEntry) {
         if (entry.bookmarks.isNotEmpty()) space()
         appendTags(entry)
     }
+    if (entry.isDanglingHead) {
+        if (entry.bookmarks.isNotEmpty() || entry.tags.isNotEmpty()) space()
+        appendDanglingHeadMarker()
+    }
     if (entry.isWorkingCopy) {
         space()
         colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
     }
+}
+
+/**
+ * A small marker for a visible head with no bookmark on it (jj-idea-lig7, GitHub #107) - work
+ * sitting past a forgotten `jj bookmark advance`. Never collapsed into the "+N more" overflow
+ * chip in [cappedDecorations] (like the `@` marker) since it isn't a ref chip to begin with.
+ */
+private fun TextCanvas.appendDanglingHeadMarker() {
+    smaller { append(icon(JujutsuIcons::BookmarkNone)) }
 }
 
 /** Fraction of the graph+description column width that decorations (bookmarks/tags) may occupy
@@ -162,8 +175,12 @@ fun cappedDecorations(
             if (kept > 0) append(" ")
             overflowChip(entry, hiddenUnits)
         }
-        if (entry.isWorkingCopy) {
+        if (entry.isDanglingHead) {
             if (kept > 0 || hiddenUnits.isNotEmpty()) append(" ")
+            appendDanglingHeadMarker()
+        }
+        if (entry.isWorkingCopy) {
+            if (kept > 0 || hiddenUnits.isNotEmpty() || entry.isDanglingHead) append(" ")
             colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
         }
     }

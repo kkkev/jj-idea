@@ -5,7 +5,9 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkWidgetText
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkItem
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
+import `in`.kkkev.jjidea.jj.DanglingHead
 import `in`.kkkev.jjidea.jj.GIT_PSEUDO_REMOTE
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -108,6 +110,18 @@ sealed interface BookmarkNode {
 
     /** A tag leaf. */
     data class Tag(val repo: JujutsuRepository, val item: TagItem, override val displayName: String) : BookmarkNode
+
+    /**
+     * A visible head with no bookmark on it (jj-idea-lig7, GitHub #107) — nests under the
+     * "Unbookmarked heads" [Category]. [closest] is `null` when [id] has no ancestor bookmark at
+     * all.
+     */
+    data class DanglingHead(
+        val repo: JujutsuRepository,
+        val id: ChangeId,
+        val closest: ClosestBookmarks?,
+        override val displayName: String
+    ) : BookmarkNode
 }
 
 /**
@@ -128,11 +142,18 @@ sealed interface BookmarkNode {
 fun buildBookmarkTree(
     references: Map<JujutsuRepository, RepositoryReferences>,
     workingCopies: Map<JujutsuRepository, LogEntry>,
-    closest: Map<JujutsuRepository, ClosestBookmarks?>
+    closest: Map<JujutsuRepository, ClosestBookmarks?>,
+    danglingHeads: Map<JujutsuRepository, List<DanglingHead>> = emptyMap()
 ): List<BookmarkNode> {
     val repos = references.keys.sortedBy { it.displayName }
     val perRepoNodes = repos.associateWith { repo ->
-        buildRepoNodes(repo, references.getValue(repo), workingCopies[repo], closest[repo])
+        buildRepoNodes(
+            repo,
+            references.getValue(repo),
+            workingCopies[repo],
+            closest[repo],
+            danglingHeads[repo].orEmpty()
+        )
     }
 
     return if (repos.size > 1) {
@@ -146,11 +167,28 @@ private fun buildRepoNodes(
     repo: JujutsuRepository,
     refs: RepositoryReferences,
     wcEntry: LogEntry?,
-    closest: ClosestBookmarks?
+    closest: ClosestBookmarks?,
+    danglingHeads: List<DanglingHead>
 ): List<BookmarkNode> = buildList {
     val onWcNames = wcEntry?.bookmarks?.filterNot { it.isRemote }?.map { it.name.name }.orEmpty()
     val wcLabel = bookmarkWidgetText(onWcNames, closest)
     if (wcLabel.isNotEmpty()) add(BookmarkNode.WorkingCopy(repo, wcLabel))
+
+    if (danglingHeads.isNotEmpty()) {
+        val leaves = danglingHeads
+            .sortedWith(compareBy({ it.closest?.distance ?: Int.MAX_VALUE }, { it.id.full }))
+            .map { head ->
+                val label = "${danglingHeadLabel(head.closest)} ${head.id.short}"
+                BookmarkNode.DanglingHead(repo, head.id, head.closest, label)
+            }
+        add(
+            BookmarkNode.Category(
+                JujutsuBundle.message("bookmarks.panel.unbookmarked"),
+                RefKind.BOOKMARK,
+                leaves
+            )
+        )
+    }
 
     // Built once for the whole repo (jj-idea-lc43, GitHub #110): a remote row whose local side is
     // pending-deletion carries a meaningless tracking_ahead_count from jj (see
@@ -233,6 +271,21 @@ private fun buildRepoNodes(
     }
 }
 
+/**
+ * The bookmark-coloured half of a [BookmarkNode.DanglingHead]'s label (jj-idea-lig7): reuses
+ * [bookmarkWidgetText] to render "[closest] +n" exactly as the working-copy row does, or a
+ * localized fallback when the head has no ancestor bookmark at all. The change id itself is
+ * appended separately by the caller (both the plain-text `displayName` here and the styled
+ * renderer in [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel]) via
+ * [in.kkkev.jjidea.ui.components.append].
+ */
+fun danglingHeadLabel(closest: ClosestBookmarks?): String =
+    if (closest != null) {
+        bookmarkWidgetText(emptyList(), closest)
+    } else {
+        JujutsuBundle.message("bookmarks.panel.unbookmarked.nobookmark")
+    }
+
 /** Sums [BookmarkRollup] contributions of every bookmark leaf reachable under [nodes]. */
 private fun rollupOf(nodes: List<BookmarkNode>): BookmarkRollup =
     nodes.fold(BookmarkRollup.EMPTY) { acc, n ->
@@ -243,7 +296,8 @@ private fun BookmarkNode.leafRollup(): BookmarkRollup = when (this) {
     is BookmarkNode.Local -> item.bookmark.toRollup()
     is BookmarkNode.Remote -> item.bookmark.toRollup()
     is BookmarkNode.WithRefKind -> rollup
-    is BookmarkNode.WorkingCopy, is BookmarkNode.Tag, is BookmarkNode.RepoGroup -> BookmarkRollup.EMPTY
+    is BookmarkNode.WorkingCopy, is BookmarkNode.Tag, is BookmarkNode.RepoGroup, is BookmarkNode.DanglingHead ->
+        BookmarkRollup.EMPTY
 }
 
 private fun Bookmark.toRollup() = BookmarkRollup(aheadCount, behindCount, hasUnsynced = !tracked || conflict)

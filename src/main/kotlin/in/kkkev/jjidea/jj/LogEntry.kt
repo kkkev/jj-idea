@@ -27,6 +27,13 @@ data class LogEntry(
     override val immutable: Boolean = false,
     val hasPushedAncestor: Boolean = false,
     /**
+     * True when this change is a visible head with no bookmark on it (jj-idea-lig7, GitHub
+     * #107) — work sitting past a forgotten `jj bookmark advance`. Gated the same way as
+     * [hasPushedAncestor]: `false` on a backend that can't evaluate the underlying
+     * `self.contained_in(...)` predicate (see [in.kkkev.jjidea.jj.cli.CliLogService]).
+     */
+    val isDanglingHead: Boolean = false,
+    /**
      * True for a not-yet-created change previewed in a rebase-simulator preview (e.g.
      * [in.kkkev.jjidea.ui.newchange.NewChangeDialog]'s "the change about to be created" row).
      * [id]/[commitId] are placeholders with no real backing commit - the log-row renderer checks

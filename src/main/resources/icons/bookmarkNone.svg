@@ -1,0 +1,7 @@
+<svg width="12" height="16" viewBox="3 0 9 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .primary { stroke: #7A5D00 }
+  </style>
+  <path d="m3.5,15 l4,-3.5 l4,3.5 v-14 h-8 v14 z" class="primary"/>
+  <path d="M2.5,1.5 L11.5,14.5" class="primary"/>
+</svg>

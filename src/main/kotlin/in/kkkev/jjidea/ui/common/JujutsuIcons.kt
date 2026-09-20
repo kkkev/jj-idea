@@ -65,6 +65,10 @@ object JujutsuIcons {
     @JvmField
     val BookmarkConflict: Icon = strokeIcon("/icons/bookmarkConflict.svg", RED)
 
+    /** A visible head with no bookmark on it (jj-idea-lig7, GitHub #107) - see [in.kkkev.jjidea.jj.DanglingHead]. */
+    @JvmField
+    val BookmarkNone: Icon = strokeIcon("/icons/bookmarkNone.svg", GREY)
+
     @JvmField
     val Describe: Icon = strokeIcon("/icons/describe.svg", GREY)
 

@@ -292,6 +292,14 @@ here" without a hand cursor implying a left-click action that doesn't exist.
 - [ ] Choosing **Filter Log to '...'** from the right-click menu applies the filter and closes the menu; choosing it again while already active clears the filter and closes the menu
 - [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
 - [ ] The "+N more" overflow chip shows both a hand cursor and the same grey background highlight on hover (jj-idea-ttmp), and **left-clicking** it still opens its popup of hidden refs, each still openable via their own submenu
+- [ ] jj-idea-lig7 (GitHub #107): `jj new` off a bookmarked change without moving the bookmark —
+      the resulting unbookmarked head's log row shows a small slashed-bookmark marker after its
+      (absent) bookmark chips; `jj bookmark set <name> -r <that change>` removes the marker after
+      the auto-refresh; a change with a bookmark, or one that's merely an ancestor of one, never
+      shows it (see MT-BOOKMARK's "Unbookmarked heads" for the bookmarks-panel side)
+- [ ] jj-idea-lig7: the marker survives column-width capping (`cappedDecorations`) — narrow the
+      graph+description column so bookmark/tag chips collapse into "+N more"; the dangling-head
+      marker still renders after the overflow chip, uncollapsed, same as the `@` marker
 
 #### Drag and drop - core infrastructure (jj-idea-6jvh)
 
@@ -1627,7 +1635,7 @@ one per affected remote.
 
 #### Bookmarks panel (jj-idea-b2ae, GitHub #48)
 
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`)
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`), `jj/ClosestBookmarks.kt` (`danglingHeads`, jj-idea-lig7)
 
 A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
 git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
@@ -1743,6 +1751,27 @@ selection does nothing; right-click for actions.
 - [ ] jj-idea-p35f: select a bookmark whose change is **not** in the currently loaded log window
   (e.g. a far-back bookmark in a filtered/paginated log) — New Change/Edit/Rebase/Duplicate show
   disabled rather than acting on the wrong change
+- [ ] jj-idea-lig7 (GitHub #107): `jj new` off a bookmarked change, twice, without moving the
+  bookmark (leaving two unbookmarked heads) — an "Unbookmarked heads" group appears right after
+  the "@" node and before "Local", listing both, each as "\<closest bookmark\> +n \<change id\>"
+  (bookmark-coloured label, change id in the log's own bold-prefix/grey-remainder style)
+- [ ] jj-idea-lig7: a dangling head with no ancestor bookmark at all (e.g. a root-adjacent
+  disconnected change) shows "(no bookmark) \<change id\>" instead of a `+n` count
+- [ ] jj-idea-lig7: `jj bookmark set \<name\> -r \<that head\>` in the terminal — the row
+  disappears from "Unbookmarked heads" after the auto-refresh, without a manual refresh
+- [ ] jj-idea-lig7: double-clicking an unbookmarked-head row scrolls/selects that change in the
+  log, including one outside the currently loaded window (same expanding-load behavior as
+  "Navigate Log to Bookmark") — this works even though the row has no bookmark to publish as
+  `BOOKMARK_TARGET`
+- [ ] jj-idea-lig7: right-clicking an unbookmarked-head row offers "Navigate Log to Bookmark",
+  "Create Bookmark Here…" (bookmarking it removes it from the group), and the same New
+  Change/Edit/Rebase/Duplicate change actions as a bookmark row
+- [ ] jj-idea-lig7: the "Unbookmarked heads" group is collapsible via the same toolbar Expand
+  All/Collapse All buttons and persists its collapsed state across an IDE restart, same as
+  Local/Tags/a remote group
+- [ ] jj-idea-lig7: with more than 10 unbookmarked heads in the repo, the group caps at 10 rows
+  rather than growing unbounded (use `scripts/fixtures/fx-stress.sh`'s stress fixture, which has
+  many concurrent unbookmarked branch tips)
 
 ### MT-WORKINGCOPY
 

@@ -187,6 +187,21 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     }
 
     /**
+     * Visible heads with no bookmark on them (jj-idea-lig7, GitHub #107) — work sitting past a
+     * forgotten `jj bookmark advance`. Invalidated together with [references]/[closestBookmarks]
+     * via [invalidateRepositoryState], since either can change which heads are dangling.
+     */
+    val danglingHeads = notifiableState<Map<JujutsuRepository, List<DanglingHead>>>(
+        project,
+        "Jujutsu Dangling Heads",
+        emptyMap()
+    ) {
+        initialisedRepositories.immediateValue.values.associateWith { repo ->
+            repo.logService.danglingHeads()
+        }
+    }
+
+    /**
      * Working copy log entries - one for each repo.
      */
     val workingCopies = notifiableState(
@@ -305,13 +320,15 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 
     /**
      * Refreshes every state derived from a repo's current operation: bookmarks/tags, the working
-     * copy, and which bookmark is nearest it ([closestBookmarks]). Kept together so a future
-     * derived state can't be added to one refresh path and forgotten on the others.
+     * copy, which bookmark is nearest it ([closestBookmarks]), and which heads have no bookmark
+     * at all ([danglingHeads]). Kept together so a future derived state can't be added to one
+     * refresh path and forgotten on the others.
      */
     internal fun invalidateRepositoryState() {
         references.invalidate()
         workingCopies.invalidate()
         closestBookmarks.invalidate()
+        danglingHeads.invalidate()
     }
 
     /**

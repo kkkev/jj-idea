@@ -99,9 +99,9 @@ class JujutsuBookmarksPanel(
         cellRenderer = BookmarkNodeRenderer(project)
     }
 
-    // Coalesces a burst of reference/working-copy/closest-bookmark invalidations (e.g. a bookmark
-    // create followed by the resulting log refresh) into a single tree rebuild, the same pattern
-    // as UnifiedWorkingCopyPanel's reloadQueue (jj-idea-f21f).
+    // Coalesces a burst of reference/working-copy/closest-bookmark/dangling-head invalidations
+    // (e.g. a bookmark create followed by the resulting log refresh) into a single tree rebuild,
+    // the same pattern as UnifiedWorkingCopyPanel's reloadQueue (jj-idea-f21f).
     private val rebuildQueue = MergingUpdateQueue("bookmarksPanelRebuild", 200, true, null, this)
 
     /** Test seam for the rebuild fan-out scale guard: how many times [rebuild] actually ran. */
@@ -137,6 +137,7 @@ class JujutsuBookmarksPanel(
             references.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
             workingCopies.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
             closestBookmarks.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
+            danglingHeads.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
         }
         // jj-idea-0rdm: bookmarks-panel drag source/target support (batch 4). This panel is its
         // own disposable parent for the DnD registration, mirroring JujutsuLogTable's own
@@ -186,7 +187,8 @@ class JujutsuBookmarksPanel(
         val nodes = buildBookmarkTree(
             project.stateModel.references.value,
             project.stateModel.workingCopies.value.values.associateBy { it.repo },
-            project.stateModel.closestBookmarks.value
+            project.stateModel.closestBookmarks.value,
+            project.stateModel.danglingHeads.value
         )
         root.removeAllChildren()
         nodes.forEach { addChildren(root, it) }
@@ -254,7 +256,8 @@ class JujutsuBookmarksPanel(
         is BookmarkNode.RepoGroup -> node.children
         is BookmarkNode.Category -> node.children
         is BookmarkNode.Prefix -> node.children
-        is BookmarkNode.WorkingCopy, is BookmarkNode.Local, is BookmarkNode.Remote, is BookmarkNode.Tag -> emptyList()
+        is BookmarkNode.WorkingCopy, is BookmarkNode.Local, is BookmarkNode.Remote, is BookmarkNode.Tag,
+        is BookmarkNode.DanglingHead -> emptyList()
     }
 
     private fun installPopupHandler() {
@@ -286,18 +289,33 @@ class JujutsuBookmarksPanel(
      * (jj-idea-th9h) via the shared [invokeEnterBoundAction] helper — jj-idea-ib1i. A click that
      * hits an issue-tracker link in the row keeps its existing behaviour (open in browser)
      * instead.
+     *
+     * A [BookmarkNode.DanglingHead] has no [JujutsuDataKeys.BOOKMARK_TARGET] (it isn't a bookmark,
+     * see [selectedBookmarkTargets]), so the registered `Jujutsu.Bookmark.Navigate` can't see it
+     * and [invokeEnterBoundAction] would no-op - navigate directly instead (jj-idea-lig7).
      */
     private fun installDoubleClickHandler() {
         object : DoubleClickListener() {
-            override fun onDoubleClick(e: MouseEvent): Boolean {
-                if (linkTargetAt(e.x, e.y) != null) return false
-                val path = tree.getClosestPathForLocation(e.x, e.y) ?: return false
-                if (tree.selectionPaths?.contains(path) != true) {
-                    tree.selectionPath = path
-                }
-                return invokeEnterBoundAction(tree)
-            }
+            override fun onDoubleClick(e: MouseEvent) = handleDoubleClick(e.x, e.y)
         }.installOn(tree)
+    }
+
+    /**
+     * Extracted from [installDoubleClickHandler] as a test seam - simulating a real Swing
+     * double-click gesture through [DoubleClickListener] is brittle.
+     */
+    internal fun handleDoubleClick(x: Int, y: Int): Boolean {
+        if (linkTargetAt(x, y) != null) return false
+        val path = tree.getClosestPathForLocation(x, y) ?: return false
+        if (tree.selectionPaths?.contains(path) != true) {
+            tree.selectionPath = path
+        }
+        val node = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode
+        if (node is BookmarkNode.DanglingHead) {
+            performNavigateToBookmark(node.repo, node.id)
+            return true
+        }
+        return invokeEnterBoundAction(tree)
     }
 
     /**
@@ -361,14 +379,18 @@ class JujutsuBookmarksPanel(
         }
 
     /**
-     * The selection's bookmark/tag leaves resolved to real [LogEntry]s via [entryLookup], or
-     * `null` if the selection has no such leaves, or resolution failed for any one of them — a
-     * partial resolution (some bookmarks outside the loaded log window) must never let a change
-     * action silently act on a subset of what's selected. See [uiDataSnapshot].
+     * The selection's bookmark/tag/dangling-head leaves resolved to real [LogEntry]s via
+     * [entryLookup], or `null` if the selection has no such leaves, or resolution failed for any
+     * one of them — a partial resolution (some bookmarks outside the loaded log window) must
+     * never let a change action silently act on a subset of what's selected. See
+     * [uiDataSnapshot].
      */
     private fun selectedLogEntries(): List<LogEntry>? {
         val leaves = selectedLeaves().filter {
-            it is BookmarkNode.Local || it is BookmarkNode.Remote || it is BookmarkNode.Tag
+            it is BookmarkNode.Local ||
+                it is BookmarkNode.Remote ||
+                it is BookmarkNode.Tag ||
+                it is BookmarkNode.DanglingHead
         }
         if (leaves.isEmpty()) return null
         val resolved = leaves.mapNotNull { node ->
@@ -376,6 +398,7 @@ class JujutsuBookmarksPanel(
                 is BookmarkNode.Local -> node.repo to node.item.id
                 is BookmarkNode.Remote -> node.repo to node.item.id
                 is BookmarkNode.Tag -> node.repo to node.item.id
+                is BookmarkNode.DanglingHead -> node.repo to node.id
                 else -> return@mapNotNull null
             }
             id?.let { entryLookup(ChangeKey(repo, it)) }
@@ -493,6 +516,19 @@ class JujutsuBookmarksPanel(
             BackgroundActionGroup(createBookmarkAction(wcEntry), advanceClosestBookmarkAction(node.repo, closest))
         }
 
+        is BookmarkNode.DanglingHead -> {
+            val entries = selectedLogEntries().orEmpty()
+            BackgroundActionGroup(
+                *buildList {
+                    add(navigateLogToBookmarkAction(node.repo, node.id))
+                    // The fix for a dangling head is to bookmark it - offer that one click away,
+                    // same as the "@" row's own createBookmarkAction (jj-idea-lig7).
+                    add(createBookmarkAction(entries.firstOrNull()))
+                    addChangeActions(node.repo, entries)
+                }.toTypedArray()
+            )
+        }
+
         is BookmarkNode.RepoGroup, is BookmarkNode.Category, is BookmarkNode.Prefix -> null
     }
 
@@ -576,6 +612,19 @@ class JujutsuBookmarksPanel(
 
                 is BookmarkNode.Tag -> {
                     canvas.appendTagChip(node.item.tag, node.displayName)
+                }
+
+                is BookmarkNode.DanglingHead -> {
+                    // Same bookmark-coloured "[closest] +n" the working-copy row renders, then the
+                    // change id in the log's own style (bold shortest prefix + grey remainder) -
+                    // jj-idea-lig7.
+                    canvas.colored(JujutsuColors.BOOKMARK) {
+                        smaller {
+                            append(danglingHeadLabel(node.closest))
+                        }
+                    }
+                    canvas.append(" ")
+                    canvas.smaller { append(node.id) }
                 }
             }
             render(canvas)

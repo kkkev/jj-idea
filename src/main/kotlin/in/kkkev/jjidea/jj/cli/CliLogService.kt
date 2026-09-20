@@ -89,9 +89,10 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     private fun markPushedAncestorUnsupported() {
         if (pushedAncestorUnsupported.add(repo.directory.path)) {
             log.warn(
-                "jj backend for ${repo.directory.path} cannot evaluate the pushed-ancestor revset " +
-                    "(descendants(::remote_bookmarks())); falling back to a reduced log template " +
-                    "for the rest of this session."
+                "jj backend for ${repo.directory.path} cannot evaluate one of the pushed-ancestor / " +
+                    "dangling-head revsets (descendants(::remote_bookmarks()) / " +
+                    "heads(all()) ~ (bookmarks() | remote_bookmarks())); falling back to a reduced " +
+                    "log template for the rest of this session."
             )
         }
     }
@@ -372,14 +373,17 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val committer = SignatureFields("committer")
         val immutable = booleanField("immutable")
         val hasPushedAncestor = booleanField("""self.contained_in("descendants(::remote_bookmarks())")""")
+        val isDanglingHead =
+            booleanField("""self.contained_in("heads(all()) ~ (bookmarks() | remote_bookmarks())")""")
     }
 
     inner class LogTemplates : LogFields() {
         /**
-         * Builds the basic log template, optionally omitting [hasPushedAncestor]. That field's
-         * spec embeds the revset `descendants(::remote_bookmarks())`, which some non-standard jj
-         * backends cannot evaluate (see [CliLogService.getLog]); when omitted, [LogEntry.hasPushedAncestor]
-         * defaults to false.
+         * Builds the basic log template, optionally omitting [hasPushedAncestor] and
+         * [isDanglingHead]. Both fields' specs embed a `self.contained_in(...)` revset predicate
+         * (`descendants(::remote_bookmarks())` / `heads(all()) ~ (bookmarks() | remote_bookmarks())`)
+         * that some non-standard jj backends cannot evaluate (see [CliLogService.getLog]); when
+         * omitted, [LogEntry.hasPushedAncestor] and [LogEntry.isDanglingHead] default to false.
          */
         private fun buildBasicTemplate(includePushedAncestor: Boolean): LogTemplate<LogEntry> {
             val fields = buildList<LogSpec<*>> {
@@ -393,7 +397,10 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 add(conflict)
                 add(empty)
                 add(immutable)
-                if (includePushedAncestor) add(hasPushedAncestor)
+                if (includePushedAncestor) {
+                    add(hasPushedAncestor)
+                    add(isDanglingHead)
+                }
             }
             return logTemplate(*fields.toTypedArray()) {
                 LogEntry(
@@ -408,7 +415,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                     conflict.take(it),
                     empty.take(it),
                     immutable = immutable.take(it),
-                    hasPushedAncestor = if (includePushedAncestor) hasPushedAncestor.take(it) else false
+                    hasPushedAncestor = if (includePushedAncestor) hasPushedAncestor.take(it) else false,
+                    isDanglingHead = if (includePushedAncestor) isDanglingHead.take(it) else false
                 )
             }
         }
