@@ -67,7 +67,7 @@ class MoveBookmarkDialogOkStateTest {
             MoveBookmarkToChangeDialog(
                 mockRepo(project.get()),
                 listOf(entry to MoveDirection.FORWARD),
-                currentId = null
+                currentTargets = emptyList()
             )
 
         dialog.isOKActionEnabled shouldBe true
@@ -81,7 +81,7 @@ class MoveBookmarkDialogOkStateTest {
         val dialog = MoveBookmarkToChangeDialog(
             mockRepo(project.get()),
             listOf(entry to MoveDirection.BACKWARD_OR_SIDEWAYS),
-            currentId = null
+            currentTargets = emptyList()
         )
 
         dialog.isOKActionEnabled shouldBe false
@@ -90,9 +90,40 @@ class MoveBookmarkDialogOkStateTest {
 
     @Test
     fun `Move to Change OK is disabled when there are no candidate changes`() {
-        val dialog = MoveBookmarkToChangeDialog(mockRepo(project.get()), emptyList(), currentId = null)
+        val dialog = MoveBookmarkToChangeDialog(mockRepo(project.get()), emptyList(), currentTargets = emptyList())
 
         dialog.isOKActionEnabled shouldBe false
+        disposeDialog(dialog)
+    }
+
+    // ---- RESOLVE (divergent bookmark, jj-idea-t7cz) ----
+
+    @Test
+    fun `OK is enabled immediately when the only row is a RESOLVE bookmark`() {
+        val bookmark = ClassifiedBookmark(
+            BookmarkItem(
+                Bookmark("dev", conflict = true),
+                listOf(ChangeId("aaafull", "aaa"), ChangeId("bbbfull", "bbb"))
+            ),
+            MoveDirection.RESOLVE
+        )
+        val dialog = MoveBookmarkDialog(project.get(), listOf(bookmark))
+
+        dialog.isOKActionEnabled shouldBe true
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `Move to Change OK is enabled immediately when the only row is a RESOLVE change`() {
+        val entry = createEntry(mockRepo(project.get()), "aaafull")
+
+        val dialog = MoveBookmarkToChangeDialog(
+            mockRepo(project.get()),
+            listOf(entry to MoveDirection.RESOLVE),
+            currentTargets = listOf(ChangeId("aaafull", "aaa"), ChangeId("bbbfull", "bbb"))
+        )
+
+        dialog.isOKActionEnabled shouldBe true
         disposeDialog(dialog)
     }
 

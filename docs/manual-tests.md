@@ -1508,7 +1508,7 @@ toolbar itself is hidden or unavailable.
       candidates picker dialog (multiple close bookmarks) is unaffected either way — it already
       served as its own confirmation before this change
 
-#### Move direction (forward vs. backward/sideways)
+#### Move direction (forward / backward-sideways / resolve)
 
 Covers `actions/bookmark/MoveBookmarkDialog.kt`, `MoveBookmarkToChangeDialog.kt`,
 `BookmarkClassifier.kt`. jj-idea-tvch: in a repo with any divergent change, every move used to
@@ -1529,6 +1529,31 @@ be misclassified as backward/sideways.
 - [ ] Confirming a forward move without ticking the checkbox actually runs `jj bookmark set`
       without `-B` (check via `jj op log` or that the bookmark moved) — no unexpected
       "backwards or sideways" retry prompt
+- [ ] jj-idea-499t: confirming a move from **both** dialogs shows an undo balloon reading "Move
+      bookmark"; clicking Undo puts the bookmark back where it was. "Move Bookmark Here…" already
+      had this; "Move '\<bookmark\>' to Change…" did not — it moved the bookmark with no balloon
+      and no undo support at all
+
+**jj-idea-t7cz (GitHub #121): resolving a divergent bookmark back onto one of its own targets.**
+Build a divergent bookmark with the `conflicted-bm` recipe in the "Bookmarks panel" subsection's
+jj-idea-5r0g item, below.
+
+- [ ] Right-click `<rev-a>` (one of `conflicted-bm`'s two targets) → "Move Bookmark Here…" →
+      `conflicted-bm` now appears (it used to be silently excluded when `<rev-a>` happened to be
+      jj's *first* `added_targets` entry), under a **"Resolve conflict"** section header, with the
+      red conflict glyph instead of the forward/backward icon, at full opacity, and OK enables
+      **without** ticking "Allow backward or sideways move". Confirm → `jj bookmark list` shows a
+      single target
+- [ ] Repeat right-clicking `<rev-b>` (the other target, after re-diverging) → same behaviour —
+      this row was already reachable before this change, but was labelled/greyed as an ordinary
+      backward move; it must now read as a resolve too
+- [ ] Right-click `conflicted-bm` itself → "Move 'conflicted-bm' to Change…" → both `<rev-a>` and
+      `<rev-b>` appear together under **"Resolve conflict (bookmark is divergent)"**; every other
+      commit sits under Backward/Sideways behind the checkbox, none under Forward (a conflicted
+      bookmark never classifies FORWARD)
+- [ ] Regression: a **non-divergent** bookmark's own current change is still absent from both
+      dialogs (plain no-op exclusion unaffected), and forward/backward sectioning for ordinary
+      moves is unchanged
 
 #### Per-bookmark push (jj-idea-t29z, GitHub #81)
 
@@ -1646,8 +1671,10 @@ selection does nothing; right-click for actions.
   `jj bookmark list` should print `conflicted-bm (conflicted):` with two `+` targets (`<rev-a>`
   and `<rev-b>`) before you check the panel.
 - [ ] jj-idea-bico: `conflicted-bm` still renders as a **single** Local node (not two), and the
-  panel's right-click context-menu actions on it behave the same as on any other bookmark - this
-  change only makes every one of its targets reachable *by drag*, it doesn't split the node
+  panel's right-click context-menu actions on it are unaffected by this change *except* Move
+  Bookmark Here…/Move '\<bookmark\>' to Change… - jj-idea-bico only made every target reachable
+  *by drag*, it doesn't split the node; the two move dialogs' own divergent-resolve behavior is
+  covered separately by MT-BOOKMARK's "Move direction" jj-idea-t7cz item, above
 - [ ] Tags appear under their own "Tags" group, also `/`-grouped
 - [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
   or "main +3") — create/delete a bookmark and confirm both update together

@@ -19,6 +19,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.appendSummary
@@ -94,6 +95,7 @@ private class ChangeItemRenderer(private val checkbox: JBCheckBox) : ListCellRen
 
         is ChangeItem.SectionHeader -> ChangeSectionHeaderPanel(
             when (value.direction) {
+                MoveDirection.RESOLVE -> JujutsuBundle.message("dialog.bookmark.moveTo.section.resolve")
                 MoveDirection.FORWARD -> JujutsuBundle.message("dialog.bookmark.moveTo.section.forward")
                 MoveDirection.BACKWARD_OR_SIDEWAYS -> JujutsuBundle.message("dialog.bookmark.moveTo.section.backward")
             }
@@ -112,7 +114,11 @@ private class ChangeItemRenderer(private val checkbox: JBCheckBox) : ListCellRen
                 else -> list.foreground
             }
             val canvas = entryCanvas(value.entry, fg) {
-                val dirIcon = if (isBackward) AllIcons.General::Warning else AllIcons.Actions::MoveUp
+                val dirIcon = when (value.direction) {
+                    MoveDirection.RESOLVE -> JujutsuIcons::Conflict
+                    MoveDirection.BACKWARD_OR_SIDEWAYS -> AllIcons.General::Warning
+                    MoveDirection.FORWARD -> AllIcons.Actions::MoveUp
+                }
                 append(icon(dirIcon))
                 append(" ")
                 appendSummary(value.entry)
@@ -130,8 +136,12 @@ private class ChangeItemRenderer(private val checkbox: JBCheckBox) : ListCellRen
 class MoveBookmarkToChangeDialog(
     private val repo: JujutsuRepository,
     initialClassified: List<Pair<LogEntry, MoveDirection>>,
-    /** The bookmark's current target, needed to classify any commit found by [searchWholeRepo]. */
-    private val currentId: ChangeId?
+    /**
+     * Every target the bookmark currently has - empty if it doesn't exist yet, more than one if
+     * it's divergent (jj-idea-bico/jj-idea-t7cz). Needed to classify any commit found by
+     * [searchWholeRepo].
+     */
+    private val currentTargets: List<ChangeId>
 ) : DialogWrapper(repo.project) {
     data class Result(val changeId: ChangeId, val allowBackwards: Boolean)
 
@@ -251,7 +261,7 @@ class MoveBookmarkToChangeDialog(
         val row = list.selectedValue as? ChangeItem.EntryRow ?: return
         result = Result(
             changeId = row.entry.id,
-            allowBackwards = row.direction == MoveDirection.BACKWARD_OR_SIDEWAYS
+            allowBackwards = row.direction != MoveDirection.FORWARD
         )
         super.doOKAction()
     }
@@ -260,6 +270,7 @@ class MoveBookmarkToChangeDialog(
         val matcher = searchField.matcher()
         val filtered = if (matcher == null) classified else classified.filter { matcher.matches(it.first) }
 
+        val resolves = filtered.filter { it.second == MoveDirection.RESOLVE }
         val forwards = filtered.filter { it.second == MoveDirection.FORWARD }
         val backwards = filtered.filter { it.second == MoveDirection.BACKWARD_OR_SIDEWAYS }
 
@@ -267,6 +278,10 @@ class MoveBookmarkToChangeDialog(
         if (filtered.isEmpty()) {
             listModel.addElement(ChangeItem.EmptyState)
         } else {
+            if (resolves.isNotEmpty()) {
+                listModel.addElement(ChangeItem.SectionHeader(MoveDirection.RESOLVE))
+                resolves.forEach { listModel.addElement(ChangeItem.EntryRow(it.first, it.second)) }
+            }
             if (forwards.isNotEmpty()) {
                 listModel.addElement(ChangeItem.SectionHeader(MoveDirection.FORWARD))
                 forwards.forEach { listModel.addElement(ChangeItem.EntryRow(it.first, it.second)) }
@@ -283,19 +298,22 @@ class MoveBookmarkToChangeDialog(
 
     /**
      * Whole-repo search (jj-idea-lpbv/jj-idea-tq4b): runs the search revset against [repo],
-     * classifies any newly found commits against [currentId] (the same rule [loadData] uses),
-     * and merges them into [classified] so they become pickable even though they were outside
-     * the loaded log window.
+     * classifies any newly found commits against [currentTargets] (the same rule [loadData]
+     * uses), and merges them into [classified] so they become pickable even though they were
+     * outside the loaded log window.
      */
     private fun searchWholeRepo() {
         val revset = searchField.revset() ?: return
         val settings = JujutsuSettings.getInstance(repo.project)
         repo.runRecoverableInBackground(retry = ::searchWholeRepo, modalityState = ModalityState.any()) {
             val found = fetchSearchResults(listOf(repo), revset) { settings.logChangeLimit(it) }[repo] ?: emptyList()
-            val alreadyKnown = classified.mapTo(mutableSetOf()) { it.first.id } + listOfNotNull(currentId)
+            // Only a *sole* target is pre-excluded from [classified] - a divergent bookmark's targets stay
+            // findable so an off-window one still resolves to RESOLVE (jj-idea-t7cz).
+            val alreadyKnown =
+                classified.mapTo(mutableSetOf()) { it.first.id } + listOfNotNull(currentTargets.singleOrNull())
             val newEntries = found.filter { it.id !in alreadyKnown }
             if (newEntries.isNotEmpty()) repo.logCache.store(newEntries)
-            val newlyClassified = classifyAgainstBookmark(repo, currentId, newEntries)
+            val newlyClassified = classifyAgainstBookmark(repo, currentTargets, newEntries)
             runLater {
                 if (isDisposed) return@runLater
                 if (newlyClassified.isNotEmpty()) {
@@ -325,7 +343,8 @@ class MoveBookmarkToChangeDialog(
     private fun isSelectableIndex(index: Int): Boolean {
         if (index < 0 || index >= listModel.size()) return false
         return when (val item = listModel.getElementAt(index)) {
-            is ChangeItem.EntryRow -> item.direction == MoveDirection.FORWARD || allowBackwardCheckbox.isSelected
+            is ChangeItem.EntryRow ->
+                item.direction != MoveDirection.BACKWARD_OR_SIDEWAYS || allowBackwardCheckbox.isSelected
             else -> false
         }
     }
@@ -351,17 +370,18 @@ class MoveBookmarkToChangeDialog(
     private fun updateOkButton() {
         val sel = list.selectedValue
         isOKActionEnabled = sel is ChangeItem.EntryRow &&
-            (sel.direction == MoveDirection.FORWARD || allowBackwardCheckbox.isSelected)
+            (sel.direction != MoveDirection.BACKWARD_OR_SIDEWAYS || allowBackwardCheckbox.isSelected)
     }
 
     companion object {
         fun show(repo: JujutsuRepository, bookmark: Bookmark, onSelected: (ChangeId, Boolean) -> Unit) {
             repo.runRecoverableInBackground(retry = { show(repo, bookmark, onSelected) }) {
-                val currentId = currentBookmarkTarget(repo, bookmark)
+                val currentTargets = currentBookmarkTargets(repo, bookmark)
                 val entries = repo.logCache.all
-                val classified = classifyAgainstBookmark(repo, currentId, entries.filter { it.id != currentId })
+                val candidates = entries.filter { currentTargets.singleOrNull() != it.id }
+                val classified = classifyAgainstBookmark(repo, currentTargets, candidates)
                 runLater {
-                    val dlg = MoveBookmarkToChangeDialog(repo, classified, currentId)
+                    val dlg = MoveBookmarkToChangeDialog(repo, classified, currentTargets)
                     if (dlg.showAndGet()) {
                         val r = dlg.result ?: return@runLater
                         onSelected(r.changeId, r.allowBackwards)
@@ -371,36 +391,50 @@ class MoveBookmarkToChangeDialog(
         }
 
         /**
-         * The bookmark's current target change id, or null if the bookmark doesn't exist yet.
+         * Every target the bookmark currently has (see [in.kkkev.jjidea.jj.RefItem.targets]), or
+         * empty if the bookmark doesn't exist yet. More than one target means it's divergent
+         * (jj-idea-bico/jj-idea-t7cz).
          * @throws VcsException if bookmarks can't be loaded at all (jj-idea-27b4) - distinct from
-         * "no such bookmark", which is a legitimate null, not a failure.
+         * "no such bookmark", which is a legitimate empty list, not a failure.
          */
-        private fun currentBookmarkTarget(repo: JujutsuRepository, bookmark: Bookmark): ChangeId? =
-            repo.logService.getBookmarks().getOrThrow().find { it.bookmark.name == bookmark.name }?.id
+        private fun currentBookmarkTargets(repo: JujutsuRepository, bookmark: Bookmark): List<ChangeId> =
+            repo.logService.getBookmarks().getOrThrow().find { it.bookmark.name == bookmark.name }?.targets
+                ?: emptyList()
 
         /**
-         * Classifies [candidates] against [currentId]: descendants of the bookmark's current
-         * target → FORWARD (the bookmark would advance); everything else → BACKWARD_OR_SIDEWAYS.
-         * Shared by [loadData] (the initial load) and [searchWholeRepo] (jj-idea-tq4b, classifying
-         * commits found outside the loaded log window).
+         * Classifies [candidates] against [currentTargets]: for a divergent bookmark (more than
+         * one target), a candidate that *is* one of those targets → RESOLVE (re-pointing there
+         * resolves the conflict, jj-idea-t7cz) and everything else → BACKWARD_OR_SIDEWAYS,
+         * without any `jj log` query - a conflicted bookmark can never advance, mirroring
+         * [BookmarkClassifier.classify]. For a single-target bookmark, descendants of that target
+         * → FORWARD, everything else → BACKWARD_OR_SIDEWAYS. Shared by [loadData] (the initial
+         * load) and [searchWholeRepo] (jj-idea-tq4b, classifying commits found outside the loaded
+         * log window).
          * @throws VcsException if the descendant revset query fails (jj-idea-27b4) - a stale
          * workspace fails exactly this way, and silently defaulting every candidate to
          * backward/sideways (as this used to) would misreport a genuinely forward move.
          */
         private fun classifyAgainstBookmark(
             repo: JujutsuRepository,
-            currentId: ChangeId?,
+            currentTargets: List<ChangeId>,
             candidates: List<LogEntry>
         ): List<Pair<LogEntry, MoveDirection>> {
             if (candidates.isEmpty()) return emptyList()
-            if (currentId == null) {
+            if (currentTargets.isEmpty()) {
                 return candidates.map { it to MoveDirection.BACKWARD_OR_SIDEWAYS }
+            }
+            if (currentTargets.size > 1) {
+                val targetIds = currentTargets.mapTo(mutableSetOf()) { it.full }
+                return candidates.map { entry ->
+                    val resolved = entry.id.full in targetIds
+                    entry to if (resolved) MoveDirection.RESOLVE else MoveDirection.BACKWARD_OR_SIDEWAYS
+                }
             }
 
             // Query descendants of the bookmark's current target only — candidate ids are never put on the
             // command line, so this is O(1) in the number of candidates and immune to any one candidate being an
             // unresolvable/divergent id.
-            val revset = BookmarkClassifier.descendantRevset(currentId)
+            val revset = BookmarkClassifier.descendantRevset(currentTargets.single())
             val result = repo.commandExecutor.log(
                 revset = revset,
                 template = "${TemplateParts.changeIdWithOffset()} ++ \"\\n\""
@@ -424,10 +458,12 @@ class MoveBookmarkToChangeDialog(
             val entries = repo.logCache.all
             if (entries.isEmpty()) return emptyList()
 
-            // Exclude the entry the bookmark is currently on (no point in "moving" there)
-            val currentId = currentBookmarkTarget(repo, bookmark)
-            val candidates = entries.filter { it.id != currentId }
-            return classifyAgainstBookmark(repo, currentId, candidates)
+            // Exclude the entry the bookmark is currently on - unless it's divergent, in which case none of
+            // its several targets is excluded: re-pointing at any one of them is a legitimate resolve, not a
+            // no-op (jj-idea-t7cz).
+            val currentTargets = currentBookmarkTargets(repo, bookmark)
+            val candidates = entries.filter { currentTargets.singleOrNull() != it.id }
+            return classifyAgainstBookmark(repo, currentTargets, candidates)
         }
     }
 }

@@ -131,6 +131,59 @@ class MoveBookmarkDirectionTest {
     }
 
     /**
+     * jj-idea-t7cz: a divergent bookmark has more than one current target. Neither target should be
+     * excluded from the candidate list (re-pointing at one is a resolve, not a no-op), both should
+     * classify RESOLVE, everything else stays BACKWARD_OR_SIDEWAYS, and - since a conflicted
+     * bookmark can never advance (mirrors [BookmarkClassifier.classify]) - no `jj log` query should
+     * run at all.
+     */
+    @Test
+    fun `MoveBookmarkToChangeDialog classifies a divergent bookmark's own targets as RESOLVE without a log call`() {
+        val targetA = changeId("aaafull")
+        val targetB = changeId("bbbfull")
+        val bookmark = Bookmark("dev", conflict = true)
+        val bookmarkItem = BookmarkItem(bookmark, listOf(targetA, targetB))
+
+        val repo = mockk<JujutsuRepository>()
+
+        fun entry(full: String) = LogEntry(repo, changeId(full), CommitId(full), "desc")
+        val entryA = entry("aaafull")
+        val entryB = entry("bbbfull")
+        val other = entry("otherfull")
+
+        var logCalls = 0
+        val executor = object : CommandExecutor by mockk(relaxed = true) {
+            override fun log(
+                revset: Revset,
+                template: String?,
+                filePaths: List<FilePath>,
+                limit: Int?,
+                quiet: Boolean
+            ): CommandExecutor.CommandResult {
+                logCalls++
+                return commandResult(0, "", "")
+            }
+        }
+
+        val logService = mockk<LogService>()
+        every { logService.getBookmarks() } returns Result.success(listOf(bookmarkItem))
+
+        val logCache = mockk<LogCache>()
+        every { logCache.all } returns listOf(entryA, entryB, other)
+
+        every { repo.commandExecutor } returns executor
+        every { repo.logService } returns logService
+        every { repo.logCache } returns logCache
+
+        val result = MoveBookmarkToChangeDialog.loadData(repo, bookmark)
+
+        result.find { it.first.id.full == "aaafull" }!!.second shouldBe MoveDirection.RESOLVE
+        result.find { it.first.id.full == "bbbfull" }!!.second shouldBe MoveDirection.RESOLVE
+        result.find { it.first.id.full == "otherfull" }!!.second shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
+        logCalls shouldBe 0
+    }
+
+    /**
      * jj-idea-27b4: a failed ancestor-revset query (e.g. a stale workspace) used to be silently
      * swallowed into `emptySet()`, misclassifying every candidate - including genuinely forward
      * ones - as backward/sideways. It must now throw instead, so the caller can offer the

@@ -19,6 +19,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.cli.TemplateParts
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
+import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.append
@@ -112,6 +113,7 @@ private class ItemRenderer(private val checkbox: JBCheckBox) : ListCellRenderer<
 
         is Item.SectionHeader -> SectionHeaderPanel(
             when (value.direction) {
+                MoveDirection.RESOLVE -> JujutsuBundle.message("dialog.bookmark.move.section.resolve")
                 MoveDirection.FORWARD -> JujutsuBundle.message("dialog.bookmark.move.section.forward")
                 MoveDirection.BACKWARD_OR_SIDEWAYS ->
                     JujutsuBundle.message("dialog.bookmark.move.section.backward")
@@ -129,7 +131,11 @@ private class ItemRenderer(private val checkbox: JBCheckBox) : ListCellRenderer<
             val canvas = FragmentRecordingCanvas()
             val fg = if (isSelected && !disabled) list.selectionForeground else list.foreground
             canvas.foreground(fg) {
-                val dirIcon = if (isBackward) AllIcons.General::Warning else AllIcons.Actions::MoveUp
+                val dirIcon = when (classified.direction) {
+                    MoveDirection.RESOLVE -> JujutsuIcons::Conflict
+                    MoveDirection.BACKWARD_OR_SIDEWAYS -> AllIcons.General::Warning
+                    MoveDirection.FORWARD -> AllIcons.Actions::MoveUp
+                }
                 append(icon(dirIcon))
                 append(" ")
                 append(classified.item.bookmark)
@@ -279,7 +285,7 @@ class MoveBookmarkDialog(
         val row = list.selectedValue as? Item.BookmarkRow ?: return
         result = Result(
             bookmark = row.classified.item.bookmark,
-            allowBackwards = row.classified.direction == MoveDirection.BACKWARD_OR_SIDEWAYS
+            allowBackwards = row.classified.direction != MoveDirection.FORWARD
         )
         super.doOKAction()
     }
@@ -291,6 +297,7 @@ class MoveBookmarkDialog(
             classified.filter { it.item.bookmark.name.name.contains(query, ignoreCase = true) }
         }
 
+        val resolves = filtered.filter { it.direction == MoveDirection.RESOLVE }
         val forwards = filtered.filter { it.direction == MoveDirection.FORWARD }
         val backwards = filtered.filter { it.direction == MoveDirection.BACKWARD_OR_SIDEWAYS }
 
@@ -298,6 +305,10 @@ class MoveBookmarkDialog(
         if (filtered.isEmpty()) {
             listModel.addElement(Item.EmptyState)
         } else {
+            if (resolves.isNotEmpty()) {
+                listModel.addElement(Item.SectionHeader(MoveDirection.RESOLVE))
+                resolves.forEach { listModel.addElement(Item.BookmarkRow(it)) }
+            }
             if (forwards.isNotEmpty()) {
                 listModel.addElement(Item.SectionHeader(MoveDirection.FORWARD))
                 forwards.forEach { listModel.addElement(Item.BookmarkRow(it)) }
@@ -326,7 +337,7 @@ class MoveBookmarkDialog(
         if (index < 0 || index >= listModel.size()) return false
         return when (val item = listModel.getElementAt(index)) {
             is Item.BookmarkRow ->
-                item.classified.direction == MoveDirection.FORWARD || allowBackwardCheckbox.isSelected
+                item.classified.direction != MoveDirection.BACKWARD_OR_SIDEWAYS || allowBackwardCheckbox.isSelected
             else -> false
         }
     }
@@ -352,7 +363,7 @@ class MoveBookmarkDialog(
     private fun updateOkButton() {
         val sel = list.selectedValue
         isOKActionEnabled = sel is Item.BookmarkRow &&
-            (sel.classified.direction == MoveDirection.FORWARD || allowBackwardCheckbox.isSelected)
+            (sel.classified.direction != MoveDirection.BACKWARD_OR_SIDEWAYS || allowBackwardCheckbox.isSelected)
     }
 
     companion object {
@@ -379,7 +390,7 @@ class MoveBookmarkDialog(
             val bookmarks = repo.logService.getBookmarks().getOrThrow()
             val candidates = BookmarkClassifier.eligible(bookmarks, targetId)
             val revset = BookmarkClassifier.ancestorRevset(candidates, targetId)
-                ?: return candidates.map { ClassifiedBookmark(it, MoveDirection.BACKWARD_OR_SIDEWAYS) }
+                ?: return BookmarkClassifier.classify(candidates, emptySet(), targetId)
 
             val result = repo.commandExecutor.log(
                 revset = revset,
@@ -389,7 +400,7 @@ class MoveBookmarkDialog(
                 throw VcsException("Error from jj log: ${result.stderr}")
             }
             val forwardIds = result.stdout.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-            return BookmarkClassifier.classify(candidates, forwardIds)
+            return BookmarkClassifier.classify(candidates, forwardIds, targetId)
         }
     }
 }

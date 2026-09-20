@@ -78,6 +78,16 @@ class BookmarkClassifierTest {
             val items = listOf(itemWithId("main", divergentId("shared", offset = 0)))
             BookmarkClassifier.eligible(items, target).shouldBeEmpty()
         }
+
+        @Test
+        fun `keeps a divergent bookmark whose first target equals targetId (jj-idea-t7cz)`() {
+            // A conflicted/divergent bookmark has more than one target; re-pointing it at one of them is a
+            // legitimate resolve, not a no-op - it must not be excluded just because that target happens to
+            // be targets.first() (RefItem.id).
+            val divergent = BookmarkItem(Bookmark("dev", conflict = true), listOf(id("aaa"), id("bbb")))
+            BookmarkClassifier.eligible(listOf(divergent), id("aaa")) shouldHaveSize 1
+            BookmarkClassifier.eligible(listOf(divergent), id("bbb")) shouldHaveSize 1
+        }
     }
 
     @Nested
@@ -127,7 +137,7 @@ class BookmarkClassifierTest {
         @Test
         fun `marks forward items whose id is in forwardIds`() {
             val items = listOf(item("main", "aaa"), item("dev", "bbb"))
-            val result = BookmarkClassifier.classify(items, setOf("aaa"))
+            val result = BookmarkClassifier.classify(items, setOf("aaa"), id("zzz"))
             result.find { it.item.bookmark.name.name == "main" }!!.direction shouldBe MoveDirection.FORWARD
             result.find { it.item.bookmark.name.name == "dev" }!!.direction shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
         }
@@ -135,14 +145,14 @@ class BookmarkClassifierTest {
         @Test
         fun `marks conflicted as BACKWARD_OR_SIDEWAYS even if id is in forwardIds`() {
             val items = listOf(item("main", "aaa", conflict = true))
-            val result = BookmarkClassifier.classify(items, setOf("aaa"))
+            val result = BookmarkClassifier.classify(items, setOf("aaa"), id("zzz"))
             result.single().direction shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
         }
 
         @Test
         fun `empty forwardIds makes everything BACKWARD_OR_SIDEWAYS`() {
             val items = listOf(item("a", "aaa"), item("b", "bbb"))
-            val result = BookmarkClassifier.classify(items, emptySet())
+            val result = BookmarkClassifier.classify(items, emptySet(), id("zzz"))
             result.map { it.direction }.shouldContainExactlyInAnyOrder(
                 MoveDirection.BACKWARD_OR_SIDEWAYS,
                 MoveDirection.BACKWARD_OR_SIDEWAYS
@@ -151,20 +161,40 @@ class BookmarkClassifierTest {
 
         @Test
         fun `empty candidates produces empty result`() {
-            BookmarkClassifier.classify(emptyList(), setOf("aaa")).shouldBeEmpty()
+            BookmarkClassifier.classify(emptyList(), setOf("aaa"), id("zzz")).shouldBeEmpty()
         }
 
         @Test
         fun `matches forwardIds on the offset-qualified id`() {
             val items = listOf(itemWithId("main", divergentId("shared", offset = 3)))
-            val result = BookmarkClassifier.classify(items, setOf("shared/3"))
+            val result = BookmarkClassifier.classify(items, setOf("shared/3"), id("zzz"))
             result.single().direction shouldBe MoveDirection.FORWARD
         }
 
         @Test
         fun `does not match a different offset of the same base id`() {
             val items = listOf(itemWithId("main", divergentId("shared", offset = 3)))
-            val result = BookmarkClassifier.classify(items, setOf("shared/0"))
+            val result = BookmarkClassifier.classify(items, setOf("shared/0"), id("zzz"))
+            result.single().direction shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
+        }
+
+        @Test
+        fun `marks a divergent bookmark RESOLVE when targetId is one of its own targets`() {
+            val divergent = BookmarkItem(
+                Bookmark("dev", conflict = true),
+                listOf(id("aaa"), id("bbb"))
+            )
+            val result = BookmarkClassifier.classify(listOf(divergent), emptySet(), id("bbb"))
+            result.single().direction shouldBe MoveDirection.RESOLVE
+        }
+
+        @Test
+        fun `divergent bookmark pointed elsewhere stays BACKWARD_OR_SIDEWAYS, not RESOLVE`() {
+            val divergent = BookmarkItem(
+                Bookmark("dev", conflict = true),
+                listOf(id("aaa"), id("bbb"))
+            )
+            val result = BookmarkClassifier.classify(listOf(divergent), emptySet(), id("ccc"))
             result.single().direction shouldBe MoveDirection.BACKWARD_OR_SIDEWAYS
         }
     }

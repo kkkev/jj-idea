@@ -38,6 +38,7 @@ private fun executeMoveToChange(
                 tellUser("action.bookmark.moveTo.error")
             }
         }
+        .addUndoTracking("action.bookmark.moveTo.undo")
         .executeAsync()
 }
 
