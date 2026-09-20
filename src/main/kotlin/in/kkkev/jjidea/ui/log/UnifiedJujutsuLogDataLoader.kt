@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
+import kotlinx.datetime.Instant
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
@@ -74,6 +75,23 @@ class UnifiedJujutsuLogDataLoader(
     private val repoLocks = ConcurrentHashMap<JujutsuRepository, ReentrantLock>()
     private fun lockFor(repo: JujutsuRepository): ReentrantLock = repoLocks.computeIfAbsent(repo) { ReentrantLock() }
 
+    // jj-idea-jnqi: serializes every read-modify-write of [snapshot] and graphBuilder's shared,
+    // non-thread-safe layout engines (see CommitGraphBuilder.incrementalEngine's doc - "one
+    // instance lays out one graph at a time" is a caller contract, not enforced). Every one of
+    // mergeAndNotify()'s callers (loadMore, refresh, forceRefresh, loadExpanding,
+    // searchWholeRepo) runs on raw runInBackground (not BackgroundDataLoader's coalesced
+    // executeInBackground - see that class's doc), so several merges can be in flight with no
+    // ordering guarantee between them - AND loadCommits() itself must take this same lock
+    // around its own snapshot/graphBuilder writes (bugfix: it originally didn't, so an eager
+    // loadMore() prefetch firing before the initial load finished could race it on the same
+    // graphBuilder instance).
+    private val mergeLock = ReentrantLock()
+
+    // jj-idea-jnqi: the merged entry set from the last mergeAndNotify() call, kept so a
+    // loadMore()-shaped append can extend it instead of re-flattening every repo's logCache
+    // and re-sorting/re-laying-out the whole thing from scratch. Mutated only under mergeLock.
+    private var snapshot: MergedSnapshot? = null
+
     private val pagedLoading = PreviewEntitlement.getInstance().isEnabled(PreviewFeature.PAGED_LOG_LOAD)
 
     override fun load() = loadCommits()
@@ -94,6 +112,12 @@ class UnifiedJujutsuLogDataLoader(
 
         if (repos.isEmpty()) {
             log.info("No repositories to load commits from")
+            // jj-idea-jnqi bugfix: both snapshot and graphBuilder mutations must go through
+            // mergeLock - see the doc on mergeLock's field and on graphBuilder's use below.
+            mergeLock.withLock {
+                snapshot = null
+                graphBuilder.resetIncremental()
+            }
             notify(Data(emptyList(), emptyMap(), defaultLimit))
             return
         }
@@ -152,7 +176,24 @@ class UnifiedJujutsuLogDataLoader(
                     .map { entry -> enrichWithDeletedBookmarks(entry, deletedNamesByRepo[entry.repo] ?: emptySet()) }
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
                 allEntries.groupBy { it.repo }.forEach { (repo, entries) -> repo.logCache.store(entries) }
-                graphNodes = graphBuilder.buildGraph(allEntries)
+                // jj-idea-jnqi bugfix: graphBuilder.buildGraph() and the snapshot write must be
+                // one atomic unit under mergeLock, exactly like fastMergeAndNotify/
+                // fullMergeAndNotify already do - loadCommits() previously called buildGraph()
+                // (which mutates graphBuilder's shared incremental-engine state) *outside* the
+                // lock, so a concurrently-running mergeAndNotify() (e.g. an eager loadMore()
+                // prefetch firing before this initial load finishes) could race it on the same
+                // engine instance.
+                mergeLock.withLock {
+                    // buildGraph() also reseeds graphBuilder's incremental engine (jj-idea-jnqi)
+                    // for a later loadMore()'s appendGraph() to build on.
+                    graphNodes = graphBuilder.buildGraph(allEntries)
+                    snapshot = MergedSnapshot(
+                        allEntries,
+                        allEntries.mapTo(HashSet()) { it.key },
+                        allEntries.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
+                        deletedNamesByRepo
+                    )
+                }
             },
             onSuccess = {
                 // A cancelled wait throws ProcessCanceledException above, which routes to onCancel()
@@ -301,14 +342,56 @@ class UnifiedJujutsuLogDataLoader(
      * [clearExpansions] on an explicit Refresh. Must be called from a background thread, since it
      * reads [JujutsuRepository.logCache].
      *
+     * jj-idea-jnqi: [delta] is the append-only fast path, supplied only by [loadMore] - whose
+     * pages are always fetched strictly older than everything already merged, in per-repo
+     * topological order. When every guard in [appendGuardHolds] passes, this extends the
+     * previous [snapshot] (an O(delta)-ish sort + [CommitGraphBuilder.appendGraph]'s O(delta +
+     * bounded window) layout) instead of re-flattening every repo's cache and recomputing from
+     * scratch. `null` (every other caller) always takes the full-recompute path below, which
+     * also reseeds the incremental engine (via [CommitGraphBuilder.buildGraph]) so a later
+     * append has a valid base to build on. Any guard failing falls back to the same full
+     * recompute - never incorrect, only slower.
+     *
      * Applies [enrichWithDeletedBookmarks] here too (jj-idea-lc43, GitHub #110) — [loadCommits]'s
      * own application at its `allEntries` assignment only covers the very first load; every path
      * that lands here (a paged "Load more", a post-write refresh, a search) would otherwise leave
      * a remote-tracking row's post-deletion garbage ahead/behind count uncorrected.
      * [deletedLocalNamesByRepo] is resolved once for every repo, not once per entry.
      */
-    private fun mergeAndNotify() {
+    private fun mergeAndNotify(delta: List<LogEntry>? = null) = mergeLock.withLock {
         val deletedNamesByRepo = deletedLocalNamesByRepo()
+        val current = snapshot
+        val hasExpansionOrSearch = expansionEntriesByRepo.isNotEmpty() || searchEntriesByRepo.isNotEmpty()
+        val data = if (delta != null &&
+            current != null &&
+            appendGuardHolds(delta, current, deletedNamesByRepo, hasExpansionOrSearch)
+        ) {
+            fastMergeAndNotify(delta, current, deletedNamesByRepo)
+        } else {
+            fullMergeAndNotify(deletedNamesByRepo)
+        }
+        runLater { notify(data) }
+    }
+
+    private fun fastMergeAndNotify(
+        delta: List<LogEntry>,
+        current: MergedSnapshot,
+        deletedNamesByRepo: Map<JujutsuRepository, Set<String>>
+    ): Data {
+        val enrichedDelta = delta.map { enrichWithDeletedBookmarks(it, deletedNamesByRepo[it.repo] ?: emptySet()) }
+        val mergedEntries = current.entries + enrichedDelta
+        val graphNodes = graphBuilder.appendGraph(enrichedDelta)
+        val deltaMinTimestamp = enrichedDelta.minOfOrNull { it.sortTimestamp() } ?: current.minTimestamp
+        snapshot = MergedSnapshot(
+            mergedEntries,
+            current.keys + enrichedDelta.mapTo(HashSet()) { it.key },
+            minOf(current.minTimestamp, deltaMinTimestamp),
+            deletedNamesByRepo
+        )
+        return Data(mergedEntries, graphNodes, lastLimit)
+    }
+
+    private fun fullMergeAndNotify(deletedNamesByRepo: Map<JujutsuRepository, Set<String>>): Data {
         val allEntries = repositories().flatMap { r ->
             val regular = r.logCache.all
             val expanded = expansionEntriesByRepo[r] ?: emptyList()
@@ -318,8 +401,14 @@ class UnifiedJujutsuLogDataLoader(
             }
         }
         val merged = topologicalSort(allEntries.distinctBy { it.key })
-        val data = Data(merged, graphBuilder.buildGraph(merged), lastLimit)
-        runLater { notify(data) }
+        val graphNodes = graphBuilder.buildGraph(merged)
+        snapshot = MergedSnapshot(
+            merged,
+            merged.mapTo(HashSet()) { it.key },
+            merged.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
+            deletedNamesByRepo
+        )
+        return Data(merged, graphNodes, lastLimit)
     }
 
     /**
@@ -489,22 +578,26 @@ class UnifiedJujutsuLogDataLoader(
         }
         if (candidates.isEmpty()) return
         runInBackground {
-            var anyUpdated = false
+            // jj-idea-jnqi: collect every repo's newly fetched page into one delta and pass it
+            // to mergeAndNotify's append-only fast path, instead of a bare re-merge signal.
+            val delta = mutableListOf<LogEntry>()
             for (repo in candidates) {
                 val lock = lockFor(repo)
                 if (!lock.tryLock()) continue
                 try {
-                    if (loadMoreOneRepoLocked(repo)) anyUpdated = true
+                    loadMoreOneRepoLocked(repo)?.let { delta += it }
                 } finally {
                     lock.unlock()
                 }
             }
-            if (anyUpdated) mergeAndNotify()
+            if (delta.isNotEmpty()) mergeAndNotify(delta)
         }
     }
 
     /**
-     * The per-repo body of [loadMore], run while holding [lockFor]. Returns whether it updated.
+     * The per-repo body of [loadMore], run while holding [lockFor]. Returns the newly fetched
+     * page (jj-idea-jnqi: [loadMore]'s delta for [mergeAndNotify]'s append-only fast path), or
+     * `null` if nothing new was fetched.
      *
      * Re-validates both of [loadMore]'s candidate-filter checks (`pagedWindowByRepo` still has
      * this repo, and the window isn't exhausted) here inside the lock, rather than trusting the
@@ -515,19 +608,20 @@ class UnifiedJujutsuLogDataLoader(
      * explicit check makes the invariant hold without relying on that as an implementation
      * detail future callers would need to rediscover.
      */
-    private fun loadMoreOneRepoLocked(repo: JujutsuRepository): Boolean {
-        val window = pagedWindowByRepo[repo] ?: return false
-        if (window.isExhausted) return false
+    private fun loadMoreOneRepoLocked(repo: JujutsuRepository): List<LogEntry>? {
+        val window = pagedWindowByRepo[repo] ?: return null
+        if (window.isExhausted) return null
         val before = window.pageCount
         val entries = fetchOnePage(repo, window)
         if (entries == null) {
             pagedWindowByRepo.remove(repo)
-            return false
+            return null
         }
-        if (window.pageCount <= before) return false
+        if (window.pageCount <= before) return null
+        val newPage = window.pages.last()
         repo.logCache.clear()
         repo.logCache.store(entries)
-        return true
+        return newPage
     }
 }
 
@@ -574,6 +668,58 @@ internal fun fetchSearchResults(
         ?.takeUnless { it.isEmpty() }
         ?.let { repo to it }
 }.toMap()
+
+/**
+ * jj-idea-jnqi: the merged (loaded + expansion + search) entry set from the last successful
+ * [UnifiedJujutsuLogDataLoader.mergeAndNotify]/[UnifiedJujutsuLogDataLoader.loadCommits] call,
+ * kept so a `loadMore()`-shaped append can extend it instead of re-flattening every repo's
+ * [in.kkkev.jjidea.jj.JujutsuRepository.logCache] and re-sorting the whole thing from scratch.
+ *
+ * @param minTimestamp the lowest [sortTimestamp] across [entries] ([Instant.DISTANT_FUTURE] when empty) -
+ *   an append guard: a delta entry newer than this could win [topologicalSort]'s timestamp
+ *   tiebreak over an already-merged entry, so it can't simply be appended after everything.
+ */
+internal class MergedSnapshot(
+    val entries: List<LogEntry>,
+    val keys: Set<ChangeKey>,
+    val minTimestamp: Instant,
+    val deletedNamesByRepo: Map<JujutsuRepository, Set<String>>
+)
+
+/** Same tiebreak expression [topologicalSort]'s `PriorityQueue` comparator uses. */
+internal fun LogEntry.sortTimestamp(): Instant = authorTimestamp ?: committerTimestamp ?: Instant.DISTANT_PAST
+
+/**
+ * jj-idea-jnqi's [UnifiedJujutsuLogDataLoader.mergeAndNotify] append-only fast path guards -
+ * any failing falls back to a full recompute (never incorrect, only slower). [delta]/[current]
+ * compare raw (pre-enrichment) [ChangeKey]s - [enrichWithDeletedBookmarks] never touches those.
+ * A top-level function (rather than a loader method) so it's directly unit-testable without
+ * the platform dependencies [UnifiedJujutsuLogDataLoader] itself needs.
+ *
+ * @param hasExpansionOrSearch whether an expansion ([UnifiedJujutsuLogDataLoader.loadExpanding])
+ *   or whole-repo search ([UnifiedJujutsuLogDataLoader.searchWholeRepo]) bucket is in play -
+ *   those can insert anywhere in history, not just at the tail, so their presence alone means
+ *   the merged set isn't append-only.
+ */
+internal fun appendGuardHolds(
+    delta: List<LogEntry>,
+    current: MergedSnapshot,
+    deletedNamesByRepo: Map<JujutsuRepository, Set<String>>,
+    hasExpansionOrSearch: Boolean
+): Boolean {
+    if (hasExpansionOrSearch) return false
+    // Changes what enrichWithDeletedBookmarks does to *already-merged* entries too, not
+    // just delta - the cached prefix would need re-enriching, which the fast path skips.
+    if (deletedNamesByRepo != current.deletedNamesByRepo) return false
+    // A delta entry that's a CHILD of an already-merged entry (one of its parents is already
+    // in the snapshot) can't simply be appended - topologicalSort would need to place it
+    // before that parent, not after everything.
+    if (delta.any { entry -> entry.parentKeys.any { it in current.keys } }) return false
+    // A delta entry newer than the merged set's oldest entry would win topologicalSort's
+    // timestamp tiebreak over that old entry, so it can't just be appended after it.
+    if (delta.any { it.sortTimestamp() > current.minTimestamp }) return false
+    return true
+}
 
 /**
  * Injects pending-deletion local bookmarks into log entries and zeroes out garbage ahead/behind counts.

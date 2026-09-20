@@ -5,8 +5,10 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeIdentity
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
+import `in`.kkkev.jjidea.ui.log.graph.IncrementalLayout
 import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
 import `in`.kkkev.jjidea.ui.log.graph.ParentState
+import `in`.kkkev.jjidea.ui.log.graph.RowLayout
 import `in`.kkkev.jjidea.util.measurePerf
 import java.awt.Color
 
@@ -68,6 +70,33 @@ class CommitGraphBuilder {
     private val layoutCalculator = LayoutCalculatorImpl<ChangeKey>()
 
     /**
+     * jj-idea-jnqi: a second, independent [IncrementalLayout] engine backing [appendGraph] -
+     * the append-only fast path `UnifiedJujutsuLogDataLoader`'s paged `loadMore()` uses.
+     * Separate from [layoutCalculator] (which stays the from-scratch path for every other
+     * caller: filtered views, rebase/commit-picker previews) because the two have
+     * incompatible state lifecycles - mixing calls into the same engine would make one
+     * silently invalidate the other.
+     *
+     * [buildGraph]'s unfiltered overload reseeds this automatically (reset + a full append)
+     * after every from-scratch layout, so a later [appendGraph] call always has a correct
+     * base - **this was missing in jnqi's initial version**, which made the first
+     * [appendGraph] after any load treat its delta as the entire log, silently dropping
+     * every earlier row's [GraphNode]. [resetIncremental] remains for callers that skip
+     * [buildGraph] entirely (e.g. an empty-repos short circuit) but still need to invalidate
+     * a prior sequence.
+     *
+     * This instance is not internally synchronized - like [LayoutCalculatorImpl], "one
+     * instance lays out one graph at a time" is a caller contract, not an enforced
+     * invariant. `UnifiedJujutsuLogDataLoader` is the only concurrent caller and must
+     * serialize every [buildGraph]/[appendGraph]/[resetIncremental] call on a given instance
+     * through the same lock (its `mergeLock`) - see that class's jj-idea-jnqi bugfix notes.
+     */
+    private val incrementalEngine = IncrementalLayout<ChangeKey>()
+
+    /** [IncrementalLayout.operationCount] of the last [appendGraph] call - see that field's doc. */
+    val incrementalOperationCount: Long get() = incrementalEngine.operationCount
+
+    /**
      * Build graph layout for [entries], with no filter concept - every unresolved parent is
      * classified [ParentState.NOT_LOADED] (see the two-arg overload for the filtered case).
      *
@@ -94,15 +123,53 @@ class CommitGraphBuilder {
             val allIds = allEntries.mapTo(HashSet()) { it.key }
             val layout = layoutCalculator.calculate(graphEntries, allIds)
             report.count("operations", layoutCalculator.operationCount)
-            layout.rows.associate { row ->
-                row.id to GraphNode(
-                    lane = row.lane,
-                    parentLanes = row.parentLanes,
-                    childLanes = row.childLanes,
-                    passthroughLanes = row.passthroughLanes,
-                    unresolvedParents = row.unresolvedParents,
-                    stubLane = row.stubLane
-                )
+            // jj-idea-jnqi bugfix: reseed the incremental engine so a later appendGraph() call
+            // has a correct base to extend, instead of silently treating its first delta as the
+            // whole log (losing every previously-loaded row's GraphNode). Only for the
+            // unfiltered case (entries === allEntries) - appendGraph()'s contract requires
+            // allIds to track entries' own ids exactly, which only holds there; a filtered call
+            // (entries !== allEntries, e.g. UnifiedJujutsuLogPanel's own instance) leaves
+            // incrementalEngine untouched, per IncrementalLayout's doc.
+            if (entries === allEntries) {
+                incrementalEngine.reset()
+                incrementalEngine.append(graphEntries)
             }
+            layout.rows.associate { it.id to it.toGraphNode() }
         }
+
+    /** Discards [appendGraph]'s accumulated state - see that field's doc. */
+    fun resetIncremental() = incrementalEngine.reset()
+
+    /**
+     * Appends [delta] to the entries previously passed to [appendGraph] since the last
+     * [resetIncremental] (jj-idea-jnqi), and returns the updated node map for the whole
+     * accumulated set. [delta] must be in valid topological order relative to what came
+     * before it (children before parents, and never a child of an already-appended entry) -
+     * the caller (`UnifiedJujutsuLogDataLoader`'s append guard) is responsible for that; see
+     * [IncrementalLayout.append]'s doc for the full contract and the algorithm itself.
+     *
+     * The returned map is a fresh linear pass over every row (same shape and cost as
+     * [buildGraph]'s own `associate` - one hashmap insert per row, safe to publish to a
+     * different thread) - what's *not* redone from scratch is the actual layout algorithm:
+     * [IncrementalLayout.append] costs O(delta + a bounded checkpoint window), not O(total
+     * rows), where the old choke point re-ran the whole passthrough/lane bookkeeping (and a
+     * fresh `topologicalSort`) on every call.
+     */
+    fun appendGraph(delta: List<GraphableEntry>): Map<ChangeKey, GraphNode> =
+        log.measurePerf("graph-layout-append") { report ->
+            report.count("delta", delta.size.toLong())
+            val graphEntries = delta.map { GraphEntry(it.key, it.parentKeys) }
+            val layout = incrementalEngine.append(graphEntries)
+            report.count("operations", incrementalEngine.operationCount)
+            layout.rows.associate { it.id to it.toGraphNode() }
+        }
+
+    private fun RowLayout<ChangeKey>.toGraphNode() = GraphNode(
+        lane = lane,
+        parentLanes = parentLanes,
+        childLanes = childLanes,
+        passthroughLanes = passthroughLanes,
+        unresolvedParents = unresolvedParents,
+        stubLane = stubLane
+    )
 }
