@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.17] - 2026-09-21
+
 ### Added
 - Restore now opens a dialog listing every changed file, with your selection pre-checked but adjustable, instead of a plain Yes/No confirmation — applies to both "Restore" (working copy → parent revision) and "Restore to This" (working copy → a historical revision). A successful restore also now shows an undo balloon with an inline Undo link. ([#84](https://github.com/kkkev/jj-idea/issues/84))
 - New "Move Up"/"Move Down" actions swap the selected commit with its single child or single parent in the commit graph (`jj rebase -A`/`-B`), as a keyboard-first complement to drag-and-drop reordering. Default shortcut Ctrl+Shift+Up/Down on every platform, including macOS - Cmd+Shift+Up/Down is deliberately not used there, since it's already the system shortcut for extending a selection to the top/bottom of a list; also in the log's right-click menu next to Rebase. Disabled when the selection isn't a single commit, doesn't have exactly one child/parent on that side, or the move would touch an immutable commit. ([#93](https://github.com/kkkev/jj-idea/issues/93))
@@ -922,7 +924,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.16...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.17...HEAD
+[0.8.17]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.17
 [0.8.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.16
 [0.8.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.15
 [0.8.14]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.14
