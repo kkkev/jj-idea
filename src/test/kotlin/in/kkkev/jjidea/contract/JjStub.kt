@@ -726,7 +726,11 @@ class JjStub(override val workDir: Path) : JjBackend {
         field(qualifiedChangeId(change))
         field(qualifiedCommitId(change))
         field(desc)
-        field(change.bookmarks.joinToString(",") { "$it;true" })
+        // name;tracked;conflict;ahead;behind, matching CliLogService.LogTemplates.localBookmarkTemplate's
+        // real shape (jj-idea-ks5k) - the stub doesn't model per-bookmark conflict or divergence
+        // on this per-commit path (only jj bookmark list's cmdBookmarkList does), so those two
+        // trailing fields are always false/0/0 here.
+        field(change.bookmarks.joinToString(",") { "$it;true;false;0;0" })
         field("") // tags (not yet supported in stub)
         field(formatParents(change))
         field(if (isWc) "true" else "false")

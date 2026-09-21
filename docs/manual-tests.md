@@ -94,7 +94,7 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 
 **Log table selection, navigation, and row interaction**
 
-**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch), `ui/log/JujutsuCustomLogTabManager.kt`, `actions/top/OpenJujutsuLogTabAction.kt`
+**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/components/LogEntryText.kt` (`appendBookmarks`, `bookmarkRefChips`, jj-idea-e4ln's `@git` filter), `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch), `ui/log/JujutsuCustomLogTabManager.kt`, `actions/top/OpenJujutsuLogTabAction.kt`
 **Also re-run:** MT-LOG-DETAILS (issue-tracker link rendering is shared with the details panel)
 
 #### Entry points (jj-idea-biqp, GitHub #118)
@@ -143,6 +143,10 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 - [ ] Double-click a bookmark or tag chip → does nothing (no diff opens, no filter change,
       jj-idea-wkcz — bookmark/tag chips have no left-click action, only a right-click menu)
 - [ ] Double-click the "+N more" overflow chip → shows the hidden-refs popup (no diff opens)
+- [ ] jj-idea-e4ln (GitHub #120): in a **colocated** repo, a bookmark shows only its local chip
+      and any real-remote chip(s) in the log row — no separate `@git` chip, matching the
+      bookmarks panel (which already hides the `git` group, see MT-BOOKMARK); the "+N more"
+      overflow count and its hidden-refs popup also never include `@git`
 - [ ] Double-click the root gutter column (multi-repo view) → toggles expansion (no diff opens)
 - [ ] In Settings → Keymap, rebind "Show Diff" off Enter onto a different jj action (or clear
       it) → both Enter and double-click on a log row now follow the new binding
@@ -1635,7 +1639,7 @@ one per affected remote.
 
 #### Bookmarks panel (jj-idea-b2ae, GitHub #48)
 
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`), `jj/ClosestBookmarks.kt` (`danglingHeads`, jj-idea-lig7)
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`, `localBookmarkTemplate`, `remoteBookmarkTemplate`), `jj/BookmarkDivergence.kt` (`withDerivedDivergence`, jj-idea-ks5k/j58e), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`), `ui/log/UnifiedJujutsuLogDataLoader.kt` (`enrichBookmarks`), `jj/ClosestBookmarks.kt` (`danglingHeads`, jj-idea-lig7)
 
 A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
 git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
@@ -1683,6 +1687,17 @@ selection does nothing; right-click for actions.
   Bookmark Here…/Move '\<bookmark\>' to Change… - jj-idea-bico only made every target reachable
   *by drag*, it doesn't split the node; the two move dialogs' own divergent-resolve behavior is
   covered separately by MT-BOOKMARK's "Move direction" jj-idea-t7cz item, above
+- [ ] jj-idea-ks5k (GitHub #110): with `conflicted-bm` from the recipe above still in place, open
+  the bookmarks panel **and** the log table side by side — `conflicted-bm`'s `↑n`/`↓m` on its
+  Local leaf must be **identical** in both, and must read as the counts a non-divergent bookmark
+  sitting at `<rev-a>` would show relative to `<rev-b>` (i.e. real bidirectional divergence, not
+  jj's own one-directional `tracking_ahead_count`/`tracking_behind_count` hint — panel and log
+  used to disagree here, and the log showed nothing at all for a local bookmark's own divergence)
+- [ ] jj-idea-j58e (GitHub #110): with `[remotes.origin] auto-track-created-bookmarks = "*"` set
+  in `jj config edit --repo` (or equivalent), create a brand-new local bookmark and don't push it
+  — neither the new bookmark's Local leaf nor its `@origin` leaf shows an arrow or a number,
+  collapsed or expanded, in either the panel or the log (this is the reporter's own repro of the
+  "↑1000+" bug); a normal ahead/behind bookmark elsewhere in the same repo is unaffected
 - [ ] Tags appear under their own "Tags" group, also `/`-grouped
 - [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
   or "main +3") — create/delete a bookmark and confirm both update together

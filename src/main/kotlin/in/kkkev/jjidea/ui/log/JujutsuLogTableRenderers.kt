@@ -80,12 +80,13 @@ fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
  * to collapse against. The capped, in-cell equivalent is [cappedDecorations]. */
 fun TextCanvas.appendDecorations(entry: LogEntry) {
     appendBookmarks(entry)
+    val hasBookmarkChips = entry.chipBookmarks().isNotEmpty()
     if (entry.tags.isNotEmpty()) {
-        if (entry.bookmarks.isNotEmpty()) space()
+        if (hasBookmarkChips) space()
         appendTags(entry)
     }
     if (entry.isDanglingHead) {
-        if (entry.bookmarks.isNotEmpty() || entry.tags.isNotEmpty()) space()
+        if (hasBookmarkChips || entry.tags.isNotEmpty()) space()
         appendDanglingHeadMarker()
     }
     if (entry.isWorkingCopy) {

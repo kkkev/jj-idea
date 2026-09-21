@@ -171,9 +171,9 @@ class UnifiedJujutsuLogDataLoader(
                     return@executeInBackground
                 }
 
-                val deletedNamesByRepo = deletedLocalNamesByRepo()
+                val correctionsByRepo = bookmarkCorrectionsByRepo()
                 allEntries = topologicalSort(entriesByRepo.values.flatten())
-                    .map { entry -> enrichWithDeletedBookmarks(entry, deletedNamesByRepo[entry.repo] ?: emptySet()) }
+                    .map { entry -> enrichBookmarks(entry, correctionsByRepo[entry.repo] ?: EMPTY_CORRECTIONS) }
                 log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
                 allEntries.groupBy { it.repo }.forEach { (repo, entries) -> repo.logCache.store(entries) }
                 // jj-idea-jnqi bugfix: graphBuilder.buildGraph() and the snapshot write must be
@@ -191,7 +191,7 @@ class UnifiedJujutsuLogDataLoader(
                         allEntries,
                         allEntries.mapTo(HashSet()) { it.key },
                         allEntries.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
-                        deletedNamesByRepo
+                        correctionsByRepo
                     )
                 }
             },
@@ -352,23 +352,24 @@ class UnifiedJujutsuLogDataLoader(
      * append has a valid base to build on. Any guard failing falls back to the same full
      * recompute - never incorrect, only slower.
      *
-     * Applies [enrichWithDeletedBookmarks] here too (jj-idea-lc43, GitHub #110) — [loadCommits]'s
-     * own application at its `allEntries` assignment only covers the very first load; every path
-     * that lands here (a paged "Load more", a post-write refresh, a search) would otherwise leave
-     * a remote-tracking row's post-deletion garbage ahead/behind count uncorrected.
-     * [deletedLocalNamesByRepo] is resolved once for every repo, not once per entry.
+     * Applies [enrichBookmarks] here too (jj-idea-lc43, GitHub #110) — [loadCommits]'s own
+     * application at its `allEntries` assignment only covers the very first load; every path that
+     * lands here (a paged "Load more", a post-write refresh, a search) would otherwise leave a
+     * remote-tracking row's post-deletion garbage ahead/behind count, or a stale divergence
+     * number (jj-idea-ks5k), uncorrected.
+     * [bookmarkCorrectionsByRepo] is resolved once for every repo, not once per entry.
      */
     private fun mergeAndNotify(delta: List<LogEntry>? = null) = mergeLock.withLock {
-        val deletedNamesByRepo = deletedLocalNamesByRepo()
+        val correctionsByRepo = bookmarkCorrectionsByRepo()
         val current = snapshot
         val hasExpansionOrSearch = expansionEntriesByRepo.isNotEmpty() || searchEntriesByRepo.isNotEmpty()
         val data = if (delta != null &&
             current != null &&
-            appendGuardHolds(delta, current, deletedNamesByRepo, hasExpansionOrSearch)
+            appendGuardHolds(delta, current, correctionsByRepo, hasExpansionOrSearch)
         ) {
-            fastMergeAndNotify(delta, current, deletedNamesByRepo)
+            fastMergeAndNotify(delta, current, correctionsByRepo)
         } else {
-            fullMergeAndNotify(deletedNamesByRepo)
+            fullMergeAndNotify(correctionsByRepo)
         }
         runLater { notify(data) }
     }
@@ -376,9 +377,9 @@ class UnifiedJujutsuLogDataLoader(
     private fun fastMergeAndNotify(
         delta: List<LogEntry>,
         current: MergedSnapshot,
-        deletedNamesByRepo: Map<JujutsuRepository, Set<String>>
+        correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>
     ): Data {
-        val enrichedDelta = delta.map { enrichWithDeletedBookmarks(it, deletedNamesByRepo[it.repo] ?: emptySet()) }
+        val enrichedDelta = delta.map { enrichBookmarks(it, correctionsByRepo[it.repo] ?: EMPTY_CORRECTIONS) }
         val mergedEntries = current.entries + enrichedDelta
         val graphNodes = graphBuilder.appendGraph(enrichedDelta)
         val deltaMinTimestamp = enrichedDelta.minOfOrNull { it.sortTimestamp() } ?: current.minTimestamp
@@ -386,18 +387,18 @@ class UnifiedJujutsuLogDataLoader(
             mergedEntries,
             current.keys + enrichedDelta.mapTo(HashSet()) { it.key },
             minOf(current.minTimestamp, deltaMinTimestamp),
-            deletedNamesByRepo
+            correctionsByRepo
         )
         return Data(mergedEntries, graphNodes, lastLimit)
     }
 
-    private fun fullMergeAndNotify(deletedNamesByRepo: Map<JujutsuRepository, Set<String>>): Data {
+    private fun fullMergeAndNotify(correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>): Data {
         val allEntries = repositories().flatMap { r ->
             val regular = r.logCache.all
             val expanded = expansionEntriesByRepo[r] ?: emptyList()
             val searched = searchEntriesByRepo[r] ?: emptyList()
             (regular + expanded + searched).map { entry ->
-                enrichWithDeletedBookmarks(entry, deletedNamesByRepo[r] ?: emptySet())
+                enrichBookmarks(entry, correctionsByRepo[r] ?: EMPTY_CORRECTIONS)
             }
         }
         val merged = topologicalSort(allEntries.distinctBy { it.key })
@@ -406,13 +407,13 @@ class UnifiedJujutsuLogDataLoader(
             merged,
             merged.mapTo(HashSet()) { it.key },
             merged.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
-            deletedNamesByRepo
+            correctionsByRepo
         )
         return Data(merged, graphNodes, lastLimit)
     }
 
     /**
-     * Pending-deletion local bookmark names per repo, off the already-cached
+     * [BookmarkCorrections] per repo, off the already-cached
      * [in.kkkev.jjidea.jj.JujutsuStateModel.references] state (BGT only — see
      * [in.kkkev.jjidea.util.NotifiableState.immediateValue]). Fetched as a single whole-map read,
      * not one [in.kkkev.jjidea.util.NotifiableState.immediateValue] call per repo: on a cold cache
@@ -420,9 +421,10 @@ class UnifiedJujutsuLogDataLoader(
      * second call in the same pass would see `hasLoaded = true` and return the still-empty start
      * value instead of the just-loaded data.
      */
-    private fun deletedLocalNamesByRepo(): Map<JujutsuRepository, Set<String>> =
+    private fun bookmarkCorrectionsByRepo(): Map<JujutsuRepository, BookmarkCorrections> =
         project.stateModel.references.immediateValue.mapValues { (_, refs) ->
-            refs.bookmarks.map { it.bookmark }.deletedLocalNames()
+            val bookmarks = refs.bookmarks.map { it.bookmark }
+            BookmarkCorrections(bookmarks.deletedLocalNames(), bookmarks.associateBy { it.name })
         }
 
     override fun clearExpansions() {
@@ -683,7 +685,7 @@ internal class MergedSnapshot(
     val entries: List<LogEntry>,
     val keys: Set<ChangeKey>,
     val minTimestamp: Instant,
-    val deletedNamesByRepo: Map<JujutsuRepository, Set<String>>
+    val correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>
 )
 
 /** Same tiebreak expression [topologicalSort]'s `PriorityQueue` comparator uses. */
@@ -692,7 +694,7 @@ internal fun LogEntry.sortTimestamp(): Instant = authorTimestamp ?: committerTim
 /**
  * jj-idea-jnqi's [UnifiedJujutsuLogDataLoader.mergeAndNotify] append-only fast path guards -
  * any failing falls back to a full recompute (never incorrect, only slower). [delta]/[current]
- * compare raw (pre-enrichment) [ChangeKey]s - [enrichWithDeletedBookmarks] never touches those.
+ * compare raw (pre-enrichment) [ChangeKey]s - [enrichBookmarks] never touches those.
  * A top-level function (rather than a loader method) so it's directly unit-testable without
  * the platform dependencies [UnifiedJujutsuLogDataLoader] itself needs.
  *
@@ -704,13 +706,13 @@ internal fun LogEntry.sortTimestamp(): Instant = authorTimestamp ?: committerTim
 internal fun appendGuardHolds(
     delta: List<LogEntry>,
     current: MergedSnapshot,
-    deletedNamesByRepo: Map<JujutsuRepository, Set<String>>,
+    correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>,
     hasExpansionOrSearch: Boolean
 ): Boolean {
     if (hasExpansionOrSearch) return false
-    // Changes what enrichWithDeletedBookmarks does to *already-merged* entries too, not
-    // just delta - the cached prefix would need re-enriching, which the fast path skips.
-    if (deletedNamesByRepo != current.deletedNamesByRepo) return false
+    // Changes what enrichBookmarks does to *already-merged* entries too, not just delta - the
+    // cached prefix would need re-enriching, which the fast path skips.
+    if (correctionsByRepo != current.correctionsByRepo) return false
     // A delta entry that's a CHILD of an already-merged entry (one of its parents is already
     // in the snapshot) can't simply be appended - topologicalSort would need to place it
     // before that parent, not after everything.
@@ -722,7 +724,23 @@ internal fun appendGuardHolds(
 }
 
 /**
- * Injects pending-deletion local bookmarks into log entries and zeroes out garbage ahead/behind counts.
+ * Everything a log entry's bookmark chips need from [in.kkkev.jjidea.jj.JujutsuStateModel.references],
+ * computed once per repo rather than once per entry: which local bookmark names are
+ * pending-deletion (see [enrichBookmarks]'s first correction), and every bookmark's already-derived
+ * ahead/behind ([byName], keyed by full name including `@remote`) from
+ * [in.kkkev.jjidea.jj.withDerivedDivergence] — the same numbers the bookmarks panel renders
+ * (jj-idea-ks5k, GitHub #110). Equality matters: it's the cache key [appendGuardHolds] compares to
+ * decide whether the fast append-only path is still valid.
+ */
+internal data class BookmarkCorrections(val deletedLocalNames: Set<String>, val byName: Map<BookmarkName, Bookmark>)
+
+internal val EMPTY_CORRECTIONS = BookmarkCorrections(emptySet(), emptyMap())
+
+/**
+ * Injects pending-deletion local bookmarks, zeroes out garbage ahead/behind counts, and overwrites
+ * every bookmark's ahead/behind with [corrections]' already-derived numbers, so a log entry's chips
+ * always agree with the bookmarks panel's for the same bookmark (jj-idea-ks5k, GitHub #110) instead
+ * of each surface computing (or, for a local ref, failing to compute) its own.
  *
  * When a local bookmark is deleted (`jj bookmark delete foo`) but the remote `foo@origin` still exists,
  * `jj log` omits the deleted local from the entry (it has no target) while `foo@origin` reports a huge
@@ -730,10 +748,9 @@ internal fun appendGuardHolds(
  * - Injects `Bookmark("foo", tracked=true, deleted=true)` at the entry that carries `foo@origin`
  * - Replaces `foo@origin` with zeroed ahead/behind counts (the original values are meaningless)
  */
-internal fun enrichWithDeletedBookmarks(entry: LogEntry, deletedNames: Set<String>): LogEntry {
-    if (deletedNames.isEmpty()) return entry
+internal fun enrichBookmarks(entry: LogEntry, corrections: BookmarkCorrections): LogEntry {
+    val deletedNames = corrections.deletedLocalNames
     val remotes = entry.bookmarks.filter { it.isRemote && it.localName in deletedNames }
-    if (remotes.isEmpty()) return entry
     // Idempotency (jj-idea-lc43): with mergeAndNotify() now also calling this, an entry that
     // already got a local injected by an earlier pass (or that genuinely has both a live local
     // and a stale remote-tracking row of the same name — jj allows that combination) must not
@@ -744,7 +761,15 @@ internal fun enrichWithDeletedBookmarks(entry: LogEntry, deletedNames: Set<Strin
         .map { Bookmark(it, tracked = true, deleted = true) }
     val cleanedRemotes = remotes.map { it.zeroedIfLocalDeleted(deletedNames) }
     val remaining = entry.bookmarks.filter { !it.isRemote || it.localName !in deletedNames }
-    return entry.copy(bookmarks = remaining + injectedLocals + cleanedRemotes)
+    val bookmarks = (remaining + injectedLocals + cleanedRemotes).map { bookmark ->
+        val derived = corrections.byName[bookmark.name] ?: return@map bookmark
+        if (derived.aheadCount == bookmark.aheadCount && derived.behindCount == bookmark.behindCount) {
+            bookmark
+        } else {
+            bookmark.copy(aheadCount = derived.aheadCount, behindCount = derived.behindCount)
+        }
+    }
+    return if (bookmarks == entry.bookmarks) entry else entry.copy(bookmarks = bookmarks)
 }
 
 /**

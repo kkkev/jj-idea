@@ -162,7 +162,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     ) {
         initialisedRepositories.immediateValue.values.associateWith { repo ->
             RepositoryReferences(
-                bookmarks = repo.logService.getBookmarks().getOrNull().orEmpty(),
+                bookmarks = repo.logService.withDerivedDivergence(repo.logService.getBookmarks().getOrNull().orEmpty()),
                 tags = repo.logService.getTags().getOrNull().orEmpty()
             )
         }

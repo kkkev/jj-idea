@@ -176,8 +176,13 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        // In a colocated git repo, jj also tracks the bookmark as test-bookmark@git;true
-        fields[3].split(",") shouldContain "test-bookmark;true"
+        // In a colocated git repo, jj also tracks the bookmark as test-bookmark@git;true. Each
+        // entry is name;tracked;conflict;ahead;behind - a real, non-error 0;0 for a local ref's
+        // ahead/behind here is the jj-idea-ks5k regression check: before localBookmarkTemplate
+        // guarded tracking_ahead_count()/tracking_behind_count() with `remote() && tracked()`,
+        // jj emitted the literal text "<Error: Not a tracked remote ref>" for these fields
+        // instead (confirmed against jj 0.44.0).
+        fields[3].split(",") shouldContain "test-bookmark;true;false;0;0"
     }
 
     @Test

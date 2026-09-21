@@ -74,6 +74,34 @@ class HtmlTextCanvasTest {
         UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "↑2↓1"
     }
 
+    /**
+     * Regression test for jj-idea-e4ln / GitHub #120: the `git` pseudo-remote (jj's own view of a
+     * colocated repo's local Git refs - always mirrors the local jj bookmark, adds no
+     * information) must not render its own chip in the log, matching the bookmarks panel, which
+     * already hides it (see [in.kkkev.jjidea.jj.GIT_PSEUDO_REMOTE]'s doc).
+     */
+    @Test
+    fun `appendBookmarks hides the git pseudo-remote chip but keeps the local and a real remote`() {
+        val entry = LogEntry(
+            repo = mockk<JujutsuRepository>(relaxed = true),
+            id = ChangeId("qpvuntsmxyz", "qp"),
+            commitId = CommitId("abc123"),
+            underlyingDescription = "",
+            bookmarks = listOf(
+                Bookmark("main"),
+                Bookmark("main@git", tracked = true),
+                Bookmark("main@origin", tracked = true)
+            )
+        )
+
+        val html = htmlString { appendBookmarks(entry) }
+
+        html shouldContain "name=main"
+        html shouldContain "name=main%40origin"
+        html shouldNotContain "git"
+        ICON_TAG.findAll(html).toList() shouldHaveSize 2
+    }
+
     @Test
     fun `separators between bookmark chips remain non-breaking spaces`() {
         val html = htmlString {

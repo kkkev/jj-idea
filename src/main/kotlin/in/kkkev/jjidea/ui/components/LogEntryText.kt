@@ -230,12 +230,19 @@ private fun TextCanvas.refChip(entry: LogEntry, kind: String, name: String, buil
     linked(refUri(entry, kind, name), build)
 
 /**
+ * Bookmark chips for [entry], excluding the `git` pseudo-remote (jj-idea-e4ln, GitHub #120): it's
+ * jj's own view of a colocated repo's local Git refs, always mirrors the local jj bookmark, and
+ * adds no information - the bookmarks panel already hides it (see [GIT_PSEUDO_REMOTE]'s doc).
+ */
+internal fun LogEntry.chipBookmarks() = bookmarks.filterNot { it.isRemote && it.remote == GIT_PSEUDO_REMOTE }
+
+/**
  * Append every bookmark chip for [entry]. [TextCanvas.linkifier] linkifies any issue-tracker
  * reference within a bookmark's own name (e.g. `jira-123-fix-thing`) (jj-idea-vrmv) - see
  * [appendBookmarkChip].
  */
 fun TextCanvas.appendBookmarks(entry: LogEntry, suffix: String = "") {
-    val groups = entry.bookmarks.grouped()
+    val groups = entry.chipBookmarks().grouped()
     var first = true
     for (group in groups) {
         group.local?.let { local ->
@@ -263,7 +270,7 @@ internal data class RefChip(val ref: Any, val build: TextCanvas.() -> Unit)
 /** One [RefChip] per bookmark chip that [appendBookmarks] would render, in the same order. */
 internal fun bookmarkRefChips(entry: LogEntry): List<RefChip> {
     val units = mutableListOf<RefChip>()
-    for (group in entry.bookmarks.grouped()) {
+    for (group in entry.chipBookmarks().grouped()) {
         group.local?.let { local ->
             units += RefChip(local) {
                 refChip(entry, "bookmark", local.name.name) { appendBookmarkChip(local, group.localName) }

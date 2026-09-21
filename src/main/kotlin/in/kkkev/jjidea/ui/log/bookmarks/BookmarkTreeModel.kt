@@ -13,9 +13,6 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RepositoryReferences
 import `in`.kkkev.jjidea.jj.TagItem
-import `in`.kkkev.jjidea.jj.deletedLocalNames
-import `in`.kkkev.jjidea.jj.withDivergenceFrom
-import `in`.kkkev.jjidea.jj.zeroedIfLocalDeleted
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 
 /**
@@ -190,30 +187,16 @@ private fun buildRepoNodes(
         )
     }
 
-    // Built once for the whole repo (jj-idea-lc43, GitHub #110): a remote row whose local side is
-    // pending-deletion carries a meaningless tracking_ahead_count from jj (see
-    // Bookmark.zeroedIfLocalDeleted) that must not leak into either the remote leaf below or the
-    // struck-through local leaf's derived divergence.
-    val deletedLocals = refs.bookmarks.map { it.bookmark }.deletedLocalNames()
-
+    // Divergence (ahead/behind) and the deleted-local/absent-remote corrections are all already
+    // applied once per repo, upstream, by LogService.withDerivedDivergence (jj-idea-ks5k,
+    // GitHub #110) — see in.kkkev.jjidea.jj.JujutsuStateModel.references. That keeps this panel
+    // and the log table's bookmark chips reading the same numbers instead of each deriving them
+    // independently.
     val localBookmarks = refs.bookmarks.filterNot { it.bookmark.isRemote }
     if (localBookmarks.isNotEmpty()) {
-        // Built once, not per leaf below (jj-idea-we1n, GitHub #110): a local bookmark's own
-        // Bookmark.aheadCount/behindCount always arrive as 0/0 from the CLI template (it can't
-        // ask jj about a local ref's tracking counts directly), so they're derived here from the
-        // already-fetched remote-tracking rows sharing the same localName — see
-        // Bookmark.withDivergenceFrom.
-        val remotesByLocalName = refs.bookmarks.asSequence()
-            .map { it.bookmark }
-            .filter { it.isRemote && it.remote != GIT_PSEUDO_REMOTE }
-            .map { it.zeroedIfLocalDeleted(deletedLocals) }
-            .groupBy { it.localName }
         val leaves = localBookmarks.map { item ->
-            val withDivergence = item.copy(
-                bookmark = item.bookmark.withDivergenceFrom(remotesByLocalName[item.bookmark.localName].orEmpty())
-            )
             RefPath(item.bookmark.localName) { name ->
-                BookmarkNode.Local(repo, withDivergence, name, item.bookmark.name.name in onWcNames)
+                BookmarkNode.Local(repo, item, name, item.bookmark.name.name in onWcNames)
             }
         }
         val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
@@ -243,7 +226,6 @@ private fun buildRepoNodes(
     for (remote in remoteNames) {
         val leaves = refs.bookmarks
             .filter { it.bookmark.isRemote && it.bookmark.remote == remote }
-            .map { item -> item.copy(bookmark = item.bookmark.zeroedIfLocalDeleted(deletedLocals)) }
             .map { item -> RefPath(item.bookmark.localName) { name -> BookmarkNode.Remote(repo, item, name) } }
         val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
         add(

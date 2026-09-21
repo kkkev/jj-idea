@@ -12,7 +12,6 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RepositoryReferences
 import `in`.kkkev.jjidea.jj.Tag
 import `in`.kkkev.jjidea.jj.TagItem
-import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -223,19 +222,19 @@ class BookmarkTreeModelTest {
         leaves.getValue("other").onWorkingCopy shouldBe false
     }
 
-    // jj-idea-we1n / jj-idea-5r0g (GitHub #110): a local bookmark's own aheadCount/behindCount
-    // always arrive 0/0 from the CLI template (it can't ask jj about a local ref's tracking
-    // counts directly), so buildRepoNodes derives them from the already-fetched remote-tracking
-    // rows sharing the same localName; a conflicted local bookmark must also survive into the
-    // tree rather than being dropped.
+    // jj-idea-ks5k (GitHub #110): divergence (ahead/behind) derivation, and the deleted-local /
+    // absent-remote count corrections, all moved upstream into
+    // `LogService.withDerivedDivergence` (see `BookmarkDivergenceTest`/`BookmarkDivergenceScaleTest`)
+    // so the panel and the log table's bookmark chips read the same already-derived numbers
+    // instead of each computing (or, for the log's local chips, failing to compute) their own.
+    // The panel's own job is now just to render whatever [BookmarkItem] it's given - these tests
+    // check that pass-through, plus that a conflicted local bookmark still survives into the tree.
 
     @Test
-    fun `local bookmark's aheadCount and behindCount are derived from its remote's, swapped`() {
-        // jj reports tracking counts from the *remote's* perspective (e.g. "@origin (behind by 1
-        // commits)" for a local bookmark that is 1 commit ahead), hence the swap.
+    fun `renders whatever ahead-behind the given BookmarkItem already carries, without re-deriving`() {
         val references = mapOf(
             repo to RepositoryReferences(
-                bookmarks = listOf(item("main"), item("main@origin", behindCount = 1))
+                bookmarks = listOf(item("main", aheadCount = 1, behindCount = 2), item("main@origin"))
             )
         )
 
@@ -244,46 +243,7 @@ class BookmarkTreeModelTest {
         val main = local.children.filterIsInstance<BookmarkNode.Local>().single()
 
         main.item.bookmark.aheadCount shouldBe 1
-        main.item.bookmark.behindCount shouldBe 0
-    }
-
-    @Test
-    fun `local bookmark divergence ignores the git pseudo-remote and untracked remotes`() {
-        val references = mapOf(
-            repo to RepositoryReferences(
-                bookmarks = listOf(
-                    item("main"),
-                    item("main@git", aheadCount = 5, behindCount = 5),
-                    item("main@origin", tracked = false, aheadCount = 9, behindCount = 9)
-                )
-            )
-        )
-
-        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
-        val local = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "Local" }
-        val main = local.children.filterIsInstance<BookmarkNode.Local>().single()
-
-        main.item.bookmark.aheadCount shouldBe 0
-        main.item.bookmark.behindCount shouldBe 0
-    }
-
-    @Test
-    fun `local bookmark divergence takes the max across multiple tracked remotes, not the sum`() {
-        val references = mapOf(
-            repo to RepositoryReferences(
-                bookmarks = listOf(
-                    item("main"),
-                    item("main@origin", behindCount = 2),
-                    item("main@github", behindCount = 5)
-                )
-            )
-        )
-
-        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
-        val local = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "Local" }
-        val main = local.children.filterIsInstance<BookmarkNode.Local>().single()
-
-        main.item.bookmark.aheadCount shouldBe 5
+        main.item.bookmark.behindCount shouldBe 2
     }
 
     @Test
@@ -298,100 +258,22 @@ class BookmarkTreeModelTest {
         local.rollup.hasUnsynced shouldBe true
     }
 
-    // jj-idea-lc43 (GitHub #110): when a local bookmark is pending deletion (`jj bookmark delete`)
-    // but its remote-tracking row still exists, jj reports that row's tracking_ahead_count as the
-    // distance from the absent local to the repo root - a huge, meaningless number - rather than
-    // the real divergence. Both the remote leaf and the struck-through local leaf's *derived*
-    // divergence must be zeroed instead of showing or propagating that garbage.
-
     @Test
-    fun `a remote row whose local is pending-deletion has its counts zeroed`() {
+    fun `a struck-through pending-deletion leaf renders as given, and doesn't make its remote category notable`() {
         val references = mapOf(
             repo to RepositoryReferences(
-                bookmarks = listOf(item("foo", deleted = true), item("foo@origin", aheadCount = 1000))
+                // Already zeroed by withDerivedDivergence upstream - the panel no longer zeroes.
+                bookmarks = listOf(item("foo", deleted = true), item("foo@origin", aheadCount = 0, behindCount = 0))
             )
         )
-
-        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
-            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
-        val remote = origin.children.filterIsInstance<BookmarkNode.Remote>().single()
-
-        remote.item.bookmark.aheadCount shouldBe 0
-        remote.item.bookmark.behindCount shouldBe 0
-    }
-
-    @Test
-    fun `the struck-through local leaf derives zero divergence, not the swapped garbage count`() {
-        val references = mapOf(
-            repo to RepositoryReferences(
-                bookmarks = listOf(item("foo", deleted = true), item("foo@origin", aheadCount = 1000))
-            )
-        )
-
-        val local = buildBookmarkTree(references, emptyMap(), emptyMap())
-            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "Local" }
-        val foo = local.children.filterIsInstance<BookmarkNode.Local>().single()
-
-        foo.item.bookmark.deleted shouldBe true
-        foo.item.bookmark.aheadCount shouldBe 0
-        foo.item.bookmark.behindCount shouldBe 0
-    }
-
-    @Test
-    fun `a pending-deletion row alone does not make its remote category notable`() {
-        val references = mapOf(
-            repo to RepositoryReferences(
-                bookmarks = listOf(item("foo", deleted = true), item("foo@origin", aheadCount = 1000))
-            )
-        )
-
-        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
-            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
-
-        origin.rollup.isNotable shouldBe false
-    }
-
-    @Test
-    fun `a live sibling bookmark on the same remote keeps its real counts`() {
-        val references = mapOf(
-            repo to RepositoryReferences(
-                bookmarks = listOf(
-                    item("foo", deleted = true),
-                    item("foo@origin", aheadCount = 1000),
-                    item("bar"),
-                    item("bar@origin", behindCount = 3)
-                )
-            )
-        )
-
-        val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
-            .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
-        val remotes = origin.children.filterIsInstance<BookmarkNode.Remote>().associateBy { it.displayName }
-
-        remotes.getValue("foo").item.bookmark.aheadCount shouldBe 0
-        remotes.getValue("bar").item.bookmark.behindCount shouldBe 3
-        origin.rollup.aheadCount shouldBe 0
-        origin.rollup.behindCount shouldBe 3
-    }
-
-    @Test
-    fun `local divergence lookup is a single grouped pass, not one remoteEntriesFor scan per leaf`() {
-        // Operation-count guard (CLAUDE.md Performance & Scale): grouping remotes by localName
-        // once (O(B)) rather than filtering the full bookmark list per local leaf (O(B) work per
-        // leaf, O(B^2) total) is the point of this fix - sized to make an O(B^2) regression slow
-        // while an O(B) pass stays fast.
-        val localCount = 3_000
-        val bookmarks = (0 until localCount).flatMap { i ->
-            listOf(item("main$i"), item("main$i@origin", behindCount = 1))
-        }
-        val references = mapOf(repo to RepositoryReferences(bookmarks = bookmarks))
 
         val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
         val local = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "Local" }
-        val leaves = local.children.filterIsInstance<BookmarkNode.Local>()
+        val foo = local.children.filterIsInstance<BookmarkNode.Local>().single()
+        val origin = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
 
-        leaves shouldHaveSize localCount
-        leaves.forEach { it.item.bookmark.aheadCount shouldBe 1 }
+        foo.item.bookmark.deleted shouldBe true
+        origin.rollup.isNotable shouldBe false
     }
 
     // jj-idea-a7a7 (GitHub #48): remote categories collapse by default; roll-up counts surface a

@@ -149,16 +149,16 @@ class LogMergeScaleTest {
     }
 
     @Test
-    fun `guard fails when deletedNamesByRepo changed since the snapshot`() {
+    fun `guard fails when correctionsByRepo changed since the snapshot`() {
         val current = MergedSnapshot(
             listOf(entry("e0", null, 100)),
             setOf(entry("e0", null, 100).key),
             Instant.fromEpochSeconds(100),
-            mapOf(REPO to setOf("old-deleted"))
+            mapOf(REPO to BookmarkCorrections(setOf("old-deleted"), emptyMap()))
         )
         val delta = listOf(entry("e1", null, 90))
-        val deletedNamesByRepo = mapOf(REPO to setOf("new-deleted"))
-        appendGuardHolds(delta, current, deletedNamesByRepo, hasExpansionOrSearch = false) shouldBe false
+        val correctionsByRepo = mapOf(REPO to BookmarkCorrections(setOf("new-deleted"), emptyMap()))
+        appendGuardHolds(delta, current, correctionsByRepo, hasExpansionOrSearch = false) shouldBe false
     }
 
     @Test

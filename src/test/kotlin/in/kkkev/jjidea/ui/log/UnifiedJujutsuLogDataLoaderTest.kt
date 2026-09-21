@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import `in`.kkkev.jjidea.jj.Bookmark
+import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Expression
@@ -18,7 +19,7 @@ import org.junit.jupiter.api.Test
 
 class UnifiedJujutsuLogDataLoaderTest {
     @Nested
-    inner class `enrichWithDeletedBookmarks` {
+    inner class `enrichBookmarks` {
         private val repo = mockk<JujutsuRepository>()
 
         private fun entry(vararg bookmarks: Bookmark) = LogEntry(
@@ -33,25 +34,30 @@ class UnifiedJujutsuLogDataLoaderTest {
             isEmpty = false
         )
 
+        private fun corrections(
+            deletedNames: Set<String> = emptySet(),
+            byName: Map<BookmarkName, Bookmark> = emptyMap()
+        ) = BookmarkCorrections(deletedNames, byName)
+
         @Test
-        fun `no-op when deleted names set is empty`() {
+        fun `no-op when there is nothing to correct`() {
             val bm = Bookmark("foo@origin", tracked = true, aheadCount = 99)
             val e = entry(bm)
-            enrichWithDeletedBookmarks(e, emptySet()) shouldBe e
+            enrichBookmarks(e, corrections()) shouldBe e
         }
 
         @Test
         fun `no-op when entry has no matching remote bookmarks`() {
             val bm = Bookmark("bar@origin", tracked = true, aheadCount = 99)
             val e = entry(bm)
-            enrichWithDeletedBookmarks(e, setOf("foo")) shouldBe e
+            enrichBookmarks(e, corrections(setOf("foo"))) shouldBe e
         }
 
         @Test
         fun `injects deleted local and zeros remote counts`() {
             val remote = Bookmark("foo@origin", tracked = true, aheadCount = 42, behindCount = 0)
             val e = entry(remote)
-            val result = enrichWithDeletedBookmarks(e, setOf("foo"))
+            val result = enrichBookmarks(e, corrections(setOf("foo")))
             val bookmarks = result.bookmarks
             bookmarks.shouldContainExactlyInAnyOrder(
                 Bookmark("foo", tracked = true, deleted = true),
@@ -65,7 +71,7 @@ class UnifiedJujutsuLogDataLoaderTest {
             val unrelated = Bookmark("main@origin", tracked = true, aheadCount = 0)
             val local = Bookmark("main")
             val e = entry(remote, unrelated, local)
-            val result = enrichWithDeletedBookmarks(e, setOf("foo"))
+            val result = enrichBookmarks(e, corrections(setOf("foo")))
             val bookmarks = result.bookmarks
             bookmarks.shouldContainExactlyInAnyOrder(
                 Bookmark("foo", tracked = true, deleted = true),
@@ -80,7 +86,7 @@ class UnifiedJujutsuLogDataLoaderTest {
             val remote1 = Bookmark("foo@origin", tracked = true, aheadCount = 50)
             val remote2 = Bookmark("bar@origin", tracked = true, aheadCount = 30)
             val e = entry(remote1, remote2)
-            val result = enrichWithDeletedBookmarks(e, setOf("foo", "bar"))
+            val result = enrichBookmarks(e, corrections(setOf("foo", "bar")))
             val bookmarks = result.bookmarks
             bookmarks.shouldContainExactlyInAnyOrder(
                 Bookmark("foo", tracked = true, deleted = true),
@@ -94,12 +100,31 @@ class UnifiedJujutsuLogDataLoaderTest {
         fun `is idempotent - a second application injects no duplicate local`() {
             val remote = Bookmark("foo@origin", tracked = true, aheadCount = 42)
             val e = entry(remote)
-            val once = enrichWithDeletedBookmarks(e, setOf("foo"))
-            val twice = enrichWithDeletedBookmarks(once, setOf("foo"))
+            val once = enrichBookmarks(e, corrections(setOf("foo")))
+            val twice = enrichBookmarks(once, corrections(setOf("foo")))
             twice.bookmarks.shouldContainExactlyInAnyOrder(
                 Bookmark("foo", tracked = true, deleted = true),
                 Bookmark("foo@origin", tracked = true, aheadCount = 0, behindCount = 0)
             )
+        }
+
+        @Test
+        fun `overwrites a bookmark's ahead-behind with the derived value from the corrections map (jj-idea-ks5k)`() {
+            // The local template can't compute a local bookmark's own divergence (jj errors "Not
+            // a tracked remote ref"), so it always arrives 0/0 here; withDerivedDivergence's
+            // already-computed value (as seen by the panel) must win.
+            val local = Bookmark("main", aheadCount = 0, behindCount = 0)
+            val e = entry(local)
+            val derived = Bookmark("main", aheadCount = 2, behindCount = 1)
+            val result = enrichBookmarks(e, corrections(byName = mapOf(local.name to derived)))
+            result.bookmarks shouldBe listOf(Bookmark("main", aheadCount = 2, behindCount = 1))
+        }
+
+        @Test
+        fun `a bookmark absent from the corrections map is left untouched`() {
+            val local = Bookmark("main", aheadCount = 3, behindCount = 4)
+            val e = entry(local)
+            enrichBookmarks(e, corrections()) shouldBe e
         }
     }
 

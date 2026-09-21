@@ -341,12 +341,23 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val currentWorkingCopy = booleanField("current_working_copy")
         val conflict = booleanField("conflict")
         val empty = booleanField("empty")
+
+        // b.tracking_ahead_count()/tracking_behind_count() error ("Not a tracked remote ref") on
+        // a local ref, so they're guarded the same way bookmarkListTemplate already guards them
+        // (jj-idea-ks5k, GitHub #110) — a local row always carries 0/0 here; its real divergence
+        // is derived once per repo by LogService.withDerivedDivergence and merged back into log
+        // entries by UnifiedJujutsuLogDataLoader's enrichBookmarks.
         private val localBookmarkTemplate =
             """bookmarks.map(|b| ${TemplateParts.nameWithRemote(
                 "b"
-            )} ++ ";" ++ if(b.remote(), b.tracked(), "true") ++ ";" ++ b.conflict() ++ ";" ++ b.tracking_ahead_count().lower() ++ ";" ++ b.tracking_behind_count().lower()).join(",")"""
+            )} ++ ";" ++ if(b.remote(), b.tracked(), "true") ++ ";" ++ b.conflict() ++ ";" ++ if(b.remote() && b.tracked(), b.tracking_ahead_count().lower(), "0") ++ ";" ++ if(b.remote() && b.tracked(), b.tracking_behind_count().lower(), "0")).join(",")"""
+
+        // Same error as localBookmarkTemplate's guard above, on the untracked side: an untracked
+        // remote_bookmarks row also errors "Not a tracked remote ref" on tracking_ahead_count()/
+        // tracking_behind_count() (pre-existing gap, fixed alongside jj-idea-ks5k since it's the
+        // same guard, on the same field, in the same template).
         private val remoteBookmarkTemplate =
-            """remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote() ++ ";" ++ b.tracked() ++ ";" ++ b.conflict() ++ ";" ++ b.tracking_ahead_count().lower() ++ ";" ++ b.tracking_behind_count().lower()).join(",")"""
+            """remote_bookmarks.map(|b| b.name() ++ "@" ++ b.remote() ++ ";" ++ b.tracked() ++ ";" ++ b.conflict() ++ ";" ++ if(b.tracked(), b.tracking_ahead_count().lower(), "0") ++ ";" ++ if(b.tracked(), b.tracking_behind_count().lower(), "0")).join(",")"""
         val bookmarks = singleField(
             """separate(",", $localBookmarkTemplate, $remoteBookmarkTemplate)"""
         ) {
