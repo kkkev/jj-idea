@@ -81,7 +81,7 @@
     <toolWindow
         id="Working copy"
         anchor="left"
-        icon="AllIcons.Vcs.Branch"
+        icon="/icons/workingCopyToolWindow.svg"
         factoryClass="in.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory"
     />
     <!-- Add .jj to ignored files on first project open -->
