@@ -91,6 +91,28 @@ class RestoreDialogTest {
     }
 
     @Test
+    fun `mixed deleted and edited pre-selection ticks and restores both (jj-idea-c2m8, GitHub #122)`() {
+        // The end-to-end guarantee behind the restorePaths fix: a selection mixing a deleted file
+        // (only reachable via changes, since it has no VirtualFile for VIRTUAL_FILE_ARRAY to carry)
+        // with an edited one must restore BOTH, not silently drop the deleted file.
+        val deleted = deletedChange("src/Deleted.kt")
+        val edited = change("src/Main.kt")
+        val dialog = RestoreDialog(
+            project.get(),
+            "@-",
+            listOf(deleted, edited),
+            setOf(path("src/Deleted.kt"), edited.filePath)
+        )
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.fileSelection.includedChanges.toList().shouldContainExactlyInAnyOrder(deleted, edited)
+
+        dialog.performOKForTest()
+        dialog.result!!.shouldContainExactlyInAnyOrder(path("src/Deleted.kt"), path("src/Main.kt"))
+        disposeDialog(dialog)
+    }
+
+    @Test
     fun `validation fails when nothing is ticked`() {
         val dialog = RestoreDialog(project.get(), "@-", listOf(change("src/Main.kt")), emptySet())
         waitForRefresh(dialog.fileSelection)
@@ -118,6 +140,8 @@ class RestoreDialogTest {
 
     private fun renameChange(beforePath: String, afterPath: String) =
         Change(SimpleContentRevision("", path(beforePath), "1"), SimpleContentRevision("", path(afterPath), "2"))
+
+    private fun deletedChange(relativePath: String) = Change(SimpleContentRevision("", path(relativePath), "1"), null)
 
     private fun disposeDialog(dialog: DialogWrapper) {
         if (!dialog.isDisposed) dialog.close(DialogWrapper.CANCEL_EXIT_CODE)

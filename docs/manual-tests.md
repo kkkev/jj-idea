@@ -1837,6 +1837,15 @@ selection does nothing; right-click for actions.
       other changed files too — no more single-file Yes/No shortcut
 - [ ] With a renamed file among the changes, checking it and confirming restores **both** the
       old and new path (no orphaned file left at either location)
+- [ ] jj-idea-c2m8 (GitHub #122): delete a tracked file (`rm`) → right-click **only** that
+      deleted file in the changed-files tree → **Restore** is offered (not hidden) → confirm →
+      the file comes back
+- [ ] jj-idea-c2m8: delete one file and edit another, select **both** in the changed-files tree
+      → Restore → the dialog opens with **both** files pre-checked → confirm → both are
+      restored (the deleted file used to be silently dropped from a mixed selection)
+- [ ] jj-idea-c2m8: same deleted-only selection → **Show File History** still opens history for
+      it (see MT-DIFF's File History section); **Squash Selected Files** / **Split** offer it
+      pre-ticked in their dialogs; **Open File** stays disabled (there's no file to open)
 - [ ] With a clean working copy (no pending changes), Restore shows a "Nothing to restore"
       notification instead of opening an empty dialog
 - [ ] After confirming a restore, an undo balloon reading "Restore" appears with an inline
@@ -2205,6 +2214,10 @@ below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, w
 - [ ] jj-idea-a1fh: in that same tab, click the "Commit Time" column header twice — rows
       order chronologically (oldest→newest, then newest→oldest), not alphabetically by
       committer name
+- [ ] jj-idea-c2m8 (GitHub #122): delete a tracked file (`rm`) → right-click it alone in the
+      Working Copy panel's changed-files tree → **Show File History** is offered and opens
+      history for it (it used to be hidden, the same root cause as MT-WORKINGCOPY's Restore
+      dialog checks)
 
 ### MT-DIFF-PREVIEW
 

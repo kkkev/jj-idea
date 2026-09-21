@@ -70,8 +70,11 @@ val AnActionEvent.fileList: List<VirtualFile>?
  * is true, i.e. only when the local file genuinely *is* the file on screen. Any future context
  * that starts publishing `VIRTUAL_FILE_ARRAY` alongside `CHANGES` for a *historical* selection
  * would silently resolve to the wrong (local, not historical) file here - this precedence is
- * pinned by `ActionEventExtensionsTest`'s "fileList takes precedence over changes" test.
- * Otherwise, each change's `after`
+ * pinned by `ActionEventExtensionsTest`'s "fileList takes precedence over changes" test. This is
+ * a different precedence than [filePaths]/[restorePaths] use (they prefer [changes], to survive
+ * an empty [fileList] for a deleted-only selection - jj-idea-c2m8): those two never need to
+ * resolve a [VirtualFile] for a historical revision in the first place, so they have no
+ * wrong-file risk to guard against. Otherwise, each change's `after`
  * [`in`.kkkev.jjidea.jj.FileAtVersion] is resolved via [possibleVirtualFileFor], which may run a
  * `jj log` subprocess. Capture [fileList] and [changes] on the EDT, then call this from
  * a `runInBackground` block.
@@ -97,12 +100,27 @@ fun Project.jujutsuFilesFor(
     filesFor(fileList, changes).filterInJujutsuRepo(this)
         .ifEmpty { listOfNotNull(focusedFile).filterInJujutsuRepo(this) }
 
+/**
+ * One [FilePath] per selected item ([FileChange.filePath]: the after path, or the before path
+ * for a delete). Prefers [changes] over [fileList] - unlike [filesFor]'s [fileList]-first
+ * precedence - because [in.kkkev.jjidea.ui.common.JujutsuChangesTree] publishes an *empty but
+ * non-null* `VIRTUAL_FILE_ARRAY` for a selection containing only deleted files (a deleted file
+ * has no [VirtualFile]), which would otherwise defeat the [changes] fallback entirely
+ * (jj-idea-c2m8). [changes] is empty in the editor/Project View context, where [fileList] is
+ * the only source anyway, so this is a no-op there.
+ */
 val AnActionEvent.filePaths: List<FilePath>
-    get() = fileList?.map { it.filePath } ?: changes.mapNotNull { it.after?.filePath }
+    get() = changes.takeIf { it.isNotEmpty() }?.map { it.filePath } ?: fileList.orEmpty().map { it.filePath }
 
-/** Like [filePaths] but includes the source path of renames and the path of deletes. Use in restore operations. */
+/**
+ * Like [filePaths] but includes the source path of renames and the path of deletes. Use in
+ * restore operations. Unlike [filePaths], this *unions* [fileList] with [changes]' [FileChange.allPaths]
+ * rather than choosing one over the other: a selection mixing a deleted file with an edited one
+ * has the edited file in [fileList] (it has a [VirtualFile]) and the deleted file only in
+ * [changes], so either source alone would drop one of them (jj-idea-c2m8).
+ */
 val AnActionEvent.restorePaths: List<FilePath>
-    get() = fileList?.map { it.filePath } ?: changes.flatMap { it.allPaths }.distinct()
+    get() = (fileList.orEmpty().map { it.filePath } + changes.flatMap { it.allPaths }).distinct()
 
 val AnActionEvent.editor: Editor? get() = this.getData(CommonDataKeys.EDITOR)
 

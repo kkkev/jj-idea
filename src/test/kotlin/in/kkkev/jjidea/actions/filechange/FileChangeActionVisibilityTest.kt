@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.actions.file.CompareFileWithBranchAction
 import `in`.kkkev.jjidea.actions.file.RestoreSelectionAction
 import `in`.kkkev.jjidea.actions.file.ShowFileHistoryAction
+import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.actions.restorePaths
 import `in`.kkkev.jjidea.actions.singleRepoForRestore
@@ -102,22 +103,26 @@ class FileChangeActionVisibilityTest {
         hasPushedAncestor = hasPushedAncestor
     )
 
-    /** A Change whose after-revision is a historical (non-working-copy) version */
-    private fun historicalChange(path: String): Change {
+    private fun jujutsuRevision(path: String): ContentRevision {
         val filePath = LocalFilePath("/project/$path", false)
-        val revision = mockk<ContentRevision> {
+        return mockk<ContentRevision> {
             every { file } returns filePath
             every { revisionNumber } returns ChangeIdRevisionNumber(ChangeId("abc123abc123", "abc1"))
             every { content } returns ""
         }
-        return Change(null, revision)
     }
+
+    /** A Change whose after-revision is a historical (non-working-copy) version */
+    private fun historicalChange(path: String): Change = Change(null, jujutsuRevision(path))
 
     /** A Change whose after-revision is the working copy */
     private fun workingCopyChange(path: String) = Change(
         null,
         CurrentContentRevision(LocalFilePath("/project/$path", false))
     )
+
+    /** A Change with no after-revision — a deleted file, only reachable via [filePaths]'s `changes` fallback. */
+    private fun deletedChange(path: String): Change = Change(jujutsuRevision(path), null)
 
     // ── OpenLocalFileAction ───────────────────────────────────────────────────
 
@@ -305,6 +310,18 @@ class FileChangeActionVisibilityTest {
             RestoreToChangeAction().update(event)
             presentation.isEnabledAndVisible shouldBe true
         }
+
+        @Test
+        fun `resolves a deleted file's path for restoring (jj-idea-c2m8, GitHub #122)`() {
+            // actionPerformed (RestoreToChangeAction.kt:42) reads restorePaths to build the
+            // preSelected set - visible above via .changes alone, but restoring the actual file
+            // depends on restorePaths surviving the changes-tree's empty VIRTUAL_FILE_ARRAY for a
+            // deleted-only selection (see restorePaths's kdoc).
+            withLogEntry(historicalEntry())
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns emptyArray()
+            withChanges(deletedChange("Deleted.kt"))
+            event.restorePaths shouldBe listOf(LocalFilePath("/project/Deleted.kt", false))
+        }
     }
 
     // ── RestoreSelectionAction ────────────────────────────────────────────────
@@ -331,6 +348,82 @@ class FileChangeActionVisibilityTest {
             // No log entry, no files, no changes — cannot resolve repo → disabled
             RestoreSelectionAction().update(event)
             presentation.isEnabledAndVisible shouldBe false
+        }
+
+        @Nested
+        inner class `deleted-file selection (jj-idea-c2m8, GitHub #122)` {
+            // Real repo resolution (possibleJujutsuRepositoryFor -> VcsUtil.getVcsRootFor) needs a
+            // live Application this test doesn't have, so - like the ShowFileHistory nested class
+            // below - stub the accessors themselves rather than the changes-tree data they read.
+            @BeforeEach
+            fun setupStatics() = mockkStatic("in.kkkev.jjidea.actions.ActionEventExtensionsKt")
+
+            @AfterEach
+            fun teardown() = unmockkAll()
+
+            @Test
+            fun `enabled for a deleted-only working-copy selection`() {
+                // The working-copy JujutsuChangesTree publishes an empty (not null)
+                // VIRTUAL_FILE_ARRAY here, since a deleted file has no VirtualFile — see
+                // JujutsuChangesTree.uiDataSnapshot and restorePaths's kdoc. That empty array used
+                // to defeat the changes fallback entirely, hiding Restore.
+                every { event.restorePaths } returns listOf(LocalFilePath("/project/Deleted.kt", false))
+                every { event.singleRepoForRestore } returns repo
+                RestoreSelectionAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
+
+            @Test
+            fun `enabled for a mixed deleted+edited working-copy selection, restoring both`() {
+                // Union, not choice: restorePaths must carry both paths, or the deleted file is
+                // silently dropped from the operation even though the action is enabled.
+                every { event.restorePaths } returns
+                    listOf(LocalFilePath("/project/Deleted.kt", false), LocalFilePath("/project/Main.kt", false))
+                every { event.singleRepoForRestore } returns repo
+                RestoreSelectionAction().update(event)
+                presentation.isEnabledAndVisible shouldBe true
+            }
+        }
+    }
+
+    // ── OpenChangeFileAction ──────────────────────────────────────────────────
+
+    @Nested
+    inner class `OpenChangeFile` {
+        @BeforeEach
+        fun setupProject() {
+            every { event.getData(CommonDataKeys.PROJECT) } returns mockk(relaxed = true)
+        }
+
+        @Test
+        fun `disabled when no files and no changes with an after-revision`() {
+            OpenChangeFileAction().update(event)
+            presentation.isEnabled shouldBe false
+        }
+
+        @Test
+        fun `disabled for a deleted-only selection (jj-idea-c2m8, GitHub #122)`() {
+            // filesFor can't resolve a VirtualFile for a delete, so - unlike filePaths, which is
+            // non-empty here since jj-idea-c2m8 - this must stay disabled rather than open nothing.
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns emptyArray()
+            withChanges(deletedChange("Deleted.kt"))
+            OpenChangeFileAction().update(event)
+            presentation.isEnabled shouldBe false
+        }
+
+        @Test
+        fun `enabled when a change has an after-revision`() {
+            withChanges(historicalChange("Main.kt"))
+            OpenChangeFileAction().update(event)
+            presentation.isEnabled shouldBe true
+        }
+
+        @Test
+        fun `enabled when VIRTUAL_FILE_ARRAY is non-empty`() {
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns
+                arrayOf(mockk<VirtualFile>(relaxed = true))
+            OpenChangeFileAction().update(event)
+            presentation.isEnabled shouldBe true
         }
     }
 
@@ -587,7 +680,7 @@ class FileChangeActionVisibilityTest {
 
         @Test
         fun `disabled when neither a VIRTUAL_FILE nor a changes-tree selection resolve`() {
-            every { event.restorePaths } returns emptyList()
+            every { event.filePaths } returns emptyList()
             every { event.singleRepoForRestore } returns null
             ShowFileHistoryAction().update(event)
             presentation.isEnabledAndVisible shouldBe false
@@ -598,15 +691,25 @@ class FileChangeActionVisibilityTest {
             // No VIRTUAL_FILE here - this is the bug: the action used to only ever read
             // CommonDataKeys.VIRTUAL_FILE, which a historical JujutsuChangesTree selection never
             // supplies (only a working-copy one does, via JujutsuChangesTree.showsLocalFiles).
-            every { event.restorePaths } returns listOf(LocalFilePath("/project/Main.kt", false))
+            every { event.filePaths } returns listOf(LocalFilePath("/project/Main.kt", false))
             every { event.singleRepoForRestore } returns repo
             ShowFileHistoryAction().update(event)
             presentation.isEnabledAndVisible shouldBe true
         }
 
         @Test
-        fun `enabled for a deleted file (no after-revision, only reachable via restorePaths)`() {
-            every { event.restorePaths } returns listOf(LocalFilePath("/project/Deleted.kt", false))
+        fun `enabled for a deleted file (no after-revision, only reachable via filePaths)`() {
+            every { event.filePaths } returns listOf(LocalFilePath("/project/Deleted.kt", false))
+            every { event.singleRepoForRestore } returns repo
+            ShowFileHistoryAction().update(event)
+            presentation.isEnabledAndVisible shouldBe true
+        }
+
+        @Test
+        fun `enabled for a renamed file (single target path, not source+target)`() {
+            // jj-idea-c2m8: filePaths (not restorePaths) is used here specifically so a rename's
+            // single target path still passes the singleOrNull() check below.
+            every { event.filePaths } returns listOf(LocalFilePath("/project/New.kt", false))
             every { event.singleRepoForRestore } returns repo
             ShowFileHistoryAction().update(event)
             presentation.isEnabledAndVisible shouldBe true
@@ -614,7 +717,7 @@ class FileChangeActionVisibilityTest {
 
         @Test
         fun `disabled when the changes-tree selection spans multiple repos`() {
-            every { event.restorePaths } returns
+            every { event.filePaths } returns
                 listOf(LocalFilePath("/a/Main.kt", false), LocalFilePath("/b/Main.kt", false))
             every { event.singleRepoForRestore } returns null
             ShowFileHistoryAction().update(event)
@@ -627,7 +730,7 @@ class FileChangeActionVisibilityTest {
             // some single file out of a multi-file selection alongside VIRTUAL_FILE_ARRAY/CHANGES.
             // hasEditorTarget must defer to hasTreeTarget here rather than treat that lead file as
             // the whole (single-file) target - see the class kdoc.
-            every { event.restorePaths } returns
+            every { event.filePaths } returns
                 listOf(LocalFilePath("/project/Main.kt", false), LocalFilePath("/project/Utils.kt", false))
             every { event.singleRepoForRestore } returns repo
             every { event.file } returns mockk<VirtualFile> { every { isDirectory } returns false }
@@ -638,7 +741,7 @@ class FileChangeActionVisibilityTest {
 
         @Test
         fun `enabled via VIRTUAL_FILE in the editor Project View context`() {
-            every { event.restorePaths } returns emptyList()
+            every { event.filePaths } returns emptyList()
             every { event.singleRepoForRestore } returns null
             every { event.file } returns mockk<VirtualFile> { every { isDirectory } returns false }
             every { event.repoForFile } returns repo
@@ -648,7 +751,7 @@ class FileChangeActionVisibilityTest {
 
         @Test
         fun `disabled when VIRTUAL_FILE is a directory`() {
-            every { event.restorePaths } returns emptyList()
+            every { event.filePaths } returns emptyList()
             every { event.singleRepoForRestore } returns null
             every { event.file } returns mockk<VirtualFile> { every { isDirectory } returns true }
             every { event.repoForFile } returns repo

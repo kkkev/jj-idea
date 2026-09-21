@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.actions
 
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.VcsDataKeys
@@ -8,17 +9,20 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.changes.CurrentContentRevision
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.possibleVirtualFileFor
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -153,6 +157,128 @@ class ActionEventExtensionsTest {
 
             val result = project.jujutsuFilesFor(listOf(vf), emptyList(), null)
             result shouldBe emptyList()
+        }
+    }
+
+    // ── AnActionEvent.filePaths / AnActionEvent.restorePaths (jj-idea-c2m8) ─────
+    // Regression coverage for GitHub #122: JujutsuChangesTree.uiDataSnapshot publishes an
+    // *empty but non-null* VIRTUAL_FILE_ARRAY for a selection containing a deleted file (it has
+    // no VirtualFile). The old `fileList?.… ?: changes.…` accessors treated that empty array as
+    // present and never fell back to `changes`, hiding Restore et al. entirely.
+
+    @Nested
+    inner class `filePaths and restorePaths` {
+        private val event = mockk<AnActionEvent>()
+
+        private fun jujutsuRevision(path: String): ContentRevision {
+            val filePath = LocalFilePath("/project/$path", false)
+            return mockk<ContentRevision> {
+                every { file } returns filePath
+                every { revisionNumber } returns ChangeIdRevisionNumber(ChangeId("abc123abc123", "abc1"))
+            }
+        }
+
+        private fun deletedChange(path: String) = Change(jujutsuRevision(path), null)
+        private fun modifiedChange(path: String) = Change(jujutsuRevision(path), jujutsuRevision(path))
+        private fun renamedChange(from: String, to: String) = Change(jujutsuRevision(from), jujutsuRevision(to))
+
+        private fun withChanges(vararg changes: Change) {
+            every { event.getData(VcsDataKeys.SELECTED_CHANGES) } returns null
+            every { event.getData(VcsDataKeys.CHANGES) } returns changes.toList().toTypedArray()
+        }
+
+        /** Simulates JujutsuChangesTree's empty-but-non-null array for a deleted-only selection. */
+        private fun withEmptyFileArray() {
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns emptyArray()
+        }
+
+        private fun withNoFileArray() {
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns null
+        }
+
+        @Test
+        fun `filePaths falls back to changes for a deleted-only selection with an empty array`() {
+            withEmptyFileArray()
+            withChanges(deletedChange("Deleted.kt"))
+
+            event.filePaths shouldBe listOf(LocalFilePath("/project/Deleted.kt", false))
+        }
+
+        @Test
+        fun `restorePaths falls back to changes for a deleted-only selection with an empty array`() {
+            withEmptyFileArray()
+            withChanges(deletedChange("Deleted.kt"))
+
+            event.restorePaths shouldBe listOf(LocalFilePath("/project/Deleted.kt", false))
+        }
+
+        @Test
+        fun `filePaths returns each change's primary path for a mixed selection`() {
+            withEmptyFileArray()
+            withChanges(deletedChange("Deleted.kt"), modifiedChange("Main.kt"))
+
+            event.filePaths shouldContainExactlyInAnyOrder listOf(
+                LocalFilePath("/project/Deleted.kt", false),
+                LocalFilePath("/project/Main.kt", false)
+            )
+        }
+
+        @Test
+        fun `restorePaths includes both the deleted and the edited file in a mixed selection`() {
+            // The real-world trigger for the "silently dropped" symptom: fileList is non-empty
+            // here (the edited file has a VirtualFile), so a fileList-wins accessor would drop
+            // the deleted file entirely.
+            mockkStatic(VcsUtil::class)
+            val editedVf = mockk<VirtualFile>(relaxed = true)
+            every { VcsUtil.getFilePath(editedVf) } returns LocalFilePath("/project/Main.kt", false)
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns arrayOf(editedVf)
+            withChanges(deletedChange("Deleted.kt"), modifiedChange("Main.kt"))
+
+            event.restorePaths shouldContainExactlyInAnyOrder listOf(
+                LocalFilePath("/project/Deleted.kt", false),
+                LocalFilePath("/project/Main.kt", false)
+            )
+            unmockkStatic(VcsUtil::class)
+        }
+
+        @Test
+        fun `restorePaths includes both source and target of a rename`() {
+            withEmptyFileArray()
+            withChanges(renamedChange("Old.kt", "New.kt"))
+
+            event.restorePaths shouldContainExactlyInAnyOrder listOf(
+                LocalFilePath("/project/Old.kt", false),
+                LocalFilePath("/project/New.kt", false)
+            )
+        }
+
+        @Test
+        fun `filePaths returns only the target of a rename`() {
+            withEmptyFileArray()
+            withChanges(renamedChange("Old.kt", "New.kt"))
+
+            event.filePaths shouldBe listOf(LocalFilePath("/project/New.kt", false))
+        }
+
+        @Test
+        fun `both fall back to an empty list with no array and no changes`() {
+            withNoFileArray()
+            withChanges()
+
+            event.filePaths shouldBe emptyList()
+            event.restorePaths shouldBe emptyList()
+        }
+
+        @Test
+        fun `no duplicate entries when the array and a change describe the same path`() {
+            mockkStatic(VcsUtil::class)
+            val vf = mockk<VirtualFile>(relaxed = true)
+            every { VcsUtil.getFilePath(vf) } returns LocalFilePath("/project/Main.kt", false)
+            every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns arrayOf(vf)
+            withChanges(modifiedChange("Main.kt"))
+
+            event.restorePaths shouldBe listOf(LocalFilePath("/project/Main.kt", false))
+            unmockkStatic(VcsUtil::class)
         }
     }
 

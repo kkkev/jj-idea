@@ -9,7 +9,6 @@ import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.fileList
-import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.filesFor
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -49,8 +48,10 @@ class OpenChangeFileAction : DumbAwareAction(
     }
 
     override fun update(e: AnActionEvent) {
-        val hasFiles = e.filePaths.isNotEmpty() ||
-            e.changes.any { it.after != null }
+        // Deliberately not e.filePaths: since jj-idea-c2m8 that's non-empty for a deleted-only
+        // selection (which filesFor can't open a file for), whereas fileList/changes.after
+        // reflect what's actually openable.
+        val hasFiles = !e.fileList.isNullOrEmpty() || e.changes.any { it.after != null }
         e.presentation.isEnabled = e.project != null && hasFiles
     }
 }

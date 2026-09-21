@@ -8,8 +8,8 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.repoForFile
-import `in`.kkkev.jjidea.actions.restorePaths
 import `in`.kkkev.jjidea.actions.singleRepoForRestore
 import `in`.kkkev.jjidea.ui.history.JujutsuFileHistoryTabManager
 
@@ -25,11 +25,14 @@ import `in`.kkkev.jjidea.ui.history.JujutsuFileHistoryTabManager
  * but a file-change tree (commit details panel, working copy panel, compare-changes panel) only
  * supplies it when [in.kkkev.jjidea.ui.common.JujutsuChangesTree.showsLocalFiles] is true - it
  * otherwise supplies [in.kkkev.jjidea.actions.changes]/[VcsDataKeys.CHANGES][com.intellij.openapi.vcs.VcsDataKeys],
- * which is why this previously showed as invisible there (jj-idea-v9g4). [restorePaths] is used
- * instead of `filePaths` so a deleted or renamed-away file's history is still reachable.
+ * which is why this previously showed as invisible there (jj-idea-v9g4). [filePaths] is used
+ * instead of `AnActionEvent.filePaths`'s old (pre jj-idea-c2m8) `fileList`-only behaviour so a
+ * deleted file's history is still reachable; [in.kkkev.jjidea.actions.restorePaths] is
+ * deliberately *not* used here, since it would return both paths of a rename and defeat the
+ * `singleOrNull()` checks below.
  *
- * [hasTreeTarget]/the [restorePaths] branch of [actionPerformed] takes priority over
- * [hasEditorTarget]/[AnActionEvent.file]: [restorePaths] is non-empty whenever the tree has *any*
+ * [hasTreeTarget]/the [filePaths] branch of [actionPerformed] takes priority over
+ * [hasEditorTarget]/[AnActionEvent.file]: [filePaths] is non-empty whenever the tree has *any*
  * selection, single or multi, so checking it first correctly disables/ignores a multi-file tree
  * selection instead of silently acting on just the lead-selected file that
  * [in.kkkev.jjidea.ui.common.JujutsuChangesTree] happens to publish as `VIRTUAL_FILE`.
@@ -49,10 +52,10 @@ class ShowFileHistoryAction : DumbAwareAction(
     // Only a genuine "no tree selection at all" context (a plain editor tab, Project View) falls
     // back to VIRTUAL_FILE - see the class kdoc for why this must defer to hasTreeTarget.
     private fun hasEditorTarget(e: AnActionEvent) =
-        e.restorePaths.isEmpty() && e.file?.takeUnless { it.isDirectory } != null && e.repoForFile != null
+        e.filePaths.isEmpty() && e.file?.takeUnless { it.isDirectory } != null && e.repoForFile != null
 
     private fun hasTreeTarget(e: AnActionEvent) =
-        e.restorePaths.singleOrNull()?.takeUnless { it.isDirectory } != null && e.singleRepoForRestore != null
+        e.filePaths.singleOrNull()?.takeUnless { it.isDirectory } != null && e.singleRepoForRestore != null
 
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabledAndVisible = hasTreeTarget(e) || hasEditorTarget(e)
@@ -60,9 +63,9 @@ class ShowFileHistoryAction : DumbAwareAction(
 
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        val (filePath, repo) = e.restorePaths.singleOrNull()?.takeUnless { it.isDirectory }?.let { path ->
+        val (filePath, repo) = e.filePaths.singleOrNull()?.takeUnless { it.isDirectory }?.let { path ->
             e.singleRepoForRestore?.let { repo -> path to repo }
-        } ?: e.file?.takeUnless { it.isDirectory }?.takeIf { e.restorePaths.isEmpty() }?.let { file ->
+        } ?: e.file?.takeUnless { it.isDirectory }?.takeIf { e.filePaths.isEmpty() }?.let { file ->
             e.repoForFile?.let { repo -> VcsUtil.getFilePath(file) to repo }
         } ?: return
 
