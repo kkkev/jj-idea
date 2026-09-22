@@ -39,23 +39,70 @@ enum class RefKind(val color: JBColor) { BOOKMARK(JujutsuColors.BOOKMARK), TAG(J
  * [BookmarkNode.Category] or [BookmarkNode.Prefix]'s descendant leaves, so a collapsed category
  * can still surface "something in here needs attention" (jj-idea-a7a7, GitHub #48 Finding 4) —
  * collapsing a remote category would otherwise hide the per-bookmark `↑n↓m` indicators entirely.
+ *
+ * [unsyncedCount] counts descendant leaves that are untracked or conflicted (jj-idea-uyu9's
+ * tooltip redesign needs an actual number, not just "something's off" - see
+ * [in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip]); the in-row collapsed badge
+ * ([in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel]) only ever needed [isNotable], so it
+ * is unaffected by this being a count rather than a boolean.
+ *
+ * [leafCount] is the total number of bookmark/tag leaves reachable under the node (jj-idea-uyu9
+ * follow-up) - shown in a folder's tooltip so hovering a collapsed/nested group answers "how many
+ * are in here" without expanding it.
  */
-data class BookmarkRollup(val aheadCount: Int = 0, val behindCount: Int = 0, val hasUnsynced: Boolean = false) {
-    val isNotable get() = aheadCount > 0 || behindCount > 0 || hasUnsynced
+data class BookmarkRollup(
+    val aheadCount: Int = 0,
+    val behindCount: Int = 0,
+    val unsyncedCount: Int = 0,
+    val leafCount: Int = 0
+) {
+    val isNotable get() = aheadCount > 0 || behindCount > 0 || unsyncedCount > 0
 
-    operator fun plus(other: BookmarkRollup) =
-        BookmarkRollup(aheadCount + other.aheadCount, behindCount + other.behindCount, hasUnsynced || other.hasUnsynced)
+    operator fun plus(other: BookmarkRollup) = BookmarkRollup(
+        aheadCount + other.aheadCount,
+        behindCount + other.behindCount,
+        unsyncedCount + other.unsyncedCount,
+        leafCount + other.leafCount
+    )
+
+    /** The `↑n↓m` arrow text for this rollup - shared by the in-row collapsed badge and
+     * [in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip]'s group bracket. See [divergenceText]
+     * for the underlying (ahead, behind) -> text logic, also reused for a single [Bookmark]'s own
+     * counts (jj-idea-uyu9 follow-up: the per-remote breakdown on a local bookmark's tooltip). */
+    fun divergenceText(): String = divergenceText(aheadCount, behindCount)
 
     companion object {
         val EMPTY = BookmarkRollup()
     }
 }
 
+/** The `↑n↓m` arrow text for [aheadCount]/[behindCount] (empty if neither is positive). */
+fun divergenceText(aheadCount: Int, behindCount: Int): String = buildString {
+    if (aheadCount > 0) append("↑$aheadCount")
+    if (behindCount > 0) append("↓$behindCount")
+}
+
 sealed interface BookmarkNode {
     val displayName: String
 
-    /** The "@" node: mirrors the main-toolbar widget's [bookmarkWidgetText] label. */
-    data class WorkingCopy(val repo: JujutsuRepository, override val displayName: String) : BookmarkNode
+    /**
+     * The "@" node: [displayName] mirrors the main-toolbar widget's [bookmarkWidgetText] label.
+     * [id] is `@`'s own change (`null` only if the working-copy entry itself failed to load -
+     * this node is otherwise only ever added once a real [in.kkkev.jjidea.jj.LogEntry] exists).
+     * [onWorkingCopyNames]/[closest] are the same two raw inputs [bookmarkWidgetText] derives
+     * [displayName] from, kept alongside it (rather than re-derived by re-parsing [displayName])
+     * so [in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip] can render its own compact
+     * bracket form (jj-idea-uyu9) - a bookmark sitting directly on `@` needs different tooltip
+     * wording than "N commits past the nearest ancestor bookmark", and only the raw data
+     * distinguishes those two cases (both collapse to the same kind of text in [displayName]).
+     */
+    data class WorkingCopy(
+        val repo: JujutsuRepository,
+        override val displayName: String,
+        val id: ChangeId?,
+        val onWorkingCopyNames: List<String>,
+        val closest: ClosestBookmarks?
+    ) : BookmarkNode
 
     /** One node per repository; only present in multi-repo projects. */
     data class RepoGroup(val repo: JujutsuRepository, val children: List<BookmarkNode>) : BookmarkNode {
@@ -70,35 +117,66 @@ sealed interface BookmarkNode {
     }
 
     /**
-     * A top-level kind: "Local", a remote's name, or "Tags". [defaultExpanded] is `false` for a
-     * remote category (collapsed by default, jj-idea-a7a7) and `true` for Local/Tags — the actual
-     * per-node state a rebuild applies also considers any explicit user toggle recorded in
-     * [in.kkkev.jjidea.settings.LogWindowConfig.bookmarkNodeExpanded].
+     * A top-level kind: "Local", a remote's name, or "Tags" - or, when [isDanglingHeadsGroup] is
+     * `true`, the one-of-a-kind "Unbookmarked heads" group (jj-idea-lig7), which unlike every
+     * other [Category] doesn't group refs by [RefKind] at all and never carries a [rollup] (its
+     * children are [DanglingHead]s, not bookmark/tag leaves) - flagged explicitly rather than
+     * inferred by comparing [displayName] against the bundle string, so
+     * [in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip] can give it its own compact-count
+     * tooltip instead of the normal group-bracket one (jj-idea-uyu9).
+     *
+     * [defaultExpanded] is `false` for a remote category (collapsed by default, jj-idea-a7a7) and
+     * `true` otherwise — the actual per-node state a rebuild applies also considers any explicit
+     * user toggle recorded in [in.kkkev.jjidea.settings.LogWindowConfig.bookmarkNodeExpanded].
      */
     data class Category(
+        val repo: JujutsuRepository,
         override val displayName: String,
         override val refKind: RefKind,
         val children: List<BookmarkNode>,
         val defaultExpanded: Boolean = true,
-        override val rollup: BookmarkRollup = BookmarkRollup.EMPTY
+        override val rollup: BookmarkRollup = BookmarkRollup.EMPTY,
+        val isDanglingHeadsGroup: Boolean = false
     ) :
         BookmarkNode, WithRefKind
 
-    /** One `/`-separated path segment shared by two or more descendants, all of the same [refKind]. */
+    /**
+     * One `/`-separated path segment shared by two or more descendants, all of the same
+     * [refKind]. [groupLabel] is the *owning* top-level [Category]'s own [Category.displayName]
+     * ("Local", a remote's name, or "Tags") - constant across an entire [buildPrefixTree] call,
+     * not this [Prefix]'s own [displayName] - and [fullPath] is the accumulated `/`-path from
+     * that [Category] down to and including this segment (e.g. `"branches/foo"` for the `foo`
+     * node under `Local ▸ branches ▸ foo`). Both exist solely for
+     * [in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip] (jj-idea-uyu9): a bare leaf's
+     * qualified path is already available via its own wrapped item and needs no such field (see
+     * [BookmarkItem]/[TagItem]), but a [Prefix] carries no ref of its own to read that from.
+     */
     data class Prefix(
+        val repo: JujutsuRepository,
         override val displayName: String,
         override val refKind: RefKind,
         val children: List<BookmarkNode>,
-        override val rollup: BookmarkRollup = BookmarkRollup.EMPTY
+        override val rollup: BookmarkRollup = BookmarkRollup.EMPTY,
+        val groupLabel: String,
+        val fullPath: String
     ) :
         BookmarkNode, WithRefKind
 
-    /** A local bookmark leaf. [onWorkingCopy] is true when it sits exactly on `@`. */
+    /**
+     * A local bookmark leaf. [onWorkingCopy] is true when it sits exactly on `@`. [remotes] is
+     * every tracked, non-[GIT_PSEUDO_REMOTE] remote-tracking [Bookmark] row sharing this
+     * bookmark's local name (jj-idea-uyu9 follow-up) - display-only, purely for
+     * [in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip]'s per-remote ahead/behind breakdown.
+     * [item.bookmark]'s own `aheadCount`/`behindCount` remain the single collapsed max across
+     * these (see [in.kkkev.jjidea.jj.withDivergenceFrom]), unaffected by this - this field
+     * doesn't feed derivation, only display.
+     */
     data class Local(
         val repo: JujutsuRepository,
         val item: BookmarkItem,
         override val displayName: String,
-        val onWorkingCopy: Boolean
+        val onWorkingCopy: Boolean,
+        val remotes: List<Bookmark> = emptyList()
     ) : BookmarkNode
 
     /** A remote-tracking bookmark leaf (e.g. `main@origin`), nested under its remote's [Category]. */
@@ -169,7 +247,9 @@ private fun buildRepoNodes(
 ): List<BookmarkNode> = buildList {
     val onWcNames = wcEntry?.bookmarks?.filterNot { it.isRemote }?.map { it.name.name }.orEmpty()
     val wcLabel = bookmarkWidgetText(onWcNames, closest)
-    if (wcLabel.isNotEmpty()) add(BookmarkNode.WorkingCopy(repo, wcLabel))
+    if (wcLabel.isNotEmpty()) {
+        add(BookmarkNode.WorkingCopy(repo, wcLabel, wcEntry?.id, onWcNames, closest))
+    }
 
     if (danglingHeads.isNotEmpty()) {
         val leaves = danglingHeads
@@ -180,9 +260,11 @@ private fun buildRepoNodes(
             }
         add(
             BookmarkNode.Category(
+                repo,
                 JujutsuBundle.message("bookmarks.panel.unbookmarked"),
                 RefKind.BOOKMARK,
-                leaves
+                leaves,
+                isDanglingHeadsGroup = true
             )
         )
     }
@@ -194,15 +276,29 @@ private fun buildRepoNodes(
     // independently.
     val localBookmarks = refs.bookmarks.filterNot { it.bookmark.isRemote }
     if (localBookmarks.isNotEmpty()) {
+        // Display-only re-grouping for BookmarkNode.Local.remotes (jj-idea-uyu9 follow-up) - not
+        // used for derivation, which already happened upstream (see the comment above).
+        val remotesByLocalName = refs.bookmarks.asSequence()
+            .map { it.bookmark }
+            .filter { it.isRemote && it.remote != GIT_PSEUDO_REMOTE && it.tracked }
+            .groupBy { it.localName }
+        val localLabel = JujutsuBundle.message("bookmarks.panel.local")
         val leaves = localBookmarks.map { item ->
             RefPath(item.bookmark.localName) { name ->
-                BookmarkNode.Local(repo, item, name, item.bookmark.name.name in onWcNames)
+                BookmarkNode.Local(
+                    repo,
+                    item,
+                    name,
+                    item.bookmark.name.name in onWcNames,
+                    remotesByLocalName[item.bookmark.localName].orEmpty()
+                )
             }
         }
-        val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
+        val children = buildPrefixTree(repo, leaves, RefKind.BOOKMARK, localLabel)
         add(
             BookmarkNode.Category(
-                JujutsuBundle.message("bookmarks.panel.local"),
+                repo,
+                localLabel,
                 RefKind.BOOKMARK,
                 children,
                 rollup = rollupOf(children)
@@ -227,9 +323,10 @@ private fun buildRepoNodes(
         val leaves = refs.bookmarks
             .filter { it.bookmark.isRemote && it.bookmark.remote == remote }
             .map { item -> RefPath(item.bookmark.localName) { name -> BookmarkNode.Remote(repo, item, name) } }
-        val children = buildPrefixTree(leaves, RefKind.BOOKMARK)
+        val children = buildPrefixTree(repo, leaves, RefKind.BOOKMARK, remote)
         add(
             BookmarkNode.Category(
+                repo,
                 remote,
                 RefKind.BOOKMARK,
                 children,
@@ -240,11 +337,13 @@ private fun buildRepoNodes(
     }
 
     if (refs.tags.isNotEmpty()) {
+        val tagsLabel = JujutsuBundle.message("bookmarks.panel.tags")
         val leaves = refs.tags.map { item -> RefPath(item.tag.name) { name -> BookmarkNode.Tag(repo, item, name) } }
-        val children = buildPrefixTree(leaves, RefKind.TAG)
+        val children = buildPrefixTree(repo, leaves, RefKind.TAG, tagsLabel)
         add(
             BookmarkNode.Category(
-                JujutsuBundle.message("bookmarks.panel.tags"),
+                repo,
+                tagsLabel,
                 RefKind.TAG,
                 children,
                 rollup = rollupOf(children)
@@ -277,12 +376,17 @@ private fun rollupOf(nodes: List<BookmarkNode>): BookmarkRollup =
 private fun BookmarkNode.leafRollup(): BookmarkRollup = when (this) {
     is BookmarkNode.Local -> item.bookmark.toRollup()
     is BookmarkNode.Remote -> item.bookmark.toRollup()
+    is BookmarkNode.Tag -> BookmarkRollup(leafCount = 1)
     is BookmarkNode.WithRefKind -> rollup
-    is BookmarkNode.WorkingCopy, is BookmarkNode.Tag, is BookmarkNode.RepoGroup, is BookmarkNode.DanglingHead ->
-        BookmarkRollup.EMPTY
+    is BookmarkNode.WorkingCopy, is BookmarkNode.RepoGroup, is BookmarkNode.DanglingHead -> BookmarkRollup.EMPTY
 }
 
-private fun Bookmark.toRollup() = BookmarkRollup(aheadCount, behindCount, hasUnsynced = !tracked || conflict)
+private fun Bookmark.toRollup() = BookmarkRollup(
+    aheadCount,
+    behindCount,
+    unsyncedCount = if (!tracked || conflict) 1 else 0,
+    leafCount = 1
+)
 
 /**
  * Whether [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel] should expand this node absent
@@ -313,8 +417,22 @@ private class RefPath(fullName: String, val toLeaf: (displayName: String) -> Boo
  * one [BookmarkNode.Prefix], recursing per remaining segment. A leaf's display name is its last
  * segment only — the full name lives on the wrapped item for actions. Groups sort before leaves;
  * both sort case-insensitively by name within their bucket.
+ *
+ * [groupLabel] is constant across the whole call (the owning top-level [BookmarkNode.Category]'s
+ * own name) and [pathPrefix] accumulates the `/`-joined segments seen so far, so every
+ * [BookmarkNode.Prefix] built here can carry its own [BookmarkNode.Prefix.groupLabel]/
+ * [BookmarkNode.Prefix.fullPath] with no second pass (jj-idea-uyu9) - every [RefPath] reaching a
+ * given recursion shares segments `0 until offset` by construction, so `pathPrefix` never needs
+ * to be recomputed from the group's members.
  */
-private fun buildPrefixTree(refs: List<RefPath>, refKind: RefKind, offset: Int = 0): List<BookmarkNode> {
+private fun buildPrefixTree(
+    repo: JujutsuRepository,
+    refs: List<RefPath>,
+    refKind: RefKind,
+    groupLabel: String,
+    offset: Int = 0,
+    pathPrefix: String = ""
+): List<BookmarkNode> {
     val leaves = mutableListOf<BookmarkNode>()
     val groups = LinkedHashMap<String, MutableList<RefPath>>()
 
@@ -327,8 +445,9 @@ private fun buildPrefixTree(refs: List<RefPath>, refKind: RefKind, offset: Int =
     }
 
     val prefixNodes = groups.map { (segment, children) ->
-        val childNodes = buildPrefixTree(children, refKind, offset + 1)
-        BookmarkNode.Prefix(segment, refKind, childNodes, rollup = rollupOf(childNodes))
+        val fullPath = if (pathPrefix.isEmpty()) segment else "$pathPrefix/$segment"
+        val childNodes = buildPrefixTree(repo, children, refKind, groupLabel, offset + 1, fullPath)
+        BookmarkNode.Prefix(repo, segment, refKind, childNodes, rollupOf(childNodes), groupLabel, fullPath)
     }
 
     return (prefixNodes + leaves)

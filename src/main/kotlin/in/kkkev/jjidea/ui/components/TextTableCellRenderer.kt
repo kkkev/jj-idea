@@ -41,6 +41,13 @@ abstract class TextTableCellRenderer<T> : ColoredTableCellRenderer() {
             hoverTable.hoveredLinkRow == row &&
             hoverTable.hoveredLinkCol == column
 
+        // ColoredTableCellRenderer.clear() (called by the platform before this method runs)
+        // resets fragments/icon but not toolTipText, so a null value here (e.g. a pending log
+        // entry's null author/date) would otherwise silently keep showing the *previous* row's
+        // toolTipText - clear it up front and let render(), below, set a fresh one when there's a
+        // real value.
+        toolTipText = null
+
         @Suppress("UNCHECKED_CAST")
         (value as? T)?.let { render(it) }
     }

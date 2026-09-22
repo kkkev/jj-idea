@@ -186,13 +186,15 @@ The toolbar's eye-icon button opens a single flat "View Options" popup (replacin
 separate "Columns" and "Details Position" submenus) with labeled section headers: **Columns**
 (the per-column toggles, then a plain separator, then "Fit Columns to Window Width" - a layout
 behavior rather than a column), **Details** (Right/Bottom), and an unlabeled trailing group with
-**Alternating Row Colors** and **Commit Tooltips**.
+**Alternating Row Colors** and **Hover Tooltips** (renamed from "Commit Tooltips", jj-idea-uyu9,
+since the same setting now also gates the bookmarks panel's own row tooltip - see
+[Bookmark-state tooltips](#bookmark-state-tooltips-jj-idea-uyu9-github-110)).
 
 - [ ] Toolbar shows one eye-icon **View Options** button (no separate Columns / Details Position
       buttons). Opening it shows "Columns" and "Details" section headers with the expected items
-      grouped underneath, and "Alternating Row Colors" / "Commit Tooltips" at the bottom, both
+      grouped underneath, and "Alternating Row Colors" / "Hover Tooltips" at the bottom, both
       checked by default
-- [ ] Uncheck **Commit Tooltips**, then hover a log row — no tooltip appears; re-check it —
+- [ ] Uncheck **Hover Tooltips**, then hover a log row — no tooltip appears; re-check it —
       hovering again shows the tooltip, no restart needed. Repeat in a file-history tab and in
       the **Working copy** tool window (same table, same global setting) — toggling it in one
       table's menu updates all of them immediately
@@ -1639,7 +1641,11 @@ one per affected remote.
 
 #### Bookmarks panel (jj-idea-b2ae, GitHub #48)
 
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`, `localBookmarkTemplate`, `remoteBookmarkTemplate`), `jj/BookmarkDivergence.kt` (`withDerivedDivergence`, jj-idea-ks5k/j58e), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`), `ui/log/UnifiedJujutsuLogDataLoader.kt` (`enrichBookmarks`), `jj/ClosestBookmarks.kt` (`danglingHeads`, jj-idea-lig7)
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarkNodeTooltip.kt` (jj-idea-uyu9), `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`, `localBookmarkTemplate`, `remoteBookmarkTemplate`), `jj/BookmarkDivergence.kt` (`withDerivedDivergence`, jj-idea-ks5k/j58e), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`), `ui/log/UnifiedJujutsuLogDataLoader.kt` (`enrichBookmarks`), `jj/ClosestBookmarks.kt` (`danglingHeads`, jj-idea-lig7)
+**Also re-run:** MT-LOG-TABLE, MT-LOG-DETAILS (jj-idea-uyu9 follow-up: the commit-row tooltip and
+details panel now also show a dangling-head's "N commits ahead of..." status, via
+`ui/log/JujutsuGraphAndDescriptionRenderer.kt`/`ui/log/JujutsuCommitDetailsPanel.kt` reading
+`JujutsuStateModel.danglingHeads`)
 
 A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
 git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
@@ -1787,6 +1793,68 @@ selection does nothing; right-click for actions.
 - [ ] jj-idea-lig7: with more than 10 unbookmarked heads in the repo, the group caps at 10 rows
   rather than growing unbounded (use `scripts/fixtures/fx-stress.sh`'s stress fixture, which has
   many concurrent unbookmarked branch tips)
+
+##### Bookmark-state tooltips (jj-idea-uyu9, GitHub #110)
+
+Hovering any row shows a compact tooltip, rendered via the same icon-aware pane the log table's
+own row tooltip uses (see [Hover tooltip behaviour](#hover-tooltip-behaviour-jj-idea-wp12)'s
+dismissal/scroll behavior, which applies here too). v2 redesign after user feedback on the first
+cut: no beginner prose, nothing that only restates the row's own icon/arrows - a
+`[GroupLabel, ...]` bracket line (with an icon), the bookmark's full `/`-qualified path, and (DRY
+with the commit tooltip) the target commit's change id/commit id/author/date/description.
+
+- [ ] Create a nested bookmark (e.g. `branches/foo/bar`) — hover its Local leaf — tooltip shows
+  `[Local]`, then the full `branches/foo/bar` path (not just `bar`) with the same chip
+  icon/arrows the row shows, then change id/commit id/author/date/description matching what the
+  log row's own tooltip shows for that same change
+- [ ] Hover the "foo" prefix node above it — bracket reads `[Local]` (not `[foo]`/`[branches]`),
+  then `branches/foo`, then its own leaf count (e.g. "1 bookmark"); no commit info (a folder
+  isn't a single change)
+- [ ] Hover the matching `@origin` leaf — bracket reads `[origin]`
+- [ ] Collapse "Local"/a remote/"Tags" — hover the folder — bracket names the group alone when
+  nothing's notable; with a divergent or untracked bookmark inside, the bracket adds `↑n↓m`/
+  `N unsynced`, matching the in-row collapsed badge exactly; below it, a leaf-count line ("N
+  bookmarks"/"N tags", singular for exactly one) counts every leaf transitively, including
+  inside collapsed/nested sub-groups
+- [ ] Track a local bookmark to two remotes with different states (e.g. `origin` in sync,
+  `github` behind by moving the bookmark backwards there with `--allow-backwards`) — hover the
+  Local leaf — below the chip, one bracket line per remote: `[origin, in sync]`,
+  `[github, ↓1, force-push required]`; a remote with no ahead/behind shows "in sync", any remote
+  the local is behind (whether or not also ahead) adds "force-push required"; a local bookmark
+  tracked by no remote shows no such lines. Hover the `github` leaf itself under its remote
+  category — its own tooltip also flags "force-push required" when behind
+- [ ] Hover a tag — bracket reads `[Tags]`, full `/`-qualified tag path, no "Tag" text, plus its
+  target commit's info (change id/commit id/author/date/description, same as a bookmark's)
+- [ ] Hover the "@" row on a bookmark directly — shows the bookmark name(s), no distance bracket;
+  after `jj new`ing past it — compact `[N commit(s) ahead of <bookmark>]` bracket instead
+  (singular "1 commit" for exactly one, "commits" otherwise; no comma before a single name,
+  comma-separated for several); both cases include `@`'s own commit info, including a
+  `[@ Working Copy]` tag matching the log
+  row tooltip's own status tag for the working-copy commit; right-click → **Navigate Log to
+  Commit** (not "...to Bookmark") works, and double-clicking the row navigates there too
+  (previously a silent no-op)
+- [ ] Build the "Unbookmarked heads" recipe above — the category's own tooltip reads "N heads
+  without bookmarks" (singular "1 head without a bookmark" for exactly one), not a bracket; each
+  row in the tree, and the category header itself, shows the same slashed-bookmark icon the log
+  table uses for a dangling head; a child row's tooltip uses the same compact
+  `[N commits ahead of ...]` form as the "@" row (with that same slashed-bookmark icon leading
+  the bracket - the "@" row's own bracket does not have it, since the working copy isn't counted
+  as a dangling head), plus commit info, and **Navigate Log to Commit** (not "...to Bookmark") on
+  right-click
+- [ ] With that same unbookmarked head still visible in the log table itself, hover its row —
+  the row's own tooltip now also shows a `[N commits ahead of <bookmark>]` status tag (with the
+  slashed-bookmark icon) alongside any other status tags (Conflict/Immutable/etc); open the
+  commit details panel for the same row and confirm it shows the identical tag. Hover the
+  *working-copy* row even when it itself has no bookmark on it — no such tag appears there (it's
+  covered by its own `@ Working Copy` tag instead, not double-counted as a dangling head)
+- [ ] Single-repo project — no tooltip shows a repo line; multi-repo project — every tooltip
+  gains a leading repo icon+name line, above the group bracket
+- [ ] Hover a row, then move the pointer *into* the tooltip balloon — it stays open; scroll the
+  panel without moving the pointer — it hides and does not reappear until the pointer moves
+  (jj-idea-wp12 regression on this surface)
+- [ ] Uncheck the log toolbar's **Hover Tooltips** (renamed from "Commit Tooltips" - see
+  [View options menu](#view-options-menu-jj-idea-lgo4-n22a)) — both the log row tooltip and every
+  bookmarks-panel tooltip stop appearing; re-check — both come back, no restart needed
 
 ### MT-WORKINGCOPY
 

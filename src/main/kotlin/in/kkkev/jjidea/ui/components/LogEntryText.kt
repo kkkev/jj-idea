@@ -383,7 +383,37 @@ fun TextCanvas.appendPendingSummary(entry: LogEntry) {
     appendDescriptionAndEmptyIndicator(entry)
 }
 
-fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
+/**
+ * "N commit(s) ahead of [icon]foo[, [icon]bar]" - the compact distance-to-nearest-bookmark phrase
+ * shared by the bookmarks panel's working-copy/dangling-head tooltips
+ * ([in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip]) and [appendSummaryAndStatuses]'s own
+ * status tag for a dangling-head row (jj-idea-uyu9 follow-up). "1 commit", singular, only for
+ * exactly one - "N commits" otherwise. No comma before the first name; comma-separated after
+ * that.
+ */
+fun TextCanvas.appendClosestBookmarkStatus(closest: ClosestBookmarks) {
+    val key = if (closest.distance == 1) {
+        "bookmarks.panel.tooltip.closest.one"
+    } else {
+        "bookmarks.panel.tooltip.closest.plural"
+    }
+    append(JujutsuBundle.message(key, closest.distance))
+    closest.names.forEachIndexed { i, name ->
+        append(if (i == 0) " " else ", ")
+        append(icon(JujutsuIcons::Bookmark))
+        append(name.name)
+    }
+}
+
+/**
+ * [danglingHeadClosest] is this dangling-head [entry]'s nearest ancestor bookmark distance, or
+ * `null` for a non-dangling-head row (the common case) or one whose data isn't available (e.g.
+ * beyond the bounded `danglingHeads` list's cap, or the entry is the working copy itself - already
+ * covered by its own `@ Working Copy` tag below). Resolving it is the caller's job
+ * ([in.kkkev.jjidea.ui.log.JujutsuGraphAndDescriptionRenderer] looks it up via the state model),
+ * since this function has no `Project` to ask itself (jj-idea-uyu9 follow-up).
+ */
+fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry, danglingHeadClosest: ClosestBookmarks? = null) {
     if (entry.pending) {
         appendPendingSummary(entry)
         return
@@ -400,6 +430,15 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
             colored(JujutsuColors.WORKING_COPY) {
                 append("@ ")
                 append(message("status.workingcopy"))
+            }
+        }
+    }
+    if (danglingHeadClosest != null) {
+        statusParts.add {
+            colored(JujutsuColors.BOOKMARK) {
+                append(icon(JujutsuIcons::BookmarkNone))
+                space()
+                appendClosestBookmarkStatus(danglingHeadClosest)
             }
         }
     }
@@ -425,18 +464,30 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry) {
             append(message("status.immutable"))
         }
     }
-    // Not the generic append(parts, separator=", ", ...) helper: the conflict/immutable parts
-    // start with an icon, and a plain separator's trailing space would collapse against that
-    // icon's <img> element the same way any other icon-adjacent space would (jj-idea-myje).
     if (statusParts.isNotEmpty()) {
-        append(" [")
-        statusParts.forEachIndexed { i, part ->
-            if (i > 0) {
-                append(",")
-                space()
-            }
-            part()
-        }
-        append("]\n")
+        append(" ")
+        appendBracket(statusParts)
+        append("\n")
     }
+}
+
+/**
+ * Append `[part, part, ...]`, icon-safely comma-separated - shared by
+ * [appendSummaryAndStatuses]'s commit-status tags and
+ * [in.kkkev.jjidea.ui.log.bookmarks.bookmarkNodeTooltip]'s group-identity/rollup tags. Not the
+ * generic [append] `(parts, separator=", ", ...)` overload: a part that starts with an icon (e.g.
+ * [JujutsuIcons.Conflict]/[JujutsuIcons.Immutable]) would have a plain separator's trailing space
+ * collapse against that icon's `<img>` element the same way any other icon-adjacent space would
+ * (jj-idea-myje) - [space] doesn't.
+ */
+internal fun TextCanvas.appendBracket(parts: List<TextCanvas.() -> Unit>) {
+    append("[")
+    parts.forEachIndexed { i, part ->
+        if (i > 0) {
+            append(",")
+            space()
+        }
+        part()
+    }
+    append("]")
 }

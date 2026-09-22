@@ -24,7 +24,9 @@ data class JujutsuSettingsState(
     // jj-idea-jqpe: tracks whether we've already auto-opened the Working copy tool window
     // once for this project, so it only happens on first discovery, not every startup.
     var workingCopyAutoOpened: Boolean = false,
-    // jj-idea-tknb: off-switch for the log row hover tooltip.
+    // jj-idea-tknb: off-switch for the log row hover tooltip - also gates the bookmarks panel's
+    // row tooltip as of jj-idea-uyu9 (displayed as "Hover Tooltips", not "Commit Tooltips", to
+    // match). Field name kept as-is to avoid churning already-persisted settings XML.
     var showLogHoverTooltip: Boolean = true,
     // jj-idea-eyf1: off-switch for alternating-row striping in log/picker tables.
     var stripedLogRows: Boolean = true,

@@ -49,6 +49,20 @@ fun navigateLogToBookmarkAction(repo: JujutsuRepository, id: ChangeId?) = nullAn
 ) { performNavigateToBookmark(repo, target) }
 
 /**
+ * Same as [navigateLogToBookmarkAction] but correctly labelled "Navigate Log to Commit" for a
+ * target that isn't a bookmark (jj-idea-uyu9): a [in.kkkev.jjidea.ui.log.bookmarks.BookmarkNode.Tag],
+ * [in.kkkev.jjidea.ui.log.bookmarks.BookmarkNode.DanglingHead], or
+ * [in.kkkev.jjidea.ui.log.bookmarks.BookmarkNode.WorkingCopy] row all navigate to a real commit,
+ * not "a bookmark's change" - [navigateLogToBookmarkAction] was reused for all three before this,
+ * which read wrong on a tag or an unbookmarked head.
+ */
+fun navigateLogToCommitAction(repo: JujutsuRepository, id: ChangeId?) = nullAndDumbAwareAction(
+    id,
+    "bookmarks.panel.action.navigate.commit",
+    AllIcons.Actions.Find
+) { performNavigateToBookmark(repo, target) }
+
+/**
  * Registered, keymap-assignable form of [filterLogToBookmarkAction] (jj-idea-ib1i, GitHub #48
  * split 1/3): reads its target from the bookmarks panel's [in.kkkev.jjidea.actions.JujutsuDataKeys.BOOKMARK_TARGET]
  * instead of a fixed closure, so it appears in Settings > Keymap and can be rebound.

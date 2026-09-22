@@ -532,6 +532,13 @@ abstract class CommitTablePanel<D>(
      * here from a global Settings checkbox). The underlying state stays project-global -
      * [JujutsuLogTable]'s hover-tooltip callback reads it live - but the control now lives on
      * each table's toolbar, next to the other display toggles it affects.
+     *
+     * Labelled "Hover Tooltips" rather than "Commit Tooltips" (jj-idea-uyu9): the same
+     * [in.kkkev.jjidea.settings.JujutsuSettingsState.showLogHoverTooltip] flag now also gates the
+     * bookmarks panel's own row tooltip
+     * ([in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel.installTooltip]), so the toggle's
+     * name needed to stop implying "commits" specifically. The Kotlin field name is unchanged to
+     * avoid churning already-persisted settings XML.
      */
     private inner class CommitTooltipsAction : ToggleAction(
         JujutsuBundle.message("log.action.tooltips"),

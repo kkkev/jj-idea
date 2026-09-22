@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -180,6 +181,102 @@ class JujutsuBookmarksPanelTest {
         val panel = JujutsuBookmarksPanel(project.get())
         try {
             selectLeaves(panel, BookmarkNode.DanglingHead(repo, id, null, "(no bookmark) a"))
+
+            val disposable = Disposer.newDisposable()
+            var selected: ChangeKey? = null
+            project.get().stateModel.changeSelection.connect(disposable) { selected = it }
+            try {
+                val bounds = panel.tree.getRowBounds(0)
+                val handled = panel.handleDoubleClick(bounds.x + 2, bounds.y + bounds.height / 2)
+                UIUtil.dispatchAllInvocationEvents()
+
+                handled shouldBe true
+                selected shouldBe ChangeKey(repo, id)
+            } finally {
+                Disposer.dispose(disposable)
+            }
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    // jj-idea-uyu9 (GitHub #110): the point→node hit-test behind the panel's hover tooltip
+    // ([JujutsuBookmarksPanel.tooltipHtmlAt]) - the tooltip content itself (every node kind, every
+    // state) is covered without a platform test by BookmarkNodeTooltipTest.
+
+    @Test
+    fun `tooltipHtmlAt resolves a row's node to its tooltip HTML`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val id = ChangeId("aaaaaaaa", "a")
+        val bookmark = Bookmark("main")
+
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            selectLeaves(panel, BookmarkNode.Local(repo, BookmarkItem(bookmark, id), "main", onWorkingCopy = false))
+
+            val bounds = panel.tree.getRowBounds(0)
+            val html = panel.tooltipHtmlAt(bounds.x + 2, bounds.y + bounds.height / 2)
+
+            // Default entryLookup ({ null }) and a repo-less project (references.value has no
+            // entries, so isMultiRepo is false) - see BookmarkNodeTooltipTest for coverage of
+            // every other entryLookup/isMultiRepo combination.
+            html shouldBe bookmarkNodeTooltip(
+                BookmarkNode.Local(repo, BookmarkItem(bookmark, id), "main", onWorkingCopy = false),
+                entryLookup = { null },
+                isMultiRepo = false
+            )
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `tooltipHtmlAt is null off any row`() {
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            panel.tooltipHtmlAt(5, 5_000) shouldBe null
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `tooltipHtmlAt is null when the Hover Tooltips setting is off`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val id = ChangeId("aaaaaaaa", "a")
+        val bookmark = Bookmark("main")
+
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            selectLeaves(panel, BookmarkNode.Local(repo, BookmarkItem(bookmark, id), "main", onWorkingCopy = false))
+            val bounds = panel.tree.getRowBounds(0)
+            val settings = JujutsuSettings.getInstance(project.get())
+
+            settings.state.showLogHoverTooltip = false
+            try {
+                panel.tooltipHtmlAt(bounds.x + 2, bounds.y + bounds.height / 2) shouldBe null
+            } finally {
+                settings.state.showLogHoverTooltip = true
+            }
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    // jj-idea-uyu9: a WorkingCopy row didn't double-click to anything before (it isn't a bookmark,
+    // so invokeEnterBoundAction's registered Jujutsu.Bookmark.Navigate saw nothing to act on).
+
+    @Test
+    fun `double-clicking the working-copy row navigates the log to its change`() {
+        val repo = mockk<JujutsuRepository> {
+            every { displayName } returns "repo"
+            every { project } returns this@JujutsuBookmarksPanelTest.project.get()
+        }
+        val id = ChangeId("aaaaaaaa", "a")
+
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            selectLeaves(panel, BookmarkNode.WorkingCopy(repo, "main", id, listOf("main"), closest = null))
 
             val disposable = Disposer.newDisposable()
             var selected: ChangeKey? = null

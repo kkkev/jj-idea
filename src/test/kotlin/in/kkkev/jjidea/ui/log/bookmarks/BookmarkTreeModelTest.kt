@@ -255,7 +255,7 @@ class BookmarkTreeModelTest {
         val main = local.children.filterIsInstance<BookmarkNode.Local>().single()
 
         main.item.bookmark.conflict shouldBe true
-        local.rollup.hasUnsynced shouldBe true
+        local.rollup.unsyncedCount shouldBe 1
     }
 
     @Test
@@ -314,8 +314,16 @@ class BookmarkTreeModelTest {
 
         origin.rollup.aheadCount shouldBe 2
         origin.rollup.behindCount shouldBe 3
-        origin.rollup.hasUnsynced shouldBe true
+        origin.rollup.unsyncedCount shouldBe 1
         origin.rollup.isNotable shouldBe true
+    }
+
+    @Test
+    fun `BookmarkRollup divergenceText renders only the directions that are actually positive`() {
+        BookmarkRollup().divergenceText() shouldBe ""
+        BookmarkRollup(aheadCount = 2).divergenceText() shouldBe "↑2"
+        BookmarkRollup(behindCount = 3).divergenceText() shouldBe "↓3"
+        BookmarkRollup(aheadCount = 2, behindCount = 3).divergenceText() shouldBe "↑2↓3"
     }
 
     @Test
@@ -325,7 +333,7 @@ class BookmarkTreeModelTest {
         val origin = buildBookmarkTree(references, emptyMap(), emptyMap())
             .filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
 
-        origin.rollup shouldBe BookmarkRollup.EMPTY
+        origin.rollup shouldBe BookmarkRollup(leafCount = 1)
         origin.rollup.isNotable shouldBe false
     }
 
@@ -448,5 +456,162 @@ class BookmarkTreeModelTest {
             tree.filterIsInstance<BookmarkNode.Category>().single().children.single() as BookmarkNode.DanglingHead
         leaf.displayName shouldBe "(no bookmark) aaa"
         leaf.closest shouldBe null
+    }
+
+    @Test
+    fun `the Unbookmarked heads category is flagged and carries no rollup`() {
+        val head = DanglingHead(ChangeId("aaa", "aaa", null), null)
+        val tree = buildBookmarkTree(refs(), emptyMap(), emptyMap(), mapOf(repo to listOf(head)))
+
+        val unbookmarked = tree.filterIsInstance<BookmarkNode.Category>().single()
+        unbookmarked.isDanglingHeadsGroup shouldBe true
+        unbookmarked.rollup shouldBe BookmarkRollup.EMPTY
+    }
+
+    // jj-idea-uyu9: every Category/Prefix carries its own repo, and a Prefix additionally carries
+    // the owning top-level Category's label plus its accumulated "/"-path, both needed by
+    // bookmarkNodeTooltip without walking the tree.
+
+    @Test
+    fun `every Category and Prefix carries the repo its bookmarks belong to`() {
+        val tree = buildBookmarkTree(refs("feature/a"), emptyMap(), emptyMap())
+
+        val local = tree.single() as BookmarkNode.Category
+        local.repo shouldBe repo
+        val feature = local.children.single() as BookmarkNode.Prefix
+        feature.repo shouldBe repo
+    }
+
+    @Test
+    fun `a nested Prefix carries its owning category's label, not its own segment name`() {
+        val references = mapOf(
+            repo to RepositoryReferences(bookmarks = listOf(item("branches/foo/bar@origin")))
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+        val origin = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "origin" }
+        val branches = origin.children.single() as BookmarkNode.Prefix
+        val foo = branches.children.single() as BookmarkNode.Prefix
+
+        branches.groupLabel shouldBe "origin"
+        foo.groupLabel shouldBe "origin"
+        branches.fullPath shouldBe "branches"
+        foo.fullPath shouldBe "branches/foo"
+    }
+
+    // jj-idea-uyu9: WorkingCopy carries the same raw ingredients bookmarkWidgetText derives
+    // displayName from, so a tooltip can render its own compact form without re-parsing text.
+
+    @Test
+    fun `working copy node carries the change id and raw bookmark-widget inputs`() {
+        val commitId = CommitId("abc123def456", "ab")
+        val wcEntry = LogEntry(
+            repo = repo,
+            id = changeId,
+            commitId = commitId,
+            underlyingDescription = "",
+            bookmarks = listOf(Bookmark("main"))
+        )
+
+        val tree = buildBookmarkTree(refs("main"), mapOf(repo to wcEntry), emptyMap())
+
+        val wc = tree.first() as BookmarkNode.WorkingCopy
+        wc.id shouldBe changeId
+        wc.onWorkingCopyNames shouldBe listOf("main")
+        wc.closest shouldBe null
+    }
+
+    @Test
+    fun `working copy node carries the closest-ancestor fallback when nothing sits on it`() {
+        val commitId = CommitId("abc123def456", "ab")
+        val wcEntry = LogEntry(repo = repo, id = changeId, commitId = commitId, underlyingDescription = "")
+        val closest = ClosestBookmarks(listOf(Bookmark("main").name), distance = 3, distanceCapped = false)
+
+        val tree = buildBookmarkTree(refs("main"), mapOf(repo to wcEntry), mapOf(repo to closest))
+
+        val wc = tree.first() as BookmarkNode.WorkingCopy
+        wc.onWorkingCopyNames shouldBe emptyList()
+        wc.closest shouldBe closest
+    }
+
+    // jj-idea-uyu9 follow-up: a Local leaf carries every tracked remote-tracking row sharing its
+    // name, for the tooltip's per-remote ahead/behind breakdown - display-only, reconstructed
+    // in-memory from the already-loaded refs.bookmarks, no new jj call.
+
+    @Test
+    fun `a local bookmark tracked by two remotes carries both in remotes`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(item("main"), item("main@origin"), item("main@github"))
+            )
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+        val local = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "Local" }
+        val main = local.children.filterIsInstance<BookmarkNode.Local>().single()
+
+        main.remotes.map { it.remote }.toSet() shouldBe setOf("origin", "github")
+    }
+
+    @Test
+    fun `a local bookmark's remotes excludes the git pseudo-remote and untracked rows`() {
+        val references = mapOf(
+            repo to RepositoryReferences(
+                bookmarks = listOf(
+                    item("main"),
+                    item("main@git"),
+                    item("main@origin", tracked = false)
+                )
+            )
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+        val local = tree.filterIsInstance<BookmarkNode.Category>().single { it.displayName == "Local" }
+        val main = local.children.filterIsInstance<BookmarkNode.Local>().single()
+
+        main.remotes shouldBe emptyList()
+    }
+
+    @Test
+    fun `a local bookmark with no matching remote rows carries an empty remotes list`() {
+        val tree = buildBookmarkTree(refs("main"), emptyMap(), emptyMap())
+
+        val local = tree.single() as BookmarkNode.Category
+        val main = local.children.single() as BookmarkNode.Local
+
+        main.remotes shouldBe emptyList()
+    }
+
+    // jj-idea-uyu9 follow-up: BookmarkRollup.leafCount is a transitive count of bookmark/tag
+    // leaves, for a folder tooltip's "N bookmarks"/"N tags" line.
+
+    @Test
+    fun `leafCount counts every leaf under a category, including nested prefixes`() {
+        val tree = buildBookmarkTree(refs("feature/a", "feature/b", "zeta"), emptyMap(), emptyMap())
+
+        val local = tree.single() as BookmarkNode.Category
+        local.rollup.leafCount shouldBe 3
+        val feature = local.children.filterIsInstance<BookmarkNode.Prefix>().single()
+        feature.rollup.leafCount shouldBe 2
+    }
+
+    @Test
+    fun `leafCount for a Tags category counts tag leaves`() {
+        val references = mapOf(
+            repo to RepositoryReferences(tags = listOf(TagItem(Tag("v1"), changeId), TagItem(Tag("v2"), changeId)))
+        )
+
+        val tree = buildBookmarkTree(references, emptyMap(), emptyMap())
+        val tags = tree.single() as BookmarkNode.Category
+
+        tags.rollup.leafCount shouldBe 2
+    }
+
+    @Test
+    fun `top-level divergenceText matches BookmarkRollup's own`() {
+        divergenceText(0, 0) shouldBe ""
+        divergenceText(2, 0) shouldBe "↑2"
+        divergenceText(0, 3) shouldBe "↓3"
+        divergenceText(2, 3) shouldBe "↑2↓3"
     }
 }

@@ -4,7 +4,9 @@ import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBValue
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.ClosestBookmarks
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.graph.ParentState
 import java.awt.*
@@ -170,6 +172,19 @@ class JujutsuGraphAndDescriptionRenderer(
             }
         }
 
+        /**
+         * This dangling-head [entry]'s nearest ancestor bookmark distance, for
+         * [appendSummaryAndStatuses]'s status tag (jj-idea-uyu9 follow-up) - `null` for every
+         * non-dangling-head row, the working copy (already has its own status tag), a picker
+         * table with no [JujutsuLogTable]/`Project` to ask, or a dangling head beyond the bounded
+         * `danglingHeads` list's cap.
+         */
+        private fun danglingHeadClosest(entry: LogEntry): ClosestBookmarks? {
+            if (!entry.isDanglingHead || entry.isWorkingCopy) return null
+            val project = (table as? JujutsuLogTable)?.project ?: return null
+            return project.stateModel.danglingHeads.value[entry.repo]?.firstOrNull { it.id == entry.id }?.closest
+        }
+
         private fun buildTooltip(entry: LogEntry) = htmlString(linkifier = linkifier) {
             if (entry.pending) {
                 // No repo/author/id to show - appendSummaryAndStatuses already covers the whole
@@ -178,7 +193,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 return@htmlString
             }
 
-            appendSummaryAndStatuses(entry)
+            appendSummaryAndStatuses(entry, danglingHeadClosest(entry))
             entry.author?.let { author ->
                 append(author)
                 entry.authorTimestamp?.let { ts ->

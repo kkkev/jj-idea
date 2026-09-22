@@ -157,7 +157,9 @@ class JujutsuBookmarksPanelDnDTest {
 
     @Test
     fun `a working-copy node produces no drag payload - it has no bookmark identity`() {
-        val panel = panelWith(BookmarkNode.WorkingCopy(repoA, "main"))
+        val panel = panelWith(
+            BookmarkNode.WorkingCopy(repoA, "main", id = null, onWorkingCopyNames = listOf("main"), closest = null)
+        )
 
         panel.dragPayloadAt(rowPoint(panel, 0)).shouldBeNull()
     }

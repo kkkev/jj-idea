@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Hovering any row in the bookmarks panel now shows a compact tooltip: a `[Local]`/`[<remote>]`/`[Tags]` group tag, the bookmark's full `/`-qualified path, a transitive count of bookmarks/tags for a folder, and — for a bookmark, tag, the "@" row, or an unbookmarked head — the change it points to (id, author, date, description, and a "@ Working Copy" tag when applicable), same as the log's own row tooltip. A local bookmark tracked by more than one remote shows each remote's own ahead/behind status, flagging when a push there would need to force-push. A repo line appears too in multi-repo projects. The log toolbar's tooltip toggle is renamed "Hover Tooltips" (from "Commit Tooltips") since it now gates both. ([#110](https://github.com/kkkev/jj-idea/issues/110))
+- The bookmarks panel's "@" row and unbookmarked-head rows gained a "Navigate Log to Commit" action (right-click, and double-click on the "@" row) to jump straight to that change; unbookmarked-head rows also gained the same slashed-bookmark icon the log table uses for the same state.
+- A commit's own hover tooltip (and the details panel) now shows "N commits ahead of &lt;bookmark&gt;" for a visible head with no bookmark on it, matching the bookmarks panel's own wording for the same state.
+
 ### Fixed
 - The bookmarks panel and the log table's bookmark chips could show different, and sometimes meaningless, ahead/behind numbers for the same bookmark. A divergent (conflicted) local bookmark now gets an exact bidirectional count instead of jj's one-directional hint, and a local bookmark tracking a remote ref that doesn't exist on the remote (e.g. via `auto-track-created-bookmarks`) now shows no arrow and no number instead of a bogus distance-to-root count. ([#110](https://github.com/kkkev/jj-idea/issues/110))
 - In a colocated repo, the log table's bookmark chips no longer show a separate `@git` chip for each bookmark — it always mirrored the local jj bookmark and added no information, and the bookmarks panel already hid it the same way. ([#120](https://github.com/kkkev/jj-idea/issues/120))

@@ -19,9 +19,11 @@ import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.ChangeService
+import `in`.kkkev.jjidea.jj.ClosestBookmarks
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RepositoryHealth
 import `in`.kkkev.jjidea.jj.classifyRepositoryFailure
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
 import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
@@ -274,6 +276,17 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
     }
 
     /**
+     * This dangling-head [entry]'s nearest ancestor bookmark distance, for
+     * [appendSummaryAndStatuses]'s status tag (jj-idea-uyu9 follow-up) - `null` for every
+     * non-dangling-head row, the working copy (already has its own status tag), or a dangling
+     * head beyond the bounded `danglingHeads` list's cap.
+     */
+    private fun danglingHeadClosest(entry: LogEntry): ClosestBookmarks? {
+        if (!entry.isDanglingHead || entry.isWorkingCopy) return null
+        return project.stateModel.danglingHeads.value[entry.repo]?.firstOrNull { it.id == entry.id }?.closest
+    }
+
+    /**
      * Build HTML for one or more commit details.
      * Multiple entries are separated by <hr> dividers, capped at MAX_DISPLAYED_COMMITS.
      */
@@ -284,7 +297,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         control("<body style='${Formatters.getBodyStyle()}'>", "</body>") {
             displayed.forEachIndexed { index, entry ->
                 if (index > 0) control("<hr/>")
-                appendSummaryAndStatuses(entry)
+                appendSummaryAndStatuses(entry, danglingHeadClosest(entry))
                 appendParents(entry)
                 control("<pre style='white-space: pre-wrap;'>", "</pre>") {
                     append(entry.description)

@@ -33,6 +33,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.remoteEntriesFor
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.common.RepositoryIcons
@@ -124,6 +125,7 @@ class JujutsuBookmarksPanel(
         installPopupHandler()
         installLinkHandler()
         installDoubleClickHandler()
+        installTooltip()
         tree.addTreeExpansionListener(
             object : TreeExpansionListener {
                 override fun treeExpanded(event: TreeExpansionEvent) = recordExpansion(event.path, true)
@@ -260,6 +262,10 @@ class JujutsuBookmarksPanel(
         is BookmarkNode.DanglingHead -> emptyList()
     }
 
+    /** The [BookmarkNode] a tree node's `userObject` wraps, or `null` for the invisible root/no path. */
+    private fun nodeFor(path: TreePath?): BookmarkNode? =
+        (path?.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode
+
     private fun installPopupHandler() {
         tree.addMouseListener(
             object : PopupHandler() {
@@ -272,8 +278,7 @@ class JujutsuBookmarksPanel(
                     if (tree.selectionPaths?.contains(path) != true) {
                         tree.selectionPath = path
                     }
-                    val node = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode
-                        ?: return
+                    val node = nodeFor(path) ?: return
                     val group = actionGroupFor(node) ?: return
                     val popupMenu = ActionManager.getInstance().createActionPopupMenu("Jujutsu.BookmarksPanel", group)
                     popupMenu.setTargetComponent(tree)
@@ -292,7 +297,9 @@ class JujutsuBookmarksPanel(
      *
      * A [BookmarkNode.DanglingHead] has no [JujutsuDataKeys.BOOKMARK_TARGET] (it isn't a bookmark,
      * see [selectedBookmarkTargets]), so the registered `Jujutsu.Bookmark.Navigate` can't see it
-     * and [invokeEnterBoundAction] would no-op - navigate directly instead (jj-idea-lig7).
+     * and [invokeEnterBoundAction] would no-op - navigate directly instead (jj-idea-lig7). Same
+     * for a [BookmarkNode.WorkingCopy] row (jj-idea-uyu9) - it isn't a bookmark either, and before
+     * this it double-clicked as a silent no-op.
      */
     private fun installDoubleClickHandler() {
         object : DoubleClickListener() {
@@ -310,12 +317,20 @@ class JujutsuBookmarksPanel(
         if (tree.selectionPaths?.contains(path) != true) {
             tree.selectionPath = path
         }
-        val node = (path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode
-        if (node is BookmarkNode.DanglingHead) {
-            performNavigateToBookmark(node.repo, node.id)
-            return true
+        when (val node = nodeFor(path)) {
+            is BookmarkNode.DanglingHead -> {
+                performNavigateToBookmark(node.repo, node.id)
+                return true
+            }
+
+            is BookmarkNode.WorkingCopy -> {
+                val id = node.id ?: return false
+                performNavigateToBookmark(node.repo, id)
+                return true
+            }
+
+            else -> return invokeEnterBoundAction(tree)
         }
-        return invokeEnterBoundAction(tree)
     }
 
     /**
@@ -360,6 +375,45 @@ class JujutsuBookmarksPanel(
             false
         ) as? SimpleColoredComponent ?: return null
         return renderer.getFragmentTagAt(x - bounds.x) as? URI
+    }
+
+    /**
+     * Hover tooltip explaining a row's state (jj-idea-uyu9, GitHub #110): every kind of node in
+     * the tree gets one (see [bookmarkNodeTooltip]), shown via [installIconAwareTooltip] rather
+     * than a plain Swing `toolTipText`/`getToolTipText` override — the tooltip HTML leads with
+     * the row's own chip, which (like every chip in this codebase) is `icon:`/`unbreakable:`
+     * `<img>` markup that only [in.kkkev.jjidea.ui.components.IconAwareHtmlPane] resolves
+     * correctly (jj-idea-fmrj, jj-idea-2md7).
+     *
+     * Gated on the same [in.kkkev.jjidea.settings.JujutsuSettingsState.showLogHoverTooltip] flag
+     * as the log table's own row tooltip (read live, so the toolbar's "Hover Tooltips" toggle
+     * applies here too without a reinstall) - the plain [installIconAwareTooltip] this panel uses
+     * has no `isEnabled` parameter the way [installIconAwareTableTooltip] does for a
+     * [javax.swing.JTable], so the check is inlined here instead.
+     *
+     * [tree.getRowForLocation] (not [getClosestPathForLocation], unlike the popup/double-click
+     * handlers above) is deliberately exact: hovering blank space below the last row must show no
+     * tooltip rather than the last row's.
+     */
+    private fun installTooltip() {
+        installIconAwareTooltip(
+            owner = tree,
+            project = project,
+            cellKeyAt = { tree.getRowForLocation(it.x, it.y) },
+            htmlAt = { point -> tooltipHtmlAt(point.x, point.y) }
+        )
+    }
+
+    /**
+     * Extracted from [installTooltip] as a test seam, mirroring [handleDoubleClick]'s precedent
+     * for this same class - exercising the real [com.intellij.ide.IdeTooltip] hover machinery in a
+     * test is brittle.
+     */
+    internal fun tooltipHtmlAt(x: Int, y: Int): String? {
+        if (!JujutsuSettings.getInstance(project).state.showLogHoverTooltip) return null
+        val node = nodeFor(tree.getPathForLocation(x, y)) ?: return null
+        val isMultiRepo = project.stateModel.references.value.size > 1
+        return bookmarkNodeTooltip(node, entryLookup, isMultiRepo)
     }
 
     /** The selected tree paths' [BookmarkNode] leaves — the only kinds a selection can meaningfully act on. */
@@ -501,7 +555,7 @@ class JujutsuBookmarksPanel(
                 *buildList {
                     add(deleteTagAction(node.repo, node.item.tag))
                     add(Separator.create())
-                    add(navigateLogToBookmarkAction(node.repo, node.item.id))
+                    add(navigateLogToCommitAction(node.repo, node.item.id))
                     // Tags have no BOOKMARK_TARGET (they aren't bookmarks) so no Filter entry, but
                     // they're still real refs onto a change - the log's change actions apply just
                     // as well here as on a bookmark row (jj-idea-p35f follow-up).
@@ -513,14 +567,19 @@ class JujutsuBookmarksPanel(
         is BookmarkNode.WorkingCopy -> {
             val wcEntry = project.stateModel.workingCopies.value.values.firstOrNull { it.repo == node.repo }
             val closest = project.stateModel.closestBookmarks.value[node.repo]
-            BackgroundActionGroup(createBookmarkAction(wcEntry), advanceClosestBookmarkAction(node.repo, closest))
+            BackgroundActionGroup(
+                createBookmarkAction(wcEntry),
+                advanceClosestBookmarkAction(node.repo, closest),
+                Separator.create(),
+                navigateLogToCommitAction(node.repo, node.id)
+            )
         }
 
         is BookmarkNode.DanglingHead -> {
             val entries = selectedLogEntries().orEmpty()
             BackgroundActionGroup(
                 *buildList {
-                    add(navigateLogToBookmarkAction(node.repo, node.id))
+                    add(navigateLogToCommitAction(node.repo, node.id))
                     // The fix for a dangling head is to bookmark it - offer that one click away,
                     // same as the "@" row's own createBookmarkAction (jj-idea-lig7).
                     add(createBookmarkAction(entries.firstOrNull()))
@@ -590,11 +649,7 @@ class JujutsuBookmarksPanel(
                         canvas.append(" ")
                         canvas.colored(JujutsuColors.DIVERGENT) {
                             smaller {
-                                val divergence = buildString {
-                                    if (node.rollup.aheadCount > 0) append("↑${node.rollup.aheadCount}")
-                                    if (node.rollup.behindCount > 0) append("↓${node.rollup.behindCount}")
-                                }
-                                append(divergence.ifEmpty { "•" })
+                                append(node.rollup.divergenceText().ifEmpty { "•" })
                             }
                         }
                     }
@@ -615,10 +670,13 @@ class JujutsuBookmarksPanel(
                 }
 
                 is BookmarkNode.DanglingHead -> {
-                    // Same bookmark-coloured "[closest] +n" the working-copy row renders, then the
-                    // change id in the log's own style (bold shortest prefix + grey remainder) -
-                    // jj-idea-lig7.
+                    // Same slashed-bookmark glyph the log table uses for a dangling head
+                    // (JujutsuLogTableRenderers.appendDanglingHeadMarker, jj-idea-lig7) - this row
+                    // had no icon at all before (jj-idea-uyu9 follow-up). Then the same
+                    // bookmark-coloured "[closest] +n" the working-copy row renders, then the
+                    // change id in the log's own style (bold shortest prefix + grey remainder).
                     canvas.colored(JujutsuColors.BOOKMARK) {
+                        append(icon(JujutsuIcons::BookmarkNone))
                         smaller {
                             append(danglingHeadLabel(node.closest))
                         }
