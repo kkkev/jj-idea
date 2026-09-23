@@ -635,6 +635,17 @@ gh workflow run "Build and Release" --repo kkkev/jj-idea -f bump=patch
 The workflow bumps the version, moves `[Unreleased]` changelog content to the new
 version section, creates the GitHub release, and publishes to the JetBrains Marketplace.
 
+**Released sections are frozen.** Once `X.Y.Z` is tagged, new entries go under
+`[Unreleased]` only — never under the now-released `## [X.Y.Z]` heading. `check` fails
+(`ChangelogReleaseDriftTest`, jj-idea-j8s6) if the newest released section gains a bullet
+that wasn't present at the tag, since that means it never actually shipped despite the
+CHANGELOG saying so (the 2026-09-13 incident this guards against). A genuine correction to
+an entry that *did* ship (e.g. a rewording) is allowed by adding, directly under that
+version's heading:
+```
+<!-- changelog-guard: edited-after-release — <reason> -->
+```
+
 ## Contributing Changes
 
 When making changes that affect users (features, fixes, behavior changes):
