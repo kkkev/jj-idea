@@ -134,6 +134,12 @@
     <action id="Jujutsu.ResolveAllConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveAllConflictsAction"/>
 
+    <action id="Jujutsu.AcceptConflictYours"
+            class="in.kkkev.jjidea.actions.file.AcceptConflictYoursAction"/>
+
+    <action id="Jujutsu.AcceptConflictTheirs"
+            class="in.kkkev.jjidea.actions.file.AcceptConflictTheirsAction"/>
+
     <!-- Vcs.Import is a transparent (non-popup) NonEmptyActionGroup embedded directly inside
          Vcs.MainMenu (see VcsActions.xml in the platform) - this is exactly where
          Git/Mercurial/Subversion register their own "init" actions (e.g. Git.Init in
@@ -345,6 +351,8 @@
       <reference ref="Jujutsu.RestoreToChange"/>
       <separator/>
       <reference ref="Jujutsu.ResolveSelectedConflicts"/>
+      <reference ref="Jujutsu.AcceptConflictYours"/>
+      <reference ref="Jujutsu.AcceptConflictTheirs"/>
       <separator/>
       <reference ref="Jujutsu.SquashFiles"/>
       <reference ref="Jujutsu.SquashIntoFiles"/>

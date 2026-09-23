@@ -71,7 +71,8 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     private val changesTree = JujutsuChangesTree(project, groupConflicts = true).apply {
         showsLocalFiles = { true } // this panel only ever shows the live working copy
     }
-    private val diffPreview = JujutsuEditorTabDiffPreview(changesTree) { "@" }
+    private val diffPreview =
+        JujutsuEditorTabDiffPreview(changesTree, resolveConflictsOnDoubleClick = true, contextLabel = { "@" })
     private val controlsPanel = WorkingCopyControlsPanel(project)
     private val emptyStateLabel = JBLabel().apply { alignmentX = CENTER_ALIGNMENT }
     private var emptyStateLinkAction: () -> Unit = { project.showVcsMappingsSettings() }

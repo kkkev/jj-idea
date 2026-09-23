@@ -154,28 +154,37 @@ This is a genuinely new UI surface for the codebase (no precedent — see gap ab
 of the six slices, and depends on S1 only in that it shares the same document-scanning
 infrastructure (worth building once, used by both).
 
-### S3 — jj-native Conflicts view
+### S3 — Resolve conflicts from the Working copy window (reframed; was "jj-native Conflicts view")
 
-A non-modal, multi-file conflicts list built directly on `resolveList(revision)` /
-`ConflictInfoParser`, showing jj's own shape text per row (`"2-sided conflict including 1
-deletion"`) rather than reconstructing that information from a platform-shaped `Change` list.
+**Reframed 2026-09-23** (`jj-idea-qmws` closed as superseded by `jj-idea-wk7p`). The original
+design called for a standalone Conflicts view with a revision picker, built on
+`resolveList(revision)`/`ConflictInfoParser`. On review, the only real requirement behind S3 is
+**GitHub #66**: "a single place listing every conflicted file that the user picks from and
+resolves as and when they like, without blocking other edits" — filed against multi-select
+"Resolve Conflicts…" forcing files through an unspecified modal queue with no way to choose the
+starting point. The Working copy tool window's "Merge Conflicts" node
+(`ui/common/JujutsuConflictsNode.kt`) already *is* that single list; it only lacked per-file
+resolve gestures and jj's own shape text. A separate view and a revision picker were unrequested
+design speculation — nobody asked to browse or bulk-resolve conflicts at a non-`@` revision from a
+dedicated tab; that's `S4`'s scope (`jj-idea-cmc3`), not S3's.
 
-The key differentiator from the platform's `MultipleFileMergeDialog` (which this replaces as the
-*bulk* affordance, alongside the existing "Merge Conflicts" tree node for the working copy): a
-revision picker, so the view can show conflicts in **descendants and arbitrary other revisions**,
-not only `@`. `CommandExecutor.kt:368`'s doc comment on `resolveList` — "infrastructure for the
-future Conflicts tool window" — was written anticipating exactly this.
+Delivered instead, inside the existing Working copy window, working-copy only:
 
-Depends on the registry gap (above) being fixed first, since a useful non-`@` conflicts view needs
-`JujutsuConflictRegistry` populated for revisions other than the working copy. Also depends on the
-S4 spike's outcome, since bulk actions in this view (accept side #1/#2 for every conflicted file at
-a chosen revision) are exactly the write-at-arbitrary-revision operation S4 needs to validate is
-safe.
+- **jj's shape text per row** (`"2-sided conflict including 1 deletion"`, verbatim from
+  `jj resolve --list`) via a `ChangeNodeDecorator` (`ui/common/ConflictShapeDecorator.kt`) reading
+  the already-populated `JujutsuConflictRegistry` — no new jj calls.
+- **Double-click a single conflicted row** opens the merge tool for just that file
+  (`JujutsuEditorTabDiffPreview.handleDoubleClick`, opt-in via `resolveConflictsOnDoubleClick`),
+  instead of forcing the whole node's queue.
+- **"Accept Yours"/"Accept Theirs" context-menu actions** (`actions/file/AcceptConflictSideAction.kt`)
+  for an explicit multi-selection of conflicted files, reusing
+  `JujutsuMergeProvider`'s `MergeSessionEx` (per-file `:ours`/`:theirs` orientation, GitHub #112,
+  and modify/delete-safe write-back) rather than duplicating that logic — the same contract the
+  platform's own `MultipleFileMergeDialog` buttons use, just invoked directly and off the EDT.
 
-Scale note for the implementing issue: listing conflicts for one revision is O(conflicts at that
-revision), which `jj resolve --list -r` already bounds — no new per-file/per-commit loop on the
-Kotlin side, so this needs an operation-count test only if the view adds its own scan (e.g.
-resolving shape for every row eagerly) rather than lazily per visible row.
+`CommandExecutor.kt:368`'s doc comment on `resolveList` ("infrastructure for the future Conflicts
+tool window") remains true for a *future* revision-scoped view, if one is ever actually requested
+— it just isn't what S3 turned out to need.
 
 ### S4 — Resolve at any revision (retire `NEEDS_EDIT`)
 
@@ -324,6 +333,10 @@ through `createUndoTrackedCommand` — already used elsewhere for exactly this p
 an "Undo" action in the resulting success notification. This makes jj's own "change your mind
 later, it's all in the op log" property visible in the UI at the moment a conflict is resolved,
 rather than requiring the user to know to look at Operation Log / `jj undo` separately.
+
+Also applies to the reframed S3's bulk "Accept Yours"/"Accept Theirs" actions
+(`actions/file/AcceptConflictSideAction.kt`, `jj-idea-wk7p`), which currently run without undo
+tracking, same as the platform's own `MultipleFileMergeDialog` buttons they reuse.
 
 Depends on S1 shipping first (nothing to attach undo to otherwise).
 

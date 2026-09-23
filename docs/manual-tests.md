@@ -2526,6 +2526,38 @@ files one at a time. This adds an equivalent affordance directly to the Working 
 - [ ] With no conflicts at all: neither the "Merge Conflicts" node nor the toolbar button appear
 - [ ] Mixed jj + Git project: the node contains only jj conflicts, never Git-tracked conflicts from a co-located Git root
 
+#### Per-file resolve gestures in the Merge Conflicts node (GitHub #66, jj-idea-wk7p)
+
+GitHub #66: multi-selecting several conflicted files and choosing "Resolve Conflicts…" puts them
+in an unspecified queue order with no way to pick where to start or skip ahead. These gestures let
+a user pick exactly which file(s) to act on instead.
+
+- [ ] Create at least 3 conflicted files, including one **modify/delete** conflict (see the
+      "Modify/delete conflicts" section above for how to set one up). Each row in the "Merge
+      Conflicts" node shows jj's own shape text after the file name (e.g. "2-sided conflict" /
+      "2-sided conflict including 1 deletion"), matching `jj resolve --list` verbatim
+- [ ] **Double-click** one conflicted row (not multi-selected): only that file's merge tool opens,
+      not a queue over the whole node
+- [ ] Double-click a **non-conflicted** row elsewhere in the tree: unaffected, still opens the
+      normal diff preview
+- [ ] Select **two or more** conflicted files (ctrl/cmd-click), right-click → **"Accept Yours"**:
+      all selected files resolve to your side in one step, no merge tool opens, no queue order to
+      contend with
+- [ ] Same, with **"Accept Theirs"**: resolves to the other side
+- [ ] Run "Accept Yours"/"Accept Theirs" on a selection that includes the **modify/delete** file:
+      if the deleted side is the one accepted, the file is actually **deleted** (`jj status`),
+      not left behind empty
+- [ ] After either bulk accept, the "Merge Conflicts" node's count drops and resolved rows
+      disappear without pressing Refresh
+- [ ] Select a mix of conflicted and non-conflicted files: "Accept Yours"/"Accept Theirs" act only
+      on the conflicted ones
+- [ ] With nothing selected, or only non-conflicted files selected: "Accept Yours"/"Accept Theirs"
+      don't appear in the context menu
+- [ ] In the log's commit details pane for a **non-`@`** conflicted commit: no shape text is
+      required to work correctly, but double-clicking a conflicted row there still opens the
+      (read-only) diff preview, not the merge tool — resolving off `@` is out of scope here (see
+      jj-idea-cmc3)
+
 #### "Resolve Conflicts" context menu action (selection-scoped)
 
 There is a single `Jujutsu.ResolveSelectedConflicts` action behind "Resolve Conflicts…";

@@ -125,7 +125,11 @@ class JujutsuChangesTree(
         }
         val builder = TreeModelBuilder(myProject, grouping)
         if (conflicted.isNotEmpty()) {
-            builder.insertChanges(conflicted, builder.insertTagNode(JujutsuConflictsNode(myProject)), null)
+            builder.insertChanges(
+                conflicted,
+                builder.insertTagNode(JujutsuConflictsNode(myProject)),
+                ConflictShapeDecorator(myProject)
+            )
         }
 
         val repo = currentRepo

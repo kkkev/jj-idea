@@ -27,7 +27,7 @@ import javax.swing.JPanel
 class JujutsuCompareChangesPanel(project: Project, contextLabel: () -> String?) :
     JPanel(BorderLayout()), Disposable, UiDataProvider {
     internal val changesTree = JujutsuChangesTree(project)
-    internal val diffPreview = JujutsuEditorTabDiffPreview(changesTree, contextLabel)
+    internal val diffPreview = JujutsuEditorTabDiffPreview(changesTree, contextLabel = contextLabel)
 
     init {
         Disposer.register(this, diffPreview)
