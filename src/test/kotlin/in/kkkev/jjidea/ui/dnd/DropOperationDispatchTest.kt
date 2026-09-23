@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RebaseDestinationMode
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.Tag
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -137,6 +138,97 @@ class DropOperationDispatchTest {
         )
 
         op.shouldBeNull()
+    }
+
+    // endregion
+
+    // region Rebase source mode (jj-idea-j8ij)
+
+    @Test
+    fun `Commit drag defaults to REVISION source mode when unspecified`() {
+        val op = resolveDropOperation(DragPayload.Commit(listOf(a)), DropTarget.CommitRow(b), copy = false)
+
+        op.shouldNotBeNull()
+        op as DropOperation.Rebase
+        op.sourceMode shouldBe RebaseSourceMode.REVISION
+        op.movedCount shouldBe 1
+    }
+
+    @Test
+    fun `Commit drag with SOURCE scope carries the mode and moved count through to the Rebase op`() {
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a)),
+            DropTarget.CommitRow(b),
+            copy = false,
+            sourceMode = RebaseSourceMode.SOURCE,
+            movedCount = 4
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.Rebase
+        op.sourceMode shouldBe RebaseSourceMode.SOURCE
+        op.movedCount shouldBe 4
+        op.label shouldBe "Rebase ${a.id.short} and its 3 descendants onto ${b.id.short}"
+    }
+
+    @Test
+    fun `Commit drag with BRANCH scope names the branch in the label, not a count`() {
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a)),
+            DropTarget.CommitRow(b),
+            copy = false,
+            sourceMode = RebaseSourceMode.BRANCH,
+            movedCount = 7
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.Rebase
+        op.label shouldBe "Rebase the branch containing ${a.id.short} onto ${b.id.short}"
+    }
+
+    @Test
+    fun `SOURCE scope with exactly one descendant uses the singular`() {
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a)),
+            DropTarget.CommitRow(b),
+            copy = false,
+            sourceMode = RebaseSourceMode.SOURCE,
+            movedCount = 2
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.Rebase
+        op.label shouldBe "Rebase ${a.id.short} and its 1 descendant onto ${b.id.short}"
+    }
+
+    @Test
+    fun `SOURCE scope with no actual descendants (a leaf) reads exactly like REVISION`() {
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a)),
+            DropTarget.CommitRow(b),
+            copy = false,
+            sourceMode = RebaseSourceMode.SOURCE,
+            movedCount = 1
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.Rebase
+        op.label shouldBe "Rebase ${a.id.short} onto ${b.id.short}"
+    }
+
+    @Test
+    fun `a copy-modifier drag stays Duplicate regardless of the drag-scope selector - no -s or -b axis`() {
+        val op = resolveDropOperation(
+            DragPayload.Commit(listOf(a)),
+            DropTarget.CommitRow(b),
+            copy = true,
+            sourceMode = RebaseSourceMode.BRANCH,
+            movedCount = 7
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.Duplicate
+        op.label shouldBe "Duplicate ${a.id.short} onto ${b.id.short}"
     }
 
     // endregion
@@ -329,8 +421,21 @@ class DropOperationDispatchTest {
     }
 
     @Test
-    fun `WorkingCopyRef onto a Gap has no operation - null`() {
-        resolveDropOperation(DragPayload.WorkingCopyRef(a), DropTarget.Gap(b, DropZone.INSERT_BEFORE), copy = false)
+    fun `WorkingCopyRef onto the top band creates a new change on top of that commit (jj-idea-d3u5)`() {
+        val op = resolveDropOperation(
+            DragPayload.WorkingCopyRef(a),
+            DropTarget.Gap(b, DropZone.INSERT_BEFORE),
+            copy = false
+        )
+
+        op.shouldNotBeNull()
+        op as DropOperation.NewChangeOnTop
+        op.destination shouldBe b
+    }
+
+    @Test
+    fun `WorkingCopyRef onto the bottom band has no operation - null`() {
+        resolveDropOperation(DragPayload.WorkingCopyRef(a), DropTarget.Gap(b, DropZone.INSERT_AFTER), copy = false)
             .shouldBeNull()
     }
 

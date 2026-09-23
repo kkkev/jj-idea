@@ -30,7 +30,7 @@ Components whose blast radius exceeds their own package:
 | Component | Feeds |
 |---|---|
 | `ui/components/TextCanvas.kt`, `LogEntryText.kt`, `HtmlTextCanvas.kt`, `UnbreakableContent.kt`, `AtomicHtmlView.kt`, `HtmlIcons.kt`, `Linkifier.kt` | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-BOOKMARK](#mt-bookmark) |
-| Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details) |
+| Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details), [MT-DND](#mt-dnd) (the `@` marker's hit target, jj-idea-pk2c) |
 | `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff), [MT-DIFFBASE](#mt-diffbase) (quick action's "Choose revision...") |
 | Shared commit picker (`ui/components/CommitPickerPanel.kt`, `ui/components/LogSearchField.kt`, used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split), [MT-BOOKMARK](#mt-bookmark), [MT-LOG-FILTER](#mt-log-filter) |
 | `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
@@ -3175,14 +3175,20 @@ file), which no automated test can supply — see contributing.md § Manual regr
 - [ ] Dragging a bookmark chip shows its name with the bookmark's own icon; dragging a tag chip
       shows its name with the tag icon
 - [ ] The label stays attached to the cursor for the whole drag, not just at the start
+- [ ] With the drag-scope icon group set to "Commit" (default), dragging a commit shows the label
+      with no extra icon - unchanged from before jj-idea-d3u5
+- [ ] Set the scope to the tree icon, then drag a commit → the label now starts with a small tree
+      icon before the id (a fixed badge, not a count - see "Rebase source scope" below); set it to
+      the branch icon → the label starts with a small branch icon instead
+- [ ] Dragging a bookmark/tag/`@` chip is unaffected by the scope selection - no badge appears on
+      those, regardless of which scope is selected
 
 #### Commit → commit rebase by drag (jj-idea-8fxs)
 
 The headline drag gesture: dropping a dragged commit row (or multi-selection) onto another row's
 centre band runs `jj rebase --onto`; the top/bottom bands run `-A`/`-B`. Applies immediately, no
-confirmation dialog, with an undo balloon on success. `RebaseSourceMode` is always `-r` (only the
-dragged commit(s) move) — choosing `-s`/`-b` from a drag is a future bead (jj-idea-j8ij); use the
-`Rebase...` dialog for those in the meantime.
+confirmation dialog, with an undo balloon on success. `RebaseSourceMode` defaults to `-r` (only the
+dragged commit(s) move); see "Rebase source scope" below for `-s`/`-b`.
 
 **Code:** `ui/dnd/DropPerformers.kt`, `ui/log/JujutsuLogTableDnD.kt`, `actions/change/rebaseAction.kt`
 
@@ -3411,6 +3417,87 @@ unaffected.
 - [ ] Right-click on a chip in this pane still shows its usual ref context menu (Move/Push/Delete/
       etc.) - unaffected by the new drag source
 - [ ] With the preview feature off, try dragging a chip out of the details pane → nothing initiates
+
+#### Drag the `@` marker: edit or new-on-top by zone (jj-idea-pk2c, redesigned by jj-idea-d3u5)
+
+The working-copy `@` marker becomes a drag source using the same zone vocabulary as the
+commit-rebase gesture, not a modal dialog: drop **on** a commit's centre band to `jj edit` it
+(rejected outright if immutable - no dialog); drop in the band **just above** a commit to run
+`jj new` with that commit as parent, creating a new change on top of it - **always allowed**,
+even for an immutable target, since `jj new` never rewrites its parent. The bottom band has no
+operation for `@`.
+
+**Code:** `ui/log/LogClickTarget.kt` (`WorkingCopyClick`), `ui/log/JujutsuLogTableRenderers.kt`
+(`appendWorkingCopyMarker`), `ui/dnd/DropOperation.kt` (`EditWorkingCopy`, `NewChangeOnTop`),
+`ui/dnd/DragGuards.kt` (the `WorkingCopyRef`+`CommitRow`+immutable check),
+`ui/statusbar/JujutsuWorkingCopySwitcher.kt` (`editWorkingCopy`, `newChangeOnTop`)
+
+- [ ] Drag the `@` marker (next to the current working-copy row) onto a different **mutable**
+      commit's centre band → tooltip "Edit &lt;id&gt;", release runs `jj edit` immediately with an
+      undo balloon; confirm with `jj log` that `@` moved
+- [ ] Drag `@` onto an **immutable** commit's centre → filled reject indicator, "&lt;id&gt; is
+      immutable" - no dialog appears at all, drop does nothing
+- [ ] Drag `@` into the band **just above** any commit - mutable or **immutable** - → tooltip "New
+      change on top of &lt;id&gt;", release creates a new child immediately with an undo balloon
+      and moves `@` there; confirm with `jj log`. The immutable case is the one most worth
+      checking carefully: there must be **no** reject indicator and **no** dialog here
+- [ ] Drag `@` into the band **below** a commit → no indicator, not an operation
+- [ ] Drag `@` onto the row it's already on (any zone) → no indicator, silent no-op (self-drop)
+- [ ] In a multi-root project, drag `@` from one repo's row onto a row from a different repo → same
+      filled reject indicator as a commit drag
+- [ ] Dragging `@` shows a small cursor-following chip labelled "@" in the usual working-copy color
+- [ ] With the preview feature off, try dragging the `@` marker → nothing initiates
+- [ ] Regression: the status-bar **Switch Working Copy** popup (click path, not drag) still works
+      exactly as before - it still asks its "Edit / New on Top / Cancel" dialog (a click has no
+      zone to read the operation from) and still shows an undo balloon on success
+
+#### Rebase source scope: `-r`/`-s`/`-b` (jj-idea-j8ij, redesigned by jj-idea-d3u5)
+
+Three **mutually-exclusive icon toggle buttons** in the toolbar (only visible with the Drag and
+Drop preview feature on, next to the View Options button - a commit-dot icon, a tree icon, and a
+branch icon) pick whether a commit-onto-commit drag rebases just the dragged commit(s) (`-r`, the
+default), the dragged commit(s) plus everything descended from them (`-s`), or the entire branch
+containing them (`-b`). Exactly one is pressed/highlighted at a time - clicking a different one
+presses it and un-presses the others, the same way a diff viewer's unified/side-by-side toggle
+works. The setting is project-level and sticky across drags, so the drop tooltip and drag chip
+both name the resolved scope every time - this is deliberate anti-footgun UX, not decoration:
+confirm it rather than skipping past it. While dragging under `-s`/`-b`, the rows that would
+actually move are tinted live in the log, the same green `RebasePreviewPanel`'s dialog preview
+uses.
+
+**Code:** `ui/common/CommitTablePanel.kt` (`DragScopeAction`), `settings/JujutsuSettingsState.kt`
+(`dragRebaseSourceMode`), `ui/dnd/DragGuards.kt` (`DragContext.movedIds`), `ui/dnd/DropOperation.kt`
+(`sourceScopeLabel`), `ui/dnd/DropPerformers.kt` (`toRebaseSpec`), `ui/log/JujutsuLogTableDnD.kt`
+(`applyDragHighlight`)
+
+- [ ] Toolbar shows three icon buttons next to View Options (commit dot / tree / branch), with the
+      commit-dot one pressed/highlighted by default; hovering each shows a tooltip naming its scope
+- [ ] Click the tree icon → it becomes pressed, the commit-dot icon un-presses - exactly one is
+      ever pressed at a time
+- [ ] With the tree icon selected, start dragging a commit that has children (don't drop yet) → its
+      descendant rows tint green, live, before you release; the dragged commit's own row tints too.
+      Releasing or cancelling the drag (Esc, or dropping off-target) removes the tint
+- [ ] Complete that drag → tooltip read "Rebase &lt;id&gt; and its N descendant(s) onto &lt;id&gt;"
+      (singular for exactly one descendant) before release; confirm with `jj log` that the children
+      moved too, not just the dragged commit
+- [ ] Same commit, but it's a **leaf** (no descendants) - tooltip reads exactly like the plain `-r`
+      case (no "and its 0 descendants" wording), and **no** tint appears during the drag either
+- [ ] Click the branch icon → it presses, the tree icon un-presses; drag a commit → tooltip reads
+      "Rebase the branch containing &lt;id&gt; onto &lt;id&gt;" (no count), the whole branch tints
+      live during the drag; confirm with `jj log` that the whole branch moved
+- [ ] With the tree or branch icon selected, drag a **mutable** commit whose descendants/branch
+      include an **immutable** commit elsewhere → filled reject indicator, "Cannot rewrite an
+      immutable commit" - even though the commit under the cursor itself is mutable. This is the
+      guard fix this bead shipped alongside the gesture; if it's missing, that's a real bug
+- [ ] Click the commit-dot icon again and confirm the previous immutable-descendant case no longer
+      rejects (only the dragged commit's own immutability matters again), and no live tint appears
+      for a plain drag
+- [ ] With the tree or branch icon selected, hold the **copy modifier** and drag a commit → still
+      duplicates only that one commit (tooltip has no scope wording, no live tint either);
+      `jj duplicate` has no `-s`/`-b` axis, so the selector is inert for a copy-modifier drag -
+      confirm with `jj log` that descendants were *not* duplicated
+- [ ] Change the selection, close and reopen the project (or restart the IDE) → the choice persisted
+- [ ] With the Drag and Drop preview feature off, all three icon buttons are entirely absent
 
 ### MT-CROSS
 

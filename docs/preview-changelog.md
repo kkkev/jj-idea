@@ -54,3 +54,12 @@ verbatim at GA, condensed into a handful of user-facing bullets.
   as dragging one from the log or the bookmarks panel.
 - Drag and Drop: dragging a commit onto a tag chip in the log now moves the tag there, matching
   what already happened when dragging onto a bookmark chip.
+- Drag and Drop: the working-copy `@` marker can now be dragged onto a commit to edit it, or into
+  the space just above a commit to create a new change on top of it. Dropping onto an immutable
+  commit's centre is rejected outright; dropping just above one always works, since that doesn't
+  rewrite anything.
+- Drag and Drop: three icon buttons next to View Options control whether dragging a commit moves
+  only that commit, the commit and everything descended from it, or its entire branch - exactly
+  one is pressed at a time. The chosen scope is named in the tooltip while dragging, the rows that
+  would actually move are highlighted live, and the drag label itself picks up a small matching
+  icon when a wider scope is selected.

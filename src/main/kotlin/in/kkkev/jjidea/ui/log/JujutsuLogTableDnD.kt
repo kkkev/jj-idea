@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.icons.AllIcons
 import com.intellij.ide.dnd.DnDAction
 import com.intellij.ide.dnd.DnDDragStartBean
 import com.intellij.ide.dnd.DnDEvent
@@ -12,12 +13,19 @@ import com.intellij.ui.awt.RelativeRectangle
 import com.intellij.ui.render.RenderingUtil
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
+import `in`.kkkev.jjidea.jj.parseRebaseSourceMode
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
+import `in`.kkkev.jjidea.settings.JujutsuSettings
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
+import `in`.kkkev.jjidea.ui.components.IconSpec
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
 import `in`.kkkev.jjidea.ui.components.append
 import `in`.kkkev.jjidea.ui.components.appendSummary
+import `in`.kkkev.jjidea.ui.components.icon
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragContextHolder
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
@@ -79,6 +87,12 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
     val rejectOverlay = RejectOverlay()
     Disposer.register(parent) { rejectOverlay.dispose() }
 
+    // The graph state saved by applyDragHighlight (jj-idea-d3u5) at the start of a gesture that
+    // actually has something extra to show, so cleanUp can restore it - null whenever the current
+    // gesture never applied a highlight (every non-Commit payload, and a Commit drag under plain
+    // -r) so a plain drop-end/leave never pays for an unnecessary updateGraph call.
+    var savedGraphNodes: Map<ChangeKey, GraphNode>? = null
+
     // Shared by two different platform hooks, not just one: setDropEndedCallback maps to
     // DnDSource.dragDropEnd, which only fires on the component that *started* the drag - for a
     // drag that started in a different component's payload source (e.g.
@@ -95,6 +109,8 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
         hysteresis.reset()
         dragContextHolder.reset()
         rejectOverlay.hide()
+        savedGraphNodes?.let { updateGraph(it) }
+        savedGraphNodes = null
     }
 
     DnDSupport.createBuilder(this)
@@ -106,7 +122,9 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
         .setImageProvider { info -> dragPayloadAt(info.point)?.let { dragImage(it) } }
         .setTargetChecker { event ->
             event.hideHighlighter()
-            when (val resolution = resolveLive(event, hysteresis, dragContextHolder)) {
+            when (
+                val resolution = resolveLive(event, hysteresis, dragContextHolder) { savedGraphNodes = it }
+            ) {
                 is DropResolution.Allowed ->
                     if (performer.supports(resolution.operation)) {
                         rejectOverlay.hide()
@@ -136,7 +154,8 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
             false
         }
         .setDropHandlerWithResult { event ->
-            val resolution = resolveLive(event, hysteresis, dragContextHolder) as? DropResolution.Allowed
+            val resolution = resolveLive(event, hysteresis, dragContextHolder) { savedGraphNodes = it }
+                as? DropResolution.Allowed
                 ?: return@setDropHandlerWithResult false
             if (!performer.supports(resolution.operation)) return@setDropHandlerWithResult false
             performer.perform(resolution.operation)
@@ -172,15 +191,22 @@ internal sealed interface DropResolution {
  * component's payload source, e.g. [in.kkkev.jjidea.ui.common.installFilesDragSource] since
  * jj-idea-yvry) - so a cross-component drag resolves here exactly like one that started on this
  * table, and [DragContextHolder]'s memoisation still keeps the guard-state build to once per
- * gesture rather than once per mouse-move.
+ * gesture rather than once per mouse-move. [onDragHighlightApplied] (jj-idea-d3u5) receives
+ * [applyDragHighlight]'s result the same one time - the caller stashes it to restore on
+ * drop-end/leave.
  */
 private fun JujutsuLogTable.resolveLive(
     event: DnDEvent,
     hysteresis: ZoneHysteresis,
-    dragContextHolder: DragContextHolder
+    dragContextHolder: DragContextHolder,
+    onDragHighlightApplied: (Map<ChangeKey, GraphNode>?) -> Unit
 ): DropResolution? {
     val payload = event.attachedObject as? DragPayload ?: return null
-    val context = dragContextHolder.forPayload(payload) { logModel.getFilteredEntries() }
+    val context = dragContextHolder.forPayload(
+        payload,
+        sourceMode = { parseRebaseSourceMode(JujutsuSettings.getInstance(project).state.dragRebaseSourceMode) },
+        onNewContext = { ctx -> onDragHighlightApplied(applyDragHighlight(ctx, payload)) }
+    ) { logModel.getFilteredEntries() }
     val point = event.relativePoint.getPoint(this)
     val (row, target) = dropTargetAt(point, hysteresis, payload) ?: return null
     val copy = event.action == DnDAction.COPY
@@ -202,8 +228,44 @@ internal fun resolveDrop(
 ): DropResolution {
     val zone = if (target is DropTarget.Gap) target.edge else DropZone.ONTO
     context.rejectionReason(target, copy)?.let { return DropResolution.Rejected(row, zone, it) }
-    val operation = resolveDropOperation(payload, target, copy) ?: return DropResolution.Rejected(row, zone, "")
+    val operation = resolveDropOperation(payload, target, copy, context.sourceMode, context.movedCount)
+        ?: return DropResolution.Rejected(row, zone, "")
     return DropResolution.Allowed(row, zone, operation)
+}
+
+/**
+ * Live "these rows would move" highlight for a [DragPayload.Commit] drag under a `-s`/`-b` scope
+ * (jj-idea-d3u5) - tints every row in [context]'s [DragContext.movedIds] the same
+ * [JujutsuColors.SOURCE_HIGHLIGHT] [in.kkkev.jjidea.ui.rebase.RebasePreviewPanel] already uses for
+ * its (dialog-based) rebase preview, reusing that exact [GraphNode.highlightColor] mechanism.
+ * Called once per gesture (from [DragContextHolder.forPayload]'s `onNewContext` hook, not per
+ * mouse-move) since [context]'s moved-id set is already fixed for the whole gesture - the hovered
+ * target plays no part in it.
+ *
+ * Returns `null` - painting nothing - for every payload but [DragPayload.Commit], and for a plain
+ * `-r` drag (or a `-s`/`-b` drag over a leaf) where the moved set is exactly the drag selection:
+ * that's already obvious from the drag chip/selection itself, so there's nothing extra to show and
+ * today's unchanged look is preserved. Otherwise returns the table's *pre-tint* [graphNodes], for
+ * the caller to hand back to [JujutsuLogTable.updateGraph] once the gesture ends.
+ *
+ * `internal` (not `private`) so [JujutsuLogTableDnDTest] can exercise it directly - a live
+ * `DnDEvent`-driven test isn't possible in this headless test setup (`DnDManager` is a no-op,
+ * `HeadlessDnDManager`), the same reason [dropTargetAt]/[dragImage]/[dragPayloadAt] are `internal`.
+ */
+internal fun JujutsuLogTable.applyDragHighlight(
+    context: DragContext,
+    payload: DragPayload
+): Map<ChangeKey, GraphNode>? {
+    if (payload !is DragPayload.Commit) return null
+    val sourceIds = payload.entries.map { it.id }.toSet()
+    if (context.movedIds == sourceIds) return null
+    val original = graphNodes
+    updateGraph(
+        original.mapValues { (key, node) ->
+            if (key.revision in context.movedIds) node.copy(highlightColor = JujutsuColors.SOURCE_HIGHLIGHT) else node
+        }
+    )
+    return original
 }
 
 /**
@@ -228,6 +290,7 @@ internal fun JujutsuLogTable.dragPayloadAt(point: Point): DragPayload? {
             click.tag,
             click.repo.tagTargets(click.tag, click.entry.id)
         )
+        is WorkingCopyClick -> return DragPayload.WorkingCopyRef(click.entry)
         else -> Unit
     }
     val row = rowAtPoint(point).takeIf { it >= 0 } ?: return null
@@ -302,28 +365,43 @@ internal fun JujutsuLogTable.dropTargetAt(
  * [JujutsuLogTable]). Without this, only the OS cursor itself indicates a drag is happening -
  * reported as missing feedback compared to the Project view's file drag.
  *
- * The [DragPayload.BookmarkRef]/[DragPayload.TagRef] cases delegate to [chipDragImage], shared
- * with every other surface a bookmark/tag chip can be dragged from (batch 4); only the
- * [DragPayload.Commit] case is log-table-specific, since a commit only ever drags from a row here.
- * Built from a [FragmentRecordingCanvas] rendered through [TextCanvasPanel], the same
- * icon+styled-text vocabulary the log table's own rows and [MoveBookmarkDialog]'s list use - a
- * single commit's id gets the usual bold-unique-prefix/grey-remainder treatment
- * (`TextCanvas.append(ChangeId)`) rather than a plain unstyled short id.
+ * The [DragPayload.BookmarkRef]/[DragPayload.TagRef]/[DragPayload.WorkingCopyRef] cases delegate
+ * to [chipDragImage], shared with every other surface those payloads can be dragged from (batch
+ * 4, jj-idea-pk2c); only the [DragPayload.Commit] case is log-table-specific, since a commit only
+ * ever drags from a row here. Built from a [FragmentRecordingCanvas] rendered through
+ * [TextCanvasPanel], the same icon+styled-text vocabulary the log table's own rows and
+ * [MoveBookmarkDialog]'s list use - a single commit's id gets the usual
+ * bold-unique-prefix/grey-remainder treatment (`TextCanvas.append(ChangeId)`) rather than a plain
+ * unstyled short id.
  *
- * Returns `null` for a payload kind with no natural single-line label yet ([DragPayload.Files],
- * [DragPayload.WorkingCopyRef]) - the platform falls back to no image (cursor only) rather than
- * this throwing or guessing at a label.
+ * Returns `null` for a payload kind with no natural single-line label yet ([DragPayload.Files]) -
+ * the platform falls back to no image (cursor only) rather than this throwing or guessing at a
+ * label.
  *
- * `internal` (not `private`) so [JujutsuLogTableDnDTest] can exercise it directly.
+ * A [DragPayload.Commit] chip is prefixed with a small scope badge - the same tree/branch icon the
+ * toolbar's drag-scope selector uses (`ui/common/CommitTablePanel.kt`'s `DragScopeAction`) - when
+ * the current scope is `-s`/`-b`, so the chip itself hints that more than the dragged commit(s)
+ * will move, not just the drop tooltip (jj-idea-d3u5). A fixed icon rather than the exact moved
+ * count: naming the count here needs the same `RebaseSimulator` pass `DragContext.forDrag` already
+ * pays for once per gesture, not once per chip render - deferred to a follow-up bead rather than
+ * duplicating that computation just for the drag image.
+ *
+ * `internal` (not `private`) so [JujutsuLogTableDnDTest] can exercise it directly. [scopeBadge]
+ * defaults to reading the live setting via [dragScopeBadge] - overridable so a test can force a
+ * badge without going through [JujutsuSettings].
  */
-internal fun JujutsuLogTable.dragImage(payload: DragPayload): DnDImage? {
-    if (payload is DragPayload.BookmarkRef || payload is DragPayload.TagRef) {
+internal fun JujutsuLogTable.dragImage(payload: DragPayload, scopeBadge: IconSpec? = dragScopeBadge()): DnDImage? {
+    if (payload is DragPayload.BookmarkRef || payload is DragPayload.TagRef || payload is DragPayload.WorkingCopyRef) {
         return chipDragImage(RenderingUtil.getForeground(this), RenderingUtil.getBackground(this), font, payload)
     }
-    if (payload is DragPayload.WorkingCopyRef || payload is DragPayload.Files) return null
+    if (payload is DragPayload.Files) return null
 
     val canvas = FragmentRecordingCanvas()
     canvas.foreground(RenderingUtil.getForeground(this)) {
+        scopeBadge?.let {
+            append(it)
+            append(" ")
+        }
         val entries = (payload as DragPayload.Commit).entries
         if (entries.size == 1) {
             val entry = entries.single()
@@ -358,6 +436,19 @@ internal fun JujutsuLogTable.dragImage(payload: DragPayload): DnDImage? {
     // the same offset ChangesTreeDnDSupport.createDragImage uses.
     return DnDImage(image, Point(-image.getWidth(null), -image.getHeight(null)))
 }
+
+/**
+ * The icon [dragImage] prefixes a [DragPayload.Commit] chip with for the current drag scope -
+ * `null` for the default `-r` (nothing extra to hint at, same as before jj-idea-d3u5), otherwise
+ * the same icon [in.kkkev.jjidea.ui.common.CommitTablePanel.DragScopeAction] uses for that scope
+ * in the toolbar, so the two stay visually paired.
+ */
+private fun JujutsuLogTable.dragScopeBadge(): IconSpec? =
+    when (parseRebaseSourceMode(JujutsuSettings.getInstance(project).state.dragRebaseSourceMode)) {
+        RebaseSourceMode.REVISION -> null
+        RebaseSourceMode.SOURCE -> icon(AllIcons.General::Tree)
+        RebaseSourceMode.BRANCH -> icon(AllIcons.Vcs::Branch)
+    }
 
 /**
  * Paint the drop indicator for [zone] at [row]: an outline around the whole row for

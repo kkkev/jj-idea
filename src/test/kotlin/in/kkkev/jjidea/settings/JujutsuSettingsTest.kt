@@ -395,6 +395,11 @@ class JujutsuSettingsTest {
         JujutsuApplicationSettingsState().disableIgnoredFileScanning shouldBe false
     }
 
+    @Test
+    fun `dragRebaseSourceMode defaults to REVISION (jj-idea-j8ij)`() {
+        JujutsuSettingsState().dragRebaseSourceMode shouldBe "REVISION"
+    }
+
     private fun mockRepo(path: String): JujutsuRepository {
         val dir = mockk<VirtualFile>()
         every { dir.path } returns path

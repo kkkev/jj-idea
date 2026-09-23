@@ -235,6 +235,9 @@ object JujutsuLogContextMenuActions {
                 // MoreRefsClick (the "+N more" overflow chip, jj-idea-w61m) is handled separately by
                 // JujutsuLogTable, which shows a popup over the hidden refs instead of this menu.
                 is MoreRefsClick -> Unit
+                // The @ marker has no right-click menu of its own (jj-idea-pk2c) - it exists as a
+                // LogClickTarget purely to give it a drag hit target.
+                is WorkingCopyClick -> Unit
             }
         }
 

@@ -234,6 +234,15 @@ enum class RebaseSourceMode(val flag: String) {
     BRANCH("-b")
 }
 
+/**
+ * Parses [in.kkkev.jjidea.settings.JujutsuSettingsState.dragRebaseSourceMode]'s stored enum name
+ * back to a [RebaseSourceMode] (jj-idea-j8ij), falling back to [RebaseSourceMode.REVISION] for an
+ * unrecognised or stale value - the same fallback-on-unrecognised idiom
+ * `GitPushDialog.parsePushScope` uses for `defaultPushScope`.
+ */
+fun parseRebaseSourceMode(value: String): RebaseSourceMode =
+    RebaseSourceMode.entries.find { it.name == value } ?: RebaseSourceMode.REVISION
+
 /** Where to place rebased revisions. */
 enum class RebaseDestinationMode(val flag: String) {
     /** Standard rebase: become children of the destination. */

@@ -146,7 +146,7 @@ ship as one PR. Every bead below carries a `dnd-batch-N` label; find your batch'
 | **2** | `jj-idea-ibth`, `jj-idea-vdwh`, `jj-idea-p6nb` | Chip payloads + copy-modifier — all extend `DragPayload`/`DropTarget` and the same log-table hit-test |
 | **3** | `jj-idea-yvry`, `jj-idea-b2oi` | Changes tree as payload source (`ui/common/JujutsuChangesTree.kt`); `b2oi` depends on `yvry` |
 | **4** | `jj-idea-0rdm`, `jj-idea-3xab`, `jj-idea-4ji7` | Bookmarks panel + details panel as sources/targets; `3xab` depends on `0rdm` |
-| **5** | `jj-idea-pk2c`, `jj-idea-j8ij` | Working-copy `@` drag; rebase source-mode differentiation |
+| **5** ✓ | `jj-idea-pk2c`, `jj-idea-j8ij`, `jj-idea-d3u5` | Working-copy `@` drag; rebase source-mode differentiation. Shipped twice: the first pass (`pk2c`/`j8ij`) used a modal confirmation dialog for an immutable `@` target and a View Options radio-style `ToggleAction` trio for scope; manual review found both off - `d3u5` redesigned the `@` gesture onto zones (centre = edit, band above = always-allowed `jj new`) and the scope picker onto a toolbar `ComboBoxAction`, and added a live "these rows would move" highlight during a `-s`/`-b` drag. See MT-DND's "@" and "Rebase source scope" subsections for the current behavior. |
 | **6** | `jj-idea-3uhu`, `jj-idea-9d7r` | Live preview and adaptive zones — polish, both gated on `8fxs` shipping |
 
 All batch-1..6 beads `depends on` `jj-idea-vpvz` (the gating bead) in beads, so `bd ready` will

@@ -91,7 +91,7 @@ fun TextCanvas.appendDecorations(entry: LogEntry) {
     }
     if (entry.isWorkingCopy) {
         space()
-        colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
+        appendWorkingCopyMarker(entry)
     }
 }
 
@@ -102,6 +102,19 @@ fun TextCanvas.appendDecorations(entry: LogEntry) {
  */
 private fun TextCanvas.appendDanglingHeadMarker() {
     smaller { append(icon(JujutsuIcons::BookmarkNone)) }
+}
+
+/**
+ * The working-copy `@` marker itself, wrapped in [linked] with a `jjref://...&kind=workingcopy`
+ * URI (jj-idea-pk2c) so [in.kkkev.jjidea.ui.log.dragPayloadAt] can hit-test it into a
+ * [in.kkkev.jjidea.ui.dnd.DragPayload.WorkingCopyRef] drag source, the same way a bookmark/tag
+ * chip's own [in.kkkev.jjidea.ui.components.refUri] wrapping does. Never collapsed into the "+N
+ * more" overflow chip in [cappedDecorations] - it isn't a ref chip.
+ */
+private fun TextCanvas.appendWorkingCopyMarker(entry: LogEntry) {
+    linked(refUri(entry, "workingcopy", WorkingCopy.REF)) {
+        colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
+    }
 }
 
 /** Fraction of the graph+description column width that decorations (bookmarks/tags) may occupy
@@ -182,7 +195,7 @@ fun cappedDecorations(
         }
         if (entry.isWorkingCopy) {
             if (kept > 0 || hiddenUnits.isNotEmpty() || entry.isDanglingHead) append(" ")
-            colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
+            appendWorkingCopyMarker(entry)
         }
     }
 

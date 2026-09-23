@@ -6,6 +6,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
@@ -150,6 +151,134 @@ class DragGuardsTest {
 
         context.rejectionReason(DropTarget.CommitRow(b), copy = false).shouldBeNull()
     }
+
+    // region Rebase source mode (jj-idea-j8ij)
+
+    @Test
+    fun `SOURCE scope rejects an immutable descendant even though the dragged entry itself is mutable`() {
+        val source = entry("aaaaaaaa")
+        val immutableChild = entry("bbbbbbbb", immutable = true, parentIds = listOf(source.id))
+        val dest = entry("cccccccc")
+        val entries = listOf(source, immutableChild, dest)
+        val context = DragContext.forDrag(entries, DragPayload.Commit(listOf(source)), RebaseSourceMode.SOURCE)
+
+        val reason = context.rejectionReason(DropTarget.CommitRow(dest), copy = false)
+
+        reason shouldBe "Cannot rewrite an immutable commit"
+    }
+
+    @Test
+    fun `REVISION scope (the default) doesn't see that same immutable descendant - only -s or -b do`() {
+        val source = entry("aaaaaaaa")
+        val immutableChild = entry("bbbbbbbb", immutable = true, parentIds = listOf(source.id))
+        val dest = entry("cccccccc")
+        val entries = listOf(source, immutableChild, dest)
+        val context = DragContext.forDrag(entries, DragPayload.Commit(listOf(source)), RebaseSourceMode.REVISION)
+
+        context.rejectionReason(DropTarget.CommitRow(dest), copy = false).shouldBeNull()
+    }
+
+    @Test
+    fun `BRANCH scope rejects when an ancestor elsewhere in the branch is immutable`() {
+        val root = entry("aaaaaaaa", immutable = true)
+        val mid = entry("bbbbbbbb", parentIds = listOf(root.id))
+        val dest = entry("cccccccc")
+        val entries = listOf(root, mid, dest)
+        val context = DragContext.forDrag(entries, DragPayload.Commit(listOf(mid)), RebaseSourceMode.BRANCH)
+
+        val reason = context.rejectionReason(DropTarget.CommitRow(dest), copy = false)
+
+        reason shouldBe "Cannot rewrite an immutable commit"
+    }
+
+    @Test
+    fun `a copy-modifier drag under SOURCE scope is still exempt - duplicate never rewrites the moved entries`() {
+        val source = entry("aaaaaaaa")
+        val immutableChild = entry("bbbbbbbb", immutable = true, parentIds = listOf(source.id))
+        val dest = entry("cccccccc")
+        val entries = listOf(source, immutableChild, dest)
+        val context = DragContext.forDrag(entries, DragPayload.Commit(listOf(source)), RebaseSourceMode.SOURCE)
+
+        context.rejectionReason(DropTarget.CommitRow(dest), copy = true).shouldBeNull()
+    }
+
+    @Test
+    fun `SOURCE scope excludes descendants as destinations too, not just the dragged entry`() {
+        val source = entry("aaaaaaaa")
+        val child = entry("bbbbbbbb", parentIds = listOf(source.id))
+        val context = DragContext.forDrag(
+            listOf(source, child),
+            DragPayload.Commit(listOf(source)),
+            RebaseSourceMode.SOURCE
+        )
+
+        val reason = context.rejectionReason(DropTarget.CommitRow(child), copy = false)
+
+        reason shouldBe "That would create a cycle"
+    }
+
+    // endregion
+
+    // region WorkingCopyRef payload (jj-idea-pk2c)
+
+    @Test
+    fun `a WorkingCopyRef drag is never subject to the cycle or source-immutability checks`() {
+        val a = entry("aaaaaaaa", immutable = true)
+        val b = entry("bbbbbbbb")
+        val context = DragContext.forDrag(listOf(a, b), DragPayload.WorkingCopyRef(a))
+
+        context.rejectionReason(DropTarget.CommitRow(b), copy = false).shouldBeNull()
+    }
+
+    @Test
+    fun `dropping the @ marker onto its own row is a silent self-drop`() {
+        val a = entry("aaaaaaaa")
+        val context = DragContext.forDrag(listOf(a), DragPayload.WorkingCopyRef(a))
+
+        context.rejectionReason(DropTarget.CommitRow(a), copy = false) shouldBe ""
+    }
+
+    @Test
+    fun `dropping the @ marker into a different repository is rejected with an explanatory reason`() {
+        val a = entry("aaaaaaaa", repo = repoA)
+        val destInOtherRepo = entry("bbbbbbbb", repo = repoB)
+        val context = DragContext.forDrag(listOf(a), DragPayload.WorkingCopyRef(a))
+
+        val reason = context.rejectionReason(DropTarget.CommitRow(destInOtherRepo), copy = false)
+
+        reason shouldBe "Cannot drop across repositories"
+    }
+
+    @Test
+    fun `dropping the @ marker onto an immutable commit's centre is rejected - no dialog (jj-idea-d3u5)`() {
+        val a = entry("aaaaaaaa")
+        val immutableDest = entry("bbbbbbbb", immutable = true)
+        val context = DragContext.forDrag(listOf(a, immutableDest), DragPayload.WorkingCopyRef(a))
+
+        val reason = context.rejectionReason(DropTarget.CommitRow(immutableDest), copy = false)
+
+        reason shouldBe "bbbbbbbb is immutable"
+    }
+
+    @Test
+    fun `dropping the @ marker in the band above an immutable commit is always allowed - jj new never rewrites it`() {
+        val a = entry("aaaaaaaa")
+        val immutableDest = entry("bbbbbbbb", immutable = true)
+        val context = DragContext.forDrag(listOf(a, immutableDest), DragPayload.WorkingCopyRef(a))
+
+        context.rejectionReason(DropTarget.Gap(immutableDest, DropZone.INSERT_BEFORE), copy = false).shouldBeNull()
+    }
+
+    @Test
+    fun `dropping the @ marker onto a mutable commit's centre is not rejected`() {
+        val a = entry("aaaaaaaa")
+        val mutableDest = entry("bbbbbbbb")
+        val context = DragContext.forDrag(listOf(a, mutableDest), DragPayload.WorkingCopyRef(a))
+
+        context.rejectionReason(DropTarget.CommitRow(mutableDest), copy = false).shouldBeNull()
+    }
+
+    // endregion
 
     // region Files payload (jj-idea-yvry, -b2oi)
 

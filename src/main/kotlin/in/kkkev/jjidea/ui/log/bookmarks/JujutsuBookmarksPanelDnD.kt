@@ -139,7 +139,7 @@ private fun JujutsuBookmarksPanel.resolveLive(
     val path = tree.getPathForLocation(point.x, point.y) ?: return null
     val bounds = tree.getPathBounds(path) ?: return null
     val target = targetAt(path) ?: return null
-    val context = dragContextHolder.forPayload(payload, allEntries)
+    val context = dragContextHolder.forPayload(payload, allEntries = allEntries)
     val copy = event.action == DnDAction.COPY
 
     context.rejectionReason(target, copy)?.let { return PanelDropResolution.Rejected(bounds, it) }

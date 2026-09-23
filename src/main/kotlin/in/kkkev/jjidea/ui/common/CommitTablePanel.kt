@@ -18,6 +18,8 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.LazyActionById
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
+import `in`.kkkev.jjidea.jj.parseRebaseSourceMode
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
@@ -29,6 +31,7 @@ import java.awt.BorderLayout
 import java.awt.Point
 import javax.swing.Box
 import javax.swing.BoxLayout
+import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.table.TableColumn
@@ -313,6 +316,20 @@ abstract class CommitTablePanel<D>(
 
     private fun createActionGroup(): BackgroundActionGroup {
         val primary = primaryActions()
+        // jj-idea-d3u5: preview-gated, same check as JujutsuLogTableDnD.installDragAndDrop's
+        // guard - built once at panel construction (this whole toolbar is), so it carries the
+        // same "a preview toggle change needs the table re-created to take effect" caveat every
+        // other drag-and-drop preview-gated seam already has.
+        val dragScope = if (PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) {
+            arrayOf(
+                DragScopeAction(RebaseSourceMode.REVISION, AllIcons.Vcs.CommitNode),
+                DragScopeAction(RebaseSourceMode.SOURCE, AllIcons.General.Tree),
+                DragScopeAction(RebaseSourceMode.BRANCH, AllIcons.Vcs.Branch),
+                Separator.create()
+            )
+        } else {
+            emptyArray()
+        }
         return BackgroundActionGroup(
             *primary.toTypedArray(),
             *(if (primary.isEmpty()) emptyArray() else arrayOf(Separator.create())),
@@ -321,6 +338,7 @@ abstract class CommitTablePanel<D>(
             LazyActionById("Jujutsu.GitFetch"),
             LazyActionById("Jujutsu.GitPush"),
             Separator.create(),
+            *dragScope,
             ViewOptionsAction()
         )
     }
@@ -504,6 +522,33 @@ abstract class CommitTablePanel<D>(
         addSeparator()
         addAction(StripedRowsAction())
         addAction(CommitTooltipsAction())
+    }
+
+    /**
+     * One of three mutually-exclusive icon toggle buttons, sitting directly in the toolbar (not
+     * nested in a popup), for the drag-rebase source scope (jj-idea-j8ij, redesigned twice by
+     * jj-idea-d3u5): `-r` (only the dragged commit), `-s` (plus descendants), or `-b` (its whole
+     * branch). Same radio pattern as [DetailsOnRightAction]/[DetailsOnBottomAction] above extended
+     * to three options - `isSelected`/`setSelected` make the three mutually exclusive, and a plain
+     * [ToggleAction] with an icon and no text, placed as toolbar siblings, is what the platform
+     * itself renders as a pressed/highlighted icon group (the same look e.g. a diff viewer's
+     * unified/side-by-side toggle has) - no custom component needed. Read once per gesture by
+     * [in.kkkev.jjidea.ui.log.JujutsuLogTableDnD.resolveLive], not live per mouse-move - see
+     * [in.kkkev.jjidea.ui.dnd.DragContextHolder.forPayload]'s doc.
+     */
+    private inner class DragScopeAction(private val mode: RebaseSourceMode, icon: Icon) : ToggleAction(
+        JujutsuBundle.message("log.action.dragscope.${mode.name.lowercase()}"),
+        JujutsuBundle.message("log.action.dragscope.${mode.name.lowercase()}.tooltip"),
+        icon
+    ) {
+        override fun isSelected(e: AnActionEvent) =
+            parseRebaseSourceMode(JujutsuSettings.getInstance(project).state.dragRebaseSourceMode) == mode
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            if (state) {
+                JujutsuSettings.getInstance(project).state.dragRebaseSourceMode = mode.name
+            }
+        }
     }
 
     /**

@@ -3,6 +3,8 @@ package `in`.kkkev.jjidea.ui.dnd
 import com.intellij.ide.dnd.DnDImage
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
 import `in`.kkkev.jjidea.ui.components.TextCanvasPanel
@@ -16,11 +18,12 @@ import java.awt.Point
 import java.awt.image.BufferedImage
 
 /**
- * A small "chip" image following the cursor for the duration of a [DragPayload.BookmarkRef] or
- * [DragPayload.TagRef] drag - the same treatment `ChangesTreeDnDSupport` gives a file drag in the
- * Project view, shared across every surface a bookmark/tag chip can be dragged from (the log
- * table, the bookmarks panel, and the commit details panel, batch 4) so the three don't each carry
- * a byte-identical copy. `null` for every other payload kind.
+ * A small "chip" image following the cursor for the duration of a [DragPayload.BookmarkRef],
+ * [DragPayload.TagRef], or [DragPayload.WorkingCopyRef] drag - the same treatment
+ * `ChangesTreeDnDSupport` gives a file drag in the Project view, shared across every surface a
+ * bookmark/tag chip (or the `@` marker, jj-idea-pk2c) can be dragged from (the log table, the
+ * bookmarks panel, and the commit details panel, batch 4) so those don't each carry a
+ * byte-identical copy. `null` for every other payload kind.
  *
  * [foreground]/[background]/[font] supply the rendering context rather than a component directly -
  * `com.intellij.ui.render.RenderingUtil.getForeground`/`getBackground` only overload for
@@ -31,7 +34,12 @@ import java.awt.image.BufferedImage
  * surface.
  */
 fun chipDragImage(foreground: Color, background: Color, font: Font, payload: DragPayload): DnDImage? {
-    if (payload !is DragPayload.BookmarkRef && payload !is DragPayload.TagRef) return null
+    if (payload !is DragPayload.BookmarkRef &&
+        payload !is DragPayload.TagRef &&
+        payload !is DragPayload.WorkingCopyRef
+    ) {
+        return null
+    }
 
     val canvas = FragmentRecordingCanvas()
     canvas.foreground(foreground) {
@@ -46,6 +54,7 @@ fun chipDragImage(foreground: Color, background: Color, font: Font, payload: Dra
                 append(" ")
                 append(payload.tag.name)
             }
+            is DragPayload.WorkingCopyRef -> colored(JujutsuColors.WORKING_COPY) { bold { append(WorkingCopy.REF) } }
             else -> Unit
         }
     }

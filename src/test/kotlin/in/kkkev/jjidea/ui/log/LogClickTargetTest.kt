@@ -40,7 +40,8 @@ class LogClickTargetTest {
         bookmarks: List<Bookmark> = emptyList(),
         changeId: String = "qpvuntsm",
         author: com.intellij.vcs.log.VcsUser? = null,
-        committer: com.intellij.vcs.log.VcsUser? = null
+        committer: com.intellij.vcs.log.VcsUser? = null,
+        isWorkingCopy: Boolean = false
     ) = LogEntry(
         repo = repo,
         id = ChangeId(changeId, changeId, null),
@@ -48,7 +49,8 @@ class LogClickTargetTest {
         underlyingDescription = "Test commit",
         bookmarks = bookmarks,
         author = author,
-        committer = committer
+        committer = committer,
+        isWorkingCopy = isWorkingCopy
     )
 
     private fun resolve(uri: URI, vararg entries: LogEntry) =
@@ -93,6 +95,26 @@ class LogClickTargetTest {
     fun `a jjref URI naming an unknown bookmark resolves to null`() {
         val e = entry()
         val uri = refUri(e, "bookmark", "no-such-bookmark")
+
+        resolve(uri, e).shouldBeNull()
+    }
+
+    @Test
+    fun `a jjref workingcopy URI on the working-copy entry resolves to a WorkingCopyClick`() {
+        val e = entry(isWorkingCopy = true)
+        val uri = refUri(e, "workingcopy", "@")
+
+        val target = resolve(uri, e)
+
+        target.shouldNotBeNull()
+        target as WorkingCopyClick
+        target.entry shouldBe e
+    }
+
+    @Test
+    fun `a jjref workingcopy URI on a non-working-copy entry resolves to null`() {
+        val e = entry()
+        val uri = refUri(e, "workingcopy", "@")
 
         resolve(uri, e).shouldBeNull()
     }

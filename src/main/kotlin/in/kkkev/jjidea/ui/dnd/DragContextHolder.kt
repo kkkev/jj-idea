@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.dnd
 
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
 
 /**
  * Memoises the one [DragContext] a gesture needs, built once from whichever surface's bean
@@ -26,13 +27,25 @@ class DragContextHolder {
      * The [DragContext] for [payload], reusing the memoised one if [payload] is reference-equal
      * to the last one seen (the log table's bean provider constructs the payload once per drag,
      * so identity is a valid cache key - no two gestures ever share a [DragPayload] instance).
-     * [allEntries] is only invoked on a cache miss.
+     * [allEntries]/[sourceMode] are only invoked on a cache miss - [sourceMode] (jj-idea-j8ij) is
+     * read once per gesture, the same "once, not per mouse-move" guarantee [allEntries] already
+     * had, so a user changing the drag-scope picker mid-drag can't retroactively change what an
+     * in-progress gesture would do. [onNewContext] fires exactly once per gesture too, on the same
+     * cache miss - the hook [in.kkkev.jjidea.ui.log.JujutsuLogTableDnD]'s live "these rows would
+     * move" highlight applies from (jj-idea-d3u5), so painting it costs one map rebuild per drag,
+     * not one per mouse-move.
      */
-    fun forPayload(payload: DragPayload, allEntries: () -> List<LogEntry>): DragContext {
+    fun forPayload(
+        payload: DragPayload,
+        sourceMode: () -> RebaseSourceMode = { RebaseSourceMode.REVISION },
+        onNewContext: (DragContext) -> Unit = {},
+        allEntries: () -> List<LogEntry>
+    ): DragContext {
         lastContext?.let { if (lastPayload === payload) return it }
-        val context = DragContext.forDrag(allEntries(), payload)
+        val context = DragContext.forDrag(allEntries(), payload, sourceMode())
         lastPayload = payload
         lastContext = context
+        onNewContext(context)
         return context
     }
 

@@ -71,15 +71,20 @@ class JujutsuLogTableDnDChipTest {
         drainBackgroundLoads()
     }
 
-    private fun entry(id: String, bookmarks: List<Bookmark> = emptyList(), tags: List<Tag> = emptyList()) =
-        LogEntry(
-            repo = repo,
-            id = ChangeId(id, id, null),
-            commitId = CommitId("commit-$id"),
-            underlyingDescription = "desc $id",
-            bookmarks = bookmarks,
-            tags = tags
-        )
+    private fun entry(
+        id: String,
+        bookmarks: List<Bookmark> = emptyList(),
+        tags: List<Tag> = emptyList(),
+        isWorkingCopy: Boolean = false
+    ) = LogEntry(
+        repo = repo,
+        id = ChangeId(id, id, null),
+        commitId = CommitId("commit-$id"),
+        underlyingDescription = "desc $id",
+        bookmarks = bookmarks,
+        tags = tags,
+        isWorkingCopy = isWorkingCopy
+    )
 
     private fun tableWith(entries: List<LogEntry>): JujutsuLogTable {
         val table = JujutsuLogTable(project.get())
@@ -112,6 +117,18 @@ class JujutsuLogTableDnDChipTest {
     private fun rowStartPoint(table: JujutsuLogTable, row: Int): Point {
         val rowRect = table.getCellRect(row, 0, true)
         return Point(rowRect.x + 10, rowRect.y + 2)
+    }
+
+    /** As [chipPoint], but scanning for the `@` marker's own hit target (jj-idea-pk2c). */
+    private fun workingCopyPoint(table: JujutsuLogTable, row: Int): Point {
+        val col = table.convertColumnIndexToView(JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION)
+        val cellRect = table.getCellRect(row, col, false)
+        val y = cellRect.y + cellRect.height / 2
+        for (x in (cellRect.x + cellRect.width - 1) downTo cellRect.x) {
+            val point = Point(x, y)
+            if (table.clickTargetAt(point) is WorkingCopyClick) return point
+        }
+        error("No working-copy marker found in row $row")
     }
 
     // region dragPayloadAt
@@ -170,6 +187,18 @@ class JujutsuLogTableDnDChipTest {
         payload.shouldNotBeNull()
         payload as DragPayload.Commit
         payload.entries shouldBe listOf(a, b)
+    }
+
+    @Test
+    fun `dragging from the working-copy marker picks up a WorkingCopyRef payload`() {
+        val a = entry("aaaaaaaa", isWorkingCopy = true)
+        val table = tableWith(listOf(a))
+
+        val payload = table.dragPayloadAt(workingCopyPoint(table, 0))
+
+        payload.shouldNotBeNull()
+        payload as DragPayload.WorkingCopyRef
+        payload.entry shouldBe a
     }
 
     // endregion

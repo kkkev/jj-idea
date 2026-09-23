@@ -41,5 +41,10 @@ data class JujutsuSettingsState(
     // jj-idea-fwea: base revision for editor gutter change markers and Annotate (GitHub #43).
     // WORKING_COPY_PARENT (the default) means "no override — behave exactly as before".
     var diffbaseStrategy: DiffbaseStrategy = DiffbaseStrategy.WORKING_COPY_PARENT,
-    var customDiffbaseRevset: String = ""
+    var customDiffbaseRevset: String = "",
+    // jj-idea-j8ij: drag-rebase source scope (-r/-s/-b), set via the log's View Options "Drag
+    // scope" group. Stored as in.kkkev.jjidea.jj.RebaseSourceMode's enum name, same as
+    // defaultPushScope above - an unrecognised value falls back to REVISION
+    // (in.kkkev.jjidea.jj.parseRebaseSourceMode).
+    var dragRebaseSourceMode: String = "REVISION"
 )

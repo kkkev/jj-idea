@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.components.bookmarkIcon
@@ -73,6 +74,7 @@ sealed interface LogClickTarget {
                 "bookmark" -> entry.bookmarks.find { it.name.name == name }
                     ?.let { BookmarkClick(entry, it) }
                 "tag" -> entry.tags.find { it.name == name }?.let { TagClick(entry, it) }
+                "workingcopy" -> entry.takeIf { it.isWorkingCopy }?.let { WorkingCopyClick(it) }
                 else -> null
             }
         }
@@ -101,6 +103,17 @@ data class BookmarkClick(val entry: LogEntry, val bookmark: Bookmark) : LogClick
 }
 
 data class TagClick(val entry: LogEntry, val tag: Tag) : LogClickTarget {
+    val repo get() = entry.repo
+}
+
+/**
+ * The working-copy `@` marker was clicked (jj-idea-pk2c) - the only reason it needs a
+ * [LogClickTarget] at all is to give [in.kkkev.jjidea.ui.dnd.DragPayload.WorkingCopyRef] a hit
+ * target via [in.kkkev.jjidea.ui.log.dragPayloadAt], the same way [BookmarkClick]/[TagClick]
+ * already do for their own drag payloads. Like those, it has no left-click action or hover cue of
+ * its own.
+ */
+data class WorkingCopyClick(val entry: LogEntry) : LogClickTarget {
     val repo get() = entry.repo
 }
 
@@ -157,7 +170,7 @@ data class ChangeNavigationClick(val changeKey: ChangeKey) : LogClickTarget {
  * would be misleading.
  */
 val LogClickTarget.hasHoverCue: Boolean
-    get() = this !is BookmarkClick && this !is TagClick
+    get() = this !is BookmarkClick && this !is TagClick && this !is WorkingCopyClick
 
 /**
  * The *kind* of visual hover cue [this] gets, once [hasHoverCue]/the pointer position has already
@@ -170,7 +183,7 @@ enum class HoverCue { ISSUE_LINK_UNDERLINE, REF_BACKGROUND, REAL_LINK_UNDERLINE,
 val LogClickTarget.hoverCue: HoverCue
     get() = when (this) {
         is IssueLinkClick -> HoverCue.ISSUE_LINK_UNDERLINE
-        is BookmarkClick, is TagClick, is MoreRefsClick -> HoverCue.REF_BACKGROUND
+        is BookmarkClick, is TagClick, is MoreRefsClick, is WorkingCopyClick -> HoverCue.REF_BACKGROUND
         is PersonClick, is ChangeNavigationClick -> HoverCue.REAL_LINK_UNDERLINE
     }
 
@@ -183,6 +196,7 @@ val LogClickTarget.displayName: String
         is IssueLinkClick -> uri.toString()
         is ChangeNavigationClick -> changeKey.revision.toString()
         is MoreRefsClick -> "+${hidden.size} more"
+        is WorkingCopyClick -> WorkingCopy.REF
     }
 
 /**
@@ -194,7 +208,7 @@ val LogClickTarget.displayIcon: KProperty0<Icon>?
     get() = when (this) {
         is BookmarkClick -> bookmarkIcon(bookmark)
         is TagClick -> JujutsuIcons::Tag
-        is PersonClick, is IssueLinkClick, is ChangeNavigationClick, is MoreRefsClick -> null
+        is PersonClick, is IssueLinkClick, is ChangeNavigationClick, is MoreRefsClick, is WorkingCopyClick -> null
     }
 
 /**
@@ -209,6 +223,6 @@ fun LogClickTarget.performDefaultAction(project: Project) {
         is PersonClick -> BrowserUtil.browse(URI("mailto", user.email, null))
         is IssueLinkClick -> BrowserUtil.browse(uri)
         is ChangeNavigationClick -> project.stateModel.changeSelection.notify(changeKey)
-        is BookmarkClick, is TagClick, is MoreRefsClick -> Unit
+        is BookmarkClick, is TagClick, is MoreRefsClick, is WorkingCopyClick -> Unit
     }
 }

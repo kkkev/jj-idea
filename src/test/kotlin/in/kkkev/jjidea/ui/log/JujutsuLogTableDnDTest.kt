@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.icons.AllIcons
 import com.intellij.ide.dnd.SmoothAutoScroller
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
@@ -7,10 +8,15 @@ import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
+import `in`.kkkev.jjidea.ui.components.icon
+import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
 import `in`.kkkev.jjidea.ui.dnd.DropTarget
 import `in`.kkkev.jjidea.ui.dnd.DropZone
@@ -66,11 +72,12 @@ class JujutsuLogTableDnDTest {
         drainBackgroundLoads()
     }
 
-    private fun entry(id: String) = LogEntry(
+    private fun entry(id: String, parentIds: List<ChangeId> = emptyList()) = LogEntry(
         repo = repo,
         id = ChangeId(id, id, null),
         commitId = CommitId("commit-$id"),
-        underlyingDescription = "desc $id"
+        underlyingDescription = "desc $id",
+        parentIds = parentIds
     )
 
     private fun tableWith(entries: List<LogEntry>): JujutsuLogTable {
@@ -282,11 +289,99 @@ class JujutsuLogTableDnDTest {
     }
 
     @Test
-    fun `dragImage for a working-copy marker is null - no natural single-line label yet`() {
+    fun `dragImage for a working-copy marker produces a non-empty image`() {
         val a = entry("aaaaaaaa")
         val table = tableWith(listOf(a))
 
-        table.dragImage(DragPayload.WorkingCopyRef(a)).shouldBeNull()
+        val image = table.dragImage(DragPayload.WorkingCopyRef(a))
+
+        image.shouldNotBeNull()
+    }
+
+    @Test
+    fun `dragImage widens a Commit chip when a scope badge is supplied (jj-idea-d3u5)`() {
+        val a = entry("aaaaaaaa")
+        val table = tableWith(listOf(a))
+
+        val plain = table.dragImage(DragPayload.Commit(listOf(a)), scopeBadge = null)
+        val withBadge = table.dragImage(DragPayload.Commit(listOf(a)), scopeBadge = icon(AllIcons.General::Tree))
+
+        plain.shouldNotBeNull()
+        withBadge.shouldNotBeNull()
+        withBadge.image.getWidth(null) shouldBeGreaterThan plain.image.getWidth(null)
+    }
+
+    @Test
+    fun `dragImage ignores a supplied scope badge for a non-Commit payload`() {
+        // The badge is only meaningful for a Commit drag - BookmarkRef/TagRef/WorkingCopyRef
+        // return via chipDragImage before scopeBadge is ever consulted, so passing one here must
+        // have no effect (and, more importantly, must not throw).
+        val a = entry("aaaaaaaa")
+        val table = tableWith(listOf(a))
+        val payload = DragPayload.BookmarkRef(a.repo, a.id, Bookmark("main"))
+
+        val plain = table.dragImage(payload, scopeBadge = null)
+        val withBadge = table.dragImage(payload, scopeBadge = icon(AllIcons.General::Tree))
+
+        plain.shouldNotBeNull()
+        withBadge.shouldNotBeNull()
+        withBadge.image.getWidth(null) shouldBe plain.image.getWidth(null)
+    }
+
+    // endregion
+
+    // region applyDragHighlight (jj-idea-d3u5)
+
+    private fun tableWithGraph(entries: List<LogEntry>): JujutsuLogTable {
+        val table = tableWith(entries)
+        table.updateGraph(CommitGraphBuilder().buildGraph(entries))
+        return table
+    }
+
+    @Test
+    fun `applyDragHighlight tints the dragged commit and its descendant under SOURCE scope`() {
+        val a = entry("aaaaaaaa")
+        val b = entry("bbbbbbbb", parentIds = listOf(a.id))
+        val table = tableWithGraph(listOf(a, b))
+        val payload = DragPayload.Commit(listOf(a))
+        val context = DragContext.forDrag(listOf(a, b), payload, RebaseSourceMode.SOURCE)
+
+        val original = table.applyDragHighlight(context, payload)
+
+        original.shouldNotBeNull()
+        table.graphNodes[ChangeKey(a.repo, a.id)]?.highlightColor shouldBe JujutsuColors.SOURCE_HIGHLIGHT
+        table.graphNodes[ChangeKey(b.repo, b.id)]?.highlightColor shouldBe JujutsuColors.SOURCE_HIGHLIGHT
+    }
+
+    @Test
+    fun `applyDragHighlight paints nothing for plain REVISION scope - the moved set is just the selection`() {
+        val a = entry("aaaaaaaa")
+        val b = entry("bbbbbbbb", parentIds = listOf(a.id))
+        val table = tableWithGraph(listOf(a, b))
+        val payload = DragPayload.Commit(listOf(a))
+        val context = DragContext.forDrag(listOf(a, b), payload, RebaseSourceMode.REVISION)
+
+        table.applyDragHighlight(context, payload).shouldBeNull()
+    }
+
+    @Test
+    fun `applyDragHighlight paints nothing for a SOURCE-scope drag over a leaf - nothing extra to show`() {
+        val a = entry("aaaaaaaa")
+        val table = tableWithGraph(listOf(a))
+        val payload = DragPayload.Commit(listOf(a))
+        val context = DragContext.forDrag(listOf(a), payload, RebaseSourceMode.SOURCE)
+
+        table.applyDragHighlight(context, payload).shouldBeNull()
+    }
+
+    @Test
+    fun `applyDragHighlight is null for a non-Commit payload`() {
+        val a = entry("aaaaaaaa")
+        val table = tableWithGraph(listOf(a))
+        val payload = DragPayload.WorkingCopyRef(a)
+        val context = DragContext.forDrag(listOf(a), payload)
+
+        table.applyDragHighlight(context, payload).shouldBeNull()
     }
 
     // endregion

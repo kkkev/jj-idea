@@ -11,21 +11,20 @@ import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.Tag
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
-import io.mockk.verify
 import org.junit.jupiter.api.Test
 
 /**
- * jj-idea-8fxs, -p6nb, -ibth, -vdwh, -yvry, -b2oi: [DropPerformers.forLogTable]'s
+ * jj-idea-8fxs, -p6nb, -ibth, -vdwh, -yvry, -b2oi, -pk2c, -d3u5: [DropPerformers.forLogTable]'s
  * [DropOperation.Rebase]/[DropOperation.Duplicate]/[DropOperation.MoveBookmark]/
  * [DropOperation.MoveTag]/[DropOperation.Push]/[DropOperation.SquashFiles]/
- * [DropOperation.SplitFiles] mappings, and the [DropPerformer.supports]/[DropPerformer.perform]
- * contract every gesture bead extends.
- * `executeRebase`/`executeDuplicate`/`executeMove`/`executeSetTag`/`openPushDialogFor`/
- * `performFileSquashInto`/`performFileSplit`'s own chains (undo tracking, the balloon,
- * `executeAsync`, `runInBackground`, opening the pre-filled dialog) are manual-verified - see each
- * bead's design TESTS section - so `perform` is never actually invoked here for a wired operation
- * (it would need a live `ApplicationManager`, which a plain unit test doesn't have); this only
- * covers the pure mapping functions and the dispatch contract for the still-unwired cells.
+ * [DropOperation.SplitFiles]/[DropOperation.EditWorkingCopy]/[DropOperation.NewChangeOnTop]
+ * mappings, and the [DropPerformer.supports]/[DropPerformer.perform] contract every gesture bead
+ * extends. `executeRebase`/`executeDuplicate`/`executeMove`/`executeSetTag`/`openPushDialogFor`/
+ * `performFileSquashInto`/`performFileSplit`/`editWorkingCopy`/`newChangeOnTop`'s own chains (undo
+ * tracking, the balloon, `executeAsync`, `runInBackground`, opening the pre-filled dialog) are
+ * manual-verified - see each bead's design TESTS section - so `perform` is never actually invoked
+ * here (it would need a live `ApplicationManager`, which a plain unit test doesn't have); this
+ * only covers the pure mapping functions and that every operation reports itself supported.
  */
 class DropPerformersTest {
     private val repo = mockk<JujutsuRepository>(relaxed = true)
@@ -47,16 +46,12 @@ class DropPerformersTest {
         DropOperation.Duplicate(listOf(a), b, RebaseDestinationMode.ONTO),
         DropOperation.MoveBookmark(Bookmark("main"), b),
         DropOperation.MoveTag(Tag("v1"), b),
+        DropOperation.EditWorkingCopy(b),
+        DropOperation.NewChangeOnTop(b),
         DropOperation.Push(Bookmark("main"), "origin", b.repo),
         DropOperation.SquashFiles(DragPayload.Files(a, listOf(mockk())), b),
         DropOperation.SplitFiles(DragPayload.Files(a, listOf(mockk())), DropTarget.Gap(a, DropZone.INSERT_AFTER))
     )
-
-    private val unwiredOperations: List<DropOperation> = listOf(
-        DropOperation.EditWorkingCopy(b)
-    )
-
-    private val allOperations: List<DropOperation> = wiredOperations + unwiredOperations
 
     // region toRebaseSpec
 
@@ -94,10 +89,30 @@ class DropPerformersTest {
     }
 
     @Test
-    fun `toRebaseSpec always uses REVISION source mode - must match DragContext's cycle-exclusion assumption`() {
+    fun `toRebaseSpec defaults to REVISION source mode - must match DragContext's cycle-exclusion assumption`() {
         val op = DropOperation.Rebase(listOf(a), b, RebaseDestinationMode.ONTO)
 
         op.toRebaseSpec().sourceMode shouldBe RebaseSourceMode.REVISION
+    }
+
+    @Test
+    fun `toRebaseSpec carries the operation's own source mode through - jj-idea-j8ij`() {
+        val op = DropOperation.Rebase(listOf(a), b, RebaseDestinationMode.ONTO, sourceMode = RebaseSourceMode.SOURCE)
+
+        op.toRebaseSpec().sourceMode shouldBe RebaseSourceMode.SOURCE
+    }
+
+    @Test
+    fun `toRebaseSpec never pre-expands revisions for -s or -b - jj rebase computes that server-side`() {
+        val op = DropOperation.Rebase(
+            listOf(a),
+            b,
+            RebaseDestinationMode.ONTO,
+            sourceMode = RebaseSourceMode.BRANCH,
+            movedCount = 5
+        )
+
+        op.toRebaseSpec().revisions shouldBe listOf(a.id)
     }
 
     // endregion
@@ -176,31 +191,11 @@ class DropPerformersTest {
     // region supports / perform dispatch
 
     @Test
-    fun `supports is true exactly for the wired operations`() {
+    fun `supports is true for every DropOperation variant - none left unwired`() {
         val performer = DropPerformers.forLogTable(project)
 
-        allOperations.forEach { operation ->
-            performer.supports(operation) shouldBe (operation in wiredOperations)
-        }
-    }
-
-    @Test
-    fun `perform on an unwired operation returns false and never touches the executor`() {
-        val performer = DropPerformers.forLogTable(project)
-
-        unwiredOperations.forEach { operation ->
-            performer.perform(operation) shouldBe false
-        }
-        verify(exactly = 0) { repo.commandExecutor }
-    }
-
-    @Test
-    fun `supports and perform agree on the unwired operations`() {
-        val performer = DropPerformers.forLogTable(project)
-
-        unwiredOperations.forEach { operation ->
-            performer.supports(operation) shouldBe false
-            performer.perform(operation) shouldBe false
+        wiredOperations.forEach { operation ->
+            performer.supports(operation) shouldBe true
         }
     }
 

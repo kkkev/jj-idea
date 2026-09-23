@@ -5,6 +5,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.Tag
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.shouldBe
@@ -53,10 +54,28 @@ class DragContextScaleTest {
         DragContext.forDrag(counting, payload)
 
         // forDrag does a small constant number of passes (excludedDestinationIds once,
-        // invalidDestinationIds twice, the immutable-source check once) - nowhere near
-        // proportional to n. 20 is a generous ceiling that still catches an accidental
+        // invalidDestinationIds twice, the source-immutability entryById lookup once) - nowhere
+        // near proportional to n. 20 is a generous ceiling that still catches an accidental
         // per-destination or per-mouse-move rescan.
         counting.passCount shouldBeLessThan 20
+    }
+
+    @Test
+    fun `forDrag stays bounded for SOURCE and BRANCH source modes too (jj-idea-j8ij)`() {
+        // -s/-b's collectDescendants/collectBranch each do their own buildChildrenMap pass over
+        // allEntries, on top of the REVISION-mode passes above - still a small constant, not
+        // proportional to n, so the same generous ceiling applies.
+        val n = 100_000
+        val entries = (0 until n).map { entry("e$it") }
+        val payload = DragPayload.Commit(listOf(entries.first()))
+
+        val sourceCounting = CountingEntryList(entries)
+        DragContext.forDrag(sourceCounting, payload, RebaseSourceMode.SOURCE)
+        sourceCounting.passCount shouldBeLessThan 20
+
+        val branchCounting = CountingEntryList(entries)
+        DragContext.forDrag(branchCounting, payload, RebaseSourceMode.BRANCH)
+        branchCounting.passCount shouldBeLessThan 20
     }
 
     @Test
@@ -72,6 +91,21 @@ class DragContextScaleTest {
 
         DragContext.forDrag(counting, DragPayload.BookmarkRef(repo, ChangeId("aaaaaaaa", "a"), Bookmark("main")))
         DragContext.forDrag(counting, DragPayload.TagRef(repo, ChangeId("bbbbbbbb", "b"), Tag("v1")))
+
+        counting.passCount shouldBe 0
+    }
+
+    @Test
+    fun `forDrag makes zero passes over the entry list for a WorkingCopyRef payload (jj-idea-pk2c)`() {
+        // Same reasoning as the BookmarkRef/TagRef case above - a dragged @ marker moves a
+        // pointer, not content, so it needs none of the Commit-only passes. sourceIds does carry
+        // its own single id (DragGuards.forDrag's self-drop fix), but that's a one-element Set
+        // literal, not a pass over allEntries.
+        val n = 100_000
+        val entries = (0 until n).map { entry("e$it") }
+        val counting = CountingEntryList(entries)
+
+        DragContext.forDrag(counting, DragPayload.WorkingCopyRef(entries.first()))
 
         counting.passCount shouldBe 0
     }

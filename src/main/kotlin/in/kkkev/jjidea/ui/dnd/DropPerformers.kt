@@ -9,10 +9,11 @@ import `in`.kkkev.jjidea.actions.filechange.performFileSplit
 import `in`.kkkev.jjidea.actions.filechange.performFileSquashInto
 import `in`.kkkev.jjidea.actions.tag.executeSetTag
 import `in`.kkkev.jjidea.jj.RebaseDestinationMode
-import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.Remote
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.ui.rebase.RebaseSpec
+import `in`.kkkev.jjidea.ui.statusbar.editWorkingCopy
+import `in`.kkkev.jjidea.ui.statusbar.newChangeOnTop
 import `in`.kkkev.jjidea.vcs.filePath
 
 /**
@@ -23,9 +24,9 @@ import `in`.kkkev.jjidea.vcs.filePath
  * [supports] is consulted on every mouse-move (via the log table's target checker) and must stay
  * O(1) - a type check against [operation], not any work toward performing it. [perform] does the
  * actual work and is called once, on drop. Splitting these (rather than a single nullable function)
- * exists so an operation this object doesn't yet handle - e.g. [DropOperation.EditWorkingCopy]
- * before jj-idea-pk2c lands - rejects cleanly with no indicator, instead of lighting up a tooltip
- * for a drop that then does nothing on release.
+ * exists so a not-yet-wired [DropOperation] variant (none remain as of jj-idea-pk2c, but the next
+ * one added will start this way) rejects cleanly with no indicator, instead of lighting up a
+ * tooltip for a drop that then does nothing on release.
  */
 interface DropPerformer {
     /** Whether this performer would actually do something for [operation] - a pure type check. */
@@ -40,8 +41,14 @@ interface DropPerformer {
  * [DropOperation.Rebase] to `jj rebase`; jj-idea-p6nb wires [DropOperation.Duplicate] to
  * `jj duplicate`; jj-idea-ibth wires [DropOperation.MoveBookmark]/[DropOperation.MoveTag];
  * jj-idea-vdwh wires [DropOperation.Push]; jj-idea-yvry/-b2oi wire
- * [DropOperation.SquashFiles]/[DropOperation.SplitFiles] to the pre-filled Squash/Split dialogs.
- * Every other [DropOperation] variant is unwired here and named with the bead that will wire it.
+ * [DropOperation.SquashFiles]/[DropOperation.SplitFiles] to the pre-filled Squash/Split dialogs;
+ * jj-idea-d3u5 wires [DropOperation.EditWorkingCopy]/[DropOperation.NewChangeOnTop] to
+ * [in.kkkev.jjidea.ui.statusbar.editWorkingCopy]/[in.kkkev.jjidea.ui.statusbar.newChangeOnTop]
+ * directly, no dialog - [DragContext.rejectionReason] already rejected an immutable
+ * `EditWorkingCopy` target before dispatch reaches here, and `NewChangeOnTop` (`jj new`) never
+ * needs to reject one. Every [DropOperation] variant is now wired; a future one should follow the
+ * same pattern - named with the bead that will wire it, `supports` returning `false` for it in the
+ * meantime.
  */
 object DropPerformers {
     fun forLogTable(project: Project): DropPerformer = object : DropPerformer {
@@ -50,7 +57,8 @@ object DropPerformers {
             is DropOperation.Duplicate -> true
             is DropOperation.MoveBookmark -> true
             is DropOperation.MoveTag -> true
-            is DropOperation.EditWorkingCopy -> false // jj-idea-pk2c
+            is DropOperation.EditWorkingCopy -> true
+            is DropOperation.NewChangeOnTop -> true
             is DropOperation.Push -> true
             is DropOperation.SquashFiles -> true
             is DropOperation.SplitFiles -> true
@@ -75,7 +83,14 @@ object DropPerformers {
                 executeSetTag(operation.destination.repo, operation.tag, operation.destination.id, allowMove = false)
                 true
             }
-            is DropOperation.EditWorkingCopy -> false // jj-idea-pk2c
+            is DropOperation.EditWorkingCopy -> {
+                editWorkingCopy(operation.destination.repo, operation.destination)
+                true
+            }
+            is DropOperation.NewChangeOnTop -> {
+                newChangeOnTop(operation.destination.repo, operation.destination)
+                true
+            }
             is DropOperation.Push -> {
                 openPushDialogFor(operation.repo, operation.bookmark, Remote(operation.remote))
                 true
@@ -116,15 +131,17 @@ internal fun DropOperation.SplitFiles.toNewParent(): Boolean = when (gap.edge) {
 }
 
 /**
- * `sourceMode` is hardcoded to [RebaseSourceMode.REVISION] - not arbitrary, it must match what
- * [DragContext.forDrag] assumed when it computed the cycle-exclusion set that
- * [DragContext.rejectionReason] already guarded this drop against. Picking `-s`/`-b` from a drag is
- * jj-idea-j8ij, blocked on this bead.
+ * `sourceMode` comes straight from [DropOperation.Rebase.sourceMode] (jj-idea-j8ij) - not
+ * recomputed here, since it must match what [DragContext.forDrag] assumed when it computed the
+ * cycle-exclusion set that [DragContext.rejectionReason] already guarded this drop against.
+ * [RebaseSpec.revisions] stays just the dragged entries regardless of scope - `jj rebase -s`/`-b`
+ * compute descendants/the branch server-side from those positional revisions plus the flag; jj-idea
+ * doesn't pre-expand the list itself.
  */
 internal fun DropOperation.Rebase.toRebaseSpec() = RebaseSpec(
     revisions = sources.map { it.id },
     destinations = listOf(destination.id),
-    sourceMode = RebaseSourceMode.REVISION,
+    sourceMode = sourceMode,
     destinationMode = mode
 )
 

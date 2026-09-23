@@ -4,6 +4,7 @@ import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RebaseDestinationMode
+import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.Tag
 
 /**
@@ -22,13 +23,36 @@ import `in`.kkkev.jjidea.jj.Tag
 sealed interface DropOperation {
     val label: String
 
-    /** Plain rebase - the commit becomes a child of [destination] (`ONTO`) or is inserted at [mode]. */
-    data class Rebase(val sources: List<LogEntry>, val destination: LogEntry, val mode: RebaseDestinationMode) :
-        DropOperation {
-        override val label get() = rebaseLabel("Rebase", sources, destination, mode)
+    /**
+     * Plain rebase - the commit becomes a child of [destination] (`ONTO`) or is inserted at
+     * [mode]. [sourceMode] picks `-r`/`-s`/`-b` (jj-idea-j8ij; the View Options "Drag scope"
+     * selector, read once per gesture) - [sources] itself is never expanded to include
+     * descendants/the branch here: `jj rebase` computes that server-side from [sourceMode] and the
+     * positional revisions in [in.kkkev.jjidea.ui.dnd.DropPerformers.toRebaseSpec]. [movedCount] is
+     * how many commits [sourceMode] will actually move (>= [sources].size for `-s`/`-b`) - carried
+     * separately because computing it needs the full loaded log
+     * ([in.kkkev.jjidea.ui.rebase.RebaseSimulator.excludedDestinationIds], already paid for by
+     * [DragContext.forDrag]'s cycle guard), which this package-pure function has no access to; it
+     * exists purely so [label] can name the scope ("...and its 3 descendants...") instead of
+     * silently moving more than the drag chip showed.
+     */
+    data class Rebase(
+        val sources: List<LogEntry>,
+        val destination: LogEntry,
+        val mode: RebaseDestinationMode,
+        val sourceMode: RebaseSourceMode = RebaseSourceMode.REVISION,
+        val movedCount: Int = sources.size
+    ) : DropOperation {
+        override val label get() = rebaseLabel("Rebase", sources, destination, mode, sourceMode, movedCount)
     }
 
-    /** Copy-modifier drag (jj-idea-p6nb): same placement as [Rebase], but duplicates rather than moves. */
+    /**
+     * Copy-modifier drag (jj-idea-p6nb): same placement as [Rebase], but duplicates rather than
+     * moves. Always `-r` scope - `jj duplicate` has no `-s`/`-b` axis (it takes positional
+     * revisions only), so the drag-scope selector (jj-idea-j8ij) has no effect on a copy-modifier
+     * drag; see [in.kkkev.jjidea.ui.dnd.DropPerformers.toDuplicateSpec]'s doc for the follow-up
+     * this leaves open.
+     */
     data class Duplicate(val sources: List<LogEntry>, val destination: LogEntry, val mode: RebaseDestinationMode) :
         DropOperation {
         override val label get() = rebaseLabel("Duplicate", sources, destination, mode)
@@ -52,9 +76,26 @@ sealed interface DropOperation {
         override val label get() = "Move tag ${tag.name} to ${destination.id.short}"
     }
 
-    /** The working-copy `@` marker is dragged onto [destination] - runs `jj edit`. */
+    /**
+     * The working-copy `@` marker is dropped on [destination]'s centre band - runs `jj edit`.
+     * Rejected outright by [DragContext.rejectionReason] if [destination] is immutable (jj-idea-d3u5:
+     * no confirmation dialog - the marker drag uses the same upfront-reject vocabulary every other
+     * gesture does, replacing the modal "Edit / New on Top / Cancel" prompt jj-idea-pk2c shipped
+     * with). See [NewChangeOnTop] for the top-band sibling that's *never* rejected for immutability.
+     */
     data class EditWorkingCopy(val destination: LogEntry) : DropOperation {
         override val label get() = "Edit ${destination.id.short}"
+    }
+
+    /**
+     * The working-copy `@` marker is dropped in the band just above [destination] (the log's
+     * newest-first rendering makes the top band the child-side slot - see
+     * [DropZone.toDestinationMode]'s doc) - runs `jj new` with [destination] as the new change's
+     * positional parent. Always allowed regardless of [destination]'s immutability: `jj new` never
+     * rewrites its parent, only adds a child, so there is nothing to guard against (jj-idea-d3u5).
+     */
+    data class NewChangeOnTop(val destination: LogEntry) : DropOperation {
+        override val label get() = "New change on top of ${destination.id.short}"
     }
 
     /**
@@ -82,13 +123,41 @@ private fun rebaseLabel(
     verb: String,
     sources: List<LogEntry>,
     destination: LogEntry,
-    mode: RebaseDestinationMode
+    mode: RebaseDestinationMode,
+    sourceMode: RebaseSourceMode = RebaseSourceMode.REVISION,
+    movedCount: Int = sources.size
 ): String {
-    val what = if (sources.size == 1) sources.single().id.short else "${sources.size} commits"
+    val what = sourceScopeLabel(sources, sourceMode, movedCount)
     return when (mode) {
         RebaseDestinationMode.ONTO -> "$verb $what onto ${destination.id.short}"
         RebaseDestinationMode.INSERT_BEFORE -> "$verb $what, inserting before ${destination.id.short}"
         RebaseDestinationMode.INSERT_AFTER -> "$verb $what, inserting after ${destination.id.short}"
+    }
+}
+
+/**
+ * The "what's moving" clause of [rebaseLabel] - plain source count/id for `-r` (unchanged from
+ * before jj-idea-j8ij), naming the extra scope for `-s`/`-b` so a sticky "Drag scope" setting
+ * can't silently move more than the drag chip showed (`docs/design/preview-gating-and-dnd-sequencing.md`
+ * batch 5's "anti-footgun" requirement).
+ */
+private fun sourceScopeLabel(sources: List<LogEntry>, sourceMode: RebaseSourceMode, movedCount: Int): String {
+    val base = if (sources.size == 1) sources.single().id.short else "${sources.size} commits"
+    return when (sourceMode) {
+        RebaseSourceMode.REVISION -> base
+        RebaseSourceMode.SOURCE -> {
+            val descendants = movedCount - sources.size
+            if (descendants > 0) {
+                "$base and its $descendants descendant${if (descendants == 1) "" else "s"}"
+            } else {
+                base
+            }
+        }
+        RebaseSourceMode.BRANCH -> if (sources.size == 1) {
+            "the branch containing ${sources.single().id.short}"
+        } else {
+            "the branches containing $base"
+        }
     }
 }
 
@@ -102,11 +171,30 @@ private fun rebaseLabel(
  * Callers are expected to have already run [DragContext.rejectionReason] against [target] - this
  * function only answers "what operation, if any" and does not itself re-check immutability, cycles,
  * self-drop, or cross-repository placement.
+ *
+ * [sourceMode]/[movedCount] (jj-idea-j8ij) only ever affect [DropOperation.Rebase] - defaulted so
+ * every other call site (chip drags, files, `@`, and the ~15 pre-existing tests of this function)
+ * is unaffected. [movedCount] is meaningless unless [sourceMode] is non-`REVISION`; see
+ * [DropOperation.Rebase]'s doc for why it's threaded in rather than recomputed here.
  */
-fun resolveDropOperation(payload: DragPayload, target: DropTarget, copy: Boolean): DropOperation? = when (payload) {
+fun resolveDropOperation(
+    payload: DragPayload,
+    target: DropTarget,
+    copy: Boolean,
+    sourceMode: RebaseSourceMode = RebaseSourceMode.REVISION,
+    movedCount: Int = (payload as? DragPayload.Commit)?.entries?.size ?: 0
+): DropOperation? = when (payload) {
     is DragPayload.Commit -> when (target) {
-        is DropTarget.CommitRow -> rebaseOrDuplicate(payload.entries, target.entry, RebaseDestinationMode.ONTO, copy)
-        is DropTarget.Gap -> rebaseOrDuplicate(payload.entries, target.entry, target.edge.toDestinationMode(), copy)
+        is DropTarget.CommitRow ->
+            rebaseOrDuplicate(payload.entries, target.entry, RebaseDestinationMode.ONTO, copy, sourceMode, movedCount)
+        is DropTarget.Gap -> rebaseOrDuplicate(
+            payload.entries,
+            target.entry,
+            target.edge.toDestinationMode(),
+            copy,
+            sourceMode,
+            movedCount
+        )
         is DropTarget.RefChip -> payload.entries.singleOrNull()?.let { DropOperation.MoveBookmark(target.bookmark, it) }
         is DropTarget.TagChip -> payload.entries.singleOrNull()?.let { DropOperation.MoveTag(target.tag, it) }
     }
@@ -136,8 +224,15 @@ fun resolveDropOperation(payload: DragPayload, target: DropTarget, copy: Boolean
         if (payload.targets == setOf(it.id)) null else DropOperation.MoveTag(payload.tag, it.entry)
     }
 
-    is DragPayload.WorkingCopyRef ->
-        (target as? DropTarget.CommitRow)?.let { DropOperation.EditWorkingCopy(it.entry) }
+    is DragPayload.WorkingCopyRef -> when (target) {
+        is DropTarget.CommitRow -> DropOperation.EditWorkingCopy(target.entry)
+        is DropTarget.Gap -> if (target.edge == DropZone.INSERT_BEFORE) {
+            DropOperation.NewChangeOnTop(target.entry)
+        } else {
+            null
+        }
+        is DropTarget.RefChip, is DropTarget.TagChip -> null
+    }
 
     is DragPayload.Files -> when (target) {
         is DropTarget.CommitRow -> DropOperation.SquashFiles(payload, target.entry)
@@ -156,9 +251,12 @@ private fun rebaseOrDuplicate(
     sources: List<LogEntry>,
     destination: LogEntry,
     mode: RebaseDestinationMode,
-    copy: Boolean
+    copy: Boolean,
+    sourceMode: RebaseSourceMode,
+    movedCount: Int
 ): DropOperation = if (copy) {
+    // Duplicate is always -r - see DropOperation.Duplicate's doc.
     DropOperation.Duplicate(sources, destination, mode)
 } else {
-    DropOperation.Rebase(sources, destination, mode)
+    DropOperation.Rebase(sources, destination, mode, sourceMode, movedCount)
 }
