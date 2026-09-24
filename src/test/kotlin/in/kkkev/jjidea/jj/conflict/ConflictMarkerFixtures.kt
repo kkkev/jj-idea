@@ -66,6 +66,48 @@ object ConflictMarkerFixtures {
         |>>>>>>> conflict 1 of 1 ends
     """.trimMargin()
 
+    /**
+     * A shape reported after shipping (jj-idea-wk7p follow-up): the diff section's own
+     * `"from:"` line names a genuine other side (`(rebase destination)`, not the usual
+     * `(parents of ... revision)` base role) - see [ConflictSide.alternateLabel]'s doc. Here the
+     * diff's `"to:"` label collides with the `+++++++` section's own label (both name
+     * `uvsstouv 0b04d257 "change A" (rebased revision)`), which is exactly the case
+     * [ConflictSide.alternateLabel] exists to let a caller recover from.
+     */
+    val diffFromNamesADistinctSide = """
+        |<<<<<<< conflict 1 of 1
+        |%%%%%%% diff from: ouukwuks b2d02fda "change B" (rebase destination)
+        |\\\\\\\        to: uvsstouv 0b04d257 "change A" (rebased revision)
+        |-line one
+        |+mine
+        |+++++++ uvsstouv 0b04d257 "change A" (rebased revision)
+        |theirs
+        |>>>>>>> conflict 1 of 1 ends
+    """.trimMargin()
+
+    /**
+     * A clean rebase conflict (no collision at all) - the counterpart used alongside
+     * [diffFromNamesADistinctSide] to reproduce a real multi-select bug: this file's `"from:"`
+     * line names the common ancestor (`(parents of ... revision)`, [ConflictRole.BASE]), so its
+     * diff section's label is trustworthy on its own, unlike [diffFromNamesADistinctSide]'s. Two
+     * files can each be internally unambiguous, or internally resolvable, yet still *disagree*
+     * with each other on which named commit is CURRENT vs LAST - see [SideDisplayLabelTest]'s
+     * "two files whose raw titles coincidentally match" test for why aggregating *before*
+     * resolving each file's own collision would wrongly assert agreement here.
+     */
+    val cleanRebaseConflictNamingSameCommits = """
+        |line 1
+        |<<<<<<< conflict 1 of 1
+        |%%%%%%% diff from: pklqtqrs 2015913a "initial" (parents of rebased revision)
+        |\\\\\\\        to: ouukwuks b2d02fda "change B" (rebase destination)
+        |-shared line
+        |+changed by B
+        |+++++++ uvsstouv 0b04d257 "change A" (rebased revision)
+        |changed by A
+        |>>>>>>> conflict 1 of 1 ends
+        |line 3
+    """.trimMargin()
+
     val rebaseRoleLabelled = """
         |context before
         |<<<<<<< abc123 "side A" (rebase destination)

@@ -25,6 +25,8 @@ class ExtractorBlockParserEquivalenceTest {
         ConflictMarkerFixtures.snapshot,
         ConflictMarkerFixtures.diffSide1First,
         ConflictMarkerFixtures.diffDestinationFirst,
+        ConflictMarkerFixtures.diffFromNamesADistinctSide,
+        ConflictMarkerFixtures.cleanRebaseConflictNamingSameCommits,
         ConflictMarkerFixtures.rebaseRoleLabelled,
         ConflictMarkerFixtures.multiBlock,
         ConflictMarkerFixtures.blockAtEofNoTrailingNewline,

@@ -18,12 +18,19 @@ import com.intellij.openapi.vcs.merge.MergeData
  * @param currentIsJjSide1 Whether the content placed in [MergeData.CURRENT] is jj's conflict
  *   side #1 (the side `jj resolve --tool :ours` picks) rather than side #2 (`:theirs`). True
  *   whenever no reorientation applied (the pre-existing, unswapped mapping).
+ * @param currentAlternateTitle [ConflictSide.alternateLabel] for whichever side ended up in
+ *   `CURRENT` - almost always null (see that field's doc); a caller whose [currentTitle] happens
+ *   to collide with [lastTitle] (e.g. both name the same commit due to divergence) can fall back
+ *   to this instead of showing the same label for both sides.
+ * @param lastAlternateTitle The [LAST][MergeData.LAST]-side counterpart of [currentAlternateTitle].
  */
 data class ExtractedConflict(
     val mergeData: MergeData,
     val currentTitle: String?,
     val lastTitle: String?,
-    val currentIsJjSide1: Boolean
+    val currentIsJjSide1: Boolean,
+    val currentAlternateTitle: String? = null,
+    val lastAlternateTitle: String? = null
 ) {
     /** The `jj resolve --tool` name that accepts the side shown as [currentTitle] ("Yours"). */
     val toolForCurrent: String get() = if (currentIsJjSide1) ":ours" else ":theirs"

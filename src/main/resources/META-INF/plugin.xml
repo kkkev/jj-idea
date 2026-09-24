@@ -134,11 +134,11 @@
     <action id="Jujutsu.ResolveAllConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveAllConflictsAction"/>
 
-    <action id="Jujutsu.AcceptConflictYours"
-            class="in.kkkev.jjidea.actions.file.AcceptConflictYoursAction"/>
+    <action id="Jujutsu.AcceptConflictCurrentSide"
+            class="in.kkkev.jjidea.actions.file.AcceptConflictCurrentSideAction"/>
 
-    <action id="Jujutsu.AcceptConflictTheirs"
-            class="in.kkkev.jjidea.actions.file.AcceptConflictTheirsAction"/>
+    <action id="Jujutsu.AcceptConflictLastSide"
+            class="in.kkkev.jjidea.actions.file.AcceptConflictLastSideAction"/>
 
     <!-- Vcs.Import is a transparent (non-popup) NonEmptyActionGroup embedded directly inside
          Vcs.MainMenu (see VcsActions.xml in the platform) - this is exactly where
@@ -351,8 +351,8 @@
       <reference ref="Jujutsu.RestoreToChange"/>
       <separator/>
       <reference ref="Jujutsu.ResolveSelectedConflicts"/>
-      <reference ref="Jujutsu.AcceptConflictYours"/>
-      <reference ref="Jujutsu.AcceptConflictTheirs"/>
+      <reference ref="Jujutsu.AcceptConflictCurrentSide"/>
+      <reference ref="Jujutsu.AcceptConflictLastSide"/>
       <separator/>
       <reference ref="Jujutsu.SquashFiles"/>
       <reference ref="Jujutsu.SquashIntoFiles"/>

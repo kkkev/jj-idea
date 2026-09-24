@@ -72,6 +72,10 @@ internal object JjConflictBlockParser {
         val sections = mutableListOf<Section>()
         var kind: Kind? = null
         var header: String? = null
+        // Only ever set for a Kind.DIFF section, from its own "%%%%%%% diff from: <label>" line -
+        // see Section.diffFromLabel's doc for why this is kept separate from `header` (which the
+        // "\\\ to:" line overwrites for the same section).
+        var diffFromLabel: String? = null
         val buf = mutableListOf<String>()
         // Collects lines before the first format-specific marker (SIDE1 in bare git-style format).
         val preHeaderBuf = mutableListOf<String>()
@@ -80,14 +84,15 @@ internal object JjConflictBlockParser {
         var sawDashBase = false
         var closeLine = -1
 
-        fun flush(newKind: Kind?, newHeader: String?) {
-            kind?.let { sections.add(Section(it, buf.toList(), header)) }
+        fun flush(newKind: Kind?, newHeader: String?, newDiffFromLabel: String? = null) {
+            kind?.let { sections.add(Section(it, buf.toList(), header, diffFromLabel)) }
                 ?: run {
                     if (preHeaderBuf.isNotEmpty()) sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader))
                 }
             buf.clear()
             kind = newKind
             header = newHeader
+            diffFromLabel = newDiffFromLabel
         }
 
         while (i < table.lineCount) {
@@ -99,7 +104,7 @@ internal object JjConflictBlockParser {
                     if (kind == Kind.SIDE2 && header == null) {
                         header = line.removePrefix(">>>>>>>").trim().takeIf { it.isNotBlank() }
                     }
-                    kind?.let { sections.add(Section(it, buf.toList(), header)) }
+                    kind?.let { sections.add(Section(it, buf.toList(), header, diffFromLabel)) }
                         ?: run {
                             if (preHeaderBuf.isNotEmpty()) {
                                 sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader))
@@ -127,11 +132,12 @@ internal object JjConflictBlockParser {
                             sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader))
                         }
                     } else {
-                        sections.add(Section(Kind.BASE, buf.toList(), header))
+                        sections.add(Section(Kind.BASE, buf.toList(), header, diffFromLabel))
                     }
                     buf.clear()
                     kind = Kind.SIDE2
                     header = null // filled in from the closing ">>>>>>>" line, above
+                    diffFromLabel = null
                 }
                 // Old/snapshot conflict style (+++++++/-------) and diff style (%%%%%%%):
                 //   <<<<<<< Conflict N of M
@@ -156,7 +162,13 @@ internal object JjConflictBlockParser {
                     sawDashBase = true
                     flush(Kind.BASE, null)
                 }
-                line.startsWith("%%%%%%%") -> flush(Kind.DIFF, null) // label comes from the "\\\ to:" line below
+                line.startsWith("%%%%%%%") -> {
+                    // Primary label comes from the "\\\ to:" line below - this line's own "from:"
+                    // text is only ever a fallback (Section.diffFromLabel's doc explains why).
+                    val fromLabel = line.removePrefix("%%%%%%%").trim().removePrefix("diff from:").trim()
+                        .takeIf { it.isNotBlank() }
+                    flush(Kind.DIFF, null, fromLabel)
+                }
                 // The diff-section header continuation line - "\\\\\\\        to: <label>" - names
                 // that side, not the base ("%%%%%%% diff from: <label>" names the base instead).
                 line.startsWith("\\\\\\") -> {
@@ -228,13 +240,15 @@ internal object JjConflictBlockParser {
                 label1?.label,
                 roleOf(label1?.label),
                 firstContent,
-                label1?.noTerminatingNewline ?: false
+                label1?.noTerminatingNewline ?: false,
+                alternateLabel(first)
             )
             val side2 = ConflictSide(
                 label2?.label,
                 roleOf(label2?.label),
                 secondContent,
-                label2?.noTerminatingNewline ?: false
+                label2?.noTerminatingNewline ?: false,
+                alternateLabel(second)
             )
             return ConflictBlock(
                 startOffset = startOffset,
@@ -307,7 +321,12 @@ internal object JjConflictBlockParser {
 
     private enum class Kind { SIDE1, BASE, SIDE2, DIFF, CONTENT }
 
-    private data class Section(val kind: Kind, val lines: List<String>, val header: String?)
+    private data class Section(
+        val kind: Kind,
+        val lines: List<String>,
+        val header: String?,
+        val diffFromLabel: String? = null
+    )
 
     /** Splits a `%%%%%%%` unified-diff section into (this side's content, its contribution to the base). */
     private fun materialize(section: Section): Pair<List<String>, List<String>> = when (section.kind) {
@@ -352,6 +371,19 @@ internal object JjConflictBlockParser {
             baseRole.matches(it) -> ConflictRole.BASE
             else -> null
         }
+    }
+
+    /**
+     * [Section.diffFromLabel], cleaned, but only when its role is a genuine side
+     * ([ConflictRole.DESTINATION] or [ConflictRole.MOVED]) rather than the common ancestor
+     * ([ConflictRole.BASE], real jj output's normal case - see [ConflictSide.alternateLabel]'s
+     * doc). Null for anything but a [Kind.DIFF] section, or when the "from:" line named no role
+     * at all (nothing to gain over the primary [label]).
+     */
+    private fun alternateLabel(section: Section): String? {
+        if (section.kind != Kind.DIFF) return null
+        val cleaned = cleanLabel(section.diffFromLabel) ?: return null
+        return cleaned.label.takeIf { roleOf(it).let { role -> role == ConflictRole.DESTINATION || role == ConflictRole.MOVED } }
     }
 
     /** `\n`-split line access with precomputed line-start offsets, built once per parse call. */

@@ -2540,19 +2540,47 @@ a user pick exactly which file(s) to act on instead.
       not a queue over the whole node
 - [ ] Double-click a **non-conflicted** row elsewhere in the tree: unaffected, still opens the
       normal diff preview
-- [ ] Select **two or more** conflicted files (ctrl/cmd-click), right-click → **"Accept Yours"**:
-      all selected files resolve to your side in one step, no merge tool opens, no queue order to
-      contend with
-- [ ] Same, with **"Accept Theirs"**: resolves to the other side
-- [ ] Run "Accept Yours"/"Accept Theirs" on a selection that includes the **modify/delete** file:
-      if the deleted side is the one accepted, the file is actually **deleted** (`jj status`),
-      not left behind empty
+- [ ] Select a **single** conflicted row, right-click: the two accept actions read **"Accept
+      &lt;jj's own commit label&gt;"** for each side (matching the label the editor banner's
+      "Accept …" links show for the same file, GitHub #112) — not "Accept Yours"/"Accept Theirs"
+- [ ] Select **two or more** conflicted files from the **same rebase/merge operation**
+      (ctrl/cmd-click), right-click: the two actions read the **shared full commit label**
+      verbatim (same text as the single-file case, since every selected file names the same
+      commit), not the generic "Side #1"/"Side #2"
+- [ ] Select conflicted files from **unrelated** conflicts (different commits, even if they'd
+      share the same role word, e.g. two unconnected rebases both saying "(rebased revision)"),
+      right-click: falls back to the generic **"Accept Side #1"** / **"Accept Side #2"** rather
+      than coercing them under one label — never "Yours"/"Theirs" at any tier
+- [ ] Reproduce a conflict shaped like `ConflictMarkerFixtures.diffFromNamesADistinctSide`
+      (a diff-style side whose own label collides with the `+++++++` side's, e.g. via a divergent
+      commit) on a **single** file: the editor banner's two "Accept …" links show **different**
+      text — the diff side falls back to jj's `"from:"` identity, and the `+++++++` side still
+      shows **its own true jj label** (not a generic fallback: its label was never actually
+      unreliable, only the diff side's was) — same for the two context-menu accept actions on
+      that one file
+- [ ] Reproduce the **same** `diffFromNamesADistinctSide` shape in **two different files** and
+      select both: the two context-menu accept actions resolve exactly as in the single-file case
+      above (one shows the `"from:"` identity, the other its own true label) — not the generic
+      "Side #1"/"Side #2" just because more than one file is selected
+- [ ] Select one `diffFromNamesADistinctSide`-shaped file **together with** a
+      `ConflictMarkerFixtures.cleanRebaseConflictNamingSameCommits`-shaped file (a *clean* rebase
+      conflict naming the same two commits, but with no collision of its own, and in *swapped*
+      current/last order relative to the first file): **both** accept actions fall back to the
+      generic **"Accept Side #1"** / **"Accept Side #2"** together — even though CURRENT alone
+      could resolve to a specific label, LAST cannot (the two files disagree there), and showing
+      one specific label alongside one generic one would itself be confusing (`jj-idea-0k7k` tracks
+      detecting this "same two commits, swapped" case properly instead of falling back)
+- [ ] Invoke either accept action on a multi-selection: all selected files resolve to that side in
+      one step, no merge tool opens, no queue order to contend with
+- [ ] Run either accept action on a selection that includes the **modify/delete** file: if the
+      deleted side is the one accepted, the file is actually **deleted** (`jj status`), not left
+      behind empty
 - [ ] After either bulk accept, the "Merge Conflicts" node's count drops and resolved rows
       disappear without pressing Refresh
-- [ ] Select a mix of conflicted and non-conflicted files: "Accept Yours"/"Accept Theirs" act only
-      on the conflicted ones
-- [ ] With nothing selected, or only non-conflicted files selected: "Accept Yours"/"Accept Theirs"
-      don't appear in the context menu
+- [ ] Select a mix of conflicted and non-conflicted files: the accept actions act only on the
+      conflicted ones
+- [ ] With nothing selected, or only non-conflicted files selected: the accept actions don't
+      appear in the context menu
 - [ ] In the log's commit details pane for a **non-`@`** conflicted commit: no shape text is
       required to work correctly, but double-clicking a conflicted row there still opens the
       (read-only) diff preview, not the merge tool — resolving off `@` is out of scope here (see

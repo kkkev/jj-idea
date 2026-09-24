@@ -22,6 +22,10 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * - Restore (Jujutsu.RestoreFile) - visible in working copy context
  * - Restore to This (Jujutsu.RestoreToChange) - visible in historical context
  * - Resolve Conflicts (Jujutsu.ResolveSelectedConflicts) - visible when selection contains conflicted files
+ * - Accept Side #1 / Accept Side #2 (Jujutsu.AcceptConflictCurrentSide/LastSide) - visible for an
+ *   explicit multi-selection of conflicted files in the working copy; labelled with jj's own
+ *   commit for a single-file selection (GitHub #66, and the #112 "yours/theirs is meaningless"
+ *   feedback)
  * - Tracked toggle (Jujutsu.TrackedToggle) - visible in working copy context on predicted-ignored files
  *
  * Actions self-filter their visibility based on the data context
@@ -58,6 +62,8 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.RestoreToChange")?.let { group.add(it) }
     actionManager.getAction("Jujutsu.ResolveSelectedConflicts")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.AcceptConflictCurrentSide")?.let { group.add(it) }
+    actionManager.getAction("Jujutsu.AcceptConflictLastSide")?.let { group.add(it) }
 
     group.addSeparator()
 

@@ -10,12 +10,16 @@ class ConflictBannerModelTest {
     private fun conflict(
         currentTitle: String? = null,
         lastTitle: String? = null,
-        currentIsJjSide1: Boolean = true
+        currentIsJjSide1: Boolean = true,
+        currentAlternateTitle: String? = null,
+        lastAlternateTitle: String? = null
     ) = ExtractedConflict(
         mergeData = MergeData(),
         currentTitle = currentTitle,
         lastTitle = lastTitle,
-        currentIsJjSide1 = currentIsJjSide1
+        currentIsJjSide1 = currentIsJjSide1,
+        currentAlternateTitle = currentAlternateTitle,
+        lastAlternateTitle = lastAlternateTitle
     )
 
     @Test
@@ -50,6 +54,35 @@ class ConflictBannerModelTest {
     }
 
     @Test
+    fun `both sides share the same title - never shows the same Accept text twice`() {
+        // jj-idea-wk7p follow-up: real jj output can name the same commit on both sides (e.g. a
+        // diff-style side whose "to:" collides with the other side's own label, via divergence).
+        val model = conflictBannerModel(conflict(currentTitle = "same commit", lastTitle = "same commit"))
+
+        model.acceptCurrent!!.label shouldBe "Side #1"
+        model.acceptLast!!.label shouldBe "Side #2"
+    }
+
+    @Test
+    fun `colliding titles, but current has an alternate - current uses it, last keeps its own true title`() {
+        // The exact asymmetry a real user reported: acceptLast's own title ("same commit") is a
+        // perfectly direct, reliable label (a plain +++++++ section's own header) - it's
+        // acceptCurrent's title that was unreliable (diff-derived), which is exactly why *it* has
+        // an alternate. Once acceptCurrent moves off the colliding label, acceptLast showing its
+        // own true title is no longer a collision, so it must not be hidden behind "Side #2".
+        val model = conflictBannerModel(
+            conflict(
+                currentTitle = "same commit",
+                lastTitle = "same commit",
+                currentAlternateTitle = "the destination commit"
+            )
+        )
+
+        model.acceptCurrent!!.label shouldBe "the destination commit"
+        model.acceptLast!!.label shouldBe "same commit"
+    }
+
+    @Test
     fun `reoriented conflict (GitHub #112) - tool mapping flips with currentIsJjSide1`() {
         val model = conflictBannerModel(conflict(currentIsJjSide1 = false))
 
@@ -69,14 +102,14 @@ class ConflictBannerModelTest {
 
     @Test
     fun `displayLabel - short label passes through unchanged`() {
-        conflict(currentTitle = "Side #1").let(::conflictBannerModel)
-            .acceptCurrent!!.displayLabel shouldBe "Side #1"
+        conflict(currentTitle = "a short label", lastTitle = "another side").let(::conflictBannerModel)
+            .acceptCurrent!!.displayLabel shouldBe "a short label"
     }
 
     @Test
     fun `displayLabel - long jj label is truncated for the banner, full text kept in label`() {
         val long = "mnuwlyrx 572656e8 \"a fairly long description of side B\""
-        val model = conflictBannerModel(conflict(currentTitle = long))
+        val model = conflictBannerModel(conflict(currentTitle = long, lastTitle = "the other side"))
 
         model.acceptCurrent!!.label shouldBe long
         model.acceptCurrent.displayLabel shouldBe truncateForBanner(long, 24)

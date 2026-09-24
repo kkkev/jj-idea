@@ -85,6 +85,11 @@ class JjMarkerConflictExtractor : ConflictExtractor {
         } else {
             firstBlock.side2.label to firstBlock.side1.label
         }
+        val (currentAlternateTitle, lastAlternateTitle) = if (currentIsSide1) {
+            firstBlock.side1.alternateLabel to firstBlock.side2.alternateLabel
+        } else {
+            firstBlock.side2.alternateLabel to firstBlock.side1.alternateLabel
+        }
 
         return ExtractedConflict(
             mergeData = MergeData().also {
@@ -93,6 +98,8 @@ class JjMarkerConflictExtractor : ConflictExtractor {
                 it.LAST = last.joinToString("\n").toByteArray(Charsets.UTF_8)
             },
             currentTitle = currentTitle,
+            currentAlternateTitle = currentAlternateTitle,
+            lastAlternateTitle = lastAlternateTitle,
             lastTitle = lastTitle,
             currentIsJjSide1 = currentIsSide1
         )

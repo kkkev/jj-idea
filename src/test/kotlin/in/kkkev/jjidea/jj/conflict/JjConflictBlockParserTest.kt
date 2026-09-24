@@ -79,6 +79,26 @@ class JjConflictBlockParserTest {
         block.base?.lines shouldBe listOf("base content")
         // Destination first, moved second -> reoriented so the moved side lands in CURRENT.
         block.side1IsCurrent shouldBe false
+        // The diff's "from:" line named the base (a "parents of ... revision" role) - nothing
+        // more specific than the primary label to offer, so no alternate.
+        block.side1.alternateLabel.shouldBeNull()
+        block.side2.alternateLabel.shouldBeNull()
+    }
+
+    @Test
+    fun `diff section's own from- line names a genuine side - exposed as an alternate label`() {
+        val blocks = JjConflictBlockParser.parseAll(ConflictMarkerFixtures.diffFromNamesADistinctSide)
+
+        val block = blocks.single()
+        block.style shouldBe ConflictMarkerStyle.DIFF
+        // The diff section's primary label ("to:") collides with the +++++++ section's own label -
+        // both name "change A" - but its "from:" line named a genuine other side (the
+        // destination), captured as an alternate rather than silently discarded.
+        block.side1.label shouldBe """uvsstouv 0b04d257 "change A" (rebased revision)"""
+        block.side2.label shouldBe """uvsstouv 0b04d257 "change A" (rebased revision)"""
+        block.side1.alternateLabel shouldBe """ouukwuks b2d02fda "change B" (rebase destination)"""
+        // The +++++++ section has no "from:" line of its own to draw an alternate from.
+        block.side2.alternateLabel.shouldBeNull()
     }
 
     @Test

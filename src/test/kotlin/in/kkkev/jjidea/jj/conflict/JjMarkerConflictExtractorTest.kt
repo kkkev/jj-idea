@@ -274,6 +274,50 @@ class JjMarkerConflictExtractorTest {
     }
 
     @Test
+    fun `diff section's from- line names a distinct side - exposed as an alternate title`() {
+        // Reported after shipping (jj-idea-wk7p follow-up): the diff section's "to:" collides
+        // with the +++++++ section's own label (both name "change A"), but its "from:" line
+        // named a genuine other commit - see ConflictSide.alternateLabel's doc.
+        val input = """
+            |<<<<<<< conflict 1 of 1
+            |%%%%%%% diff from: ouukwuks b2d02fda "change B" (rebase destination)
+            |\\\\\\\        to: uvsstouv 0b04d257 "change A" (rebased revision)
+            |-line one
+            |+mine
+            |+++++++ uvsstouv 0b04d257 "change A" (rebased revision)
+            |theirs
+            |>>>>>>> conflict 1 of 1 ends
+        """.trimMargin()
+
+        val result = extractor.extract(input.toByteArray(Charsets.UTF_8))
+
+        result shouldNotBe null
+        result!!.currentTitle shouldBe """uvsstouv 0b04d257 "change A" (rebased revision)"""
+        result.lastTitle shouldBe """uvsstouv 0b04d257 "change A" (rebased revision)"""
+        result.currentAlternateTitle shouldBe """ouukwuks b2d02fda "change B" (rebase destination)"""
+        result.lastAlternateTitle shouldBe null
+    }
+
+    @Test
+    fun `clean rebase conflict naming the same two commits as the colliding case above - no collision, no alternate`() {
+        // Paired with the test above (jj-idea-wk7p multi-select follow-up): this file's "from:"
+        // names the common ancestor, so its diff section's "to:" label is trustworthy on its own -
+        // no collision, nothing to fall back to. Its currentTitle/lastTitle happen to name the
+        // same two commits ("change A"/"change B") as the colliding test above, which is exactly
+        // what made the multi-select bug non-obvious: text-matching across files isn't enough,
+        // each file's own collision must be resolved first (see SideDisplayLabelTest).
+        val result = extractor.extract(
+            ConflictMarkerFixtures.cleanRebaseConflictNamingSameCommits.toByteArray(Charsets.UTF_8)
+        )
+
+        result shouldNotBe null
+        result!!.currentTitle shouldBe """uvsstouv 0b04d257 "change A" (rebased revision)"""
+        result.lastTitle shouldBe """ouukwuks b2d02fda "change B" (rebase destination)"""
+        result.currentAlternateTitle shouldBe null
+        result.lastAlternateTitle shouldBe null
+    }
+
+    @Test
     fun `hypothetical reversed role order - already-correct orientation is left alone`() {
         // Defensive coverage, not an observed jj shape: if a future jj rendering ever put the
         // rebased revision first and the destination second, side #1 would already be "Yours" -

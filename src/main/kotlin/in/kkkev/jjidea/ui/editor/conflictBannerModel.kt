@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.editor
 
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
+import `in`.kkkev.jjidea.jj.conflict.sideDisplayLabels
 
 /** Max length of a side's label as shown on the banner's action link - see [SideAction.displayLabel]. */
 private const val MAX_SIDE_LABEL_LENGTH = 24
@@ -46,13 +47,22 @@ internal data class ConflictBannerModel(val acceptCurrent: SideAction?, val acce
  * Labels fall back to "Side #1"/"Side #2" exactly like [JujutsuConflictResolver]'s merge-tool
  * pane titles ([in.kkkev.jjidea.vcs.merge.JujutsuConflictResolver]) - the same jj markers carry
  * no commit-identifying text (snapshot style, or an unresolved boilerplate header) in both places.
+ * See [sideDisplayLabels] for how a colliding [ExtractedConflict.currentTitle]/[lastTitle] pair
+ * (both naming the same commit, e.g. due to divergence) is handled without showing the same
+ * "Accept …" text twice - and why both links fall back together rather than independently.
  */
 internal fun conflictBannerModel(conflict: ExtractedConflict?): ConflictBannerModel {
     if (conflict == null) return ConflictBannerModel(acceptCurrent = null, acceptLast = null)
-    val side1Label = JujutsuBundle.message("merge.column.side1")
-    val side2Label = JujutsuBundle.message("merge.column.side2")
+    val (currentLabel, lastLabel) = sideDisplayLabels(
+        currentTitles = listOf(conflict.currentTitle),
+        currentAlternateTitles = listOf(conflict.currentAlternateTitle),
+        lastTitles = listOf(conflict.lastTitle),
+        lastAlternateTitles = listOf(conflict.lastAlternateTitle),
+        currentFallback = JujutsuBundle.message("merge.column.side1"),
+        lastFallback = JujutsuBundle.message("merge.column.side2")
+    )
     return ConflictBannerModel(
-        acceptCurrent = SideAction(conflict.currentTitle ?: side1Label, conflict.toolForCurrent),
-        acceptLast = SideAction(conflict.lastTitle ?: side2Label, conflict.toolForLast)
+        acceptCurrent = SideAction(currentLabel, conflict.toolForCurrent),
+        acceptLast = SideAction(lastLabel, conflict.toolForLast)
     )
 }

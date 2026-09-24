@@ -176,11 +176,82 @@ Delivered instead, inside the existing Working copy window, working-copy only:
 - **Double-click a single conflicted row** opens the merge tool for just that file
   (`JujutsuEditorTabDiffPreview.handleDoubleClick`, opt-in via `resolveConflictsOnDoubleClick`),
   instead of forcing the whole node's queue.
-- **"Accept Yours"/"Accept Theirs" context-menu actions** (`actions/file/AcceptConflictSideAction.kt`)
-  for an explicit multi-selection of conflicted files, reusing
-  `JujutsuMergeProvider`'s `MergeSessionEx` (per-file `:ours`/`:theirs` orientation, GitHub #112,
-  and modify/delete-safe write-back) rather than duplicating that logic — the same contract the
-  platform's own `MultipleFileMergeDialog` buttons use, just invoked directly and off the EDT.
+- **"Accept …" context-menu actions** (`actions/file/AcceptConflictSideAction.kt`) for an explicit
+  multi-selection of conflicted files, reusing `JujutsuMergeProvider`'s `MergeSessionEx` (per-file
+  `:ours`/`:theirs` orientation and modify/delete-safe write-back) rather than duplicating that
+  logic — the same contract the platform's own `MultipleFileMergeDialog` buttons use, just invoked
+  directly and off the EDT. Deliberately not "Accept Yours"/"Accept Theirs": toddjonker's GitHub
+  #112 feedback (below) already called that wording meaningless. Menu text is
+  `jj/conflict/SideDisplayLabel.kt`'s `sideDisplayLabel` (shared with the S1 banner, below): jj's
+  own commit label when every selected file agrees on it — the common case for a single file, or
+  several files conflicted by the same rebase/merge, where the label is naturally identical, since
+  it's keyed on the actual commit rather than jj's fixed role vocabulary (deliberately *not*
+  "shared role word" matching — two unrelated rebases both saying `(rebased revision)` must not be
+  coerced into one label); otherwise, when the selection's primary label collides with the other
+  side's (see below), its alternate label; otherwise the generic "Side #1"/"Side #2". The
+  action still runs on the *entire* explicit selection regardless of which tier the label lands
+  on — never silently narrowing or hiding the action for a heterogeneous selection (matching
+  `scopeToConflicted`'s existing "honour the explicit selection exactly" norm).
+
+  **Follow-up correctness fix (found after shipping):** `JjConflictBlockParser`'s diff-style
+  (`%%%%%%%`/`\\\\\\\`) section header only ever kept the `"to:"` line's label, silently
+  discarding the `"from:"` line's — normally harmless (real jj output's `"from:"` almost always
+  names the common ancestor, adding nothing), but when `"from:"` instead names a genuine other
+  side (`(rebase destination)`/`(rebased revision)`, not `(parents of ... revision)`), and that
+  side's `"to:"` collides with the other section's own label (e.g. via divergence — two commits
+  sharing a label), the banner's two "Accept …" links and the bulk actions' menu text would show
+  the *exact same text twice*, indistinguishable in the UI. Fixed by capturing that `"from:"` text
+  as `ConflictSide.alternateLabel` (exposed on `ExtractedConflict` as
+  `currentAlternateTitle`/`lastAlternateTitle`), consulted only as `sideDisplayLabel`'s tier-2
+  fallback when the primary label collides — never changing the well-tested `CURRENT`/`LAST`
+  assignment itself. See `ConflictMarkerFixtures.diffFromNamesADistinctSide` and
+  `JjConflictBlockParserTest`/`JjMarkerConflictExtractorTest` for the reproducing fixture.
+
+  **Second follow-up (an asymmetry in the fix above, also found via review):** the collision
+  handling was initially symmetric — when both sides' primary labels collided, *both* fell back
+  (one to its alternate, the other, having none, to the generic wording) even though only one
+  side's label was ever actually unreliable. In the reported shape, the `+++++++` section's own
+  header is a direct, un-derived label (nothing else could it be), while the colliding `%%%%%%%`
+  diff section's `"to:"` label is derived from diffing two endpoints — that's exactly why *it* has
+  an alternate and the `+++++++` side doesn't. Once the diff side moves off the colliding label,
+  the `+++++++` side showing its own true label is no longer a real collision, so hiding it behind
+  "Side #2" was itself a bug. `sideDisplayLabel` gained a third tier: a side with no usable
+  alternate of its own, colliding with a sibling that *does* have one, shows its own primary label
+  after all — the sibling is the one moving away from the shared text.
+
+  **Third follow-up (multi-select regression, and a same-day course correction):** tiers 2/3 above
+  were initially gated to a single selected file, so a multi-select where every file shared the
+  exact same collision (two files with the identical `diffFromNamesADistinctSide` shape) fell
+  straight through to the generic wording instead of the alternate/sibling-absorption logic that
+  already worked for one file. Fix: generalize every tier to require "every selected file agrees",
+  the same rule tier 1 already used for the primary label - a single file trivially agrees with
+  itself.
+
+  A same-day attempt to tighten this further (resolving each file's tier 1-3 result in isolation
+  *before* checking cross-file agreement, rather than aggregating raw titles first) turned out to
+  be an over-correction: it made a `diffFromNamesADistinctSide`-shaped file, selected alongside an
+  unrelated but *collision-free* file that happened to also name "change A" for tier 1
+  (`ConflictMarkerFixtures.cleanRebaseConflictNamingSameCommits`), fall back to the generic wording
+  even though both files' tier-1 claims plainly agreed and that agreement didn't collide with
+  anything. Reverted: tier 1 is jj's own literal claim, and cross-file agreement on it is honoured
+  even when computing it in isolation would have made an alternate more tempting for one of the
+  files.
+
+  **Fourth follow-up (the two fixes above still left an inconsistent result):** that same
+  combination - the colliding file alongside the collision-free file - resolved CURRENT to a
+  specific label ("change A", both files agree and it doesn't collide) while LAST fell back to
+  the generic wording (the files disagree there, no rescuing alternate). A real user found this
+  itself confusing: one specific label alongside one generic one looks like a mismatched, broken
+  result, even though each individually followed a defensible rule. Rather than keep refining the
+  per-side heuristic (a fully correct fix - detecting that the two files describe *the same pair
+  of commits, just assigned to opposite CURRENT/LAST slots*, and presenting a coherent swapped
+  pair either way - would need computing both sides jointly with cross-slot awareness, a
+  meaningfully larger and riskier change deferred as `jj-idea-0k7k`), `sideDisplayLabels` was
+  changed to decide **atomically**: compute both sides' candidate labels, and if *either* would
+  need to fall back, both fall back together. This directly fixes the "one specific, one generic"
+  inconsistency at the cost of occasionally falling back to generic wording for a side that could,
+  on its own, have resolved to something more specific. See `SideDisplayLabelTest`'s "a real
+  reported combination" test for the exact case and the rationale.
 
 `CommandExecutor.kt:368`'s doc comment on `resolveList` ("infrastructure for the future Conflicts
 tool window") remains true for a *future* revision-scoped view, if one is ever actually requested
@@ -334,7 +405,7 @@ an "Undo" action in the resulting success notification. This makes jj's own "cha
 later, it's all in the op log" property visible in the UI at the moment a conflict is resolved,
 rather than requiring the user to know to look at Operation Log / `jj undo` separately.
 
-Also applies to the reframed S3's bulk "Accept Yours"/"Accept Theirs" actions
+Also applies to the reframed S3's bulk "Accept Side #1"/"Accept Side #2" actions
 (`actions/file/AcceptConflictSideAction.kt`, `jj-idea-wk7p`), which currently run without undo
 tracking, same as the platform's own `MultipleFileMergeDialog` buttons they reuse.
 

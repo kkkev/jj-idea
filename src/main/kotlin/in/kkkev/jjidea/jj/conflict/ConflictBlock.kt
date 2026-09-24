@@ -21,12 +21,21 @@ enum class ConflictRole { DESTINATION, MOVED, BASE }
  *   itself (see [JjConflictBlockParser.cleanLabel]) - a caller reconstructing replacement text
  *   for this side (accepting it) must honour this rather than always appending a trailing
  *   newline.
+ * @param alternateLabel A second candidate identity for this side, non-null only when this side
+ *   was rendered as a `%%%%%%%` diff whose own `"diff from: <label>"` line names a genuine other
+ *   side (a [ConflictRole.DESTINATION] or [ConflictRole.MOVED] role) rather than the common
+ *   ancestor ([ConflictRole.BASE]). [label] (from the diff's `"to:"` line) is still this side's
+ *   primary identity in every case - real jj output always uses `"to:"` for "the actual side",
+ *   never `"from:"` (see [JjConflictBlockParser]'s class doc) - but a caller whose primary label
+ *   happens to collide with the other side's own label (e.g. both named the same commit due to
+ *   divergence) can fall back to this instead of showing two identical labels.
  */
 data class ConflictSide(
     val label: String?,
     val role: ConflictRole?,
     val lines: List<String>,
-    val noTerminatingNewline: Boolean = false
+    val noTerminatingNewline: Boolean = false,
+    val alternateLabel: String? = null
 )
 
 /**

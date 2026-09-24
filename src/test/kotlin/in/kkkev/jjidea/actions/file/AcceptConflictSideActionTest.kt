@@ -12,8 +12,8 @@ import io.mockk.verifyOrder
 import org.junit.jupiter.api.Test
 
 /**
- * Covers [acceptConflictSide], the bulk "Accept Yours"/"Accept Theirs" gesture behind
- * [AcceptConflictYoursAction]/[AcceptConflictTheirsAction] (GitHub #66): it must reuse
+ * Covers [acceptConflictSide], the bulk accept-a-side gesture behind
+ * [AcceptConflictCurrentSideAction]/[AcceptConflictLastSideAction] (GitHub #66): it must reuse
  * [in.kkkev.jjidea.vcs.merge.JujutsuMergeProvider]'s [MergeSessionEx] contract - the exact same
  * per-file `:ours`/`:theirs` orientation and modify/delete-safe write-back the platform's own
  * `MultipleFileMergeDialog` buttons use - rather than reimplementing it, and must not touch the
