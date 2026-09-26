@@ -151,6 +151,22 @@ object ConflictMarkerFixtures {
         append(">>>>>>> def \"side B\"") // deliberately no trailing \n
     }
 
+    /**
+     * jj's own `"(no terminating newline)"` annotation on a side's header - the real trigger for
+     * [ConflictSide.noTerminatingNewline] (as opposed to [blockAtEofNoTrailingNewline]'s
+     * file-level EOF, which is unrelated - see that field's own doc).
+     */
+    val gitSide2NoTerminatingNewline = """
+        |<<<<<<< abc "side A"
+        |ours content
+        |||||||| base "parent"
+        |base content
+        |=======
+        |theirs content
+        |>>>>>>> def "side B" (no terminating newline)
+        |context after
+    """.trimMargin()
+
     val unterminatedBlock = """
         |before
         |<<<<<<< Conflict 1 of 1

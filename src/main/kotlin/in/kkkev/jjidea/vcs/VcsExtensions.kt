@@ -8,6 +8,7 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.changes.CurrentContentRevision
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -42,6 +43,29 @@ fun Project.jujutsuRepositoryForRoot(directory: VirtualFile) = stateModel.initia
 
 fun Project.possibleJujutsuRepositoryFor(file: VirtualFile): JujutsuRepository? =
     file.getUserData(JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY)?.repo ?: possibleJujutsuRepositoryFor(file.filePath)
+
+/**
+ * An alternative to [possibleJujutsuRepositoryFor] that never touches [VcsUtil.getVcsRootFor] -
+ * found necessary by jj-idea-82fo's gutter feature: `VcsUtil.getVcsRootFor` (backed by
+ * `ProjectLevelVcsManager`'s own internal mapping index, a cache distinct from - and observed to
+ * lag behind - [in.kkkev.jjidea.jj.JujutsuStateModel.initialisedRepositories]) returned null for
+ * a file under a repo [initialisedJujutsuRepositories] already listed as initialised, with no
+ * further event ever correcting it in that session. [in.kkkev.jjidea.jj.JujutsuStateModel]
+ * itself never calls `getVcsRootFor` for this reason - every one of its own file-to-repo checks
+ * (`isOpHeadsChange`, `isUnderJjDirectory`, the working-copy-file grouping) resolves ancestry
+ * directly against its own already-loaded [initialisedJujutsuRepositories] via
+ * [VfsUtil.isAncestor] instead. This function does the same, for any other caller that would
+ * rather have that reliability than [possibleJujutsuRepositoryFor]'s
+ * [JujutsuDataKeys.VIRTUAL_FILE_LOG_ENTRY] fast path (a historical-revision log entry has no
+ * real ancestry to check against, so this has no equivalent for that case).
+ *
+ * `possibleJujutsuRepositoryFor`'s own `getVcsRootFor`-based path is not touched here, despite
+ * this apparently being a real gap in it too - that's a wider-reaching, riskier change (every
+ * caller in the file, not just this one gutter feature) better made deliberately, not as a
+ * side effect of fixing one bead.
+ */
+fun Project.jujutsuRepositoryByAncestry(file: VirtualFile): JujutsuRepository? =
+    initialisedJujutsuRepositories.firstOrNull { VfsUtil.isAncestor(it.directory, file, false) }
 
 /**
  * Gets the log entry for the specified virtual file. If the virtual file originated from a file change in a historical

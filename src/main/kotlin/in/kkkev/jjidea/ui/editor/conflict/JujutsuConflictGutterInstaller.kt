@@ -13,8 +13,9 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.util.Alarm
 import `in`.kkkev.jjidea.jj.conflict.ConflictRegionScanner
+import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.editor.debouncedDocumentScan
-import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
+import `in`.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry
 
 /**
  * Registers per-block gutter icons for jj conflict marker blocks in every eligible main editor
@@ -41,35 +42,96 @@ import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
  * that across a handful of split panes is not a scale concern. Unify onto one shared model
  * later if a cross-pane concern (e.g. shared accept-state) ever needs it.
  *
- * Stage 4 adds the actual accept actions to [ConflictBlockGutterIconRenderer]; this stage ships
- * the icon and its tooltip only.
+ * **[editorCreated] cannot just gate once and give up.** [shouldInstall]'s repository check
+ * reads [in.kkkev.jjidea.jj.JujutsuStateModel.initialisedRepositories]'s *cached* value - which,
+ * unlike [in.kkkev.jjidea.ui.editor.JujutsuConflictEditorNotificationProvider]'s banner (an
+ * `EditorNotificationProvider`, re-invoked by the platform on its own refresh triggers), this
+ * one-shot `editorFactoryListener` callback never gets asked again for an editor that's already
+ * open. An editor restored as part of the IDE's own layout can open before that state's
+ * background load (kicked off by `JujutsuStartupActivity`) completes - `editorFactoryListener`
+ * has no ordering guarantee relative to `ProjectActivity` the way VCS provider activation does
+ * (see that state's own KDoc). A permanent gate at that moment would permanently miss the icon
+ * even though the banner (asked again later) shows up fine - exactly the discrepancy this
+ * class's [ConflictGutterWatcher] exists to close: it retries [shouldInstall] every time
+ * [in.kkkev.jjidea.jj.JujutsuStateModel.initialisedRepositories] finishes a load, for as long as
+ * the editor stays open, until it succeeds once.
+ *
+ * **[shouldInstall] resolves the repository via [in.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry],
+ * not `possibleJujutsuRepositoryFor`** (the banner's own check) - found necessary in manual
+ * testing: `possibleJujutsuRepositoryFor`'s `VcsUtil.getVcsRootFor` path returned null for a file
+ * under a repo [in.kkkev.jjidea.jj.JujutsuStateModel.initialisedRepositories] already listed as
+ * initialised, with nothing ever correcting it for the rest of that session (a real gap in a
+ * shared utility, but a wider-reaching fix than this one bead should make as a side effect - see
+ * that function's own KDoc). [in.kkkev.jjidea.jj.JujutsuStateModel] itself never uses
+ * `getVcsRootFor` for this exact reason.
  */
 class JujutsuConflictGutterInstaller : EditorFactoryListener {
     override fun editorCreated(event: EditorFactoryEvent) {
         val editor = event.editor
-        if (!shouldInstall(editor)) return
-        val controller = ConflictGutterController(editor)
-        editor.putUserData(CONTROLLER_KEY, controller)
-        controller.installInitial()
+        if (editor.editorKind != EditorKind.MAIN_EDITOR) return
+        val project = editor.project ?: return
+        if (project.isDisposed) return
+        if (FileDocumentManager.getInstance().getFile(editor.document) == null) return
+
+        val watcher = ConflictGutterWatcher(editor)
+        editor.putUserData(WATCHER_KEY, watcher)
+        watcher.start()
     }
 
     override fun editorReleased(event: EditorFactoryEvent) {
         val editor = event.editor
-        editor.getUserData(CONTROLLER_KEY)?.let { Disposer.dispose(it) }
-        editor.putUserData(CONTROLLER_KEY, null)
+        editor.getUserData(WATCHER_KEY)?.let { Disposer.dispose(it) }
+        editor.putUserData(WATCHER_KEY, null)
     }
 
     companion object {
-        private val CONTROLLER_KEY: Key<ConflictGutterController> = Key.create("jjidea.conflictGutterController")
+        private val WATCHER_KEY: Key<ConflictGutterWatcher> = Key.create("jjidea.conflictGutterWatcher")
 
-        /** Cheapest checks first - every one after the first touches something off the hot editor-open path. */
+        /**
+         * Whether [editor] should have gutter icons *right now*, given the repository state's
+         * current cached value - cheapest checks first. Called both by [editorCreated] (via
+         * [ConflictGutterWatcher]) and again every time that state reloads, since the answer can
+         * flip from false to true after the checks above this class's KDoc explains.
+         */
         fun shouldInstall(editor: Editor): Boolean {
             if (editor.editorKind != EditorKind.MAIN_EDITOR) return false
             val project = editor.project ?: return false
             if (project.isDisposed) return false
             val file = FileDocumentManager.getInstance().getFile(editor.document) ?: return false
-            return project.possibleJujutsuRepositoryFor(file) != null
+            return project.jujutsuRepositoryByAncestry(file) != null
         }
+    }
+}
+
+/**
+ * Retries [JujutsuConflictGutterInstaller.shouldInstall] every time
+ * [in.kkkev.jjidea.jj.JujutsuStateModel.initialisedRepositories] finishes a (re)load, until it
+ * succeeds once and installs a [ConflictGutterController] - see the installer's own KDoc for
+ * why a single check at `editorCreated` time isn't enough. [connectAndFireSync] both fires
+ * immediately with whatever's cached right now (covers the common case: already loaded) and
+ * guarantees a real background load happens if it hasn't (covers the race) - unlike plain
+ * `connect`, which only replays an *already-loaded* value and would otherwise depend on some
+ * unrelated caller invalidating the state on our behalf.
+ */
+private class ConflictGutterWatcher(private val editor: Editor) : Disposable {
+    private var controller: ConflictGutterController? = null
+
+    fun start() {
+        val project = requireNotNull(editor.project) {
+            "checked non-null by JujutsuConflictGutterInstaller.editorCreated"
+        }
+        project.stateModel.initialisedRepositories.connectAndFireSync(this) { tryInstall() }
+    }
+
+    private fun tryInstall() {
+        if (controller != null) return
+        if (!JujutsuConflictGutterInstaller.shouldInstall(editor)) return
+        controller = ConflictGutterController(editor).also { it.installInitial() }
+    }
+
+    override fun dispose() {
+        controller?.let { Disposer.dispose(it) }
+        controller = null
     }
 }
 
@@ -82,6 +144,7 @@ class JujutsuConflictGutterInstaller : EditorFactoryListener {
  * dispose/recreate-flickering the icons on every keystroke while typing inside a block.
  */
 private class ConflictGutterController(private val editor: Editor) : Disposable {
+    private val project = requireNotNull(editor.project) { "editor.project checked non-null by shouldInstall" }
     private val scanner = ConflictRegionScanner()
     private var operations: List<DiffGutterOperation> = emptyList()
     private val alarm = Alarm(this)
@@ -117,7 +180,7 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
             DiffGutterOperation.Simple(
                 editor,
                 block.startOffset,
-                DiffGutterOperation.RendererBuilder { ConflictBlockGutterIconRenderer(block) }
+                DiffGutterOperation.RendererBuilder { ConflictBlockGutterIconRenderer(project, editor.document, block) }
             )
         }
     }
