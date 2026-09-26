@@ -88,7 +88,10 @@ class SideDisplayLabelTest {
         // not matched, per the "don't coerce unrelated conflicts together" requirement. Falling
         // back on CURRENT alone would still leave LAST showing a specific label, so both fall back.
         val labels = sideDisplayLabels(
-            currentTitles = listOf("""abc123 "change B" (rebase destination)""", """def456 "unrelated" (rebase destination)"""),
+            currentTitles = listOf(
+                """abc123 "change B" (rebase destination)""",
+                """def456 "unrelated" (rebase destination)"""
+            ),
             currentAlternateTitles = listOf(null, null),
             lastTitles = listOf("shared last", "shared last"),
             lastAlternateTitles = listOf(null, null),

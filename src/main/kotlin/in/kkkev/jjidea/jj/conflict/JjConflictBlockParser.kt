@@ -383,7 +383,12 @@ internal object JjConflictBlockParser {
     private fun alternateLabel(section: Section): String? {
         if (section.kind != Kind.DIFF) return null
         val cleaned = cleanLabel(section.diffFromLabel) ?: return null
-        return cleaned.label.takeIf { roleOf(it).let { role -> role == ConflictRole.DESTINATION || role == ConflictRole.MOVED } }
+        return cleaned.label.takeIf {
+            roleOf(it).let { role ->
+                role == ConflictRole.DESTINATION ||
+                    role == ConflictRole.MOVED
+            }
+        }
     }
 
     /** `\n`-split line access with precomputed line-start offsets, built once per parse call. */
