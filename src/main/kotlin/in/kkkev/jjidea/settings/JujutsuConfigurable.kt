@@ -26,6 +26,7 @@ import `in`.kkkev.jjidea.jj.cli.Config
 import `in`.kkkev.jjidea.jj.cli.config
 import `in`.kkkev.jjidea.jj.cli.rootlessConfig
 import `in`.kkkev.jjidea.preview.AccessCode
+import `in`.kkkev.jjidea.preview.PreviewCode
 import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
@@ -706,20 +707,47 @@ class JujutsuConfigurable(
             // code and clicking Apply needs Settings reopened to reveal the feature list, the
             // same "reopen/restart to take effect" tradeoff as the DnD install-time guard itself
             // (in.kkkev.jjidea.ui.log.installDragAndDrop).
-            if (AccessCode.isValid(appSettings.state.previewAccessCode)) {
+            // The feature checkboxes below already say what the code unlocks, so the status line
+            // only needs to cover the cases the checkboxes can't show on their own: an expiring
+            // code's date, or why no checkboxes appeared at all.
+            val grant = AccessCode.grant(appSettings.state.previewAccessCode)
+            val statusMessage = when (grant) {
+                is PreviewCode.Grant.Valid ->
+                    grant.expiry?.let { JujutsuBundle.message("settings.preview.code.status.validUntil", it) }
+                is PreviewCode.Grant.Expired ->
+                    JujutsuBundle.message("settings.preview.code.status.expired", grant.lastValidDate)
+                is PreviewCode.Grant.Revoked -> JujutsuBundle.message("settings.preview.code.status.revoked")
+                is PreviewCode.Grant.Invalid ->
+                    if (appSettings.state.previewAccessCode.isNotBlank()) {
+                        JujutsuBundle.message("settings.preview.code.status.invalid")
+                    } else {
+                        null
+                    }
+            }
+            if (statusMessage != null) {
+                row("") {
+                    comment(statusMessage, maxLineLength = NARROW_COMMENT_WIDTH)
+                }
+            }
+            val granted = (grant as? PreviewCode.Grant.Valid)?.features.orEmpty()
+            if (granted.isNotEmpty()) {
                 indent {
-                    for (feature in PreviewFeature.entries) {
+                    for (feature in PreviewFeature.entries.filter { it in granted }) {
                         row {
                             checkBox(feature.displayName)
                                 .bindSelected(
                                     { isPreviewFeatureEnabled(feature) },
                                     { setPreviewFeatureEnabled(feature, it) }
                                 )
-                                .comment(
-                                    JujutsuBundle.message("settings.preview.features.comment"),
-                                    maxLineLength = NARROW_COMMENT_WIDTH
-                                )
                         }
+                    }
+                    // One shared note below the whole list, rather than repeating it per
+                    // checkbox - it says the same thing regardless of which feature it's under.
+                    row("") {
+                        comment(
+                            JujutsuBundle.message("settings.preview.features.comment"),
+                            maxLineLength = NARROW_COMMENT_WIDTH
+                        )
                     }
                 }
             }

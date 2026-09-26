@@ -16,4 +16,13 @@ class PreviewFeatureTest {
         val ids = PreviewFeature.entries.map { it.id }
         ids.toSet().size shouldBe ids.size
     }
+
+    @Test
+    fun `every feature has a unique bit in range 0 to 6, leaving bit 7 for ALL`() {
+        val bits = PreviewFeature.entries.map { it.bit }
+        bits.toSet().size shouldBe bits.size
+        for (bit in bits) {
+            (bit in 0..6) shouldBe true
+        }
+    }
 }

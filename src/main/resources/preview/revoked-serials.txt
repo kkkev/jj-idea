@@ -1,0 +1,6 @@
+# Revoked JJP1 preview access code serials (in.kkkev.jjidea.preview.AccessCode/PreviewCode).
+# One integer serial per line. Lines starting with '#' and blank lines are ignored.
+#
+# Revoking a code needs a plugin release (unlike minting, which doesn't) - add the serial here
+# and cut a build. The serial (not the code itself) is looked up in the private access-code
+# registry (home GitLab wiki: "Preview access codes").

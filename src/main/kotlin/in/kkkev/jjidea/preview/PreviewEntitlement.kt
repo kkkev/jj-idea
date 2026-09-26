@@ -12,7 +12,10 @@ import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
  * 1. System property `jjidea.preview.<id>=true` - dev/CI/platform-test escape hatch, not
  *    documented to users.
  * 2. Access code: [in.kkkev.jjidea.settings.JujutsuApplicationSettingsState.previewAccessCode]
- *    validates via [AccessCode], *and* the feature's id is in the user's opted-in feature set.
+ *    grants [feature] via [AccessCode.grantedFeatures], *and* the feature's id is in the user's
+ *    opted-in feature set (the settings panel only offers checkboxes for granted features, but a
+ *    stale opt-in for a feature the current code doesn't grant - e.g. after entering a
+ *    different code - is simply ignored here rather than validated separately).
  * 3. *(future)* Licence, via a Marketplace freemium provider - a new step in this list, nothing
  *    else changes.
  *
@@ -25,9 +28,9 @@ class PreviewEntitlement {
         if (System.getProperty("jjidea.preview.${feature.id}").toBoolean()) return true
 
         val state = JujutsuApplicationSettings.getInstance().state
-        val hasCode = AccessCode.isValid(state.previewAccessCode)
+        val granted = feature in AccessCode.grantedFeatures(state.previewAccessCode)
         val optedIn = state.enabledPreviewFeatures.split(",").map { it.trim() }.contains(feature.id)
-        return hasCode && optedIn
+        return granted && optedIn
     }
 
     companion object {

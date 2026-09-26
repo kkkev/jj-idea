@@ -1,6 +1,9 @@
-# Preview access codes: one salted SHA-256 hash per line (in.kkkev.jjidea.preview.AccessCode).
-# Lines starting with '#' and blank lines are ignored.
+# Legacy preview access codes: one salted SHA-256 hash per line (in.kkkev.jjidea.preview.AccessCode).
+# Lines starting with '#' and blank lines are ignored. A hash here always grants every
+# PreviewFeature - this format predates per-feature scoping.
 #
-# To invite a new tester or rotate a code, add or replace a line here - no code change needed.
-# The plaintext code is never stored in the repo; keep it in your own notes.
+# New codes should use the JJP1 format instead (in.kkkev.jjidea.preview.PreviewCode, minted with
+# PreviewCodeMinter): feature-scoped, expiring, and mintable at any time with no build. This file
+# is kept only for already-issued legacy codes; to add one here anyway, no code change is needed,
+# just a rotated build. The plaintext code is never stored in the repo; keep it in your own notes.
 b7091443896512500e8c6e66c026c38f334d98fd30769b3acf6b30e0913aea1e

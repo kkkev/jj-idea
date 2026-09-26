@@ -243,7 +243,20 @@ jobs:
           cat build.gradle.kts | grep '^version'
 
       - name: Build plugin
-        run: ./gradlew buildPlugin
+        # jj-idea-0x06: PREVIEW_CODE_KEY signs JJP1 preview access codes (preview/AccessCode.kt).
+        # Only injected - and required, via -PrequirePreviewCodeKey - for an actual tagged/dispatched
+        # release. Every other run (PRs, snapshot pushes to master) builds with the key ABSENT on
+        # purpose: their plugin-artifact.zip is a downloadable Actions artifact on this public repo,
+        # and embedding the real key in a snapshot build shipped on every push would leak it far more
+        # often than a real release. Non-release builds simply can't validate JJP1 codes, same as any
+        # local dev build - only the legacy access-codes.txt path works there. See
+        # generatePreviewCodeKey in build.gradle.kts.
+        run: |
+          if [ "${{ steps.version.outputs.is_release }}" = "true" ]; then
+            PREVIEW_CODE_KEY="${{ secrets.PREVIEW_CODE_KEY }}" ./gradlew buildPlugin -PrequirePreviewCodeKey
+          else
+            ./gradlew buildPlugin
+          fi
 
       - name: Lint
         run: ./gradlew ktlintCheck

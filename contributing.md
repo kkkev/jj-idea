@@ -646,6 +646,20 @@ version's heading:
 <!-- changelog-guard: edited-after-release — <reason> -->
 ```
 
+### Minting preview access codes
+
+Preview features (`preview/PreviewFeature.kt`) are gated behind a `JJP1-...` access code a tester
+enters in Settings. Minting one needs no build or release:
+
+```bash
+./gradlew previewCode --args="mint --features pagedLogLoad --for someUser --ref 'GitHub #123'"
+./gradlew previewCode --args="inspect JJP1-ABCD-EFGH-JKMN-PQRS"
+```
+
+See `PreviewCodeMinter`'s KDoc (`src/test/kotlin/in/kkkev/jjidea/preview/`) for the full command
+set and `docs/design/preview-gating-and-dnd-sequencing.md` for the code format, key custody, and
+revocation. Issued codes are tracked in a private registry outside this repo — ask kkkev.
+
 ## Contributing Changes
 
 When making changes that affect users (features, fixes, behavior changes):

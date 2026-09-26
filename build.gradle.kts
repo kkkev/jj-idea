@@ -1,6 +1,7 @@
 import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask
+import java.util.Base64
 
 /**
  * Extracts changelog notes from CHANGELOG.md for the given version.
@@ -108,6 +109,53 @@ sourceSets {
         }
     }
 }
+
+// jj-idea-0x06 (GitHub #69 early access): the JJP1 preview-access-code HMAC key never lives in
+// the repo. It's resolved from, in order: the PREVIEW_CODE_KEY env var (base64, 32 bytes - what
+// CI/the release workflow sets), then the same local file PreviewCodeMinter's `keygen` writes
+// (~/.config/jj-idea/preview-code-key) - so a plain `./gradlew runIde` on kkkev's own machine
+// picks up whatever key is already there for local testing, with no env var to remember. Either
+// way the resolved key is written into a generated resource that preview/AccessCode.kt loads at
+// runtime. Absent both, this task writes nothing: forks and non-release CI runs simply can't
+// validate JJP1 codes (they still see the legacy access-codes.txt path).
+// -PrequirePreviewCodeKey fails the build instead of writing nothing, so a release can never
+// silently ship without the key - wired into the "Build and Release" workflow's buildPlugin step
+// for release runs only (see .github/workflows/build.yml); that workflow's CI runner has no local
+// key file, so it only ever gets the key from the env var, same as before.
+val previewKeyOutputDir = layout.buildDirectory.dir("generated/previewKey")
+val localPreviewKeyFile = File(System.getProperty("user.home"), ".config/jj-idea/preview-code-key")
+val generatePreviewCodeKey = tasks.register("generatePreviewCodeKey") {
+    val keyEnv = providers.environmentVariable("PREVIEW_CODE_KEY")
+    val requireKey = project.hasProperty("requirePreviewCodeKey")
+    outputs.dir(previewKeyOutputDir)
+    // Cheap task; always rerun rather than tracking the local key file's mtime/content as an input.
+    outputs.upToDateWhen { false }
+    doLast {
+        val outFile = previewKeyOutputDir.get().file("preview/code-key.bin").asFile
+        outFile.parentFile.mkdirs()
+        val base64Key = keyEnv.orNull?.takeIf { it.isNotBlank() }
+            ?: localPreviewKeyFile.takeIf { it.isFile }?.readText()?.trim()
+        if (base64Key.isNullOrBlank()) {
+            outFile.delete()
+            if (requireKey) {
+                throw GradleException(
+                    "No preview access-code signing key found (checked PREVIEW_CODE_KEY and " +
+                        "$localPreviewKeyFile), but -PrequirePreviewCodeKey was passed - refusing to " +
+                        "build a release without it."
+                )
+            }
+        } else {
+            val keyBytes = Base64.getDecoder().decode(base64Key)
+            require(keyBytes.size == 32) {
+                "The preview code key must decode to exactly 32 bytes, got ${keyBytes.size}"
+            }
+            outFile.writeBytes(keyBytes)
+        }
+    }
+}
+
+sourceSets["main"].resources.srcDir(previewKeyOutputDir)
+tasks.named("processResources") { dependsOn(generatePreviewCodeKey) }
 
 dependencies {
     intellijPlatform {
@@ -442,6 +490,23 @@ tasks.register<Test>("stubTest") {
         "--add-opens=java.desktop/sun.font=ALL-UNNAMED"
     )
     doFirst { jvmArgumentProviders.clear() }
+}
+
+// jj-idea-0x06: offline CLI for minting/inspecting JJP1 preview access codes
+// (PreviewCodeMinter, deliberately under src/test - see its KDoc for why it must never ship).
+// Runs on the plain unit-test classpath (no IJPGP platform bootstrap needed), reusing the same
+// stripped-down classpath as tasks.test.
+// Usage: ./gradlew previewCode --args="mint --features pagedLogLoad --for cYDN48 --ref 'GitHub #69'"
+tasks.register<JavaExec>("previewCode") {
+    group = "jj-idea"
+    description = "Mint or inspect JJP1 preview access codes offline. See PreviewCodeMinter's KDoc."
+    mainClass.set("in.kkkev.jjidea.preview.PreviewCodeMinter")
+    classpath = configurations["testCompileClasspath"] +
+        configurations["testRuntimeClasspath"] +
+        sourceSets["test"].output +
+        sourceSets["main"].output
+    javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) })
+    standardInput = System.`in`
 }
 
 // Convenience task that runs both tests and linting

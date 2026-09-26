@@ -3133,18 +3133,30 @@ file), which no automated test can supply — see contributing.md § Manual regr
 - [ ] With **only** the scope supplying an identity (no `[user]` table, no per-repo override): no
       "Configure Jujutsu User" notification appears for that repo on IDE startup
 
-#### Preview features (jj-idea-vpvz)
+#### Preview features (jj-idea-vpvz, jj-idea-0x06)
 
 - [ ] Open **Settings → Version Control → Jujutsu**: a **Preview features** group appears at the
       bottom of the panel, below **Support**, with only an "Access code:" field and a one-line
       explanation — no feature
       names anywhere
-- [ ] Enter an invalid code, click Apply: no feature list appears; nothing crashes
-- [ ] Enter a valid access code, click Apply, then reopen Settings (or the panel) — a checkbox
-      for each preview feature (currently "Drag and Drop") appears under the code field, each
-      with a comment noting it's unfinished and that reopening the IDE is needed for a toggle
-      change to take effect
-- [ ] Clear the code and click Apply, reopen Settings — the feature checkboxes disappear again
+- [ ] Enter an invalid code, click Apply: a "Not a valid access code." line appears; no feature
+      list appears; nothing crashes
+- [ ] Enter a valid legacy code, click Apply, then reopen Settings (or the panel) — no status
+      line appears (nothing to add beyond what the checkboxes show), a checkbox for every preview
+      feature appears underneath, and a single shared comment (noting it's unfinished and that
+      reopening the IDE is needed for a toggle change to take effect) appears once below the
+      whole list, not repeated per checkbox
+- [ ] Enter a valid, single-feature `JJP1-...` code (needs a build whose signing key resolves —
+      either `PREVIEW_CODE_KEY` set, or the local key at `~/.config/jj-idea/preview-code-key` that
+      `previewCode keygen`/`mint` use by default — e.g. minted for yourself via `./gradlew
+      previewCode --args="mint --features pagedLogLoad"`), click Apply, reopen Settings — no
+      status line, and only that one feature's checkbox appears (no Drag and Drop checkbox)
+- [ ] Mint a `JJP1` code with `--expires` set to a future month, enter it — a "Valid through ..."
+      line appears above its checkbox(es)
+- [ ] Mint a `JJP1` code with `--expires` set to last month, enter it — a "This code expired on
+      ..." line appears instead of a feature list, and no checkboxes appear
+- [ ] Clear the code and click Apply, reopen Settings — the status line and feature checkboxes
+      disappear again
 
 → see MT-DND below for the effect of the toggle on the log table
 

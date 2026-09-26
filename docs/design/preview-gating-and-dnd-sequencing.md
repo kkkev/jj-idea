@@ -50,23 +50,80 @@ answering `isEnabled(feature: PreviewFeature): Boolean`, resolved through ordere
 
 1. **System property / registry escape hatch** — `jjidea.preview.<id>=true`. For dev, CI, and
    platform tests. Not documented to users.
-2. **Access code** — the code the user entered validates, *and* the per-feature opt-in toggle is
-   on. This is the tester path.
+2. **Access code** — the code the user entered grants [feature] (via `AccessCode.grantedFeatures`),
+   *and* the per-feature opt-in toggle is on. This is the tester path.
 3. *(future)* **Licence** — `LicensingFacade` from the Marketplace freemium API. A new provider
    in this same list; nothing else changes.
 
 Default when no provider says yes: **off**.
 
-**`src/main/kotlin/in/kkkev/jjidea/preview/AccessCode.kt`** — offline validation. SHA-256 of
-`normalise(code) + salt`, compared against hashes loaded from a plugin resource
-(`resources/preview/access-codes.txt`, one hash per line, `#` comments allowed). A resource
-rather than a Kotlin constant so rotating or adding a code is a one-line, non-code edit.
+**`src/main/kotlin/in/kkkev/jjidea/preview/AccessCode.kt`** — resolves a code to a
+`PreviewCode.Grant` through two families, tried in order:
 
-Be clear-eyed about the strength: a determined user can decompile the jar or share the code with
-a friend. That is fine — the goal is to keep casual Marketplace users from stumbling into an
-unfinished gesture and filing issues, not to protect revenue. The freemium provider added later
-will do real signature verification via the platform's licensing API; this provider is not the
-thing that will guard paid features.
+1. **`JJP1-...` codes** ([PreviewCode.kt](#previewcodekt-jjp1-codes), below) — short (16 characters
+   after the prefix), feature-scoped, expiring, HMAC-signed, and mintable offline at any time with
+   no plugin release. This is the format for all new codes (jj-idea-0x06, GitHub #69).
+2. **Anything else** — the original flat SHA-256 hash list, kept only so already-issued legacy
+   codes keep working: `normalise(code) + salt` hashed and compared against
+   `resources/preview/access-codes.txt` (one hash per line, `#` comments allowed). A hash always
+   grants *every* `PreviewFeature` — this format predates per-feature scoping. New codes should use
+   `JJP1` instead; this path is not meant to gain new entries.
+
+Be clear-eyed about the strength of either family: a determined user can decompile the jar or
+share a valid code with a friend. That is fine — the goal is to keep casual Marketplace users
+from stumbling into an unfinished gesture and filing issues, not to protect revenue. The freemium
+provider added later will do real signature verification via the platform's licensing API;
+neither code family here is the thing that will guard paid features.
+
+#### `PreviewCode.kt` (`JJP1` codes)
+
+Format: `JJP1-` + 16 Crockford-base32 characters (`JJP1-ABCD-EFGH-JKMN-PQRS`), encoding a 4-byte
+payload — `features: u8` bitmap (bit *n* = `PreviewFeature.bit` *n*; bit 7 is the ALL wildcard,
+granting every feature including ones added after minting), `expiry: u8` (months since 2026-01,
+`0` = never), `serial: u16` (attribution/revocation, not itself validated) — plus a 6-byte
+HMAC-SHA256 tag over `"JJP1" + payload`.
+
+**Why HMAC, not a signature.** A public-key signature (Ed25519, 64 bytes) was considered and
+rejected: it would push the code to 88+ characters for a benefit — stopping someone who has
+decompiled the jar (and thus already has whatever key it embeds) from minting their own codes —
+that's moot while `-Djjidea.preview.<id>=true` already bypasses the whole gate. This is "noise
+reduction, not DRM" either way (see above); HMAC gets the same practical effect at 16 characters.
+
+**Key custody.** The HMAC key never enters the repository. It's generated once via
+`PreviewCodeMinter`'s `keygen` command, kept in three places only: `~/.config/jj-idea/preview-code-key`
+(kkkev's machine), the GitHub Actions secret `PREVIEW_CODE_KEY` on `kkkev/jj-idea` (a backup copy
+also lives as a masked/protected CI/CD variable on the home GitLab instance), and kkkev's password
+manager. `build.gradle.kts`'s `generatePreviewCodeKey` task resolves the key from, in order, the
+`PREVIEW_CODE_KEY` env var, then the same local file `keygen` writes — so a plain `./gradlew
+runIde` on kkkev's own machine picks up whatever key is already there, no env var needed for local
+testing — and writes it to a generated resource (`preview/code-key.bin`) that `AccessCode` loads
+lazily; `-PrequirePreviewCodeKey` makes a missing/malformed key fail the build outright. The
+release workflow (`.github/workflows/build.yml`) passes the real secret (env var only — the CI
+runner has no local key file) and that flag only for an actual tagged/dispatched release — every
+other CI run (PRs, snapshot pushes) builds without the key on purpose, since `plugin-artifact.zip`
+from those runs is a downloadable Actions artifact on
+a public repo, and embedding the real key in a build produced on every push would leak it far more
+often than shipping it in real releases. A build with no key present treats every `JJP1` code as
+invalid — same as any local dev build.
+
+**Bit stability.** At most 7 concurrently-gated features (`PreviewFeature.bit` in `0..6`; bit 7 is
+reserved for ALL). A bit is never reused once assigned: if a feature graduates out of preview and
+its enum entry is removed, the old bit stays retired until every code that could have granted it
+has expired (checkable in the private code registry) — reusing it sooner would let a still-valid
+old code silently grant whatever new feature claims the bit.
+
+**Minting** (`PreviewCodeMinter`, `src/test/kotlin/in/kkkev/jjidea/preview/`, run via
+`./gradlew previewCode --args="..."`) deliberately lives under `src/test`, never `src/main`: it
+needs the same key the plugin only ever sees as a verifier, so it must never ship inside the
+plugin jar. `keygen` generates a new key (only ever needed once, or if the current key is lost and
+must be rotated — rotating means re-issuing every outstanding code). `mint --features <id>[,<id>|all]
+[--expires yyyy-MM] [--for X] [--ref Y]` prints a code and a registry row. `inspect <code>` decodes
+and verifies one against the local key. Issued codes, who they were granted to, and why are
+tracked in a private registry (a GitLab wiki page, not this repo — codes are plaintext there).
+
+**Revocation** needs a build: add the code's `serial` to `resources/preview/revoked-serials.txt`
+(committed, one integer per line, starts empty) and ship a release. This is expected to be rare —
+letting a tester code expire (via `--expires`) is the normal way to bound exposure instead.
 
 ### Changed files
 

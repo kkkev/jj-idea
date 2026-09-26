@@ -82,4 +82,12 @@ class PreviewEntitlementTest {
         state.previewAccessCode = "wrong-code"
         entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe true
     }
+
+    @Test
+    fun `the legacy shipped code also grants PAGED_LOG_LOAD, not just DRAG_AND_DROP`() {
+        val state = JujutsuApplicationSettings.getInstance().state
+        state.previewAccessCode = VALID_CODE
+        state.enabledPreviewFeatures = PreviewFeature.PAGED_LOG_LOAD.id
+        entitlement.isEnabled(PreviewFeature.PAGED_LOG_LOAD) shouldBe true
+    }
 }
