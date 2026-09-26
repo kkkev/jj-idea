@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
+import com.intellij.ui.ColoredTableCellRenderer
 import com.intellij.util.ui.JBUI
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -17,6 +18,7 @@ import java.awt.Color
 import java.awt.Font
 import java.awt.font.FontRenderContext
 import java.net.URI
+import javax.swing.JTable
 
 /**
  * Renderer for the Author and Committer columns.
@@ -319,6 +321,13 @@ private val COMMITTER_MIN_WIDTH = JBUI.scale(55)
 private val DATE_MIN_WIDTH = JBUI.scale(60)
 
 /**
+ * Width of [JujutsuLogTableModel.COLUMN_TRAILING_SPACER] (locked, min == max). Just over
+ * `InvisibleResizableHeader`'s private 3px "table's own edge" dead zone - the minimum needed to
+ * un-block Date's own trailing edge, and about as close to invisible as this workaround allows.
+ */
+private val TRAILING_SPACER_WIDTH = JBUI.scale(4)
+
+/**
  * Install all custom renderers on the given table.
  * Note: Combined graph+description renderer is installed separately when graph data is loaded.
  * Only installs renderers for columns that are actually present in the column model.
@@ -328,6 +337,18 @@ fun JujutsuLogTable.installRenderers() {
     val authorRenderer = UserCellRenderer()
     val committerRenderer = UserCellRenderer()
     val dateRenderer = DateCellRenderer()
+    // Paints nothing but the normal selection/background - COLUMN_TRAILING_SPACER has no data
+    // (getValueAt returns null for it) and needs none.
+    val trailingSpacerRenderer = object : ColoredTableCellRenderer() {
+        override fun customizeCellRenderer(
+            table: JTable,
+            value: Any?,
+            selected: Boolean,
+            hasFocus: Boolean,
+            row: Int,
+            column: Int
+        ) = Unit
+    }
 
     for (i in 0 until columnModel.columnCount) {
         val column = columnModel.getColumn(i)
@@ -371,6 +392,13 @@ fun JujutsuLogTable.installRenderers() {
                 column.preferredWidth = defaultWidth
                 column.width = defaultWidth
                 column.minWidth = DATE_MIN_WIDTH
+            }
+            JujutsuLogTableModel.COLUMN_TRAILING_SPACER -> {
+                column.cellRenderer = trailingSpacerRenderer
+                column.preferredWidth = TRAILING_SPACER_WIDTH
+                column.width = TRAILING_SPACER_WIDTH
+                column.minWidth = TRAILING_SPACER_WIDTH
+                column.maxWidth = TRAILING_SPACER_WIDTH
             }
         }
     }

@@ -21,6 +21,8 @@ class JujutsuColumnManager {
         if (showAuthorColumn) add(JujutsuLogTableModel.COLUMN_AUTHOR)
         if (showCommitterColumn) add(JujutsuLogTableModel.COLUMN_COMMITTER)
         if (showDateColumn) add(JujutsuLogTableModel.COLUMN_DATE)
+        // Always last (jj-idea-rozx) - see COLUMN_TRAILING_SPACER's doc.
+        add(JujutsuLogTableModel.COLUMN_TRAILING_SPACER)
     }
 
     fun isColumnVisible(columnIndex: Int) = when (columnIndex) {
@@ -29,6 +31,8 @@ class JujutsuColumnManager {
         JujutsuLogTableModel.COLUMN_AUTHOR -> showAuthorColumn
         JujutsuLogTableModel.COLUMN_COMMITTER -> showCommitterColumn
         JujutsuLogTableModel.COLUMN_DATE -> showDateColumn
+        // Not user-toggleable - always present.
+        JujutsuLogTableModel.COLUMN_TRAILING_SPACER -> true
         else -> false
     }
 

@@ -105,6 +105,19 @@ class JujutsuColumnManagerTest {
     }
 
     @Test
+    fun `trailing spacer column is always visible and always last`() {
+        val manager = JujutsuColumnManager()
+
+        manager.isColumnVisible(JujutsuLogTableModel.COLUMN_TRAILING_SPACER) shouldBe true
+        manager.getVisibleColumns().last() shouldBe JujutsuLogTableModel.COLUMN_TRAILING_SPACER
+
+        // Still last even with every other toggleable column shown.
+        manager.showRootGutterColumn = true
+        manager.showCommitterColumn = true
+        manager.getVisibleColumns().last() shouldBe JujutsuLogTableModel.COLUMN_TRAILING_SPACER
+    }
+
+    @Test
     fun `root gutter column hidden by default`() {
         val manager = JujutsuColumnManager()
 

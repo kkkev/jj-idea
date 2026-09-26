@@ -176,9 +176,18 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 
 #### Column management
 
-- [ ] Column visibility toggle, reordering (drag-and-drop), resizing (drag separator), and
-      auto-fit (double-click separator) all work
+- [ ] jj-idea-rozx: no blank header row above the log table (GitHub #78) - the table starts
+      directly under the toolbar
+- [ ] Column visibility toggle (View Options menu) still works
+- [ ] Resize a column by dragging its border directly in the rows (matches Git's log - no visible
+      header row to grab). Reorder a column by dragging it horizontally; a mostly-vertical drag
+      doesn't start a reorder. Double-clicking a border no longer auto-fits it
+- [ ] The root gutter (leftmost) column can't be resized or dragged to reorder
+- [ ] Date (rightmost) can be resized by dragging its right edge, same as any other column, and
+      isn't noticeably narrower than the other fixed columns with "Fit columns to window width" on
 - [ ] Column widths and visibility both persist across IDE restarts
+- [ ] With drag-and-drop preview enabled (jj-idea-vpvz): a mostly-vertical drag on a commit row
+      still starts a commit drag/drop (e.g. rebase), not a column reorder
 
 #### View options menu (jj-idea-lgo4, n22a)
 

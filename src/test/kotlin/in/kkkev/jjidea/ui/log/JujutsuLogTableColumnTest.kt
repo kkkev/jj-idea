@@ -20,16 +20,17 @@ import java.awt.Rectangle
  * - Tests cover enabling/disabling individual columns
  * - Tests cover getVisibleColumns() logic
  *
- * ## Column Resizing
+ * ## Column Resizing / Reordering
  * - Implementation: JujutsuLogTable.saveColumnWidths() and loadColumnWidths()
  * - Column widths persisted to JujutsuSettings.columnWidths (string-keyed)
- * - Resizing enabled via tableHeader.resizingAllowed = true
- * - Manual testing required (needs Swing environment)
+ * - The header is invisible (see JujutsuLogTable's init and [JujutsuLogTableHeaderTest]); resize/
+ *   reorder happen by dragging in the rows. Gesture-level behavior needs manual testing (see
+ *   docs/manual-tests.md's MT-LOG-TABLE "Column management")
  *
  * ## Column Sorting
  * - Implementation: JujutsuLogTable.autoCreateRowSorter = true
  * - Uses standard JTable row sorter with automatic comparators
- * - All columns sortable by default (click column header to sort)
+ * - All columns sortable by default
  * - Selected entry handling updated to convert view row to model row
  * - Manual testing required (needs Swing environment and user interaction)
  *
@@ -58,9 +59,8 @@ class JujutsuLogTableColumnTest {
     fun `table model provides correct column count`() {
         val model = JujutsuLogTableModel()
 
-        // Always 5 columns in the model (visibility controlled separately)
-        // Columns: Root Gutter, Graph+Desc, Author, Committer, Date
-        model.columnCount shouldBe 5
+        // Root Gutter, Graph+Desc, Author, Committer, Date, Trailing Spacer
+        model.columnCount shouldBe 6
     }
 
     @Test
@@ -155,13 +155,14 @@ class JujutsuLogTableColumnTest {
     fun `column manager getVisibleColumns returns only visible column indices`() {
         val manager = JujutsuColumnManager()
 
-        // Default: graph, author, date
+        // Default: graph, author, date, trailing spacer
         var visible = manager.getVisibleColumns()
         visible shouldContainExactly
             listOf(
                 JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
                 JujutsuLogTableModel.COLUMN_AUTHOR,
-                JujutsuLogTableModel.COLUMN_DATE
+                JujutsuLogTableModel.COLUMN_DATE,
+                JujutsuLogTableModel.COLUMN_TRAILING_SPACER
             )
 
         // Hide author
@@ -170,7 +171,8 @@ class JujutsuLogTableColumnTest {
         visible shouldContainExactly
             listOf(
                 JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
-                JujutsuLogTableModel.COLUMN_DATE
+                JujutsuLogTableModel.COLUMN_DATE,
+                JujutsuLogTableModel.COLUMN_TRAILING_SPACER
             )
 
         // Show committer column
@@ -180,7 +182,8 @@ class JujutsuLogTableColumnTest {
             listOf(
                 JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION,
                 JujutsuLogTableModel.COLUMN_COMMITTER,
-                JujutsuLogTableModel.COLUMN_DATE
+                JujutsuLogTableModel.COLUMN_DATE,
+                JujutsuLogTableModel.COLUMN_TRAILING_SPACER
             )
     }
 
@@ -266,11 +269,10 @@ class JujutsuLogTableColumnTest {
         val layout = fitColumnWidths(available = 350, descMin = 180, fixed = fixed)
 
         layout.desc shouldBe 180
-        // author: 100 - 50*45/105 = 100 - 21 = 79 (integer division truncates); date: 120 - 50*60/105 = 120 - 28 = 92
-        layout.fixed shouldBe listOf(79, 92)
-        // Total lands within a few px of available - integer-division truncation on each fixed
-        // column's share means the reclaimed total can undershoot the exact shortfall slightly.
-        (layout.desc + layout.fixed.sum()) shouldBe 351
+        // author: 100 - 50*45/105 = 79 (floored); date: 120 - 50*60/105 = 92, then -1 to recover
+        // the px the floor above left unreclaimed -> 91.
+        layout.fixed shouldBe listOf(79, 91)
+        (layout.desc + layout.fixed.sum()) shouldBe 350 // exact - no overflow
     }
 
     @Test
@@ -284,6 +286,21 @@ class JujutsuLogTableColumnTest {
         layout.fixed shouldBe listOf(55, 60)
         // Total exceeds available - this is the accepted horizontal-scroll fallback.
         (layout.desc + layout.fixed.sum()) shouldBe 295
+    }
+
+    @Test
+    fun `fitColumnWidths never overflows the viewport with three fixed columns either`() {
+        val fixed = listOf(
+            FixedColumn(desired = 100, min = 55), // author
+            FixedColumn(desired = 100, min = 55), // committer
+            FixedColumn(desired = 120, min = 60) // date
+        )
+
+        val layout = fitColumnWidths(available = 423, descMin = 180, fixed = fixed)
+
+        layout.desc shouldBe 180
+        layout.fixed shouldBe listOf(77, 77, 89)
+        (layout.desc + layout.fixed.sum()) shouldBe 423
     }
 
     @Test

@@ -179,12 +179,24 @@ class JujutsuLogTable(
         // Single selection mode for now
         selectionModel.selectionMode = ListSelectionModel.MULTIPLE_INTERVAL_SELECTION
 
-        // Enable column reordering and resizing
-        tableHeader.reorderingAllowed = true
+        // Git-parity header (jj-idea-rozx / GitHub #78): same JBTable.InvisibleResizableHeader
+        // VcsLogGraphTable uses for a zero-height header (no blank row) that still resizes/reorders
+        // by dragging in the body. Root gutter and the trailing spacer are excluded - neither should
+        // be draggable (see COLUMN_TRAILING_SPACER's doc for why the spacer exists at all).
+        //
+        // Must use the setter method, not `tableHeader = ...`: JTable has both a protected
+        // `tableHeader` field and a setter/getter pair, and Kotlin's property syntax resolves to the
+        // raw field here, bypassing setTableHeader's `newHeader.setTable(this)` - leaving an NPE
+        // waiting in InvisibleResizableHeader.canMoveOrResizeColumn.
+        setTableHeader(
+            object : InvisibleResizableHeader() {
+                override fun canMoveOrResizeColumn(modelIndex: Int) =
+                    super.canMoveOrResizeColumn(modelIndex) &&
+                        modelIndex != JujutsuLogTableModel.COLUMN_ROOT_GUTTER &&
+                        modelIndex != JujutsuLogTableModel.COLUMN_TRAILING_SPACER
+            }
+        )
         tableHeader.resizingAllowed = true
-
-        // Ensure header is visible even with empty column names
-        tableHeader.preferredSize = Dimension(tableHeader.preferredSize.width, 24)
 
         // Disable auto-resize to allow manual column sizing
         autoResizeMode = AUTO_RESIZE_OFF
@@ -615,13 +627,19 @@ class JujutsuLogTable(
         // already look like up/down arrows on every platform, for free. Direction itself comes
         // from GraphEdgeIndex.hoveredEdgeAt, not from where within the row the pointer sits - see
         // its doc for why.
-        cursor = when {
-            newHoveredEdge?.navigable == true && newHoveredEdge.direction == EdgeDirection.UP ->
-                Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR)
-            newHoveredEdge?.navigable == true ->
-                Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
-            showsHoverCue -> Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-            else -> Cursor.getDefaultCursor()
+        //
+        // jj-idea-rozx: the invisible header (init) is also a mouseMoved listener on this table,
+        // registered first, and already set the resize cursor if we're on a column border - don't
+        // stomp it. `Cursor.getPredefinedCursor` caches one instance per type, so `===` detects it.
+        if (cursor !== Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR)) {
+            cursor = when {
+                newHoveredEdge?.navigable == true && newHoveredEdge.direction == EdgeDirection.UP ->
+                    Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR)
+                newHoveredEdge?.navigable == true ->
+                    Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
+                showsHoverCue -> Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                else -> Cursor.getDefaultCursor()
+            }
         }
         val newHoveredLinkRow = if (showsHoverCue) newRow else -1
         val newHoveredLinkCol = if (showsHoverCue) newCol else -1
@@ -953,11 +971,17 @@ class JujutsuLogTable(
         val columns = (0 until columnModel.columnCount).map { columnModel.getColumn(it) }
         val descColumn = columns.firstOrNull { it.modelIndex == JujutsuLogTableModel.COLUMN_GRAPH_AND_DESCRIPTION }
             ?: return
+        // Root gutter and the trailing spacer are both fixed-width - not columns this layout shrinks.
         val pinnedWidth = columns
-            .filter { it.modelIndex == JujutsuLogTableModel.COLUMN_ROOT_GUTTER }
+            .filter {
+                it.modelIndex == JujutsuLogTableModel.COLUMN_ROOT_GUTTER ||
+                    it.modelIndex == JujutsuLogTableModel.COLUMN_TRAILING_SPACER
+            }
             .sumOf { it.width }
         val fixedColumns = columns.filter {
-            it != descColumn && it.modelIndex != JujutsuLogTableModel.COLUMN_ROOT_GUTTER
+            it != descColumn &&
+                it.modelIndex != JujutsuLogTableModel.COLUMN_ROOT_GUTTER &&
+                it.modelIndex != JujutsuLogTableModel.COLUMN_TRAILING_SPACER
         }
 
         val layout = fitColumnWidths(
@@ -1032,7 +1056,18 @@ internal fun fitColumnWidths(available: Int, descMin: Int, fixed: List<FixedColu
     if (shrinkable <= 0) return ColumnLayout(descMin, fixed.map { it.min })
 
     val reclaim = minOf(shortfall, shrinkable)
-    return ColumnLayout(descMin, fixed.map { it.desired - reclaim * (it.desired - it.min) / shrinkable })
+    val shrunk = fixed.map { it.desired - reclaim * (it.desired - it.min) / shrinkable }.toMutableList()
+    // Each column's floored share can undershoot `reclaim` by a few px, letting the total overshoot
+    // `available` (jj-idea-rozx: the last column, date, ran past the viewport). Recover it from the
+    // last column with room above its minimum.
+    var roundingLoss = reclaim - (fixed.sumOf { it.desired } - shrunk.sum())
+    for (i in shrunk.indices.reversed()) {
+        if (roundingLoss <= 0) break
+        val give = minOf(roundingLoss, shrunk[i] - fixed[i].min)
+        shrunk[i] -= give
+        roundingLoss -= give
+    }
+    return ColumnLayout(descMin, shrunk)
 }
 
 /**
@@ -1044,6 +1079,7 @@ internal fun fitColumnWidths(available: Int, descMin: Int, fixed: List<FixedColu
  * 2. Author - Author name
  * 3. Committer - Committer name (optional)
  * 4. Date - Commit timestamp
+ * 5. Trailing Spacer - blank, tiny, fixed-width - see [COLUMN_TRAILING_SPACER]
  */
 class JujutsuLogTableModel : AbstractTableModel() {
     private val entries = mutableListOf<LogEntry>()
@@ -1112,7 +1148,16 @@ class JujutsuLogTableModel : AbstractTableModel() {
         const val COLUMN_COMMITTER = 3
         const val COLUMN_DATE = 4
 
-        const val NUM_COLUMNS = 5
+        /**
+         * jj-idea-rozx: blank, hairline, fixed-width column after Date. `InvisibleResizableHeader`
+         * treats the table's own right edge as a dead zone for resize/reorder, which otherwise makes
+         * the last real column un-resizable - this just gives Date a real border to its right.
+         * Inert (excluded from `canMoveOrResizeColumn`, like the root gutter), always present, and
+         * never persisted ([columnKey] is null for it).
+         */
+        const val COLUMN_TRAILING_SPACER = 5
+
+        const val NUM_COLUMNS = 6
 
         const val KEY_ROOT_GUTTER = "rootGutter"
         const val KEY_GRAPH_AND_DESCRIPTION = "graph"
@@ -1126,7 +1171,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
             COLUMN_AUTHOR -> KEY_AUTHOR
             COLUMN_COMMITTER -> KEY_COMMITTER
             COLUMN_DATE -> KEY_DATE
-            else -> null
+            else -> null // includes COLUMN_TRAILING_SPACER - its width is never persisted
         }
     }
 
@@ -1134,7 +1179,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
     override fun getColumnCount() = NUM_COLUMNS
 
-    // No column headings - matches Git plugin
+    // No column headings - the header is invisible (see JujutsuLogTable's init), so never rendered.
     override fun getColumnName(column: Int) = ""
 
     override fun getValueAt(rowIndex: Int, columnIndex: Int): Any? {

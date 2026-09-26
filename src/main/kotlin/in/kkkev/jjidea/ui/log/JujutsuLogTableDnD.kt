@@ -115,6 +115,12 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
 
     DnDSupport.createBuilder(this)
         .setBeanProvider { info ->
+            // jj-idea-rozx: the invisible header resizes/reorders columns via gestures on this same
+            // table body, so don't also start a commit drag once it's claimed one (draggedColumn
+            // alone isn't enough - it's set on every header press, not just an actual drag).
+            if (tableHeader.resizingColumn != null || tableHeader.draggedDistance != 0) {
+                return@setBeanProvider null
+            }
             val payload = dragPayloadAt(info.point) ?: return@setBeanProvider null
             hysteresis.reset()
             DnDDragStartBean(payload)
