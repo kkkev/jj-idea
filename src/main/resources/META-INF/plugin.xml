@@ -112,6 +112,12 @@
     <editorNotificationProvider
         implementation="in.kkkev.jjidea.ui.editor.JujutsuConflictEditorNotificationProvider"/>
 
+    <!-- Per-block gutter icons on jj conflict marker blocks (jj-idea-82fo). Global EP: gated to
+         a strict no-op on every non-main/non-jj editor by
+         JujutsuConflictGutterInstaller.shouldInstall. -->
+    <editorFactoryListener
+        implementation="in.kkkev.jjidea.ui.editor.conflict.JujutsuConflictGutterInstaller"/>
+
     <!-- Per-hunk gutter arrows for HunkPickerDialog (jj-idea-xuob). Global EP: gated to a
          strict no-op on every other diff viewer by HunkArrowDiffExtension.HUNK_PICKER_SESSION. -->
     <diff.DiffExtension implementation="in.kkkev.jjidea.diffedit.HunkArrowDiffExtension"/>
