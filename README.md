@@ -8,12 +8,16 @@ Native IntelliJ integration for [Jujutsu (jj)](https://jj-vcs.github.io/jj/), a 
 
 - **Describe-First Workflow** — The Working Copy tool window lets you describe your current work and create new changes with one click. No staging area, no "WIP" commits.
 - **Custom Log View** — Visual commit graph with inline change IDs, descriptions, bookmarks, and author info. Filter by text, branch, author, or date range.
-- **Change Operations** — Edit, abandon, describe, squash, and rebase changes directly from the log context menu.
-- **Rebase** — Full rebase dialog with source mode selection (-r/-s/-b), visual destination picker with commit graph, and live preview.
+- **Change Operations** — Edit, abandon, describe, squash, split, duplicate, rebase and restore changes directly from the log context menu.
+- **Operation Previews** — Full dialogs with for rebase, squash and split, with visual destination pickers and live previews.
 - **Git Remotes** — Fetch and push to Git remotes without leaving the IDE.
 - **File History & Annotations** — Full file history with diff viewer. Line-by-line blame annotations.
 - **Multi-Repository Support** — Work with multiple JJ repositories in a single project with a unified log view.
 - **Real-Time Status** — Auto-refresh keeps the UI in sync as you edit files.
+- **Bookmarks & Tags** — Actions to create, move, advance, track, untrack, delete and push bookmarks, and set and delete tags.
+- **Hunk-Level Squash & Split** — Line/hunk granularity for moving changes between commits, plus a live preview panel for the Squash Into dialog.
+- **Bookmark Management & Branches Panel** — Interactive bookmark decorations, pending-deletion visibility, distinguishing local from tracked-remote drift, and a dedicated branches panel (the main-toolbar bookmark widget has shipped)
+- **Conflicts** — Support for viewing and resolving conflicts in any order.
 
 ### Working Copy
 
@@ -39,7 +43,11 @@ Visual rebase with source mode selection, searchable destination picker, and a l
 
 ## Installing
 
-### From Custom Repository (Recommended)
+### From Jetbrains Marketplace (Recommended)
+
+Search for "Jujutsu VCS Integration" in the Marketplace tab and install. Or install from the [plugin page](https://plugins.jetbrains.com/plugin/30576-jujutsu-vcs-integration). 
+
+### From Custom Repository
 
 1. In IntelliJ IDEA: **Settings → Plugins → ⚙️ → Manage Plugin Repositories**
 2. Add: `https://raw.githubusercontent.com/kkkev/jj-idea/master/updatePlugins.xml`
@@ -64,7 +72,7 @@ Then install from `build/distributions/` via **Settings → Plugins → Install 
 ## Requirements
 
 - IntelliJ IDEA 2025.2 or later
-- [Jujutsu](https://jj-vcs.github.io/jj/latest/install/) (`jj`) version 0.37 or later installed, available in PATH (or otherwise configured)
+- [Jujutsu](https://jj-vcs.github.io/jj/latest/install/) (`jj`) version 0.37 or later (0.39 or later recommended) installed, available in PATH (or otherwise configured)
 
 ## Getting Started
 
