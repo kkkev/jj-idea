@@ -104,29 +104,34 @@ private const val MAX_WIDGET_TEXT_LENGTH = 30
  * `"main +3"`), so the widget never just goes blank once `@` moves past every bookmark (jj-idea-l7wd
  * / GitHub #62). Empty when there's no working copy or no bookmark anywhere in its ancestry.
  *
+ * [maxLength] caps the *names* portion only — the trailing ` +n`/` +n+` suffix is never dropped
+ * or counted against the names' own budget, so a long name never pushes the distance count out of
+ * the string entirely (jj-idea-9ck7, GitHub #107). Callers with genuinely fixed-width space (the
+ * toolbar/status-bar widgets) keep the default cap; callers with variable width (the bookmarks
+ * panel tree) pass `Int.MAX_VALUE` to lay out uncapped, like every other row in that tree.
+ *
  * A pure function so it's testable without a platform test.
  */
-fun bookmarkWidgetText(bookmarksOnWorkingCopy: List<String>, closest: ClosestBookmarks?): String {
-    val text = if (bookmarksOnWorkingCopy.isNotEmpty()) {
-        joinTruncated(bookmarksOnWorkingCopy)
+fun bookmarkWidgetText(
+    bookmarksOnWorkingCopy: List<String>,
+    closest: ClosestBookmarks?,
+    maxLength: Int = MAX_WIDGET_TEXT_LENGTH
+): String {
+    val (names, suffix) = if (bookmarksOnWorkingCopy.isNotEmpty()) {
+        bookmarksOnWorkingCopy to ""
     } else if (closest != null) {
-        val namesText = joinTruncated(closest.names.map { it.name })
         val cappedMarker = if (closest.distanceCapped) "+" else ""
-        "$namesText +${closest.distance}$cappedMarker"
+        closest.names.map { it.name } to " +${closest.distance}$cappedMarker"
     } else {
         return ""
     }
-    return if (text.length > MAX_WIDGET_TEXT_LENGTH) {
-        text.take(MAX_WIDGET_TEXT_LENGTH - 1) + "…"
-    } else {
-        text
-    }
-}
 
-private fun joinTruncated(names: List<String>) = buildString {
-    for (name in names) {
-        if (length >= MAX_WIDGET_TEXT_LENGTH) break
-        if (isNotEmpty()) append(", ")
-        append(name)
+    val namesText = names.joinToString(", ")
+    val namesBudget = (maxLength - suffix.length).coerceAtLeast(1)
+    val truncatedNames = if (namesText.length > namesBudget) {
+        namesText.take(namesBudget - 1) + "…"
+    } else {
+        namesText
     }
+    return truncatedNames + suffix
 }

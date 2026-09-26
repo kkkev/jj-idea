@@ -246,7 +246,9 @@ private fun buildRepoNodes(
     danglingHeads: List<DanglingHead>
 ): List<BookmarkNode> = buildList {
     val onWcNames = wcEntry?.bookmarks?.filterNot { it.isRemote }?.map { it.name.name }.orEmpty()
-    val wcLabel = bookmarkWidgetText(onWcNames, closest)
+    // Uncapped (jj-idea-9ck7): the panel's variable-width tree, unlike the fixed-width toolbar
+    // widget, lays this row out like every other row rather than char-capping it.
+    val wcLabel = bookmarkWidgetText(onWcNames, closest, maxLength = Int.MAX_VALUE)
     if (wcLabel.isNotEmpty()) {
         add(BookmarkNode.WorkingCopy(repo, wcLabel, wcEntry?.id, onWcNames, closest))
     }
@@ -355,14 +357,16 @@ private fun buildRepoNodes(
 /**
  * The bookmark-coloured half of a [BookmarkNode.DanglingHead]'s label (jj-idea-lig7): reuses
  * [bookmarkWidgetText] to render "[closest] +n" exactly as the working-copy row does, or a
- * localized fallback when the head has no ancestor bookmark at all. The change id itself is
+ * localized fallback when the head has no ancestor bookmark at all. Uncapped (jj-idea-9ck7): this
+ * row lives in the panel's variable-width tree, not the fixed-width toolbar widget, so it's never
+ * char-capped and the ` +n` suffix is never at risk of being dropped. The change id itself is
  * appended separately by the caller (both the plain-text `displayName` here and the styled
  * renderer in [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel]) via
  * [in.kkkev.jjidea.ui.components.append].
  */
 fun danglingHeadLabel(closest: ClosestBookmarks?): String =
     if (closest != null) {
-        bookmarkWidgetText(emptyList(), closest)
+        bookmarkWidgetText(emptyList(), closest, maxLength = Int.MAX_VALUE)
     } else {
         JujutsuBundle.message("bookmarks.panel.unbookmarked.nobookmark")
     }

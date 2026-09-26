@@ -74,4 +74,44 @@ class BookmarkMenuTest {
         text.length shouldBe 30
         text.last() shouldBe '…'
     }
+
+    @Test
+    fun `a long closest-ancestor name is truncated but the distance suffix survives`() {
+        val closest = ClosestBookmarks(
+            listOf(BookmarkName("a-very-long-bookmark-name-that-would-eat-the-whole-cap")),
+            distance = 3,
+            distanceCapped = false
+        )
+
+        val text = bookmarkWidgetText(emptyList(), closest)
+
+        text.length shouldBe 30
+        text shouldBe (text.dropLast(3) + " +3")
+        text.endsWith(" +3") shouldBe true
+    }
+
+    @Test
+    fun `a long closest-ancestor name with a capped distance still keeps the full suffix`() {
+        val closest = ClosestBookmarks(
+            listOf(BookmarkName("a-very-long-bookmark-name-that-would-eat-the-whole-cap")),
+            distance = 1000,
+            distanceCapped = true
+        )
+
+        val text = bookmarkWidgetText(emptyList(), closest)
+
+        text.endsWith(" +1000+") shouldBe true
+    }
+
+    @Test
+    fun `maxLength Int MAX_VALUE lays out uncapped, as the bookmarks panel tree needs`() {
+        val closest = ClosestBookmarks(
+            listOf(BookmarkName("a-very-long-bookmark-name-that-would-eat-the-whole-cap")),
+            distance = 3,
+            distanceCapped = false
+        )
+
+        bookmarkWidgetText(emptyList(), closest, maxLength = Int.MAX_VALUE) shouldBe
+            "a-very-long-bookmark-name-that-would-eat-the-whole-cap +3"
+    }
 }

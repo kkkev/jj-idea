@@ -197,6 +197,37 @@ class BookmarkTreeModelTest {
     }
 
     @Test
+    fun `working copy node label is never char-capped, unlike the toolbar widget (jj-idea-9ck7)`() {
+        val commitId = CommitId("abc123def456", "ab")
+        val longName = "a-very-long-bookmark-name-that-would-eat-the-whole-toolbar-cap"
+        val wcEntry = LogEntry(
+            repo = repo,
+            id = changeId,
+            commitId = commitId,
+            underlyingDescription = "",
+            bookmarks = listOf(Bookmark(longName))
+        )
+
+        val tree = buildBookmarkTree(refs(longName), mapOf(repo to wcEntry), emptyMap())
+
+        val wc = tree.first() as BookmarkNode.WorkingCopy
+        wc.displayName shouldBe longName
+    }
+
+    @Test
+    fun `working copy closest-ancestor label is never char-capped and keeps its full suffix`() {
+        val commitId = CommitId("abc123def456", "ab")
+        val longName = "a-very-long-bookmark-name-that-would-eat-the-whole-toolbar-cap"
+        val wcEntry = LogEntry(repo = repo, id = changeId, commitId = commitId, underlyingDescription = "")
+        val closest = ClosestBookmarks(listOf(BookmarkName(longName)), distance = 1000, distanceCapped = true)
+
+        val tree = buildBookmarkTree(refs(longName), mapOf(repo to wcEntry), mapOf(repo to closest))
+
+        val wc = tree.first() as BookmarkNode.WorkingCopy
+        wc.displayName shouldBe "$longName +1000+"
+    }
+
+    @Test
     fun `working copy node is absent when there is nothing to show`() {
         val tree = buildBookmarkTree(refs(), emptyMap(), emptyMap())
 
@@ -427,6 +458,23 @@ class BookmarkTreeModelTest {
         val leaves = unbookmarked.children.filterIsInstance<BookmarkNode.DanglingHead>()
         leaves.map { it.id } shouldBe listOf(closeHead.id, farHead.id)
         leaves[0].displayName shouldBe "main +1 aaa"
+    }
+
+    @Test
+    fun `a dangling head's long closest-bookmark name is never char-capped (jj-idea-9ck7)`() {
+        val longName = "a-very-long-bookmark-name-that-would-eat-the-whole-toolbar-cap"
+        val head = DanglingHead(
+            ChangeId("aaa", "aaa", null),
+            ClosestBookmarks(listOf(BookmarkName(longName)), distance = 1000, distanceCapped = true)
+        )
+        val danglingHeads = mapOf(repo to listOf(head))
+
+        val tree = buildBookmarkTree(refs("main"), emptyMap(), emptyMap(), danglingHeads)
+
+        val unbookmarked =
+            tree.filterIsInstance<BookmarkNode.Category>().first { it.displayName == "Unbookmarked heads" }
+        val leaf = unbookmarked.children.filterIsInstance<BookmarkNode.DanglingHead>().single()
+        leaf.displayName shouldBe "$longName +1000+ aaa"
     }
 
     @Test

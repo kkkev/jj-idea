@@ -1802,6 +1802,11 @@ selection does nothing; right-click for actions.
 - [ ] jj-idea-lig7: with more than 10 unbookmarked heads in the repo, the group caps at 10 rows
   rather than growing unbounded (use `scripts/fixtures/fx-stress.sh`'s stress fixture, which has
   many concurrent unbookmarked branch tips)
+- [ ] jj-idea-9ck7 (GitHub #107): `jj bookmark create` a ~50-char bookmark name, then `jj new`
+  twice off it without moving the bookmark — the main-toolbar bookmark widget truncates the name
+  with `…` but still shows the trailing `+n`; the bookmarks panel's "@" row and the
+  "Unbookmarked heads" row both show the **full, untruncated** name plus `+n` (the panel lays
+  out by available width like the rest of the tree, not by the toolbar's fixed char cap)
 
 ##### Bookmark-state tooltips (jj-idea-uyu9, GitHub #110)
 
