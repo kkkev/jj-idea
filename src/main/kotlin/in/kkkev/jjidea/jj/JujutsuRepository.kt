@@ -215,19 +215,34 @@ data class JujutsuRepositoryImpl(
 
                 else -> {
                     val filePath = file.filePath
-                    createContentRevision(filePath, logEntry).content?.let { content ->
-                        DiffContentFactory.getInstance().create(project, content, filePath.fileType).apply {
-                            putUserData(
-                                JujutsuDataKeys.DIFF_CONTENT_INFO,
-                                DiffContentInfo(logEntry.repo, filePath, logEntry.commitId)
-                            )
-                        }
-                    }
+                    historicalDiffContent(
+                        project,
+                        createContentRevision(filePath, logEntry),
+                        DiffContentInfo(logEntry.repo, filePath, logEntry.commitId)
+                    )
                 }
             }
         }
     }
 }
+
+/**
+ * Builds the diff content for a historical (non-working-copy) [revision], tagged with [info].
+ *
+ * The platform gets raw bytes - as `ChangeDiffRequestProducer` does for a
+ * [com.intellij.openapi.vcs.changes.ByteBackedContentRevision] - so it picks the viewer itself: a
+ * document (with the file's charset and highlighting) for text, a binary content for images and
+ * other binaries, which the image diff tool then renders. Building from a decoded `String`
+ * instead forced every file, images included, into a text diff.
+ *
+ * @return null if the revision has no content or it can't be loaded
+ */
+internal fun historicalDiffContent(project: Project?, revision: ContentRevision, info: DiffContentInfo): DiffContent? =
+    revision.contentBytes()?.let { bytes ->
+        DiffContentFactory.getInstance().createFromBytes(project, bytes, revision.file).apply {
+            putUserData(JujutsuDataKeys.DIFF_CONTENT_INFO, info)
+        }
+    }
 
 /**
  * Reconstructs the auto-merged parent tree content for [childRevision]'s [filePath] by
