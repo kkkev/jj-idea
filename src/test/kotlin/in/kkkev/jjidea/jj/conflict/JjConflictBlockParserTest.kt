@@ -174,4 +174,78 @@ class JjConflictBlockParserTest {
 
         JjConflictBlockParser.parseBlockAt(text, expected.startOffset) shouldBe expected
     }
+
+    @Test
+    fun `git format with base - each side's own content offset range slices out exactly its raw text`() {
+        val text = ConflictMarkerFixtures.gitWithBase
+        val block = JjConflictBlockParser.parseAll(text).single()
+
+        rawText(text, block.side1) shouldBe "ours content\n"
+        rawText(text, block.base!!) shouldBe "base content\n"
+        rawText(text, block.side2) shouldBe "theirs content\n"
+    }
+
+    @Test
+    fun `git format with an explicit but empty base - its content range is present but empty`() {
+        val text = ConflictMarkerFixtures.gitEmptyBase
+        val block = JjConflictBlockParser.parseAll(text).single()
+
+        val base = block.base!!
+        base.contentStartOffset.shouldNotBeNull()
+        base.contentEndOffset.shouldNotBeNull()
+        base.contentStartOffset shouldBe base.contentEndOffset
+        rawText(text, base) shouldBe ""
+    }
+
+    @Test
+    fun `snapshot format - each side's own content offset range slices out exactly its raw text`() {
+        val text = ConflictMarkerFixtures.snapshot
+        val block = JjConflictBlockParser.parseAll(text).single()
+
+        rawText(text, block.side1) shouldBe "ours content\n"
+        rawText(text, block.base!!) shouldBe "base content\n"
+        rawText(text, block.side2) shouldBe "theirs content\n"
+    }
+
+    @Test
+    fun `diff format (content first) - each side's own raw section text is recovered, base is not ranged`() {
+        val text = ConflictMarkerFixtures.diffSide1First
+        val block = JjConflictBlockParser.parseAll(text).single()
+
+        rawText(text, block.side1) shouldBe "ours content\n"
+        rawText(text, block.side2) shouldBe "+theirs content\n" // raw diff line, not materialized
+        block.side1.contentStartOffset.shouldNotBeNull()
+        block.side2.contentStartOffset.shouldNotBeNull()
+    }
+
+    @Test
+    fun `diff format (diff first) - each side's own raw section text is recovered, base is not ranged`() {
+        val text = ConflictMarkerFixtures.diffDestinationFirst
+        val block = JjConflictBlockParser.parseAll(text).single()
+
+        rawText(text, block.side1) shouldBe "-base content\n+destination content\n" // raw diff lines
+        rawText(text, block.side2) shouldBe "moved content\n"
+        // DIFF's base is derived from scattered "-" lines, not read from one literal place -
+        // there is no contiguous span to point at (see ConflictSide.contentEndOffset's doc).
+        block.base.shouldNotBeNull()
+        block.base!!.contentStartOffset.shouldBeNull()
+        block.base!!.contentEndOffset.shouldBeNull()
+    }
+
+    @Test
+    fun `multi-block file - each block's sides are ranged within that block only`() {
+        val text = ConflictMarkerFixtures.multiBlock
+        val (first, second) = JjConflictBlockParser.parseAll(text)
+
+        rawText(text, first.side1) shouldBe "ours-A\n"
+        rawText(text, first.side2) shouldBe "theirs-A\n"
+        rawText(text, second.side1) shouldBe "ours-B\n"
+        rawText(text, second.side2) shouldBe "theirs-B\n"
+    }
+
+    private fun rawText(text: CharSequence, side: ConflictSide): String {
+        val start = requireNotNull(side.contentStartOffset)
+        val end = requireNotNull(side.contentEndOffset)
+        return text.substring(start, end)
+    }
 }

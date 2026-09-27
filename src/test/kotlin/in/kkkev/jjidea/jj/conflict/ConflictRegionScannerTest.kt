@@ -175,5 +175,13 @@ fun ConflictBlock.shifted(offsetDelta: Int, lineDelta: Int): ConflictBlock = cop
     startOffset = startOffset + offsetDelta,
     endOffset = endOffset + offsetDelta,
     startLine = startLine + lineDelta,
-    endLine = endLine + lineDelta
+    endLine = endLine + lineDelta,
+    side1 = side1.shifted(offsetDelta),
+    side2 = side2.shifted(offsetDelta),
+    base = base?.shifted(offsetDelta)
+)
+
+private fun ConflictSide.shifted(offsetDelta: Int): ConflictSide = copy(
+    contentStartOffset = contentStartOffset?.plus(offsetDelta),
+    contentEndOffset = contentEndOffset?.plus(offsetDelta)
 )

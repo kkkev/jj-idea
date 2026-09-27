@@ -40,6 +40,7 @@ Components whose blast radius exceeds their own package:
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
 | `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
+| `ui/editor/conflict/JujutsuConflictGutterInstaller.kt` (plugin-wide `editorFactoryListener` — fires on every editor the platform creates, gated to a no-op outside a main editor on a jj-tracked file) | [MT-CONFLICT](#mt-conflict), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview), [MT-DIFFBASE](#mt-diffbase) (shares the gutter), [MT-WORKINGCOPY](#mt-workingcopy) (its preview tabs open editors this listener sees), [MT-CROSS](#mt-cross) (multi-repo scoping of the repo-detection gate) |
 | `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
 | `actions/diffbase/SetDiffbaseAction.kt` (quick action, jj-idea-g1io) | [MT-DIFFBASE](#mt-diffbase), [MT-CTXMENU](#mt-ctxmenu) (shares `RevisionSelectorPopup`), [MT-CROSS](#mt-cross) (multi-repo submenu) |
 | `actions/JujutsuMainMenuGroup.kt` ("Jujutsu" submenu in `Vcs.MainMenu`) | [MT-DIFFBASE](#mt-diffbase) |
@@ -2460,9 +2461,9 @@ confirm that's no longer possible (below).
 
 **Conflict resolution**
 
-**Code:** `jj/conflict/`, `vcs/merge/JujutsuConflictResolver.kt`, `vcs/merge/JujutsuMergeProvider.kt`, `vcs/diff/JujutsuConflictDiffRequestProvider.kt`, `ui/common/JujutsuConflictsNode.kt`, `actions/file/ResolveSelectedConflictsAction.kt`, `actions/file/ResolveAllConflictsAction.kt`, `actions/change/resolveConflictsAction.kt`, `actions/change/resolveConflictsAvailability.kt`
+**Code:** `jj/conflict/`, `ui/editor/conflict/`, `vcs/merge/JujutsuConflictResolver.kt`, `vcs/merge/JujutsuMergeProvider.kt`, `vcs/diff/JujutsuConflictDiffRequestProvider.kt`, `ui/common/JujutsuConflictsNode.kt`, `actions/file/ResolveSelectedConflictsAction.kt`, `actions/file/ResolveAllConflictsAction.kt`, `actions/change/resolveConflictsAction.kt`, `actions/change/resolveConflictsAvailability.kt`
 **Fixture:** FX-CONFLICT (content conflicts), FX-MD-CONFLICT (modify/delete conflicts)
-**Also re-run:** MT-CROSS (multi-repo scoping); MT-DIFF-PREVIEW, MT-LOG-DETAILS, MT-WORKINGCOPY (`JujutsuConflictDiffRequestProvider` is consumed via the shared preview-tab helper those sections cover)
+**Also re-run:** MT-CROSS (multi-repo scoping); MT-DIFF-PREVIEW, MT-LOG-DETAILS, MT-WORKINGCOPY (`JujutsuConflictDiffRequestProvider` is consumed via the shared preview-tab helper those sections cover); MT-DIFF, MT-DIFFBASE (the in-editor gutter's plugin-wide `editorFactoryListener` — see Shared Surfaces)
 
 #### Detection
 
@@ -2688,6 +2689,57 @@ tooltips.
 - [ ] Open a **non-conflicted** jj-tracked file: no banner appears
 - [ ] Mixed jj + Git project: opening a file with a **Git** conflict shows no jj banner (and vice versa)
 - [ ] Open a conflicted file that is **outside** any jj repo (e.g. an unrelated Git-only root in a multi-root project): no jj banner appears
+
+#### In-editor conflict gutter: per-side colors and accept icons (jj-idea-82fo)
+
+Alongside the whole-file banner above, each conflict block gets its own in-editor affordance:
+a background color per side (`side1`/`base`/`side2`) covering exactly that side's own lines,
+and one gutter icon per side for accepting it directly. Reuses the platform's own
+`DiffColors.DIFF_DELETED`/`DIFF_INSERTED`/`DIFF_MODIFIED` keys, so colors match what the
+built-in 3-way merge viewer already uses. Regions/icons are driven by an incremental,
+debounced (~300ms) rescan of the document text, independent of the banner's own
+`ChangeListManager`-based status - the two surfaces can legitimately disagree briefly (e.g.
+right after a manual marker edit, before the next jj snapshot).
+
+- [ ] Open `file.txt` (git marker style): each side's lines are tinted a distinct background
+      color; the marker lines themselves (`<<<<<<<`/`|||||||`/`=======`/`>>>>>>>`) stay
+      uncolored, reading as separators between the colored regions
+- [ ] One gutter icon (right-aligned, so it doesn't collide with the diffbase gutter's own
+      line-status markers if a custom diff base is configured - see MT-DIFFBASE) appears on
+      each side's own first line - side1's icon on side1's first line, base's on base's first
+      line, side2's on side2's first line - not one icon on the block's opening `<<<<<<<` line
+- [ ] Hovering an icon shows a tooltip naming that side specifically (e.g. `Accept <label> —
+      right-click for more options`), not the whole block
+- [ ] **Left-click** an icon: a small one-item popup appears (`Accept <label>`) - the document is
+      **not** edited yet
+- [ ] Clicking that popup's one entry applies it: the block's markers are replaced with that
+      side's content, no jj process runs (`jj op log` unchanged until the file is saved)
+- [ ] Dismissing the popup instead (click elsewhere, Escape) leaves the document **untouched**
+- [ ] Ctrl/Cmd+Z once after an accept: content and gutter icon/highlighting are restored; Undo
+      reads "Accept `<label>`" - each accept is its own undo unit, not coalesced with others
+- [ ] **Right-click** any of a block's icons: the full menu (Accept side #1 / side #2 / Both /
+      Base) appears, not the one-item popup - Base is present only for git/snapshot style
+- [ ] Diff marker style (`ui.conflict-marker-style = "diff"`): side1/side2 still get colors and
+      icons; the derived base gets **neither** an icon nor a color (its "base" text is
+      synthesized from scattered diff lines, not read from one literal place)
+- [ ] Snapshot marker style: same behavior as git style, base included
+- [ ] Save the file after accepting one block in a multi-block file: the *other* block's own
+      color/icons are unaffected (offsets shift correctly, no stale highlighting)
+- [ ] Hand-delete a block's closing `>>>>>>>` marker to merge two adjacent blocks: colors/icons
+      update within ~300ms to match the merged shape, no stale icons left over
+- [ ] Type a stray `<<<<<<<` with no closer anywhere below it: no icon/color appears for it, and
+      the IDE stays responsive (not a full-document rescan every keystroke)
+- [ ] Split the editor on the conflicted file: colors/icons appear independently in **both**
+      panes (each pane gets its own copy - this feature does not share highlighters across a
+      split view, unlike some other gutter markers - see the code's own KDoc for why)
+- [ ] Open the same file in a diff viewer or a preview tab: **no** jj gutter icons/colors there
+      (the plugin-wide `editorFactoryListener` this depends on must be a no-op outside a real
+      main editor - see MT-DIFF, MT-DIFF-PREVIEW)
+- [ ] Mixed jj + Git project, a file with a **Git** conflict (not jj): no jj gutter icons/colors
+- [ ] A conflicted file **outside** any jj repo: no jj gutter icons/colors
+- [ ] FX-MD-CONFLICT: accepting a side on a block does **not** delete the file even if that side
+      is the deletion - per-block accept only ever edits text; the whole-file deletion behavior
+      stays on the banner's own Accept link and the merge tool, not this per-block affordance
 
 #### Cancelling must never discard a side (GitHub #63 — critical regression check)
 

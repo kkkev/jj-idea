@@ -2,17 +2,26 @@ package `in`.kkkev.jjidea.ui.editor.conflict
 
 import com.intellij.diff.util.DiffGutterOperation
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.diff.DiffColors
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorKind
+import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
+import com.intellij.openapi.editor.markup.HighlighterLayer
+import com.intellij.openapi.editor.markup.HighlighterTargetArea
+import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.util.Alarm
+import `in`.kkkev.jjidea.jj.conflict.AcceptChoice
+import `in`.kkkev.jjidea.jj.conflict.ConflictBlock
 import `in`.kkkev.jjidea.jj.conflict.ConflictRegionScanner
+import `in`.kkkev.jjidea.jj.conflict.ConflictSide
+import `in`.kkkev.jjidea.jj.conflict.choicesFor
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.editor.debouncedDocumentScan
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry
@@ -136,19 +145,21 @@ private class ConflictGutterWatcher(private val editor: Editor) : Disposable {
 }
 
 /**
- * One editor's worth of gutter icons, from first scan through every subsequent edit.
- * [ConflictRegionScanner] keeps [scanner]'s block list up to date synchronously in
- * [DocumentListener.documentChanged] itself - cheap by construction (see that class's doc), so
- * this does *not* defer the model update itself, only the (already O(active blocks in the
- * file), so equally cheap) icon reconciliation - debounced purely to avoid visibly
- * dispose/recreate-flickering the icons on every keystroke while typing inside a block.
+ * One editor's worth of gutter icons and side-background highlighting, from first scan through
+ * every subsequent edit. [ConflictRegionScanner] keeps [scanner]'s block list up to date
+ * synchronously in [DocumentListener.documentChanged] itself - cheap by construction (see that
+ * class's doc), so this does *not* defer the model update itself, only the (already O(active
+ * blocks in the file), so equally cheap) icon/highlighter reconciliation in [reconcile] -
+ * debounced purely to avoid visibly dispose/recreate-flickering them on every keystroke while
+ * typing inside a block.
  */
 private class ConflictGutterController(private val editor: Editor) : Disposable {
     private val project = requireNotNull(editor.project) { "editor.project checked non-null by shouldInstall" }
     private val scanner = ConflictRegionScanner()
     private var operations: List<DiffGutterOperation> = emptyList()
+    private var highlighters: List<RangeHighlighter> = emptyList()
     private val alarm = Alarm(this)
-    private val debounced = debouncedDocumentScan(alarm) { reconcileIcons() }
+    private val debounced = debouncedDocumentScan(alarm) { reconcile() }
 
     fun installInitial() {
         scanner.fullScan(editor.document.immutableCharSequence)
@@ -161,7 +172,7 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
             },
             this
         )
-        reconcileIcons()
+        reconcile()
     }
 
     private fun applyToScanner(event: DocumentEvent) {
@@ -174,20 +185,60 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
         )
     }
 
-    private fun reconcileIcons() {
+    private fun reconcile() {
         operations.forEach { it.dispose() }
-        operations = scanner.blocks.map { block ->
-            DiffGutterOperation.Simple(
-                editor,
-                block.startOffset,
-                DiffGutterOperation.RendererBuilder { ConflictBlockGutterIconRenderer(project, editor.document, block) }
+        operations = scanner.blocks.flatMap { block ->
+            choicesFor(block).filter { it != AcceptChoice.BOTH }.map { choice ->
+                DiffGutterOperation.Simple(
+                    editor,
+                    offsetFor(block, choice),
+                    DiffGutterOperation.RendererBuilder {
+                        ConflictBlockGutterIconRenderer(project, editor.document, block, choice)
+                    }
+                )
+            }
+        }
+
+        highlighters.forEach { it.dispose() }
+        highlighters = scanner.blocks.flatMap { block ->
+            listOfNotNull(
+                sideHighlighter(block.side1, DiffColors.DIFF_DELETED),
+                sideHighlighter(block.side2, DiffColors.DIFF_INSERTED),
+                sideHighlighter(block.base, DiffColors.DIFF_MODIFIED)
             )
         }
+    }
+
+    /**
+     * Anchor offset for [choice]'s gutter icon - that side's own first content line, falling
+     * back to the block's own opening `<<<<<<<` line for the rare shape (`UNRECOGNISED`) that
+     * has no per-side range at all.
+     */
+    private fun offsetFor(block: ConflictBlock, choice: AcceptChoice): Int = when (choice) {
+        AcceptChoice.SIDE1 -> block.side1.contentStartOffset ?: block.startOffset
+        AcceptChoice.SIDE2 -> block.side2.contentStartOffset ?: block.startOffset
+        AcceptChoice.BASE -> block.base?.contentStartOffset ?: block.startOffset
+        AcceptChoice.BOTH -> block.startOffset // unreachable - filtered out of reconcile()'s icon pass
+    }
+
+    private fun sideHighlighter(side: ConflictSide?, key: TextAttributesKey): RangeHighlighter? {
+        val start = side?.contentStartOffset ?: return null
+        val end = side.contentEndOffset ?: return null
+        if (start == end) return null // an explicit but empty side/base - nothing to tint
+        return editor.markupModel.addRangeHighlighter(
+            key,
+            start,
+            end,
+            HighlighterLayer.SELECTION - 1,
+            HighlighterTargetArea.EXACT_RANGE
+        )
     }
 
     override fun dispose() {
         operations.forEach { it.dispose() }
         operations = emptyList()
+        highlighters.forEach { it.dispose() }
+        highlighters = emptyList()
     }
 }
 

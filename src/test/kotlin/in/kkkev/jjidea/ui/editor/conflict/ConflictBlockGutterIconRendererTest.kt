@@ -10,26 +10,35 @@ import `in`.kkkev.jjidea.jj.conflict.JjConflictBlockParser
 import `in`.kkkev.jjidea.jj.conflict.choicesFor
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 
 /**
- * [ConflictBlockGutterIconRenderer.equals]/[hashCode] and its menu (jj-idea-82fo, stage 4/4) -
- * see that class's KDoc for why equals/hashCode are implemented at all despite the
- * dispose-and-recreate pattern that makes them largely inert today.
+ * [ConflictBlockGutterIconRenderer.equals]/[hashCode] and its menu (jj-idea-82fo follow-up:
+ * per-side icons) - see that class's KDoc for why equals/hashCode are implemented at all despite
+ * the dispose-and-recreate pattern that makes them largely inert today.
  */
 class ConflictBlockGutterIconRendererTest {
     private val project = mockk<Project>()
     private val document = mockk<Document>()
 
-    private fun renderer(block: ConflictBlock) = ConflictBlockGutterIconRenderer(project, document, block)
+    private fun renderer(block: ConflictBlock, choice: AcceptChoice = AcceptChoice.SIDE1) =
+        ConflictBlockGutterIconRenderer(project, document, block, choice)
 
     @Test
-    fun `two renderers for the same block are equal`() {
+    fun `two renderers for the same block and side are equal`() {
         val block = JjConflictBlockParser.parseAll(ConflictMarkerFixtures.gitWithBase).single()
 
-        renderer(block) shouldBe renderer(block)
-        renderer(block).hashCode() shouldBe renderer(block).hashCode()
+        renderer(block, AcceptChoice.SIDE1) shouldBe renderer(block, AcceptChoice.SIDE1)
+        renderer(block, AcceptChoice.SIDE1).hashCode() shouldBe renderer(block, AcceptChoice.SIDE1).hashCode()
+    }
+
+    @Test
+    fun `renderers for the same block but different sides are not equal`() {
+        val block = JjConflictBlockParser.parseAll(ConflictMarkerFixtures.gitWithBase).single()
+
+        renderer(block, AcceptChoice.SIDE1) shouldNotBe renderer(block, AcceptChoice.SIDE2)
     }
 
     @Test
@@ -41,20 +50,35 @@ class ConflictBlockGutterIconRendererTest {
     }
 
     @Test
-    fun `tooltip mentions both sides' labels`() {
+    fun `tooltip names this icon's own side`() {
         val block = JjConflictBlockParser.parseAll(ConflictMarkerFixtures.gitWithBase).single()
 
-        val tooltip = renderer(block).tooltipText
-
-        tooltip.contains("side A") shouldBe true
-        tooltip.contains("side B") shouldBe true
+        renderer(block, AcceptChoice.SIDE1).tooltipText.contains("side A") shouldBe true
+        renderer(block, AcceptChoice.SIDE2).tooltipText.contains("side B") shouldBe true
     }
 
     @Test
-    fun `popup menu offers exactly one action per choicesFor this block`() {
+    fun `left-click shows a one-item confirmation popup for this icon's own side, not an instant accept`() {
         val block = JjConflictBlockParser.parseAll(ConflictMarkerFixtures.gitWithBase).single()
 
-        val actions = (renderer(block).popupMenuActions as DefaultActionGroup).getChildActionsOrStubs()
+        val side1Click = renderer(block, AcceptChoice.SIDE1).clickAction
+        val side2Click = renderer(block, AcceptChoice.SIDE2).clickAction
+
+        side1Click.shouldBeInstanceOf<ConflictAcceptConfirmAction>()
+        side1Click.templateText?.contains("side A") shouldBe true
+        side2Click.templateText?.contains("side B") shouldBe true
+    }
+
+    @Test
+    fun `popup menu still offers every choicesFor entry, regardless of which side this icon is`() {
+        val block = JjConflictBlockParser.parseAll(ConflictMarkerFixtures.gitWithBase).single()
+
+        val actions = (
+            renderer(
+                block,
+                AcceptChoice.SIDE2
+            ).popupMenuActions as DefaultActionGroup
+        ).getChildActionsOrStubs()
 
         actions.size shouldBe choicesFor(block).size
     }

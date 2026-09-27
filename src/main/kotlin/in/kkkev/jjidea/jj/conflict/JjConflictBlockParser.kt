@@ -83,16 +83,24 @@ internal object JjConflictBlockParser {
         var sawPipeBase = false
         var sawDashBase = false
         var closeLine = -1
+        // Line index of the current section's own first content line - every marker line's
+        // content starts on the very next line, so this is always `i + 1` as of whichever marker
+        // line most recently started the current section (bar the DIFF style's own two-line
+        // header, see the "\\\" branch below, which pushes it one further).
+        var sectionStartLine = startIndex
 
-        fun flush(newKind: Kind?, newHeader: String?, newDiffFromLabel: String? = null) {
-            kind?.let { sections.add(Section(it, buf.toList(), header, diffFromLabel)) }
+        fun flush(newKind: Kind?, newHeader: String?, newDiffFromLabel: String? = null, newStartLine: Int = i + 1) {
+            kind?.let { sections.add(Section(it, buf.toList(), header, sectionStartLine, diffFromLabel)) }
                 ?: run {
-                    if (preHeaderBuf.isNotEmpty()) sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader))
+                    if (preHeaderBuf.isNotEmpty()) {
+                        sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader, sectionStartLine))
+                    }
                 }
             buf.clear()
             kind = newKind
             header = newHeader
             diffFromLabel = newDiffFromLabel
+            sectionStartLine = newStartLine
         }
 
         while (i < table.lineCount) {
@@ -104,10 +112,10 @@ internal object JjConflictBlockParser {
                     if (kind == Kind.SIDE2 && header == null) {
                         header = line.removePrefix(">>>>>>>").trim().takeIf { it.isNotBlank() }
                     }
-                    kind?.let { sections.add(Section(it, buf.toList(), header, diffFromLabel)) }
+                    kind?.let { sections.add(Section(it, buf.toList(), header, sectionStartLine, diffFromLabel)) }
                         ?: run {
                             if (preHeaderBuf.isNotEmpty()) {
-                                sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader))
+                                sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader, sectionStartLine))
                             }
                         }
                     closeLine = i
@@ -129,15 +137,16 @@ internal object JjConflictBlockParser {
                 line == "=======" && (kind == null || kind == Kind.BASE) -> {
                     if (kind == null) {
                         if (preHeaderBuf.isNotEmpty()) {
-                            sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader))
+                            sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader, sectionStartLine))
                         }
                     } else {
-                        sections.add(Section(Kind.BASE, buf.toList(), header, diffFromLabel))
+                        sections.add(Section(Kind.BASE, buf.toList(), header, sectionStartLine, diffFromLabel))
                     }
                     buf.clear()
                     kind = Kind.SIDE2
                     header = null // filled in from the closing ">>>>>>>" line, above
                     diffFromLabel = null
+                    sectionStartLine = i + 1
                 }
                 // Old/snapshot conflict style (+++++++/-------) and diff style (%%%%%%%):
                 //   <<<<<<< Conflict N of M
@@ -171,10 +180,13 @@ internal object JjConflictBlockParser {
                 }
                 // The diff-section header continuation line - "\\\\\\\        to: <label>" - names
                 // that side, not the base ("%%%%%%% diff from: <label>" names the base instead).
+                // Content for this section starts *after* this line, not the "%%%%%%%" line
+                // flush() above tentatively assumed - correct that now that we've seen it.
                 line.startsWith("\\\\\\") -> {
                     if (kind == Kind.DIFF) {
                         line.trimStart('\\').trim().removePrefix("to:").trim()
                             .takeIf { it.isNotBlank() }?.let { header = it }
+                        sectionStartLine = i + 1
                     }
                 }
                 else -> kind?.let { buf.add(line) } ?: preHeaderBuf.add(line)
@@ -213,6 +225,7 @@ internal object JjConflictBlockParser {
                 ConflictMarkerStyle.GIT
             }
             return explicitSidesBlock(
+                table,
                 side1Section,
                 baseSection,
                 side2Section,
@@ -236,19 +249,25 @@ internal object JjConflictBlockParser {
             val baseLines = if (first.kind == Kind.DIFF) firstBase else secondBase
             val label1 = cleanLabel(first.header)
             val label2 = cleanLabel(second.header)
+            val (firstStart, firstEnd) = table.contentOffsets(first)
+            val (secondStart, secondEnd) = table.contentOffsets(second)
             val side1 = ConflictSide(
                 label1?.label,
                 roleOf(label1?.label),
                 firstContent,
                 label1?.noTerminatingNewline ?: false,
-                alternateLabel(first)
+                alternateLabel(first),
+                firstStart,
+                firstEnd
             )
             val side2 = ConflictSide(
                 label2?.label,
                 roleOf(label2?.label),
                 secondContent,
                 label2?.noTerminatingNewline ?: false,
-                alternateLabel(second)
+                alternateLabel(second),
+                secondStart,
+                secondEnd
             )
             return ConflictBlock(
                 startOffset = startOffset,
@@ -279,6 +298,7 @@ internal object JjConflictBlockParser {
     }
 
     private fun explicitSidesBlock(
+        table: LineTable,
         side1: Section,
         baseSection: Section?,
         side2: Section,
@@ -290,8 +310,24 @@ internal object JjConflictBlockParser {
     ): ConflictBlock {
         val label1 = cleanLabel(side1.header)
         val label2 = cleanLabel(side2.header)
-        val s1 = ConflictSide(label1?.label, roleOf(label1?.label), side1.lines, label1?.noTerminatingNewline ?: false)
-        val s2 = ConflictSide(label2?.label, roleOf(label2?.label), side2.lines, label2?.noTerminatingNewline ?: false)
+        val (side1Start, side1End) = table.contentOffsets(side1)
+        val (side2Start, side2End) = table.contentOffsets(side2)
+        val s1 = ConflictSide(
+            label1?.label,
+            roleOf(label1?.label),
+            side1.lines,
+            label1?.noTerminatingNewline ?: false,
+            contentStartOffset = side1Start,
+            contentEndOffset = side1End
+        )
+        val s2 = ConflictSide(
+            label2?.label,
+            roleOf(label2?.label),
+            side2.lines,
+            label2?.noTerminatingNewline ?: false,
+            contentStartOffset = side2Start,
+            contentEndOffset = side2End
+        )
         val baseLabel = baseSection?.let { cleanLabel(it.header) }
         return ConflictBlock(
             startOffset = startOffset,
@@ -302,11 +338,14 @@ internal object JjConflictBlockParser {
             side1 = s1,
             side2 = s2,
             base = baseSection?.let {
+                val (baseStart, baseEnd) = table.contentOffsets(it)
                 ConflictSide(
                     baseLabel?.label,
                     ConflictRole.BASE,
                     it.lines,
-                    baseLabel?.noTerminatingNewline ?: false
+                    baseLabel?.noTerminatingNewline ?: false,
+                    contentStartOffset = baseStart,
+                    contentEndOffset = baseEnd
                 )
             },
             side1IsCurrent = currentIsSide1(s1.role, s2.role)
@@ -325,6 +364,8 @@ internal object JjConflictBlockParser {
         val kind: Kind,
         val lines: List<String>,
         val header: String?,
+        /** Line index of [lines]' first entry - see [ConflictSide.contentEndOffset]'s doc. */
+        val contentStartLine: Int,
         val diffFromLabel: String? = null
     )
 
@@ -406,5 +447,17 @@ internal object JjConflictBlockParser {
         fun line(i: Int): String = lines[i]
         fun startOffsetOfLine(i: Int): Int = offsets[i]
         fun endOffsetOfLine(i: Int): Int = if (i + 1 < lines.size) offsets[i + 1] else offsets[i] + lines[i].length
+    }
+
+    /**
+     * [section]'s own raw (start, end-exclusive) offset span - see [ConflictSide.contentEndOffset]'s
+     * doc. [Section.contentStartLine] plus its own line count exactly bounds the span, since every
+     * line between markers is copied verbatim into [Section.lines] with nothing skipped or added.
+     */
+    private fun LineTable.contentOffsets(section: Section): Pair<Int, Int> {
+        val start = startOffsetOfLine(section.contentStartLine)
+        val endLineExclusive = section.contentStartLine + section.lines.size
+        val end = startOffsetOfLine(endLineExclusive)
+        return start to end
     }
 }

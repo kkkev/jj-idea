@@ -29,13 +29,28 @@ enum class ConflictRole { DESTINATION, MOVED, BASE }
  *   never `"from:"` (see [JjConflictBlockParser]'s class doc) - but a caller whose primary label
  *   happens to collide with the other side's own label (e.g. both named the same commit due to
  *   divergence) can fall back to this instead of showing two identical labels.
+ * @param contentStartOffset The start of [contentEndOffset]'s span - see that param's doc.
+ * @param contentEndOffset This side's own **raw** span in the document, together with
+ *   [contentStartOffset] - the literal text between its own marker line and the next
+ *   marker/close line (verbatim, including e.g. a `DIFF`-style section's own `+`/`-` prefixes -
+ *   never the *materialized* text [lines] holds). Both `null` together only when there is no
+ *   such contiguous span to point at: the `UNRECOGNISED` fallback shape, or a `DIFF`-style
+ *   [ConflictBlock.base] (synthesized from `-` lines scattered across the diff section, not read
+ *   from one literal place - see `choicesFor`'s matching exclusion of `DIFF` bases in
+ *   `conflictBlockReplacement.kt`). Always both non-null otherwise, even when the span is empty
+ *   (e.g. an explicit but empty `|||||||`/`=======` base section) - `contentStartOffset ==
+ *   contentEndOffset` then. Added for the in-editor gutter's per-side background highlighting
+ *   (jj-idea-82fo follow-up); the accept logic in `conflictBlockReplacement.kt` doesn't need
+ *   these, since it replaces the *whole* block from [lines], not this side's own raw span.
  */
 data class ConflictSide(
     val label: String?,
     val role: ConflictRole?,
     val lines: List<String>,
     val noTerminatingNewline: Boolean = false,
-    val alternateLabel: String? = null
+    val alternateLabel: String? = null,
+    val contentStartOffset: Int? = null,
+    val contentEndOffset: Int? = null
 )
 
 /**
