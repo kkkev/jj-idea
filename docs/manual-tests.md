@@ -2255,6 +2255,11 @@ below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, w
       once (not once at top level and again under "Jujutsu")
 - [ ] Right-hand diff pane is editable when it contains the working copy, read-only when
       it contains a historical version
+- [ ] Binary/image diffs: commit a change that modifies a `.png`, select that commit in the
+      log and open the file's diff (and again with a later commit selected, so both sides are
+      historical) — IntelliJ's image diff viewer shows both versions as images, not garbled
+      text/bytes; an ordinary text file in the same commit still shows a syntax-highlighted
+      text diff
 - [ ] "Open in -> remote": for a single parent, opens that parent (resolves to pushed
       ancestor); hidden when no pushed ancestor exists; for an unpushed historical version,
       resolves to the nearest pushed ancestor — verify in Working Copy Panel, Project Tool
@@ -2305,6 +2310,9 @@ below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, w
 - [ ] jj-idea-hq4d: opening a file from the File History panel (right-click a file → "Show File
       History", pick an older revision, open the file) enables "Annotate"; it produces a blame
       gutter for that revision's content
+- [ ] Binary/image history: open the platform history tab for a `.png` changed across a few
+      commits, and show the diff between two revisions — it renders as an image diff, not
+      text
 - [ ] jj-idea-qrne: open a file's platform history tab (editor's Jujutsu submenu → "Show
       History") — Date, Author, and Committer columns are populated for every revision, not
       blank

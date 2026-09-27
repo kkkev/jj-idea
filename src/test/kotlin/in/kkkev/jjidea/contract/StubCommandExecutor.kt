@@ -123,6 +123,9 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         revision: Revision
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun showBytes(filePath: FilePath, revision: Revision): ByteArray =
+        TODO("Not needed for integration tests")
+
     override fun isAvailable() = true
     override fun version() = "stub-1.0"
 

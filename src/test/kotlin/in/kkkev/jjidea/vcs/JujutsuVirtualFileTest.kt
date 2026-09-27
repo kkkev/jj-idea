@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.changes.ByteBackedContentRevision
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.vfs.VcsVirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -30,11 +31,10 @@ class JujutsuVirtualFileTest {
     private fun mockRepo(
         logEntry: LogEntry?,
         content1: String = "a",
-        content2: String = "b"
+        content2: String = "b",
+        contentRevision: ContentRevision =
+            mockk<ContentRevision>().also { every { it.content } returnsMany listOf(content1, content2) }
     ): Pair<JujutsuRepository, ContentRevision> {
-        val contentRevision = mockk<ContentRevision>()
-        every { contentRevision.content } returnsMany listOf(content1, content2)
-
         val registry = mockk<MutableContentRegistry>(relaxed = true)
         val project = mockk<Project>()
         every { project.getService(MutableContentRegistry::class.java) } returns registry
@@ -194,5 +194,21 @@ class JujutsuVirtualFileTest {
         val (repo) = mockRepo(logEntry = null)
 
         makeFile(repo).fileRevision shouldBe null
+    }
+
+    // Binary content (GitHub: image diffs rendered as text): the file's bytes must be exactly
+    // jj's bytes, not a String round-trip of them, or the platform can't render the image.
+    @Test
+    fun `binary content from a byte-backed revision is preserved byte-for-byte`() {
+        val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+        val revision = mockk<ByteBackedContentRevision> {
+            every { contentAsBytes } returns png
+            every { content } returns String(png, Charsets.UTF_8)
+        }
+        val logEntry = mockk<LogEntry>().also { every { it.immutable } returns true }
+        val (repo) = mockRepo(logEntry, contentRevision = revision)
+
+        makeFile(repo).contentsToByteArray() shouldBe png
+        verify(exactly = 0) { revision.content }
     }
 }

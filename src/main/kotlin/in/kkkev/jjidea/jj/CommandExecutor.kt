@@ -5,6 +5,7 @@ import com.intellij.openapi.progress.Task
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.createCommand
@@ -159,6 +160,19 @@ interface CommandExecutor {
      * @return File content
      */
     fun show(filePath: FilePath, revision: Revision): CommandResult
+
+    /**
+     * Get the exact bytes of a file at a specific revision (`jj file show`'s raw stdout).
+     *
+     * Unlike [show], which decodes stdout as UTF-8 text, this never passes the content through a
+     * charset — use it wherever raw file content is handed to the platform (diff contents, file
+     * history, [com.intellij.openapi.vcs.changes.ByteBackedContentRevision]), so binary files such
+     * as images reach the platform intact and it can pick the right viewer.
+     *
+     * @throws com.intellij.openapi.vcs.VcsException if jj fails, times out, or can't be launched
+     */
+    @Throws(VcsException::class)
+    fun showBytes(filePath: FilePath, revision: Revision): ByteArray
 
     /**
      * Check if jujutsu is available and working
