@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.18] - 2026-09-27
+
 ### Added
 - The Working Copy panel's "Merge Conflicts" node now shows jj's own shape text per file (e.g. "2-sided conflict including 1 deletion") and gained two ways to resolve several files without going through an unspecified one-at-a-time queue: double-click a single conflicted row to open the merge tool for just that file, or multi-select several and use the new "Accept …" context-menu actions to resolve them all at once by side. Menu text is jj's own commit label when every selected file names the same commit (the common case for a single file, or several files from the same rebase/merge), or a generic "Side #1"/"Side #2" when they don't — never "Yours"/"Theirs", and never coercing unrelated conflicts under one label just because they share jj's wording. ([#66](https://github.com/kkkev/jj-idea/issues/66))
 - Fixed a rare case where the conflicted-file editor banner's two "Accept <side>" links, and the new bulk accept actions above, could show the exact same label for both sides of a conflict (a `%%%%%%%` diff-style side whose header collided with the other side's, e.g. via a divergent commit) — jj's own text for the genuinely different side, previously discarded, is now used instead.
@@ -937,7 +939,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.17...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.18...HEAD
+[0.8.18]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.18
 [0.8.17]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.17
 [0.8.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.16
 [0.8.15]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.15
