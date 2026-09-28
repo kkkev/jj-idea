@@ -28,6 +28,14 @@ fun choicesFor(block: ConflictBlock): List<AcceptChoice> = buildList {
     if (block.base != null && block.style != ConflictMarkerStyle.DIFF) add(AcceptChoice.BASE)
 }
 
+/** The [ConflictSide] [choice] refers to - `null` for [AcceptChoice.BOTH] (not a single side) or a [AcceptChoice.BASE] on a block with none. */
+fun ConflictBlock.sideFor(choice: AcceptChoice): ConflictSide? = when (choice) {
+    AcceptChoice.SIDE1 -> side1
+    AcceptChoice.SIDE2 -> side2
+    AcceptChoice.BASE -> base
+    AcceptChoice.BOTH -> null
+}
+
 /**
  * The replacement text for [block]'s whole `<<<<<<<`...`>>>>>>>` span (start to end offset
  * inclusive of both marker lines) if [choice] is accepted - the caller replaces exactly that

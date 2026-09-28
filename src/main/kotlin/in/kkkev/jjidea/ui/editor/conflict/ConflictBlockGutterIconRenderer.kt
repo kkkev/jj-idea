@@ -33,8 +33,8 @@ import javax.swing.Icon
  *   icon, so "Accept Both" and the base option stay reachable from any of them - no separate
  *   whole-block icon is needed for those.
  *
- * Hover feedback (a genuine first for this codebase - no `EditorMouseMotionListener` anywhere
- * in it yet) is deferred to jj-idea-sr42, a separate follow-up.
+ * Mouseover feedback on a block's side tint (not this icon itself) is [ConflictSideHover]'s job
+ * (jj-idea-sr42), installed independently by [JujutsuConflictGutterInstaller].
  *
  * [getAlignment] is [Alignment.RIGHT], not the default [Alignment.CENTER] - `DiffbaseContentLoader`'s
  * per-line change-status markers already use the gutter's center column (jj-idea-fwea), so this

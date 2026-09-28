@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.jj.conflict.ConflictBlock
 import `in`.kkkev.jjidea.jj.conflict.ConflictRegionScanner
 import `in`.kkkev.jjidea.jj.conflict.ConflictSide
 import `in`.kkkev.jjidea.jj.conflict.choicesFor
+import `in`.kkkev.jjidea.jj.conflict.sideFor
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.editor.debouncedDocumentScan
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry
@@ -172,6 +173,7 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
             },
             this
         )
+        ConflictSideHover(editor) { scanner.blocks }.also { Disposer.register(this, it) }.install()
         reconcile()
     }
 
@@ -202,9 +204,9 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
         highlighters.forEach { it.dispose() }
         highlighters = scanner.blocks.flatMap { block ->
             listOfNotNull(
-                sideHighlighter(block.side1, DiffColors.DIFF_DELETED),
-                sideHighlighter(block.side2, DiffColors.DIFF_INSERTED),
-                sideHighlighter(block.base, DiffColors.DIFF_MODIFIED)
+                sideHighlighter(block.sideFor(AcceptChoice.SIDE1), DiffColors.DIFF_DELETED),
+                sideHighlighter(block.sideFor(AcceptChoice.SIDE2), DiffColors.DIFF_INSERTED),
+                sideHighlighter(block.sideFor(AcceptChoice.BASE), DiffColors.DIFF_MODIFIED)
             )
         }
     }
@@ -229,7 +231,7 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
             key,
             start,
             end,
-            HighlighterLayer.SELECTION - 1,
+            HighlighterLayer.SELECTION - 2, // below ConflictSideHover's own hover-tint layer (SELECTION - 1)
             HighlighterTargetArea.EXACT_RANGE
         )
     }

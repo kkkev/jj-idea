@@ -2741,6 +2741,27 @@ right after a manual marker edit, before the next jj snapshot).
       is the deletion - per-block accept only ever edits text; the whole-file deletion behavior
       stays on the banner's own Accept link and the merge tool, not this per-block affordance
 
+**Mouseover hover feedback on a side's own tint (jj-idea-sr42)**
+
+- [ ] Hover the mouse over a side's own colored text: that side's background brightens/strengthens
+      (visibly stronger than its resting tint), the other two sides stay at their resting tint
+- [ ] Hover a side's own gutter icon (not just its text): the same side's background strengthens,
+      exactly as hovering the text itself does, **and** a separate rounded highlight (the same
+      hover color as an ordinary IDE toolbar button, not the side's own tint color) appears
+      directly behind the icon - the icon now reads as the clickable element, distinct from the
+      side's own color
+- [ ] Hover a marker line (`<<<<<<<`/`|||||||`/`=======`/`>>>>>>>`) or plain text outside any
+      block: no hover strengthening appears anywhere, on the text **or** in the gutter
+- [ ] Move the mouse off the editor entirely (`mouseExited`): any active hover strengthening
+      clears immediately
+- [ ] Click-drag a text selection across a hovered block: the platform's own selection color
+      takes visual precedence, and releasing the drag leaves the editor in a normal, editable
+      state - the hover overlay never interferes with selection or typing
+- [ ] Type inside a hovered side, or accept a different block elsewhere in the file: the stale
+      hover clears (the next mouse move re-establishes it correctly against the edited document)
+- [ ] Repeat the above in both a light and a dark color scheme: the hover strengthening reads as
+      visibly stronger than the resting tint in both
+
 #### Cancelling must never discard a side (GitHub #63 — critical regression check)
 
 - [ ] Open the merge tool for `file.txt` and close it via the window's `x` button **without** touching anything: `file.txt` **stays conflicted** — content on disk still has its original conflict markers, and it still shows red (MERGED_WITH_CONFLICTS) in the Working Copy panel

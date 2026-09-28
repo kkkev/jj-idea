@@ -146,6 +146,7 @@ class JujutsuConflictGutterInstallerTest {
         every { project.jujutsuRepositoryByAncestry(file) } returns repo
         handler.captured.changed(mapOf(mockk<VirtualFile>() to repo))
 
-        verify(exactly = 1) { document.addDocumentListener(any(), any()) } // installed exactly once
+        // Installed exactly once - ConflictGutterController's own listener plus ConflictSideHover's.
+        verify(exactly = 2) { document.addDocumentListener(any(), any()) }
     }
 }
