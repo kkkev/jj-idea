@@ -500,6 +500,76 @@ class JujutsuLogTableModelFilterTest {
         }
     }
 
+    /**
+     * jj-idea-vqpn (GitHub #116): the custom revset filter chip, resolved client-side to a
+     * [ChangeKey] set (see [resolveRevsetFilter]) and applied here exactly like [Bookmark filter]'s
+     * `bookmarkFilter` — except `null` (inactive) is distinct from an empty set (active, matches
+     * nothing), unlike every other filter's empty-means-inactive convention.
+     */
+    @Nested
+    inner class `Revset filter` {
+        @Test
+        fun `null shows everything (inactive)`() {
+            model.setEntries(listOf(createEntry("abc123"), createEntry("def456")))
+
+            model.setRevsetFilter(null)
+
+            model.rowCount shouldBe 2
+        }
+
+        @Test
+        fun `an empty set (active, no matches) shows nothing`() {
+            model.setEntries(listOf(createEntry("abc123"), createEntry("def456")))
+
+            model.setRevsetFilter(emptySet())
+
+            model.rowCount shouldBe 0
+        }
+
+        @Test
+        fun `intersects with the author filter`() {
+            val entry1 = createEntry("abc123", author = alice)
+            val entry2 = createEntry("def456", author = bob)
+            model.setEntries(listOf(entry1, entry2))
+
+            // Both filters individually match both entries' union, but only entry1 matches both.
+            model.setRevsetFilter(setOf(ChangeKey(repo, entry1.id), ChangeKey(repo, entry2.id)))
+            model.setAuthorFilter(setOf("alice@example.com"))
+
+            model.rowCount shouldBe 1
+            model.getEntry(0)?.id?.short shouldBe "abc123"
+        }
+
+        @Test
+        fun `intersects with the date filter`() {
+            val old = createEntry("abc123", timestamp = Instant.fromEpochMilliseconds(0L))
+            val new = createEntry("def456", timestamp = Instant.fromEpochMilliseconds(2000000000L))
+            model.setEntries(listOf(old, new))
+
+            model.setRevsetFilter(setOf(ChangeKey(repo, old.id), ChangeKey(repo, new.id)))
+            model.setDateFilter(Instant.fromEpochMilliseconds(1000000000L))
+
+            model.rowCount shouldBe 1
+            model.getEntry(0)?.id?.short shouldBe "def456"
+        }
+
+        @Test
+        fun `a later setEntries call, such as a paged append, is filtered against the same id set`() {
+            val entry1 = createEntry("abc123")
+            val entry2 = createEntry("def456")
+            model.setEntries(listOf(entry1))
+            model.setRevsetFilter(setOf(ChangeKey(repo, entry1.id), ChangeKey(repo, entry2.id)))
+            model.rowCount shouldBe 1
+
+            // A page-2 append (loadMore) reuses the id set resolved for page 1 - change ids are
+            // stable across pages, so no re-query is needed for the newly loaded entry to be
+            // filtered correctly.
+            model.setEntries(listOf(entry1, entry2))
+
+            model.rowCount shouldBe 2
+        }
+    }
+
     @Nested
     inner class `Date filter` {
         @Test
@@ -971,6 +1041,16 @@ class JujutsuLogTableModelFilterTest {
             callCount = 0
 
             model.setBookmarkFilter(setOf(ChangeKey(repo, ChangeId("aaa111", "aaa111", null))))
+
+            callCount shouldBe 1
+        }
+
+        @Test
+        fun `setRevsetFilter fires callback`() {
+            model.setEntries(listOf(createEntry("aaa111")))
+            callCount = 0
+
+            model.setRevsetFilter(setOf(ChangeKey(repo, ChangeId("aaa111", "aaa111", null))))
 
             callCount shouldBe 1
         }

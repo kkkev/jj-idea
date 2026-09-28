@@ -44,6 +44,11 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     // Root filter component (created lazily, only shown if multiple roots)
     private var rootFilterComponent: JujutsuRootFilterComponent? = null
 
+    // Custom revset filter component (jj-idea-vqpn, GitHub #116) - created in
+    // createOtherFilterComponents(), which the base class constructor calls before this
+    // subclass's own init{} block runs.
+    private var revsetFilterComponent: JujutsuRevsetFilterComponent? = null
+
     /**
      * Builds the graph layout for the visible (filtered) subset of entries.
      * Runs on the EDT; the input list is already topo-sorted by the data loader.
@@ -116,6 +121,9 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         if (config.dateFilterPeriodName.isNotEmpty()) {
             dateFilterComponent.setSelectedPeriod(config.dateFilterPeriodName)
         }
+        if (config.revsetFilter.isNotEmpty()) {
+            revsetFilterComponent?.setInitialRevset(config.revsetFilter)
+        }
 
         // Persist filter changes into config
         referenceFilterComponent.addChangeListener {
@@ -128,6 +136,10 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         }
         dateFilterComponent.addChangeListener {
             config.dateFilterPeriodName = dateFilterComponent.getSelectedPeriodName()
+            persistConfig()
+        }
+        revsetFilterComponent?.addChangeListener {
+            config.revsetFilter = revsetFilterComponent?.getRevsetText().orEmpty()
             persistConfig()
         }
 
@@ -169,7 +181,19 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     }
 
     private fun setupStateListener() {
-        project.stateModel.logRefresh.connect(this) { _ -> refresh() }
+        project.stateModel.logRefresh.connect(this) { _ ->
+            refresh()
+            // jj-idea-vqpn (GitHub #116): a write can create/abandon commits the revset filter
+            // matches, so its resolved id set needs re-checking on the same trigger as the rest
+            // of the log - see JujutsuRevsetFilterComponent.reresolve's doc for why this doesn't
+            // silently drop the filter on a transient failure.
+            revsetFilterComponent?.reresolve()
+        }
+    }
+
+    /** jj-idea-vqpn (GitHub #116): an explicit Refresh re-resolves the revset filter too. */
+    override fun onManualRefresh() {
+        revsetFilterComponent?.reresolve()
     }
 
     /**
@@ -202,6 +226,16 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         refreshDisplayedGraph()
         updateRootFilterVisibility()
         updateStatusBar(newData.entries.size, newData.limit)
+        // jj-idea-vqpn (GitHub #116): a narrow revset filter over a deep/paged history can match
+        // commits outside the currently loaded window - say so explicitly rather than letting a
+        // short or empty filtered graph look like the filter silently found nothing.
+        revsetFilterComponent?.getMatchedKeys()?.let { keys ->
+            val loadedKeys = newData.entries.mapTo(HashSet()) { it.key }
+            val beyondWindow = keys.count { it !in loadedKeys }
+            if (beyondWindow > 0) {
+                showStatusMessage(JujutsuBundle.message("log.status.revset.beyondWindow", beyondWindow))
+            }
+        }
         detailsPanel.showCommits(logTable.selectedEntries)
         referenceFilterComponent.retryFilter()
         // Restore root filter after data loads (roots are only available once the model is populated)
@@ -324,7 +358,23 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             }
         }
 
-        return listOfNotNull(rootFilterComponent)
+        // Custom revset filter (jj-idea-vqpn, GitHub #116). Log-only (not passed to file
+        // history's toolbar, which doesn't override this method), and reads the same per-repo
+        // resolved revset the data loader itself fetches with, so the filter can never surface a
+        // commit outside what's already loadable for this tab.
+        revsetFilterComponent = JujutsuRevsetFilterComponent(
+            repos = { config.selectedRepos(project.initialisedJujutsuRepositories) },
+            baseFor = { repo -> JujutsuSettings.getInstance(project).resolvedLogRevset(repo) },
+            tableModel = logTable.logModel,
+            onReresolveError = { message ->
+                showStatusMessage(JujutsuBundle.message("log.status.revset.error", message))
+            }
+        ).apply {
+            initUi()
+            initialize()
+        }
+
+        return listOfNotNull(rootFilterComponent, revsetFilterComponent)
     }
 
     override fun updateTableStuff() {

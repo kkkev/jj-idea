@@ -12,6 +12,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPanel
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.NamedColorUtil
 import com.intellij.util.ui.UIUtil
 import java.awt.*
 import java.awt.event.*
@@ -45,6 +46,15 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
     private lateinit var valueLabel: JBLabel
     private lateinit var filterButton: InlineIconButton
     private val changeListeners = mutableListOf<Runnable>()
+
+    /**
+     * Set by [setErrorText] (jj-idea-vqpn, GitHub #116's revset filter chip) when the filter's
+     * currently-applied value failed to (re-)resolve — e.g. a persisted revset that stops
+     * parsing after a bookmark it referenced was deleted. Non-null overrides the value label's
+     * foreground with the platform's error color and becomes the chip's tooltip, so the failure
+     * is visible without needing to reopen the filter's edit popup.
+     */
+    private var errorText: String? = null
 
     /**
      * Initialize the UI components after the subclass is fully constructed.
@@ -115,6 +125,22 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         updateFilterButton()
         valueLabel.revalidate()
         valueLabel.repaint()
+    }
+
+    /**
+     * Marks (or clears, with `null`) this filter's currently-applied value as failing to
+     * (re-)resolve. See [errorText]'s doc. Safe to call before [initUi] (e.g. during restore from
+     * persisted config) since it only touches state — the label/tooltip pick it up once built.
+     */
+    protected fun setErrorText(text: String?) {
+        errorText = text
+        toolTipText = text
+        if (::valueLabel.isInitialized) {
+            setDefaultForeground()
+            valueLabel.toolTipText = text
+            valueLabel.revalidate()
+            valueLabel.repaint()
+        }
     }
 
     /**
@@ -201,6 +227,16 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
 
     private fun setForeground(isHovered: Boolean) {
         val isEnabled = isEnabled
+        if (isEnabled && errorText != null) {
+            valueLabel.foreground = NamedColorUtil.getErrorForeground()
+            nameLabel.foreground =
+                if (isHovered) {
+                    if (!JBColor.isBright()) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
+                } else {
+                    UIUtil.getLabelInfoForeground()
+                }
+            return
+        }
         if (isEnabled && isHovered) {
             nameLabel.foreground =
                 if (!JBColor.isBright()) UIUtil.getLabelForeground() else UIUtil.getTextAreaForeground()
@@ -217,7 +253,13 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         doResetFilter()
     }
 
-    private fun showPopup() {
+    /**
+     * Opens this filter's selection UI, anchored under the chip. The default builds
+     * [createActionGroup] into a standard action-list popup; [JujutsuRevsetFilterComponent]
+     * overrides this to show its own text-entry popup instead (jj-idea-vqpn, GitHub #116) — a
+     * revset doesn't fit a fixed action list, and needs Enter-to-apply plus inline error text.
+     */
+    protected open fun showPopup() {
         val popup = createPopupMenu()
         popup.showUnderneathOf(this)
     }

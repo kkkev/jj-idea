@@ -80,4 +80,16 @@ interface LogService {
      * @return List of change IDs at the heads of [revset], in jj's own returned order
      */
     fun getLogHeads(revset: Revset = Expression.ALL): Result<List<ChangeId>>
+
+    /**
+     * Get just the change ids matching [revset] — no other metadata. Used by
+     * [in.kkkev.jjidea.ui.log.resolveRevsetFilter] (the custom revset log filter, jj-idea-vqpn,
+     * GitHub #116) to resolve a filter to a [in.kkkev.jjidea.jj.ChangeKey] set client-side,
+     * without disturbing what [in.kkkev.jjidea.jj.LogCache] has loaded for other tabs/dialogs.
+     * A failure carries jj's own error message (e.g. an invalid revset), for display next to the
+     * filter chip.
+     * @param revset Revset to query (default: "all()")
+     * @return List of change ids matching [revset], in jj's own returned order
+     */
+    fun getChangeIds(revset: Revset = Expression.ALL): Result<List<ChangeId>>
 }

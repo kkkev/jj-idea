@@ -1121,6 +1121,15 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var rootFilter = RootFilterSelection() // Filter by repository root (jj-idea-qcks)
 
     /**
+     * Custom revset filter (jj-idea-vqpn, GitHub #116): repo-scoped change keys resolved from a
+     * user-typed revset via [resolveRevsetFilter]. `null` means the filter is inactive (show
+     * everything) - unlike [bookmarkFilter]'s empty-set-means-inactive convention, an active
+     * revset filter that resolves to *no* matches is a real, distinct state that must show an
+     * empty graph, not fall back to unfiltered.
+     */
+    private var revsetFilter: Set<ChangeKey>? = null
+
+    /**
      * Invoked on the EDT after [applyFilter] rebuilds [filteredEntries], except when called
      * from [setEntries] (which is followed immediately by an explicit graph update by the
      * caller). Used by the panel to rebuild the displayed graph for the visible subset.
@@ -1297,6 +1306,16 @@ class JujutsuLogTableModel : AbstractTableModel() {
     }
 
     /**
+     * Set the custom revset filter (jj-idea-vqpn, GitHub #116) by its already-resolved
+     * [ChangeKey] set. `null` means no revset filtering; a non-null (possibly empty) set means
+     * the filter is active and only these keys pass.
+     */
+    fun setRevsetFilter(keys: Set<ChangeKey>?) {
+        revsetFilter = keys
+        applyFilter()
+    }
+
+    /**
      * Get all unique roots in the current entries (for filter UI).
      */
     fun getAllRoots(): List<JujutsuRepository> = entries.map { it.repo }.distinct()
@@ -1377,7 +1396,16 @@ class JujutsuLogTableModel : AbstractTableModel() {
                 // Root filter (if active)
                 val matchesRoot = rootFilter.shows(entry.repo)
 
-                matchesText && matchesAuthor && matchesBookmark && matchesDate && matchesPaths && matchesRoot
+                // Revset filter (if active) - jj-idea-vqpn, GitHub #116
+                val matchesRevset = revsetFilter?.contains(entry.key) ?: true
+
+                matchesText &&
+                    matchesAuthor &&
+                    matchesBookmark &&
+                    matchesDate &&
+                    matchesPaths &&
+                    matchesRoot &&
+                    matchesRevset
             }
         )
         filteredRowByKey = buildMap(filteredEntries.size) {

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - The Working Copy panel's changes toolbar gained a **Restore** button, next to Resolve all conflicts, pre-checking whatever's selected in the tree (or opening empty for the current repo when nothing's selected). "Restore" and "Restore to This" now read "Restore…"/"Restore to This…", since both open a dialog rather than acting immediately. ([#84](https://github.com/kkkev/jj-idea/issues/84))
+- The log toolbar gained a **Revset** filter chip alongside Reference/Author/Date/Root: type any jj revset (click the chip, Enter to apply) to narrow the graph to it, combined (AND) with every other active filter. Resolved client-side against the loaded entries, so it never changes what's fetched from jj for this or any other open tab. An invalid revset shows jj's own error inline without losing the chip's last-good filter; a filter that matches commits outside the currently loaded window says so in the status bar instead of just looking short. Persisted per log tab. ([#116](https://github.com/kkkev/jj-idea/issues/116))
+
+### Fixed
+- A per-repo override of Log Revset or Log Limit in Settings didn't update any open log window until the toolbar Refresh button was clicked — the setting change wasn't reaching the log panel at all in the common case, and, separately, once paged log loading was enabled its lightweight per-write refresh path kept reusing the previous revset/limit until an explicit Refresh rebuilt it from scratch. Both now take effect as soon as you click OK/Apply.
 
 ## [0.8.18] - 2026-09-27
 

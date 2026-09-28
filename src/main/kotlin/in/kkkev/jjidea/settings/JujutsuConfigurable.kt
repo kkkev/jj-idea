@@ -956,6 +956,13 @@ class JujutsuConfigurable(
 
         // Save per-repo settings
         var diffbaseOverrideChanged = false
+        // jj-idea-vqpn (GitHub #116) bugfix: only a change to the *global* logRevset/logChangeLimit
+        // fields (checked below, against previousLogRevset/previousLogLimit) used to trigger
+        // project.stateModel.logRefresh.notify() - a per-repo override's revset/limit change was
+        // saved into repositoryOverrides but nothing told any open log window to reload, leaving
+        // it showing stale data (and, for jj-idea-vqpn's revset filter chip, ANDing against a
+        // stale base) until an unrelated refresh happened to fire.
+        var repoLogConfigChanged = false
         repoSettingsPanels.forEach { panel ->
             val repoPath = panel.repo.directory.path
 
@@ -980,6 +987,10 @@ class JujutsuConfigurable(
                 newCustomDiffbaseRevset != currentOverride?.customDiffbaseRevset
             ) {
                 diffbaseOverrideChanged = true
+            }
+
+            if (newLimit != currentOverride?.logChangeLimit || newRevset != currentOverride?.logRevset) {
+                repoLogConfigChanged = true
             }
 
             if (newLimit != currentOverride?.logChangeLimit ||
@@ -1042,10 +1053,10 @@ class JujutsuConfigurable(
             project.stateModel.logRefresh.notify(Unit)
         }
 
-        // If log limit or revset changed, reload the log
+        // If the global log limit/revset or any per-repo override of either changed, reload the log
         val newLogLimit = settings.state.logChangeLimit
         val newLogRevset = settings.state.logRevset
-        if (newLogLimit != previousLogLimit || newLogRevset != previousLogRevset) {
+        if (newLogLimit != previousLogLimit || newLogRevset != previousLogRevset || repoLogConfigChanged) {
             previousLogLimit = newLogLimit
             previousLogRevset = newLogRevset
             project.stateModel.logRefresh.notify(Unit)
@@ -1393,6 +1404,18 @@ class JujutsuConfigurable(
      */
     internal fun setInstallHelpStatusForTest(status: JjAvailabilityStatus) {
         installHelpPlaceholder.component = buildInstallHelpContent(status)
+    }
+
+    /**
+     * Test seam for jj-idea-vqpn's per-repo-override-triggers-a-log-refresh regression guard: a
+     * test builds the panel via [createPanel] and needs to toggle a specific repo's revset/limit
+     * override checkbox+field before calling [apply], the same way a user would in the real
+     * per-repo "Repository Settings" group — but [repoSettingsPanels] and its fields are private.
+     */
+    internal fun setRepoRevsetOverrideForTest(repo: JujutsuRepository, revset: String?) {
+        val panel = repoSettingsPanels.first { it.repo == repo }
+        panel.revsetCb.isSelected = revset != null
+        panel.revsetField.text = revset ?: ""
     }
 
     /** Creates a row with method name, monospace command in a box, and copy button. */

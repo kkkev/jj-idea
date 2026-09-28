@@ -127,9 +127,13 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         if (revset == Revset.Default) {
             return Result.failure(VcsException("getLogHeads requires an explicit revset, not the default"))
         }
-        val headsRevset = Expression("heads($revset)")
-        return getLog(logTemplates.changeIdOnlyTemplate, headsRevset)
+        return getChangeIds(Expression("heads($revset)"))
     }
+
+    override fun getChangeIds(revset: Revset): Result<List<ChangeId>> = getLog(
+        logTemplates.changeIdOnlyTemplate,
+        revset
+    )
 
     override fun getBookmarks() = getRefs("bookmark", logTemplates.bookmarkListTemplate) {
         executor.bookmarkList(it)

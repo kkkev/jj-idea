@@ -370,7 +370,17 @@ abstract class CommitTablePanel<D>(
         log.info("Refresh action triggered")
         project.stateModel.invalidateRepositoryState()
         dataLoader.forceRefresh()
+        onManualRefresh()
     }
+
+    /**
+     * Extension point for subclasses that need to react to an explicit Refresh independently of
+     * [dataLoader]'s own reload — e.g. [in.kkkev.jjidea.ui.log.UnifiedJujutsuLogPanel] re-resolving
+     * its client-side revset filter chip (jj-idea-vqpn, GitHub #116), whose matched id set can
+     * have changed underneath it (new/abandoned commits) even though it isn't part of what the
+     * data loader fetches. No-op by default.
+     */
+    protected open fun onManualRefresh() {}
 
     /**
      * Refresh action - reload commits from all repositories.

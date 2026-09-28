@@ -564,7 +564,7 @@ more lanes than the 3-4 needed here.
 
 **Toolbar, filters, and reference filter**
 
-**Code:** `ui/log/JujutsuFilterComponent.kt`, `ui/log/JujutsuAuthorFilterComponent.kt`, `ui/log/JujutsuDateFilterComponent.kt`, `ui/log/JujutsuReferenceFilterComponent.kt`, `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/JujutsuPathsFilterComponent.kt`, `ui/log/LogFilterMatcher.kt`, `ui/common/FilterPriorityLayoutStrategy.kt`, `ui/common/CommitTablePanel.kt`, `ui/log/UnifiedJujutsuLogPanel.kt` (primaryActions), `actions/change/DescribeChangeAction.kt`, `actions/change/RebaseChangeAction.kt`
+**Code:** `ui/log/JujutsuFilterComponent.kt`, `ui/log/JujutsuAuthorFilterComponent.kt`, `ui/log/JujutsuDateFilterComponent.kt`, `ui/log/JujutsuReferenceFilterComponent.kt`, `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/JujutsuPathsFilterComponent.kt`, `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`, `ui/log/LogFilterMatcher.kt`, `ui/common/FilterPriorityLayoutStrategy.kt`, `ui/common/CommitTablePanel.kt`, `ui/log/UnifiedJujutsuLogPanel.kt` (primaryActions), `actions/change/DescribeChangeAction.kt`, `actions/change/RebaseChangeAction.kt`
 
 #### Toolbar & filters
 
@@ -716,6 +716,52 @@ alongside one other repo works.
       repo's root shares the same underlying change id
 - [ ] Filtering to "@" (working copy) shows **every** repo's working copy, each with its own
       ancestry — not just the first repo's
+
+#### Custom revset filter (jj-idea-vqpn, GitHub #116)
+
+**Code:** `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`,
+`ui/log/JujutsuLogTable.kt` (`revsetFilter`), `ui/log/UnifiedJujutsuLogPanel.kt`
+(`revsetFilterComponent`), `settings/LogWindowConfig.kt` (`revsetFilter`),
+`jj/cli/CliLogService.kt` (`getChangeIds`)
+
+Client-side filter: resolves the typed revset to a change-id set (one `jj log` call per repo,
+ANDed with the repo-level revset from Settings) and intersects that set with whatever the
+already-loaded log table shows — it never changes what jj loads for this or any other tab.
+
+- [ ] Click the **Revset** chip — a popup opens under it with a text field and a
+      "Enter to apply · Esc to close" hint
+- [ ] Type `ancestors(@, 5)` and press **Enter** — the popup closes, the graph narrows to that
+      revset, and the chip shows the revset text
+- [ ] Also apply the **Author** filter — the visible rows are the intersection of both filters
+- [ ] Open the chip again, clear the field, and press Enter — the filter clears and the full log
+      returns
+- [ ] Open the chip, type an invalid revset (e.g. `foo(`) and press Enter — the field gets a red
+      outline and jj's own parse error shows under it; the popup stays open, letting you fix it
+- [ ] Press **Esc** instead of fixing it — the popup closes and the previous filter state (if any)
+      is unchanged
+- [ ] In Settings → Version Control → Jujutsu, set a repo-level Log Revset (e.g. `::@`), then set
+      the chip to `all()` — the result stays within `::@` (the repo-level setting always wins)
+- [ ] Change the repo-level Log Revset (or Log Limit) override and click OK/Apply — the log window
+      updates immediately, with **no need to click the toolbar Refresh button first** (jj-idea-vqpn
+      regression: the config change wasn't reaching the log window at all until Refresh was hit
+      explicitly; test with paged log loading both on and off, since the paged path had a second,
+      separate staleness bug of its own — see `UnifiedJujutsuLogDataLoader.refreshOneRepoLocked`)
+- [ ] Set the chip to a revset that references a bookmark (e.g. `my-bookmark::`), then delete that
+      bookmark and trigger a refresh (a write, or the toolbar **Refresh** button) — the chip turns
+      red with a tooltip showing jj's error, and the status bar shows the same error; the graph
+      keeps showing the last successfully-resolved set rather than going blank
+- [ ] Restart the IDE — the chip's revset persists per log tab
+- [ ] With paged log loading enabled (Settings → preview features) and a filter active, scroll to
+      load more pages — newly loaded rows are filtered correctly with no extra `jj log` calls
+      (check `idea.log` for repeated revset queries if in doubt)
+- [ ] A narrow revset over a deep/paged history that matches commits outside the currently loaded
+      window shows a status-bar message reporting how many extra matches exist, instead of just
+      looking like the filter found less than it should
+- [ ] Open a second log tab with no revset filter — it still shows the full log; opening the "New
+      Change" picker or another dialog that reads the log cache is unaffected by the first tab's
+      filter
+- [ ] Create a new change that falls inside the active revset filter — after a refresh, it appears
+      in the filtered graph
 
 ### MT-LOG-REFRESH
 

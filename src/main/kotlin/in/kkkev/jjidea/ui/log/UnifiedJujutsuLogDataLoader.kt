@@ -458,7 +458,7 @@ class UnifiedJujutsuLogDataLoader(
         runInBackground {
             var anyUpdated = false
             for (repo in pagedRepos) {
-                if (lockFor(repo).withLock { refreshOneRepoLocked(repo) }) anyUpdated = true
+                if (lockFor(repo).withLock { refreshOneRepoLocked(repo, settings) }) anyUpdated = true
             }
             if (anyUpdated) {
                 mergeAndNotify()
@@ -477,9 +477,37 @@ class UnifiedJujutsuLogDataLoader(
      * `?: return false` below) rather than trusting it - that filter can go stale between being
      * read and the lock being acquired (e.g. a concurrent [loadMoreOneRepoLocked] removing the
      * window on a fetch failure).
+     *
+     * jj-idea-vqpn bugfix: [window]'s [PagedLogWindow.baseRevset]/[PagedLogWindow.pageSize] are
+     * fixed at construction ([loadFirstPageOrFallbackLocked]'s call to `PagedLogWindow(...)`) and
+     * never change on their own - so the cheap splice-in-a-fresh-page-1 path below, if taken
+     * unconditionally, would keep serving the *old* repo-level revset/limit forever after a
+     * Settings change, even once [JujutsuConfigurable.apply] correctly notifies [refresh] to run.
+     * Only an explicit Refresh ([forceRefresh], which always builds a brand-new window from
+     * current settings) would ever pick it up - exactly the staleness a maintainer found via
+     * manual testing of this same bead. When [settings] no longer agrees with [window], treat this
+     * repo like a first load instead: re-seed via [loadFirstPageOrFallbackLocked], same cost as
+     * the initial load (one `getLogHeads` + one page fetch) - not [forceRefresh]'s O(pages
+     * already loaded) re-walk, which is unnecessary here since only page 1 needs to reflect the
+     * new revset for the splice to be correct.
      */
-    private fun refreshOneRepoLocked(repo: JujutsuRepository): Boolean {
+    private fun refreshOneRepoLocked(repo: JujutsuRepository, settings: JujutsuSettings): Boolean {
         val window = pagedWindowByRepo[repo] ?: return false
+        val staleConfig = window.baseRevset != settings.resolvedLogRevset(repo) ||
+            window.pageSize != settings.logChangeLimit(repo)
+        if (staleConfig) {
+            return try {
+                loadFirstPageOrFallbackLocked(repo, settings)
+                true
+            } catch (e: Exception) {
+                log.warn(
+                    "Failed to reseed paged log window for ${repo.displayName} after a revset/limit " +
+                        "config change: ${e.message}"
+                )
+                pagedWindowByRepo.remove(repo)
+                false
+            }
+        }
         val olderPages = window.pages.drop(1)
         window.reset()
         val freshPage1 = fetchOnePage(repo, window)

@@ -42,6 +42,14 @@ data class LogWindowConfig(
     /** Name of the selected reference (bookmark, tag, or "@"), or "" for none. */
     var selectedReference: String = "",
     /**
+     * The custom revset log filter chip's text (jj-idea-vqpn, GitHub #116), or "" for none.
+     * Resolved client-side against the loaded entries — see
+     * [in.kkkev.jjidea.ui.log.JujutsuRevsetFilterComponent] and
+     * [in.kkkev.jjidea.ui.log.resolveRevsetFilter] — not sent to the data loader, so it doesn't
+     * affect what's fetched from jj for this or any other tab.
+     */
+    var revsetFilter: String = "",
+    /**
      * Repository paths *included* in the per-tab root display filter (the allowlist half of
      * the tri-state filter - jj-idea-qcks, GitHub #96). Empty means no inclusion filter is
      * active - see [excludedRootPaths] for the other half. Distinct from [selectedRepoPaths]
