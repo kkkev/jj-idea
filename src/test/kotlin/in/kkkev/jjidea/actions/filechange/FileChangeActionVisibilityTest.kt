@@ -350,6 +350,15 @@ class FileChangeActionVisibilityTest {
             presentation.isEnabledAndVisible shouldBe false
         }
 
+        @Test
+        fun `enabled when LOG_ENTRY is working copy with an empty selection (toolbar fallback, GitHub #84)`() {
+            // Working Copy toolbar button with nothing ticked in the tree: falls back to the
+            // bound repo behind LOG_ENTRY rather than staying disabled until something's selected.
+            withLogEntry(workingCopyEntry())
+            RestoreSelectionAction().update(event)
+            presentation.isEnabledAndVisible shouldBe true
+        }
+
         @Nested
         inner class `deleted-file selection (jj-idea-c2m8, GitHub #122)` {
             // Real repo resolution (possibleJujutsuRepositoryFor -> VcsUtil.getVcsRootFor) needs a

@@ -166,7 +166,9 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         add(cardPanel, BorderLayout.CENTER)
     }
 
-    private fun createChangesToolbar(): ActionToolbar {
+    // internal (not private) so UnifiedWorkingCopyPanelBindingTest can assert its composition -
+    // see createChangesToolbar's Jujutsu.RestoreFile/Jujutsu.ResolveAllConflicts entries.
+    internal fun createChangesToolbar(): ActionToolbar {
         // Use DefaultActionGroup (not BackgroundActionGroup) because this toolbar contains
         // platform tree expander actions that access TreeUI in update() and require EDT
         val group = DefaultActionGroup()
@@ -187,6 +189,10 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         // Resolve all conflicts (GitHub #56): visible only when the working copy has conflicts,
         // so it's reachable even when the JujutsuConflictsNode is collapsed or scrolled out of view.
         ActionManager.getInstance().getAction("Jujutsu.ResolveAllConflicts")?.let { group.add(it) }
+
+        // Restore (GitHub #84): pre-checks whatever's selected in the tree, or opens empty for the
+        // bound repo when nothing's selected - see RestoreSelectionAction's update()/singleRepoForRestore.
+        ActionManager.getInstance().getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
 
         group.addSeparator()
 

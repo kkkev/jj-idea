@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.workingcopy
 
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
@@ -14,6 +15,7 @@ import `in`.kkkev.jjidea.jj.RepositoryHealth
 import `in`.kkkev.jjidea.jj.WorkingCopyUnavailableException
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
@@ -133,6 +135,28 @@ class UnifiedWorkingCopyPanelBindingTest {
             // Must not throw - this used to read the throwing `workingCopy` directly, from
             // inside the platform's data-context caching path (jj-idea-b65g).
             panel.uiDataSnapshot(sink)
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    /**
+     * Regression test for jj-idea-lisi (GitHub #84): the changes toolbar must offer Restore
+     * alongside Resolve all conflicts, so it's reachable without first right-clicking a file.
+     */
+    @Test
+    fun `changes toolbar includes Restore after Resolve all conflicts`() {
+        val panel = UnifiedWorkingCopyPanel(project.get())
+        try {
+            val actionManager = ActionManager.getInstance()
+            val actions = panel.createChangesToolbar().actionGroup.getChildren(null).toList()
+
+            val restoreIndex = actions.indexOf(actionManager.getAction("Jujutsu.RestoreFile"))
+            val resolveIndex = actions.indexOf(actionManager.getAction("Jujutsu.ResolveAllConflicts"))
+
+            restoreIndex shouldNotBe -1
+            resolveIndex shouldNotBe -1
+            restoreIndex shouldBe resolveIndex + 1 // immediately after, no separator between them
         } finally {
             Disposer.dispose(panel)
         }

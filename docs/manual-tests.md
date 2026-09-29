@@ -490,7 +490,7 @@ more lanes than the 3-4 needed here.
       commit via the CLI in another terminal, then right-click the now-stale link without
       refreshing) — shows an empty menu rather than throwing or crashing
 - [ ] jj-idea-g2p8 (GitHub #84): right-click one or more files in the changed-files list of a
-      **historical** commit's details panel → **Restore to This** opens the Restore dialog
+      **historical** commit's details panel → **Restore to This…** opens the Restore dialog
       (see MT-WORKINGCOPY's "Restore dialog" for the full checklist) listing the files that
       differ between that commit and `@`, with the right-clicked file(s) pre-checked;
       confirming restores exactly the checked files via `jj restore -f <that revision>`
@@ -875,10 +875,10 @@ pending, see the last bullet below.
       yet (jj-idea-t0iy extends this to the rest)
 - [ ] Settings → Keymap → search "Jujutsu" → **Undo Last Jujutsu Operation** shows that name,
       not the raw action id `Jujutsu.UndoLastOperation`
-- [ ] jj-idea-g2p8: modify a file, right-click → **Restore**, tick it in the dialog, confirm
+- [ ] jj-idea-g2p8: modify a file, right-click → **Restore…**, tick it in the dialog, confirm
       → a balloon appears reading "Restore" with an inline **Undo** link; clicking it brings
       the discarded content back and refreshes the working-copy tree
-- [ ] jj-idea-g2p8: same check for **Restore to This** from a historical commit's changed
+- [ ] jj-idea-g2p8: same check for **Restore to This…** from a historical commit's changed
       files (see MT-LOG-DETAILS) → the balloon reads "Restore to This"
 
 #### Duplicate Change (jj-idea-vu35)
@@ -1924,9 +1924,16 @@ with the commit tooltip) the target commit's change id/commit id/author/date/des
 
 ##### Restore dialog (jj-idea-g2p8, GitHub #84)
 
-- [ ] Modify 3+ files; right-click one in the changed-files tree → **Restore** opens a dialog
+- [ ] Modify 3+ files; right-click one in the changed-files tree → **Restore…** opens a dialog
       (not a plain Yes/No confirm) listing every changed file, with only the right-clicked
-      file checked
+      file checked; the right-click menu and editor Jujutsu submenu both show "Restore…" with
+      the ellipsis (it opens a dialog, not an immediate action)
+- [ ] jj-idea-lisi (GitHub #84): a **Restore** toolbar button sits on the changes tree toolbar
+      (after Resolve all conflicts) — select one or more files in the tree, click it → the
+      dialog opens with exactly those files pre-checked, same as right-click Restore
+- [ ] jj-idea-lisi: with **nothing** selected in the tree, the toolbar Restore button stays
+      enabled (not greyed out) → clicking it opens the dialog for the panel's current repo with
+      **no** files pre-checked, so it can still be widened to restore anything
 - [ ] Tick an additional file before confirming → exactly the checked files revert to `@-`;
       unchecked files are untouched
 - [ ] Untick every file → the OK button is disabled with a "check at least one file" message

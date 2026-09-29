@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The Working Copy panel's changes toolbar gained a **Restore** button, next to Resolve all conflicts, pre-checking whatever's selected in the tree (or opening empty for the current repo when nothing's selected). "Restore" and "Restore to This" now read "Restore…"/"Restore to This…", since both open a dialog rather than acting immediately. ([#84](https://github.com/kkkev/jj-idea/issues/84))
+
 ## [0.8.18] - 2026-09-27
 
 ### Added
