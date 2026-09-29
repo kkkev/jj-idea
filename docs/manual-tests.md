@@ -1355,7 +1355,7 @@ well-formed composition of Before/New-commit hunks. No "resolved" concept, so no
 confirmation dialogs anywhere in this picker.
 
 #### Basic hunk selection (main dialog preview)
-- [ ] Right-click a mutable change → **Split…** → dialog shows changed-files list on the left (nothing ticked) and a native read-only diff preview on the right
+- [ ] Right-click a mutable change → **Split into New Child…** → dialog shows changed-files list on the left (nothing ticked) and a native read-only diff preview on the right
 - [ ] Under "Source", a muted note states the mode's shape: default mode reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new child commit created on top of it."
 - [ ] The note **word-wraps across multiple lines** and does **not** widen the left column or push the diff preview panel narrower — the splitter stays at its usual ~40/60 proportion regardless of note length (jj-idea-8khi follow-up: a plain, non-wrapping label here previously forced the column wide enough to fit the whole sentence on one line)
 - [ ] The change id embedded in the note and in both description labels renders with the same bold-prefix/grey-remainder styling used everywhere else in the plugin (log table, commit details, other dialogs' "Source" line) — not plain, equal-weight text
@@ -1367,6 +1367,13 @@ confirmation dialogs anywhere in this picker.
 #### Right-click file(s) → "Split into New Child"
 - [ ] Select one or more files in the working-copy / commit-details file list, right-click → **Split into New Child** → dialog opens with exactly those files **ticked** (moving to the child)
 - [ ] Split → the new child commit contains only the selected files; the parent keeps the rest
+
+#### Log row → "Split into New Parent…" (jj-idea-xvgl, GitHub #132)
+- [ ] Right-click a **mutable** log row → **Split into New Parent…** appears directly below **Split into New Child…**
+- [ ] Invoking it opens the "Split into New Parent" dialog (same as the file-list entry below) with **nothing ticked**; no "Create parallel commits" checkbox and no "Pick Hunks…"
+- [ ] Tick a file and Split → `jj log` shows a new commit inserted as the parent holding that file; the original row keeps its own change ID
+- [ ] The entry is disabled on an **immutable** row and when **multiple** rows are selected (same gating as "Split into New Child…")
+- [ ] The Working Copy toolbar's Split button is unchanged (still child mode)
 
 #### Right-click file(s) → "Split into New Parent" (jj-idea-qswq / jj-idea-tkog, GitHub #74)
 

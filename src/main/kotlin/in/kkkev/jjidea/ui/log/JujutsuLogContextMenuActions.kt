@@ -127,6 +127,7 @@ object JujutsuLogContextMenuActions {
         add(squashIntoAction(uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() }, squashIntoSrcs))
         add(squashFromAction(entry?.takeIf { !it.immutable }))
         add(splitAction(project, entry?.takeIf { !it.immutable }))
+        add(splitAction(project, entry?.takeIf { !it.immutable }, newParent = true))
 
         addSeparator()
         add(createBookmarkAction(entry))

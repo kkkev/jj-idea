@@ -55,17 +55,26 @@ internal fun parseRemainingChangeId(stderr: String): ChangeId? {
  *
  * If the child description differs from the original, chains a `jj describe` for the child.
  * After splitting, selects the original change ID.
+ *
+ * With [newParent] the dialog runs in "Split into New Parent" mode (`jj split -B`, GitHub #74/#132):
+ * ticked files move to a new commit inserted before [entry], which keeps its own change ID. The
+ * mode logic all lives in [SplitDialog] and [executeSplit]; this only selects it.
  */
 fun splitAction(
     project: Project,
-    entry: LogEntry?
-) = nullAndDumbAwareAction(entry, "log.action.split", JujutsuIcons.Split) {
+    entry: LogEntry?,
+    newParent: Boolean = false
+) = nullAndDumbAwareAction(
+    entry,
+    if (newParent) "log.action.split.intoParent" else "log.action.split",
+    JujutsuIcons.Split
+) {
     fun openDialog() {
         target.repo.runRecoverableInBackground(retry = ::openDialog) {
             val changes = ChangeService.loadChanges(target)
 
             runLater {
-                val dialog = SplitDialog(project, target, changes)
+                val dialog = SplitDialog(project, target, changes, newParent = newParent)
                 if (!dialog.showAndGet()) return@runLater
 
                 val spec = dialog.result ?: return@runLater
