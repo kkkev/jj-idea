@@ -158,6 +158,28 @@ class JujutsuConflictResolverTest {
         verify(exactly = 1) { mergeProvider.conflictResolvedForFile(file2) }
     }
 
+    // GitHub #66 (jj-idea-wk7p): a multi-file resolve walks the caller's list in the order given,
+    // so the working-copy tree's display order is what the user sees the merge tool step through.
+    @Test
+    fun `three files - merge tool is opened in the order given, not sorted or reversed`() {
+        val files = listOf("c.txt", "a.txt", "b.txt").map { name ->
+            mockk<VirtualFile>().also {
+                every { it.name } returns name
+                every { mergeProvider.loadConflict(it) } returns conflict()
+            }
+        }
+        val opened = mutableListOf<String>()
+
+        val (resolver, _) = resolverWith(resolveOne = { file, _ ->
+            opened += file.name
+            "resolved".toByteArray(Charsets.UTF_8)
+        })
+
+        resolver.resolve(files)
+
+        opened shouldBe listOf("c.txt", "a.txt", "b.txt")
+    }
+
     // -------------------------------------------------------------------------
     // GitHub #112: pane titles follow jj's own commit labels, with a fallback when absent.
     // -------------------------------------------------------------------------

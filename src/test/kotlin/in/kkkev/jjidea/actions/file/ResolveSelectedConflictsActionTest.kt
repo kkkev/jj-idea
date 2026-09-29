@@ -70,4 +70,15 @@ class ResolveSelectedConflictsActionTest {
 
         scopeToConflicted(listOf(a, b)) shouldBe listOf(a, b)
     }
+
+    // GitHub #66 (jj-idea-wk7p): the selection's order is the order the merge tool opens files in.
+    @Test
+    fun `selection order is preserved - not sorted - with non-conflicted files filtered out`() {
+        val c = change("c.txt", isConflicted = true)
+        val clean = change("clean.txt", isConflicted = false)
+        val a = change("a.txt", isConflicted = true)
+        val b = change("b.txt", isConflicted = true)
+
+        scopeToConflicted(listOf(c, clean, a, b)) shouldBe listOf(c, a, b)
+    }
 }
