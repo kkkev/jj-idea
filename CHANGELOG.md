@@ -7,9 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-- The in-editor conflict gutter icons now show the hand cursor on hover, matching every other clickable gutter icon.
-
 ## [0.8.18] - 2026-09-27
 
 ### Added
