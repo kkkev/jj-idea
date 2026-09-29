@@ -886,6 +886,7 @@ non-paged behavior is perceptible.
       bookmark (`name@remote`) abandons without prompting
 - [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
 - [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
+- [ ] jj-idea-1uz0 (GitHub #125): with ~20 rows selected, **Rebase…** and **Duplicate Onto…** show the source list scrolling within about 5 rows, with the destination picker still visible (the source list helper is shared with Squash Into…)
 - [ ] jj-idea-2md7: hovering a commit row in the Duplicate Onto... destination picker, and in the
       Rebase destination picker / preview, shows real bookmark/tag chips and status icons in the
       tooltip - not a broken-image glyph
@@ -1144,6 +1145,7 @@ jj new; jj new; jj new` then `jj bookmark create -r A base` and set the diff bas
 #### Availability / enablement
 
 - [ ] "Squash Into..." is present in context menu for a single mutable change
+- [ ] jj-idea-1uz0 (GitHub #125): select ~20 mutable changes → **Squash Into…** → the source list at the top **scrolls within about 5 rows** and the destination picker below it stays visible and usable (previously it was squeezed off the bottom). With 2–3 selected, the list shows in full with no scrollbar, as before
 - [ ] "Squash Into..." is present when 2+ mutable changes are selected
 - [ ] "Squash Into..." is **disabled** when any selected change is immutable
 - [ ] "Squash Into..." is **disabled** when selections span multiple repos (multi-root project)
