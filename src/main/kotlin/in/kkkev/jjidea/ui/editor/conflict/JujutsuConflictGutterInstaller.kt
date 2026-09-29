@@ -24,6 +24,8 @@ import `in`.kkkev.jjidea.jj.conflict.ConflictSide
 import `in`.kkkev.jjidea.jj.conflict.choicesFor
 import `in`.kkkev.jjidea.jj.conflict.sideFor
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.preview.PreviewEntitlement
+import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.editor.debouncedDocumentScan
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry
 
@@ -74,11 +76,20 @@ import `in`.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry
  * shared utility, but a wider-reaching fix than this one bead should make as a side effect - see
  * that function's own KDoc). [in.kkkev.jjidea.jj.JujutsuStateModel] itself never uses
  * `getVcsRootFor` for this exact reason.
+ *
+ * **Gated behind [PreviewFeature.CONFLICT_GUTTER]** (jj-idea-n6fz.1): this whole surface - scanner,
+ * icons, side tints, hover - is withheld from a gradual release as one unit, so [editorCreated]
+ * checks [PreviewEntitlement] before doing anything else observable (subscribing to
+ * [in.kkkev.jjidea.jj.JujutsuStateModel.initialisedRepositories] included), leaving the
+ * plugin-wide listener a strict no-op for every editor while the feature is off. The S1 banner
+ * ([in.kkkev.jjidea.ui.editor.JujutsuConflictEditorNotificationProvider]) is a separate bead
+ * (jj-idea-lkrt, already released) and stays ungated.
  */
 class JujutsuConflictGutterInstaller : EditorFactoryListener {
     override fun editorCreated(event: EditorFactoryEvent) {
         val editor = event.editor
         if (editor.editorKind != EditorKind.MAIN_EDITOR) return
+        if (!PreviewEntitlement.getInstance().isEnabled(PreviewFeature.CONFLICT_GUTTER)) return
         val project = editor.project ?: return
         if (project.isDisposed) return
         if (FileDocumentManager.getInstance().getFile(editor.document) == null) return

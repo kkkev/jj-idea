@@ -27,7 +27,17 @@ enum class PreviewFeature(val bit: Int) {
      * see docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated
      * (and not-yet-validated) boundaries.
      */
-    PAGED_LOG_LOAD(1);
+    PAGED_LOG_LOAD(1),
+
+    /**
+     * In-editor jj conflict marker regions: per-side gutter icons with accept actions
+     * (jj-idea-82fo), per-side background tints, and hover feedback (jj-idea-sr42), all gated as
+     * one unit under jj-idea-n6fz.1 - a large, already-built surface withheld from a gradual
+     * release. Gates [in.kkkev.jjidea.ui.editor.conflict.JujutsuConflictGutterInstaller] alone;
+     * the S1 editor banner (jj-idea-lkrt, `JujutsuConflictEditorNotificationProvider`) is
+     * unaffected and keeps shipping ungated.
+     */
+    CONFLICT_GUTTER(2);
 
     val id = name.snakeToCamelCase()
     val displayName get() = JujutsuBundle.message("preview.$id.name")

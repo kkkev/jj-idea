@@ -154,6 +154,12 @@ This is a genuinely new UI surface for the codebase (no precedent — see gap ab
 of the six slices, and depends on S1 only in that it shares the same document-scanning
 infrastructure (worth building once, used by both).
 
+**Ships behind `PreviewFeature.CONFLICT_GUTTER`, off by default, until GA** (jj-idea-n6fz.1,
+added 2026-09-29 after S2 was fully built and reviewed): too large and visible a surface to
+trickle out piecemeal across point releases. S1's banner above is unaffected and ships ungated.
+Follow-up children of S2 (fold-marker-lines, DIFF-style tidy, multi-select label detection) stay
+behind the same flag until it's removed at GA.
+
 ### S3 — Resolve conflicts from the Working copy window (reframed; was "jj-native Conflicts view")
 
 **Reframed 2026-09-23** (`jj-idea-qmws` closed as superseded by `jj-idea-wk7p`). The original

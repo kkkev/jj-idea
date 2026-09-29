@@ -114,7 +114,8 @@
 
     <!-- Per-block gutter icons on jj conflict marker blocks (jj-idea-82fo). Global EP: gated to
          a strict no-op on every non-main/non-jj editor by
-         JujutsuConflictGutterInstaller.shouldInstall. -->
+         JujutsuConflictGutterInstaller.shouldInstall, and to a strict no-op everywhere while
+         PreviewFeature.CONFLICT_GUTTER is off (jj-idea-n6fz.1). -->
     <editorFactoryListener
         implementation="in.kkkev.jjidea.ui.editor.conflict.JujutsuConflictGutterInstaller"/>
 
