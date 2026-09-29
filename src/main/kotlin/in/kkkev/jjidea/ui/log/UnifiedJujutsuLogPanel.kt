@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.diagnostic.Logger
@@ -8,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.OnePixelSplitter
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.stateModel
@@ -239,10 +239,10 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
      * File history doesn't override this.
      */
     override fun primaryActions() = listOfNotNull(
-        ActionManager.getInstance().getAction("Jujutsu.NewChange"),
-        ActionManager.getInstance().getAction("Jujutsu.EditChange"),
-        ActionManager.getInstance().getAction("Jujutsu.RebaseChangeToolbar"),
-        ActionManager.getInstance().getAction("Jujutsu.DescribeChangeToolbar")
+        ManagedActions["Jujutsu.NewChange"],
+        ManagedActions["Jujutsu.EditChange"],
+        ManagedActions["Jujutsu.RebaseChangeToolbar"],
+        ManagedActions["Jujutsu.DescribeChangeToolbar"]
     )
 
     /**

@@ -1,7 +1,8 @@
 package `in`.kkkev.jjidea.actions.filechange
 
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.add
 
 /**
  * Builds a context menu action group for file changes.
@@ -32,51 +33,50 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
  * (specifically [in.kkkev.jjidea.actions.JujutsuDataKeys.LOG_ENTRY]).
  */
 fun fileChangeActionGroup(): DefaultActionGroup {
-    val actionManager = ActionManager.getInstance()
     val group = DefaultActionGroup()
 
-    actionManager.getAction("Jujutsu.ShowChangesDiff")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.ShowDiffInNewTab")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.OpenChangeFile")?.let { group.add(it) }
+    group.add(ManagedActions["Jujutsu.ShowChangesDiff"])
+    group.add(ManagedActions["Jujutsu.ShowDiffInNewTab"])
+    group.add(ManagedActions["Jujutsu.OpenChangeFile"])
 
     group.addSeparator()
 
     // Compare/navigate actions (self-filter: historical only)
-    actionManager.getAction("Jujutsu.OpenLocalFile")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.CompareWithLocal")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.CompareBeforeWithLocal")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.CompareWithBranch")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.CompareBeforeWithBranch")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.OpenFileInRemote")?.let { group.add(it) }
+    group.add(ManagedActions["Jujutsu.OpenLocalFile"])
+    group.add(ManagedActions["Jujutsu.CompareWithLocal"])
+    group.add(ManagedActions["Jujutsu.CompareBeforeWithLocal"])
+    group.add(ManagedActions["Jujutsu.CompareWithBranch"])
+    group.add(ManagedActions["Jujutsu.CompareBeforeWithBranch"])
+    group.add(ManagedActions["Jujutsu.OpenFileInRemote"])
 
     // jj-idea-0t5o: same slot Jujutsu.EditorGroup gives the standard Annotate action (right
     // before Show History, no separator between them). It resolves the file via VIRTUAL_FILE,
     // which JujutsuChangesTree only supplies for a working-copy selection
     // (JujutsuChangesTree.showsLocalFiles) - self-filters (hidden) otherwise.
-    actionManager.getAction("Annotate")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.ShowFileHistory")?.let { group.add(it) }
+    group.add(ManagedActions["Annotate"])
+    group.add(ManagedActions["Jujutsu.ShowFileHistory"])
 
     group.addSeparator()
 
     // Restore actions self-filter: RestoreFile visible for working copy, RestoreToChange for historical
-    actionManager.getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.RestoreToChange")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.ResolveSelectedConflicts")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.AcceptConflictCurrentSide")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.AcceptConflictLastSide")?.let { group.add(it) }
+    group.add(ManagedActions["Jujutsu.RestoreFile"])
+    group.add(ManagedActions["Jujutsu.RestoreToChange"])
+    group.add(ManagedActions["Jujutsu.ResolveSelectedConflicts"])
+    group.add(ManagedActions["Jujutsu.AcceptConflictCurrentSide"])
+    group.add(ManagedActions["Jujutsu.AcceptConflictLastSide"])
 
     group.addSeparator()
 
     // Squash/split actions — self-filter based on entry mutability
-    actionManager.getAction("Jujutsu.SquashFiles")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.SquashIntoFiles")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.SplitFiles")?.let { group.add(it) }
-    actionManager.getAction("Jujutsu.SplitIntoNewParentFiles")?.let { group.add(it) }
+    group.add(ManagedActions["Jujutsu.SquashFiles"])
+    group.add(ManagedActions["Jujutsu.SquashIntoFiles"])
+    group.add(ManagedActions["Jujutsu.SplitFiles"])
+    group.add(ManagedActions["Jujutsu.SplitIntoNewParentFiles"])
 
     group.addSeparator()
 
     // Tracked toggle — self-filters (hidden outside working-copy context / when not predicted-ignored)
-    actionManager.getAction("Jujutsu.TrackedToggle")?.let { group.add(it) }
+    group.add(ManagedActions["Jujutsu.TrackedToggle"])
 
     return group
 }

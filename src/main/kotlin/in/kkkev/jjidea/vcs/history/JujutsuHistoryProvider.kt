@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.vcs.history
 
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
@@ -14,6 +13,7 @@ import com.intellij.openapi.vcs.history.VcsHistoryProvider
 import com.intellij.openapi.vcs.history.VcsHistorySession
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
 import javax.swing.JComponent
@@ -86,7 +86,7 @@ class JujutsuHistoryProvider(private val project: Project) : VcsHistoryProvider 
     override fun getAdditionalActions(refresher: Runnable): Array<AnAction> =
         arrayOf(
             ShowAllAffectedGenericAction.getInstance(),
-            ActionManager.getInstance().getAction(VcsActions.ACTION_COPY_REVISION_NUMBER)
+            ManagedActions[VcsActions.ACTION_COPY_REVISION_NUMBER]!!
         )
 
     override fun isDateOmittable() = false

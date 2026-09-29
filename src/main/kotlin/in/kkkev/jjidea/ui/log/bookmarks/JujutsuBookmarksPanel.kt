@@ -22,6 +22,7 @@ import com.intellij.util.ui.update.Update
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.actions.bookmark.*
 import `in`.kkkev.jjidea.actions.change.duplicateChangeAction
 import `in`.kkkev.jjidea.actions.change.newChangeFromAction
@@ -491,24 +492,12 @@ class JujutsuBookmarksPanel(
      */
     private fun MutableList<AnAction>.addChangeActions(repo: JujutsuRepository, entries: List<LogEntry>) {
         add(Separator.create())
-        ActionManager.getInstance().getAction("Jujutsu.NewChange")?.let { add(it) }
+        ManagedActions["Jujutsu.NewChange"]?.let(::add)
         if (entries.isNotEmpty()) add(newChangeFromAction(project, repo, entries))
-        ActionManager.getInstance().getAction("Jujutsu.EditChange")?.let { add(it) }
-        ActionManager.getInstance().getAction("Jujutsu.RebaseChangeToolbar")?.let { add(it) }
+        ManagedActions["Jujutsu.EditChange"]?.let(::add)
+        ManagedActions["Jujutsu.RebaseChangeToolbar"]?.let(::add)
         if (entries.isNotEmpty()) add(duplicateChangeAction(project, repo, entries))
     }
-
-    /**
-     * Looks up a registered action by id, for use in this panel's own menus in place of the
-     * fixed-target factories in [in.kkkev.jjidea.actions.bookmark] - the *same instance* the
-     * Keymap settings page resolves a shortcut for, so it can show a hint here too (jj-idea-ib1i),
-     * exactly as [in.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.createActionGroup]'s
-     * `liveSelection` path already does for New Change/Edit/Rebase. Push stays on the
-     * fixed-target [pushBookmarkAction] submenu below - it's shared with call sites (the bookmark
-     * widget, the log's chip submenu) that never publish [JujutsuDataKeys.BOOKMARK_TARGET], so
-     * swapping it there would make Push silently disable itself in every *other* context instead.
-     */
-    private fun registeredAction(id: String): AnAction? = ActionManager.getInstance().getAction(id)
 
     private fun actionGroupFor(node: BookmarkNode): ActionGroup? = when (node) {
         is BookmarkNode.Local -> {
@@ -517,8 +506,8 @@ class JujutsuBookmarksPanel(
             BackgroundActionGroup(
                 *buildList {
                     if (!node.onWorkingCopy) add(moveBookmarkToChangeAction(node.repo, node.item.bookmark))
-                    registeredAction("Jujutsu.Bookmark.Advance")?.let { add(it) }
-                    registeredAction("Jujutsu.Bookmark.Rename")?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Advance"]?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Rename"]?.let { add(it) }
                     add(
                         pushBookmarkAction(
                             node.repo,
@@ -526,11 +515,11 @@ class JujutsuBookmarksPanel(
                             allBookmarks.remoteEntriesFor(node.item.bookmark.localName)
                         )
                     )
-                    registeredAction("Jujutsu.Bookmark.Delete")?.let { add(it) }
-                    registeredAction("Jujutsu.Bookmark.Forget")?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Delete"]?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Forget"]?.let { add(it) }
                     add(Separator.create())
-                    registeredAction("Jujutsu.Bookmark.Filter")?.let { add(it) }
-                    registeredAction("Jujutsu.Bookmark.Navigate")?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Filter"]?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Navigate"]?.let { add(it) }
                     addChangeActions(node.repo, entries)
                 }.toTypedArray()
             )
@@ -540,10 +529,10 @@ class JujutsuBookmarksPanel(
             val entries = selectedLogEntries().orEmpty()
             BackgroundActionGroup(
                 *buildList {
-                    registeredAction("Jujutsu.Bookmark.ToggleTrack")?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.ToggleTrack"]?.let { add(it) }
                     add(Separator.create())
-                    registeredAction("Jujutsu.Bookmark.Filter")?.let { add(it) }
-                    registeredAction("Jujutsu.Bookmark.Navigate")?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Filter"]?.let { add(it) }
+                    ManagedActions["Jujutsu.Bookmark.Navigate"]?.let { add(it) }
                     addChangeActions(node.repo, entries)
                 }.toTypedArray()
             )

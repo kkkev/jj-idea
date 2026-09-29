@@ -29,10 +29,7 @@ import javax.swing.KeyStroke
  */
 fun invokeEnterBoundAction(component: Component, actionIds: List<String> = enterBoundActionIds()): Boolean {
     val actionId = actionIds.firstOrNull() ?: return false
-    val action: AnAction? = ActionManager.getInstance().getAction(actionId)
-    if (action == null) {
-        return invokeEnterBoundAction(component, actionIds.drop(1))
-    }
+    val action: AnAction = ManagedActions[actionId] ?: return invokeEnterBoundAction(component, actionIds.drop(1))
     val keyEvent = KeyEvent(component, KeyEvent.KEY_PRESSED, System.currentTimeMillis(), 0, KeyEvent.VK_ENTER, '\r')
     ActionManager.getInstance()
         .tryToExecute(action, keyEvent, component, ActionPlaces.KEYBOARD_SHORTCUT, true)

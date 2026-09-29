@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.actions.file
 
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
@@ -9,6 +8,8 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorKind
 import com.intellij.testFramework.TestActionEvent
 import com.intellij.testFramework.junit5.TestApplication
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.id
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotContain
 import io.mockk.every
@@ -39,9 +40,9 @@ class JujutsuEditorActionGroupTest {
         return TestActionEvent.createTestEvent(context)
     }
 
-    private fun group() = ActionManager.getInstance().getAction("Jujutsu.EditorGroup") as JujutsuEditorActionGroup
+    private fun group() = ManagedActions["Jujutsu.EditorGroup"] as JujutsuEditorActionGroup
 
-    private fun ids(actions: Array<AnAction>) = actions.mapNotNull { ActionManager.getInstance().getId(it) }
+    private fun ids(actions: Array<AnAction>) = actions.mapNotNull { it.id }
 
     @Test
     fun `Annotate is present in the plain code editor context`() {

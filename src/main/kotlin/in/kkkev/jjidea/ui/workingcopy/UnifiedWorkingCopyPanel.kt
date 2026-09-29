@@ -26,12 +26,10 @@ import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.add
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.ui.common.JjNotInstalledPanel
-import `in`.kkkev.jjidea.ui.common.JujutsuChangesTree
-import `in`.kkkev.jjidea.ui.common.JujutsuEditorTabDiffPreview
-import `in`.kkkev.jjidea.ui.common.installFilesDragSource
-import `in`.kkkev.jjidea.ui.common.sameChangesAndStatuses
+import `in`.kkkev.jjidea.ui.common.*
 import `in`.kkkev.jjidea.ui.services.showVcsMappingsSettings
 import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.util.runInBackground
@@ -188,11 +186,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
         // Resolve all conflicts (GitHub #56): visible only when the working copy has conflicts,
         // so it's reachable even when the JujutsuConflictsNode is collapsed or scrolled out of view.
-        ActionManager.getInstance().getAction("Jujutsu.ResolveAllConflicts")?.let { group.add(it) }
+        group.add(ManagedActions["Jujutsu.ResolveAllConflicts"])
 
         // Restore (GitHub #84): pre-checks whatever's selected in the tree, or opens empty for the
         // bound repo when nothing's selected - see RestoreSelectionAction's update()/singleRepoForRestore.
-        ActionManager.getInstance().getAction("Jujutsu.RestoreFile")?.let { group.add(it) }
+        group.add(ManagedActions["Jujutsu.RestoreFile"])
 
         group.addSeparator()
 
@@ -205,7 +203,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         group.addSeparator()
 
         // Grouping actions
-        group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
+        group.add(ManagedActions["ChangesView.GroupBy"])
 
         return ActionManager.getInstance().createActionToolbar(ActionPlaces.CHANGES_VIEW_TOOLBAR, group, true)
     }
@@ -257,9 +255,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
             unhealthy.isEmpty() -> {
                 { project.showVcsMappingsSettings() }
             }
+
             allStale -> {
                 { unhealthy.forEach { (repo, _) -> updateStaleWorkspace(project, repo) } }
             }
+
             else -> {
                 { project.stateModel.invalidateRepositoryState() }
             }

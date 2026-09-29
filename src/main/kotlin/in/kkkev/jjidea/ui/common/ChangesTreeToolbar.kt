@@ -4,6 +4,8 @@ import com.intellij.ide.CommonActionsManager
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.add
 
 /**
  * Standard Expand All / Collapse All / Group By toolbar for a [JujutsuChangesTree], shared by
@@ -17,7 +19,7 @@ fun changesTreeToolbar(tree: JujutsuChangesTree, place: String): ActionToolbar {
     group.add(commonActionsManager.createExpandAllAction(treeExpander, tree))
     group.add(commonActionsManager.createCollapseAllAction(treeExpander, tree))
     group.addSeparator()
-    group.add(ActionManager.getInstance().getAction("ChangesView.GroupBy"))
+    group.add(ManagedActions["ChangesView.GroupBy"])
 
     return ActionManager.getInstance()
         .createActionToolbar(place, group, true)

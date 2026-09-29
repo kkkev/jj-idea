@@ -1,11 +1,11 @@
 package `in`.kkkev.jjidea.vcs
 
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionPromoter
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.vcs.VcsDataKeys
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.id
 
 /**
  * Promotes jj actions over IntelliJ's built-in actions they deliberately shadow, but only in the
@@ -18,7 +18,7 @@ import `in`.kkkev.jjidea.actions.JujutsuDataKeys
  *   what lets the log reuse a mnemonic shortcut without stealing it from the editor.
  */
 class JujutsuActionPromoter(
-    private val getActionId: (AnAction) -> String? = { ActionManager.getInstance().getId(it) }
+    private val getActionId: (AnAction) -> String? = { it.id }
 ) : ActionPromoter {
     override fun promote(actions: List<AnAction>, context: DataContext): List<AnAction> {
         val hasVcsData = context.getData(VcsDataKeys.SELECTED_CHANGES)?.isNotEmpty() == true ||

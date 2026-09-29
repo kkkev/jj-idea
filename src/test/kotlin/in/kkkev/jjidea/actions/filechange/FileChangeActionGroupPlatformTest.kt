@@ -1,10 +1,11 @@
 package `in`.kkkev.jjidea.actions.filechange
 
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.testFramework.junit5.TestApplication
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.id
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Tag
@@ -21,7 +22,6 @@ import org.junit.jupiter.api.Test
 class FileChangeActionGroupPlatformTest {
     @Test
     fun `all expected action IDs are registered in ActionManager`() {
-        val actionManager = ActionManager.getInstance()
         val expected = listOf(
             "Jujutsu.ShowChangesDiff",
             "Jujutsu.OpenChangeFile",
@@ -38,7 +38,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.SplitIntoNewParentFiles",
             "Jujutsu.TrackedToggle"
         )
-        val missing = expected.filter { actionManager.getAction(it) == null }
+        val missing = expected.filter { ManagedActions[it] == null }
         missing shouldBe emptyList()
     }
 
@@ -122,11 +122,10 @@ class FileChangeActionGroupPlatformTest {
 
     /** Returns the action IDs of direct children (excluding separators). */
     private fun DefaultActionGroup.childActionIds(): List<String> =
-        getChildren(null).mapNotNull { ActionManager.getInstance().getId(it) }
+        getChildren(null).mapNotNull { it.id }
 
     /** Returns the action IDs of a list of actions (excluding separators). */
-    private fun List<AnAction>.actionIds(): List<String> =
-        mapNotNull { ActionManager.getInstance().getId(it) }
+    private fun List<AnAction>.actionIds(): List<String> = mapNotNull { it.id }
 
     /** Splits a flat list of actions by [Separator] items, returning the non-separator blocks. */
     private fun splitBySeparators(children: List<AnAction>): List<List<AnAction>> {

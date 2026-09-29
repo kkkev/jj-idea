@@ -1,10 +1,6 @@
 package `in`.kkkev.jjidea.actions
 
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.ActionWrapperUtil
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.*
 
 /**
  * Toolbar entry that delegates to whichever action is currently registered under [actionId],
@@ -19,8 +15,7 @@ import com.intellij.openapi.actionSystem.AnActionEvent
  * classloader has registered, so a stale delegate is never invoked.
  */
 class LazyActionById(private val actionId: String) : AnAction() {
-    private val delegate: AnAction?
-        get() = ActionManager.getInstance().getAction(actionId)
+    private val delegate: AnAction? get() = ManagedActions[actionId]
 
     override fun update(e: AnActionEvent) {
         val action = delegate

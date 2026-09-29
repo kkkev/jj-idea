@@ -6,6 +6,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.add
 import `in`.kkkev.jjidea.actions.addPopup
 import `in`.kkkev.jjidea.actions.bookmark.*
 import `in`.kkkev.jjidea.actions.change.*
@@ -57,7 +59,7 @@ object JujutsuLogContextMenuActions {
         entries: List<LogEntry>,
         liveSelection: Boolean = true
     ): DefaultActionGroup = BackgroundActionGroup().apply {
-        ActionManager.getInstance().getAction("Jujutsu.ShowChangesDiff")?.let { add(it) }
+        add(ManagedActions["Jujutsu.ShowChangesDiff"])
 
         val entry = entries.singleOrNull()
         add(compareWithWorkingCopyAction(project, entry?.takeIf { !it.isWorkingCopy }))
@@ -75,18 +77,18 @@ object JujutsuLogContextMenuActions {
         val uniqueRepo = entries.uniqueRepo
 
         if (liveSelection) {
-            ActionManager.getInstance().getAction("Jujutsu.NewChange")?.let { add(it) }
+            add(ManagedActions["Jujutsu.NewChange"])
         }
         add(newChangeFromAction(project, uniqueRepo, entries))
 
         // Offer "Edit" for non-working-copy, non-immutable changes
         if (liveSelection) {
-            ActionManager.getInstance().getAction("Jujutsu.EditChange")?.let { add(it) }
+            add(ManagedActions["Jujutsu.EditChange"])
         }
 
         // Offer "Describe" for mutable changes
         if (liveSelection) {
-            ActionManager.getInstance().getAction("Jujutsu.DescribeChangeToolbar")?.let { add(it) }
+            add(ManagedActions["Jujutsu.DescribeChangeToolbar"])
         } else {
             add(describeAction(project, entry?.takeUnless { it.immutable }))
         }
@@ -102,7 +104,7 @@ object JujutsuLogContextMenuActions {
         val mutableEntries = entries.filter { !it.immutable }
         val rebaseRepo = uniqueRepo?.takeIf { mutableEntries.isNotEmpty() }
         if (liveSelection) {
-            ActionManager.getInstance().getAction("Jujutsu.RebaseChangeToolbar")?.let { add(it) }
+            add(ManagedActions["Jujutsu.RebaseChangeToolbar"])
         } else {
             add(rebaseAction(project, rebaseRepo, mutableEntries))
         }
@@ -112,8 +114,8 @@ object JujutsuLogContextMenuActions {
         // selection publishes, so there's no fixed-target factory equivalent for the
         // liveSelection = false (link-menu) path.
         if (liveSelection) {
-            ActionManager.getInstance().getAction("Jujutsu.MoveChangeUp")?.let { add(it) }
-            ActionManager.getInstance().getAction("Jujutsu.MoveChangeDown")?.let { add(it) }
+            add(ManagedActions["Jujutsu.MoveChangeUp"])
+            add(ManagedActions["Jujutsu.MoveChangeDown"])
         }
 
         // Duplicate works on any change, including immutable ones

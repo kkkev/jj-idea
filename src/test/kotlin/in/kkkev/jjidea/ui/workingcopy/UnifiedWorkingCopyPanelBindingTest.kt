@@ -1,18 +1,13 @@
 package `in`.kkkev.jjidea.ui.workingcopy
 
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.CommitId
-import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.jj.RepositoryHealth
-import `in`.kkkev.jjidea.jj.WorkingCopyUnavailableException
+import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -148,11 +143,10 @@ class UnifiedWorkingCopyPanelBindingTest {
     fun `changes toolbar includes Restore after Resolve all conflicts`() {
         val panel = UnifiedWorkingCopyPanel(project.get())
         try {
-            val actionManager = ActionManager.getInstance()
             val actions = panel.createChangesToolbar().actionGroup.getChildren(null).toList()
 
-            val restoreIndex = actions.indexOf(actionManager.getAction("Jujutsu.RestoreFile"))
-            val resolveIndex = actions.indexOf(actionManager.getAction("Jujutsu.ResolveAllConflicts"))
+            val restoreIndex = actions.indexOf(ManagedActions["Jujutsu.RestoreFile"])
+            val resolveIndex = actions.indexOf(ManagedActions["Jujutsu.ResolveAllConflicts"])
 
             restoreIndex shouldNotBe -1
             resolveIndex shouldNotBe -1

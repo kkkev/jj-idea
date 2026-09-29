@@ -1,12 +1,8 @@
 package `in`.kkkev.jjidea.actions.file
 
 import com.intellij.diff.util.DiffUtil
-import com.intellij.openapi.actionSystem.ActionManager
-import com.intellij.openapi.actionSystem.ActionUpdateThread
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.CommonDataKeys
-import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.*
+import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.actions.file
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
@@ -34,7 +30,7 @@ class JujutsuEditorActionGroup : DefaultActionGroup() {
         val children = super.getChildren(e)
         val editor = e?.getData(CommonDataKeys.EDITOR) ?: return children
         if (!DiffUtil.isDiffEditor(editor)) return children
-        val annotate = ActionManager.getInstance().getAction("Annotate")
+        val annotate = ManagedActions["Annotate"]
         return children.filter { it !== annotate }.toTypedArray()
     }
 }

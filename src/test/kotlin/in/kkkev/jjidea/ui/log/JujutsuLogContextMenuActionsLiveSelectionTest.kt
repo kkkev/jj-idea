@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import `in`.kkkev.jjidea.actions.id
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -45,7 +46,7 @@ class JujutsuLogContextMenuActionsLiveSelectionTest {
     private fun actionIds(entries: List<LogEntry>, liveSelection: Boolean): List<String?> {
         val group = JujutsuLogContextMenuActions.createActionGroup(project, entries, liveSelection)
         val actionManager = ActionManager.getInstance()
-        return group.getChildren(null).map { actionManager.getId(it) }
+        return group.getChildren(null).map { it.id }
     }
 
     @Test
