@@ -58,6 +58,8 @@ class ConflictBlockGutterIconRenderer(
 
     override fun getAlignment(): Alignment = Alignment.RIGHT
 
+    override fun isNavigateAction(): Boolean = true
+
     override fun getClickAction(): AnAction =
         ConflictAcceptConfirmAction(project, document, block, primaryChoice, labelFor(primaryChoice))
 
