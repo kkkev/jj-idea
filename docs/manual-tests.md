@@ -880,6 +880,10 @@ non-paged behavior is perceptible.
       for change \<short-id\>:" using the same short id shown in the log row, not the full
       64-character change id
 - [ ] **Abandon** action removes change after confirmation
+- [ ] jj-idea-940s (GitHub #129): abandoning an empty, undescribed change that carries a local
+      bookmark asks for confirmation naming the bookmark and warning it will be deleted;
+      cancelling keeps both the change and the bookmark. A change with only a remote-tracking
+      bookmark (`name@remote`) abandons without prompting
 - [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
 - [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
 - [ ] jj-idea-2md7: hovering a commit row in the Duplicate Onto... destination picker, and in the

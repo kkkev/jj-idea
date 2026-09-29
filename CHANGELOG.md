@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - A per-repo override of Log Revset or Log Limit in Settings didn't update any open log window until the toolbar Refresh button was clicked — the setting change wasn't reaching the log panel at all in the common case, and, separately, once paged log loading was enabled its lightweight per-write refresh path kept reusing the previous revset/limit until an explicit Refresh rebuilt it from scratch. Both now take effect as soon as you click OK/Apply.
+- Abandoning a non-empty change or one with a description already asked for confirmation, but abandoning an *empty*, undescribed change that carried a bookmark silently deleted the bookmark along with it, since `jj abandon` removes local bookmarks pointing at the abandoned revision. The confirmation dialog now also fires in that case and names the bookmark(s) that would be deleted. ([#129](https://github.com/kkkev/jj-idea/issues/129))
 
 ## [0.8.18] - 2026-09-27
 
