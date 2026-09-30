@@ -189,6 +189,11 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             // silently drop the filter on a transient failure.
             revsetFilterComponent?.reresolve()
         }
+        // jj-idea-dii4 (GitHub #128): rows and references reload in parallel, so a row's bookmark
+        // ahead/behind can be merged against the previous references - re-merge once they land.
+        project.stateModel.references.connect(this) { _ ->
+            (dataLoader as UnifiedJujutsuLogDataLoader).reapplyBookmarkCorrections()
+        }
     }
 
     /** jj-idea-vqpn (GitHub #116): an explicit Refresh re-resolves the revset filter too. */

@@ -1773,6 +1773,10 @@ selection does nothing; right-click for actions.
   — neither the new bookmark's Local leaf nor its `@origin` leaf shows an arrow or a number,
   collapsed or expanded, in either the panel or the log (this is the reporter's own repro of the
   "↑1000+" bug); a normal ahead/behind bookmark elsewhere in the same repo is unaffected
+- [ ] jj-idea-dii4 (GitHub #128): with a tracked bookmark whose remote moves outside the IDE
+  (e.g. `git fetch` in a colocated repo, or push from another clone then `jj git fetch` in a
+  terminal), click the log toolbar's Refresh **once** — the bookmark's `↑n`/`↓m` updates in the
+  bookmarks panel **and** on the log table's chip, without a second Refresh
 - [ ] Tags appear under their own "Tags" group, also `/`-grouped
 - [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
   or "main +3") — create/delete a bookmark and confirm both update together

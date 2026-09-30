@@ -171,11 +171,7 @@ class UnifiedJujutsuLogDataLoader(
                     return@executeInBackground
                 }
 
-                val correctionsByRepo = bookmarkCorrectionsByRepo()
-                allEntries = topologicalSort(entriesByRepo.values.flatten())
-                    .map { entry -> enrichBookmarks(entry, correctionsByRepo[entry.repo] ?: EMPTY_CORRECTIONS) }
-                log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
-                allEntries.groupBy { it.repo }.forEach { (repo, entries) -> repo.logCache.store(entries) }
+                val sorted = topologicalSort(entriesByRepo.values.flatten())
                 // jj-idea-jnqi bugfix: graphBuilder.buildGraph() and the snapshot write must be
                 // one atomic unit under mergeLock, exactly like fastMergeAndNotify/
                 // fullMergeAndNotify already do - loadCommits() previously called buildGraph()
@@ -183,7 +179,17 @@ class UnifiedJujutsuLogDataLoader(
                 // lock, so a concurrently-running mergeAndNotify() (e.g. an eager loadMore()
                 // prefetch firing before this initial load finishes) could race it on the same
                 // engine instance.
+                //
+                // jj-idea-dii4: the corrections read and enrichment are under mergeLock too, so a
+                // reapplyBookmarkCorrections() racing this load can't merge fresh references only
+                // for this load to then overwrite the snapshot with the stale ones it read earlier.
                 mergeLock.withLock {
+                    val correctionsByRepo = bookmarkCorrectionsByRepo()
+                    allEntries = sorted.map { entry ->
+                        enrichBookmarks(entry, correctionsByRepo[entry.repo] ?: EMPTY_CORRECTIONS)
+                    }
+                    log.info("Merged ${allEntries.size} commits from ${entriesByRepo.size} repositories")
+                    allEntries.groupBy { it.repo }.forEach { (repo, entries) -> repo.logCache.store(entries) }
                     // buildGraph() also reseeds graphBuilder's incremental engine (jj-idea-jnqi)
                     // for a later loadMore()'s appendGraph() to build on.
                     graphNodes = graphBuilder.buildGraph(allEntries)
@@ -426,6 +432,28 @@ class UnifiedJujutsuLogDataLoader(
             val bookmarks = refs.bookmarks.map { it.bookmark }
             BookmarkCorrections(bookmarks.deletedLocalNames(), bookmarks.associateBy { it.name })
         }
+
+    /**
+     * Re-merges the already-loaded entries against the latest
+     * [in.kkkev.jjidea.jj.JujutsuStateModel.references] (jj-idea-dii4, GitHub #128). A Refresh
+     * reloads the log rows and `references` in parallel, and [mergeAndNotify]/[loadCommits] bake
+     * whatever `references` held *at merge time* into each row's bookmark chips - so when the log
+     * finished first, its ↑n/↓m numbers were the previous load's, and stayed that way until a
+     * second Refresh found the (by then fresh) value. Called whenever `references` publishes.
+     *
+     * No jj calls: a no-op unless an initial load has happened and the corrections actually
+     * differ from the ones the current [snapshot] was built with, else one [mergeAndNotify] full
+     * recompute - the same O(loaded entries) cost as any post-write merge.
+     */
+    fun reapplyBookmarkCorrections() {
+        runInBackground {
+            mergeLock.withLock {
+                val current = snapshot ?: return@runInBackground
+                if (current.correctionsByRepo == bookmarkCorrectionsByRepo()) return@runInBackground
+                mergeAndNotify()
+            }
+        }
+    }
 
     override fun clearExpansions() {
         expansionEntriesByRepo.clear()
