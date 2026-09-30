@@ -775,6 +775,9 @@ already-loaded log table shows — it never changes what jj loads for this or an
       `jj bookmark create`) within ~300 ms, without saving a file (op-heads watch) — this is the
       canonical auto-refresh check; other sections (bookmark widget, reference filter) reference
       it rather than repeating it
+- [ ] jj-idea-xhnw: in a **secondary workspace** (`jj workspace add ../ws2` from the sandbox
+      repo, open `ws2` as the project), run `jj new` in a terminal in `ws2`, then `jj new` in the
+      primary workspace → the log refreshes within ~300 ms both times, without saving a file
 - [ ] Working copy (@) selection maintained after refresh
 - [ ] No flickering during refresh
 - [ ] jj-idea-c4tp: open a large repo's log, click Refresh, then close the project while it is

@@ -93,6 +93,15 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 
     /** Watch requests for each repo's operation-heads directory, replaced whenever the repo set changes. */
     private var opHeadsWatchRequests: Set<LocalFileSystem.WatchRequest> = emptySet()
+    private val opHeadsLock = Any()
+
+    /** Resolved `op_heads` directories currently watched — the shared repo's, for secondary workspaces. */
+    @Volatile
+    private var opHeadsDirs: Set<String> = emptySet()
+
+    /** Resolved `.jj/repo` directories of currently-unreadable repos, for [isRepoRootChange]. */
+    @Volatile
+    private var unreadableRepoDirs: Set<String> = emptySet()
 
     /**
      * Watch requests for currently-unreadable repos' `.jj/repo/` directory, replaced whenever
@@ -443,11 +452,11 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 
                     // An external jj operation (e.g. terminal `jj bookmark create`) rewrites the
                     // operation head under .jj/repo/op_heads/. We refresh on it but never mark .jj/ files dirty.
-                    val hasExternalJjOp = events.any { it.file?.let { f -> isOpHeadsChange(f, repos) } == true }
+                    val hasExternalJjOp = events.any { it.file?.let { f -> isOpHeadsChange(f) } == true }
 
                     // A previously-unreadable repo's .jj/repo/ directory changed (e.g. store/ was
                     // restored) — recheck readability rather than waiting for the user to notice.
-                    val hasRepoRepair = events.any { it.file?.let { f -> isRepoRootChange(f, repos) } == true }
+                    val hasRepoRepair = events.any { it.file?.let { f -> isRepoRootChange(f) } == true }
 
                     if (hasRepoChanges || hasExternalJjOp || hasRepoRepair) {
                         if (refreshSuppression.get() > 0) {
@@ -565,13 +574,24 @@ class JujutsuStateModel(private val project: Project) : Disposable {
      * named by operation id and is replaced — different name — on every operation, so watching the
      * containing directory is both correct and robust to jj reshuffling the layout beneath it,
      * while staying just as cheap.
+     *
+     * In a secondary workspace `.jj/repo` is a pointer *file*, so the directory to watch is the
+     * shared repo's `op_heads/` (see [resolveJjRepoDir]), which lies outside the workspace root;
+     * events are therefore matched against the resolved paths, not by ancestry under the root.
      */
     private fun watchOpHeads(repos: Collection<JujutsuRepository>) {
         val fs = LocalFileSystem.getInstance()
         fs.removeWatchedRoots(opHeadsWatchRequests)
-        val paths = repos.map { "${it.directory.path}/$OP_HEADS_RELATIVE_PATH" }.toSet()
-        opHeadsWatchRequests = fs.addRootsToWatch(paths, true)
+        opHeadsWatchRequests = emptySet()
+        // Resolving reads a tiny pointer file in secondary workspaces, so keep it off the EDT.
         runInBackground {
+            val paths = repos.map { "${jjRepoDirPath(it.directory.toNioPath())}/op_heads" }.toSet()
+            opHeadsDirs = paths
+            val requests = fs.addRootsToWatch(paths, true)
+            synchronized(opHeadsLock) {
+                fs.removeWatchedRoots(opHeadsWatchRequests)
+                opHeadsWatchRequests = requests
+            }
             paths.forEach { path ->
                 fs.refreshAndFindFileByPath(path)?.let {
                     VfsUtilCore.processFilesRecursively(it, CommonProcessors.alwaysTrue())
@@ -580,9 +600,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         }
     }
 
-    private fun isOpHeadsChange(file: VirtualFile, repos: Collection<JujutsuRepository>) =
-        repos.any { VfsUtil.isAncestor(it.directory, file, false) } &&
-            file.path.contains("/$OP_HEADS_RELATIVE_PATH")
+    private fun isOpHeadsChange(file: VirtualFile) = isUnderAnyDir(file.path, opHeadsDirs)
 
     /**
      * Watch each currently-unreadable repo's `.jj/repo/` directory itself (jj-idea-9ife) — so a
@@ -599,25 +617,20 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     private fun watchUnreadableRepoRoots(repos: Collection<JujutsuRepository>) {
         val fs = LocalFileSystem.getInstance()
         fs.removeWatchedRoots(repoRootWatchRequests)
-        val paths = repos.map { "${it.directory.path}/$DOT_JJ/repo" }.toSet()
+        val paths = repos.map { jjRepoDirPath(it.directory.toNioPath()) }.toSet()
+        unreadableRepoDirs = paths
         repoRootWatchRequests = fs.addRootsToWatch(paths, false)
         runInBackground {
             paths.forEach { fs.refreshAndFindFileByPath(it) }
         }
     }
 
-    private fun isRepoRootChange(file: VirtualFile, repos: Collection<JujutsuRepository>) =
-        repos.any { "${it.directory.path}/$DOT_JJ/repo" == file.parent?.path }
+    private fun isRepoRootChange(file: VirtualFile) = file.parent?.path in unreadableRepoDirs
 
     override fun dispose() {
         val fs = LocalFileSystem.getInstance()
         fs.removeWatchedRoots(opHeadsWatchRequests)
         fs.removeWatchedRoots(repoRootWatchRequests)
-    }
-
-    companion object {
-        /** Operation-heads directory, relative to a repo root. See [watchOpHeads] for why this exact path. */
-        private const val OP_HEADS_RELATIVE_PATH = "$DOT_JJ/repo/op_heads"
     }
 }
 
