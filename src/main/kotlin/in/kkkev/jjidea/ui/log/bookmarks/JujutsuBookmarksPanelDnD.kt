@@ -15,6 +15,8 @@ import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragContextHolder
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
+import `in`.kkkev.jjidea.ui.dnd.DropHint
+import `in`.kkkev.jjidea.ui.dnd.DropMessage
 import `in`.kkkev.jjidea.ui.dnd.DropOperation
 import `in`.kkkev.jjidea.ui.dnd.DropPerformers
 import `in`.kkkev.jjidea.ui.dnd.DropTarget
@@ -53,11 +55,16 @@ internal fun JujutsuBookmarksPanel.installDragAndDrop(parent: Disposable) {
     val dragContextHolder = DragContextHolder()
     val performer = DropPerformers.forLogTable(project)
     val rejectOverlay = RejectOverlay()
-    Disposer.register(parent) { rejectOverlay.dispose() }
+    val dropHint = DropHint(project)
+    Disposer.register(parent) {
+        rejectOverlay.dispose()
+        dropHint.dispose()
+    }
 
     val cleanUp = {
         dragContextHolder.reset()
         rejectOverlay.hide()
+        dropHint.hide()
     }
 
     DnDSupport.createBuilder(tree)
@@ -73,21 +80,26 @@ internal fun JujutsuBookmarksPanel.installDragAndDrop(parent: Disposable) {
                     if (performer.supports(resolution.operation)) {
                         rejectOverlay.hide()
                         highlight(event, resolution.bounds)
+                        dropHint.show(tree, event.point, resolution.operation.message, rejected = false)
                         event.setDropPossible(true, resolution.operation.label)
                     } else {
                         rejectOverlay.hide()
+                        dropHint.hide()
                         event.setDropPossible(false, "")
                     }
                 is PanelDropResolution.Rejected -> {
-                    if (resolution.reason.isNotEmpty()) {
+                    if (!resolution.message.isBlank) {
                         rejectOverlay.show(tree, resolution.bounds)
+                        dropHint.show(tree, event.point, resolution.message, rejected = true)
                     } else {
                         rejectOverlay.hide()
+                        dropHint.hide()
                     }
-                    event.setDropPossible(false, resolution.reason)
+                    event.setDropPossible(false, resolution.message.plain)
                 }
                 null -> {
                     rejectOverlay.hide()
+                    dropHint.hide()
                     event.setDropPossible(false, "")
                 }
             }
@@ -116,7 +128,7 @@ internal fun JujutsuBookmarksPanel.installDragAndDrop(parent: Disposable) {
  */
 private sealed interface PanelDropResolution {
     data class Allowed(val bounds: Rectangle, val operation: DropOperation) : PanelDropResolution
-    data class Rejected(val bounds: Rectangle, val reason: String) : PanelDropResolution
+    data class Rejected(val bounds: Rectangle, val message: DropMessage) : PanelDropResolution
 }
 
 /**
@@ -142,8 +154,9 @@ private fun JujutsuBookmarksPanel.resolveLive(
     val context = dragContextHolder.forPayload(payload, allEntries = allEntries)
     val copy = event.action == DnDAction.COPY
 
-    context.rejectionReason(target, copy)?.let { return PanelDropResolution.Rejected(bounds, it) }
-    val operation = resolveDropOperation(payload, target, copy) ?: return PanelDropResolution.Rejected(bounds, "")
+    context.rejectionMessage(target, copy)?.let { return PanelDropResolution.Rejected(bounds, it) }
+    val operation =
+        resolveDropOperation(payload, target, copy) ?: return PanelDropResolution.Rejected(bounds, DropMessage.EMPTY)
     return PanelDropResolution.Allowed(bounds, operation)
 }
 

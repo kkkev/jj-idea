@@ -7,6 +7,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RebaseDestinationMode
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
+import `in`.kkkev.jjidea.ui.dnd.DropMessage
 import `in`.kkkev.jjidea.ui.dnd.DropOperation
 import `in`.kkkev.jjidea.ui.dnd.DropTarget
 import `in`.kkkev.jjidea.ui.dnd.DropZone
@@ -51,12 +52,12 @@ class JujutsuLogTableDnDResolveDropTest {
         resolution shouldBe DropResolution.Rejected(
             row = 7,
             zone = DropZone.ONTO,
-            reason = "Cannot drop across repositories"
+            message = DropMessage.of("Cannot drop across repositories")
         )
     }
 
     @Test
-    fun `a self-drop is Rejected silently - empty reason, not a message`() {
+    fun `a self-drop is Rejected silently - empty message, not a reason`() {
         val a = entry("aaaaaaaa")
         val context = DragContext.forDrag(listOf(a), DragPayload.Commit(listOf(a)))
 
@@ -68,7 +69,7 @@ class JujutsuLogTableDnDResolveDropTest {
             context = context
         )
 
-        resolution shouldBe DropResolution.Rejected(row = 0, zone = DropZone.ONTO, reason = "")
+        resolution shouldBe DropResolution.Rejected(row = 0, zone = DropZone.ONTO, message = DropMessage.EMPTY)
     }
 
     @Test

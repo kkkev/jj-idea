@@ -43,17 +43,17 @@ class DragContext private constructor(
      * rewrites, so it is exempt from the "can't rewrite an immutable source" check (`jj duplicate`
      * never rewrites the commit(s) being duplicated).
      *
-     * An empty string (as opposed to `null`) means "reject, but say nothing" - reserved for the
+     * An empty message (as opposed to `null`) means "reject, but say nothing" - reserved for the
      * self-drop case: per the comment in the platform's own `RowsDnDSupport.java`, a drag gesture
      * always starts with the pointer over its own source, so that first instant must not show an
      * error tooltip (design section 6).
      */
-    fun rejectionReason(target: DropTarget, copy: Boolean): String? {
-        if (target.repo != payload.repo) return "Cannot drop across repositories"
-        if (target.id in sourceIds) return ""
-        if (target.id in movedIds) return "That would create a cycle"
+    fun rejectionMessage(target: DropTarget, copy: Boolean): DropMessage? {
+        if (target.repo != payload.repo) return DropMessage.of("Cannot drop across repositories")
+        if (target.id in sourceIds) return DropMessage.EMPTY
+        if (target.id in movedIds) return DropMessage.of("That would create a cycle")
         if (!copy && sourceHasImmutable && target !is DropTarget.RefChip && target !is DropTarget.TagChip) {
-            return "Cannot rewrite an immutable commit"
+            return CANNOT_REWRITE_IMMUTABLE
         }
         (payload as? DragPayload.Files)?.let { return filesRejectionReason(it, target) }
         return when (target) {
@@ -72,13 +72,16 @@ class DragContext private constructor(
             // parent, so there's nothing to guard - dropping @ in the band above an immutable commit
             // must always be allowed, and simply has no branch checking it here.
             is DropTarget.CommitRow -> if (payload is DragPayload.WorkingCopyRef && target.entry.immutable) {
-                "${target.entry.id.short} is immutable"
+                DropMessage.of(target.entry.id, " is immutable")
             } else {
                 null
             }
             is DropTarget.RefChip, is DropTarget.TagChip -> null
         }
     }
+
+    /** [rejectionMessage]'s plain text - `null` if allowed, `""` for the deliberately silent reject. */
+    fun rejectionReason(target: DropTarget, copy: Boolean): String? = rejectionMessage(target, copy)?.plain
 
     /**
      * The [DragPayload.Files]-specific half of [rejectionReason] (jj-idea-yvry, -b2oi): a
@@ -89,25 +92,28 @@ class DragContext private constructor(
      * a *named* rejection the log table's [in.kkkev.jjidea.ui.log.RejectOverlay] can show, instead
      * of the silent "no operation" a guardless reject produces.
      */
-    private fun filesRejectionReason(files: DragPayload.Files, target: DropTarget): String? = when (target) {
+    private fun filesRejectionReason(files: DragPayload.Files, target: DropTarget): DropMessage? = when (target) {
         is DropTarget.CommitRow -> when {
-            target.entry.id == files.owner.id -> "" // squashing into the owning change itself - a no-op
-            files.owner.immutable -> "Cannot rewrite an immutable commit"
-            target.entry.immutable -> "${target.entry.id.short} is immutable"
+            target.entry.id == files.owner.id -> DropMessage.EMPTY // squashing into the owning change itself - a no-op
+            files.owner.immutable -> CANNOT_REWRITE_IMMUTABLE
+            target.entry.immutable -> DropMessage.of(target.entry.id, " is immutable")
             else -> null
         }
         is DropTarget.Gap -> when {
-            target.entry.id != files.owner.id -> "Files can only be split out next to their own change"
-            files.owner.immutable -> "Cannot rewrite an immutable commit"
+            target.entry.id != files.owner.id ->
+                DropMessage.of("Files can only be split out next to their own change")
+            files.owner.immutable -> CANNOT_REWRITE_IMMUTABLE
             else -> null
         }
         is DropTarget.RefChip, is DropTarget.TagChip -> null
     }
 
-    private fun immutabilityReason(entry: LogEntry, invalidIds: Set<ChangeId>): String? =
-        if (entry.id in invalidIds) "${entry.id.short} is immutable" else null
+    private fun immutabilityReason(entry: LogEntry, invalidIds: Set<ChangeId>): DropMessage? =
+        if (entry.id in invalidIds) DropMessage.of(entry.id, " is immutable") else null
 
     companion object {
+        private val CANNOT_REWRITE_IMMUTABLE = DropMessage.of("Cannot rewrite an immutable commit")
+
         /**
          * Build the guard state for a drag of [payload] against the currently-loaded [allEntries],
          * with [sourceMode] picking `-r`/`-s`/`-b` (jj-idea-j8ij; ignored for anything but a

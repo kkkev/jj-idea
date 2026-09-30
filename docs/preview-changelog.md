@@ -76,3 +76,7 @@ verbatim at GA, condensed into a handful of user-facing bullets.
   strengthens that side's background tint, and its gutter icon gets its own rounded highlight (the
   same hover color as an ordinary toolbar button) so it clearly reads as the clickable element —
   making it obvious which side an accept icon acts on before you click it.
+- Drag and Drop: while dragging, a small hint next to the cursor now says what dropping would do
+  ("Rebase abc onto def") or, when the drop isn't allowed, why not ("Cannot drop across
+  repositories", "… is immutable"). Change ids, bookmarks and tags in the hint are styled the same way as in the log.
+  Previously a rejected drop only showed a red row with no explanation.

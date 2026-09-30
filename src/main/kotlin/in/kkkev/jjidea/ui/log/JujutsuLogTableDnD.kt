@@ -29,6 +29,8 @@ import `in`.kkkev.jjidea.ui.components.icon
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragContextHolder
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
+import `in`.kkkev.jjidea.ui.dnd.DropHint
+import `in`.kkkev.jjidea.ui.dnd.DropMessage
 import `in`.kkkev.jjidea.ui.dnd.DropOperation
 import `in`.kkkev.jjidea.ui.dnd.DropPerformer
 import `in`.kkkev.jjidea.ui.dnd.DropPerformers
@@ -85,7 +87,11 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
     val dragContextHolder = DragContextHolder()
     val performer = DropPerformers.forLogTable(project)
     val rejectOverlay = RejectOverlay()
-    Disposer.register(parent) { rejectOverlay.dispose() }
+    val dropHint = DropHint(project)
+    Disposer.register(parent) {
+        rejectOverlay.dispose()
+        dropHint.dispose()
+    }
 
     // The graph state saved by applyDragHighlight (jj-idea-d3u5) at the start of a gesture that
     // actually has something extra to show, so cleanUp can restore it - null whenever the current
@@ -109,6 +115,7 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
         hysteresis.reset()
         dragContextHolder.reset()
         rejectOverlay.hide()
+        dropHint.hide()
         savedGraphNodes?.let { updateGraph(it) }
         savedGraphNodes = null
     }
@@ -135,25 +142,30 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
                     if (performer.supports(resolution.operation)) {
                         rejectOverlay.hide()
                         highlight(event, resolution.row, resolution.zone)
+                        dropHint.show(this, event.point, resolution.operation.message, rejected = false)
                         event.setDropPossible(true, resolution.operation.label)
                     } else {
                         // Unwired operation (e.g. Duplicate before jj-idea-p6nb) - reject with no
                         // indicator, same as a guarded/undefined drop, so it never looks available.
                         rejectOverlay.hide()
+                        dropHint.hide()
                         event.setDropPossible(false, "")
                     }
                 is DropResolution.Rejected -> {
                     // Only a guard's real reason (non-blank) is worth flagging - self-drop and an
                     // undefined dispatch cell both return "" deliberately and stay silent.
-                    if (resolution.reason.isNotEmpty()) {
+                    if (!resolution.message.isBlank) {
                         rejectOverlay.show(this, zoneHighlightRect(rowRect(resolution.row), resolution.zone))
+                        dropHint.show(this, event.point, resolution.message, rejected = true)
                     } else {
                         rejectOverlay.hide()
+                        dropHint.hide()
                     }
-                    event.setDropPossible(false, resolution.reason)
+                    event.setDropPossible(false, resolution.message.plain)
                 }
                 null -> {
                     rejectOverlay.hide()
+                    dropHint.hide()
                     event.setDropPossible(false, "")
                 }
             }
@@ -176,14 +188,14 @@ internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
 
 /**
  * The outcome of resolving a live drop, always carrying the `(row, zone)` it landed in (so a
- * rejection can still be painted at the right spot, not just an allowed drop). [Rejected.reason]
- * is [DragContext.rejectionReason]'s message - e.g. "Cannot drop across repositories", "That would
- * create a cycle", "&lt;id&gt; is immutable" - or `""` for the deliberately-silent self-drop case
- * and an undefined [resolveDropOperation] dispatch cell.
+ * rejection can still be painted at the right spot, not just an allowed drop). [Rejected.message]
+ * is [DragContext.rejectionMessage]'s - e.g. "Cannot drop across repositories", "That would
+ * create a cycle", "&lt;id&gt; is immutable" - or [DropMessage.EMPTY] for the deliberately-silent
+ * self-drop case and an undefined [resolveDropOperation] dispatch cell.
  */
 internal sealed interface DropResolution {
     data class Allowed(val row: Int, val zone: DropZone, val operation: DropOperation) : DropResolution
-    data class Rejected(val row: Int, val zone: DropZone, val reason: String) : DropResolution
+    data class Rejected(val row: Int, val zone: DropZone, val message: DropMessage) : DropResolution
 }
 
 /**
@@ -233,9 +245,9 @@ internal fun resolveDrop(
     context: DragContext
 ): DropResolution {
     val zone = if (target is DropTarget.Gap) target.edge else DropZone.ONTO
-    context.rejectionReason(target, copy)?.let { return DropResolution.Rejected(row, zone, it) }
+    context.rejectionMessage(target, copy)?.let { return DropResolution.Rejected(row, zone, it) }
     val operation = resolveDropOperation(payload, target, copy, context.sourceMode, context.movedCount)
-        ?: return DropResolution.Rejected(row, zone, "")
+        ?: return DropResolution.Rejected(row, zone, DropMessage.EMPTY)
     return DropResolution.Allowed(row, zone, operation)
 }
 

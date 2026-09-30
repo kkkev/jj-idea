@@ -11,9 +11,10 @@ import `in`.kkkev.jjidea.jj.Tag
  * The operation a `(payload, target)` pair resolves to - [resolveDropOperation] is the single
  * dispatch point implementing the full matrix from
  * `docs/design/jj-idea-6oeg-drag-and-drop-graph-ops.md` section 1, mirroring how
- * [in.kkkev.jjidea.ui.log.LogClickTarget.resolve] already centralizes click resolution. [label] is
- * the human-readable name of the operation, passed to `DnDEvent.setDropPossible(true, label)` so
- * the platform's inline tooltip names the exact operation a drop would perform - not just that one
+ * [in.kkkev.jjidea.ui.log.LogClickTarget.resolve] already centralizes click resolution. [message] is
+ * the human-readable name of the operation - structured, so [DropHint] can style its change ids;
+ * [label] is its plain text, passed to `DnDEvent.setDropPossible(true, label)` so the platform's
+ * inline tooltip (when enabled) names the exact operation a drop would perform - not just that one
  * is available.
  *
  * This bead (jj-idea-6jvh) only builds the dispatch table itself; nothing in this package invokes
@@ -21,7 +22,9 @@ import `in`.kkkev.jjidea.jj.Tag
  * variant to the command layer once undo (jj-idea-v9zp) is in place for the immediate-apply cases.
  */
 sealed interface DropOperation {
-    val label: String
+    val message: DropMessage
+
+    val label: String get() = message.plain
 
     /**
      * Plain rebase - the commit becomes a child of [destination] (`ONTO`) or is inserted at
@@ -43,7 +46,7 @@ sealed interface DropOperation {
         val sourceMode: RebaseSourceMode = RebaseSourceMode.REVISION,
         val movedCount: Int = sources.size
     ) : DropOperation {
-        override val label get() = rebaseLabel("Rebase", sources, destination, mode, sourceMode, movedCount)
+        override val message get() = rebaseMessage("Rebase", sources, destination, mode, sourceMode, movedCount)
     }
 
     /**
@@ -55,7 +58,7 @@ sealed interface DropOperation {
      */
     data class Duplicate(val sources: List<LogEntry>, val destination: LogEntry, val mode: RebaseDestinationMode) :
         DropOperation {
-        override val label get() = rebaseLabel("Duplicate", sources, destination, mode)
+        override val message get() = rebaseMessage("Duplicate", sources, destination, mode)
     }
 
     /**
@@ -65,15 +68,16 @@ sealed interface DropOperation {
      * resolves it, not an ordinary move.
      */
     data class MoveBookmark(val bookmark: Bookmark, val destination: LogEntry) : DropOperation {
-        override val label get() = if (bookmark.conflict) {
-            "Resolve bookmark ${bookmark.name} to ${destination.id.short}"
-        } else {
-            "Move bookmark ${bookmark.name} to ${destination.id.short}"
-        }
+        override val message get() = DropMessage.of(
+            if (bookmark.conflict) "Resolve bookmark " else "Move bookmark ",
+            bookmark,
+            " to ",
+            destination.id
+        )
     }
 
     data class MoveTag(val tag: Tag, val destination: LogEntry) : DropOperation {
-        override val label get() = "Move tag ${tag.name} to ${destination.id.short}"
+        override val message get() = DropMessage.of("Move tag ", tag, " to ", destination.id)
     }
 
     /**
@@ -84,7 +88,7 @@ sealed interface DropOperation {
      * with). See [NewChangeOnTop] for the top-band sibling that's *never* rejected for immutability.
      */
     data class EditWorkingCopy(val destination: LogEntry) : DropOperation {
-        override val label get() = "Edit ${destination.id.short}"
+        override val message get() = DropMessage.of("Edit ", destination.id)
     }
 
     /**
@@ -95,7 +99,7 @@ sealed interface DropOperation {
      * rewrites its parent, only adds a child, so there is nothing to guard against (jj-idea-d3u5).
      */
     data class NewChangeOnTop(val destination: LogEntry) : DropOperation {
-        override val label get() = "New change on top of ${destination.id.short}"
+        override val message get() = DropMessage.of("New change on top of ", destination.id)
     }
 
     /**
@@ -105,58 +109,58 @@ sealed interface DropOperation {
      * longer needs a [LogEntry], since the `name@remote` chip's row may not be loaded (jj-idea-3xab).
      */
     data class Push(val bookmark: Bookmark, val remote: String, val repo: JujutsuRepository) : DropOperation {
-        override val label get() = "Push ${bookmark.name} to $remote"
+        override val message get() = DropMessage.of("Push ", bookmark, " to $remote")
     }
 
     /** Files dropped on a row's centre - squashed into [destination] (dialog-gated). */
     data class SquashFiles(val files: DragPayload.Files, val destination: LogEntry) : DropOperation {
-        override val label get() = "Squash ${files.changes.size} file(s) into ${destination.id.short}"
+        override val message get() = DropMessage.of("Squash ${files.changes.size} file(s) into ", destination.id)
     }
 
     /** Files dropped in a gap bordering their own change - split out into a new change there (dialog-gated). */
     data class SplitFiles(val files: DragPayload.Files, val gap: DropTarget.Gap) : DropOperation {
-        override val label get() = "Split ${files.changes.size} file(s) out of ${files.owner.id.short}"
+        override val message get() = DropMessage.of("Split ${files.changes.size} file(s) out of ", files.owner.id)
     }
 }
 
-private fun rebaseLabel(
+private fun rebaseMessage(
     verb: String,
     sources: List<LogEntry>,
     destination: LogEntry,
     mode: RebaseDestinationMode,
     sourceMode: RebaseSourceMode = RebaseSourceMode.REVISION,
     movedCount: Int = sources.size
-): String {
-    val what = sourceScopeLabel(sources, sourceMode, movedCount)
+): DropMessage {
+    val what = sourceScopeMessage(sources, sourceMode, movedCount)
     return when (mode) {
-        RebaseDestinationMode.ONTO -> "$verb $what onto ${destination.id.short}"
-        RebaseDestinationMode.INSERT_BEFORE -> "$verb $what, inserting before ${destination.id.short}"
-        RebaseDestinationMode.INSERT_AFTER -> "$verb $what, inserting after ${destination.id.short}"
+        RebaseDestinationMode.ONTO -> DropMessage.of("$verb ", what, " onto ", destination.id)
+        RebaseDestinationMode.INSERT_BEFORE -> DropMessage.of("$verb ", what, ", inserting before ", destination.id)
+        RebaseDestinationMode.INSERT_AFTER -> DropMessage.of("$verb ", what, ", inserting after ", destination.id)
     }
 }
 
 /**
- * The "what's moving" clause of [rebaseLabel] - plain source count/id for `-r` (unchanged from
+ * The "what's moving" clause of [rebaseMessage] - plain source count/id for `-r` (unchanged from
  * before jj-idea-j8ij), naming the extra scope for `-s`/`-b` so a sticky "Drag scope" setting
  * can't silently move more than the drag chip showed (`docs/design/preview-gating-and-dnd-sequencing.md`
  * batch 5's "anti-footgun" requirement).
  */
-private fun sourceScopeLabel(sources: List<LogEntry>, sourceMode: RebaseSourceMode, movedCount: Int): String {
-    val base = if (sources.size == 1) sources.single().id.short else "${sources.size} commits"
+private fun sourceScopeMessage(sources: List<LogEntry>, sourceMode: RebaseSourceMode, movedCount: Int): DropMessage {
+    val base = if (sources.size == 1) DropMessage.of(sources.single().id) else DropMessage.of("${sources.size} commits")
     return when (sourceMode) {
         RebaseSourceMode.REVISION -> base
         RebaseSourceMode.SOURCE -> {
             val descendants = movedCount - sources.size
             if (descendants > 0) {
-                "$base and its $descendants descendant${if (descendants == 1) "" else "s"}"
+                DropMessage.of(base, " and its $descendants descendant${if (descendants == 1) "" else "s"}")
             } else {
                 base
             }
         }
         RebaseSourceMode.BRANCH -> if (sources.size == 1) {
-            "the branch containing ${sources.single().id.short}"
+            DropMessage.of("the branch containing ", sources.single().id)
         } else {
-            "the branches containing $base"
+            DropMessage.of("the branches containing ", base)
         }
     }
 }

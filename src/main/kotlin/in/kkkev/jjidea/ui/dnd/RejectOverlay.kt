@@ -42,13 +42,14 @@ class RejectOverlay {
      */
     fun show(component: JComponent, rect: Rectangle) {
         val layeredPane = SwingUtilities.getRootPane(component)?.layeredPane ?: return
-        val current = panel ?: RejectPanel().also {
-            panel = it
-            layeredPane.add(it, JLayeredPane.DRAG_LAYER)
-        }
+        val current = panel ?: RejectPanel().also { panel = it }
         if (current.parent !== layeredPane) {
             current.parent?.remove(current)
-            layeredPane.add(current, JLayeredPane.DRAG_LAYER)
+            // add + setLayer, not add(component, DRAG_LAYER): in Kotlin that binds to
+            // Container.add(Component, int index) (a position, not a layer), which silently left the
+            // overlay in the default layer.
+            layeredPane.add(current)
+            layeredPane.setLayer(current, JLayeredPane.DRAG_LAYER)
         }
         val topLeft = SwingUtilities.convertPoint(component, rect.location, layeredPane)
         current.setBounds(topLeft.x, topLeft.y, rect.width, rect.height)

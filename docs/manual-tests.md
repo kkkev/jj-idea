@@ -3357,6 +3357,60 @@ file), which no automated test can supply — see contributing.md § Manual regr
 - [ ] Dragging a bookmark/tag/`@` chip is unaffected by the scope selection - no badge appears on
       those, regardless of which scope is selected
 
+#### Drop hint text next to the cursor (jj-idea-ymuu)
+
+Every drop target shows a small text bubble beside the cursor: the operation a drop would perform
+(allowed) or the reason it can't (rejected). Painted by the plugin itself, because the platform's
+own drop tooltip is off by default (`ide.dnd.textHints`) - so this is the only place a rejection's
+reason is ever visible. Applies to the log table and the Bookmarks panel; the changes tree and
+details panel are drag sources only.
+
+**Code:** `ui/dnd/DropHint.kt`, `ui/dnd/RejectOverlay.kt`, `ui/log/JujutsuLogTableDnD.kt`,
+`ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`
+
+- [ ] In a multi-repo project, drag a commit onto a row from a **different** repo → red fill on the
+      row **and** a red bubble beside the cursor reading "Cannot drop across repositories" (or the
+      guard's actual wording); the bubble follows the cursor while you stay over the row
+- [ ] Drag onto an immutable commit → red bubble "&lt;id&gt; is immutable"; onto a descendant of the
+      dragged commit → the cycle reason
+- [ ] Drag onto a valid centre band → neutral (tooltip-coloured) bubble "Rebase &lt;id&gt; onto &lt;id&gt;";
+      top/bottom band → the "inserting after/before" wording. The bubble changes text as you move
+      between zones/rows, without leaving a stale one behind
+- [ ] Move to the far right and bottom edges of the log while dragging → the bubble stays fully
+      visible (clamped inside the window), never cut off
+- [ ] Change ids in the bubble are styled the way the log styles them: bold unique prefix, grey
+      remainder, and a coloured `/N` suffix on a divergent change - not plain unstyled text. Check
+      an allowed rebase ("Rebase **kk**mpztqr onto **mz**rsnvtu") and an immutable reject
+      ("**ab**cdefgh is immutable")
+- [ ] Bookmark and tag names in the bubble are icon chips coloured like the log's (bookmark icon +
+      bookmark colour, tag icon + tag colour), not plain text: drag a bookmark chip onto a commit
+      ("Move bookmark [chip] to **kk**…"), a tag chip likewise, and a local bookmark onto its
+      `@remote` chip ("Push [chip] to origin"). A deleted bookmark shows struck through and a
+      conflicted one shows the conflict icon, as in the log. Check the same wording in dark theme
+- [ ] Spacing around a chip: a normal gap between the chip's last letter and the following "to"
+      ("Move bookmark [chip] to kk") - the word must not butt against the name
+- [ ] Drag a bookmark with a **very long** name (~50 characters) onto a commit → the bubble shows
+      three lines - "Move bookmark", the whole name with its icon on a line of its own, then
+      "to kk" - with nothing clipped at the right edge and no word split mid-way ("t" / "o")
+- [ ] A bookmark with an **absurdly long** name (~150 characters, wider than the bubble) → shown
+      shortened in the middle with "…" so it fits on its line, never running past the bubble edge
+- [ ] Repeat the long-name check with a tag chip, and with the IDE at a non-100% UI scale
+      (Settings → Appearance → Zoom) - the layout must follow the scale, not the pixel count
+- [ ] Shrink the IDE window narrow and drag a `-s`/`-b` scope rebase (the longest label) → the
+      bubble wraps onto several lines instead of running off the window edge
+- [ ] Move the cursor so it passes **over** the bubble itself (e.g. near the right edge, where the
+      bubble is pushed left under the cursor) → the drag keeps working: the hovered row still
+      highlights and a drop there still lands
+- [ ] The bubble is drawn **above** the red fill and stays legible over it
+- [ ] Drag a commit onto itself → no fill and **no** bubble (deliberately silent)
+- [ ] Move off any row (empty space below the last row), leave the log for another panel, or
+      release/cancel with Esc → the bubble disappears every time; nothing lingers after the drop
+- [ ] Repeat the cross-repo and allowed cases on the **Bookmarks panel** (drag a commit onto a
+      bookmark of another repo; drag a bookmark onto a valid commit) → same bubble behaviour
+- [ ] Turn on Registry key `ide.dnd.textHints` (Help → Find Action → Registry) and drag again →
+      only **one** hint appears (the platform's), not two; turn it back off afterwards
+- [ ] Switch between light and dark themes → bubble and red fill are readable in both
+
 #### Commit → commit rebase by drag (jj-idea-8fxs)
 
 The headline drag gesture: dropping a dragged commit row (or multi-selection) onto another row's
@@ -3381,7 +3435,8 @@ dragged commit(s) move); see "Rebase source scope" below for `-s`/`-b`.
       nothing. Hover slowly and confirm the filled indicator is reliably visible every time you're
       over that row - not just an occasional flicker (jj-idea-ymuu: the native reject cursor alone
       was not reliable feedback; this filled indicator is the fix, painted the same reliable way as
-      the allowed-drop outline rather than depending on the cursor)
+      the allowed-drop outline rather than depending on the cursor). The reason text beside the
+      cursor is checked in "Drop hint text" above
 - [ ] In a multi-root project, drag a commit from one repo's row onto a row from a different repo
       in the same unified log — same filled reject indicator, same reliability check as above
 - [ ] Drag a commit onto itself, or onto another member of the same multi-selection — reject
