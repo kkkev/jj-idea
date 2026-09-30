@@ -358,6 +358,12 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     }
 
     init {
+        // Create the platform's AllVcses service now, while the project is certainly alive (jj-idea-fchy).
+        // Its constructor adds an EP listener to the application-level VcsEP *before* registering the
+        // removal with the project's Disposer; if a pooled-thread loader below is the first to touch it
+        // after the project started disposing, the listener is never removed and leaks the Project.
+        project.projectLevelVcsManager.getAllVcss()
+
         // Fire off an initial invalidation of repository roots to transition from empty to the actual roots - so that
         // initial state is initialised in all listeners
         jujutsuVcsRoots.invalidate()

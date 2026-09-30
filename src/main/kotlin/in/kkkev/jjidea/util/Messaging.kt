@@ -197,9 +197,16 @@ class SimpleNotifiableState<T : Any>(
     }
 
     override fun invalidate() {
+        if (project.isDisposed) {
+            log.info("[$topicDisplayName] invalidate ignored, project disposed")
+            return
+        }
         val myVersion = version.incrementAndGet()
         log.info("[$topicDisplayName] invalidate v$myVersion on ${Thread.currentThread().name}")
         runInBackground {
+            // Don't run loaders against a project that is disposing: they can lazily create project
+            // services during teardown and leak the Project (jj-idea-fchy).
+            if (project.isDisposed) return@runInBackground
             val newValue = loader()
             // If version has moved on since we started, another load is queued or will be —
             // just discard this result. The latest invalidate() will produce a fresher load.
@@ -213,7 +220,7 @@ class SimpleNotifiableState<T : Any>(
             if (changed) {
                 value = newValue
                 runLater {
-                    publisher.changed(newValue)
+                    if (!project.isDisposed) publisher.changed(newValue)
                 }
             }
         }
