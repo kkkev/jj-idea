@@ -101,6 +101,7 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
 
     init {
         isOpaque = false
+        transferHandler = CopyableTextTransferHandler
         addMouseMotionListener(
             object : MouseMotionAdapter() {
                 override fun mouseMoved(e: MouseEvent) {

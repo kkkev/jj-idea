@@ -13,12 +13,13 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Tag as JupiterTag
 
 /**
- * The decoded inner HTML of every chip in [html]. A chip is one `<img src='unbreakable:…'/>` whose
+ * The decoded text of every chip in [html]. A chip is one `<img src='unbreakable:…'/>` whose
  * content is URL-encoded into the src (see `UnbreakableContent`), so assertions about a chip's text
  * have to look through that encoding.
  */
 internal fun chipContents(html: String): String =
-    Regex("unbreakable:([^']*)'").findAll(html).joinToString("") { UnbreakableContent.decode(it.groupValues[1]) }
+    Regex("unbreakable:([^']*)'").findAll(html)
+        .joinToString("") { UnbreakableContent.decode(it.groupValues[1]).plainText }
 
 /**
  * [DropMessage] renders one structure two ways (jj-idea-ymuu): [DropMessage.plain] must stay exactly
