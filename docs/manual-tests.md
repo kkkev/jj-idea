@@ -522,6 +522,32 @@ more lanes than the 3-4 needed here.
       exactly as before (ref-only hover highlight, no link)
 - [ ] With no Issue Navigation patterns configured, descriptions render exactly as before
 
+#### Icons and chips at non-default zoom (jj-idea-3as8)
+
+Repeat at **View → Appearance → Zoom IDE** 85%, 150% and 200%, then reset to 100%. Use a commit
+with a local and a remote bookmark (one divergent, e.g. ↑1), a tag, an immutable parent and an
+author/committer email. Compare each surface with the same commit's row in the log table.
+
+- [ ] Details panel: the repo line's icon, the bookmark/tag chips' icons and the immutable/conflict
+      icons are the same size as in the log table, centred on their text line, with no overlap
+      and no extra gap before the text that follows
+- [ ] Bookmark/tag chip names and the ↑/↓ divergence scale with the zoom, the same as the
+      surrounding text (slightly smaller, as in the log table)
+- [ ] The "+N" overflow chip, the `@` marker and the dangling-head marker line up the same way
+- [ ] Row tooltip and the bookmarks panel (tree and its tooltips) show the same alignment
+- [ ] Hovering a bookmark/tag chip highlights exactly the chip; hovering the author's
+      `Name <email>` underlines exactly it; the issue-link substring inside a chip name still
+      underlines only itself
+
+#### Copying chip text (jj-idea-5zio)
+
+- [ ] In the details panel, drag-select from plain text before the author line to past the date
+      (start the drag on plain text, not on a chip), copy, and paste into a plain text editor —
+      the pasted text includes `Name <email>` and the date
+- [ ] Select All (Ctrl/Cmd+A) in the details panel, copy and paste — bookmark/tag chip names
+      (with any ↑/↓ divergence) appear in the pasted text; icons contribute nothing
+- [ ] Row tooltip text selected and copied the same way includes its chips' text
+
 #### Details Changes Panel
 
 - [ ] File change tree shows correct files

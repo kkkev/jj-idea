@@ -1,6 +1,9 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.openapi.vcs.IssueNavigationConfiguration
+import com.intellij.openapi.vcs.IssueNavigationLink
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.io.URLUtil
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkName
@@ -11,6 +14,7 @@ import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Tag
+import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.collections.shouldHaveSize
@@ -71,7 +75,7 @@ class HtmlTextCanvasTest {
         val iconTags = ICON_TAG.findAll(html).toList()
         iconTags shouldHaveSize 1
         val src = Regex("src='([^']*)'").find(iconTags[0].value)!!.groupValues[1]
-        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "↑2↓1"
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)).plainText shouldContain "↑2↓1"
     }
 
     /**
@@ -204,8 +208,8 @@ class HtmlTextCanvasTest {
         iconTags shouldHaveSize 1
         val src = Regex("src='([^']*)'").find(iconTags[0].value)!!.groupValues[1]
         src shouldContain UNBREAKABLE_PREFIX
-        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "Alice"
-        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "alice@example.com"
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)).plainText shouldContain "Alice"
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)).plainText shouldContain "alice@example.com"
     }
 
     @Test
@@ -231,6 +235,42 @@ class HtmlTextCanvasTest {
         iconTags shouldHaveSize 1
         val src = Regex("src='([^']*)'").find(iconTags[0].value)!!.groupValues[1]
         src shouldContain UNBREAKABLE_PREFIX
-        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)) shouldContain "12/07/2026"
+        UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)).plainText shouldContain "12/07/2026"
+    }
+
+    /**
+     * jj-idea-3as8: a chip carries the same icon/text runs the log table records, not HTML, so
+     * [AtomicHtmlView] can size and place them the way the log table does - including the `smaller`
+     * style it was opened under, which the surrounding HTML already applies to its ambient font.
+     */
+    @Test
+    fun `bookmark chip records its icon and label as runs under the enclosing smaller style`() {
+        val html = htmlString { append(Bookmark("main", deleted = true)) }
+
+        val src = Regex("src='([^']*)'").find(ICON_TAG.findAll(html).single().value)!!.groupValues[1]
+        val content = UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX))
+
+        (content.outerStyle and SimpleTextAttributes.STYLE_SMALLER) shouldBe SimpleTextAttributes.STYLE_SMALLER
+        val icon = content.runs[0] as ChipRun.Icon
+        icon.key shouldContain "BookmarkDeleted"
+        val label = content.runs[1] as ChipRun.Text
+        label.text shouldBe "main"
+        (label.style and SimpleTextAttributes.STYLE_STRIKEOUT) shouldBe SimpleTextAttributes.STYLE_STRIKEOUT
+        label.color shouldBe JujutsuColors.BOOKMARK
+        label.link shouldBe null
+    }
+
+    @Test
+    fun `an issue reference inside a chip is recorded as that run's own link, not the chip's`() {
+        val config = IssueNavigationConfiguration().apply {
+            links = listOf(IssueNavigationLink("[A-Z]+-\\d+", "https://tracker/\$0"))
+        }
+        val html = htmlString(linkifier = IssueLinkifier(config)) { append(Bookmark("JIRA-123-fix")) }
+
+        val src = Regex("src='([^']*)'").find(ICON_TAG.findAll(html).single().value)!!.groupValues[1]
+        val runs = UnbreakableContent.decode(src.removePrefix(UNBREAKABLE_PREFIX)).runs.filterIsInstance<ChipRun.Text>()
+
+        runs.single { it.text == "JIRA-123" }.link shouldBe "https://tracker/JIRA-123"
+        runs.single { it.text == "-fix" }.link shouldBe null
     }
 }

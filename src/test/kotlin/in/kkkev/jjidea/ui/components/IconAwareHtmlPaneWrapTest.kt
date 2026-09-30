@@ -113,10 +113,10 @@ class IconAwareHtmlPaneWrapTest {
     }
 
     /**
-     * Regression test for the chip-text-renders-in-the-wrong-font bug: [AtomicHtmlView]'s inner
-     * document has no ambient CSS of its own, so without seeding a font/color rule from the outer
-     * pane it silently falls back to Swing's built-in HTML stylesheet default (a serif font) - a
-     * mismatch from the rest of the pane's text, not merely "looks wrong" in isolation. Measures the
+     * Regression test for the chip-text-renders-in-the-wrong-font bug: [AtomicHtmlView] paints its
+     * own text, so its font must be resolved from the same view attributes the surrounding text uses
+     * (an earlier nested-document design fell back to Swing's serif default, and later failed to
+     * follow the IDE zoom - jj-idea-3as8; see [IconZoomRenderingTest] for the zoom case). Measures the
      * *actual rendered pixel width* of an unbreakable chip's text against `pane`'s own font metrics
      * for the identical string, rather than introspecting [AtomicHtmlView]'s private state - if the
      * chip's font family or size ever drifts from the pane's, the two widths diverge.
