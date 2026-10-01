@@ -2792,6 +2792,8 @@ tooltips.
 - [ ] After resolving `file.txt` via any accept link, the merge tool, or any other entry point
       while the file is open in the editor, the banner **disappears automatically**, without
       switching tabs or reopening the file
+- [ ] Click the banner's **"Accept …"** link (jj-idea-5k16): the file resolves and a **"Resolve conflict completed."** balloon with an **Undo** link appears. Click Undo: the markers return in the file, the banner reappears with the original count, and `jj op log` shows an `op revert`
+- [ ] After dismissing that balloon (before any other jj action), the VCS/Jujutsu **"Undo Resolve conflict"** action does the same; on a modify/delete conflict (FX-MD-CONFLICT) accepting the deletion side then undoing restores the file
 - [ ] Open a **non-conflicted** jj-tracked file: no banner appears
 - [ ] Mixed jj + Git project: opening a file with a **Git** conflict shows no jj banner (and vice versa)
 - [ ] Open a conflicted file that is **outside** any jj repo (e.g. an unrelated Git-only root in a multi-root project): no jj banner appears

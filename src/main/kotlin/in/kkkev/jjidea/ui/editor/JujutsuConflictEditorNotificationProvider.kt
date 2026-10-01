@@ -18,11 +18,14 @@ import com.intellij.ui.EditorNotifications
 import com.intellij.util.Alarm
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.change.resolveConflicts
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.OperationId
 import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
 import `in`.kkkev.jjidea.jj.conflict.countConflictBlocks
 import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.jj.relativePathOf
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import java.util.function.Function
 import javax.swing.JComponent
@@ -127,12 +130,24 @@ class JujutsuConflictEditorNotificationProvider : EditorNotificationProvider, Du
 
     private fun acceptSide(project: Project, file: VirtualFile, tool: String) {
         val repo = project.possibleJujutsuRepositoryFor(file) ?: return
-        repo.createCommand { resolve(listOf(repo.relativePathOf(file)), tool) }
-            .onSuccess {
-                invalidate(vfsChanged = true)
-                EditorNotifications.getInstance(project).updateNotifications(file)
-            }
-            .onFailure { tellUser("notification.conflict.accept.error") }
-            .executeAsync()
+        acceptSideCommand(project, repo, file, tool).executeAsync()
     }
 }
+
+/**
+ * The banner's "Accept <side>" command: one `jj resolve --tool` call, hence one op, so a single
+ * undo balloon (jj-idea-5k16) exactly reverses it. [notify] is the undo-balloon seam for tests.
+ */
+internal fun acceptSideCommand(
+    project: Project,
+    repo: JujutsuRepository,
+    file: VirtualFile,
+    tool: String,
+    notify: (JujutsuRepository, OperationId, String) -> Unit = JujutsuNotifications::notifyUndoable
+) = repo.createCommand { resolve(listOf(repo.relativePathOf(file)), tool) }
+    .onSuccess {
+        invalidate(vfsChanged = true)
+        EditorNotifications.getInstance(project).updateNotifications(file)
+    }
+    .onFailure { tellUser("notification.conflict.accept.error") }
+    .addUndoTracking("notification.conflict.accept.undo", notify)
