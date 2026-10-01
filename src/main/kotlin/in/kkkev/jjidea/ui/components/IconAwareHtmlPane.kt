@@ -1,6 +1,12 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.actionSystem.CommonShortcuts
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.EmptyAction
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.actionSystem.PlatformDataKeys
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.project.Project
 import com.intellij.ui.BrowserHyperlinkListener
 import com.intellij.ui.components.JBHtmlPane
@@ -34,12 +40,21 @@ private val REF_URL_PARSER = Pattern.compile("^jjref://([^?]+)\\?([^&]+)&kind=([
  * the right-click context menu ([refUriAt]) but have no left-click action and no hover cue - a
  * bookmark/tag chip's only interactive affordance is the right-click menu (jj-idea-wkcz).
  */
-class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
-    JBHtmlPaneStyleConfiguration(),
-    JBHtmlPaneConfiguration {
-        extensions(AtomicHtmlExtension, IconImgExtension)
+class IconAwareHtmlPane(private val project: Project) :
+    JBHtmlPane(
+        JBHtmlPaneStyleConfiguration(),
+        JBHtmlPaneConfiguration {
+            extensions(AtomicHtmlExtension, IconImgExtension)
+        }
+    ),
+    UiDataProvider {
+    private val copyProvider = CopyableTextCopyProvider(this)
+
+    // JBHtmlPane isn't itself a UiDataProvider, so there's no super snapshot to chain to.
+    override fun uiDataSnapshot(sink: DataSink) {
+        sink[PlatformDataKeys.COPY_PROVIDER] = copyProvider
     }
-) {
+
     /**
      * The atomic-content `<img>` [Element] currently under the pointer, if it's inside a link
      * (jj-idea-iesq) - read by [AtomicHtmlView.paint] to underline/highlight only that one unit
@@ -102,6 +117,10 @@ class IconAwareHtmlPane(private val project: Project) : JBHtmlPane(
     init {
         isOpaque = false
         transferHandler = CopyableTextTransferHandler
+        // The keymap binds Cmd/Ctrl+C straight to EditorCopy, which would wrap this pane as a text-component
+        // editor and copy chips as placeholders; an action registered on the component is tried first, so this
+        // routes the shortcut to the platform's Copy action and thus to copyProvider (jj-idea-5zio).
+        EmptyAction.registerWithShortcutSet(IdeActions.ACTION_COPY, CommonShortcuts.getCopy(), this)
         addMouseMotionListener(
             object : MouseMotionAdapter() {
                 override fun mouseMoved(e: MouseEvent) {

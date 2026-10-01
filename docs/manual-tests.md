@@ -541,12 +541,23 @@ author/committer email. Compare each surface with the same commit's row in the l
 
 #### Copying chip text (jj-idea-5zio)
 
+Use the **keyboard** shortcut (Cmd/Ctrl+C) throughout: the IDE routes it through its own Copy action,
+not Swing's, so that's the path that must carry the chip text (a context menu has no Copy here).
+
 - [ ] In the details panel, drag-select from plain text before the author line to past the date
-      (start the drag on plain text, not on a chip), copy, and paste into a plain text editor —
-      the pasted text includes `Name <email>` and the date
-- [ ] Select All (Ctrl/Cmd+A) in the details panel, copy and paste — bookmark/tag chip names
-      (with any ↑/↓ divergence) appear in the pasted text; icons contribute nothing
-- [ ] Row tooltip text selected and copied the same way includes its chips' text
+      (start the drag on plain text, not on a chip), Cmd/Ctrl+C, and paste into a plain text
+      editor — the pasted text includes `Name <email>` and the date
+- [ ] Select All (Ctrl/Cmd+A) in the details panel, Cmd/Ctrl+C and paste — bookmark/tag chip names
+      (with any ↑/↓ divergence) appear in the pasted text; icons contribute nothing. (The on-screen
+      highlight skips chips and the author line — their selection highlight has zero width, a known
+      limitation — but the clipboard has them)
+- [ ] A commit with an issue-tracker reference in its description and bookmark name (e.g.
+      `Fixes JIRA-123`, `jira-123-fix-thing`) copies as plain text — no URL or markup
+- [ ] Row tooltip: select text with the mouse (not from a corner of the tooltip, which dismisses
+      it), then Cmd/Ctrl+C and paste — includes its chips' text. The tooltip closes on the key
+      press (it dismisses on any key, so Cmd/Ctrl+A in it just closes it); the copy still happens
+- [ ] The description line pastes with ordinary spaces; the only non-breaking spaces are the
+      deliberate gaps between chips and around the `·` before the date (out of scope)
 
 #### Details Changes Panel
 

@@ -1,5 +1,9 @@
 package `in`.kkkev.jjidea.ui.components
 
+import com.intellij.ide.CopyProvider
+import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.ide.CopyPasteManager
 import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
 import javax.swing.JComponent
@@ -27,6 +31,28 @@ internal object CopyableTextTransferHandler : TransferHandler() {
         val end = pane.selectionEnd
         if (start == end) return null
         return StringSelection(doc.copyableText(start, end))
+    }
+}
+
+/**
+ * The IDE's Copy (Cmd/Ctrl+C) never reaches [CopyableTextTransferHandler]: the keymap binds the shortcut
+ * straight to `EditorCopy`, which wraps the pane as a text-component editor and reads the selection through
+ * the IDE's own document view - where each chip is the same placeholder character again. [IconAwareHtmlPane]
+ * therefore supplies this as its `COPY_PROVIDER` *and* registers the platform's Copy action on itself (a
+ * component-registered action is tried before the keymap's), so the shortcut ends up here (jj-idea-5zio).
+ */
+internal class CopyableTextCopyProvider(private val pane: JTextComponent) : CopyProvider {
+    override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+    override fun isCopyEnabled(dataContext: DataContext) = pane.selectionStart != pane.selectionEnd
+
+    override fun isCopyVisible(dataContext: DataContext) = true
+
+    override fun performCopy(dataContext: DataContext) {
+        val doc = pane.document as? HTMLDocument ?: return
+        if (pane.selectionStart == pane.selectionEnd) return
+        val text = doc.copyableText(pane.selectionStart, pane.selectionEnd)
+        CopyPasteManager.getInstance().setContents(StringSelection(text))
     }
 }
 
