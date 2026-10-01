@@ -28,7 +28,7 @@ class LoadWorkingCopiesTest {
     // don't leak state into each other.
     @AfterEach
     fun clearHealthCache() {
-        listOf("/healthy", "/broken", "/a", "/b", "/stale").forEach(JujutsuRepositoryHealth::markReadable)
+        listOf("/healthy", "/broken", "/a", "/b", "/stale", "/slow").forEach(JujutsuRepositoryHealth::markReadable)
     }
 
     /** A readable repo at [path]: `logCache[WorkingCopy]` returns a [LogEntry] pointing back at this same repo. */
@@ -102,6 +102,40 @@ class LoadWorkingCopiesTest {
             )
         )
         JujutsuRepositoryHealth.healthFor("/stale").shouldBe(notified.single())
+    }
+
+    @Test
+    fun `a timeout keeps the previous working copy, is not marked unreadable, and notifies NotResponding`() {
+        val previousEntry = LogEntry(
+            repo = readableRepoAt("/slow"),
+            id = ChangeId("/slow", "/slow", null),
+            commitId = CommitId("commit-/slow"),
+            underlyingDescription = ""
+        )
+        val slow = unreadableRepoAt("/slow", JjTimedOutException("Error from jj log: timed out", 30_000))
+        val notified = mutableListOf<RepositoryHealth>()
+
+        val result = loadWorkingCopies(project, listOf(slow), log, mapOf("/slow" to previousEntry)) { _, _, h ->
+            notified.add(h)
+        }
+
+        result["/slow"] shouldBe previousEntry
+        notified.single() shouldBe RepositoryHealth.NotResponding("Error from jj log: timed out", 30)
+        JujutsuRepositoryHealth.healthFor("/slow") shouldBe null
+        JujutsuRepositoryHealth.isUnreadable("/slow").shouldBeFalse()
+    }
+
+    @Test
+    fun `a timeout with nothing to keep is recorded as NotResponding, not unreadable`() {
+        val slow = unreadableRepoAt("/slow", JjTimedOutException("Error from jj log: timed out", 30_000))
+        val notified = mutableListOf<RepositoryHealth>()
+
+        val result = loadWorkingCopies(project, listOf(slow), log) { _, _, h -> notified.add(h) }
+
+        result shouldNotContainKey "/slow"
+        notified.single() shouldBe RepositoryHealth.NotResponding("Error from jj log: timed out", 30)
+        JujutsuRepositoryHealth.healthFor("/slow") shouldBe notified.single()
+        JujutsuRepositoryHealth.isUnreadable("/slow").shouldBeFalse()
     }
 
     @Test

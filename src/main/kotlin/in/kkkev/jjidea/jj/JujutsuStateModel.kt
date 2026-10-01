@@ -21,6 +21,7 @@ import com.intellij.util.Alarm
 import com.intellij.util.CommonProcessors
 import com.intellij.vcsUtil.VcsUtil
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
+import `in`.kkkev.jjidea.util.NotifiableState
 import `in`.kkkev.jjidea.util.notifiableState
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.simpleNotifier
@@ -213,7 +214,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     /**
      * Working copy log entries - one for each repo.
      */
-    val workingCopies = notifiableState(
+    val workingCopies: NotifiableState<Map<String, LogEntry>> = notifiableState(
         project,
         "Working Copies",
         emptyMap(),
@@ -222,13 +223,31 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         }
     ) {
         val repos = initialisedRepositories.immediateValue.values
-        loadWorkingCopies(project, repos, log).also {
+        loadWorkingCopies(project, repos, log, previous = workingCopies.value).also {
             // Re-arm regardless of whether the published workingCopies value actually changed (a
             // repo broken since project open never had a readable value to change *from*), so a
             // repair is always detected — see watchUnreadableRepoRoots.
             watchUnreadableRepoRoots(repos.filter { repo -> JujutsuRepositoryHealth.isUnreadable(repo.directory.path) })
+            // A load that ends with the same (e.g. still empty) map publishes nothing, so tell the
+            // Working Copy empty state separately that it can leave "loading" or change its reason.
+            workingCopiesProbed = true
+            repositoryHealthChanged.notify(Unit)
         }
     }
+
+    @Volatile
+    private var workingCopiesProbed = false
+
+    /**
+     * Fired after every [workingCopies] load, even one whose map is unchanged, so the Working Copy
+     * tool window's empty state can switch from "loading" to the reason a repo has no working copy
+     * (not responding, unreadable, stale) - [workingCopies] itself stays silent when an empty map
+     * loads as another empty map.
+     */
+    val repositoryHealthChanged = simpleNotifier<Unit>(project, "Jujutsu Repository Health Changed")
+
+    /** True while repos are initialised but the first [workingCopies] load hasn't finished (EDT-safe). */
+    fun isLoadingWorkingCopies() = !workingCopiesProbed && initialisedRepositories.value.isNotEmpty()
 
     /**
      * Git remotes for each initialised repository, keyed by [VirtualFile.path].
@@ -643,11 +662,15 @@ val Project.stateModel: JujutsuStateModel get() = service()
  * startup, also covers a repo that breaks after [JujutsuStateModel.initialisedRepositories] has
  * already accepted it (jj-idea-9ife). Extracted from [JujutsuStateModel.workingCopies] so it can
  * be unit-tested without registering real VCS roots.
+ *
+ * A jj timeout (jj-idea-1bio) is not a broken repo: it keeps the repo's [previous] working copy if
+ * there is one, and otherwise records [RepositoryHealth.NotResponding] rather than "unreadable".
  */
 internal fun loadWorkingCopies(
     project: Project,
     repos: Collection<JujutsuRepository>,
     log: Logger,
+    previous: Map<String, LogEntry> = emptyMap(),
     notifyUnreadable: (Project, JujutsuRepository, RepositoryHealth) -> Unit =
         JujutsuNotifications::notifyUnreadableRoot
 ) = repos.mapNotNull { repo ->
@@ -659,6 +682,16 @@ internal fun loadWorkingCopies(
             JujutsuRepositoryHealth.markReadable(repo.directory.path)
             JujutsuNotifications.clearNotificationState(repo.directory.path)
         }
+    } catch (e: JjTimedOutException) {
+        // jj was slow (jj-idea-1bio), not the repo broken. Keep the last-known working copy so a
+        // busy system doesn't blank the UI; only a first load with nothing to keep is recorded.
+        log.warn("Timed out reading working copy for ${repo.directory.path}", e)
+        val health = RepositoryHealth.NotResponding(e.message.orEmpty(), e.timeoutSeconds)
+        val path = repo.directory.path
+        val kept = previous[path]
+        if (kept == null) JujutsuRepositoryHealth.mark(path, health)
+        notifyUnreadable(project, repo, health)
+        kept
     } catch (e: VcsException) {
         log.warn("Could not read working copy for ${repo.directory.path}", e)
         val health = classifyRepositoryFailure(e.message.orEmpty())

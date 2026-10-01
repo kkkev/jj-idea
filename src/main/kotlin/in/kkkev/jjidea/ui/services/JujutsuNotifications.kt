@@ -50,6 +50,13 @@ object JujutsuNotifications {
     // Track which roots we've already notified as unreadable, to avoid spamming
     private val notifiedUnreadableRoots = ConcurrentHashMap.newKeySet<String>()
 
+    // A live "jj not responding" balloon per root (jj-idea-1bio). Unlike notifiedUnreadableRoots this
+    // is not a once-per-session latch: a timeout is transient, so it may notify again once the previous
+    // balloon is dismissed, or when the same root is opened in another project window.
+    private class LiveNotification(val project: Project, val notification: Notification)
+
+    private val liveNotRespondingByRoot = ConcurrentHashMap<String, LiveNotification>()
+
     // Track current availability notification to avoid duplicates (global, not per-project)
     @Volatile
     private var currentAvailabilityNotification: Notification? = null
@@ -107,10 +114,13 @@ object JujutsuNotifications {
     fun notifyUnreadableRoot(project: Project, repo: JujutsuRepository, health: RepositoryHealth) {
         val rootPath = repo.directory.path
 
-        // Only notify once per root
-        if (!notifiedUnreadableRoots.add(rootPath)) {
-            return
+        val firstNotification = if (health is RepositoryHealth.NotResponding) {
+            liveNotRespondingByRoot[rootPath]
+                ?.let { it.project !== project || it.notification.isExpired || project.isDisposed } ?: true
+        } else {
+            notifiedUnreadableRoots.add(rootPath)
         }
+        if (!firstNotification) return
 
         val notification = when (health) {
             is RepositoryHealth.Stale -> NotificationGroupManager.getInstance()
@@ -128,6 +138,26 @@ object JujutsuNotifications {
                         notifiedUnreadableRoots.remove(rootPath)
                         project.stateModel.invalidateRepositoryState()
                     }
+                }
+
+            is RepositoryHealth.NotResponding -> NotificationGroupManager.getInstance()
+                .getNotificationGroup(GROUP_ID)
+                .createNotification(
+                    JujutsuBundle.message("notification.notresponding.title"),
+                    JujutsuBundle.message(
+                        "notification.notresponding.content",
+                        repo.displayName,
+                        health.timeoutSeconds.toString(),
+                        health.detail
+                    ),
+                    NotificationType.WARNING
+                ).apply {
+                    addExpiringAction("notification.notresponding.action.retry") {
+                        project.stateModel.invalidateRepositoryState()
+                    }
+                    val live = LiveNotification(project, this)
+                    liveNotRespondingByRoot[rootPath] = live
+                    whenExpired { liveNotRespondingByRoot.remove(rootPath, live) }
                 }
 
             is RepositoryHealth.Unreadable -> NotificationGroupManager.getInstance()
@@ -183,6 +213,21 @@ object JujutsuNotifications {
                     addExpiringAction("notification.stale.action.retry") { retry() }
                 }
 
+            is RepositoryHealth.NotResponding -> NotificationGroupManager.getInstance()
+                .getNotificationGroup(GROUP_ID)
+                .createNotification(
+                    JujutsuBundle.message("notification.notresponding.title"),
+                    JujutsuBundle.message(
+                        "notification.notresponding.content",
+                        repo.displayName,
+                        health.timeoutSeconds.toString(),
+                        health.detail
+                    ),
+                    NotificationType.WARNING
+                ).apply {
+                    addExpiringAction("notification.notresponding.action.retry") { retry() }
+                }
+
             is RepositoryHealth.Unreadable -> NotificationGroupManager.getInstance()
                 .getNotificationGroup(GROUP_ID)
                 .createNotification(
@@ -204,6 +249,7 @@ object JujutsuNotifications {
     fun clearNotificationState(rootPath: String) {
         notifiedUninitializedRoots.remove(rootPath)
         notifiedUnreadableRoots.remove(rootPath)
+        liveNotRespondingByRoot.remove(rootPath)?.notification?.expire()
     }
 
     /**

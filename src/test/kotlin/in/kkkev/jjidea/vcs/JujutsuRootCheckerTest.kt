@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.vcs
 
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.JujutsuRepositoryHealth
+import `in`.kkkev.jjidea.jj.RepositoryHealth
 import io.kotest.matchers.booleans.shouldBeFalse
 import io.kotest.matchers.booleans.shouldBeTrue
 import io.mockk.every
@@ -32,6 +33,13 @@ class JujutsuRootCheckerTest {
         JujutsuRepositoryHealth.markUnreadable(repoPath, "broken store")
 
         checker.validateRoot(file).shouldBeFalse()
+    }
+
+    @Test
+    fun `a repo that merely timed out still validates`() {
+        JujutsuRepositoryHealth.mark(repoPath, RepositoryHealth.NotResponding("timed out", 30))
+
+        checker.validateRoot(file).shouldBeTrue()
     }
 
     @Test

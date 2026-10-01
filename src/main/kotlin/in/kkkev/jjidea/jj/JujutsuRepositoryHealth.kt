@@ -21,6 +21,13 @@ sealed interface RepositoryHealth {
 
     /** Broken/moved store, incompatible jj version - jj-idea-9ife's original case. */
     data class Unreadable(override val detail: String) : RepositoryHealth
+
+    /**
+     * jj didn't answer within [timeoutSeconds] (jj-idea-1bio) - typically a busy system, not a
+     * broken repo. Transient: never reported by [JujutsuRepositoryHealth.isUnreadable], so it
+     * neither reds the VCS mapping nor arms the broken-store watcher.
+     */
+    data class NotResponding(override val detail: String, val timeoutSeconds: Long) : RepositoryHealth
 }
 
 /**
@@ -74,5 +81,6 @@ object JujutsuRepositoryHealth {
 
     fun detailFor(repoPath: String): String? = unhealthy[repoPath]?.detail
 
-    fun isUnreadable(repoPath: String) = unhealthy.containsKey(repoPath)
+    fun isUnreadable(repoPath: String) =
+        unhealthy[repoPath].let { it != null && it !is RepositoryHealth.NotResponding }
 }

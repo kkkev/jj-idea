@@ -11,6 +11,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Splitter
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.openapi.vcs.VcsDataKeys
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ChangeListListener
@@ -39,9 +40,9 @@ import `in`.kkkev.jjidea.vcs.filterInJujutsuRepo
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 import java.awt.BorderLayout
 import java.awt.CardLayout
-import javax.swing.Box
-import javax.swing.BoxLayout
+import java.awt.FlowLayout
 import javax.swing.JPanel
+import javax.swing.SwingConstants
 import javax.swing.event.TreeExpansionEvent
 import javax.swing.event.TreeExpansionListener
 import javax.swing.tree.TreePath
@@ -72,10 +73,14 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     private val diffPreview =
         JujutsuEditorTabDiffPreview(changesTree, resolveConflictsOnDoubleClick = true, contextLabel = { "@" })
     private val controlsPanel = WorkingCopyControlsPanel(project)
-    private val emptyStateLabel = JBLabel().apply { alignmentX = CENTER_ALIGNMENT }
+
+    // Wraps to the tool window's width; the longer not-responding/unreadable messages truncated otherwise.
+    private val emptyStateLabel = JBLabel().apply {
+        horizontalAlignment = SwingConstants.CENTER
+        setAllowAutoWrapping(true)
+    }
     private var emptyStateLinkAction: () -> Unit = { project.showVcsMappingsSettings() }
     private val emptyStateLink = HyperlinkLabel().apply {
-        alignmentX = CENTER_ALIGNMENT
         addHyperlinkListener { emptyStateLinkAction() }
     }
     private val emptyStatePanel = createEmptyStatePanel()
@@ -209,12 +214,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
     }
 
     private fun createEmptyStatePanel(): JPanel = JPanel(BorderLayout()).apply {
-        val centerPanel = JPanel().apply {
-            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        // BorderLayout (not BoxLayout) so the label is given the available width and can wrap.
+        val centerPanel = JPanel(BorderLayout(0, JBUI.scale(8))).apply {
             border = JBUI.Borders.empty(20)
-            add(emptyStateLabel)
-            add(Box.createVerticalStrut(8))
-            add(emptyStateLink)
+            add(emptyStateLabel, BorderLayout.NORTH)
+            add(JPanel(FlowLayout(FlowLayout.CENTER, 0, 0)).apply { add(emptyStateLink) }, BorderLayout.CENTER)
         }
 
         add(centerPanel, BorderLayout.CENTER)
@@ -227,7 +231,12 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
      */
     private fun updateEmptyState() {
         val unhealthy = project.stateModel.unhealthyRepositories()
-        emptyStateLabel.text = when {
+        val loading = unhealthy.isEmpty() && project.stateModel.isLoadingWorkingCopies()
+        // Nothing to retry or configure while the first load is still running.
+        emptyStateLink.isVisible = !loading
+        val message = when {
+            unhealthy.isEmpty() && loading -> JujutsuBundle.message("workingcopy.empty.loading")
+
             unhealthy.isEmpty() -> JujutsuBundle.message("workingcopy.empty.message")
 
             unhealthy.all { (_, health) -> health is RepositoryHealth.Stale } ->
@@ -237,11 +246,26 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
                     JujutsuBundle.message("workingcopy.empty.stale.message.multiple", unhealthy.size)
                 }
 
+            unhealthy.all { (_, health) -> health is RepositoryHealth.NotResponding } ->
+                if (unhealthy.size == 1) {
+                    val (repo, health) = unhealthy.single()
+                    JujutsuBundle.message(
+                        "workingcopy.empty.notresponding.message",
+                        repo.displayName,
+                        (health as RepositoryHealth.NotResponding).timeoutSeconds.toString()
+                    )
+                } else {
+                    JujutsuBundle.message("workingcopy.empty.notresponding.message.multiple", unhealthy.size)
+                }
+
             unhealthy.size == 1 ->
                 JujutsuBundle.message("workingcopy.empty.unreadable.message", unhealthy.single().first.displayName)
 
             else -> JujutsuBundle.message("workingcopy.empty.unreadable.message.multiple", unhealthy.size)
         }
+        // JBLabel only wraps HTML text; plain text is truncated with an ellipsis. Repo names in the
+        // message are user data, so escape before wrapping.
+        emptyStateLabel.text = "<html>${StringUtil.escapeXmlEntities(message)}</html>"
 
         val allStale = unhealthy.isNotEmpty() && unhealthy.all { (_, health) -> health is RepositoryHealth.Stale }
         emptyStateLink.setHyperlinkText(
@@ -272,6 +296,11 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
 
         // Subscribe to change selection for programmatic repo selection
         project.stateModel.changeSelection.connect(this) { bindRepository(it.repo) }
+
+        // An empty -> empty load doesn't publish workingCopies, so refresh the empty state's reason here.
+        project.stateModel.repositoryHealthChanged.connect(this) {
+            if (project.stateModel.workingCopies.value.isEmpty()) updateEmptyState()
+        }
     }
 
     /**

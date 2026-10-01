@@ -2215,6 +2215,34 @@ and was reverted rather than shipped half-working.
   (create a bookmark with a name that already exists) — confirm it still shows the correct
   "already exists" message (the exit-code fix must not regress the true-positive case)
 
+#### jj Not Responding (jj-idea-1bio)
+
+A jj timeout (30s) is a busy system, not a broken repo. Simulate it with a wrapper script as the
+jj path (Settings → Version Control → Jujutsu):
+
+```bash
+#!/bin/sh
+case "$*" in *"-r @"*) sleep 35;; esac
+exec jj "$@"
+```
+
+- [ ] Open a project with the wrapper active, from a cold start: after ~30s a WARNING
+  **"Jujutsu Is Not Responding"** balloon appears with only a **Retry** action (no
+  "Configure VCS Mappings"), and does **not** say "broken, moved, or incompatible"
+- [ ] While that first load is still waiting (the first ~30s), the Working copy tool window
+  says **"Loading Jujutsu repositories, please wait..."** with no link — not "No Jujutsu
+  repositories configured"
+- [ ] Close the project window and reopen the same project **without restarting the IDE**: the
+  balloon appears again (it must not be suppressed by the earlier one)
+- [ ] The Working copy tool window's empty state then says jj did not respond within 30 seconds /
+  the system may be busy, with a **Retry** link; Settings → Directory Mappings does **not**
+  show the root in red
+- [ ] Restore the real jj path and click **Retry** — the tool window and Log populate
+- [ ] With data already loaded, re-activate the wrapper and trigger a refresh (e.g. edit a
+  file): the Working copy and Log data stay visible; only the balloon appears
+- [ ] A genuinely broken store still shows the original "could not be read" balloon (see
+  the unreadable-repo section above)
+
 #### Standard Commit Tool Window Suppression (jj-idea-wb5l)
 
 - [ ] In a **jj-only** project (default setting), the standard **Commit** tool window and

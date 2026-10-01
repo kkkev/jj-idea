@@ -276,12 +276,22 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 if (retry is CommandExecutor.CommandResult.Success) {
                     parseSuccess(retry.stdout, fallbackTemplate)
                 } else {
-                    Result.failure(VcsException("Error from jj log: " + retry.stderr))
+                    Result.failure(logFailure(retry))
                 }
             } else {
                 // TODO Improve logging
-                Result.failure(VcsException("Error from jj log: " + result.stderr))
+                Result.failure(logFailure(result))
             }
+        }
+    }
+
+    /** A timeout becomes a [JjTimedOutException] (jj-idea-1bio) so callers don't mistake it for a broken repo. */
+    private fun logFailure(result: CommandExecutor.CommandResult): VcsException {
+        val message = "Error from jj log: " + result.stderr
+        return if (result is CommandExecutor.CommandResult.Failure.TimedOut) {
+            JjTimedOutException(message, result.timeoutMillis)
+        } else {
+            VcsException(message)
         }
     }
 
