@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
 import `in`.kkkev.jjidea.jj.conflict.sideDisplayLabels
 import `in`.kkkev.jjidea.ui.editor.acceptSideCommand
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
@@ -37,8 +38,9 @@ import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
  * together - deliberately never a weaker signal like a shared role *word* alone (which could
  * coerce two genuinely unrelated conflicts that just happen to share jj's fixed vocabulary into a
  * single, misleading label), and deliberately never one action resolving to a specific label while
- * its sibling falls back to generic wording (see [sideDisplayLabels]'s doc for a concretely
- * reported case that motivated this). Never "Yours"/"Theirs" at any tier.
+ * its sibling falls back to generic wording. A selection naming the same two commits in swapped
+ * order gets one coherent pair, and the files in the other order accept the opposite side (see
+ * [sideDisplayLabels]). Never "Yours"/"Theirs" at any tier.
  *
  * Deliberately scoped to the explicit selection only (unlike
  * [ResolveSelectedConflictsAction.conflictedFilesFromContext], which falls back to inherited
@@ -79,22 +81,9 @@ sealed class AcceptConflictSideAction(private val resolution: MergeSession.Resol
      * its own.
      */
     private fun labelFor(project: Project, files: List<VirtualFile>): String {
-        val conflicts = files.map { file ->
-            try {
-                project.possibleJujutsuVcs?.mergeProvider?.loadConflict(file)
-            } catch (_: VcsException) {
-                null
-            }
-        }
-        val (currentLabel, lastLabel) = sideDisplayLabels(
-            currentTitles = conflicts.map { it?.currentTitle },
-            currentAlternateTitles = conflicts.map { it?.currentAlternateTitle },
-            lastTitles = conflicts.map { it?.lastTitle },
-            lastAlternateTitles = conflicts.map { it?.lastAlternateTitle },
-            currentFallback = JujutsuBundle.message("merge.column.side1"),
-            lastFallback = JujutsuBundle.message("merge.column.side2")
-        )
-        return if (resolution == MergeSession.Resolution.AcceptedYours) currentLabel else lastLabel
+        val provider = project.possibleJujutsuVcs?.mergeProvider
+        val labels = sideLabels(files.map { loadConflictOrNull(provider, it) })
+        return if (resolution == MergeSession.Resolution.AcceptedYours) labels.current else labels.last
     }
 
     private fun selectedConflictedFiles(e: AnActionEvent): List<VirtualFile> =
@@ -107,6 +96,29 @@ class AcceptConflictCurrentSideAction : AcceptConflictSideAction(MergeSession.Re
 /** Accepts the side jj extracted into `LAST` ([in.kkkev.jjidea.jj.conflict.ExtractedConflict.lastTitle]). */
 class AcceptConflictLastSideAction : AcceptConflictSideAction(MergeSession.Resolution.AcceptedTheirs)
 
+private fun loadConflictOrNull(provider: JujutsuMergeProvider?, file: VirtualFile): ExtractedConflict? =
+    try {
+        provider?.loadConflict(file)
+    } catch (_: VcsException) {
+        null
+    }
+
+private fun sideLabels(conflicts: List<ExtractedConflict?>) = sideDisplayLabels(
+    currentTitles = conflicts.map { it?.currentTitle },
+    currentAlternateTitles = conflicts.map { it?.currentAlternateTitle },
+    lastTitles = conflicts.map { it?.lastTitle },
+    lastAlternateTitles = conflicts.map { it?.lastAlternateTitle },
+    currentFallback = JujutsuBundle.message("merge.column.side1"),
+    lastFallback = JujutsuBundle.message("merge.column.side2")
+)
+
+private fun MergeSession.Resolution.flipped() =
+    if (this == MergeSession.Resolution.AcceptedYours) {
+        MergeSession.Resolution.AcceptedTheirs
+    } else {
+        MergeSession.Resolution.AcceptedYours
+    }
+
 /**
  * Groups [files] by (repo, [JujutsuMergeProvider.toolFor]) and runs one undo-tracked
  * `jj resolve --tool` per group via [in.kkkev.jjidea.ui.editor.acceptSideCommand] (jj-idea-n6fz.2):
@@ -115,7 +127,9 @@ class AcceptConflictLastSideAction : AcceptConflictSideAction(MergeSession.Resol
  * split into a few groups, each with its own balloon reverting exactly its own op. Per-file tool
  * selection reuses the merge provider's orientation and `:ours`/`:theirs` fallback logic, so
  * modify/delete conflicts still delete rather than leaving empty content. Runs off the EDT since
- * the extraction reads files.
+ * the extraction reads files. Each file is loaded once; files whose CURRENT/LAST are reordered
+ * relative to the others (jj-idea-0k7k, see [sideDisplayLabels]) accept the opposite side so every
+ * file ends up on the commit the menu text names.
  */
 internal fun acceptConflictSide(
     project: Project,
@@ -129,15 +143,18 @@ internal fun acceptConflictSide(
     if (files.isEmpty()) return
     val mergeProvider = mergeProviderFor(project) ?: return
     runInBackground {
+        val conflicts = files.map { loadConflictOrNull(mergeProvider, it) }
+        val swapped = sideLabels(conflicts).swapped
         val noRepo = mutableListOf<VirtualFile>()
         val groups = linkedMapOf<Pair<JujutsuRepository, String>, MutableList<VirtualFile>>()
-        for (file in files) {
+        for ((i, file) in files.withIndex()) {
             val repo = mergeProvider.repositoryFor(file)
             if (repo == null) {
                 noRepo += file
                 continue
             }
-            groups.getOrPut(repo to mergeProvider.toolFor(file, resolution)) { mutableListOf() } += file
+            val effective = if (swapped[i]) resolution.flipped() else resolution
+            groups.getOrPut(repo to mergeProvider.toolFor(conflicts[i], effective)) { mutableListOf() } += file
         }
         groups.forEach { (key, group) -> commandFor(key.first, group, key.second).executeAsync() }
         if (noRepo.isNotEmpty()) {

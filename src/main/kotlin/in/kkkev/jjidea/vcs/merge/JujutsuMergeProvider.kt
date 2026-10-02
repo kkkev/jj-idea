@@ -77,6 +77,11 @@ class JujutsuMergeProvider(
         } catch (_: VcsException) {
             null
         }
+        return toolFor(conflict, resolution)
+    }
+
+    /** [toolFor] for an already-loaded [conflict] (null = couldn't be extracted). */
+    internal fun toolFor(conflict: ExtractedConflict?, resolution: MergeSession.Resolution): String {
         val acceptingCurrent = resolution == MergeSession.Resolution.AcceptedYours
         return when {
             conflict == null -> if (acceptingCurrent) ":ours" else ":theirs"

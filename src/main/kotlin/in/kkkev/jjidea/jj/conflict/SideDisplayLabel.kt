@@ -15,9 +15,11 @@ package `in`.kkkev.jjidea.jj.conflict
  * other - showing a specific label for the slot that happened to agree, and a generic one for the
  * slot that didn't, asserts a false consistency the selection doesn't actually have.
  *
- * `jj-idea-0k7k` (tracked separately): detecting that such a selection is really "the same two
- * commits, reordered" and presenting a coherent swapped pair instead of falling back - deferred as
- * a larger, riskier heuristic; this atomic all-or-nothing rule is the safe default until then.
+ * The one exception is a selection that is really "the same two commits, reordered" (`jj-idea-0k7k`):
+ * when the joint rule above can't resolve, but every file *individually* resolves to a pair of
+ * distinct labels and those pairs are all the same pair or its exact swap, the first file's
+ * order is used and [SideDisplayLabels.swapped] marks the files whose CURRENT/LAST are the other
+ * way round. Callers must then accept the opposite side in those files, or the label would lie.
  *
  * Each side's own candidate (see [resolvedOrNull]) follows the same tiers, most specific first:
  * 1. Every file's title for this side agrees on the same non-null value, and that value differs
@@ -42,10 +44,53 @@ fun sideDisplayLabels(
     lastAlternateTitles: List<String?>,
     currentFallback: String,
     lastFallback: String
-): Pair<String, String> {
+): SideDisplayLabels {
+    val unswapped = List(currentTitles.size) { false }
     val current = resolvedOrNull(currentTitles, currentAlternateTitles, lastTitles, lastAlternateTitles)
     val last = resolvedOrNull(lastTitles, lastAlternateTitles, currentTitles, currentAlternateTitles)
-    return if (current != null && last != null) current to last else currentFallback to lastFallback
+    if (current != null && last != null) return SideDisplayLabels(current, last, unswapped)
+    return swappedPairOrNull(currentTitles, currentAlternateTitles, lastTitles, lastAlternateTitles)
+        ?: SideDisplayLabels(currentFallback, lastFallback, unswapped)
+}
+
+/**
+ * Both sides' labels plus, per input file, whether that file's CURRENT holds the commit shown
+ * under [last] (and its LAST the one under [current]) - see [sideDisplayLabels].
+ */
+data class SideDisplayLabels(val current: String, val last: String, val swapped: List<Boolean>)
+
+/** The "same two commits, reordered" case - see [sideDisplayLabels]'s doc. O(n) over files. */
+private fun swappedPairOrNull(
+    currentTitles: List<String?>,
+    currentAlternateTitles: List<String?>,
+    lastTitles: List<String?>,
+    lastAlternateTitles: List<String?>
+): SideDisplayLabels? {
+    val pairs = currentTitles.indices.map { i ->
+        val cur = resolvedOrNull(
+            listOf(currentTitles[i]),
+            listOf(currentAlternateTitles[i]),
+            listOf(lastTitles[i]),
+            listOf(lastAlternateTitles[i])
+        )
+        val last = resolvedOrNull(
+            listOf(lastTitles[i]),
+            listOf(lastAlternateTitles[i]),
+            listOf(currentTitles[i]),
+            listOf(currentAlternateTitles[i])
+        )
+        if (cur == null || last == null || cur == last) return null
+        cur to last
+    }
+    val (refCurrent, refLast) = pairs.firstOrNull() ?: return null
+    val swapped = pairs.map { (cur, last) ->
+        when {
+            cur == refCurrent && last == refLast -> false
+            cur == refLast && last == refCurrent -> true
+            else -> return null
+        }
+    }
+    return SideDisplayLabels(refCurrent, refLast, swapped)
 }
 
 /** One side's own tiers 1-3 - see [sideDisplayLabels]'s doc. `null` means "fall back". */

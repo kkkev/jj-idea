@@ -2732,11 +2732,13 @@ a user pick exactly which file(s) to act on instead.
 - [ ] Select one `diffFromNamesADistinctSide`-shaped file **together with** a
       `ConflictMarkerFixtures.cleanRebaseConflictNamingSameCommits`-shaped file (a *clean* rebase
       conflict naming the same two commits, but with no collision of its own, and in *swapped*
-      current/last order relative to the first file): **both** accept actions fall back to the
-      generic **"Accept Side #1"** / **"Accept Side #2"** together — even though CURRENT alone
-      could resolve to a specific label, LAST cannot (the two files disagree there), and showing
-      one specific label alongside one generic one would itself be confusing (`jj-idea-0k7k` tracks
-      detecting this "same two commits, swapped" case properly instead of falling back)
+      current/last order relative to the first file): the two accept actions show **specific
+      labels** (`change B` / `change A`, in the first selected file's order), not the generic
+      "Side #1"/"Side #2" (jj-idea-0k7k). Click **"Accept change B"**: **both** files end up with
+      change B's content (the swapped file is resolved via its opposite side), in one balloon per
+      resolve op. Undo restores both
+- [ ] Select two files that share only **one** of their two commits (e.g. A/B and B/C): both accept
+      actions fall back to the generic **"Accept Side #1"** / **"Accept Side #2"** together
 - [ ] Invoke either accept action on a multi-selection: all selected files resolve to that side in
       one step, no merge tool opens, no queue order to contend with
 - [ ] Run either accept action on a selection that includes the **modify/delete** file: if the

@@ -5,6 +5,7 @@ import com.intellij.openapi.vcs.merge.MergeSession
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
 import `in`.kkkev.jjidea.vcs.merge.JujutsuMergeProvider
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -25,6 +26,13 @@ class AcceptConflictSideActionTest {
     private val repoA = mockk<JujutsuRepository>()
     private val repoB = mockk<JujutsuRepository>()
     private val ran = mockk<CommandExecutor.Command.WithRepo>(relaxed = true)
+
+    private fun conflict(current: String?, last: String?, currentIsJjSide1: Boolean) = ExtractedConflict(
+        mergeData = mockk(),
+        currentTitle = current,
+        lastTitle = last,
+        currentIsJjSide1 = currentIsJjSide1
+    )
 
     private fun run(
         provider: JujutsuMergeProvider,
@@ -47,7 +55,8 @@ class AcceptConflictSideActionTest {
         val many = List(50) { mockk<VirtualFile>() }
         val provider = mockk<JujutsuMergeProvider> {
             every { repositoryFor(any()) } returns repoA
-            every { toolFor(any(), MergeSession.Resolution.AcceptedYours) } returns ":ours"
+            every { loadConflict(any()) } returns conflict(null, null, true)
+            every { toolFor(any<ExtractedConflict>(), MergeSession.Resolution.AcceptedYours) } returns ":ours"
         }
         val calls = mutableListOf<Triple<JujutsuRepository, List<VirtualFile>, String>>()
 
@@ -57,6 +66,8 @@ class AcceptConflictSideActionTest {
         calls.single().second shouldBe many
         calls.single().third shouldBe ":ours"
         verify(exactly = 1) { ran.executeAsync() }
+        // Scale: one conflict load per file (no double extraction for label + tool), one command.
+        verify(exactly = 50) { provider.loadConflict(any()) }
     }
 
     @Test
@@ -65,9 +76,15 @@ class AcceptConflictSideActionTest {
             every { repositoryFor(files[0]) } returns repoA
             every { repositoryFor(files[1]) } returns repoA
             every { repositoryFor(files[2]) } returns repoB
-            every { toolFor(files[0], any()) } returns ":ours"
-            every { toolFor(files[1], any()) } returns ":theirs"
-            every { toolFor(files[2], any()) } returns ":ours"
+            val c0 = conflict(null, null, true)
+            val c1 = conflict(null, null, false)
+            val c2 = conflict(null, null, true)
+            every { loadConflict(files[0]) } returns c0
+            every { loadConflict(files[1]) } returns c1
+            every { loadConflict(files[2]) } returns c2
+            every { toolFor(c0, any()) } returns ":ours"
+            every { toolFor(c1, any()) } returns ":theirs"
+            every { toolFor(c2, any()) } returns ":ours"
         }
         val calls = mutableListOf<Triple<JujutsuRepository, List<VirtualFile>, String>>()
 
@@ -77,6 +94,35 @@ class AcceptConflictSideActionTest {
             Triple(repoA, listOf(files[0]), ":ours"),
             Triple(repoA, listOf(files[1]), ":theirs"),
             Triple(repoB, listOf(files[2]), ":ours")
+        )
+    }
+
+    @Test
+    fun `files naming the same commits in swapped order - second file accepts the opposite side`() {
+        val c0 = conflict("A", "B", true)
+        val c1 = conflict("B", "A", true)
+        val provider = mockk<JujutsuMergeProvider> {
+            every { repositoryFor(any()) } returns repoA
+            every { loadConflict(files[0]) } returns c0
+            every { loadConflict(files[1]) } returns c1
+        }
+        // Mirror the real orientation logic so the test sees which side each file is told to accept.
+        every { provider.toolFor(any<ExtractedConflict>(), any()) } answers {
+            val c = firstArg<ExtractedConflict>()
+            if (secondArg<MergeSession.Resolution>() == MergeSession.Resolution.AcceptedYours) {
+                c.toolForCurrent
+            } else {
+                c.toolForLast
+            }
+        }
+        val calls = mutableListOf<Triple<JujutsuRepository, List<VirtualFile>, String>>()
+
+        run(provider, listOf(files[0], files[1]), calls)
+
+        // Accepting "CURRENT" (A, per file 1): file 1 via its CURRENT, file 2 via its LAST.
+        calls shouldBe listOf(
+            Triple(repoA, listOf(files[0]), c0.toolForCurrent),
+            Triple(repoA, listOf(files[1]), c1.toolForLast)
         )
     }
 

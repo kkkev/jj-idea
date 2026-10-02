@@ -92,8 +92,7 @@ object ConflictMarkerFixtures {
      * diff section's label is trustworthy on its own, unlike [diffFromNamesADistinctSide]'s. Two
      * files can each be internally unambiguous, or internally resolvable, yet still *disagree*
      * with each other on which named commit is CURRENT vs LAST - see [SideDisplayLabelTest]'s
-     * "two files whose raw titles coincidentally match" test for why aggregating *before*
-     * resolving each file's own collision would wrongly assert agreement here.
+     * swapped-pair tests (jj-idea-0k7k) for how that is detected and resolved per file.
      */
     val cleanRebaseConflictNamingSameCommits = """
         |line 1

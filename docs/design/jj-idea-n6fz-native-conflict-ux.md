@@ -266,6 +266,13 @@ Delivered instead, inside the existing Working copy window, working-copy only:
   on its own, have resolved to something more specific. See `SideDisplayLabelTest`'s "a real
   reported combination" test for the exact case and the rationale.
 
+  **Follow-up (`jj-idea-0k7k`, shipped):** the swapped-pair detection is now implemented. When the
+  joint rule can't resolve, each file is resolved individually; if every file yields the same two
+  distinct labels (as an ordered pair or its exact swap), the first file's order is used and
+  `SideDisplayLabels.swapped` flags the reordered files. The bulk accept path then accepts the
+  *opposite* side in those files, so the menu text never lies about which commit wins. Anything
+  weaker (one shared commit, a file that can't resolve alone) still falls back atomically.
+
 `CommandExecutor.kt:368`'s doc comment on `resolveList` ("infrastructure for the future Conflicts
 tool window") remains true for a *future* revision-scoped view, if one is ever actually requested
 — it just isn't what S3 turned out to need.

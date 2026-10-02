@@ -19,14 +19,14 @@ class SideDisplayLabelTest {
             lastFallback = "Side #2"
         )
 
-        labels shouldBe ("abc123 fix the thing" to "def456 other change")
+        (labels.current to labels.last) shouldBe ("abc123 fix the thing" to "def456 other change")
     }
 
     @Test
     fun `single file with no labels at all - both fall back`() {
         val labels = sideDisplayLabels(listOf(null), listOf(null), listOf(null), listOf(null), "Side #1", "Side #2")
 
-        labels shouldBe ("Side #1" to "Side #2")
+        (labels.current to labels.last) shouldBe ("Side #1" to "Side #2")
     }
 
     @Test
@@ -46,7 +46,7 @@ class SideDisplayLabelTest {
             lastFallback = "Side #2"
         )
 
-        labels shouldBe (changeB to changeA)
+        (labels.current to labels.last) shouldBe (changeB to changeA)
     }
 
     @Test
@@ -60,7 +60,7 @@ class SideDisplayLabelTest {
             lastFallback = "Side #2"
         )
 
-        labels shouldBe ("Side #1" to "Side #2")
+        (labels.current to labels.last) shouldBe ("Side #1" to "Side #2")
     }
 
     @Test
@@ -79,7 +79,7 @@ class SideDisplayLabelTest {
             lastFallback = "Side #2"
         )
 
-        labels shouldBe (changeB to changeA)
+        (labels.current to labels.last) shouldBe (changeB to changeA)
     }
 
     @Test
@@ -99,7 +99,7 @@ class SideDisplayLabelTest {
             lastFallback = "Side #2"
         )
 
-        labels shouldBe ("Side #1" to "Side #2")
+        (labels.current to labels.last) shouldBe ("Side #1" to "Side #2")
     }
 
     @Test
@@ -120,33 +120,83 @@ class SideDisplayLabelTest {
             lastFallback = "Side #2"
         )
 
-        labels shouldBe (changeB to changeA)
+        (labels.current to labels.last) shouldBe (changeB to changeA)
     }
 
     @Test
-    fun `a real reported combination - CURRENT could resolve alone, but LAST can't, so both fall back`() {
-        // A real reported combination: file 1 has an internal collision (its CURRENT title equals
-        // its own LAST title, "change A", with "change B" available as its alternate). File 2 has
-        // no collision at all: its CURRENT genuinely, unambiguously is "change A" and its LAST is
-        // "change B". In isolation, CURRENT would resolve confidently to "change A" (both files'
-        // raw CURRENT title agrees, and that agreement doesn't collide with LAST's own shared
-        // value) - but LAST has no cross-file agreement at all (file 1 says "change A", file 2 says
-        // "change B", neither side has a rescuing alternate). Atomicity means CURRENT's success
-        // doesn't matter on its own: since LAST can't produce a confident label, BOTH fall back,
-        // rather than asserting CURRENT="change A" while LAST shows a bare "Side #2" alongside it.
+    fun `a real reported combination - same two commits in swapped order resolves to a swapped pair`() {
+        // File 1 has an internal collision (CURRENT == LAST == "change A", alternate "change B"),
+        // so individually it resolves to (B, A). File 2 is clean: (A, B). Same pair, reordered -
+        // jj-idea-0k7k: use file 1's order and flag file 2 as swapped.
         val changeA = """uvsstouv 0b04d257 "change A" (rebased revision)"""
         val changeB = """ouukwuks b2d02fda "change B" (rebase destination)"""
 
         val labels = sideDisplayLabels(
-            currentTitles = listOf(changeA, changeA), // file 1's raw (colliding) CURRENT, file 2's real CURRENT
+            currentTitles = listOf(changeA, changeA),
             currentAlternateTitles = listOf(changeB, null),
-            lastTitles = listOf(changeA, changeB), // file 1's raw (colliding) LAST, file 2's real LAST
+            lastTitles = listOf(changeA, changeB),
             lastAlternateTitles = listOf(null, null),
             currentFallback = "Side #1",
             lastFallback = "Side #2"
         )
 
-        labels shouldBe ("Side #1" to "Side #2")
+        labels shouldBe SideDisplayLabels(changeB, changeA, listOf(false, true))
+    }
+
+    @Test
+    fun `two clean files with exactly swapped titles - labels from the first, second flagged swapped`() {
+        val labels = sideDisplayLabels(
+            currentTitles = listOf("A", "B"),
+            currentAlternateTitles = listOf(null, null),
+            lastTitles = listOf("B", "A"),
+            lastAlternateTitles = listOf(null, null),
+            currentFallback = "Side #1",
+            lastFallback = "Side #2"
+        )
+
+        labels shouldBe SideDisplayLabels("A", "B", listOf(false, true))
+    }
+
+    @Test
+    fun `three files with mixed orientation - swapped flags follow each file`() {
+        val labels = sideDisplayLabels(
+            currentTitles = listOf("A", "B", "A"),
+            currentAlternateTitles = listOf(null, null, null),
+            lastTitles = listOf("B", "A", "B"),
+            lastAlternateTitles = listOf(null, null, null),
+            currentFallback = "Side #1",
+            lastFallback = "Side #2"
+        )
+
+        labels shouldBe SideDisplayLabels("A", "B", listOf(false, true, false))
+    }
+
+    @Test
+    fun `files sharing one commit but differing on the other - falls back, nothing swapped`() {
+        val labels = sideDisplayLabels(
+            currentTitles = listOf("A", "B"),
+            currentAlternateTitles = listOf(null, null),
+            lastTitles = listOf("B", "C"),
+            lastAlternateTitles = listOf(null, null),
+            currentFallback = "Side #1",
+            lastFallback = "Side #2"
+        )
+
+        labels shouldBe SideDisplayLabels("Side #1", "Side #2", listOf(false, false))
+    }
+
+    @Test
+    fun `a file that cannot resolve on its own blocks the swapped pair - falls back`() {
+        val labels = sideDisplayLabels(
+            currentTitles = listOf("A", "same"),
+            currentAlternateTitles = listOf(null, null),
+            lastTitles = listOf("B", "same"),
+            lastAlternateTitles = listOf(null, null),
+            currentFallback = "Side #1",
+            lastFallback = "Side #2"
+        )
+
+        labels shouldBe SideDisplayLabels("Side #1", "Side #2", listOf(false, false))
     }
 
     @Test
@@ -165,6 +215,6 @@ class SideDisplayLabelTest {
             lastFallback = "Side #2"
         )
 
-        labels shouldBe ("Side #1" to "Side #2")
+        (labels.current to labels.last) shouldBe ("Side #1" to "Side #2")
     }
 }
