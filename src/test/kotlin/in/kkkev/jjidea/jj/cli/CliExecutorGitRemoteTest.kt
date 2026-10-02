@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj.cli
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Remote
+import `in`.kkkev.jjidea.jj.Tag
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -56,6 +57,30 @@ class CliExecutorGitRemoteTest {
         @Test
         fun `push specific bookmark`() {
             gitPushArgs(bookmark = Bookmark("main")).args shouldBe listOf("git", "push", "--bookmark", "main")
+        }
+
+        @Test
+        fun `push specific tag`() {
+            gitPushArgs(tag = Tag("v1")).args shouldBe listOf("git", "push", "--tag", "v1")
+        }
+
+        @Test
+        fun `push specific tag to specific remote`() {
+            gitPushArgs(remote = Remote("origin"), tag = Tag("v1")).args shouldBe
+                listOf("git", "push", "--remote", "origin", "--tag", "v1")
+        }
+
+        @Test
+        fun `bookmark and allBookmarks win over tag`() {
+            gitPushArgs(bookmark = Bookmark("main"), tag = Tag("v1")).args shouldBe
+                listOf("git", "push", "--bookmark", "main")
+            gitPushArgs(allBookmarks = true, tag = Tag("v1")).args shouldBe listOf("git", "push", "--all")
+        }
+
+        @Test
+        fun `tag wins over change revisions`() {
+            gitPushArgs(tag = Tag("v1"), changeRevisions = listOf(ChangeId("abc123", "abc"))).args shouldBe
+                listOf("git", "push", "--tag", "v1")
         }
 
         @Test

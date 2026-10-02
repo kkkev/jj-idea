@@ -304,7 +304,7 @@ here" without a hand cursor implying a left-click action that doesn't exist.
 - [ ] Hovering a bookmark or tag chip does **not** show a hand cursor, but does show a subtle grey background highlight (jj-idea-a52h) — its accent color (bookmark/tag color) stays visible on top of the highlight. Check across the whole width of the chip (left edge, middle, right edge), not just one spot
 - [ ] The highlight covers only the hovered chip's own icon+label(+suffix) — not the space before/after it, and not a neighboring chip
 - [ ] **Left-clicking** a bookmark/tag chip does nothing — no filter change, no navigation
-- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/advance/track actions (see MT-BOOKMARK for Advance)
+- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/advance/track actions (see MT-BOOKMARK for Advance; a tag chip also gets **Push Tag** — see MT-GIT)
 - [ ] Choosing **Filter Log to '...'** from the right-click menu applies the filter and closes the menu; choosing it again while already active clears the filter and closes the menu
 - [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
 - [ ] The "+N more" overflow chip shows both a hand cursor and the same grey background highlight on hover (jj-idea-ttmp), and **left-clicking** it still opens its popup of hidden refs, each still openable via their own submenu
@@ -3152,6 +3152,18 @@ Setup: have a local bookmark that has never been pushed to the remote.
   newly selected remote/bookmark. Repeat switching remotes several times before pressing OK.
   Check Help → Show Log afterwards for any `NullPointerException` from `GitPushDialog` — there
   must be none (previously the Push button appeared completely inert after a remote switch)
+#### Push Tag (jj-idea-k9oy, GitHub #124)
+
+Setup: jj 0.44+; a repo with a Git remote (e.g. a bare repo) and a local tag (`jj tag set v1 -r @-`).
+
+- [ ] Right-click the `v1` tag chip in the log → **Push Tag 'v1' to origin...** appears next to **Delete Tag** → click it → a confirmation prompt names the tag and remote → **Yes** → a "Push" success notification appears and `git ls-remote --tags <remote>` lists `v1`
+- [ ] Choose **No** in the prompt → nothing is pushed
+- [ ] Move the tag (`jj tag set v1 -r @ --allow-move`), push it again from the chip → succeeds; push again with no changes → notification shows jj's "Nothing changed."
+- [ ] Right-click a tag in the **Bookmarks panel** → the same **Push Tag** item is present and works
+- [ ] Right-click a commit row that carries a tag → the **Tag** submenu offers **Push Tag** above **Delete Tag**
+- [ ] With 2+ remotes the item becomes a **Push Tag 'v1' to ▸** submenu with one entry per remote; with no remotes it is hidden
+- [ ] With jj older than 0.44 (Settings → Jujutsu → jj path) the item stays visible but disabled, reading "requires jj 0.44.0", and Settings → Feature Availability lists **Push Tag**
+
 - [ ] Push a bookmark that's already up to date with the remote → the notification shows jj's
   own "Nothing changed." message rather than a bare "Push complete"
 - [ ] Every bookmark tracked against the selected remote appears **exactly once** in the

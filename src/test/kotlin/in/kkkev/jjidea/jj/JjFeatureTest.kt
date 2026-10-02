@@ -39,12 +39,13 @@ class JjFeatureTest {
 
     @Test
     fun `unsupportedFeatures is empty when the version supports everything`() {
-        unsupportedFeatures(JjVersion(0, 39, 0)) shouldBe emptyList()
+        unsupportedFeatures(JjVersion(0, 44, 0)) shouldBe emptyList()
     }
 
     @Test
     fun `unsupportedFeatures reports features the version is too old for`() {
-        unsupportedFeatures(JjVersion(0, 38, 0)) shouldBe listOf(JjFeature.BOOKMARK_ADVANCE)
+        unsupportedFeatures(JjVersion(0, 38, 0)) shouldBe listOf(JjFeature.BOOKMARK_ADVANCE, JjFeature.TAG_PUSH)
+        unsupportedFeatures(JjVersion(0, 43, 0)) shouldBe listOf(JjFeature.TAG_PUSH)
     }
 
     @Test
@@ -61,12 +62,12 @@ class JjFeatureTest {
     @Test
     fun `unsupportedFeatures for status reports gated features when Available`() {
         val status = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 38, 0), InstallMethod.Manual)
-        unsupportedFeatures(status) shouldBe listOf(JjFeature.BOOKMARK_ADVANCE)
+        unsupportedFeatures(status) shouldBe listOf(JjFeature.BOOKMARK_ADVANCE, JjFeature.TAG_PUSH)
     }
 
     @Test
     fun `unsupportedFeatures for status is empty when Available and up to date`() {
-        val status = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 39, 0), InstallMethod.Manual)
+        val status = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 44, 0), InstallMethod.Manual)
         unsupportedFeatures(status) shouldBe emptyList()
     }
 
@@ -100,5 +101,11 @@ class JjFeatureTest {
             emptyList()
         )
         unsupportedFeatures(status) shouldBe emptyList()
+    }
+
+    @Test
+    fun `tag push needs 0_44`() {
+        JjVersion(0, 43, 0).supports(JjFeature.TAG_PUSH) shouldBe false
+        JjVersion(0, 44, 0).supports(JjFeature.TAG_PUSH) shouldBe true
     }
 }

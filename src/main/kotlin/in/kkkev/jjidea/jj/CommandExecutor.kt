@@ -416,6 +416,7 @@ interface CommandExecutor {
      * @param allBookmarks Push all bookmarks
      * @param changeRevisions Revisions to push via repeated `--change` flags, each auto-generating
      *   its own bookmark
+     * @param tag Specific tag to push (`--tag`); requires jj 0.44+ ([JjFeature.TAG_PUSH])
      * @return Command result
      */
     fun gitPush(
@@ -424,7 +425,8 @@ interface CommandExecutor {
         allBookmarks: Boolean = false,
         changeRevisions: List<Revision> = emptyList(),
         revision: Revision? = null,
-        dryRun: Boolean = false
+        dryRun: Boolean = false,
+        tag: Tag? = null
     ): CommandResult
 
     /**

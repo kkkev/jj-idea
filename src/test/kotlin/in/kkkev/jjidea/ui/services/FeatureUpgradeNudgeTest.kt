@@ -19,7 +19,7 @@ import java.nio.file.Path
  */
 class FeatureUpgradeNudgeTest {
     private val outOfDate = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 38, 0), InstallMethod.Manual)
-    private val upToDate = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 39, 0), InstallMethod.Manual)
+    private val upToDate = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 44, 0), InstallMethod.Manual)
 
     @Test
     fun `Checking never nudges`() {
@@ -64,7 +64,7 @@ class FeatureUpgradeNudgeTest {
 
         nudge?.version shouldBe JjVersion(0, 38, 0)
         nudge?.gatedFeatures shouldBe unsupportedFeatures(JjVersion(0, 38, 0))
-        nudge?.gatedFeatures shouldBe listOf(JjFeature.BOOKMARK_ADVANCE)
+        nudge?.gatedFeatures shouldBe listOf(JjFeature.BOOKMARK_ADVANCE, JjFeature.TAG_PUSH)
     }
 
     @Test

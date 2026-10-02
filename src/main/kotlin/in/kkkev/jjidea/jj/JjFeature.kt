@@ -14,7 +14,10 @@ import `in`.kkkev.jjidea.JujutsuBundle
  */
 enum class JjFeature(val minVersion: JjVersion, private val displayNameKey: String) {
     /** `jj bookmark advance`, added in jj 0.39.0. */
-    BOOKMARK_ADVANCE(JjVersion(0, 39, 0), "feature.bookmark.advance.name");
+    BOOKMARK_ADVANCE(JjVersion(0, 39, 0), "feature.bookmark.advance.name"),
+
+    /** `jj git push --tag`, stabilized in jj 0.44.0. */
+    TAG_PUSH(JjVersion(0, 44, 0), "feature.tag.push.name");
 
     /** User-facing name for this feature, e.g. for a settings list or upgrade nudge. */
     val displayName: String get() = JujutsuBundle.message(displayNameKey)

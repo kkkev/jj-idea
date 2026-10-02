@@ -18,7 +18,7 @@ import java.nio.file.Path
  */
 class FeatureAvailabilityTest {
     private val outOfDate = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 38, 0), InstallMethod.Manual)
-    private val upToDate = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 39, 0), InstallMethod.Manual)
+    private val upToDate = JjAvailabilityStatus.Available(Path.of("jj"), JjVersion(0, 44, 0), InstallMethod.Manual)
 
     @Test
     fun `Available below a feature's minimum is Gated with that feature`() {

@@ -305,7 +305,7 @@ internal fun gitFetchArgs(remote: Remote? = null, allRemotes: Boolean = false) =
  * @param changeRevisions Revisions to push via repeated `--change` flags, each auto-generating its
  *   own `push-<change-id>`-style bookmark (see `git.push-bookmark-prefix`) — `jj git push -c A -c B`
  *   is natively supported and creates one bookmark per change. Mutually exclusive with
- *   [bookmark]/[allBookmarks]/[revision] — one of the four scopes below wins, in this precedence
+ *   [bookmark]/[allBookmarks]/[tag]/[revision] — one of the scopes below wins, in this precedence
  *   order.
  */
 internal fun gitPushArgs(
@@ -314,7 +314,8 @@ internal fun gitPushArgs(
     allBookmarks: Boolean = false,
     changeRevisions: List<Revision> = emptyList(),
     revision: Revision? = null,
-    dryRun: Boolean = false
+    dryRun: Boolean = false,
+    tag: Tag? = null
 ) = JjInvocation(
     IRREVERSIBLE,
     buildList {
@@ -329,6 +330,12 @@ internal fun gitPushArgs(
             bookmark != null -> {
                 add("--bookmark")
                 add(bookmark.name.name)
+            }
+
+            // Requires jj 0.44+ (JjFeature.TAG_PUSH); callers gate on that, not this builder.
+            tag != null -> {
+                add("--tag")
+                add(tag.name)
             }
 
             changeRevisions.isNotEmpty() -> changeRevisions.forEach {
@@ -915,10 +922,11 @@ class CliExecutor(
         allBookmarks: Boolean,
         changeRevisions: List<Revision>,
         revision: Revision?,
-        dryRun: Boolean
+        dryRun: Boolean,
+        tag: Tag?
     ) = execute(
         root,
-        gitPushArgs(remote, bookmark, allBookmarks, changeRevisions, revision, dryRun),
+        gitPushArgs(remote, bookmark, allBookmarks, changeRevisions, revision, dryRun, tag),
         timeout = networkTimeout
     )
 

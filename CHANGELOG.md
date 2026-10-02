@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Push Tag** is now in the right-click menu of a tag chip in the log and of a tag in the Bookmarks panel (a submenu when there are several remotes). It runs `jj git push --tag` after a confirmation prompt, and needs jj 0.44 or later — on older versions the item stays visible but disabled, and Settings lists it under Feature Availability. ([#124](https://github.com/kkkev/jj-idea/issues/124))
 - The Working Copy panel's changes toolbar gained a **Restore** button, next to Resolve all conflicts, pre-checking whatever's selected in the tree (or opening empty for the current repo when nothing's selected). "Restore" and "Restore to This" now read "Restore…"/"Restore to This…", since both open a dialog rather than acting immediately. ([#84](https://github.com/kkkev/jj-idea/issues/84))
 - The log toolbar gained a **Revset** filter chip alongside Reference/Author/Date/Root: type any jj revset (click the chip, Enter to apply) to narrow the graph to it, combined (AND) with every other active filter. Resolved client-side against the loaded entries, so it never changes what's fetched from jj for this or any other open tab. An invalid revset shows jj's own error inline without losing the chip's last-good filter; a filter that matches commits outside the currently loaded window says so in the status bar instead of just looking short. Persisted per log tab. ([#116](https://github.com/kkkev/jj-idea/issues/116))
 

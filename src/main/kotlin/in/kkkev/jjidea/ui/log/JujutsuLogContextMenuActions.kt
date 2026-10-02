@@ -15,6 +15,7 @@ import `in`.kkkev.jjidea.actions.git.gitFetchAction
 import `in`.kkkev.jjidea.actions.git.gitPushAction
 import `in`.kkkev.jjidea.actions.git.openInRemoteGroup
 import `in`.kkkev.jjidea.actions.tag.deleteTagAction
+import `in`.kkkev.jjidea.actions.tag.pushTagAction
 import `in`.kkkev.jjidea.actions.tag.setTagAction
 import `in`.kkkev.jjidea.actions.uniqueRepo
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -160,6 +161,7 @@ object JujutsuLogContextMenuActions {
             addPopup("action.tag.submenu", JujutsuIcons.Tag) {
                 e.tags.forEachIndexed { i, tag ->
                     if (i > 0) addSeparator()
+                    add(pushTagAction(e.repo, tag))
                     add(deleteTagAction(e.repo, tag))
                 }
             }
@@ -211,6 +213,7 @@ object JujutsuLogContextMenuActions {
                 is TagClick -> {
                     add(FilterToReferenceAction(project, target.tag.name))
                     addSeparator()
+                    add(pushTagAction(target.repo, target.tag))
                     add(deleteTagAction(target.repo, target.tag))
                 }
 

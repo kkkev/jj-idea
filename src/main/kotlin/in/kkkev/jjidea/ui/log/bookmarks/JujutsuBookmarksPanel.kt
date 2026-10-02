@@ -28,6 +28,7 @@ import `in`.kkkev.jjidea.actions.change.duplicateChangeAction
 import `in`.kkkev.jjidea.actions.change.newChangeFromAction
 import `in`.kkkev.jjidea.actions.invokeEnterBoundAction
 import `in`.kkkev.jjidea.actions.tag.deleteTagAction
+import `in`.kkkev.jjidea.actions.tag.pushTagAction
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
@@ -542,6 +543,7 @@ class JujutsuBookmarksPanel(
             val entries = selectedLogEntries().orEmpty()
             BackgroundActionGroup(
                 *buildList {
+                    add(pushTagAction(node.repo, node.item.tag))
                     add(deleteTagAction(node.repo, node.item.tag))
                     add(Separator.create())
                     add(navigateLogToCommitAction(node.repo, node.item.id))
