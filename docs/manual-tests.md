@@ -2991,6 +2991,16 @@ In a project with two jj roots each having conflicts:
 - [ ] Right-clicking a conflicted file in root B's → merge tool opens only for root B's conflicts
 - [ ] Global action (VCS menu) → merge tool opens for conflicts from both roots, one after another
 
+#### Conflict gutter: marker dividers and DIFF-line tidy (preview `CONFLICT_GUTTER`, jj-idea-6ja9 / jj-idea-8u0g)
+
+Run with `-Djjidea.preview.conflictGutter=true`. Repeat for each `ui.conflict-marker-style` (`git`, `snapshot`, `diff`), in light and dark themes:
+
+- [ ] With the caret **outside** the block, every run of marker lines (`<<<<<<<`, `|||||||`/`-------`, `=======`/`+++++++`, `%%%%%%%`+`\\\\`, `>>>>>>>`) is a full-width coloured rule, labelled with the following side's label; the closing rule is unlabelled
+- [ ] Rule colours match their side's tint (side 1 / base / side 2) and are legible on both themes
+- [ ] Moving the caret **into** the block reveals its raw marker lines (other blocks stay folded); moving it out restores the rules. Typing/deleting inside a block never leaves stale or doubled rules
+- [ ] Per-side gutter icons still show and work (Accept side 1 / base / side 2 / both), including a side or base that is **empty** (its icon must still be visible and clickable; if it vanishes, anchor it to the preceding divider)
+- [ ] `diff` style only: the `-`/`+` prefix characters in the `%%%%%%%` section are dimmed, and `-` lines are dimmed + struck through; document text is unchanged (copy a line to confirm the prefix is still there) and Accept still produces the right result
+
 ### MT-IGNORE
 
 **.gitignore file status and file tracking**

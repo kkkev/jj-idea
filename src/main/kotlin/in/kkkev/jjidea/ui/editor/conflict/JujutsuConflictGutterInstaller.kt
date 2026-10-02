@@ -3,31 +3,41 @@ package `in`.kkkev.jjidea.ui.editor.conflict
 import com.intellij.diff.util.DiffGutterOperation
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.diff.DiffColors
+import com.intellij.openapi.editor.CustomFoldRegion
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.EditorKind
 import com.intellij.openapi.editor.colors.TextAttributesKey
+import com.intellij.openapi.editor.event.CaretEvent
+import com.intellij.openapi.editor.event.CaretListener
 import com.intellij.openapi.editor.event.DocumentEvent
 import com.intellij.openapi.editor.event.DocumentListener
 import com.intellij.openapi.editor.event.EditorFactoryEvent
 import com.intellij.openapi.editor.event.EditorFactoryListener
+import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.editor.markup.HighlighterLayer
 import com.intellij.openapi.editor.markup.HighlighterTargetArea
 import com.intellij.openapi.editor.markup.RangeHighlighter
+import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.Key
 import com.intellij.util.Alarm
+import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.conflict.AcceptChoice
 import `in`.kkkev.jjidea.jj.conflict.ConflictBlock
 import `in`.kkkev.jjidea.jj.conflict.ConflictRegionScanner
 import `in`.kkkev.jjidea.jj.conflict.ConflictSide
+import `in`.kkkev.jjidea.jj.conflict.DiffLineKind
 import `in`.kkkev.jjidea.jj.conflict.choicesFor
+import `in`.kkkev.jjidea.jj.conflict.conflictBlockIndexAt
+import `in`.kkkev.jjidea.jj.conflict.diffSectionLines
 import `in`.kkkev.jjidea.jj.conflict.sideFor
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.editor.debouncedDocumentScan
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry
+import java.awt.Font
 
 /**
  * Registers per-block gutter icons for jj conflict marker blocks in every eligible main editor
@@ -170,6 +180,8 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
     private val scanner = ConflictRegionScanner()
     private var operations: List<DiffGutterOperation> = emptyList()
     private var highlighters: List<RangeHighlighter> = emptyList()
+    private var folds: List<CustomFoldRegion> = emptyList()
+    private var foldedExceptBlock = -1
     private val alarm = Alarm(this)
     private val debounced = debouncedDocumentScan(alarm) { reconcile() }
 
@@ -180,6 +192,17 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
                 override fun documentChanged(event: DocumentEvent) {
                     applyToScanner(event)
                     debounced.onDocumentChanged()
+                }
+            },
+            this
+        )
+        editor.caretModel.addCaretListener(
+            object : CaretListener {
+                override fun caretPositionChanged(event: CaretEvent) {
+                    // Fast path: caret still in the same block (or still outside all) - no fold churn.
+                    if (conflictBlockIndexAt(scanner.blocks, editor.caretModel.offset) != foldedExceptBlock) {
+                        reconcileFolds()
+                    }
                 }
             },
             this
@@ -218,9 +241,63 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
                 sideHighlighter(block.sideFor(AcceptChoice.SIDE1), DiffColors.DIFF_DELETED),
                 sideHighlighter(block.sideFor(AcceptChoice.SIDE2), DiffColors.DIFF_INSERTED),
                 sideHighlighter(block.sideFor(AcceptChoice.BASE), DiffColors.DIFF_MODIFIED)
-            )
+            ) + diffPrefixHighlighters(block)
+        }
+        reconcileFolds()
+    }
+
+    /**
+     * Replaces every marker-line run with a [ConflictMarkerDivider] fold (jj-idea-6ja9), except
+     * in the block the caret is inside - a custom fold can't be expanded, so that block shows its
+     * raw markers for hand-editing until the caret leaves (see the caret listener). O(marker runs).
+     */
+    private fun reconcileFolds() {
+        val caretBlock = conflictBlockIndexAt(scanner.blocks, editor.caretModel.offset)
+        foldedExceptBlock = caretBlock
+        editor.foldingModel.runBatchFoldingOperation {
+            folds.forEach { if (it.isValid) editor.foldingModel.removeFoldRegion(it) }
+            folds = scanner.blocks.withIndex().filter { it.index != caretBlock }.flatMap { (_, block) ->
+                block.markerRuns.mapNotNull { run ->
+                    val key = run.next?.let { conflictSideKey(it) }
+                    editor.foldingModel.addCustomLinesFolding(
+                        run.startLine,
+                        run.endLine,
+                        ConflictMarkerDivider(editor, key, run.label)
+                    )
+                }
+            }
         }
     }
+
+    /**
+     * jj-idea-8u0g: a DIFF-style `%%%%%%%` section's raw `-`/`+` prefixes are noise under the
+     * side tint, so dim each prefix character and dim + strike through `-` (base-only) lines.
+     * Display only - the document text, and so every accept action, is untouched.
+     */
+    private fun diffPrefixHighlighters(block: ConflictBlock): List<RangeHighlighter> {
+        val side = listOf(block.side1, block.side2).firstOrNull { it.isDiffSection } ?: return emptyList()
+        val start = side.contentStartOffset ?: return emptyList()
+        val end = side.contentEndOffset ?: return emptyList()
+        val dim = UIUtil.getInactiveTextColor()
+        val prefix = TextAttributes(dim, null, null, null, Font.PLAIN)
+        val removed = TextAttributes(dim, null, dim, EffectType.STRIKEOUT, Font.PLAIN)
+        return diffSectionLines(editor.document.immutableCharSequence, start, end).flatMap { line ->
+            when (line.kind) {
+                DiffLineKind.CONTEXT -> emptyList()
+                DiffLineKind.ADDED -> listOf(diffHighlighter(line.prefixOffset, line.prefixOffset + 1, prefix))
+                DiffLineKind.REMOVED -> listOf(diffHighlighter(line.prefixOffset, line.lineEnd, removed))
+            }
+        }
+    }
+
+    private fun diffHighlighter(start: Int, end: Int, attributes: TextAttributes): RangeHighlighter =
+        editor.markupModel.addRangeHighlighter(
+            start,
+            end,
+            HighlighterLayer.SELECTION - 2,
+            attributes,
+            HighlighterTargetArea.EXACT_RANGE
+        )
 
     /**
      * Anchor offset for [choice]'s gutter icon - that side's own first content line, falling
@@ -252,6 +329,10 @@ private class ConflictGutterController(private val editor: Editor) : Disposable 
         operations = emptyList()
         highlighters.forEach { it.dispose() }
         highlighters = emptyList()
+        editor.foldingModel.runBatchFoldingOperation {
+            folds.forEach { if (it.isValid) editor.foldingModel.removeFoldRegion(it) }
+        }
+        folds = emptyList()
     }
 }
 

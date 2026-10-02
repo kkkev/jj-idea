@@ -16,6 +16,8 @@ enum class ConflictRole { DESTINATION, MOVED, BASE }
  * One side (or the base) of a conflict block, as *materialized* content - never the raw
  * `%%%%%%%`/`\\\` diff lines a jj diff-style block may render one side as.
  *
+ * @param isDiffSection True only for the side rendered as a `%%%%%%%` unified-diff section, whose
+ *   raw span carries `-`/`+` line prefixes (jj-idea-8u0g).
  * @param noTerminatingNewline Whether jj's header annotated this side with `(no terminating
  *   newline)`, meaning its content does not end with `\n` even mid-file. Stripped from [label]
  *   itself (see [JjConflictBlockParser.cleanLabel]) - a caller reconstructing replacement text
@@ -50,7 +52,25 @@ data class ConflictSide(
     val noTerminatingNewline: Boolean = false,
     val alternateLabel: String? = null,
     val contentStartOffset: Int? = null,
-    val contentEndOffset: Int? = null
+    val contentEndOffset: Int? = null,
+    val isDiffSection: Boolean = false
+)
+
+/**
+ * A run of consecutive marker lines (`<<<<<<<`, `|||||||`, `=======`, `%%%%%%%`+`\\\\`, ...)
+ * inside one [ConflictBlock], for the gutter's divider folds (jj-idea-6ja9).
+ *
+ * @param next The side whose content follows this run; null for the closing `>>>>>>>` run, or
+ *   when no section starts right after it.
+ * @param label That side's cleaned label, when it has one.
+ */
+data class MarkerRun(
+    val startOffset: Int,
+    val endOffset: Int,
+    val startLine: Int,
+    val endLine: Int,
+    val next: AcceptChoice?,
+    val label: String?
 )
 
 /**
@@ -62,6 +82,7 @@ data class ConflictSide(
  *   block is the text's last line with no trailing newline, the offset of the text's end.
  * @param startLine 0-based index (by `\n`-split lines) of the opening `<<<<<<<` line.
  * @param endLine 0-based index of the closing `>>>>>>>` line.
+ * @param markerRuns Marker-line runs in document order; empty for [ConflictMarkerStyle.UNRECOGNISED].
  * @param side1IsCurrent Whether [side1] (the side `jj resolve --tool :ours` picks) is the side
  *   [JjMarkerConflictExtractor] would place in `MergeData.CURRENT` ("Yours") - see that class's
  *   doc for the GitHub #112 role-based reorientation this mirrors.
@@ -75,5 +96,6 @@ data class ConflictBlock(
     val side1: ConflictSide,
     val side2: ConflictSide,
     val base: ConflictSide?,
-    val side1IsCurrent: Boolean
+    val side1IsCurrent: Boolean,
+    val markerRuns: List<MarkerRun> = emptyList()
 )

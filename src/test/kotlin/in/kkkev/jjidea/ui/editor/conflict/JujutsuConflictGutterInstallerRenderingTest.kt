@@ -5,6 +5,7 @@ import com.intellij.openapi.application.WriteIntentReadAction
 import com.intellij.openapi.diff.DiffColors
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.editor.EditorKind
+import com.intellij.openapi.editor.markup.EffectType
 import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
@@ -194,6 +195,56 @@ class JujutsuConflictGutterInstallerRenderingTest {
             try {
                 editor.markupModel.allHighlighters.mapNotNull { it.gutterIconRenderer } shouldBe emptyList()
                 colorHighlighters(editor.markupModel.allHighlighters) shouldBe emptyList()
+            } finally {
+                factory.releaseEditor(editor)
+            }
+        }
+    }
+
+    @Test
+    fun `marker runs become divider folds, and the caret's own block shows its raw markers instead`() {
+        stubJjRepo(mockk<JujutsuRepository>())
+
+        WriteIntentReadAction.run {
+            val text = ConflictMarkerFixtures.gitWithBase
+            val file = LightVirtualFile("file.txt", text)
+            val document = requireNotNull(FileDocumentManager.getInstance().getDocument(file))
+            val factory = EditorFactory.getInstance()
+            val editor = factory.createEditor(document, project.get(), file, false, EditorKind.MAIN_EDITOR)
+            try {
+                // Caret starts at offset 0, outside the block: <<<<<<<, |||||||, =======, >>>>>>> -> 4 dividers.
+                editor.foldingModel.allFoldRegions.size shouldBe 4
+
+                editor.caretModel.moveToOffset(text.indexOf("ours content"))
+                editor.foldingModel.allFoldRegions.size shouldBe 0
+
+                editor.caretModel.moveToOffset(0)
+                editor.foldingModel.allFoldRegions.size shouldBe 4
+            } finally {
+                factory.releaseEditor(editor)
+            }
+        }
+    }
+
+    @Test
+    fun `a diff-style section's removed lines are struck through and its prefixes dimmed, text untouched`() {
+        stubJjRepo(mockk<JujutsuRepository>())
+
+        WriteIntentReadAction.run {
+            val text = ConflictMarkerFixtures.diffDestinationFirst
+            val file = LightVirtualFile("file.txt", text)
+            val document = requireNotNull(FileDocumentManager.getInstance().getDocument(file))
+            val factory = EditorFactory.getInstance()
+            val editor = factory.createEditor(document, project.get(), file, false, EditorKind.MAIN_EDITOR)
+            try {
+                val styled = editor.markupModel.allHighlighters
+                    .filter { it.textAttributesKey == null && it.getTextAttributes(null) != null }
+                val struck = styled.filter { it.getTextAttributes(null)?.effectType == EffectType.STRIKEOUT }
+
+                struck.map { text.substring(it.startOffset, it.endOffset) } shouldBe listOf("-base content")
+                styled.map { text.substring(it.startOffset, it.endOffset) } shouldContainExactlyInAnyOrder
+                    listOf("-base content", "+")
+                document.text shouldBe text
             } finally {
                 factory.releaseEditor(editor)
             }

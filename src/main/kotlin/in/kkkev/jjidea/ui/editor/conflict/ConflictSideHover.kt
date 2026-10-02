@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.ui.editor.conflict
 
 import com.intellij.codeInsight.hint.TooltipController
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.diff.DiffColors
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.editor.colors.TextAttributesKey
 import com.intellij.openapi.editor.event.DocumentEvent
@@ -20,7 +19,6 @@ import com.intellij.openapi.editor.markup.RangeHighlighter
 import com.intellij.openapi.editor.markup.TextAttributes
 import com.intellij.ui.ColorUtil
 import com.intellij.util.ui.JBUI
-import `in`.kkkev.jjidea.jj.conflict.AcceptChoice
 import `in`.kkkev.jjidea.jj.conflict.ConflictBlock
 import `in`.kkkev.jjidea.jj.conflict.conflictBlockIndexAt
 import `in`.kkkev.jjidea.jj.conflict.sideAt
@@ -117,7 +115,7 @@ internal class ConflictSideHover(
         if (start == hoveredStart && end == hoveredEnd) return // same side, reached via a jump (e.g. from the gutter)
 
         clear()
-        val attributes = hoverAttributes(keyFor(choice)) ?: return
+        val attributes = hoverAttributes(conflictSideKey(choice)) ?: return
         hoveredStart = start
         hoveredEnd = end
         highlighter = editor.markupModel.addRangeHighlighter(
@@ -156,13 +154,6 @@ internal class ConflictSideHover(
         iconHighlighter = null
         hoveredStart = -1
         hoveredEnd = -1
-    }
-
-    private fun keyFor(choice: AcceptChoice): TextAttributesKey = when (choice) {
-        AcceptChoice.SIDE1 -> DiffColors.DIFF_DELETED
-        AcceptChoice.SIDE2 -> DiffColors.DIFF_INSERTED
-        AcceptChoice.BASE -> DiffColors.DIFF_MODIFIED
-        AcceptChoice.BOTH -> error("sideAt never returns BOTH")
     }
 
     /** The base tint's own background, mixed [HOVER_MIX] of the way toward the scheme's foreground - theme-agnostic: darkens on a light scheme, lightens on a dark one. `null` if the scheme gives [key] no background at all (a legitimate scheme choice, not a bug - nothing to strengthen then). */

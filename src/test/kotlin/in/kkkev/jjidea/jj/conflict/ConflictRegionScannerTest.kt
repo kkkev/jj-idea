@@ -178,7 +178,15 @@ fun ConflictBlock.shifted(offsetDelta: Int, lineDelta: Int): ConflictBlock = cop
     endLine = endLine + lineDelta,
     side1 = side1.shifted(offsetDelta),
     side2 = side2.shifted(offsetDelta),
-    base = base?.shifted(offsetDelta)
+    base = base?.shifted(offsetDelta),
+    markerRuns = markerRuns.map {
+        it.copy(
+            startOffset = it.startOffset + offsetDelta,
+            endOffset = it.endOffset + offsetDelta,
+            startLine = it.startLine + lineDelta,
+            endLine = it.endLine + lineDelta
+        )
+    }
 )
 
 private fun ConflictSide.shifted(offsetDelta: Int): ConflictSide = copy(

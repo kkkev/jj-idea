@@ -83,6 +83,7 @@ internal object JjConflictBlockParser {
         var sawPipeBase = false
         var sawDashBase = false
         var closeLine = -1
+        val markerLines = mutableListOf<Int>(blockStartLine)
         // Line index of the current section's own first content line - every marker line's
         // content starts on the very next line, so this is always `i + 1` as of whichever marker
         // line most recently started the current section (bar the DIFF style's own two-line
@@ -119,6 +120,7 @@ internal object JjConflictBlockParser {
                             }
                         }
                     closeLine = i
+                    markerLines += i
                     i++
                     break
                 }
@@ -132,9 +134,11 @@ internal object JjConflictBlockParser {
                 //   >>>>>>> side2 info
                 line.startsWith("|||||||") -> {
                     sawPipeBase = true
+                    markerLines += i
                     flush(Kind.BASE, line.removePrefix("|||||||").trim().takeIf { it.isNotBlank() })
                 }
                 line == "=======" && (kind == null || kind == Kind.BASE) -> {
+                    markerLines += i
                     if (kind == null) {
                         if (preHeaderBuf.isNotEmpty()) {
                             sections.add(Section(Kind.SIDE1, preHeaderBuf.toList(), preHeader, sectionStartLine))
@@ -158,6 +162,7 @@ internal object JjConflictBlockParser {
                 //   ...
                 //   >>>>>>>
                 line.startsWith("+++++++") -> {
+                    markerLines += i
                     val text = line.removePrefix("+++++++").trim()
                     val newKind = when {
                         text.contains("Contents of side #1") -> Kind.SIDE1
@@ -169,9 +174,11 @@ internal object JjConflictBlockParser {
                 }
                 line.startsWith("-------") -> {
                     sawDashBase = true
+                    markerLines += i
                     flush(Kind.BASE, null)
                 }
                 line.startsWith("%%%%%%%") -> {
+                    markerLines += i
                     // Primary label comes from the "\\\ to:" line below - this line's own "from:"
                     // text is only ever a fallback (Section.diffFromLabel's doc explains why).
                     val fromLabel = line.removePrefix("%%%%%%%").trim().removePrefix("diff from:").trim()
@@ -184,6 +191,7 @@ internal object JjConflictBlockParser {
                 // flush() above tentatively assumed - correct that now that we've seen it.
                 line.startsWith("\\\\\\") -> {
                     if (kind == Kind.DIFF) {
+                        markerLines += i
                         line.trimStart('\\').trim().removePrefix("to:").trim()
                             .takeIf { it.isNotBlank() }?.let { header = it }
                         sectionStartLine = i + 1
@@ -196,7 +204,8 @@ internal object JjConflictBlockParser {
 
         if (closeLine < 0) return null
 
-        val block = buildBlock(sections, table, blockStartLine, closeLine, sawPipeBase, sawDashBase) ?: return null
+        val block =
+            buildBlock(sections, table, blockStartLine, closeLine, sawPipeBase, sawDashBase, markerLines) ?: return null
         return ParsedBlock(block, i)
     }
 
@@ -206,7 +215,8 @@ internal object JjConflictBlockParser {
         startLine: Int,
         closeLine: Int,
         sawPipeBase: Boolean,
-        sawDashBase: Boolean
+        sawDashBase: Boolean,
+        markerLines: List<Int>
     ): ConflictBlock? {
         val startOffset = table.startOffsetOfLine(startLine)
         val endOffset = table.endOffsetOfLine(closeLine)
@@ -224,7 +234,17 @@ internal object JjConflictBlockParser {
             } else {
                 ConflictMarkerStyle.GIT
             }
+            val runs = markerRuns(
+                table,
+                markerLines,
+                listOfNotNull(
+                    side1Section.contentStartLine to (AcceptChoice.SIDE1 to cleanLabel(side1Section.header)?.label),
+                    baseSection?.let { it.contentStartLine to (AcceptChoice.BASE to cleanLabel(it.header)?.label) },
+                    side2Section.contentStartLine to (AcceptChoice.SIDE2 to cleanLabel(side2Section.header)?.label)
+                ).toMap()
+            )
             return explicitSidesBlock(
+                runs,
                 table,
                 side1Section,
                 baseSection,
@@ -258,7 +278,8 @@ internal object JjConflictBlockParser {
                 label1?.noTerminatingNewline ?: false,
                 alternateLabel(first),
                 firstStart,
-                firstEnd
+                firstEnd,
+                isDiffSection = first.kind == Kind.DIFF
             )
             val side2 = ConflictSide(
                 label2?.label,
@@ -267,7 +288,8 @@ internal object JjConflictBlockParser {
                 label2?.noTerminatingNewline ?: false,
                 alternateLabel(second),
                 secondStart,
-                secondEnd
+                secondEnd,
+                isDiffSection = second.kind == Kind.DIFF
             )
             return ConflictBlock(
                 startOffset = startOffset,
@@ -278,7 +300,15 @@ internal object JjConflictBlockParser {
                 side1 = side1,
                 side2 = side2,
                 base = if (baseLines.isNotEmpty()) ConflictSide(null, ConflictRole.BASE, baseLines) else null,
-                side1IsCurrent = currentIsSide1(side1.role, side2.role)
+                side1IsCurrent = currentIsSide1(side1.role, side2.role),
+                markerRuns = markerRuns(
+                    table,
+                    markerLines,
+                    mapOf(
+                        first.contentStartLine to (AcceptChoice.SIDE1 to label1?.label),
+                        second.contentStartLine to (AcceptChoice.SIDE2 to label2?.label)
+                    )
+                )
             )
         }
 
@@ -298,6 +328,7 @@ internal object JjConflictBlockParser {
     }
 
     private fun explicitSidesBlock(
+        markerRuns: List<MarkerRun>,
         table: LineTable,
         side1: Section,
         baseSection: Section?,
@@ -348,8 +379,40 @@ internal object JjConflictBlockParser {
                     contentEndOffset = baseEnd
                 )
             },
-            side1IsCurrent = currentIsSide1(s1.role, s2.role)
+            side1IsCurrent = currentIsSide1(s1.role, s2.role),
+            markerRuns = markerRuns
         )
+    }
+
+    /**
+     * Groups [markerLines] (ascending line indices of every recognised marker line, opener and
+     * closer included) into runs of consecutive lines. A run's [MarkerRun.next] side is looked up
+     * by the line right after it, in [sideByContentStartLine]; the run ending the block has none.
+     */
+    private fun markerRuns(
+        table: LineTable,
+        markerLines: List<Int>,
+        sideByContentStartLine: Map<Int, Pair<AcceptChoice, String?>>
+    ): List<MarkerRun> {
+        val runs = mutableListOf<MarkerRun>()
+        var i = 0
+        while (i < markerLines.size) {
+            var j = i
+            while (j + 1 < markerLines.size && markerLines[j + 1] == markerLines[j] + 1) j++
+            val first = markerLines[i]
+            val last = markerLines[j]
+            val side = sideByContentStartLine[last + 1]
+            runs += MarkerRun(
+                table.startOffsetOfLine(first),
+                table.endOffsetOfLine(last),
+                first,
+                last,
+                side?.first,
+                side?.second
+            )
+            i = j + 1
+        }
+        return runs
     }
 
     private fun currentIsSide1(role1: ConflictRole?, role2: ConflictRole?): Boolean = when {

@@ -160,6 +160,13 @@ trickle out piecemeal across point releases. S1's banner above is unaffected and
 Follow-up children of S2 (fold-marker-lines, DIFF-style tidy, multi-select label detection) stay
 behind the same flag until it's removed at GA.
 
+**Visual polish shipped (jj-idea-6ja9, jj-idea-8u0g):** `ConflictBlock.markerRuns` (consecutive marker
+lines, each naming the side that follows) drives one `CustomFoldRegion` divider per run; custom
+folds can't expand, so the caret's own block is left unfolded so its raw markers stay editable.
+`ConflictSide.isDiffSection` + `diffSectionLines` drive display-only dimming of `-`/`+` prefixes
+(strikethrough for `-` lines). An empty side's gutter icon anchors on the marker line that is now
+folded - verify in runIde (see MT-CONFLICT).
+
 ### S3 — Resolve conflicts from the Working copy window (reframed; was "jj-native Conflicts view")
 
 **Reframed 2026-09-23** (`jj-idea-qmws` closed as superseded by `jj-idea-wk7p`). The original
