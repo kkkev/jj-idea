@@ -9,6 +9,7 @@ import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.FileChange
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.contentBytes
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 
 private val log = Logger.getInstance(JujutsuVirtualFile::class.java)
@@ -108,7 +109,8 @@ class JujutsuVirtualFile(
     /** Fetches and caches content; idempotent if already cached. Returns the (now-cached) bytes. */
     private fun loadAndCache(): ByteArray = cached ?: fetch().also { cached = it }
 
-    private fun fetch() = repo.createContentRevision(fileAtVersion).content?.toByteArray() ?: byteArrayOf()
+    // Bytes, not content?.toByteArray(): a String round-trip corrupts binary files such as images.
+    private fun fetch() = repo.createContentRevision(fileAtVersion).contentBytes() ?: byteArrayOf()
 
     override fun isDirectory() = false
     override fun getPresentableName() = fileAtVersion.title

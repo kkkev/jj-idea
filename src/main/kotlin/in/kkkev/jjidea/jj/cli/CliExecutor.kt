@@ -6,6 +6,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.util.SystemProperties
 import com.intellij.util.containers.addAllIfNotNull
@@ -720,6 +721,9 @@ class CliExecutor(
 
     override fun show(filePath: FilePath, revision: Revision) = execute(root, showArgs(filePath, revision, root))
 
+    override fun showBytes(filePath: FilePath, revision: Revision) =
+        executeBytes(root, showArgs(filePath, revision, root))
+
     override fun isAvailable() = try {
         val result = execute(null, versionArgs())
         result is CommandExecutor.CommandResult.Success
@@ -1072,24 +1076,8 @@ class CliExecutor(
             invocation.args
         }
         val executable = executableProvider()
-        val commandLine = GeneralCommandLine(executable)
-            .withParameters(args)
-            .withCharset(StandardCharsets.UTF_8)
-
-        // jj-idea-i0e6: a rootless executor (workingDir == null) must not inherit the IDE
-        // process's own CWD - that would let `--when.repositories` scopes match whatever repo
-        // the IDE happened to be launched from. Pin it to the user's home directory instead,
-        // which is guaranteed to never match a repository scope.
-        commandLine.setWorkDirectory(workingDir?.path ?: SystemProperties.getUserHome())
-
-        // Add color=never to avoid ANSI codes in output
-        commandLine.environment["NO_COLOR"] = "1"
-
-        val cmdName = args.joinToString(" ") {
-            val truncatePoint =
-                listOfNotNull(20, it.length, it.indexOfFirst { c -> c.isWhitespace() }.takeIf { i -> i >= 0 }).min()
-            if (truncatePoint < it.length) it.substring(0..truncatePoint - 1) + "..." else it
-        }
+        val commandLine = commandLineFor(executable, workingDir, args)
+        val cmdName = cmdNameFor(args)
         log.info("Executing in ${workingDir?.path ?: "."}: jj $cmdName (${Thread.currentThread().name})")
 
         val startTime = System.currentTimeMillis()
@@ -1130,6 +1118,101 @@ class CliExecutor(
             identifyOperation(undoToken, result)
         } else {
             result
+        }
+    }
+
+    private fun commandLineFor(executable: String, workingDir: VirtualFile?, args: List<String>): GeneralCommandLine {
+        val commandLine = GeneralCommandLine(executable)
+            .withParameters(args)
+            .withCharset(StandardCharsets.UTF_8)
+
+        // jj-idea-i0e6: a rootless executor (workingDir == null) must not inherit the IDE
+        // process's own CWD - that would let `--when.repositories` scopes match whatever repo
+        // the IDE happened to be launched from. Pin it to the user's home directory instead,
+        // which is guaranteed to never match a repository scope.
+        commandLine.setWorkDirectory(workingDir?.path ?: SystemProperties.getUserHome())
+
+        // Add color=never to avoid ANSI codes in output
+        commandLine.environment["NO_COLOR"] = "1"
+        return commandLine
+    }
+
+    private fun cmdNameFor(args: List<String>) = args.joinToString(" ") {
+        val truncatePoint =
+            listOfNotNull(20, it.length, it.indexOfFirst { c -> c.isWhitespace() }.takeIf { i -> i >= 0 }).min()
+        if (truncatePoint < it.length) it.substring(0..truncatePoint - 1) + "..." else it
+    }
+
+    /**
+     * Runs a [READ_ONLY] [invocation] and returns its stdout as raw bytes, never decoded through a
+     * charset - see [CommandExecutor.showBytes]. Separate from [execute] because
+     * [CapturingProcessHandler] only exposes stdout as a decoded `String`, which corrupts binary
+     * content (e.g. a PNG's `0x89` signature byte isn't valid UTF-8).
+     *
+     * Both streams are drained concurrently, so neither pipe can fill up and deadlock the process.
+     * Failures (not launched, timed out, non-zero exit) mirror [execute]'s logging and are thrown as
+     * [VcsException], the platform's contract for content loading
+     * ([com.intellij.openapi.vcs.changes.ByteBackedContentRevision.getContentAsBytes],
+     * [com.intellij.openapi.vcs.history.VcsFileRevision.loadContent]).
+     */
+    private fun executeBytes(
+        workingDir: VirtualFile?,
+        invocation: JjInvocation,
+        timeout: Long = defaultTimeout
+    ): ByteArray {
+        require(invocation.reversibility == READ_ONLY) { "executeBytes only supports read-only commands" }
+        val args = invocation.args
+        val executable = executableProvider()
+        val commandLine = commandLineFor(executable, workingDir, args)
+        val cmdName = cmdNameFor(args)
+        log.info("Executing in ${workingDir?.path ?: "."}: jj $cmdName [bytes] (${Thread.currentThread().name})")
+
+        val startTime = System.currentTimeMillis()
+        val process = try {
+            commandLine.createProcess()
+        } catch (_: ProcessNotCreatedException) {
+            log.warn("jj executable not found: $executable")
+            onJjNotFound?.invoke()
+            throw VcsException(
+                "jj executable not found: $executable. Please install jj or configure the path in Settings."
+            )
+        } catch (e: com.intellij.execution.ExecutionException) {
+            throw VcsException("Failed to execute jj $cmdName: ${e.message}", e)
+        }
+
+        val stdout = ProcessIOExecutorService.INSTANCE.submit<ByteArray> {
+            process.inputStream.use { it.readAllBytes() }
+        }
+        val stderr = ProcessIOExecutorService.INSTANCE.submit<ByteArray> {
+            process.errorStream.use { it.readAllBytes() }
+        }
+        try {
+            if (!process.waitFor(timeout, TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly()
+                log.warn("jj $cmdName timed out after ${timeout}ms")
+                val seconds = TimeUnit.MILLISECONDS.toSeconds(timeout)
+                throw VcsException(JujutsuBundle.message("cli.error.timeout", cmdName, seconds.toString()))
+            }
+            val exitCode = process.exitValue()
+            val bytes = stdout.get()
+            val errorText = String(stderr.get(), StandardCharsets.UTF_8)
+            log.info(
+                "Completed in ${workingDir?.path ?: "."}: jj $cmdName [bytes] in " +
+                    "${System.currentTimeMillis() - startTime}ms (exit=$exitCode, ${bytes.size} bytes)"
+            )
+            if (exitCode != 0) {
+                val message = "jj $cmdName failed with exit code $exitCode:\n$errorText"
+                log.warn(message)
+                throw VcsException(message)
+            }
+            return bytes
+        } catch (e: InterruptedException) {
+            process.destroyForcibly()
+            Thread.currentThread().interrupt()
+            throw VcsException("Interrupted while running jj $cmdName", e)
+        } catch (e: java.util.concurrent.ExecutionException) {
+            process.destroyForcibly()
+            throw VcsException("Failed to read output of jj $cmdName: ${e.cause?.message}", e.cause ?: e)
         }
     }
 
