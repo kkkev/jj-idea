@@ -134,4 +134,33 @@ class PagedLogWindowTest {
         window.pageCount shouldBe 0
         window.isExhausted shouldBe false // not seeded yet
     }
+
+    @Test
+    fun `loadedCount sums every recorded page`() {
+        val window = PagedLogWindow(Expression("all()"), pageSize = 2)
+        window.loadedCount shouldBe 0
+        window.seed(listOf(ChangeId("A", "A")))
+        window.recordPage(listOf(entry("A", "B"), entry("B", "C")))
+        window.recordPage(listOf(entry("C")))
+        window.loadedCount shouldBe 3
+    }
+
+    @Test
+    fun `nextPageLimit is the first-page size for page 1 and the page size after`() {
+        val window = PagedLogWindow(Expression("all()"), pageSize = 10_000, firstPageSize = 500)
+        window.seed(listOf(ChangeId("A", "A")))
+        window.nextPageLimit() shouldBe 500
+        window.recordPage(listOf(entry("A", "B")))
+        window.nextPageLimit() shouldBe 10_000
+        window.reset() // refresh()'s page-1 re-fetch starts over with the small first page
+        window.nextPageLimit() shouldBe 500
+    }
+
+    @Test
+    fun `firstPageSizeFor never exceeds the page size and prefetchDistance never exceeds its cap`() {
+        PagedLogWindow.firstPageSizeFor(10_000) shouldBe PagedLogWindow.FIRST_PAGE_ROWS
+        PagedLogWindow.firstPageSizeFor(50) shouldBe 50
+        PagedLogWindow.prefetchDistance(10_000) shouldBe PagedLogWindow.PREFETCH_ROWS_MAX
+        PagedLogWindow.prefetchDistance(200) shouldBe 200
+    }
 }

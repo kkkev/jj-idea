@@ -337,6 +337,7 @@ covered by permanent tests (`PagedLogWindowTest`, `PagedLogWindowContractTest`,
 `JujutsuLogTableScrollPreservationTest`, `ViewportAnchorTest`,
 `JujutsuLogTableModelRowOfScaleTest`, `PagedLogLoaderConcurrencyTest`), not just the one-off
 scratch scripts used during design.
+Follow-up (jj-idea-2570.5): besides the demand path (`loadMore`, fired within a page of the bottom, unthrottled and uncapped), `UnifiedJujutsuLogDataLoader` runs a low-duty idle *trickle* that keeps paging in jj's own order until the log is fully loaded or `TricklePolicy.ROW_CAP` (10,000) rows are in memory, waiting `TricklePolicy.DUTY_FACTOR` x the work just done between pages (~25% duty, 200 ms-5 s). Faded `NOT_LOADED` stubs therefore normally resolve without scrolling. An earlier viewport-driven design (page while a stub is on screen, with a row allowance renewed by scrolling deeper) was replaced because it needed viewport hooks, stub detection and scroll bookkeeping to guess what the throttled loop does unconditionally; in-order paging is still what avoids the out-of-order problem that sank fetch-parents-only.
 Remaining open items are cross-referenced from "The paint treatment for an elided parent" above
 and the cross-bead plan for `jj-idea-hlu3`/`jj-idea-xi58`.
 

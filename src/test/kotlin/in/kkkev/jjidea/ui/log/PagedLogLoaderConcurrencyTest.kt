@@ -181,6 +181,8 @@ class PagedLogLoaderConcurrencyTest {
     private fun loader(vararg repos: FakeRepo): UnifiedJujutsuLogDataLoader {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
         return UnifiedJujutsuLogDataLoader(projectFx.get(), { repos.map { it.repo } }, panel)
+            // jj-idea-2570.5: this test counts/orders fetches itself - no background trickle
+            .also { it.trickleEnabled = false }
     }
 
     // ─── tests ───────────────────────────────────────────────────────────────

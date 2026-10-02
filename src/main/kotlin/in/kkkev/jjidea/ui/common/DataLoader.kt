@@ -24,4 +24,7 @@ interface DataLoader {
      * of the visible viewport. No-op for loaders that don't page.
      */
     fun loadMore() {}
+
+    /** Release any background work the loader started (e.g. the paged log's idle trickle). */
+    fun close() {}
 }

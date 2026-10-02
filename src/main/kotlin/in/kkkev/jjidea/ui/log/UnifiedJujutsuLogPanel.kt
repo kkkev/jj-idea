@@ -398,6 +398,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
 
     override fun dispose() {
         log.info("UnifiedJujutsuLogPanel disposed")
+        dataLoader.close() // stops the paged log's idle trickle (jj-idea-2570.5)
         // detailsPanel is registered as a child via Disposer — no manual dispose needed
     }
 }

@@ -57,6 +57,7 @@ directory as a project in the plugin IDE (`./gradlew runIde`).
 | FX-CONFLICT | `scripts/fixtures/fx-conflict.sh [target-dir] [marker-style] [wc-position]` | A content conflict on `file.txt` (change A rebased onto change B); `marker-style` is `git` (default), `snapshot`, or `diff` — rerun with a different style against the same repo to test all three. `wc-position` is `conflicted` (default, working copy on the conflict) or `sibling` (working copy on change B, a clean commit unrelated to the conflict — GitHub #119 / jj-idea-ct7e's repro position) |
 | FX-MD-CONFLICT | `scripts/fixtures/fx-md-conflict.sh [target-dir]` | A modify/delete conflict on `a.txt` — one side deletes the file entirely, so "accept" on that side must remove it from disk, not leave an empty file; a different case from FX-CONFLICT's content conflict |
 | FX-STRESS | `scripts/fixtures/fx-stress.sh [target-dir]` | A ~1084-commit repo with ~26 concurrent heads (main trunk, 20 short feature branches, 5 long branches, a 200-commit deep-branch, an octopus-merge, a hotfix/* cluster), for log-graph/filter stress testing. Reused as `jj-stress-test` by MT-LOG-GRAPH's stress bullet and its "Graph layout under filtering" subsection, and by MT-LOG-FILTER's Reference filter fixture — don't build a separate throwaway multi-branch repo for those, this one already has far more lanes than any of them need. Two env knobs for larger-scale work (jj-idea-2c8k): `SCALE=<n>` multiplies the main trunk / deep-branch / long-branch lengths (e.g. `SCALE=6` for ~7,000 commits, matching GitHub #69's repo size), and `WITH_REMOTE=1` pushes `main` and a few branch bookmarks to a bare repo created alongside the target, so `remote_bookmarks()` is non-empty — a plain `jj git init` leaves it empty, which makes the log template's `hasPushedAncestor` predicate (`descendants(::remote_bookmarks())`) trivially cheap and would understate its real cost |
+| FX-SCALE-SET | `scripts/fixtures/fx-scale-set.sh [target-dir]` (default `~/workspace/jj-scale`; `ONLY="name ..."` builds a subset) | A ladder of repo sizes for tuning large-repo log behaviour (paged loading, the idle trickle, first-page size, prefetch distance — jj-idea-2570.x, GitHub #69): `s1k-synthetic` (~1.1k commits) and `s6k-synthetic` (~6k, `WITH_REMOTE`, #69's reporter's shape) via FX-STRESS, plus real code cloned with `jj git clone --colocate`: `r2k-openNDS` (~2k, C), `r6k-longhorn` (~6.3k, Go — #69-sized with real code), `r36k-keycloak` (~35k, Java/Maven — the IDE does Maven import and indexing on open, so first-page latency is measured against real project-opening load) and `r80k-git` (~86k, C — well past the 10,000-row idle-trickle cap). Local checkouts under `~/workspace` are cloned from when present (read-only), else GitHub. To reproduce #69's reporter set Settings → Version Control → Jujutsu → Log → *Changes to show* to 10000 with the paged-log preview on. Each load logs `perf: log-load`, `perf: log-edt-wait` and `perf: log-apply` lines to idea.log (grep `perf:`) for timing |
 
 Each script fails loudly (non-zero exit, explanatory message) if the jj version installed
 produces a different topology than expected, rather than silently leaving a broken fixture —
@@ -872,6 +873,15 @@ non-paged behavior is perceptible.
 - [ ] Clicking that faded straight line loads and reveals the missing parent, scrolling to it
       once it arrives — see MT-LOG-GRAPH's "Long-edge navigation" (jj-idea-sc8m) subsection for
       the full hover/click behavior
+- [ ] jj-idea-2570.5 (idle trickle): on FX-STRESS (`SCALE=6 WITH_REMOTE=1`) with a small "Changes
+      to show" (e.g. 50), open the log and *leave it alone*: older history keeps loading in the
+      background at a gentle pace (the scrollbar thumb slowly shrinks), faded stubs on screen
+      connect to their parents without any scrolling or clicking, no old row ever appears ahead
+      of the rows between, and the IDE stays responsive. It stops when the whole log is loaded or
+      ~10,000 rows are in memory, after which stubs remain clickable (sc8m) and scrolling to the
+      bottom still loads more, uncapped. Check Activity Monitor: the IDE/jj stay well under a core
+      while it trickles. With the flag off, nothing loads on its own. Closing the log window
+      stops it
 - [ ] Scroll to the bottom of the loaded rows: more history loads in automatically before you
       reach the literal end (eager one-page-ahead prefetch); scrolling repeatedly keeps loading
       further pages at a consistent, flat pace — not slowing down page over page; the viewport

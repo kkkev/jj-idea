@@ -126,6 +126,8 @@ class PagedLogDeepPageRefreshTest {
     private fun loader(repo: JujutsuRepository): UnifiedJujutsuLogDataLoader {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
         return UnifiedJujutsuLogDataLoader(projectFx.get(), { listOf(repo) }, panel)
+            // jj-idea-2570.5: this test counts/orders fetches itself - no background trickle
+            .also { it.trickleEnabled = false }
     }
 
     private fun FakeRepo.hasConflictInCurrentView(changeId: String): Boolean =

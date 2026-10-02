@@ -3,12 +3,14 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
+import com.intellij.util.concurrency.AppExecutorUtil
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
+import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import kotlinx.datetime.Instant
@@ -16,6 +18,7 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -96,9 +99,22 @@ class UnifiedJujutsuLogDataLoader(
 
     override fun load() = loadCommits()
 
-    private fun notify(data: Data) {
+    /**
+     * Hands [data] to the panel on the EDT. [readyAtNanos] is when the background work finished
+     * (from [System.nanoTime]); logging the gap to this call separates "the EDT was busy" (project
+     * open, indexing) from our own apply cost, which `perf: log-apply` measures on its own.
+     */
+    private fun notify(data: Data, readyAtNanos: Long? = null) {
         lastLimit = data.limit
-        panel.onDataLoaded(data)
+        if (readyAtNanos != null) {
+            val waitedMs = (System.nanoTime() - readyAtNanos) / 1_000_000
+            log.info("perf: log-edt-wait took ${waitedMs}ms [rows=%,d]".format(data.entries.size))
+        }
+        log.measurePerf("log-apply") { report ->
+            report.count("rows", data.entries.size.toLong())
+            panel.onDataLoaded(data)
+        }
+        ensureTrickle()
         log.info("Table updated with ${data.entries.size} commits and graph layout")
     }
 
@@ -126,6 +142,7 @@ class UnifiedJujutsuLogDataLoader(
         val errors = ConcurrentHashMap<JujutsuRepository, Throwable>()
         var allEntries: List<LogEntry> = emptyList()
         var graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
+        var readyAtNanos = System.nanoTime()
 
         executeInBackground(
             run = { indicator ->
@@ -200,12 +217,13 @@ class UnifiedJujutsuLogDataLoader(
                         correctionsByRepo
                     )
                 }
+                readyAtNanos = System.nanoTime()
             },
             onSuccess = {
                 // A cancelled wait throws ProcessCanceledException above, which routes to onCancel()
                 // instead of here - so reaching onSuccess means the load actually completed.
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) return@executeInBackground
-                notify(Data(allEntries, graphNodes, defaultLimit))
+                notify(Data(allEntries, graphNodes, defaultLimit), readyAtNanos)
             }
         )
     }
@@ -233,7 +251,7 @@ class UnifiedJujutsuLogDataLoader(
             return repo.logCache.reload()
         }
         val pageSize = settings.logChangeLimit(repo)
-        val window = PagedLogWindow(revset, pageSize)
+        val window = PagedLogWindow(revset, pageSize, PagedLogWindow.firstPageSizeFor(pageSize))
         val entries = fetchOnePage(repo, window)
         if (entries == null) {
             pagedWindowByRepo.remove(repo)
@@ -269,7 +287,7 @@ class UnifiedJujutsuLogDataLoader(
             )
             return null
         }
-        val page = repo.logService.getLog(revset = window.pageRevset(), limit = window.pageSize).getOrElse {
+        val page = repo.logService.getLog(revset = window.pageRevset(), limit = window.nextPageLimit()).getOrElse {
             log.warn("Failed to fetch log page for ${repo.displayName}: ${it.message}")
             return null
         }
@@ -377,7 +395,8 @@ class UnifiedJujutsuLogDataLoader(
         } else {
             fullMergeAndNotify(correctionsByRepo)
         }
-        runLater { notify(data) }
+        val readyAt = System.nanoTime()
+        runLater { notify(data, readyAt) }
     }
 
     private fun fastMergeAndNotify(
@@ -607,7 +626,7 @@ class UnifiedJujutsuLogDataLoader(
             val targetPageCount = lockFor(repo).withLock {
                 (pagedWindowByRepo[repo]?.pageCount ?: 0).coerceAtLeast(1)
             }
-            val window = PagedLogWindow(revset, pageSize)
+            val window = PagedLogWindow(revset, pageSize, PagedLogWindow.firstPageSizeFor(pageSize))
             repeat(targetPageCount) {
                 if (!window.isExhausted && fetchOnePage(repo, window) == null) return null
             }
@@ -631,25 +650,102 @@ class UnifiedJujutsuLogDataLoader(
      */
     override fun loadMore() {
         if (!pagedLoading) return
-        val candidates = repositories().filter { repo ->
-            pagedWindowByRepo[repo]?.let { !it.isExhausted } == true
-        }
+        loadMoreFrom(repositories().filter { pagedWindowByRepo[it]?.let { w -> !w.isExhausted } == true })
+    }
+
+    /**
+     * Shared body of [loadMore]: fetches one more page for each of [candidates] in the background
+     * (skipping any repo already mid-fetch, see [loadMore]) and merges the combined delta through
+     * [mergeAndNotify]'s append fast path.
+     */
+    private fun loadMoreFrom(candidates: List<JujutsuRepository>) {
         if (candidates.isEmpty()) return
-        runInBackground {
-            // jj-idea-jnqi: collect every repo's newly fetched page into one delta and pass it
-            // to mergeAndNotify's append-only fast path, instead of a bare re-merge signal.
-            val delta = mutableListOf<LogEntry>()
-            for (repo in candidates) {
-                val lock = lockFor(repo)
-                if (!lock.tryLock()) continue
-                try {
-                    loadMoreOneRepoLocked(repo)?.let { delta += it }
-                } finally {
-                    lock.unlock()
-                }
+        runInBackground { fetchAndMerge(candidates) }
+    }
+
+    /**
+     * Synchronous core of [loadMoreFrom], also driven by the idle [trickleTick]. Returns the number
+     * of rows loaded (0 if every candidate was skipped as busy or had nothing new).
+     */
+    private fun fetchAndMerge(candidates: List<JujutsuRepository>): Int {
+        // jj-idea-jnqi: collect every repo's newly fetched page into one delta and pass it
+        // to mergeAndNotify's append-only fast path, instead of a bare re-merge signal.
+        val delta = mutableListOf<LogEntry>()
+        for (repo in candidates) {
+            val lock = lockFor(repo)
+            if (!lock.tryLock()) continue
+            try {
+                loadMoreOneRepoLocked(repo)?.let { delta += it }
+            } finally {
+                lock.unlock()
             }
-            if (delta.isNotEmpty()) mergeAndNotify(delta)
         }
+        if (delta.isNotEmpty()) mergeAndNotify(delta)
+        return delta.size
+    }
+
+    // jj-idea-2570.5: idle-time "trickle". Besides the demand path ([loadMore], fired when the
+    // user nears the bottom, unthrottled), a low-duty background loop keeps paging the log in
+    // order until it is fully loaded or [TricklePolicy.ROW_CAP] rows are in memory, so a faded
+    // NOT_LOADED stub's parent normally arrives without the user having to scroll or click.
+    // Throttled by [TricklePolicy.delayAfter] so it never hogs the CPU; it shares the per-repo
+    // lock with the demand path, so the two can't collide (a busy repo just skips that tick).
+    private val trickleScheduled = AtomicBoolean(false)
+
+    // A flag, not a Disposer child: loaders are plain objects owned by their panel, and a
+    // Disposer registration would leak (and fail the platform leak check) wherever one is dropped
+    // without close().
+    @Volatile
+    private var closed = false
+
+    /** Off switch for tests that count fetches and don't want background paging interleaved. */
+    @Volatile
+    internal var trickleEnabled = true
+
+    /** [TricklePolicy.ROW_CAP]; a var only so tests can reach it without a 10,000-row fake. */
+    @Volatile
+    internal var trickleRowCap = TricklePolicy.ROW_CAP
+
+    /** Starts the trickle if it isn't already running. Idempotent; every load path ends in [notify]. */
+    private fun ensureTrickle() {
+        if (!pagedLoading || !trickleEnabled) return
+        if (trickleScheduled.compareAndSet(false, true)) scheduleTrickle(TricklePolicy.MIN_DELAY_MS)
+    }
+
+    private fun scheduleTrickle(delayMs: Long) {
+        if (closed) return
+        AppExecutorUtil.getAppScheduledExecutorService().schedule({
+            if (closed || project.isDisposed) {
+                trickleScheduled.set(false)
+                return@schedule
+            }
+            val next = trickleTick()
+            if (next == null) trickleScheduled.set(false) else scheduleTrickle(next)
+        }, delayMs, TimeUnit.MILLISECONDS)
+    }
+
+    /**
+     * One trickle step: loads one page for every still-pageable repo unless the whole log is
+     * loaded or [TricklePolicy.ROW_CAP] rows are already in memory. Returns the delay before the
+     * next step, or `null` when the trickle is finished (restarted by the next load via
+     * [ensureTrickle]). Synchronous so tests can drive it directly.
+     */
+    internal fun trickleTick(): Long? {
+        val windows = repositories().mapNotNull { r -> pagedWindowByRepo[r]?.let { r to it } }
+        val candidates = windows.filter { !it.second.isExhausted }.map { it.first }
+        if (!TricklePolicy.wantsMore(windows.sumOf { it.second.loadedCount }, candidates.isNotEmpty(), trickleRowCap)) {
+            return null
+        }
+        val start = System.nanoTime()
+        val rows = fetchAndMerge(candidates)
+        val workMs = (System.nanoTime() - start) / 1_000_000
+        log.debug("log trickle: loaded $rows rows in $workMs ms")
+        return TricklePolicy.delayAfter(workMs)
+    }
+
+    /** Stops the idle trickle. Called when the owning panel is disposed. */
+    override fun close() {
+        closed = true
     }
 
     /**

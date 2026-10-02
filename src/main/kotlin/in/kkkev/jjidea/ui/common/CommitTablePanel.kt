@@ -189,7 +189,7 @@ abstract class CommitTablePanel<D>(
             )
             if (lastVisibleRow < 0) return@addChangeListener
             val pageSize = JujutsuSettings.getInstance(project).state.logChangeLimit
-            if (lastVisibleRow >= logTable.rowCount - pageSize) {
+            if (lastVisibleRow >= logTable.rowCount - PagedLogWindow.prefetchDistance(pageSize)) {
                 dataLoader.loadMore()
             }
         }
