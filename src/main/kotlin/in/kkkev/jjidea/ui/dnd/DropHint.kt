@@ -2,10 +2,13 @@ package `in`.kkkev.jjidea.ui.dnd
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.ui.Gray
+import com.intellij.ui.JBColor
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.ui.components.IconAwareHtmlPane
 import java.awt.BorderLayout
+import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
@@ -169,13 +172,13 @@ class DropHint(private val project: Project) {
                 g2.color = if (rejected) {
                     JBUI.CurrentTheme.Validator.errorBackgroundColor()
                 } else {
-                    JBUI.CurrentTheme.Tooltip.background()
+                    TOOLTIP_BACKGROUND
                 }
                 g2.fillRoundRect(0, 0, width, height, arc, arc)
                 g2.color = if (rejected) {
                     JBUI.CurrentTheme.Validator.errorBorderColor()
                 } else {
-                    JBUI.CurrentTheme.Tooltip.separatorColor()
+                    TOOLTIP_SEPARATOR
                 }
                 g2.drawRoundRect(0, 0, width - 1, height - 1, arc, arc)
             } finally {
@@ -200,6 +203,11 @@ class DropHint(private val project: Project) {
         // room for the words around it.
         private const val FIT_FRACTION = 0.9
         private const val INLINE_FRACTION = 0.4
+
+        // JBUI.CurrentTheme.Tooltip.background()/separatorColor() postdate 2025.1; these are the same
+        // theme keys and fallbacks the platform uses.
+        private val TOOLTIP_BACKGROUND = JBColor.namedColor("ToolTip.background", JBColor(Gray.xF2, Color(0x3c3f41)))
+        private val TOOLTIP_SEPARATOR = JBColor.namedColor("ToolTip.separatorColor", 0xd1d1d1, 0x545658)
 
         private const val CURSOR_OFFSET = 16
         private const val PADDING_X = 8
