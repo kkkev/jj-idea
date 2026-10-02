@@ -219,7 +219,7 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
     override fun fileUntrack(filePaths: List<FilePath>): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
-    override fun fileList(filePaths: List<FilePath>): CommandExecutor.CommandResult =
+    override fun fileList(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 
     override fun resolveList(revision: Revision): CommandExecutor.CommandResult =

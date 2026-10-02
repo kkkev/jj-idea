@@ -52,7 +52,7 @@ class JujutsuTrackedFilesServicePlatformTest {
     private fun path(name: String) = LocalFilePath("${directory.path}/$name", false)
 
     private fun stubFileList(stdout: String) {
-        every { commandExecutor.fileList(any()) } returns commandResult(0, stdout, "")
+        every { commandExecutor.fileList(any(), any()) } returns commandResult(0, stdout, "")
     }
 
     @Test

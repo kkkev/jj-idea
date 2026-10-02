@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj.cli
 
+import `in`.kkkev.jjidea.jj.ChangeId
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 
@@ -23,5 +24,11 @@ class CliExecutorFileListTest {
     @Test
     fun `file list is read-only`() {
         fileListArgs(listOf("foo.txt")).reversibility shouldBe Reversibility.READ_ONLY
+    }
+
+    @Test
+    fun `fileListArgs - at a revision`() {
+        fileListArgs(listOf("foo.txt"), ChangeId("abc", "abc")).args shouldBe
+            listOf("file", "list", "-r", "abc", "cwd:\"foo.txt\"")
     }
 }

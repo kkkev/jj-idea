@@ -277,8 +277,11 @@ internal fun fileUntrackArgs(paths: List<String>) =
  * Build the argument list for `jj file list`. [paths] must already be relative to the repo root.
  * The only fully reliable way to determine tracked status - see docs/jj-track-untrack-model.md.
  */
-internal fun fileListArgs(paths: List<String>) =
-    JjInvocation(READ_ONLY, listOf("file", "list") + paths.map { it.toFileset() })
+internal fun fileListArgs(paths: List<String>, revision: Revision = WorkingCopy) = JjInvocation(
+    READ_ONLY,
+    listOf("file", "list") + (if (revision == WorkingCopy) emptyList() else listOf("-r", revision.toString())) +
+        paths.map { it.toFileset() }
+)
 
 /** Build the argument list for `jj git fetch`. IRREVERSIBLE - verified: reverting a fetch leaves
  * `main@origin` still pointing at the fetched (now hidden) commit while local `main` moves back,
@@ -850,8 +853,8 @@ class CliExecutor(
     override fun fileUntrack(filePaths: List<FilePath>): CommandExecutor.CommandResult =
         execute(root, fileUntrackArgs(filePaths.map { it.relativeTo(root!!) }))
 
-    override fun fileList(filePaths: List<FilePath>): CommandExecutor.CommandResult =
-        execute(root, fileListArgs(filePaths.map { it.relativeTo(root!!) }))
+    override fun fileList(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
+        execute(root, fileListArgs(filePaths.map { it.relativeTo(root!!) }, revision))
 
     override fun rebase(
         revisions: List<Revision>,

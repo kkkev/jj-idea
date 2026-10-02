@@ -361,8 +361,11 @@ interface CommandExecutor {
      * "untracked for any other reason" here, so this only answers the tracked/untracked question,
      * not why. This is the only fully reliable way to determine tracked status; see
      * docs/jj-track-untrack-model.md.
+     *
+     * With a non-default [revision], lists the paths present in that revision instead; a path
+     * absent there yields success with empty stdout (unlike `file show`, which fails).
      */
-    fun fileList(filePaths: List<FilePath>): CommandResult
+    fun fileList(filePaths: List<FilePath>, revision: Revision = WorkingCopy): CommandResult
 
     /** Lists all conflicted file paths in the given revision (infrastructure for the future Conflicts tool window). */
     fun resolveList(revision: Revision = WorkingCopy): CommandResult

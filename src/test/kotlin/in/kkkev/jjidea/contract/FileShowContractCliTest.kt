@@ -37,4 +37,21 @@ class FileShowContractCliTest : FileShowContractTest() {
 
         result.isSuccess shouldBe false
     }
+
+    // jj-idea-zf1j / GitHub #133: DiffbaseContentLoader relies on `file show` failing but
+    // `file list` succeeding with empty output for a path absent at the revision.
+
+    @Test
+    fun `file show fails but file list is empty for a path absent at the revision`() {
+        jj.createFile("base.txt", "base\n")
+        jj.newChange("base done")
+        jj.createFile("foo.rs", "foo\n")
+
+        val show = jj.run("file", "show", "-r", "@-", "foo.rs".toFileset())
+        val list = jj.run("file", "list", "-r", "@-", "foo.rs".toFileset())
+
+        show.isSuccess shouldBe false
+        list.isSuccess shouldBe true
+        list.stdout.isBlank() shouldBe true
+    }
 }

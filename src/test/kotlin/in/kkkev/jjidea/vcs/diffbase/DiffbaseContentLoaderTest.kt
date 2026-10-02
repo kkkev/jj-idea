@@ -8,10 +8,13 @@ import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
+import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.ContentInfo
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.vcs.JujutsuVirtualFile
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
@@ -20,6 +23,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
+import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -159,5 +163,56 @@ class DiffbaseContentLoaderTest {
         val old = contentInfo(revisionNumber = number, charset = StandardCharsets.UTF_8)
         val new = contentInfo(revisionNumber = number, charset = StandardCharsets.ISO_8859_1)
         loader.shouldBeUpdated(old, new) shouldBe true
+    }
+
+    // ── loadContent (jj-idea-zf1j / GitHub #133) ─────────────────────────────
+
+    private val executor = mockk<CommandExecutor>()
+
+    private fun infoWithContent(content: String?): ContentInfo {
+        val filePath: FilePath = LocalFilePath("/repo/file.txt", false)
+        val base = ChangeId("base", "base")
+        val file = mockk<VirtualFile> { every { this@mockk.charset } returns StandardCharsets.UTF_8 }
+        every { file.filePath } returns filePath
+        every { project.possibleJujutsuRepositoryFor(file) } returns repo
+        every { diffbaseService.resolve(repo) } returns base
+        every { repo.commandExecutor } returns executor
+        val revision = mockk<ContentRevision> {
+            every { revisionNumber } returns mockk()
+            every { this@mockk.content } returns content
+        }
+        every { repo.createContentRevision(filePath, base) } returns revision
+        return loader.getContentInfo(project, file)!!
+    }
+
+    private fun textOf(content: LineStatusTrackerContentLoader.TrackerContent?) =
+        content?.let { it.javaClass.getDeclaredMethod("getText").apply { isAccessible = true }.invoke(it).toString() }
+
+    @Test
+    fun `loadContent uses an empty base when the file is absent at the diff base`() {
+        every { executor.fileList(any(), any()) } returns commandResult(0, "", "Warning: No matching entries")
+
+        textOf(loader.loadContent(project, infoWithContent(null))) shouldBe ""
+    }
+
+    @Test
+    fun `loadContent drops the base when the file exists at the base but content failed to load`() {
+        every { executor.fileList(any(), any()) } returns commandResult(0, "file.txt\n")
+
+        loader.loadContent(project, infoWithContent(null)) shouldBe null
+    }
+
+    @Test
+    fun `loadContent drops the base when jj file list itself fails`() {
+        every { executor.fileList(any(), any()) } returns commandResult(1, "", "boom")
+
+        loader.loadContent(project, infoWithContent(null)) shouldBe null
+    }
+
+    @Test
+    fun `loadContent does not call jj file list when content loads`() {
+        textOf(loader.loadContent(project, infoWithContent("a\r\nb"))) shouldBe "a\nb"
+
+        verify(exactly = 0) { executor.fileList(any(), any()) }
     }
 }

@@ -2492,6 +2492,10 @@ Requires a repo with at least one immutable ancestor and a few mutable commits a
       underlying revset (`@-` / `latest(ancestors(@-) & immutable())` /
       `latest(@-- | latest(ancestors(@-) & immutable()))`); the labels themselves stay short, no
       raw revset text visible without hovering
+- [ ] jj-idea-zf1j (GitHub #133): add a file in a mutable ancestor (`echo foo>foo.rs; jj commit`),
+      then `echo bar>>foo.rs` — with base "Latest immutable ancestor" or "Previous commit", every
+      line of `foo.rs` shows an *added* marker (the file doesn't exist at the base); with
+      "Working copy parent" only the new line is marked
 - [ ] Select "Latest immutable ancestor (trunk)", click Apply — without touching the editor,
       every open file's gutter markers expand to the full diff vs trunk (not just vs `@-`)
 - [ ] jj-idea-g1io: select "Previous commit (grandparent)", click Apply — gutter markers narrow

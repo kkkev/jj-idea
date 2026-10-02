@@ -4,6 +4,7 @@ import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.text.StringUtil
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vcs.changes.ContentRevision
@@ -14,6 +15,9 @@ import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.ContentInfo
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.TrackerContent
 import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.JujutsuVirtualFile
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
@@ -62,7 +66,7 @@ class DiffbaseContentLoader : LineStatusTrackerContentLoader {
         val repo = project.possibleJujutsuRepositoryFor(file) ?: return null
         val baseRevision = DiffbaseService.getInstance(project).resolve(repo) ?: return null
         val contentRevision = repo.createContentRevision(file.filePath, baseRevision)
-        return DiffbaseContentInfo(contentRevision, file.charset)
+        return DiffbaseContentInfo(contentRevision, file.charset, repo, file.filePath, baseRevision)
     }
 
     /** Mirrors the platform's own `BaseRevisionStatusTrackerContentLoader.shouldBeUpdated`. */
@@ -75,8 +79,23 @@ class DiffbaseContentLoader : LineStatusTrackerContentLoader {
     }
 
     override fun loadContent(project: Project, contentInfo: ContentInfo): TrackerContent? {
-        val text = (contentInfo as DiffbaseContentInfo).contentRevision.content ?: return null
+        val info = contentInfo as DiffbaseContentInfo
+        val text = info.contentRevision.content
+            // `jj file show` fails when the file doesn't exist at the base (e.g. it was added after
+            // it): diff against an empty base so every line shows as added, rather than dropping
+            // the base and showing no markers (jj-idea-zf1j / GitHub #133).
+            ?: if (isAbsentAtBase(info)) "" else return null
         return DiffbaseTrackerContent(StringUtil.convertLineSeparators(text))
+    }
+
+    /**
+     * `jj file list -r <base> <path>` succeeds with empty output when the path is absent, whereas
+     * a genuine failure (jj error) is non-success — so only the former yields an empty base.
+     * Runs only when `file show` already failed: at most one extra jj call per file per reload.
+     */
+    private fun isAbsentAtBase(info: DiffbaseContentInfo): Boolean {
+        val result = info.repo.commandExecutor.fileList(listOf(info.filePath), info.base)
+        return result is CommandExecutor.CommandResult.Success && result.stdout.isBlank()
     }
 
     override fun setLoadedContent(tracker: LocalLineStatusTracker<*>, content: TrackerContent) {
@@ -87,7 +106,13 @@ class DiffbaseContentLoader : LineStatusTrackerContentLoader {
         (tracker as SimpleLocalLineStatusTracker).dropBaseRevision()
     }
 
-    private data class DiffbaseContentInfo(val contentRevision: ContentRevision, val charset: Charset) : ContentInfo
+    private data class DiffbaseContentInfo(
+        val contentRevision: ContentRevision,
+        val charset: Charset,
+        val repo: JujutsuRepository,
+        val filePath: FilePath,
+        val base: ChangeId
+    ) : ContentInfo
 
     private data class DiffbaseTrackerContent(val text: CharSequence) : TrackerContent
 }
