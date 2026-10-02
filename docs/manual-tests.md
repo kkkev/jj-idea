@@ -3183,6 +3183,7 @@ Setup: have a local bookmark that has never been pushed to the remote.
   newly selected remote/bookmark. Repeat switching remotes several times before pressing OK.
   Check Help → Show Log afterwards for any `NullPointerException` from `GitPushDialog` — there
   must be none (previously the Push button appeared completely inert after a remote switch)
+- [ ] (jj-idea-spwt) Run on the **current** jj (0.44+) and on an older pinned jj (0.37/0.39, see contributing.md). Push a bookmark that is already on the remote after moving it to a diverging commit (`jj bookmark set main -r <sibling> --allow-backwards`) → the **force-push confirmation** appears and names the bookmark; cancel → nothing is pushed. Delete a pushed bookmark (`jj bookmark delete main`) and push it → the **deletion confirmation** appears. Same result on both jj versions
 #### Push Tag (jj-idea-k9oy, GitHub #124)
 
 Setup: jj 0.44+; a repo with a Git remote (e.g. a bare repo) and a local tag (`jj tag set v1 -r @-`).

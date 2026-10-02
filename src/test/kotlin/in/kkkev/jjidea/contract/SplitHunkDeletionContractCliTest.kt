@@ -44,7 +44,10 @@ class SplitHunkDeletionContractCliTest {
             deletedPaths = setOf("gone.txt")
         ) { configArgs, tool ->
             val args = buildList {
-                configArgs.forEach { add("--config"); add(it) }
+                configArgs.forEach {
+                    add("--config")
+                    add(it)
+                }
                 addAll(listOf("split", "-r", "@", "--message=first", "--tool=$tool"))
             }
             jj.run(*args.toTypedArray())

@@ -1,0 +1,13 @@
+## sideways
+Changes to push to origin:
+  Move sideways bookmark main from 0c745389bf9b to 54c993807f4f
+Dry-run requested, not pushing.
+## delete
+Changes to push to origin:
+  Delete bookmark main from 0c745389bf9b
+Dry-run requested, not pushing.
+## add
+Warning: --allow-new is deprecated, track bookmarks manually or configure remotes.<name>.auto-track-bookmarks instead.
+Changes to push to origin:
+  Add bookmark main to 0c745389bf9b
+Dry-run requested, not pushing.

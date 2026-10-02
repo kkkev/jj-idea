@@ -185,8 +185,10 @@ fun checkAndPush(spec: GitPushDialog.GitPushSpec, project: Project, revision: Re
             return@runInBackground
         }
 
-        val forcePushBookmarks = parseForcePushBookmarks(dryRun.stderr)
-        val deletedBookmarks = parseDeletedBookmarks(dryRun.stderr)
+        // jj writes the plan to stderr today; read both so a stream change can't silently drop it.
+        val plan = dryRun.stderr + "\n" + dryRun.stdout
+        val forcePushBookmarks = parseForcePushBookmarks(plan)
+        val deletedBookmarks = parseDeletedBookmarks(plan)
 
         runLater {
             if ((forcePushBookmarks.isEmpty() && deletedBookmarks.isEmpty()) ||
@@ -259,29 +261,13 @@ internal fun parseRefusedNewBookmarks(stderr: String): List<BookmarkName> =
         .mapNotNull { REFUSING_NEW_BOOKMARK_MARKER.find(it)?.groupValues?.get(1) }
         .map { BookmarkName(it) }
 
-// jj outputs "Move sideways bookmark X from Y to Z" or "Move backward bookmark X from Y to Z"
-// for non-fast-forward pushes. Both require a force-push and must be confirmed.
-private val FORCE_PUSH_MARKERS = listOf("Move sideways bookmark ", "Move backward bookmark ")
+/** Parses dry-run output for non-fast-forward bookmark/tag moves, returning their names. */
+internal fun parseForcePushBookmarks(output: String): List<String> =
+    parsePushPlan(output).filter { it.needsForce }.map { it.name }
 
-/** Parses dry-run stderr for non-fast-forward bookmark moves, returning the bookmark names. */
-internal fun parseForcePushBookmarks(stderr: String): List<String> =
-    stderr.lines()
-        .mapNotNull { line -> FORCE_PUSH_MARKERS.firstOrNull { line.contains(it) }?.let { line to it } }
-        .map { (line, marker) -> line.substringAfter(marker).substringBefore(" from ") }
-        .filter { it.isNotEmpty() }
-
-// jj outputs "Delete bookmark X from Y" for bookmarks pending local deletion being pushed.
-private const val DELETE_MARKER = "Delete bookmark "
-
-/** Parses dry-run stderr for pending bookmark deletions, returning the bookmark names. */
-internal fun parseDeletedBookmarks(stderr: String): List<String> =
-    stderr.lines()
-        .mapNotNull { line ->
-            line.takeIf { it.contains(DELETE_MARKER) }
-                ?.substringAfter(DELETE_MARKER)
-                ?.substringBefore(" from ")
-                ?.takeIf { it.isNotEmpty() }
-        }
+/** Parses dry-run output for pending deletions, returning the bookmark/tag names. */
+internal fun parseDeletedBookmarks(output: String): List<String> =
+    parsePushPlan(output).filter { it.kind == PushAction.Kind.DELETE }.map { it.name }
 
 private fun confirmUntrackedPush(project: Project, bookmarkNames: List<String>): Boolean {
     val list = bookmarkNames.joinToString("\n") { "  • $it" }
