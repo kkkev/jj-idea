@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.actions.file
 
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.application.ApplicationManager
@@ -7,12 +8,15 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.merge.MergeSession
-import com.intellij.openapi.vcs.merge.MergeSessionEx
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.logEntry
+import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.conflict.sideDisplayLabels
+import `in`.kkkev.jjidea.ui.editor.acceptSideCommand
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.merge.JujutsuMergeProvider
 import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
@@ -104,24 +108,48 @@ class AcceptConflictCurrentSideAction : AcceptConflictSideAction(MergeSession.Re
 class AcceptConflictLastSideAction : AcceptConflictSideAction(MergeSession.Resolution.AcceptedTheirs)
 
 /**
- * Runs `jj resolve --tool` for each file via [in.kkkev.jjidea.vcs.merge.JujutsuMergeProvider]'s
- * [MergeSessionEx] - reusing its per-file `:ours`/`:theirs` orientation
- * (`ExtractedConflict.currentIsJjSide1`, GitHub #112) and modify/delete-safe write-back, the same
- * logic the platform's own `MultipleFileMergeDialog` buttons use - rather than duplicating it
- * here. Runs off the EDT since, unlike that dialog, this isn't invoked from inside a modal task.
+ * Groups [files] by (repo, [JujutsuMergeProvider.toolFor]) and runs one undo-tracked
+ * `jj resolve --tool` per group via [in.kkkev.jjidea.ui.editor.acceptSideCommand] (jj-idea-n6fz.2):
+ * the common case - every file from one rebase/merge in one repo - is a single jj op and a single
+ * Undo balloon that reverts the whole selection. Mixed orientations (GitHub #112) or repos
+ * split into a few groups, each with its own balloon reverting exactly its own op. Per-file tool
+ * selection reuses the merge provider's orientation and `:ours`/`:theirs` fallback logic, so
+ * modify/delete conflicts still delete rather than leaving empty content. Runs off the EDT since
+ * the extraction reads files.
  */
 internal fun acceptConflictSide(
     project: Project,
     files: List<VirtualFile>,
     resolution: MergeSession.Resolution,
     mergeProviderFor: (Project) -> JujutsuMergeProvider? = { it.possibleJujutsuVcs?.mergeProvider },
-    runInBackground: (() -> Unit) -> Unit = { ApplicationManager.getApplication().executeOnPooledThread(it) }
+    runInBackground: (() -> Unit) -> Unit = { ApplicationManager.getApplication().executeOnPooledThread(it) },
+    commandFor: (JujutsuRepository, List<VirtualFile>, String) -> CommandExecutor.Command.WithRepo =
+        { repo, group, tool -> acceptSideCommand(project, repo, group, tool) }
 ) {
     if (files.isEmpty()) return
     val mergeProvider = mergeProviderFor(project) ?: return
     runInBackground {
-        val session = mergeProvider.createMergeSession(files) as MergeSessionEx
-        session.acceptFilesRevisions(files, resolution)
-        session.conflictResolvedForFiles(files, resolution)
+        val noRepo = mutableListOf<VirtualFile>()
+        val groups = linkedMapOf<Pair<JujutsuRepository, String>, MutableList<VirtualFile>>()
+        for (file in files) {
+            val repo = mergeProvider.repositoryFor(file)
+            if (repo == null) {
+                noRepo += file
+                continue
+            }
+            groups.getOrPut(repo to mergeProvider.toolFor(file, resolution)) { mutableListOf() } += file
+        }
+        groups.forEach { (key, group) -> commandFor(key.first, group, key.second).executeAsync() }
+        if (noRepo.isNotEmpty()) {
+            JujutsuNotifications.notify(
+                project,
+                JujutsuBundle.message("notification.resolve.failed.title"),
+                JujutsuBundle.message(
+                    "notification.resolve.failed.message",
+                    noRepo.joinToString("\n") { "${it.name}: ${JujutsuBundle.message("merge.resolve.noRepo")}" }
+                ),
+                NotificationType.ERROR
+            )
+        }
     }
 }

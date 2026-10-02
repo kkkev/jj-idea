@@ -419,8 +419,11 @@ later, it's all in the op log" property visible in the UI at the moment a confli
 rather than requiring the user to know to look at Operation Log / `jj undo` separately.
 
 Also applies to the reframed S3's bulk "Accept Side #1"/"Accept Side #2" actions
-(`actions/file/AcceptConflictSideAction.kt`, `jj-idea-wk7p`), which currently run without undo
-tracking, same as the platform's own `MultipleFileMergeDialog` buttons they reuse.
+(`actions/file/AcceptConflictSideAction.kt`, `jj-idea-wk7p`). Shipped as `jj-idea-n6fz.2`: the
+selection is grouped by (repo, per-file `:ours`/`:theirs` tool) and each group is one
+`acceptSideCommand` - a single `jj resolve`, so a single op and a single Undo balloon (normally
+one group, hence one undo for the whole selection). The platform's own `MultipleFileMergeDialog`
+buttons still run per file without undo.
 
 Depends on S1 shipping first (nothing to attach undo to otherwise).
 

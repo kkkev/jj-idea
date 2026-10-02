@@ -11,6 +11,7 @@ import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
+import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotificationProvider
@@ -130,24 +131,29 @@ class JujutsuConflictEditorNotificationProvider : EditorNotificationProvider, Du
 
     private fun acceptSide(project: Project, file: VirtualFile, tool: String) {
         val repo = project.possibleJujutsuRepositoryFor(file) ?: return
-        acceptSideCommand(project, repo, file, tool).executeAsync()
+        acceptSideCommand(project, repo, listOf(file), tool).executeAsync()
     }
 }
 
 /**
- * The banner's "Accept <side>" command: one `jj resolve --tool` call, hence one op, so a single
- * undo balloon (jj-idea-5k16) exactly reverses it. [notify] is the undo-balloon seam for tests.
+ * An "Accept <side>" command over [files] (all in [repo]): one `jj resolve --tool` call, hence one
+ * op, so a single undo balloon (jj-idea-5k16, jj-idea-n6fz.2) exactly reverses it - for the editor
+ * banner (one file) and the bulk multi-select accept alike. [notify] is the undo-balloon seam for
+ * tests.
  */
 internal fun acceptSideCommand(
     project: Project,
     repo: JujutsuRepository,
-    file: VirtualFile,
+    files: List<VirtualFile>,
     tool: String,
     notify: (JujutsuRepository, OperationId, String) -> Unit = JujutsuNotifications::notifyUndoable
-) = repo.createCommand { resolve(listOf(repo.relativePathOf(file)), tool) }
+) = repo.createCommand { resolve(files.map { repo.relativePathOf(it) }, tool) }
     .onSuccess {
         invalidate(vfsChanged = true)
-        EditorNotifications.getInstance(project).updateNotifications(file)
+        files.forEach {
+            VcsDirtyScopeManager.getInstance(project).fileDirty(it)
+            EditorNotifications.getInstance(project).updateNotifications(it)
+        }
     }
     .onFailure { tellUser("notification.conflict.accept.error") }
     .addUndoTracking("notification.conflict.accept.undo", notify)

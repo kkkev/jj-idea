@@ -34,11 +34,18 @@ class ConflictAcceptUndoPlatformTest {
 
     private data class Notified(val operation: OperationId, val label: String)
 
-    private fun run(tool: String, result: CommandResult): List<Notified> {
+    private val file2 = mockk<VirtualFile> { every { path } returns "/repo/b.txt" }
+
+    private fun run(
+        tool: String,
+        result: CommandResult,
+        files: List<VirtualFile> = listOf(file),
+        paths: List<String> = listOf("a.txt")
+    ): List<Notified> {
         every { executor.withUndoTracking() } returns executor
-        every { executor.resolve(listOf("a.txt"), tool) } returns result
+        every { executor.resolve(paths, tool) } returns result
         val notified = mutableListOf<Notified>()
-        acceptSideCommand(project, repo, file, tool) { _, op, label -> notified += Notified(op, label) }
+        acceptSideCommand(project, repo, files, tool) { _, op, label -> notified += Notified(op, label) }
             .action(executor)
         UIUtil.dispatchAllInvocationEvents()
         return notified
@@ -49,6 +56,17 @@ class ConflictAcceptUndoPlatformTest {
         run(":theirs", CommandResult.Success.Reversible("", "", OperationId("op1"))) shouldBe
             listOf(Notified(OperationId("op1"), "Resolve conflict"))
         verify { executor.resolve(listOf("a.txt"), ":theirs") }
+    }
+
+    @Test
+    fun `bulk accept is one resolve call and one undo balloon`() {
+        run(
+            ":ours",
+            CommandResult.Success.Reversible("", "", OperationId("op2")),
+            files = listOf(file, file2),
+            paths = listOf("a.txt", "b.txt")
+        ) shouldBe listOf(Notified(OperationId("op2"), "Resolve conflict"))
+        verify(exactly = 1) { executor.resolve(listOf("a.txt", "b.txt"), ":ours") }
     }
 
     @Test

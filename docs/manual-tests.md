@@ -2704,6 +2704,10 @@ a user pick exactly which file(s) to act on instead.
       (ctrl/cmd-click), right-click: the two actions read the **shared full commit label**
       verbatim (same text as the single-file case, since every selected file names the same
       commit), not the generic "Side #1"/"Side #2"
+- [ ] With those two-or-more files still selected, click one of the accept actions
+      (jj-idea-n6fz.2): all files resolve, **one** "Resolve conflict completed." balloon with an
+      **Undo** link appears, and `jj op log` shows **one** new `resolve` op. Click Undo **once**:
+      **every** file's markers return (not just the last one)
 - [ ] Select conflicted files from **unrelated** conflicts (different commits, even if they'd
       share the same role word, e.g. two unconnected rebases both saying "(rebased revision)"),
       right-click: falls back to the generic **"Accept Side #1"** / **"Accept Side #2"** rather

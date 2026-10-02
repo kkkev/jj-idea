@@ -63,6 +63,31 @@ class JujutsuMergeProvider(
             ?: throw VcsException("Could not extract conflict data from ${file.name}")
     }
 
+    /**
+     * "Yours" isn't always jj's side #1 - a rebase conflict's panes may be reoriented so the
+     * user's own change is "Yours" even when it's jj's side #2 (GitHub #112, see
+     * [ExtractedConflict.currentIsJjSide1]). Without this, this bulk accept path would pick
+     * the opposite side from what the interactive dialog just showed for the same file.
+     * Falls back to the literal `:ours`/`:theirs` mapping when the file can no longer be
+     * extracted (e.g. already resolved externally).
+     */
+    internal fun toolFor(file: VirtualFile, resolution: MergeSession.Resolution): String {
+        val conflict = try {
+            loadConflict(file)
+        } catch (_: VcsException) {
+            null
+        }
+        val acceptingCurrent = resolution == MergeSession.Resolution.AcceptedYours
+        return when {
+            conflict == null -> if (acceptingCurrent) ":ours" else ":theirs"
+            acceptingCurrent -> conflict.toolForCurrent
+            else -> conflict.toolForLast
+        }
+    }
+
+    /** The jj repository owning [file], or null when it isn't under one. */
+    internal fun repositoryFor(file: VirtualFile): JujutsuRepository? = repoFor(file)
+
     override fun conflictResolvedForFile(file: VirtualFile) = refreshResolved(listOf(file))
 
     override fun isBinary(file: VirtualFile) = file.fileType.isBinary
@@ -132,28 +157,6 @@ class JujutsuMergeProvider(
                 }
             }
             if (failures.isNotEmpty()) reportFailures(failures)
-        }
-
-        /**
-         * "Yours" isn't always jj's side #1 - a rebase conflict's panes may be reoriented so the
-         * user's own change is "Yours" even when it's jj's side #2 (GitHub #112, see
-         * [ExtractedConflict.currentIsJjSide1]). Without this, this bulk accept path would pick
-         * the opposite side from what the interactive dialog just showed for the same file.
-         * Falls back to the literal `:ours`/`:theirs` mapping when the file can no longer be
-         * extracted (e.g. already resolved externally).
-         */
-        private fun toolFor(file: VirtualFile, resolution: MergeSession.Resolution): String {
-            val conflict = try {
-                loadConflict(file)
-            } catch (_: VcsException) {
-                null
-            }
-            val acceptingCurrent = resolution == MergeSession.Resolution.AcceptedYours
-            return when {
-                conflict == null -> if (acceptingCurrent) ":ours" else ":theirs"
-                acceptingCurrent -> conflict.toolForCurrent
-                else -> conflict.toolForLast
-            }
         }
 
         private fun reportFailures(failures: List<Pair<VirtualFile, String>>) {
