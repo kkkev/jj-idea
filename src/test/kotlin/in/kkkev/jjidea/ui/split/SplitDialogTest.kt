@@ -267,6 +267,42 @@ class SplitDialogTest {
     }
 
     @Test
+    fun `unticked deletion lands in the first commit via the deletion manifest (jj-idea-5g8h)`() {
+        val gone = deletion("src/Gone.kt")
+        val auth = change("src/Auth.kt")
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, listOf(gone, auth))
+        waitForRefresh(dialog.fileSelection)
+
+        // Auth.kt is partially picked (forces the hunk route); nothing is ticked, so Gone.kt's
+        // deletion stays with the first commit.
+        dialog.setFirstCommitOverrideForTest(LocalFilePath("src/Auth.kt", false), "partial\n")
+        dialog.performOKForTest()
+
+        val hunks = dialog.result!!.hunkSelection!!
+        hunks.deletedPaths shouldBe setOf("src/Gone.kt")
+        hunks.files.first { it.filePath == gone.filePath }.content shouldBe null
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `ticked deletion stays out of the first commit's deletion manifest (jj-idea-5g8h)`() {
+        val gone = deletion("src/Gone.kt")
+        val auth = change("src/Auth.kt")
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, listOf(gone, auth))
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.fileSelection.changesTree.setIncludedChanges(listOf(gone))
+        UIUtil.dispatchAllInvocationEvents()
+        dialog.setFirstCommitOverrideForTest(LocalFilePath("src/Auth.kt", false), "partial\n")
+        dialog.performOKForTest()
+
+        dialog.result!!.hunkSelection!!.deletedPaths shouldBe emptySet()
+        disposeDialog(dialog)
+    }
+
+    @Test
     fun `newParent mode still rejects an empty selection even with an override present`() {
         val authChange = change("src/Auth.kt")
         val changes = listOf(authChange)
@@ -745,6 +781,11 @@ class SplitDialogTest {
         commitId = CommitId(id, id),
         underlyingDescription = description
     )
+
+    private fun deletion(path: String): Change {
+        val filePath = LocalFilePath(path, false)
+        return Change(SimpleContentRevision("old", filePath, "1"), null)
+    }
 
     private fun change(path: String): Change {
         val filePath = LocalFilePath(path, false)

@@ -609,19 +609,20 @@ class SplitDialog(
         }
 
         val hunkSelection: HunkSelection? = if (isPartialSplit) {
-            // Build the parent-remainder content for every changed file.
+            // Build the first commit's content for every changed file.
             // newParent mode never reaches here - "Pick Hunks…" is hidden in that mode.
-            // Deletion-manifest handling is deferred here (isDeletion always false) - see
-            // jj-idea-4q7m's follow-up bead for Split's symmetric gap (an *unticked* deletion
-            // should land in the first commit, which today just writes an empty file instead).
+            // buildHunkSelection's "included" means "written into the staging tree", i.e. the change
+            // lands in the FIRST commit - the UNticked files here (ticked ones move to the child).
+            // Deletions of such files go through the deletion manifest (an empty `after` would
+            // otherwise be written as an empty file, jj-idea-5g8h).
             buildHunkSelection(
                 changes = allChanges,
                 root = sourceEntry.repo.directory,
                 overrides = firstCommitOverrides,
-                isIncluded = { it in tickedPaths },
-                isDeletion = { false },
-                contentFor = { change, included ->
-                    if (included) null else previewController.cachedContents(change.filePath)?.after
+                isIncluded = { it !in tickedPaths },
+                isDeletion = { it.afterRevision == null },
+                contentFor = { change, landsInFirstCommit ->
+                    if (landsInFirstCommit) previewController.cachedContents(change.filePath)?.after else null
                 }
             )
         } else {

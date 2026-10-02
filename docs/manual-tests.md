@@ -1460,6 +1460,7 @@ the right-clicked files now tick **directly**, same as "Split into New Child".
 - [ ] Click **Cancel** → closes immediately with **no confirmation dialog**; file state (tick + any prior override) unchanged
 - [ ] **Reopen "Pick Hunks…" on a file with an existing partial selection** → the Existing-commit pane opens already showing the exact prior split (the content itself resumes; no per-hunk state to reconstruct)
 - [ ] Split (linear) → new commit contains only the hunks left pointing at it; the existing commit has the rest
+- [ ] jj-idea-5g8h: change a file partially and **delete a second file** in the same change, pick hunks for the first file only, leave the deletion **unticked** → the first commit deletes the file (log details show it as deleted, not as an empty file); tick the deleted file instead → the deletion appears in the new commit and not the first
 - [ ] Log refreshes selecting the newly created change
 - [ ] **Global extension no-op check**: open any ordinary diff elsewhere (log → Show Diff, a working-copy file diff) — confirm **no arrows appear** and behavior is identical to before (the arrow overlay is registered as a plugin-wide `diff.DiffExtension`, gated to fire only inside this picker)
 
