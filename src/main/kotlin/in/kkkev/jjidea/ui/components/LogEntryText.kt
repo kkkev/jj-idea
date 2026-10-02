@@ -1,15 +1,18 @@
 package `in`.kkkev.jjidea.ui.components
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.util.io.URLUtil
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.JujutsuMessage
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.message
+import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.log.RepositoryColors
+import `in`.kkkev.jjidea.ui.log.bookmarks.divergenceText
 import kotlinx.datetime.Instant
 import java.net.URI
 import java.net.URLEncoder
@@ -121,6 +124,14 @@ internal fun bookmarkIcon(bookmark: Bookmark): KProperty0<Icon> = when {
 }
 
 /**
+ * Whether bookmark chips show their ↑n↓m counts (jj-idea-qr78, GitHub #128). Read live so the View
+ * Options toggle applies without reinstalling renderers; defaults to on when there is no
+ * Application (plain unit tests).
+ */
+internal fun showBookmarkDivergence(): Boolean = ApplicationManager.getApplication()
+    ?.let { JujutsuApplicationSettings.getInstance().state.showBookmarkDivergence } ?: true
+
+/**
  * Renders a single bookmark's chip (icon, name, strikethrough if pending deletion, ahead/behind
  * divergence) with an explicit [label] rather than [bookmark]'s own full name — used by
  * [in.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel] to show just a name's last `/`-segment
@@ -128,9 +139,10 @@ internal fun bookmarkIcon(bookmark: Bookmark): KProperty0<Icon> = when {
  */
 internal fun TextCanvas.appendBookmarkChip(bookmark: Bookmark, label: String) = colored(JujutsuColors.BOOKMARK) {
     smaller {
-        val divergence = buildString {
-            if (bookmark.aheadCount > 0) append("↑${bookmark.aheadCount}")
-            if (bookmark.behindCount > 0) append("↓${bookmark.behindCount}")
+        val divergence = if (showBookmarkDivergence()) {
+            divergenceText(bookmark.aheadCount, bookmark.behindCount)
+        } else {
+            ""
         }
         appendUnbreakable {
             append(icon(bookmarkIcon(bookmark)))

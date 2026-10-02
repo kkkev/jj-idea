@@ -134,6 +134,9 @@ class JujutsuBookmarksPanel(
                 override fun treeCollapsed(event: TreeExpansionEvent) = recordExpansion(event.path, false)
             }
         )
+        // jj-idea-qr78: the View Options "Bookmark Ahead/Behind Counts" toggle broadcasts logRefresh;
+        // cached row widths must be dropped so the chips re-measure without a full rebuild.
+        project.stateModel.logRefresh.connect(this) { tree.treeDidChange() }
         // Registered against this panel (not project.stateModel) so closing a log tab
         // unregisters these listeners along with everything else Disposer tears down for it,
         // rather than leaking them for the state model's project-wide lifetime.
@@ -640,7 +643,14 @@ class JujutsuBookmarksPanel(
                         canvas.append(" ")
                         canvas.colored(JujutsuColors.DIVERGENT) {
                             smaller {
-                                append(node.rollup.divergenceText().ifEmpty { "•" })
+                                // jj-idea-qr78: counts hidden -> keep just the "needs attention" dot.
+                                append(
+                                    if (showBookmarkDivergence()) {
+                                        node.rollup.divergenceText().ifEmpty { "•" }
+                                    } else {
+                                        "•"
+                                    }
+                                )
                             }
                         }
                     }

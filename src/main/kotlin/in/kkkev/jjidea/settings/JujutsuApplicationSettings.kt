@@ -55,5 +55,8 @@ data class JujutsuApplicationSettingsState(
     var previewAccessCode: String = "",
     // jj-idea-vpvz: comma-separated PreviewFeature ids the user has opted into, only meaningful
     // while previewAccessCode validates. See in.kkkev.jjidea.preview.PreviewEntitlement.
-    var enabledPreviewFeatures: String = ""
+    var enabledPreviewFeatures: String = "",
+    // jj-idea-qr78 (GitHub #128): display-only switch for the ↑n↓m ahead/behind counts on bookmark
+    // chips. App-level because TextCanvas.appendBookmarkChip has no Project to read from.
+    var showBookmarkDivergence: Boolean = true
 )

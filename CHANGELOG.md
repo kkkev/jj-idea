@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Split into New Parent…** is now in the log's right-click menu, right below **Split into New Child…**, instead of only being reachable from the file-tree menu. It opens the same dialog: ticked files move to a new commit inserted before the selected one, which keeps its own change ID. ([#132](https://github.com/kkkev/jj-idea/issues/132))
 - Accepting a side for several conflicted files at once is now a single jj operation with an **Undo** link in the confirmation balloon, so one click reverts the whole selection instead of only the last file.
-- In the in-editor conflict gutter (preview), jj conflict marker lines now collapse into labelled, side-coloured divider rules while your caret is outside the block (move the caret in to edit the raw markers), and a diff-style conflict section's `-`/`+` prefixes are dimmed, with removed lines struck through.
+- **Bookmark Ahead/Behind Counts** in the log's View Options menu hides the ↑n↓m numbers on bookmark chips in the log and the Bookmarks panel (a collapsed folder with unsynced bookmarks keeps a plain `•` marker, and hover tooltips still show the counts). On by default; applies to every project. ([#128](https://github.com/kkkev/jj-idea/issues/128))
 
 ### Fixed
 - A bookmark's ↑n/↓m ahead/behind arrows on the log table's chips could keep showing the previous numbers after a Refresh, only catching up on a second Refresh: the log rows and the bookmark data reload in parallel, and the rows could finish first and pick up the old counts. The chips now update as soon as the fresh bookmark data arrives. ([#128](https://github.com/kkkev/jj-idea/issues/128))

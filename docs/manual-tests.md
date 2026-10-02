@@ -208,6 +208,12 @@ since the same setting now also gates the bookmarks panel's own row tooltip - se
       hovering again shows the tooltip, no restart needed. Repeat in a file-history tab and in
       the **Working copy** tool window (same table, same global setting) — toggling it in one
       table's menu updates all of them immediately
+- [ ] Uncheck **Bookmark Ahead/Behind Counts** (jj-idea-qr78, GitHub #128; checked by default)
+      with a bookmark that's ahead/behind its tracked remote — the ↑n↓m arrows vanish at once
+      from the log's bookmark chips and from the bookmarks panel's leaves; a *collapsed* remote
+      folder with unsynced bookmarks still shows just a `•` (no number); the hover tooltip still
+      shows the counts. Re-check it — the arrows return immediately. The setting survives an IDE
+      restart and applies to every open project
 - [ ] Uncheck **Alternating Row Colors** — log window rows become uniform, no restart needed;
       open the Duplicate, Squash-into, and Rebase dialogs — their destination/source picker
       tables are also unstriped (they read the same global setting when opened). Re-check and

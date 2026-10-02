@@ -8,6 +8,7 @@ import com.intellij.openapi.actionSystem.ex.CustomComponentAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.OnePixelSplitter
@@ -23,6 +24,7 @@ import `in`.kkkev.jjidea.jj.parseRebaseSourceMode
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.preview.PreviewEntitlement
 import `in`.kkkev.jjidea.preview.PreviewFeature
+import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.log.*
@@ -532,6 +534,7 @@ abstract class CommitTablePanel<D>(
         addSeparator()
         addAction(StripedRowsAction())
         addAction(CommitTooltipsAction())
+        addAction(BookmarkDivergenceAction())
     }
 
     /**
@@ -605,6 +608,26 @@ abstract class CommitTablePanel<D>(
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {
             JujutsuSettings.getInstance(project).state.showLogHoverTooltip = state
+        }
+    }
+
+    /**
+     * Toggle for the ↑n↓m ahead/behind counts on bookmark chips (jj-idea-qr78, GitHub #128).
+     * Display-only and application-wide - the counts are still loaded, since push enablement and
+     * the bookmarks panel's roll-up marker depend on them. Broadcasts logRefresh on every open
+     * project so log tables and bookmarks panels repaint immediately.
+     */
+    private inner class BookmarkDivergenceAction : ToggleAction(
+        JujutsuBundle.message("log.action.bookmark.divergence"),
+        JujutsuBundle.message("log.action.bookmark.divergence.tooltip"),
+        null
+    ) {
+        override fun isSelected(e: AnActionEvent) =
+            JujutsuApplicationSettings.getInstance().state.showBookmarkDivergence
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            JujutsuApplicationSettings.getInstance().state.showBookmarkDivergence = state
+            ProjectManager.getInstance().openProjects.forEach { it.stateModel.logRefresh.notify(Unit) }
         }
     }
 
