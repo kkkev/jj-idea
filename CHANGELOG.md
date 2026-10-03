@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The standard **Rollback** action (Ctrl+Alt+Z / right-click → Rollback) on changed files in the Working Copy tree now actually discards them instead of doing nothing. It shows the familiar pre-checked file dialog and restores the ticked files to their state in the parent revision (`jj restore`), undoing renames at both paths, with a "Restore" balloon carrying an **Undo** link. ([#56](https://github.com/kkkev/jj-idea/issues/56), [#84](https://github.com/kkkev/jj-idea/issues/84))
+
 ## [0.8.19] - 2026-10-03
 
 ### Added

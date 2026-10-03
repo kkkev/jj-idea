@@ -28,6 +28,7 @@ open class JujutsuVcsBase(project: Project) : AbstractVcs(project, VCS_NAME) {
     private val lazyHistoryProvider by lazy { JujutsuHistoryProvider(project) }
     private val lazyAnnotationProvider by lazy { JujutsuAnnotationProvider(myProject, this) }
     private val lazyMergeProvider by lazy { JujutsuMergeProvider(myProject) }
+    private val lazyRollbackEnvironment by lazy { JujutsuRollbackEnvironment(myProject) }
 
     override fun getChangeProvider() = lazyChangeProvider
 
@@ -40,6 +41,8 @@ open class JujutsuVcsBase(project: Project) : AbstractVcs(project, VCS_NAME) {
     override fun getAnnotationProvider() = lazyAnnotationProvider
 
     override fun getMergeProvider() = lazyMergeProvider
+
+    override fun getRollbackEnvironment() = lazyRollbackEnvironment
 
     override fun getDisplayName(): String = JujutsuBundle.message("vcs.displayname")
 

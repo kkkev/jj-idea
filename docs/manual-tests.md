@@ -952,7 +952,7 @@ non-paged behavior is perceptible.
 #### Undo (jj-idea-v9zp)
 
 **Code:** `ui/services/UndoBalloon.kt`, `ui/services/JujutsuUndoService.kt`,
-`actions/undo/UndoLastOperationAction.kt`, `actions/change/abandonChangeAction.kt`,
+`vcs/JujutsuRollbackEnvironment.kt` (via `offerUndo`), `actions/undo/UndoLastOperationAction.kt`, `actions/change/abandonChangeAction.kt`,
 `ui/restore/RestoreDialog.kt` (jj-idea-g2p8)
 
 Stage 1 of the undo roadmap (docs/design/undo-support-roadmap.md). Wired to **Abandon**,
@@ -1995,7 +1995,7 @@ with the commit tooltip) the target commit's change id/commit id/author/date/des
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (jj-idea-g2p8, GitHub #84)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `vcs/JujutsuRollbackEnvironment.kt` (jj-idea-ad5d), `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (jj-idea-g2p8, GitHub #84)
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
@@ -2071,6 +2071,14 @@ with the commit tooltip) the target commit's change id/commit id/author/date/des
 - [ ] jj-idea-c2m8: same deleted-only selection → **Show File History** still opens history for
       it (see MT-DIFF's File History section); **Squash Selected Files** / **Split** offer it
       pre-ticked in their dialogs; **Open File** stays disabled (there's no file to open)
+- [ ] jj-idea-ad5d (GitHub #56/#84): modify one file, add one, delete one and rename one; select
+      them in the changed-files tree → platform **Rollback** (Ctrl+Alt+Z / right-click →
+      Rollback) → the "Rollback Changes" dialog lists them pre-checked → confirm → modified/deleted
+      files return to their @- content, the added file is gone, the rename is undone at **both**
+      paths, open editors reload, and the tree empties. Cancelling the dialog changes nothing.
+      A "Restore" balloon with an inline **Undo** link appears (one per repo); clicking it brings
+      the changes back. Also recoverable via Operations Log → Undo. In a colocated Git project, Rollback of a file under the
+      Git root still routes to Git (MT-CROSS)
 - [ ] With a clean working copy (no pending changes), Restore shows a "Nothing to restore"
       notification instead of opening an empty dialog
 - [ ] After confirming a restore, an undo balloon reading "Restore" appears with an inline

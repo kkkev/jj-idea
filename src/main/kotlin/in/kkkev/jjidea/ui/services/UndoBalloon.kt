@@ -27,17 +27,26 @@ fun WithRepo.withUndoBalloon(
     notify: (JujutsuRepository, OperationId, String) -> Unit = JujutsuNotifications::notifyUndoable
 ): WithRepo {
     val originalAction = action
-    return copy(
-        action = {
-            originalAction().also { result ->
-                (result as? CommandExecutor.CommandResult.Success.Reversible)?.let { reversible ->
-                    val label = JujutsuBundle.message(labelKey)
-                    JujutsuUndoService.getInstance(repo.project).record(repo, reversible.operation, label)
-                    runLater { notify(repo, reversible.operation, label) }
-                }
-            }
-        }
-    )
+    return copy(action = { originalAction().also { result -> offerUndo(repo, result, labelKey, notify) } })
+}
+
+/**
+ * If [result] is [CommandExecutor.CommandResult.Success.Reversible], records it with
+ * [JujutsuUndoService] and shows the Undo balloon. For callers that run the command synchronously
+ * (e.g. the platform's `RollbackEnvironment`) instead of via a [WithRepo] command; the command must
+ * have been run on an executor from [CommandExecutor.withUndoTracking].
+ */
+fun offerUndo(
+    repo: JujutsuRepository,
+    result: CommandExecutor.CommandResult,
+    labelKey: String,
+    notify: (JujutsuRepository, OperationId, String) -> Unit = JujutsuNotifications::notifyUndoable
+) {
+    (result as? CommandExecutor.CommandResult.Success.Reversible)?.let { reversible ->
+        val label = JujutsuBundle.message(labelKey)
+        JujutsuUndoService.getInstance(repo.project).record(repo, reversible.operation, label)
+        runLater { notify(repo, reversible.operation, label) }
+    }
 }
 
 /**

@@ -45,6 +45,33 @@ class MutatingCommandsContractCliTest : MutatingCommandsContractTest() {
     }
 
     @Test
+    fun `restore to parent undoes modify, add, delete and rename completely`() {
+        jj.createFile("modified.txt", "orig\n")
+        jj.createFile("deleted.txt", "gone\n")
+        jj.createFile("renamed-old.txt", "r\n")
+        jj.describe("Base")
+        jj.newChange()
+        jj.createFile("modified.txt", "changed\n")
+        jj.createFile("added.txt", "new\n")
+        java.nio.file.Files.delete(tempDir.resolve("deleted.txt"))
+        jj.renameFile("renamed-old.txt", "renamed-new.txt")
+
+        val result = jj.run(
+            "restore",
+            "-f",
+            "@-",
+            "modified.txt",
+            "added.txt",
+            "deleted.txt",
+            "renamed-old.txt",
+            "renamed-new.txt"
+        )
+
+        result.isSuccess shouldBe true
+        jj.run("diff", "--summary").stdout.trim() shouldBe ""
+    }
+
+    @Test
     fun `file untrack and re-track succeed for a path with parens and brackets when wrapped as a fileset`() {
         // `jj file untrack` requires the path to be ignored (docs/jj-track-untrack-model.md), so
         // gitignore it first. `[` and `]` are also gitignore glob meta-characters and must be
