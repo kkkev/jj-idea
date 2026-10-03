@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.19] - 2026-10-03
+
 ### Added
 - **Push Tag** is now in the right-click menu of a tag chip in the log and of a tag in the Bookmarks panel (a submenu when there are several remotes). It runs `jj git push --tag` after a confirmation prompt, and needs jj 0.44 or later — on older versions the item stays visible but disabled, and Settings lists it under Feature Availability. ([#124](https://github.com/kkkev/jj-idea/issues/124))
 - The Working Copy panel's changes toolbar gained a **Restore** button, next to Resolve all conflicts, pre-checking whatever's selected in the tree (or opening empty for the current repo when nothing's selected). "Restore" and "Restore to This" now read "Restore…"/"Restore to This…", since both open a dialog rather than acting immediately. ([#84](https://github.com/kkkev/jj-idea/issues/84))
@@ -963,7 +965,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.18...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.8.19...HEAD
+[0.8.19]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.19
 [0.8.18]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.18
 [0.8.17]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.17
 [0.8.16]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.16
