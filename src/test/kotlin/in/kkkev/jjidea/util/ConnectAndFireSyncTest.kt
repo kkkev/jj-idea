@@ -38,7 +38,10 @@ class ConnectAndFireSyncTest {
             state.connectAndFireSync(disposable) { received += it }
             received shouldBe listOf(0) // delivered synchronously, before the load completes
 
-            drainBackgroundLoads()
+            // Poll for the load rather than a fixed pump: on a loaded CI runner the pooled-thread
+            // load can take longer than drainBackgroundLoads()'s 1s budget.
+            val deadline = System.currentTimeMillis() + 15_000
+            while (received.size < 2 && System.currentTimeMillis() < deadline) drainBackgroundLoads(100)
 
             received shouldBe listOf(0, 42) // background load completed and notified
         } finally {
