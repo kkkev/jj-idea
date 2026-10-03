@@ -250,8 +250,7 @@ class UnifiedJujutsuLogDataLoader(
             pagedWindowByRepo.remove(repo)
             return repo.logCache.reload()
         }
-        val pageSize = settings.logChangeLimit(repo)
-        val window = PagedLogWindow(revset, pageSize, PagedLogWindow.firstPageSizeFor(pageSize))
+        val window = PagedLogWindow(revset, pageRows)
         val entries = fetchOnePage(repo, window)
         if (entries == null) {
             pagedWindowByRepo.remove(repo)
@@ -287,7 +286,7 @@ class UnifiedJujutsuLogDataLoader(
             )
             return null
         }
-        val page = repo.logService.getLog(revset = window.pageRevset(), limit = window.nextPageLimit()).getOrElse {
+        val page = repo.logService.getLog(revset = window.pageRevset(), limit = window.pageSize).getOrElse {
             log.warn("Failed to fetch log page for ${repo.displayName}: ${it.message}")
             return null
         }
@@ -525,11 +524,11 @@ class UnifiedJujutsuLogDataLoader(
      * read and the lock being acquired (e.g. a concurrent [loadMoreOneRepoLocked] removing the
      * window on a fetch failure).
      *
-     * jj-idea-vqpn bugfix: [window]'s [PagedLogWindow.baseRevset]/[PagedLogWindow.pageSize] are
-     * fixed at construction ([loadFirstPageOrFallbackLocked]'s call to `PagedLogWindow(...)`) and
-     * never change on their own - so the cheap splice-in-a-fresh-page-1 path below, if taken
-     * unconditionally, would keep serving the *old* repo-level revset/limit forever after a
-     * Settings change, even once [JujutsuConfigurable.apply] correctly notifies [refresh] to run.
+     * jj-idea-vqpn bugfix: [window]'s [PagedLogWindow.baseRevset] is fixed at construction
+     * ([loadFirstPageOrFallbackLocked]'s call to `PagedLogWindow(...)`) and never changes on its
+     * own - so the cheap splice-in-a-fresh-page-1 path below, if taken unconditionally, would
+     * keep serving the *old* repo-level revset forever after a Settings change (the page size is
+     * the constant [PagedLogWindow.PAGE_ROWS], not a setting, so only the revset can go stale), even once [JujutsuConfigurable.apply] correctly notifies [refresh] to run.
      * Only an explicit Refresh ([forceRefresh], which always builds a brand-new window from
      * current settings) would ever pick it up - exactly the staleness a maintainer found via
      * manual testing of this same bead. When [settings] no longer agrees with [window], treat this
@@ -540,8 +539,7 @@ class UnifiedJujutsuLogDataLoader(
      */
     private fun refreshOneRepoLocked(repo: JujutsuRepository, settings: JujutsuSettings): Boolean {
         val window = pagedWindowByRepo[repo] ?: return false
-        val staleConfig = window.baseRevset != settings.resolvedLogRevset(repo) ||
-            window.pageSize != settings.logChangeLimit(repo)
+        val staleConfig = window.baseRevset != settings.resolvedLogRevset(repo)
         if (staleConfig) {
             return try {
                 loadFirstPageOrFallbackLocked(repo, settings)
@@ -622,11 +620,10 @@ class UnifiedJujutsuLogDataLoader(
         for (repo in repos) {
             val revset = settings.resolvedLogRevset(repo)
             if (revset == Revset.Default) return null
-            val pageSize = settings.logChangeLimit(repo)
             val targetPageCount = lockFor(repo).withLock {
                 (pagedWindowByRepo[repo]?.pageCount ?: 0).coerceAtLeast(1)
             }
-            val window = PagedLogWindow(revset, pageSize, PagedLogWindow.firstPageSizeFor(pageSize))
+            val window = PagedLogWindow(revset, pageRows)
             repeat(targetPageCount) {
                 if (!window.isExhausted && fetchOnePage(repo, window) == null) return null
             }
@@ -701,6 +698,10 @@ class UnifiedJujutsuLogDataLoader(
     /** Off switch for tests that count fetches and don't want background paging interleaved. */
     @Volatile
     internal var trickleEnabled = true
+
+    /** [PagedLogWindow.PAGE_ROWS]; a var only so tests can page a short fake chain. */
+    @Volatile
+    internal var pageRows = PagedLogWindow.PAGE_ROWS
 
     /** [TricklePolicy.ROW_CAP]; a var only so tests can reach it without a 10,000-row fake. */
     @Volatile

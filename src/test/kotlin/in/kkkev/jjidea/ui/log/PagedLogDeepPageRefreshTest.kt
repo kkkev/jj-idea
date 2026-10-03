@@ -12,7 +12,6 @@ import `in`.kkkev.jjidea.jj.LogCache
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.Revset
-import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import io.kotest.matchers.shouldBe
@@ -55,13 +54,11 @@ class PagedLogDeepPageRefreshTest {
     @BeforeEach
     fun enablePaging() {
         System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 10
     }
 
     @AfterEach
     fun cleanup() {
         System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 500
         // Longer than the sibling paged-log tests' drain: these also run loadMore() and
         // forceRefresh(), leaving more pooled-thread work in flight when the project is torn down.
         drainBackgroundLoads(5_000)
@@ -127,7 +124,10 @@ class PagedLogDeepPageRefreshTest {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
         return UnifiedJujutsuLogDataLoader(projectFx.get(), { listOf(repo) }, panel)
             // jj-idea-2570.5: this test counts/orders fetches itself - no background trickle
-            .also { it.trickleEnabled = false }
+            .also {
+                it.trickleEnabled = false
+                it.pageRows = 10 // short fake chains must span several pages
+            }
     }
 
     private fun FakeRepo.hasConflictInCurrentView(changeId: String): Boolean =

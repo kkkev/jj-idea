@@ -43,13 +43,11 @@ class PagedLogTrickleTest {
     @BeforeEach
     fun enablePaging() {
         System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = pageSize
     }
 
     @AfterEach
     fun cleanup() {
         System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 500
         drainBackgroundLoads(2_000)
     }
 
@@ -98,11 +96,16 @@ class PagedLogTrickleTest {
         return Fake(repo, calls, limits)
     }
 
-    private fun loaded(fake: Fake, rowCap: Int = TricklePolicy.ROW_CAP): UnifiedJujutsuLogDataLoader {
+    private fun loaded(
+        fake: Fake,
+        rowCap: Int = TricklePolicy.ROW_CAP,
+        rows: Int = pageSize
+    ): UnifiedJujutsuLogDataLoader {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
         val loader = UnifiedJujutsuLogDataLoader(projectFx.get(), { listOf(fake.repo) }, panel)
         loader.trickleEnabled = false
         loader.trickleRowCap = rowCap
+        loader.pageRows = rows
         loader.loadCommits()
         drainBackgroundLoads(1_000)
         return loader
@@ -152,20 +155,19 @@ class PagedLogTrickleTest {
     }
 
     @Test
-    fun `a huge page size gets a small first fetch, then full-size pages`() {
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 1_000
-        val fake = fakeRepo(length = 3_000)
-        val log = loaded(fake)
-        log.trickleTick()
-        log.trickleTick()
+    fun `the page size is the constant PAGE_ROWS whatever Changes to show says`() {
+        val settings = JujutsuSettings.getInstance(projectFx.get())
+        settings.state.logChangeLimit = 10_000
+        try {
+            val fake = fakeRepo(length = 1_700)
+            val log = loaded(fake, rows = PagedLogWindow.PAGE_ROWS) // the production default
+            log.trickleTick()
+            log.trickleTick()
 
-        fake.limits shouldBe listOf(PagedLogWindow.FIRST_PAGE_ROWS, 1_000, 1_000)
-    }
-
-    @Test
-    fun `a page size below the first-page size is used as is`() {
-        val fake = fakeRepo(length = 100) // setUp's page size is 10
-        loaded(fake)
-        fake.limits shouldBe listOf(pageSize)
+            // Every fetch - the first paint included - is 500 rows, not the 10,000 setting.
+            fake.limits shouldBe List(3) { PagedLogWindow.PAGE_ROWS }
+        } finally {
+            settings.state.logChangeLimit = 500
+        }
     }
 }

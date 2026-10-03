@@ -22,8 +22,9 @@ enum class PreviewFeature(val bit: Int) {
     DRAG_AND_DROP(0),
 
     /**
-     * jj-idea-2c8k (GitHub #69), early access: loads the log in pages (each "changes to show"
-     * wide) instead of reloading the whole configured limit on every write. Off by default —
+     * jj-idea-2c8k (GitHub #69), early access: loads the log in pages (500 rows each,
+     * [in.kkkev.jjidea.ui.log.PagedLogWindow.PAGE_ROWS]; "Changes to show" no longer sets the page
+     * size) instead of reloading the whole configured limit on every write. Off by default —
      * see docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated
      * (and not-yet-validated) boundaries.
      */

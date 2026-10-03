@@ -22,20 +22,11 @@ import `in`.kkkev.jjidea.jj.Revset
  * or incrementally-inferred seed can silently drop entire branches (a bug found and fixed during
  * design; see the doc's "carry-forward-vs-recompute-fresh" note).
  */
-class PagedLogWindow(val baseRevset: Revset, val pageSize: Int, val firstPageSize: Int = pageSize) {
+class PagedLogWindow(val baseRevset: Revset, val pageSize: Int = PAGE_ROWS) {
     private val recordedPages = mutableListOf<List<LogEntry>>()
     private val shown = mutableSetOf<ChangeId>()
     private var frontier: Set<ChangeId> = emptySet()
     private var seeded = false
-
-    /**
-     * The `--limit` for the next fetch: [firstPageSize] for page 1, [pageSize] after. A smaller
-     * first page gets rows on screen quickly even when "Changes to show" is huge (jj-idea-2570.x,
-     * GitHub #69 / keycloak). Fixed for the window's whole life: [refresh][in.kkkev.jjidea.ui.log.UnifiedJujutsuLogDataLoader.refresh]
-     * re-fetches page 1 and splices it ahead of deeper pages, which is only sound if page 1 is
-     * always the same size.
-     */
-    fun nextPageLimit(): Int = if (pageCount == 0) firstPageSize else pageSize
 
     /** All entries loaded so far, in page order. */
     val entries: List<LogEntry> get() = recordedPages.flatten()
@@ -147,26 +138,16 @@ class PagedLogWindow(val baseRevset: Revset, val pageSize: Int, val firstPageSiz
 
     companion object {
         /**
-         * Rows fetched for page 1 when "Changes to show" is larger - roughly a screen-and-a-bit,
-         * so the log paints after a cheap fetch and the configured-size pages follow in the
-         * background. Tuned against the scale fixtures (scripts/fixtures/fx-scale-set.sh).
+         * Rows per page, and so per `jj log` call, for every page including the first: small enough
+         * that the log paints after a cheap fetch and a page holds the repo lock only briefly
+         * (a write's `refresh()` waits behind it), large enough to amortise jj's per-call
+         * overhead. Deliberately independent of the "Changes to show" setting, which is a hard
+         * limit for the non-paged path only - an old value of 10,000 there would otherwise make
+         * every page a 10,000-row fetch (keycloak: 1.2-1.75 s to first paint). Also the distance
+         * from the bottom at which scrolling triggers the next page. Tuned against the scale
+         * fixtures (scripts/fixtures/fx-scale-set.sh).
          */
-        const val FIRST_PAGE_ROWS = 500
-
-        /** The page-1 size to use for a window with page size [pageSize]. */
-        fun firstPageSizeFor(pageSize: Int): Int = minOf(pageSize, FIRST_PAGE_ROWS)
-
-        /** Most rows from the bottom at which the demand prefetch fires, however large [pageSize] is. */
-        const val PREFETCH_ROWS_MAX = 1000
-
-        /**
-         * How close to the end of the loaded rows the last visible row must be to trigger
-         * [in.kkkev.jjidea.ui.common.DataLoader.loadMore]: one page, but never more than
-         * [PREFETCH_ROWS_MAX]. With a page size of 10,000 an uncapped "within one page" test is
-         * true for every row of a 10,000-row log, so it would pull the whole repository in on
-         * its own.
-         */
-        fun prefetchDistance(pageSize: Int): Int = minOf(pageSize, PREFETCH_ROWS_MAX)
+        const val PAGE_ROWS = 500
 
         /**
          * Safety-valve threshold for [frontierTooWide] — a repo whose frontier ever exceeds this

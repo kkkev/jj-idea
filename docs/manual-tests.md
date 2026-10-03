@@ -863,8 +863,8 @@ not-yet-validated) boundaries. Enable via Settings → Version Control → Jujut
 (`jj-stress-test`, ~5,952 commits) for a repo large enough that the difference from the
 non-paged behavior is perceptible.
 
-- [ ] With the flag **on**, open the log: loads fast, showing the first page (page size = the
-      "Changes to show" setting); the status strip below the table stays hidden the whole time
+- [ ] With the flag **on**, open the log: loads fast, showing the first page (500 rows,
+      independent of the "Changes to show" setting); the status strip below the table stays hidden the whole time
       (no "Showing N changes" message in this mode — the scrollbar already says there's more)
 - [ ] On a wide multi-branch repo (e.g. FX-STRESS), rows whose parent didn't make it into any
       loaded page show a **faded straight line** down from the commit circle instead of nothing
@@ -873,8 +873,8 @@ non-paged behavior is perceptible.
 - [ ] Clicking that faded straight line loads and reveals the missing parent, scrolling to it
       once it arrives — see MT-LOG-GRAPH's "Long-edge navigation" (jj-idea-sc8m) subsection for
       the full hover/click behavior
-- [ ] jj-idea-2570.5 (idle trickle): on FX-STRESS (`SCALE=6 WITH_REMOTE=1`) with a small "Changes
-      to show" (e.g. 50), open the log and *leave it alone*: older history keeps loading in the
+- [ ] jj-idea-2570.5 (idle trickle): on FX-STRESS (`SCALE=6 WITH_REMOTE=1`; pages are a fixed 500
+      rows, so "Changes to show" is irrelevant), open the log and *leave it alone*: older history keeps loading in the
       background at a gentle pace (the scrollbar thumb slowly shrinks), faded stubs on screen
       connect to their parents without any scrolling or clicking, no old row ever appears ahead
       of the rows between, and the IDE stays responsive. It stops when the whole log is loaded or
@@ -910,10 +910,10 @@ non-paged behavior is perceptible.
 - [ ] Click a bookmark/reference filter entry that's currently off-screen (explicit navigation,
       not a data refresh): the viewport still scrolls to make it visible, unlike the loadMore
       case above — confirms the scroll-suppression fix didn't break real navigation
-- [ ] Raise "Changes to show" to a large value (e.g. 5,000) with the flag on: the *first* page
-      load and each subsequent scroll-triggered page cost what a fetch of that size costs, but a
-      write near `@` stays fast (post-write refresh only ever touches page 1, independent of
-      page size)
+- [ ] Raise "Changes to show" to a large value (e.g. 10,000) with the flag on: nothing changes —
+      the first paint and every page are still 500 rows (the setting only caps the non-paged
+      path), and a write near `@` stays fast. With the flag off the same setting is a hard limit
+      again (status strip and "change the limit" link return)
 
 ### MT-CTXMENU
 

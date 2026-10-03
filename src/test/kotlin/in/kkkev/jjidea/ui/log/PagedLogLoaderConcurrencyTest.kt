@@ -62,15 +62,11 @@ class PagedLogLoaderConcurrencyTest {
     @BeforeEach
     fun enablePaging() {
         System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-        // Small enough that a fake chain repo genuinely pages (the default 500 would swallow every
-        // chain below in one page, exhausting the window before loadMore() ever got a second call).
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 10
     }
 
     @AfterEach
     fun cleanup() {
         System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 500
         // The last drain before projectFixture disposes the project - generous on purpose (see
         // jj-idea-5gof): this class's fake repos do real concurrent pooled-thread work (unlike
         // most drainBackgroundLoads() callers, which only wait out JujutsuStateModel's init
@@ -182,7 +178,10 @@ class PagedLogLoaderConcurrencyTest {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
         return UnifiedJujutsuLogDataLoader(projectFx.get(), { repos.map { it.repo } }, panel)
             // jj-idea-2570.5: this test counts/orders fetches itself - no background trickle
-            .also { it.trickleEnabled = false }
+            .also {
+                it.trickleEnabled = false
+                it.pageRows = 10 // short fake chains must span several pages
+            }
     }
 
     // ─── tests ───────────────────────────────────────────────────────────────

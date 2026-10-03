@@ -32,8 +32,8 @@ private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
 /**
  * Regression coverage for jj-idea-vqpn: [UnifiedJujutsuLogDataLoader.refresh]'s cheap per-write
  * path reused an already-seeded [PagedLogWindow] unconditionally, but a [PagedLogWindow]'s
- * [PagedLogWindow.baseRevset]/[PagedLogWindow.pageSize] are fixed at construction and never
- * change on their own — so once paging was engaged, changing a repo's Log Revset (or Log Limit)
+ * [PagedLogWindow.baseRevset] is fixed at construction and never
+ * change on their own — so once paging was engaged, changing a repo's Log Revset
  * in Settings had no visible effect until an explicit Refresh (which always builds a fresh
  * window), even though [in.kkkev.jjidea.settings.JujutsuConfigurable.apply]'s
  * [in.kkkev.jjidea.jj.JujutsuStateModel.logRefresh] notification correctly triggered [refresh].
@@ -54,13 +54,11 @@ class PagedLogRevsetChangeTest {
     @BeforeEach
     fun enablePaging() {
         System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 10
     }
 
     @AfterEach
     fun cleanup() {
         System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
-        JujutsuSettings.getInstance(projectFx.get()).state.logChangeLimit = 500
         JujutsuSettings.getInstance(projectFx.get()).state.logRevset = "all()"
         drainBackgroundLoads(2_000)
     }
@@ -123,7 +121,10 @@ class PagedLogRevsetChangeTest {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
         return UnifiedJujutsuLogDataLoader(projectFx.get(), { listOf(repo) }, panel)
             // jj-idea-2570.5: this test counts/orders fetches itself - no background trickle
-            .also { it.trickleEnabled = false }
+            .also {
+                it.trickleEnabled = false
+                it.pageRows = 10 // short fake chains must span several pages
+            }
     }
 
     @Test
@@ -148,23 +149,30 @@ class PagedLogRevsetChangeTest {
     }
 
     @Test
-    fun `refresh reseeds an already-paged window when the repo's limit setting changes`() {
+    fun `refresh does not reseed when only the limit setting changes (paged page size is fixed)`() {
         val settings = JujutsuSettings.getInstance(projectFx.get())
         val fake = fakeChainRepo("a", length = 30)
         val log = loader(fake.repo)
 
-        log.loadCommits()
+        log.loadCommits() // page 1: 10 entries
         drainBackgroundLoads(1_000)
-        val headsCallsBefore = fake.logService.headsRevsets.size
-
-        settings.state.logChangeLimit = 3
-        log.refresh()
+        log.loadMore() // page 2: 20 entries total
         drainBackgroundLoads(1_000)
+        fake.storedDepths shouldContain 20
 
-        // A limit-only change also invalidates the window (PagedLogWindow.pageSize is likewise
-        // fixed at construction) - the reseed path re-runs getLogHeads even though the revset text
-        // itself didn't change.
-        (fake.logService.headsRevsets.size > headsCallsBefore) shouldBe true
+        try {
+            settings.state.logChangeLimit = 3
+            log.refresh()
+            drainBackgroundLoads(1_000)
+
+            // "Changes to show" is only the non-paged path's hard limit; the paged window's page
+            // size is PagedLogWindow.PAGE_ROWS, so a limit-only change must take the cheap
+            // page-1 splice (deeper pages kept) - the reseed path would collapse the view back to
+            // page 1 (10 entries), as it did before the page size was decoupled from the setting.
+            fake.storedDepths.last() shouldBe 20
+        } finally {
+            settings.state.logChangeLimit = 500
+        }
     }
 
     @Test
