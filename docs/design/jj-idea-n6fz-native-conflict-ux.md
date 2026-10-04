@@ -417,6 +417,15 @@ blocker is large; both are now sized. Recommend filing S4 as its own beads issue
 `jj-idea-n6fz`) scoped to: the log-shaped resolve flow, the `forceRefresh`-or-patch-in-place
 fix, and the descendant warning — with this section as its design input.
 
+**Decision (2026-10-04): S4 is not being built (`jj-idea-cmc3` closed as won't-do).** The
+standard jj workflow already covers resolving a conflicted non-`@` change, and the plugin
+supports every step: edit the conflicted change and use the existing resolve flow, or `new` on
+it, resolve, then squash. The feature would only save a click and keep `@` in place, at the cost
+of a parallel resolve flow (new dialog, `@`-descendant warning, deep-page `forceRefresh`,
+multi-op undo). `NEEDS_EDIT` therefore stays as the intended state, and its hint points users at
+the edit route. `MergeApplyMain` / `DiffEditTool.mergeToolConfigArgs` stay as tested
+infrastructure should this be revisited.
+
 ### S5 — Undo affordance
 
 Route S1's accept actions (and, if it ships, S2's per-block accepts once they trigger a snapshot)

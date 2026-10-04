@@ -11,7 +11,9 @@ package `in`.kkkev.jjidea.actions.change
  * through IntelliJ's merge dialog, which reads/writes files on disk - i.e. the working copy - so a
  * non-working-copy commit can't be resolved in place without first `jj edit`-ing it. Rather than
  * doing that edit implicitly, we surface [NEEDS_EDIT]: visible but disabled, with a hint telling
- * the user to edit the change first.
+ * the user to edit the change first. This is the intended long-term state, not a placeholder:
+ * editing (or `new` on the change, resolve, then squash) is jj's normal workflow (jj-idea-cmc3
+ * was closed as won't-do).
  */
 internal enum class ResolveAvailability(val visible: Boolean, val enabled: Boolean, val needsEditHint: Boolean) {
     HIDDEN(visible = false, enabled = false, needsEditHint = false),
