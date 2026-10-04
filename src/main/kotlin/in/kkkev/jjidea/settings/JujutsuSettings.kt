@@ -4,6 +4,7 @@ import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
+import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.project.Project
 import com.intellij.util.xmlb.XmlSerializerUtil
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -15,10 +16,20 @@ import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
 /**
  * Persistent configuration for Jujutsu plugin.
  *
+ * Stored in `.idea/workspace.xml` (per-user, not for VCS) rather than a dedicated `.idea/jujutsu.xml`,
+ * which jj would track by default (jj-idea-44db).
+ *
  * Access via: `project.getService(JujutsuSettings::class.java)`
  */
 @Service(Service.Level.PROJECT)
-@State(name = "JujutsuSettings", storages = [Storage("jujutsu.xml")])
+@State(
+    name = "JujutsuSettings",
+    storages = [
+        Storage(StoragePathMacros.WORKSPACE_FILE),
+        // jj-idea-44db: legacy location, VCS-visible. Read as fallback, cleared on next save.
+        Storage("jujutsu.xml", deprecated = true)
+    ]
+)
 class JujutsuSettings : PersistentStateComponent<JujutsuSettingsState> {
     private var state = JujutsuSettingsState()
 

@@ -3312,6 +3312,10 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 **Code:** `settings/JujutsuConfigurable.kt`, `settings/JujutsuSettings.kt`, `settings/JujutsuSettingsState.kt`, `settings/JujutsuApplicationSettings.kt`
 **Also re-run:** MT-DIFFBASE (its Diff Base group and per-repo override live in this same panel); MT-DND (its Preview features group is checked there too)
 
+- [ ] (jj-idea-44db) With a pre-existing legacy `.idea/jujutsu.xml` (e.g. non-default log change
+      limit), open the project — the value carries over; change any setting, wait for save —
+      `.idea/jujutsu.xml` is deleted, `.idea/workspace.xml` contains `JujutsuSettings`, and
+      `jj st` no longer lists `jujutsu.xml`; value persists across restart
 - [ ] JJ executable path can be configured, including via the file picker
 - [ ] Auto-refresh toggle, change ID format preference (short/long), and log change limit
       each take effect as expected, and all settings persist across IDE restarts

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Per-project plugin settings are now stored in `.idea/workspace.xml` (which the IDE already keeps out of version control) instead of `.idea/jujutsu.xml`, so they no longer show up as a change in your repo. Existing settings carry over automatically and the old file is removed the next time the IDE saves; if you had committed `.idea/jujutsu.xml`, commit its deletion.
+
 ### Fixed
 - The standard **Rollback** action (Ctrl+Alt+Z / right-click → Rollback) on changed files in the Working Copy tree now actually discards them instead of doing nothing. It shows the familiar pre-checked file dialog and restores the ticked files to their state in the parent revision (`jj restore`), undoing renames at both paths, with a "Restore" balloon carrying an **Undo** link. ([#56](https://github.com/kkkev/jj-idea/issues/56), [#84](https://github.com/kkkev/jj-idea/issues/84))
 
