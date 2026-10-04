@@ -44,6 +44,57 @@ data class HoveredEdge(
 }
 
 /**
+ * One connector occupying [lane] over rows [start]..[end] (inclusive, `start <= end`). [seq] is the
+ * order it was recorded in, so equal-length spans on a (row, lane) tie-break to the earliest.
+ */
+internal class LaneSpan(val start: Int, val end: Int, val edge: GraphEdge, val seq: Int) {
+    val length: Int get() = end - start
+}
+
+/** One lane's spans, sorted by [LaneSpan.start], with the running max of [LaneSpan.end] so a
+ * stabbing query can stop as soon as no earlier span can still reach the queried row. */
+internal class LaneSpans(sortedByStart: List<LaneSpan>) {
+    private val spans = sortedByStart
+    private val prefixMaxEnd = IntArray(spans.size).also {
+        var max = Int.MIN_VALUE
+        for (i in spans.indices) {
+            max = maxOf(max, spans[i].end)
+            it[i] = max
+        }
+    }
+
+    /**
+     * The span occupying [row]: the longest covering one, the earliest-recorded among equals (what
+     * the old per-cell `place()` kept). O(log k + spans overlapping [row]) - lanes only overlap at
+     * endpoint rows, so effectively O(log k).
+     */
+    fun at(row: Int): LaneSpan? {
+        // Last span with start <= row.
+        var lo = 0
+        var hi = spans.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (spans[mid].start <= row) lo = mid + 1 else hi = mid
+        }
+        var best: LaneSpan? = null
+        var i = lo - 1
+        while (i >= 0 && prefixMaxEnd[i] >= row) {
+            val span = spans[i]
+            if (span.end >= row &&
+                (best == null || span.length > best.length || (span.length == best.length && span.seq < best.seq))
+            ) {
+                best = span
+            }
+            i--
+        }
+        return best
+    }
+}
+
+/** Per-row answers derived from the lane spans - see [GraphEdgeIndex.passthroughLanes]/[GraphEdgeIndex.rightmostLane]. */
+private class RowSummary(val passthroughLanes: Set<Int>, val rightmostLane: Int)
+
+/**
  * Pure, font-free index over one graph layout's rows, replacing three separate O(rows)-per-call
  * passes that used to live in [JujutsuGraphAndDescriptionRenderer] (`getRowPassthroughs`) and
  * [graphTextStartX] with one shared pass, built once per graph update (jj-idea-sc8m). Also the
@@ -54,25 +105,51 @@ data class HoveredEdge(
  * every edge touching that row directly off the index instead of rescanning the whole graph above
  * it - see their docs.
  *
+ * Each edge is stored once, as a row interval on its lane (jj-idea-2570.6), not once per row it
+ * spans: the old per-(row, lane) cells made [build] and the heap O(sum of edge spans) = rows x
+ * active lanes (~557 cells/row on git/git, 5-6 s EDT freezes at ~47k rows). [build] is now
+ * O(rows + edges + sort), and per-row answers are computed on demand for the rows actually painted.
+ *
  * Built once via [build] and reused for the lifetime of one rendered graph (no invalidation logic
  * needed - a fresh index is built alongside every fresh [GraphNode] map, exactly like the
  * renderer's old per-instance cache).
  */
 class GraphEdgeIndex private constructor(
     private val rowOfKey: Map<ChangeKey, Int>,
-    private val edgesByRow: Map<Int, Map<Int, GraphEdge>>,
+    private val spansByLane: List<LaneSpans?>,
     private val incomingByRow: Map<Int, List<RowEdge>>,
     private val outgoingByRow: Map<Int, List<RowEdge>>,
     private val stubByRow: Map<Int, RowEdge>,
-    private val passthroughLanesByRow: Map<Int, Set<Int>>,
-    private val rightmostLaneByRow: Map<Int, Int>,
     private val ownLaneByRow: Map<Int, Int>,
     val operationCount: Long
 ) {
+    private val rowSummaries = java.util.concurrent.ConcurrentHashMap<Int, RowSummary>()
+
+    private fun spanAt(row: Int, lane: Int): LaneSpan? = spansByLane.getOrNull(lane)?.at(row)
+
+    private fun summaryOf(row: Int): RowSummary {
+        rowSummaries[row]?.let { return it }
+        var rightmost = -1
+        val passthrough = HashSet<Int>()
+        for (lane in spansByLane.indices) {
+            val span = spanAt(row, lane) ?: continue
+            rightmost = lane // ascending, so the last hit is the rightmost
+            // Strictly between the endpoints, and a real edge (a stub is span 0, never strictly inside).
+            if (span.edge.state == null && span.start != row && span.end != row) passthrough += lane
+        }
+        val summary = RowSummary(
+            passthrough,
+            if (rightmost >= 0) maxOf(rightmost, ownLaneByRow[row] ?: -1) else (ownLaneByRow[row] ?: 0)
+        )
+        if (rowSummaries.size >= MAX_MEMOISED_ROWS) rowSummaries.clear()
+        rowSummaries[row] = summary
+        return summary
+    }
+
     fun rowOf(key: ChangeKey): Int? = rowOfKey[key]
 
     /** The [GraphEdge] occupying [lane] at [row] (a real connector or a stub), or null. */
-    fun edgeAt(row: Int, lane: Int): GraphEdge? = edgesByRow[row]?.get(lane)
+    fun edgeAt(row: Int, lane: Int): GraphEdge? = spanAt(row, lane)?.edge
 
     /**
      * Every real edge arriving at [row] from a child row above it (`prevRow -> row`) - i.e. [row]
@@ -99,10 +176,10 @@ class GraphEdgeIndex private constructor(
      * (the pre-jj-idea-sc8m check) missed this case and painted a spurious extra vertical line
      * alongside the real diagonal at the merge row.
      */
-    fun passthroughLanes(row: Int): Set<Int> = passthroughLanesByRow[row] ?: emptySet()
+    fun passthroughLanes(row: Int): Set<Int> = summaryOf(row).passthroughLanes
 
     /** The rightmost lane active at [row] - used to place the text column after the graph. */
-    fun rightmostLane(row: Int): Int = rightmostLaneByRow[row] ?: (ownLaneByRow[row] ?: 0)
+    fun rightmostLane(row: Int): Int = summaryOf(row).rightmostLane
 
     /**
      * Map [localX] to a lane index (lanes are evenly spaced [laneWidth] apart, starting at
@@ -183,29 +260,27 @@ class GraphEdgeIndex private constructor(
          * When two edges would occupy the same (row, lane) - only possible at an endpoint row,
          * e.g. a linear chain reusing lane 0 - the longest-spanning edge wins: it's the one the
          * long-edge interaction is about.
+         *
+         * Complexity (jj-idea-2570.6): O(rows + edges) work plus an O(k log k) sort per lane,
+         * independent of how many lanes are active at once - each edge is one interval, never one
+         * entry per row it spans. [operationCount] counts rows, edges and stubs, plus spans sorted.
          */
         fun build(entries: List<GraphableEntry>, nodes: Map<ChangeKey, GraphNode>): GraphEdgeIndex {
             var operationCount = 0L
             val rowOfKey = HashMap<ChangeKey, Int>(entries.size * 2)
             entries.forEachIndexed { row, entry -> rowOfKey[entry.key] = row }
 
-            val edgesByRow = HashMap<Int, MutableMap<Int, GraphEdge>>()
-            val spanByRowLane = HashMap<Int, MutableMap<Int, Int>>() // row -> lane -> span length of edge occupying it
             val ownLaneByRow = HashMap<Int, Int>(entries.size * 2)
-            val rightmostLaneByRow = HashMap<Int, Int>(entries.size * 2)
             val incomingByRow = HashMap<Int, MutableList<RowEdge>>()
             val outgoingByRow = HashMap<Int, MutableList<RowEdge>>()
             val stubByRow = HashMap<Int, RowEdge>()
+            val spansByLane = ArrayList<MutableList<LaneSpan>?>()
+            var seq = 0
 
-            fun place(row: Int, lane: Int, edge: GraphEdge, span: Int) {
-                val existingSpan = spanByRowLane.getOrPut(row) { mutableMapOf() }[lane]
-                if (existingSpan != null && existingSpan >= span) return
-                spanByRowLane[row]!![lane] = span
-                edgesByRow.getOrPut(row) { mutableMapOf() }[lane] = edge
-            }
-
-            fun markActive(row: Int, lane: Int) {
-                rightmostLaneByRow[row] = maxOf(rightmostLaneByRow[row] ?: -1, lane)
+            fun record(lane: Int, start: Int, end: Int, edge: GraphEdge) {
+                while (spansByLane.size <= lane) spansByLane.add(null)
+                val list = spansByLane[lane] ?: mutableListOf<LaneSpan>().also { spansByLane[lane] = it }
+                list.add(LaneSpan(start, end, edge, seq++))
             }
 
             for ((row, entry) in entries.withIndex()) {
@@ -213,7 +288,6 @@ class GraphEdgeIndex private constructor(
                 val node = nodes[key] ?: continue
                 operationCount++
                 ownLaneByRow[row] = node.lane
-                markActive(row, node.lane)
 
                 // Real edges to loaded parents - same lane choice as
                 // JujutsuGraphAndDescriptionRenderer.drawLinesToParents.
@@ -226,18 +300,12 @@ class GraphEdgeIndex private constructor(
                     val lane = passThroughLane
                         ?: if (childHasMultipleParents && parentNode.lane != node.lane) parentNode.lane else node.lane
                     val edge = GraphEdge(child = key, parent = parentKey, state = null)
-                    val span = parentRow - row
                     // Recorded once per edge, not per row it spans - what a row's own paint
-                    // (jj-idea-a0wp) needs is "which edges touch my row as an endpoint", not the
-                    // full passthrough span (that's edgesByRow/passthroughLanesByRow's job below).
+                    // (jj-idea-a0wp) needs is "which edges touch my row as an endpoint"; the
+                    // passthrough extent is one interval on the lane (jj-idea-2570.6).
                     outgoingByRow.getOrPut(row) { mutableListOf() }.add(RowEdge(lane, edge))
                     incomingByRow.getOrPut(parentRow) { mutableListOf() }.add(RowEdge(lane, edge))
-                    for (r in row..parentRow) {
-                        // The actual scale-sensitive work: one increment per row this edge's span touches.
-                        operationCount++
-                        place(r, lane, edge, span)
-                        markActive(r, lane)
-                    }
+                    if (parentRow >= row) record(lane, row, parentRow, edge)
                 }
 
                 // Stub for unresolved parents - one row, `stubLane` or the row's own lane.
@@ -246,33 +314,33 @@ class GraphEdgeIndex private constructor(
                     val stubLane = node.stubLane ?: node.lane
                     val stubEdge = GraphEdge(child = key, parent = parentKey, state = state)
                     stubByRow[row] = RowEdge(stubLane, stubEdge)
-                    place(row, stubLane, stubEdge, span = 0)
-                    markActive(row, stubLane)
+                    record(stubLane, row, row, stubEdge)
                 }
             }
 
-            // Passthrough classification depends on which edge ultimately won each (row, lane) -
-            // decided over the whole loop above (longest-span-wins, see place()) - so it's derived
-            // in one post-pass over the final edgesByRow rather than tracked incrementally. Bounded
-            // by the same total placement count the main loop already paid for.
-            val passthroughLanesByRow = edgesByRow.mapValues { (row, lanes) ->
-                lanes.filterValues { edge ->
-                    edge.state == null && rowOfKey[edge.child] != row && rowOfKey[edge.parent] != row
-                }.keys
+            // When two edges would occupy the same (row, lane) - only possible at an endpoint row,
+            // e.g. a linear chain reusing lane 0 - the longest-spanning edge wins (earliest on a
+            // tie): LaneSpans.at(). Sorting is the only super-linear step: O(k log k) per lane.
+            val sorted = spansByLane.map { list ->
+                list?.let {
+                    operationCount += it.size
+                    LaneSpans(it.sortedBy { span -> span.start }) // stable: keeps seq order within a start
+                }
             }
 
             return GraphEdgeIndex(
                 rowOfKey = rowOfKey,
-                edgesByRow = edgesByRow,
+                spansByLane = sorted,
                 incomingByRow = incomingByRow,
                 outgoingByRow = outgoingByRow,
                 stubByRow = stubByRow,
-                passthroughLanesByRow = passthroughLanesByRow,
-                rightmostLaneByRow = rightmostLaneByRow,
                 ownLaneByRow = ownLaneByRow,
                 operationCount = operationCount
             )
         }
+
+        /** Per-index cap on memoised row summaries - paint touches only the visible window. */
+        private const val MAX_MEMOISED_ROWS = 512
     }
 }
 

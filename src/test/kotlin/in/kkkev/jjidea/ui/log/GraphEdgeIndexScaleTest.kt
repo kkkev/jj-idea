@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Test
  * (inherited from `Any`, never overridden here) is all [GraphEdgeIndex] needs; every other member
  * is unreachable from this test and left unimplemented.
  */
-private val TODO_REPO: JujutsuRepository = object : JujutsuRepository {
+internal val TODO_REPO: JujutsuRepository = object : JujutsuRepository {
     override val displayName get() = throw UnsupportedOperationException()
     override val project get() = throw UnsupportedOperationException()
     override val directory get() = throw UnsupportedOperationException()
@@ -93,7 +93,8 @@ class GraphEdgeIndexScaleTest {
 
         val index = GraphEdgeIndex.build(entries, nodes)
 
-        index.operationCount shouldBeLessThan (20L * n * width)
+        // jj-idea-2570.6: spans are stored once each, so this is O(n), not O(n * width).
+        index.operationCount shouldBeLessThan (8L * n)
     }
 
     @Test
@@ -121,5 +122,41 @@ class GraphEdgeIndexScaleTest {
         val bound = 20L * windowSize * width
         topWork shouldBeLessThan bound
         bottomWork shouldBeLessThan bound
+    }
+
+    // jj-idea-2570.6: a git/git-shaped graph. The layout engine itself keeps O(rows x width) lane
+    // entries for it, so keep rows x width modest - the bounds below don't need more to discriminate
+    // (the old per-cell index did ~rows x width placements here, 40x over the O(rows) bound).
+    private val wideRows = 5_000
+    private val wideWidth = 200
+    private val wideEntries by lazy {
+        (0 until wideRows).map { i ->
+            entry(i, if (i + wideWidth < wideRows) listOf(i + wideWidth) else emptyList())
+        }
+    }
+    private val wideNodes by lazy { CommitGraphBuilder().buildGraph(wideEntries) }
+
+    @Test
+    fun `very wide long-span graph (git-git shape) builds in O(rows + edges), independent of lane count`() {
+        val index = GraphEdgeIndex.build(wideEntries, wideNodes)
+
+        index.operationCount shouldBeLessThan (8L * wideRows)
+    }
+
+    @Test
+    fun `per-row paint queries on a very wide graph are bounded by lanes, independent of row offset`() {
+        val index = GraphEdgeIndex.build(wideEntries, wideNodes)
+
+        // Each summary touches every lane once (binary search per lane) - cost is lanes, never rows.
+        val windowSize = 60
+        val windows = listOf(
+            0 until windowSize,
+            (wideRows / 2) until (wideRows / 2 + windowSize),
+            (wideRows - windowSize) until wideRows
+        )
+        windows.forEach { window ->
+            val lanes = window.sumOf { r -> index.passthroughLanes(r).size + index.rightmostLane(r) }
+            lanes shouldBeLessThan windowSize * 2 * (wideWidth + 2)
+        }
     }
 }
