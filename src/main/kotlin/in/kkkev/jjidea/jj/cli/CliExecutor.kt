@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * `--ignore-working-copy` is deliberate and non-optional: reading the op log must never itself
@@ -1186,16 +1187,29 @@ class CliExecutor(
         val stderr = ProcessIOExecutorService.INSTANCE.submit<ByteArray> {
             process.errorStream.use { it.readAllBytes() }
         }
+        // One deadline covers the exit wait and both reader joins: a grandchild that inherits the
+        // pipes and outlives jj would otherwise keep a reader (and this caller) blocked forever.
+        val deadline = startTime + timeout
+        fun timedOut(): Nothing {
+            process.destroyForcibly()
+            log.warn("jj $cmdName timed out after ${timeout}ms")
+            val seconds = TimeUnit.MILLISECONDS.toSeconds(timeout)
+            throw VcsException(JujutsuBundle.message("cli.error.timeout", cmdName, seconds.toString()))
+        }
+        fun remaining() = (deadline - System.currentTimeMillis()).coerceAtLeast(0)
         try {
-            if (!process.waitFor(timeout, TimeUnit.MILLISECONDS)) {
-                process.destroyForcibly()
-                log.warn("jj $cmdName timed out after ${timeout}ms")
-                val seconds = TimeUnit.MILLISECONDS.toSeconds(timeout)
-                throw VcsException(JujutsuBundle.message("cli.error.timeout", cmdName, seconds.toString()))
-            }
+            if (!process.waitFor(timeout, TimeUnit.MILLISECONDS)) timedOut()
             val exitCode = process.exitValue()
-            val bytes = stdout.get()
-            val errorText = String(stderr.get(), StandardCharsets.UTF_8)
+            val bytes = try {
+                stdout.get(remaining(), TimeUnit.MILLISECONDS)
+            } catch (_: TimeoutException) {
+                timedOut()
+            }
+            val errorText = try {
+                String(stderr.get(remaining(), TimeUnit.MILLISECONDS), StandardCharsets.UTF_8)
+            } catch (_: TimeoutException) {
+                timedOut()
+            }
             log.info(
                 "Completed in ${workingDir?.path ?: "."}: jj $cmdName [bytes] in " +
                     "${System.currentTimeMillis() - startTime}ms (exit=$exitCode, ${bytes.size} bytes)"
@@ -1213,6 +1227,10 @@ class CliExecutor(
         } catch (e: java.util.concurrent.ExecutionException) {
             process.destroyForcibly()
             throw VcsException("Failed to read output of jj $cmdName: ${e.cause?.message}", e.cause ?: e)
+        } finally {
+            // No-ops once the readers are done; frees the pooled threads on every failure path.
+            stdout.cancel(true)
+            stderr.cancel(true)
         }
     }
 
