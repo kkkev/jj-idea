@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 This plugin now supports drag-and-drop: rebase, duplicate, move bookmarks and tags, and squash or split files by dragging them in the log, the bookmarks panel and the changes tree.
 
 ### Added
+- **Copy Commit ID** in the log's right-click menu copies the full Git commit hash. **Copy Change ID** and **Copy Commit ID** can now be bound to keyboard shortcuts in Settings → Keymap. ([#137](https://github.com/kkkev/jj-idea/issues/137))
 - **Drag and drop** in the log: drag a commit onto another commit to rebase it there (drop on the middle of a row to rebase onto it, near the top or bottom edge to insert it after or before). Hold the copy modifier (Option on macOS, Ctrl on Windows/Linux) to duplicate instead. Three buttons next to View Options choose whether a drag moves just that commit, it and its descendants, or its whole branch. Every change shows an Undo option. ([#93](https://github.com/kkkev/jj-idea/issues/93), [#97](https://github.com/kkkev/jj-idea/issues/97))
 - Drag a bookmark or tag chip, from the log, the bookmarks panel or the commit details, onto a commit to move it there. Drag a local bookmark onto its own remote-tracking bookmark to open Git Push pre-filled. Drag the working-copy `@` marker onto a commit to edit it, or just above a commit to create a new change on top of it.
 - Drag a file selection from the Working Copy panel or a commit's details onto another commit to open Squash pre-filled, or just above or below its own change to open Split pre-filled.

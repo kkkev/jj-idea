@@ -67,8 +67,9 @@ object JujutsuLogContextMenuActions {
         add(compareBeforeWithRevisionAction(project, entry?.takeIf { it.parentIds.isNotEmpty() }))
         addSeparator()
 
-        entry?.run { add(copyIdAction(id)) }
-        add(copyDescriptionAction(entry?.description?.actual))
+        add(ManagedActions["Jujutsu.CopyChangeId"])
+        add(ManagedActions["Jujutsu.CopyCommitId"])
+        add(ManagedActions["Jujutsu.CopyDescription"])
         addSeparator()
 
         // Offer "New Change From This/These" if all entries are in the same root.

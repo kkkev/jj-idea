@@ -238,6 +238,12 @@
       <keyboard-shortcut first-keystroke="meta shift E" keymap="Mac OS X 10.5+"/>
     </action>
 
+    <!-- Actions to copy various fields of a log entry (jj-idea-mavt, GitHub #137): keymap-assignable, unbound by
+         default. Read the selected entry from the log; the context menu references them by id. -->
+    <action id="Jujutsu.CopyChangeId" class="in.kkkev.jjidea.actions.change.CopyChangeIdAction"/>
+    <action id="Jujutsu.CopyCommitId" class="in.kkkev.jjidea.actions.change.CopyCommitIdAction"/>
+    <action id="Jujutsu.CopyDescription" class="in.kkkev.jjidea.actions.change.CopyDescriptionAction"/>
+
     <!-- "Describe": edits the selected change's description. Log toolbar button (GitHub #78);
          the context-menu entry is the same registered action. -->
     <action id="Jujutsu.DescribeChangeToolbar" class="in.kkkev.jjidea.actions.change.DescribeChangeAction">

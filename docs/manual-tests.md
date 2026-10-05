@@ -956,6 +956,8 @@ non-paged behavior is perceptible.
 
 - [ ] Right-click opens context menu
 - [ ] **Copy Change ID** works and copies to clipboard
+- [ ] **Copy Commit ID** copies the full 40-char hex commit id (jj-idea-mavt, GitHub #137)
+- [ ] **Copy Change ID** / **Copy Commit ID** appear under Settings → Keymap (search "Copy Change ID"), unbound by default; assign a shortcut to each, select a log row, and the shortcut copies the right id (and does nothing outside the log). The menu items show the assigned shortcut hint
 - [ ] **Copy Description** works and copies to clipboard
 - [ ] **New Change From This** (primary, no dialog) creates new change directly and refreshes
 - [ ] **New Change...** (secondary) opens the New Change dialog and creates the change

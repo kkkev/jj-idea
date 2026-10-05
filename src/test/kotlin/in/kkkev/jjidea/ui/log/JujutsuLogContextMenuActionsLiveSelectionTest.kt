@@ -51,7 +51,10 @@ class JujutsuLogContextMenuActionsLiveSelectionTest {
             "Jujutsu.RebaseChangeToolbar",
             "Jujutsu.DescribeChangeToolbar",
             "Jujutsu.MoveChangeUp",
-            "Jujutsu.MoveChangeDown"
+            "Jujutsu.MoveChangeDown",
+            "Jujutsu.CopyChangeId",
+            "Jujutsu.CopyCommitId",
+            "Jujutsu.CopyDescription"
         ).forEach { (ids.contains(it)) shouldBe true }
     }
 
