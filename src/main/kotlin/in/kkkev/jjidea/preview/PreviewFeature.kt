@@ -18,8 +18,7 @@ import `in`.kkkev.jjidea.util.snakeToCamelCase
  * a still-valid old code silently grant whatever new feature claims the bit.
  */
 enum class PreviewFeature(val bit: Int) {
-    /** Drag-and-drop graph operations in the log table and related panels (jj-idea-6oeg). */
-    DRAG_AND_DROP(0),
+    /** bit 0 retired (was DRAG_AND_DROP, graduated in jj-idea-jxii) - never reuse */
 
     /**
      * jj-idea-2c8k (GitHub #69), early access: loads the log in pages (500 rows each,

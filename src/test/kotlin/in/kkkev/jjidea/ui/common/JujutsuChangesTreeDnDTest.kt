@@ -15,15 +15,12 @@ import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
-private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
-
 /**
  * Coverage for [JujutsuChangesTree.installFilesDragSource] (jj-idea-yvry, -b2oi): the pure
- * [filesDragPayload] hit-test, and the [PreviewFeature.DRAG_AND_DROP]-gated install itself -
+ * [filesDragPayload] hit-test, and the install itself -
  * mirroring [in.kkkev.jjidea.ui.log.JujutsuLogTableDnDTest]'s coverage of
  * [in.kkkev.jjidea.ui.log.installDragAndDrop] for the log table's own source.
  */
@@ -33,11 +30,6 @@ private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
 class JujutsuChangesTreeDnDTest {
     private val project = projectFixture()
     private val repo = mockk<JujutsuRepository>(relaxed = true)
-
-    @AfterEach
-    fun cleanUp() {
-        System.clearProperty(PREVIEW_PROPERTY)
-    }
 
     private fun entry(id: String) = LogEntry(
         repo = repo,
@@ -90,23 +82,15 @@ class JujutsuChangesTreeDnDTest {
 
     // endregion
 
-    // region gating
+    // region install
 
     @Test
-    fun `installFilesDragSource does not throw with the preview feature off`() {
-        val tree = treeWith(listOf(change("/a")))
-
-        tree.installFilesDragSource(project.get()) { entry("aaaaaaaa") }
-    }
-
-    @Test
-    fun `installFilesDragSource does not throw with the preview feature on`() {
-        System.setProperty(PREVIEW_PROPERTY, "true")
+    fun `installFilesDragSource does not throw`() {
         val tree = treeWith(listOf(change("/a")))
 
         // DnDManager is a no-op in tests (HeadlessDnDManager, same as JujutsuLogTableDnDTest), so
         // there's no client-property-style signal that install() actually ran (unlike
-        // installDragAndDrop's SmoothAutoScroller side effect) - this only asserts the gated call
+        // installDragAndDrop's SmoothAutoScroller side effect) - this only asserts the call
         // itself is safe; filesDragPayload above covers the actual behaviour the builder wires up.
         tree.installFilesDragSource(project.get()) { entry("aaaaaaaa") }
     }

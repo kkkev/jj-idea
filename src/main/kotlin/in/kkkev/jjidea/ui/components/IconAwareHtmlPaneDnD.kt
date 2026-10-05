@@ -5,8 +5,6 @@ import com.intellij.ide.dnd.DnDSupport
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.preview.PreviewEntitlement
-import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
 import `in`.kkkev.jjidea.ui.dnd.bookmarkTargets
 import `in`.kkkev.jjidea.ui.dnd.chipDragImage
@@ -34,13 +32,8 @@ import java.awt.Point
  * ([LogClickTarget.resolve] needs one to know which entry's bookmark/tag a name matched) - the
  * same list [in.kkkev.jjidea.ui.log.JujutsuCommitDetailsPanel]'s own right-click handler already
  * resolves against.
- *
- * Guarded behind [PreviewFeature.DRAG_AND_DROP] (jj-idea-vpvz), exactly like the other two install
- * sites - no `DnDSupport` is registered at all unless the feature is enabled.
  */
 fun IconAwareHtmlPane.installRefDragSource(parent: Disposable, project: Project, entries: () -> List<LogEntry>) {
-    if (!PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) return
-
     DnDSupport.createBuilder(this)
         .disableAsTarget()
         .setBeanProvider { info -> refDragPayload(info.point, project, entries())?.let { DnDDragStartBean(it) } }

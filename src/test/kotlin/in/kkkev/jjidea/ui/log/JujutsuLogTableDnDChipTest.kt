@@ -19,22 +19,17 @@ import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.awt.Point
 import java.awt.event.MouseEvent
 import org.junit.jupiter.api.Tag as JupiterTag
-
-private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
 
 /**
  * Platform-level coverage for [JujutsuLogTable.dragPayloadAt] and [dropTargetAt]'s chip handling
  * (jj-idea-ibth, -vdwh) against a real, laid-out [JujutsuLogTable] - the chip geometry these two
  * rely on ([JujutsuLogTable.clickTargetAt]) already has its own coverage in
  * [JujutsuLogTableBookmarkClickTest]; this only covers the drag/drop-specific dispatch on top of
- * it. Mirrors [JujutsuLogTableDnDTest]'s fixture (real preview-feature gating isn't exercised
- * here, only the pure hit-test functions, so the preview system property is set purely so
- * `installDragAndDrop` doesn't matter either way).
+ * it. Mirrors [JujutsuLogTableDnDTest]'s fixture.
  */
 @JupiterTag("platform")
 @TestApplication
@@ -57,14 +52,8 @@ class JujutsuLogTableDnDChipTest {
     }
     private var table: JujutsuLogTable? = null
 
-    @BeforeEach
-    fun enablePreview() {
-        System.setProperty(PREVIEW_PROPERTY, "true")
-    }
-
     @AfterEach
     fun cleanUp() {
-        System.clearProperty(PREVIEW_PROPERTY)
         table?.let {
             it.dispatchEvent(MouseEvent(it, MouseEvent.MOUSE_EXITED, System.currentTimeMillis(), 0, -1, -1, 0, false))
         }

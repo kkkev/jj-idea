@@ -317,20 +317,12 @@ abstract class CommitTablePanel<D>(
 
     private fun createActionGroup(): BackgroundActionGroup {
         val primary = primaryActions()
-        // jj-idea-d3u5: preview-gated, same check as JujutsuLogTableDnD.installDragAndDrop's
-        // guard - built once at panel construction (this whole toolbar is), so it carries the
-        // same "a preview toggle change needs the table re-created to take effect" caveat every
-        // other drag-and-drop preview-gated seam already has.
-        val dragScope = if (PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) {
-            arrayOf(
-                DragScopeAction(RebaseSourceMode.REVISION, AllIcons.Vcs.CommitNode),
-                DragScopeAction(RebaseSourceMode.SOURCE, AllIcons.General.Tree),
-                DragScopeAction(RebaseSourceMode.BRANCH, AllIcons.Vcs.Branch),
-                Separator.create()
-            )
-        } else {
-            emptyArray()
-        }
+        val dragScope = arrayOf(
+            DragScopeAction(RebaseSourceMode.REVISION, AllIcons.Vcs.CommitNode),
+            DragScopeAction(RebaseSourceMode.SOURCE, AllIcons.General.Tree),
+            DragScopeAction(RebaseSourceMode.BRANCH, AllIcons.Vcs.Branch),
+            Separator.create()
+        )
         return BackgroundActionGroup(
             *primary.toTypedArray(),
             *(if (primary.isEmpty()) emptyArray() else arrayOf(Separator.create())),

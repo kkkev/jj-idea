@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This plugin now supports drag-and-drop: rebase, duplicate, move bookmarks and tags, and squash or split files by dragging them in the log, the bookmarks panel and the changes tree.
+
 ### Added
+- **Drag and drop** in the log: drag a commit onto another commit to rebase it there (drop on the middle of a row to rebase onto it, near the top or bottom edge to insert it after or before). Hold the copy modifier (Option on macOS, Ctrl on Windows/Linux) to duplicate instead. Three buttons next to View Options choose whether a drag moves just that commit, it and its descendants, or its whole branch. Every change shows an Undo option. ([#93](https://github.com/kkkev/jj-idea/issues/93), [#97](https://github.com/kkkev/jj-idea/issues/97))
+- Drag a bookmark or tag chip, from the log, the bookmarks panel or the commit details, onto a commit to move it there. Drag a local bookmark onto its own remote-tracking bookmark to open Git Push pre-filled. Drag the working-copy `@` marker onto a commit to edit it, or just above a commit to create a new change on top of it.
+- Drag a file selection from the Working Copy panel or a commit's details onto another commit to open Squash pre-filled, or just above or below its own change to open Split pre-filled.
+- While dragging, a label follows the cursor naming what you're dragging and a hint says what dropping would do ("Rebase abc onto def") or why it isn't allowed ("Cannot drop across repositories", "… is immutable").
 - IntelliJ **Tasks** integration: with the Tasks plugin, opening a task can create a bookmark for it (the task's commit message becomes the new change's description), "Use branch" switches to an existing bookmark, and switching or closing tasks moves your working copy between them. Switching goes to the latest change in the task's stack (or starts a new change on top if the bookmark is immutable), and uncommitted edits are never lost because jj snapshots them. Closing a task with "Merge branch" ticked asks whether to rebase the whole task stack onto the original, make a merge change, or just switch back, and moves the task bookmark (and a mutable original bookmark) forward; the task bookmark is never deleted. ([#102](https://github.com/kkkev/jj-idea/issues/102))
 
 ### Changed

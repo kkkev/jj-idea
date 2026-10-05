@@ -7,7 +7,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
-private const val PROPERTY = "jjidea.preview.dragAndDrop"
+private const val PROPERTY = "jjidea.preview.conflictGutter"
 
 // Runs against the sandboxed plugin jar, which bundles only src/main/resources - so unlike the
 // plain-unit-test AccessCodeTest (which shadows that resource from src/test/resources), this uses
@@ -36,43 +36,43 @@ class PreviewEntitlementTest {
 
     @Test
     fun `default is off`() {
-        entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe false
+        entitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) shouldBe false
     }
 
     @Test
     fun `system property turns the feature on with no code`() {
         System.setProperty(PROPERTY, "true")
-        entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe true
+        entitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) shouldBe true
     }
 
     @Test
     fun `a valid code without the toggle is off`() {
         val state = JujutsuApplicationSettings.getInstance().state
         state.previewAccessCode = VALID_CODE
-        entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe false
+        entitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) shouldBe false
     }
 
     @Test
     fun `the toggle without a valid code is off`() {
         val state = JujutsuApplicationSettings.getInstance().state
-        state.enabledPreviewFeatures = PreviewFeature.DRAG_AND_DROP.id
-        entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe false
+        state.enabledPreviewFeatures = PreviewFeature.CONFLICT_GUTTER.id
+        entitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) shouldBe false
     }
 
     @Test
     fun `an invalid code with the toggle is off`() {
         val state = JujutsuApplicationSettings.getInstance().state
         state.previewAccessCode = "wrong-code"
-        state.enabledPreviewFeatures = PreviewFeature.DRAG_AND_DROP.id
-        entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe false
+        state.enabledPreviewFeatures = PreviewFeature.CONFLICT_GUTTER.id
+        entitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) shouldBe false
     }
 
     @Test
     fun `a valid code with the toggle is on`() {
         val state = JujutsuApplicationSettings.getInstance().state
         state.previewAccessCode = VALID_CODE
-        state.enabledPreviewFeatures = PreviewFeature.DRAG_AND_DROP.id
-        entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe true
+        state.enabledPreviewFeatures = PreviewFeature.CONFLICT_GUTTER.id
+        entitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) shouldBe true
     }
 
     @Test
@@ -80,11 +80,11 @@ class PreviewEntitlementTest {
         System.setProperty(PROPERTY, "true")
         val state = JujutsuApplicationSettings.getInstance().state
         state.previewAccessCode = "wrong-code"
-        entitlement.isEnabled(PreviewFeature.DRAG_AND_DROP) shouldBe true
+        entitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) shouldBe true
     }
 
     @Test
-    fun `the legacy shipped code also grants PAGED_LOG_LOAD, not just DRAG_AND_DROP`() {
+    fun `the legacy shipped code also grants PAGED_LOG_LOAD, not just CONFLICT_GUTTER`() {
         val state = JujutsuApplicationSettings.getInstance().state
         state.previewAccessCode = VALID_CODE
         state.enabledPreviewFeatures = PreviewFeature.PAGED_LOG_LOAD.id

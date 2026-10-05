@@ -194,7 +194,7 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 - [ ] Date (rightmost) can be resized by dragging its right edge, same as any other column, and
       isn't noticeably narrower than the other fixed columns with "Fit columns to window width" on
 - [ ] Column widths and visibility both persist across IDE restarts
-- [ ] With drag-and-drop preview enabled (jj-idea-vpvz): a mostly-vertical drag on a commit row
+- [ ] A mostly-vertical drag on a commit row
       still starts a commit drag/drop (e.g. rebase), not a column reorder
 
 #### View options menu (jj-idea-lgo4, n22a)
@@ -3316,7 +3316,7 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 **Settings panel**
 
 **Code:** `settings/JujutsuConfigurable.kt`, `settings/JujutsuSettings.kt`, `settings/JujutsuSettingsState.kt`, `settings/JujutsuApplicationSettings.kt`
-**Also re-run:** MT-DIFFBASE (its Diff Base group and per-repo override live in this same panel); MT-DND (its Preview features group is checked there too)
+**Also re-run:** MT-DIFFBASE (its Diff Base group and per-repo override live in this same panel); MT-DND (drag and drop is no longer gated by the Preview features group)
 
 - [ ] (jj-idea-44db) With a pre-existing legacy `.idea/jujutsu.xml` (e.g. non-default log change
       limit), open the project — the value carries over; change any setting, wait for save —
@@ -3462,7 +3462,7 @@ file), which no automated test can supply — see contributing.md § Manual regr
       either `PREVIEW_CODE_KEY` set, or the local key at `~/.config/jj-idea/preview-code-key` that
       `previewCode keygen`/`mint` use by default — e.g. minted for yourself via `./gradlew
       previewCode --args="mint --features pagedLogLoad"`), click Apply, reopen Settings — no
-      status line, and only that one feature's checkbox appears (no Drag and Drop checkbox)
+      status line, and only that one feature's checkbox appears
 - [ ] Mint a `JJP1` code with `--expires` set to a future month, enter it — a "Valid through ..."
       line appears above its checkbox(es)
 - [ ] Mint a `JJP1` code with `--expires` set to last month, enter it — a "This code expired on
@@ -3474,17 +3474,15 @@ file), which no automated test can supply — see contributing.md § Manual regr
 
 ### MT-DND
 
-**Drag-and-drop preview gating (jj-idea-vpvz)**
+**Availability (graduated from preview, jj-idea-jxii)**
 
-**Code:** `preview/PreviewFeature.kt`, `preview/PreviewEntitlement.kt`, `preview/AccessCode.kt`, `ui/log/JujutsuLogTableDnD.kt`
+**Code:** `ui/log/JujutsuLogTableDnD.kt`, `ui/common/JujutsuChangesTreeDnD.kt`, `ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`, `ui/components/IconAwareHtmlPaneDnD.kt`
 
-- [ ] With no access code entered and no `-Djjidea.preview.dragAndDrop` system property: open the
-      Jujutsu log and try to drag a commit row — nothing initiates, no drag cursor, no indicator
-- [ ] Enter a valid access code in Settings → Preview features, tick Drag and Drop, click Apply,
-      then **restart the IDE** (or reopen the project) — dragging a commit row now initiates
-- [ ] Untick Drag and Drop (or clear the code) and restart again — dragging stops initiating
-- [ ] Launch with `-Djjidea.preview.dragAndDrop=true` and no access code — dragging initiates
-      (the dev/CI escape hatch)
+- [ ] With no access code entered and no `jjidea.preview.*` system property: open the Jujutsu log
+      and drag a commit row — the drag initiates (drag label, drop hint)
+- [ ] The same with no code in the bookmarks panel, the Working Copy changes tree and a bookmark
+      chip in the commit details panel
+- [ ] Settings → Preview features has no Drag and Drop checkbox, even with a valid legacy code
 
 #### Drag image (mirrors the Project view's file drag)
 
@@ -3700,9 +3698,7 @@ source's content).
 `ui/dnd/DropPerformers.kt`, `actions/filechange/SquashIntoFilesAction.kt`
 (`performFileSquashInto`), `actions/filechange/SplitFilesAction.kt` (`performFileSplit`)
 
-- [ ] With the preview feature off, select files in the Working Copy panel's changes tree and try
-      to drag them — nothing initiates, same as the log table with the feature off
-- [ ] With the feature on: select one or more files in the **Working Copy** panel's changes tree,
+- [ ] Select one or more files in the **Working Copy** panel's changes tree,
       drag onto another mutable commit's **centre** band — tooltip names the squash, release opens
       **Squash Into** pre-filled with those files ticked and that commit as the fixed destination
       (not a free picker); confirm with `jj log`/`jj status` after accepting
@@ -3764,7 +3760,6 @@ the case this bead exists for.
       Confirm with `jj bookmark list` that the conflict is actually gone afterwards
 - [ ] Dragging a bookmark/tag node shows the same small cursor-following chip label the log table's
       own chip drag shows
-- [ ] With the preview feature off, try dragging a node in the panel → nothing initiates
 
 #### Push by dragging local onto remote, within the panel (jj-idea-3xab)
 
@@ -3795,7 +3790,6 @@ unaffected.
       text selection works for that second gesture (confirms the suppression doesn't stick)
 - [ ] Right-click on a chip in this pane still shows its usual ref context menu (Move/Push/Delete/
       etc.) - unaffected by the new drag source
-- [ ] With the preview feature off, try dragging a chip out of the details pane → nothing initiates
 
 #### Drag the `@` marker: edit or new-on-top by zone (jj-idea-pk2c, redesigned by jj-idea-d3u5)
 
@@ -3825,7 +3819,6 @@ operation for `@`.
 - [ ] In a multi-root project, drag `@` from one repo's row onto a row from a different repo → same
       filled reject indicator as a commit drag
 - [ ] Dragging `@` shows a small cursor-following chip labelled "@" in the usual working-copy color
-- [ ] With the preview feature off, try dragging the `@` marker → nothing initiates
 - [ ] Regression: the status-bar **Switch Working Copy** popup (click path, not drag) still works
       exactly as before - it still asks its "Edit / New on Top / Cancel" dialog (a click has no
       zone to read the operation from) and still shows an undo balloon on success
@@ -3876,7 +3869,6 @@ uses.
       `jj duplicate` has no `-s`/`-b` axis, so the selector is inert for a copy-modifier drag -
       confirm with `jj log` that descendants were *not* duplicated
 - [ ] Change the selection, close and reopen the project (or restart the IDE) → the choice persisted
-- [ ] With the Drag and Drop preview feature off, all three icon buttons are entirely absent
 
 ### MT-TASKS
 

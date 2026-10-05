@@ -16,8 +16,6 @@ import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.parseRebaseSourceMode
-import `in`.kkkev.jjidea.preview.PreviewEntitlement
-import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.components.FragmentRecordingCanvas
@@ -74,15 +72,8 @@ import java.awt.image.BufferedImage
  * [RejectOverlay] indicator, not just the platform's native reject cursor - see
  * [RejectOverlay.show]'s doc for why the cursor (and even `DnDEvent.setHighlighting`) alone isn't
  * reliable feedback (jj-idea-ymuu).
- *
- * Guarded behind [PreviewFeature.DRAG_AND_DROP] (jj-idea-vpvz): installs nothing at all - no
- * `DnDSupport`, no drag ever initiates - unless the feature is enabled. Guarded here, at install
- * time, not per-drop, so a disabled preview feature costs nothing at drag time and can't
- * half-work; a toggle change needs the table re-created (e.g. an IDE restart) to take effect.
  */
 internal fun JujutsuLogTable.installDragAndDrop(parent: Disposable) {
-    if (!PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) return
-
     val hysteresis = ZoneHysteresis()
     val dragContextHolder = DragContextHolder()
     val performer = DropPerformers.forLogTable(project)

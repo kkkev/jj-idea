@@ -16,14 +16,11 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import java.awt.Point
 import java.awt.event.MouseEvent
 import javax.swing.text.Element
 import org.junit.jupiter.api.Tag as JupiterTag
-
-private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
 
 /**
  * Coverage for [IconAwareHtmlPane.refDragPayload]/[installRefDragSource] (jj-idea-4ji7, batch 4)
@@ -48,11 +45,6 @@ class IconAwareHtmlPaneDnDTest {
         // `answers`, not `returns` - `project.get()` only resolves once the fixture framework has
         // started, which isn't yet true while this field itself is being constructed.
         every { it.project } answers { project.get() }
-    }
-
-    @AfterEach
-    fun cleanUp() {
-        System.clearProperty(PREVIEW_PROPERTY)
     }
 
     private fun entry(id: String, bookmarks: List<Bookmark> = emptyList(), tags: List<Tag> = emptyList()) =
@@ -240,24 +232,15 @@ class IconAwareHtmlPaneDnDTest {
 
     // endregion
 
-    // region gating
+    // region install
 
     @Test
-    fun `installRefDragSource does not throw with the preview feature off`() {
-        val a = entry("aaaaaaaa")
-        val pane = paneWithChip(a, "bookmark", "main")
-
-        pane.installRefDragSource(project.get(), project.get()) { listOf(a) }
-    }
-
-    @Test
-    fun `installRefDragSource does not throw with the preview feature on`() {
-        System.setProperty(PREVIEW_PROPERTY, "true")
+    fun `installRefDragSource does not throw`() {
         val a = entry("aaaaaaaa")
         val pane = paneWithChip(a, "bookmark", "main")
 
         // DnDManager is a no-op in tests (HeadlessDnDManager), same as the other install-site
-        // tests - this only asserts the gated call itself is safe; refDragPayload above covers
+        // tests - this only asserts the call itself is safe; refDragPayload above covers
         // the actual behaviour the builder wires up.
         pane.installRefDragSource(project.get(), project.get()) { listOf(a) }
     }

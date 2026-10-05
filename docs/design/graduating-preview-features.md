@@ -34,9 +34,8 @@ gh workflow run "Build and Release" --repo kkkev/jj-idea -f bump=minor
 6. **Release summary.** A short prose headline paragraph directly under `## [Unreleased]`,
    above `### Added`. The release workflow moves everything under that heading into the new
    version section verbatim, so it carries through. The first graduation to land creates the
-   paragraph; each adds a sentence for its feature. **Unverified:** that the change-notes
-   extraction in `build.gradle.kts` (the `[Unreleased]`/version section reader near the top)
-   keeps prose that precedes the first `###` heading — check before relying on it.
+   paragraph; each adds a sentence for its feature. **Verified** (jj-idea-jxii): the extraction reads every line between the `## [Unreleased]`
+   heading and the next `## [`, so prose before the first `###` carries through.
 7. **`ROADMAP.md` and README.** Remove or rewrite entries that describe the feature as planned
    or in progress.
 8. **`docs/manual-tests.md`.** Remove "requires access code / system property" preconditions;

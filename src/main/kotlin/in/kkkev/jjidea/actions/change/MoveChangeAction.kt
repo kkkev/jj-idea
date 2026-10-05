@@ -63,8 +63,7 @@ fun moveTarget(entry: LogEntry?, neighbours: LogNeighbours?, direction: MoveDire
 /**
  * Toolbar/context-menu "Move Up"/"Move Down" actions (jj-idea-owje, GitHub #93): swap the
  * selected commit with its single child (Up) or single parent (Down) in the commit graph, as a
- * keyboard-first complement to drag-and-drop reordering (jj-idea-6oeg's preview-gated
- * follow-ups). Each is just
+ * keyboard-first complement to drag-and-drop reordering (jj-idea-6oeg). Each is just
  * `jj rebase -r <selected> -A/-B <neighbour>` - the same `-A`/`-B` placement the "New Change..."
  * dialog (GitHub #83) already exercises via [in.kkkev.jjidea.jj.CommandExecutor.rebase] - run
  * through the existing [executeRebase] (undo tracking, undo balloon, refresh, error reporting)

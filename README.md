@@ -9,6 +9,7 @@ Native IntelliJ integration for [Jujutsu (jj)](https://jj-vcs.github.io/jj/), a 
 - **Describe-First Workflow** — The Working Copy tool window lets you describe your current work and create new changes with one click. No staging area, no "WIP" commits.
 - **Custom Log View** — Visual commit graph with inline change IDs, descriptions, bookmarks, and author info. Filter by text, branch, author, or date range.
 - **Change Operations** — Edit, abandon, describe, squash, split, duplicate, rebase and restore changes directly from the log context menu.
+- **Drag & Drop** — Drag commits in the log to rebase or duplicate them, drag bookmark and tag chips to move them, and drag files out of the changes tree to squash or split, with a live hint of what a drop will do.
 - **Operation Previews** — Full dialogs with for rebase, squash and split, with visual destination pickers and live previews.
 - **Git Remotes** — Fetch and push to Git remotes without leaving the IDE.
 - **File History & Annotations** — Full file history with diff viewer. Line-by-line blame annotations.

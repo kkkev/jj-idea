@@ -23,22 +23,18 @@ import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.awt.Point
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import org.junit.jupiter.api.Tag as JupiterTag
 
-private const val PREVIEW_PROPERTY = "jjidea.preview.dragAndDrop"
-
 /**
  * Platform-level coverage for [JujutsuBookmarksPanel.dragPayloadAt]/[dropTargetAt] (jj-idea-0rdm,
  * batch 4) against a real, laid-out panel - mirrors
  * [in.kkkev.jjidea.ui.log.JujutsuLogTableDnDChipTest]'s shape for the log table's own chip
- * hit-tests. The preview system property is set purely so [installDragAndDrop] doesn't matter
- * either way for the hit-test tests (which call [dragPayloadAt]/[dropTargetAt] directly, not
- * through a live `DnDEvent`); the gating region at the bottom exercises the install call itself.
+ * hit-tests. The hit-test tests call [dragPayloadAt]/[dropTargetAt] directly, not through a live
+ * `DnDEvent`; the install region at the bottom exercises the install call itself.
  */
 @JupiterTag("platform")
 @TestApplication
@@ -49,14 +45,8 @@ class JujutsuBookmarksPanelDnDTest {
     private val repoB = mockk<JujutsuRepository>(relaxed = true)
     private var panel: JujutsuBookmarksPanel? = null
 
-    @BeforeEach
-    fun enablePreview() {
-        System.setProperty(PREVIEW_PROPERTY, "true")
-    }
-
     @AfterEach
     fun cleanUp() {
-        System.clearProperty(PREVIEW_PROPERTY)
         panel?.let { Disposer.dispose(it) }
         drainBackgroundLoads()
     }
@@ -260,20 +250,13 @@ class JujutsuBookmarksPanelDnDTest {
 
     // endregion
 
-    // region gating
+    // region install
 
     @Test
-    fun `installDragAndDrop does not throw with the preview feature off`() {
-        System.clearProperty(PREVIEW_PROPERTY)
-        val panel = JujutsuBookmarksPanel(project.get())
-        this.panel = panel
-    }
-
-    @Test
-    fun `installDragAndDrop does not throw with the preview feature on`() {
+    fun `installDragAndDrop does not throw`() {
         // DnDManager is a no-op in tests (HeadlessDnDManager, same as JujutsuLogTableDnDTest), so
         // there's no client-property-style signal that install() actually ran - this only asserts
-        // the gated call itself is safe; the hit-test regions above cover the actual behaviour the
+        // the call itself is safe; the hit-test regions above cover the actual behaviour the
         // builder wires up.
         val panel = JujutsuBookmarksPanel(project.get())
         this.panel = panel

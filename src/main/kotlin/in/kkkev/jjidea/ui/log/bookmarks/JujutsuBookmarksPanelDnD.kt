@@ -10,8 +10,6 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.awt.RelativeRectangle
 import com.intellij.ui.render.RenderingUtil
-import `in`.kkkev.jjidea.preview.PreviewEntitlement
-import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.dnd.DragContext
 import `in`.kkkev.jjidea.ui.dnd.DragContextHolder
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
@@ -45,13 +43,8 @@ import javax.swing.tree.DefaultMutableTreeNode
  * A node whose [in.kkkev.jjidea.jj.RefItem.id] is null - a deleted or pending-delete bookmark
  * (`CliLogService.bookmarkListTemplate`) - has no target commit and neither drags nor accepts
  * drops.
- *
- * Guarded behind [PreviewFeature.DRAG_AND_DROP] (jj-idea-vpvz), exactly like the other two install
- * sites - no `DnDSupport` is registered at all unless the feature is enabled.
  */
 internal fun JujutsuBookmarksPanel.installDragAndDrop(parent: Disposable) {
-    if (!PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) return
-
     val dragContextHolder = DragContextHolder()
     val performer = DropPerformers.forLogTable(project)
     val rejectOverlay = RejectOverlay()

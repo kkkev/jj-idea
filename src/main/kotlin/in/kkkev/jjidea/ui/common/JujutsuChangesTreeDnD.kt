@@ -7,8 +7,6 @@ import com.intellij.openapi.vcs.VcsBundle
 import com.intellij.openapi.vcs.changes.Change
 import com.intellij.openapi.vcs.changes.ui.ChangesTreeDnDSupport
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.preview.PreviewEntitlement
-import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.dnd.DragPayload
 
 /**
@@ -28,14 +26,8 @@ import `in`.kkkev.jjidea.ui.dnd.DragPayload
  * `null` (an ambiguous or cross-repo selection, e.g. a multi-commit details-panel selection with
  * no single owner) means no drag starts at all, mirroring how [dragPayloadAt] in the log table
  * returns `null` for an empty selection.
- *
- * Guarded behind [PreviewFeature.DRAG_AND_DROP] at install, exactly like
- * [in.kkkev.jjidea.ui.log.installDragAndDrop] - no `DnDSupport` is registered at all unless the
- * feature is enabled, so a disabled preview feature costs nothing at drag time.
  */
 internal fun JujutsuChangesTree.installFilesDragSource(parent: Disposable, ownerFor: (List<Change>) -> LogEntry?) {
-    if (!PreviewEntitlement.getInstance().isEnabled(PreviewFeature.DRAG_AND_DROP)) return
-
     DnDSupport.createBuilder(this)
         .disableAsTarget()
         .setBeanProvider { _ -> filesDragPayload(ownerFor)?.let { payload -> DnDDragStartBean(payload) } }

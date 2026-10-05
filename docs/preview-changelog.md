@@ -20,49 +20,6 @@ verbatim at GA, condensed into a handful of user-facing bullets.
   current selection.
 - Load log in pages: removed the "Showing N changes — scroll for more" status message — there's
   nothing useful left to say once scrolling always loads more.
-- Drag and Drop: dragging a commit onto another commit now rebases it there — drop on the middle
-  of a row to rebase onto it, or near the top/bottom edge to insert it just after/before that
-  commit. Applies immediately, with an Undo option in the notification that appears.
-- Drag and Drop: dragging onto a row you can't actually drop on (a different repository, a commit
-  that would create a cycle, an immutable commit) now reliably shows a "can't drop here" indicator
-  on that row, instead of an inconsistent or missing cursor change.
-- Drag and Drop: holding the copy modifier (Option on macOS, Ctrl on Windows/Linux — the same key
-  that copies when dragging a file in the Project view) while dragging a commit now duplicates it
-  instead of rebasing it, leaving the original in place.
-- Drag and Drop: dragging a bookmark or tag chip onto another commit now moves it there, with the
-  same confirmation prompts as the existing bookmark/tag actions for a backward move or an
-  already-existing tag, and the selection follows the bookmark to its new commit.
-- Drag and Drop: dragging a local bookmark chip onto its own remote-tracking chip now opens the Git
-  Push dialog pre-filled with that bookmark and remote, ready to review before pushing.
-- Drag and Drop: dragging a commit, bookmark, or tag now shows a small label following the cursor
-  naming what's being dragged, the same way dragging a file in the Project view does — a dragged
-  commit's id keeps its usual styling (bold unique prefix, grey remainder) rather than showing as
-  plain text.
-- Drag and Drop: dragging a file selection out of the changes tree (Working Copy panel or a
-  commit's details) onto another commit now opens the Squash dialog, pre-filled with those files
-  and that commit as the destination.
-- Drag and Drop: dragging a file selection just above or below its own change now opens the Split
-  dialog, pre-filled with those files moving into a new child or parent change; dropping on any
-  other change's gap shows a "can't drop here" indicator instead.
-- Drag and Drop: the bookmarks panel is now a drag source and drop target, matching the log — drag
-  a bookmark or tag from the panel onto a commit in the log to move it there, or drag a commit onto
-  a bookmark/tag in the panel to do the reverse. This also works for a bookmark whose change isn't
-  currently visible in the log.
-- Drag and Drop: dragging a local bookmark onto its own remote-tracking bookmark in the bookmarks
-  panel now opens the Git Push dialog pre-filled, the same as doing it from the log.
-- Drag and Drop: dragging a bookmark or tag chip out of the commit details panel now works the same
-  as dragging one from the log or the bookmarks panel.
-- Drag and Drop: dragging a commit onto a tag chip in the log now moves the tag there, matching
-  what already happened when dragging onto a bookmark chip.
-- Drag and Drop: the working-copy `@` marker can now be dragged onto a commit to edit it, or into
-  the space just above a commit to create a new change on top of it. Dropping onto an immutable
-  commit's centre is rejected outright; dropping just above one always works, since that doesn't
-  rewrite anything.
-- Drag and Drop: three icon buttons next to View Options control whether dragging a commit moves
-  only that commit, the commit and everything descended from it, or its entire branch - exactly
-  one is pressed at a time. The chosen scope is named in the tooltip while dragging, the rows that
-  would actually move are highlighted live, and the drag label itself picks up a small matching
-  icon when a wider scope is selected.
 - In-Editor Conflict Actions: conflicted files now show live, per-side affordances directly in the
   editor gutter, alongside the existing banner: each side of a conflict block (and its base, where
   present) is tinted a distinct background color using the same colors the built-in 3-way merge
@@ -76,7 +33,3 @@ verbatim at GA, condensed into a handful of user-facing bullets.
   strengthens that side's background tint, and its gutter icon gets its own rounded highlight (the
   same hover color as an ordinary toolbar button) so it clearly reads as the clickable element —
   making it obvious which side an accept icon acts on before you click it.
-- Drag and Drop: while dragging, a small hint next to the cursor now says what dropping would do
-  ("Rebase abc onto def") or, when the drop isn't allowed, why not ("Cannot drop across
-  repositories", "… is immutable"). Change ids, bookmarks and tags in the hint are styled the same way as in the log.
-  Previously a rejected drop only showed a red row with no explanation.
