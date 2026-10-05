@@ -125,11 +125,16 @@ class JujutsuLogTable(
 
     fun requestSelection(changeKey: ChangeKey) {
         // Try immediate selection from current model data (e.g., annotation click with no pending refresh).
-        // Store as pending regardless so setEntries() can apply it if a refresh is in flight.
+        // Stored as pending until found, so setEntries() can apply it once a refresh/expansion lands it.
         pendingSelection = changeKey
         pendingSelectionIsExplicit = true
         expansionPending = false
-        if (!selectEntry(changeKey.repo, changeKey.revision)) {
+        if (selectEntry(changeKey.repo, changeKey.revision)) {
+            // Done: a later setEntries() carries the (now selected) row through on its own. Left
+            // pending, it would scroll back to this row on the next page load, however far the
+            // user had since scrolled away.
+            pendingSelection = null
+        } else {
             log.info("requestSelection: entry not in current model, triggering expansion")
             expansionPending = true
             onSelectionExpansionNeeded?.invoke(changeKey)
@@ -737,7 +742,11 @@ class JujutsuLogTable(
     fun setEntries(entries: List<LogEntry>) {
         // Capture current selection for re-selection after model update,
         // but only if no explicit selection was requested (e.g., via changeSelection after edit/abandon).
-        if (pendingSelection == null) {
+        // A selection captured here is merely carried through the refresh: never scroll to it,
+        // even though pendingSelectionIsExplicit lingers from an earlier requestSelection() (it
+        // would otherwise yank the viewport back on every later page load).
+        val carried = pendingSelection == null
+        if (carried) {
             selectedEntry?.let {
                 pendingSelection = it.key
             }
@@ -746,7 +755,7 @@ class JujutsuLogTable(
         logModel.setEntries(entries)
         restoreViewportAnchor(anchor)
         pendingSelection?.let {
-            if (selectEntry(it.repo, it.revision, scrollIntoView = pendingSelectionIsExplicit)) {
+            if (selectEntry(it.repo, it.revision, scrollIntoView = pendingSelectionIsExplicit && !carried)) {
                 pendingSelection = null
                 expansionPending = false
                 // pendingSelectionIsExplicit stays true: if a concurrent loadCommits later

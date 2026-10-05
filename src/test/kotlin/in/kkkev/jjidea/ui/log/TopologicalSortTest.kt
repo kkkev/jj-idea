@@ -205,4 +205,31 @@ class TopologicalSortTest {
             result.map { it.id.full } shouldBe listOf("qp", "yp")
         }
     }
+
+    @Nested
+    inner class `Log order` {
+        @Test
+        fun `topological input keeps its order whatever the timestamps`() {
+            val a = createEntry("aa", parentIds = listOf("cc"), timestamp = 10)
+            val b = createEntry("bb", timestamp = 900)
+            val c = createEntry("cc", timestamp = 500)
+            logOrder(listOf(a, b, c)) shouldBe listOf(a, b, c)
+        }
+
+        @Test
+        fun `a parent listed before its child is moved after it`() {
+            val parent = createEntry("pp", timestamp = 100)
+            val child = createEntry("ch", parentIds = listOf("pp"), timestamp = 50)
+            logOrder(listOf(parent, child)) shouldBe listOf(child, parent)
+        }
+
+        @Test
+        fun `repos interleave newest first and keep their own order`() {
+            val a1 = createEntry("a1", timestamp = 300)
+            val a2 = createEntry("a2", timestamp = 100)
+            val b1 = createEntry("b1", timestamp = 200, entryRepo = repo2)
+            val b2 = createEntry("b2", timestamp = 150, entryRepo = repo2)
+            logOrder(listOf(a1, a2, b1, b2)).map { it.id.full } shouldBe listOf("a1", "b1", "b2", "a2")
+        }
+    }
 }

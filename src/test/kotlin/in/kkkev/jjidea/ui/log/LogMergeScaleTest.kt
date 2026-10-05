@@ -11,7 +11,7 @@ import kotlinx.datetime.Instant
 import org.junit.jupiter.api.Test
 
 /** Same minimal, non-mockk stand-in as [GraphEdgeIndexScaleTest]'s `TODO_REPO` - see its doc. */
-private val REPO: JujutsuRepository = object : JujutsuRepository {
+private fun newRepo(): JujutsuRepository = object : JujutsuRepository {
     override val displayName get() = throw UnsupportedOperationException()
     override val project get() = throw UnsupportedOperationException()
     override val directory get() = throw UnsupportedOperationException()
@@ -42,8 +42,16 @@ private val REPO: JujutsuRepository = object : JujutsuRepository {
     override fun getRelativePath(file: com.intellij.openapi.vfs.VirtualFile) = throw UnsupportedOperationException()
 }
 
-private fun entry(id: String, parentId: String?, timestampSeconds: Long) = LogEntry(
-    repo = REPO,
+private val REPO = newRepo()
+private val REPO2 = newRepo()
+
+private fun entry(
+    id: String,
+    parentId: String?,
+    timestampSeconds: Long,
+    repo: JujutsuRepository = REPO
+) = LogEntry(
+    repo = repo,
     id = ChangeId(id, id, null),
     commitId = CommitId(id.padEnd(40, '0')),
     underlyingDescription = "entry $id",
@@ -142,10 +150,57 @@ class LogMergeScaleTest {
     }
 
     @Test
-    fun `guard fails when a delta entry is newer than the snapshot's oldest entry`() {
+    fun `single repo guard ignores timestamps - jj order is kept`() {
         val current = snapshotOf(listOf(entry("e0", null, 100)))
-        val delta = listOf(entry("e1", null, 150)) // newer than e0
+        val delta = listOf(entry("e1", null, 150)) // newer than e0, but same repo
+        appendGuardHolds(delta, current, emptyMap(), hasExpansionOrSearch = false) shouldBe true
+    }
+
+    @Test
+    fun `multi repo guard fails when a delta entry is not older than the snapshot's oldest entry`() {
+        val current = snapshotOf(listOf(entry("e0", null, 100)))
+        val delta = listOf(entry("f1", null, 150, REPO2))
         appendGuardHolds(delta, current, emptyMap(), hasExpansionOrSearch = false) shouldBe false
+        val older = listOf(entry("f1", null, 50, REPO2))
+        appendGuardHolds(older, current, emptyMap(), hasExpansionOrSearch = false) shouldBe true
+    }
+
+    @Test
+    fun `deep append on a wide graph with non-monotonic timestamps always takes the append path`() {
+        val lanes = 40
+        val pageSize = 500
+        val pageCount = 60
+        val totalRows = pageSize * pageCount
+        // `lanes` interleaved chains; parent of row i is row i + lanes. Timestamps are scrambled so
+        // nearly every page is "newer" than the oldest loaded row, as on git/git.
+        val all = (0 until totalRows).map { i ->
+            val ts = ((i * 7919L) % 100_003L) + 1
+            entry("w$i", if (i + lanes < totalRows) "w${i + lanes}" else null, ts)
+        }
+        val graphBuilder = CommitGraphBuilder()
+        var snapshot: MergedSnapshot? = null
+        var totalOperations = 0L
+        var loaded = emptyList<LogEntry>()
+        for (page in all.chunked(pageSize)) {
+            val current = snapshot
+            if (current == null) {
+                graphBuilder.buildGraph(page)
+                snapshot = snapshotOf(page)
+            } else {
+                appendGuardFailure(page, current, emptyMap(), hasExpansionOrSearch = false) shouldBe null
+                graphBuilder.appendGraph(page)
+                totalOperations += graphBuilder.incrementalOperationCount
+                snapshot = MergedSnapshot(
+                    current.entries + page,
+                    current.keys + page.mapTo(HashSet()) { it.key },
+                    minOf(current.minTimestamp, page.minOf { it.sortTimestamp() }),
+                    emptyMap()
+                )
+            }
+            loaded = loaded + page
+        }
+        logOrder(all).map { it.key } shouldBe all.map { it.key }
+        totalOperations shouldBeLessThan (10L * lanes * totalRows)
     }
 
     @Test

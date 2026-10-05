@@ -99,6 +99,12 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 **Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/components/LogEntryText.kt` (`appendBookmarks`, `bookmarkRefChips`, jj-idea-e4ln's `@git` filter), `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch), `ui/log/JujutsuCustomLogTabManager.kt`, `actions/top/OpenJujutsuLogTabAction.kt`
 **Also re-run:** MT-LOG-DETAILS (issue-tracker link rendering is shared with the details panel)
 
+#### Row order (jj-idea-2570.7)
+
+- [ ] In a single-repo project, log rows follow `jj log` order (compare the top ~50 rows with
+      `jj log -r 'all()'` in a terminal), and paging/scrolling to load more never reshuffles rows
+      already shown
+
 #### Entry points (jj-idea-biqp, GitHub #118)
 
 - [ ] With the Version Control tool window closed/hidden, **VCS → Jujutsu → Open Jujutsu Log**

@@ -188,7 +188,7 @@ class UnifiedJujutsuLogDataLoader(
                     return@executeInBackground
                 }
 
-                val sorted = topologicalSort(entriesByRepo.values.flatten())
+                val sorted = logOrder(entriesByRepo.values.flatten())
                 // jj-idea-jnqi bugfix: graphBuilder.buildGraph() and the snapshot write must be
                 // one atomic unit under mergeLock, exactly like fastMergeAndNotify/
                 // fullMergeAndNotify already do - loadCommits() previously called buildGraph()
@@ -386,11 +386,14 @@ class UnifiedJujutsuLogDataLoader(
         val correctionsByRepo = bookmarkCorrectionsByRepo()
         val current = snapshot
         val hasExpansionOrSearch = expansionEntriesByRepo.isNotEmpty() || searchEntriesByRepo.isNotEmpty()
-        val data = if (delta != null &&
-            current != null &&
-            appendGuardHolds(delta, current, correctionsByRepo, hasExpansionOrSearch)
-        ) {
-            fastMergeAndNotify(delta, current, correctionsByRepo)
+        val failure = when {
+            delta == null -> "no delta"
+            current == null -> "no snapshot"
+            else -> appendGuardFailure(delta, current, correctionsByRepo, hasExpansionOrSearch)
+        }
+        log.debug("log merge: ${if (failure == null) "append" else "full ($failure)"}")
+        val data = if (failure == null) {
+            fastMergeAndNotify(delta!!, current!!, correctionsByRepo)
         } else {
             fullMergeAndNotify(correctionsByRepo)
         }
@@ -403,7 +406,12 @@ class UnifiedJujutsuLogDataLoader(
         current: MergedSnapshot,
         correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>
     ): Data {
-        val enrichedDelta = delta.map { enrichBookmarks(it, correctionsByRepo[it.repo] ?: EMPTY_CORRECTIONS) }
+        // Same order logOrder would give the whole set: a no-op for one repo, a timestamp
+        // interleave of the per-repo pages for several.
+        val enrichedDelta = mergeByTimestamp(
+            delta.map { enrichBookmarks(it, correctionsByRepo[it.repo] ?: EMPTY_CORRECTIONS) }
+                .groupByTo(LinkedHashMap()) { it.repo }.values.toList()
+        )
         val mergedEntries = current.entries + enrichedDelta
         val graphNodes = graphBuilder.appendGraph(enrichedDelta)
         val deltaMinTimestamp = enrichedDelta.minOfOrNull { it.sortTimestamp() } ?: current.minTimestamp
@@ -411,7 +419,8 @@ class UnifiedJujutsuLogDataLoader(
             mergedEntries,
             current.keys + enrichedDelta.mapTo(HashSet()) { it.key },
             minOf(current.minTimestamp, deltaMinTimestamp),
-            correctionsByRepo
+            correctionsByRepo,
+            current.repos + enrichedDelta.mapTo(HashSet()) { it.repo }
         )
         return Data(mergedEntries, graphNodes, lastLimit)
     }
@@ -425,7 +434,7 @@ class UnifiedJujutsuLogDataLoader(
                 enrichBookmarks(entry, correctionsByRepo[r] ?: EMPTY_CORRECTIONS)
             }
         }
-        val merged = topologicalSort(allEntries.distinctBy { it.key })
+        val merged = logOrder(allEntries.distinctBy { it.key })
         val graphNodes = graphBuilder.buildGraph(merged)
         snapshot = MergedSnapshot(
             merged,
@@ -831,17 +840,19 @@ internal fun fetchSearchResults(
  * [in.kkkev.jjidea.jj.JujutsuRepository.logCache] and re-sorting the whole thing from scratch.
  *
  * @param minTimestamp the lowest [sortTimestamp] across [entries] ([Instant.DISTANT_FUTURE] when empty) -
- *   an append guard: a delta entry newer than this could win [topologicalSort]'s timestamp
- *   tiebreak over an already-merged entry, so it can't simply be appended after everything.
+ *   an append guard for multi-repo sets only: a delta entry not older than this could be
+ *   interleaved ahead of an already-merged entry by [logOrder]'s cross-repo timestamp merge.
+ * @param repos the repositories contributing to [entries].
  */
 internal class MergedSnapshot(
     val entries: List<LogEntry>,
     val keys: Set<ChangeKey>,
     val minTimestamp: Instant,
-    val correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>
+    val correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>,
+    val repos: Set<JujutsuRepository> = entries.mapTo(HashSet()) { it.repo }
 )
 
-/** Same tiebreak expression [topologicalSort]'s `PriorityQueue` comparator uses. */
+/** The timestamp [logOrder] interleaves repositories by. */
 internal fun LogEntry.sortTimestamp(): Instant = authorTimestamp ?: committerTimestamp ?: Instant.DISTANT_PAST
 
 /**
@@ -861,19 +872,33 @@ internal fun appendGuardHolds(
     current: MergedSnapshot,
     correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>,
     hasExpansionOrSearch: Boolean
-): Boolean {
-    if (hasExpansionOrSearch) return false
+): Boolean = appendGuardFailure(delta, current, correctionsByRepo, hasExpansionOrSearch) == null
+
+/** The reason [appendGuardHolds] fails, or `null` when it holds. */
+internal fun appendGuardFailure(
+    delta: List<LogEntry>,
+    current: MergedSnapshot,
+    correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>,
+    hasExpansionOrSearch: Boolean
+): String? {
+    if (hasExpansionOrSearch) return "expansion/search entries present"
     // Changes what enrichBookmarks does to *already-merged* entries too, not just delta - the
     // cached prefix would need re-enriching, which the fast path skips.
-    if (correctionsByRepo != current.correctionsByRepo) return false
+    if (correctionsByRepo != current.correctionsByRepo) return "bookmark corrections changed"
     // A delta entry that's a CHILD of an already-merged entry (one of its parents is already
-    // in the snapshot) can't simply be appended - topologicalSort would need to place it
+    // in the snapshot) can't simply be appended - logOrder would need to place it
     // before that parent, not after everything.
-    if (delta.any { entry -> entry.parentKeys.any { it in current.keys } }) return false
-    // A delta entry newer than the merged set's oldest entry would win topologicalSort's
-    // timestamp tiebreak over that old entry, so it can't just be appended after it.
-    if (delta.any { it.sortTimestamp() > current.minTimestamp }) return false
-    return true
+    if (delta.any { entry -> entry.parentKeys.any { it in current.keys } }) {
+        return "delta entry is a child of a merged entry"
+    }
+    // Within one repo logOrder keeps jj's own order, so a topologically-ordered page is
+    // append-only whatever its timestamps. Across repos, logOrder interleaves by timestamp, so
+    // a delta entry not older than the merged set's oldest could land ahead of a merged one.
+    val multiRepo = (current.repos + delta.map { it.repo }).size > 1
+    if (multiRepo && delta.any { it.sortTimestamp() >= current.minTimestamp }) {
+        return "delta entry not older than snapshot"
+    }
+    return null
 }
 
 /**
@@ -983,5 +1008,58 @@ internal fun topologicalSort(entries: List<LogEntry>): List<LogEntry> {
         }
     }
 
+    return result
+}
+
+/**
+ * The order the log shows rows in: within each repository jj's own order (already topological -
+ * children before parents), with ties and any out-of-order input (expansion/search entries
+ * appended after the cache) resolved by input position via Kahn's algorithm; repositories are
+ * then interleaved newest-first by [sortTimestamp] ([mergeByTimestamp]). Unlike [topologicalSort]
+ * a single repo's order never depends on author timestamps, so paging an older page in is
+ * append-only by construction (jj-idea-2570.7).
+ */
+internal fun logOrder(entries: List<LogEntry>): List<LogEntry> =
+    mergeByTimestamp(entries.groupByTo(LinkedHashMap()) { it.repo }.values.map(::topologicalByPosition))
+
+private fun topologicalByPosition(entries: List<LogEntry>): List<LogEntry> {
+    val indexByKey = HashMap<ChangeKey, Int>(entries.size * 2)
+    entries.forEachIndexed { i, e -> indexByKey[e.key] = i }
+    val childCount = IntArray(entries.size)
+    for (entry in entries) {
+        for (parentKey in entry.parentKeys) indexByKey[parentKey]?.let { childCount[it]++ }
+    }
+    val ready = PriorityQueue<Int>()
+    for (i in entries.indices) if (childCount[i] == 0) ready.add(i)
+    val result = ArrayList<LogEntry>(entries.size)
+    while (ready.isNotEmpty()) {
+        val entry = entries[ready.poll()]
+        result.add(entry)
+        for (parentKey in entry.parentKeys) {
+            val p = indexByKey[parentKey] ?: continue
+            if (--childCount[p] == 0) ready.add(p)
+        }
+    }
+    return result
+}
+
+/**
+ * K-way merge of per-repo ordered lists: repeatedly takes the head with the newest
+ * [sortTimestamp], earlier list winning ties. Order within each list is preserved, so a
+ * topological list stays topological.
+ */
+internal fun mergeByTimestamp(lists: List<List<LogEntry>>): List<LogEntry> {
+    if (lists.size <= 1) return lists.firstOrNull() ?: emptyList()
+    val positions = IntArray(lists.size)
+    val heads = PriorityQueue<Int>(
+        compareByDescending<Int> { lists[it][positions[it]].sortTimestamp() }.thenBy { it }
+    )
+    lists.forEachIndexed { i, l -> if (l.isNotEmpty()) heads.add(i) }
+    val result = ArrayList<LogEntry>(lists.sumOf { it.size })
+    while (heads.isNotEmpty()) {
+        val i = heads.poll()
+        result.add(lists[i][positions[i]++])
+        if (positions[i] < lists[i].size) heads.add(i)
+    }
     return result
 }

@@ -85,6 +85,22 @@ class JujutsuLogTableScrollPreservationTest {
     }
 
     @Test
+    fun `selection carried through setEntries after an earlier requestSelection does not scroll back`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+
+        // Explicitly select row 0 (found immediately), leaving pendingSelectionIsExplicit set.
+        table.requestSelection(ChangeKey(repo, entries[0].id))
+
+        // The user scrolls away, then a page loads.
+        scrollPane.viewport.viewPosition = java.awt.Point(0, table.getCellRect(49, 0, true).y)
+        val scrolledPosition = scrollPane.viewport.viewPosition
+        table.setEntries(entries)
+
+        scrollPane.viewport.viewPosition shouldBe scrolledPosition
+    }
+
+    @Test
     fun `explicit requestSelection still scrolls to make the target visible`() {
         val entries = manyEntries(50)
         val (table, scrollPane) = tableInScrollPane(entries)
