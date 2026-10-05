@@ -3,16 +3,18 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.KeepPopupOnPerform
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Condition
 import com.intellij.ui.RowIcon
 import com.intellij.util.ui.EmptyIcon
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.actions.ListActionGroup
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -168,31 +170,33 @@ class JujutsuReferenceFilterComponent(
         refreshPresentation()
     }
 
-    override fun createActionGroup(): ActionGroup {
-        val group = BackgroundActionGroup()
+    // Built as a plain list, not DefaultActionGroup.add per entry, which is O(n^2) in the number
+    // of references and froze the EDT with thousands of bookmarks/tags (jj-idea-bok6, #136).
+    // Public so the scale test can drive it.
+    public override fun createActionGroup(): ActionGroup {
+        val children = buildList<AnAction> {
+            // Bookmarks/tags load on a pooled thread and can genuinely still be empty right after
+            // the log opens (jj-idea-a52h) - without this, that transient state is
+            // indistinguishable from "this repo really has no bookmarks or tags".
+            if (!project.stateModel.references.hasLoaded) {
+                add(LoadingReferencesAction())
+                add(Separator.create())
+            }
 
-        // Bookmarks/tags load on a pooled thread and can genuinely still be empty right after the
-        // log opens (jj-idea-a52h) - without this, that transient state is indistinguishable from
-        // "this repo really has no bookmarks or tags".
-        if (!project.stateModel.references.hasLoaded) {
-            group.add(LoadingReferencesAction())
-            group.addSeparator()
+            val references = getAllReferences()
+
+            if (references.workingCopy != null) {
+                add(SelectReferenceAction(WorkingCopy.REF, ReferenceType.WORKING_COPY))
+            }
+            references.bookmarks.forEach { (name, type) -> add(SelectReferenceAction(name, type)) }
+            references.tags.forEach { add(SelectReferenceAction(it, ReferenceType.TAG)) }
+
+            if (selectedReference != null) {
+                add(Separator.create())
+                add(ClearFilterAction())
+            }
         }
-
-        val references = getAllReferences()
-
-        if (references.workingCopy != null) {
-            group.add(SelectReferenceAction(WorkingCopy.REF, ReferenceType.WORKING_COPY))
-        }
-        references.bookmarks.forEach { (name, type) -> group.add(SelectReferenceAction(name, type)) }
-        references.tags.forEach { group.add(SelectReferenceAction(it, ReferenceType.TAG)) }
-
-        if (selectedReference != null) {
-            group.addSeparator()
-            group.add(ClearFilterAction())
-        }
-
-        return group
+        return ListActionGroup(children)
     }
 
     override fun doResetFilter() {
@@ -290,9 +294,11 @@ class JujutsuReferenceFilterComponent(
      * loading (jj-idea-a52h), so an empty dropdown isn't mistaken for "this repo has no bookmarks
      * or tags". */
     private class LoadingReferencesAction : AnAction(JujutsuBundle.message("log.filter.reference.loading")) {
-        init {
-            templatePresentation.isEnabled = false
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = false
         }
+
+        override fun getActionUpdateThread() = ActionUpdateThread.BGT
 
         override fun actionPerformed(e: AnActionEvent) = Unit
     }

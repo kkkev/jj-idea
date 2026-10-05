@@ -3,7 +3,7 @@ package `in`.kkkev.jjidea.ui.log
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.actions.ListActionGroup
 import `in`.kkkev.jjidea.jj.stateModel
 
 /**
@@ -44,22 +44,19 @@ class JujutsuAuthorFilterComponent(private val tableModel: JujutsuLogTableModel,
         notifyFilterChanged()
     }
 
-    override fun createActionGroup(): ActionGroup {
-        val group = BackgroundActionGroup()
+    // Plain list rather than DefaultActionGroup.add per entry (O(n^2); jj-idea-bok6, #136).
+    // Public so the scale test can drive it.
+    public override fun createActionGroup(): ActionGroup {
+        val children = buildList<AnAction> {
+            tableModel.getAllAuthors().forEach { add(ToggleAuthorAction(it)) }
 
-        // Add author options
-        val authors = tableModel.getAllAuthors()
-        authors.forEach { author ->
-            group.add(ToggleAuthorAction(author))
+            // Add clear option if authors are selected
+            if (selectedAuthors.isNotEmpty()) {
+                add(Separator.create())
+                add(ClearFilterAction())
+            }
         }
-
-        // Add clear option if authors are selected
-        if (selectedAuthors.isNotEmpty()) {
-            group.addSeparator()
-            group.add(ClearFilterAction())
-        }
-
-        return group
+        return ListActionGroup(children)
     }
 
     override fun doResetFilter() {
