@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.vcs
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DoNotAskOption
+import com.intellij.openapi.ui.MessageDialogBuilder
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vcs.VcsTaskHandler
 import com.intellij.openapi.vcs.changes.ChangeListManager
@@ -242,20 +243,22 @@ private fun chooseCloseMode(project: Project, task: String, original: String): C
 
         override fun getDoNotShowMessage() = JujutsuBundle.message("task.close.remember")
     }
-    val choice = Messages.showDialog(
-        project,
-        JujutsuBundle.message("task.close.message", task, original),
-        JujutsuBundle.message("task.close.title"),
-        arrayOf(
-            JujutsuBundle.message("task.close.rebase", original),
-            JujutsuBundle.message("task.close.merge"),
-            JujutsuBundle.message("task.close.switch")
-        ),
-        0,
-        Messages.getQuestionIcon(),
-        remember
+    val options = arrayOf(
+        JujutsuBundle.message("task.close.rebase", original),
+        JujutsuBundle.message("task.close.merge"),
+        JujutsuBundle.message("task.close.switch")
     )
-    return CloseMode.entries.getOrNull(choice)
+    // MessageDialogBuilder rather than Messages.showDialog: the latter's DoNotAskOption overload only exists on 2025.3+
+    val chosen = MessageDialogBuilder.Message(
+        JujutsuBundle.message("task.close.title"),
+        JujutsuBundle.message("task.close.message", task, original)
+    )
+        .buttons(*options)
+        .defaultButton(options[0])
+        .icon(Messages.getQuestionIcon())
+        .doNotAsk(remember)
+        .show(project)
+    return CloseMode.entries.getOrNull(options.indexOf(chosen))
 }
 
 private fun namedBookmark(name: String) = "bookmarks(exact:${quoted(name)})"
