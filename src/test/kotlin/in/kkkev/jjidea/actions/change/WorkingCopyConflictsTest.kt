@@ -88,4 +88,39 @@ class WorkingCopyConflictsTest {
 
         workingCopyConflicts(project) shouldBe emptyList()
     }
+
+    @Test
+    fun `firstConflictToOpen picks the first path in path order`() {
+        val b = mockk<VirtualFile> { every { path } returns "/repo/b.txt" }
+        val a = mockk<VirtualFile> { every { path } returns "/repo/a.txt" }
+        firstConflictToOpen(listOf(b, a)) shouldBe a
+        firstConflictToOpen(emptyList()) shouldBe null
+    }
+
+    @Test
+    fun `resolveConflictsInEditor opens exactly one file regardless of how many are conflicted`() {
+        val opened = mutableListOf<Pair<VirtualFile, Int>>()
+        val files = (1..50).map { n -> mockk<VirtualFile> { every { path } returns "/repo/f$n.txt" } }
+        val doc = mockk<com.intellij.openapi.editor.Document> {
+            every { immutableCharSequence } returns "x\n<<<<<<< c\na\n>>>>>>> e\n"
+        }
+        val fdm = mockk<com.intellij.openapi.fileEditor.FileDocumentManager> {
+            every { getDocument(any()) } returns doc
+        }
+        mockkStatic(com.intellij.openapi.fileEditor.FileDocumentManager::class)
+        every { com.intellij.openapi.fileEditor.FileDocumentManager.getInstance() } returns fdm
+
+        resolveConflictsInEditor(project, files) { f, off -> opened += f to off }
+
+        opened.size shouldBe 1
+        opened.single().first.path shouldBe "/repo/f1.txt"
+        opened.single().second shouldBe 2
+    }
+
+    @Test
+    fun `resolveConflictsInEditor with no files is a no-op`() {
+        var calls = 0
+        resolveConflictsInEditor(project, emptyList()) { _, _ -> calls++ }
+        calls shouldBe 0
+    }
 }

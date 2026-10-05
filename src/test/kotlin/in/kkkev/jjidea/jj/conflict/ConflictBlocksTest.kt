@@ -135,4 +135,28 @@ class ConflictBlocksTest {
 
         countConflictBlocks(input) shouldBe 1
     }
+
+    @Test
+    fun `firstConflictBlockOffset - none`() {
+        firstConflictBlockOffset("plain\ncontent\n") shouldBe null
+        firstConflictBlockOffset("") shouldBe null
+    }
+
+    @Test
+    fun `firstConflictBlockOffset - offset of the opening marker line`() {
+        val text = "before\n<<<<<<< Conflict 1 of 1\nx\n>>>>>>> end\nafter\n"
+        firstConflictBlockOffset(text) shouldBe 7
+    }
+
+    @Test
+    fun `firstConflictBlockOffset - agrees with count when a second opener appears inside an open block`() {
+        val text = "<<<<<<< a\nstray\n<<<<<<< b\nx\n>>>>>>> end\n"
+        countConflictBlocks(text) shouldBe 1
+        firstConflictBlockOffset(text) shouldBe 0
+    }
+
+    @Test
+    fun `firstConflictBlockOffset - block with no closing marker is not a block`() {
+        firstConflictBlockOffset("<<<<<<< a\nx\nno close\n") shouldBe null
+    }
 }

@@ -13,23 +13,46 @@ package `in`.kkkev.jjidea.jj.conflict
  */
 fun countConflictBlocks(text: CharSequence): Int {
     var count = 0
-    var open = false
+    forEachConflictBlock(text) {
+        count++
+        true
+    }
+    return count
+}
+
+/**
+ * Offset of the `<<<<<<<` line opening the first *complete* conflict block in [text], or `null`
+ * if there is none. Same single-pass walk as [countConflictBlocks], exiting at the first block's
+ * closing marker - used to put the caret on the first conflict when opening a conflicted file.
+ */
+fun firstConflictBlockOffset(text: CharSequence): Int? {
+    var offset: Int? = null
+    forEachConflictBlock(text) { start ->
+        offset = start
+        false
+    }
+    return offset
+}
+
+/** Calls [onBlock] with each complete block's opening offset until it returns `false`. */
+private inline fun forEachConflictBlock(text: CharSequence, onBlock: (Int) -> Boolean) {
+    var openStart = -1
     var lineStart = 0
     val length = text.length
     var i = 0
     while (i <= length) {
         if (i == length || text[i] == '\n') {
             if (i - lineStart >= 7) {
-                if (!open && text.startsWith("<<<<<<<", lineStart)) {
-                    open = true
-                } else if (open && text.startsWith(">>>>>>>", lineStart)) {
-                    open = false
-                    count++
+                if (openStart < 0 && text.startsWith("<<<<<<<", lineStart)) {
+                    openStart = lineStart
+                } else if (openStart >= 0 && text.startsWith(">>>>>>>", lineStart)) {
+                    val start = openStart
+                    openStart = -1
+                    if (!onBlock(start)) return
                 }
             }
             lineStart = i + 1
         }
         i++
     }
-    return count
 }

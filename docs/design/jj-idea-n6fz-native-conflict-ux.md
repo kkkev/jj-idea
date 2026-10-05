@@ -452,6 +452,15 @@ only option. Ships last, deliberately: it's a pure UI re-wiring with no new logi
 before S1/S2 are validated in real use would remove the fallback before the replacement has proven
 itself.
 
+**Shipped (jj-idea-z9tp).** `actions/change/workingCopyConflicts.kt`'s `resolveConflicts` is split:
+`resolveConflictsInEditor` (default; opens the first conflicted file in path order, caret on its
+first block via `firstConflictBlockOffset`, one tab regardless of file count) and `openMergeTool`
+(the old #63-safe body). Every entry point now has both: tree-node "Resolve" / "Merge Tool" links,
+toolbar `Jujutsu.ResolveAllConflicts` / `Jujutsu.OpenMergeToolAll`, log menu
+`resolveConflictsAction` / `openMergeToolAction`, context menu `Jujutsu.ResolveSelectedConflicts` /
+`Jujutsu.OpenMergeToolSelected`; the banner keeps its "Open Merge Tool" link. Double-clicking a
+single conflicted Working-copy row now opens the editor too.
+
 ## Verification for the design itself
 
 This document's own claims are checkable without writing code:

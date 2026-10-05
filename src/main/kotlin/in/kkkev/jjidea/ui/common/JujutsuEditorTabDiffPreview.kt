@@ -6,14 +6,14 @@ import com.intellij.openapi.vcs.changes.ChangeViewDiffRequestProcessor.Wrapper
 import com.intellij.openapi.vcs.changes.ui.DefaultChangesTreeDiffPreviewHandler
 import com.intellij.openapi.vcs.changes.ui.TreeHandlerEditorDiffPreview
 import com.intellij.openapi.wm.ToolWindowManager
-import `in`.kkkev.jjidea.actions.change.resolveConflicts
+import `in`.kkkev.jjidea.actions.change.resolveConflictsInEditor
 import `in`.kkkev.jjidea.vcs.filePath
 import java.awt.event.MouseEvent
 
 class JujutsuEditorTabDiffPreview(
     private val jjTree: JujutsuChangesTree,
     // Only the Working Copy tool window's tree opts in: double-clicking a conflicted row there
-    // resolves that one file instead of opening the (read-only, for a conflict) diff preview -
+    // opens that one file in the editor (jj-idea-z9tp; the merge tool is a secondary action) instead of the (read-only, for a conflict) diff preview -
     // GitHub #66's "pick which file to start with" without a modal queue. Off by default: the
     // commit-details pane and compare-changes panel show historical/read-only trees where
     // resolving isn't meaningful (see resolveConflictsAvailability's NEEDS_EDIT state).
@@ -30,7 +30,7 @@ class JujutsuEditorTabDiffPreview(
         val conflictedChange = conflictForDoubleClick(resolveConflictsOnDoubleClick, jjTree.selectedChanges)
         val conflictedFile = conflictedChange?.filePath?.virtualFile
         if (conflictedFile != null) {
-            resolveConflicts(project, listOf(conflictedFile))
+            resolveConflictsInEditor(project, listOf(conflictedFile))
             return true
         }
         return super.handleDoubleClick(e)

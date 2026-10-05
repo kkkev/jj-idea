@@ -9,7 +9,8 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.SimpleTextAttributes
 import com.intellij.util.FontUtil
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.change.resolveConflicts
+import `in`.kkkev.jjidea.actions.change.openMergeTool
+import `in`.kkkev.jjidea.actions.change.resolveConflictsInEditor
 import javax.swing.JTree
 
 /**
@@ -27,9 +28,10 @@ private val CONFLICTS_TAG: ChangesBrowserNode.Tag = object : ChangesBrowserNode.
  * Deliberately does not extend the platform's `@ApiStatus.Internal` `ChangesBrowserConflictsNode`:
  * that class's "Resolve" link routes through `ConflictsResolutionService`, which ultimately calls
  * `AbstractVcsHelper.showMergeDialog` - the exact call GitHub #63 found to silently discard a side
- * of a jj conflict on cancel. This node's link instead funnels through [resolveConflicts], the
+ * of a jj conflict on cancel. This node's link instead "Resolve" opens the first conflicted file in the editor
+ * ([resolveConflictsInEditor]); the secondary "Merge Tool" link goes through [openMergeTool], the
  * same #63-safe [in.kkkev.jjidea.vcs.merge.JujutsuConflictResolver] entry point used by
- * `Jujutsu.ResolveSelectedConflicts` and the log-table "Resolve Conflicts…" action.
+ * `Jujutsu.OpenMergeToolSelected` and the log-table "Open Merge Tool…" action.
  */
 class JujutsuConflictsNode(private val project: Project) :
     TagChangesBrowserNode(CONFLICTS_TAG, SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES, true) {
@@ -48,7 +50,13 @@ class JujutsuConflictsNode(private val project: Project) :
             SimpleTextAttributes.LINK_BOLD_ATTRIBUTES,
             // Explicit Runnable: Kotlin will not SAM-convert a lambda to append()'s Object tag
             // parameter, and the link silently won't fire if this is written as a lambda.
-            Runnable { resolveConflicts(project, conflictedFilesUnder()) }
+            Runnable { resolveConflictsInEditor(project, conflictedFilesUnder()) }
+        )
+        renderer.append(FontUtil.spaceAndThinSpace(), SimpleTextAttributes.REGULAR_BOLD_ATTRIBUTES)
+        renderer.append(
+            JujutsuBundle.message("changes.node.conflicts.mergeTool"),
+            SimpleTextAttributes.LINK_ATTRIBUTES,
+            Runnable { openMergeTool(project, conflictedFilesUnder()) }
         )
     }
 

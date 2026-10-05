@@ -140,8 +140,14 @@
     <action id="Jujutsu.ResolveSelectedConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveSelectedConflictsAction"/>
 
+    <action id="Jujutsu.OpenMergeToolSelected"
+            class="in.kkkev.jjidea.actions.file.OpenMergeToolForSelectedConflictsAction"/>
+
     <action id="Jujutsu.ResolveAllConflicts"
             class="in.kkkev.jjidea.actions.file.ResolveAllConflictsAction"/>
+
+    <action id="Jujutsu.OpenMergeToolAll"
+            class="in.kkkev.jjidea.actions.file.OpenMergeToolForAllConflictsAction"/>
 
     <action id="Jujutsu.AcceptConflictCurrentSide"
             class="in.kkkev.jjidea.actions.file.AcceptConflictCurrentSideAction"/>
@@ -360,6 +366,7 @@
       <reference ref="Jujutsu.RestoreToChange"/>
       <separator/>
       <reference ref="Jujutsu.ResolveSelectedConflicts"/>
+      <reference ref="Jujutsu.OpenMergeToolSelected"/>
       <reference ref="Jujutsu.AcceptConflictCurrentSide"/>
       <reference ref="Jujutsu.AcceptConflictLastSide"/>
       <separator/>
@@ -414,6 +421,10 @@
          changes — see JujutsuBookmarkStatusBarWidgetFactory -->
     <listener class="in.kkkev.jjidea.ui.statusbar.JujutsuBookmarkStatusBarSettingsListener"
               topic="com.intellij.ide.ui.UISettingsListener"/>
+    <!-- Re-shows/hides the conflict editor banner when conflicted status changes without the banner's
+         own accept links (e.g. Undo) - see ConflictBannerRefresher -->
+    <listener class="in.kkkev.jjidea.ui.editor.ConflictBannerRefresher"
+              topic="com.intellij.openapi.vcs.changes.ChangeListListener"/>
   </projectListeners>
 
 </idea-plugin>

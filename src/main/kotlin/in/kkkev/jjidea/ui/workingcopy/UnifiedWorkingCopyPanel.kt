@@ -192,6 +192,7 @@ class UnifiedWorkingCopyPanel(private val project: Project) : JPanel(BorderLayou
         // Resolve all conflicts (GitHub #56): visible only when the working copy has conflicts,
         // so it's reachable even when the JujutsuConflictsNode is collapsed or scrolled out of view.
         group.add(ManagedActions["Jujutsu.ResolveAllConflicts"])
+        group.add(ManagedActions["Jujutsu.OpenMergeToolAll"])
 
         // Restore (GitHub #84): pre-checks whatever's selected in the tree, or opens empty for the
         // bound repo when nothing's selected - see RestoreSelectionAction's update()/singleRepoForRestore.

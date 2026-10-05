@@ -18,7 +18,7 @@ import com.intellij.ui.EditorNotificationProvider
 import com.intellij.ui.EditorNotifications
 import com.intellij.util.Alarm
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.change.resolveConflicts
+import `in`.kkkev.jjidea.actions.change.openMergeTool
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.OperationId
 import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
@@ -47,7 +47,7 @@ import javax.swing.JComponent
  *   GitHub #112), routed through `jj resolve --tool :ours`/`:theirs` - the same call
  *   [in.kkkev.jjidea.vcs.merge.JujutsuMergeProvider.acceptFilesRevisions] makes, so modify/delete
  *   conflicts correctly delete rather than leaving empty content;
- * - keeps a secondary **"Open Merge Tool"** link that calls the existing [resolveConflicts]
+ * - keeps a secondary **"Open Merge Tool"** link that calls the existing [openMergeTool]
  *   funnel, unchanged. It must never call
  *   [com.intellij.openapi.vcs.AbstractVcsHelper.showMergeDialog] directly; that's the exact call
  *   GitHub #63 found to silently discard a side of the conflict on cancel, and using it here
@@ -99,7 +99,7 @@ class JujutsuConflictEditorNotificationProvider : EditorNotificationProvider, Du
             }.toolTipText = side.label
         }
         panel.createActionLabel(JujutsuBundle.message("notification.conflict.mergeTool")) {
-            resolveConflicts(project, listOf(file))
+            openMergeTool(project, listOf(file))
         }
 
         if (document != null) {

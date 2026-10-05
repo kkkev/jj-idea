@@ -2642,7 +2642,7 @@ confirm that's no longer possible (below).
 
 **Conflict resolution**
 
-**Code:** `jj/conflict/`, `ui/editor/conflict/`, `vcs/merge/JujutsuConflictResolver.kt`, `vcs/merge/JujutsuMergeProvider.kt`, `vcs/diff/JujutsuConflictDiffRequestProvider.kt`, `ui/common/JujutsuConflictsNode.kt`, `actions/file/ResolveSelectedConflictsAction.kt`, `actions/file/ResolveAllConflictsAction.kt`, `actions/change/resolveConflictsAction.kt`, `actions/change/resolveConflictsAvailability.kt`
+**Code:** `jj/conflict/`, `ui/editor/conflict/`, `vcs/merge/JujutsuConflictResolver.kt`, `vcs/merge/JujutsuMergeProvider.kt`, `vcs/diff/JujutsuConflictDiffRequestProvider.kt`, `ui/common/JujutsuConflictsNode.kt`, `actions/file/ResolveSelectedConflictsAction.kt`, `actions/file/ResolveAllConflictsAction.kt`, `actions/change/resolveConflictsAction.kt`, `actions/change/workingCopyConflicts.kt`, `actions/change/resolveConflictsAvailability.kt`
 **Fixture:** FX-CONFLICT (content conflicts), FX-MD-CONFLICT (modify/delete conflicts)
 **Also re-run:** MT-CROSS (multi-repo scoping); MT-DIFF-PREVIEW, MT-LOG-DETAILS, MT-WORKINGCOPY (`JujutsuConflictDiffRequestProvider` is consumed via the shared preview-tab helper those sections cover); MT-DIFF, MT-DIFFBASE (the in-editor gutter's plugin-wide `editorFactoryListener` — see Shared Surfaces)
 
@@ -2709,16 +2709,17 @@ Commit tool window's single "Merge Conflicts / Resolve" grouping, it required hu
 files one at a time. This adds an equivalent affordance directly to the Working Copy panel.
 
 - [ ] With `file.txt` conflicted, a bold **"Merge Conflicts"** node appears at the **top** of the Working Copy changes tree, above the normal directory/repository grouping, showing a file count and a clickable **"Resolve"** link
-- [ ] Clicking the node's "Resolve" link opens the merge tool for every file under that node, one after another
-- [ ] Cancelling out of the merge tool from this entry point still **leaves conflict markers intact** (the GitHub #63 invariant — confirm with `jj status` after cancelling)
+- [ ] Clicking the node's "Resolve" link opens the **first** conflicted file (path order) **in the editor**, caret on its first `<<<<<<<` block, with the conflict banner showing — one tab only, never one per file (jj-idea-z9tp)
+- [ ] Clicking the node's secondary **"Merge Tool"** link opens the three-way merge tool for every file under that node, one after another
+- [ ] Cancelling out of the merge tool (via the "Merge Tool" link) from this entry point still **leaves conflict markers intact** (the GitHub #63 invariant — confirm with `jj status` after cancelling)
 - [ ] After resolving the only conflicted file, the "Merge Conflicts" node **disappears** on the next automatic refresh, without pressing Refresh (exercises the same jj-idea-3cvb fix as the file-level action)
 - [ ] Toggle **Group By → Directory / Repository / None** in the changes-tree toolbar: the "Merge Conflicts" node stays pinned at the top in all three modes, with the chosen grouping nested *inside* it
 - [ ] Multi-repo project with conflicts in two jj roots: a single "Merge Conflicts" node contains both roots' conflicted files (grouped by repository underneath, if that grouping is active)
 - [ ] Collapse the "Merge Conflicts" node, restart the IDE: it's still collapsed. Then create/resolve a conflict so the file count changes: it's **still collapsed** (the node's persisted collapse-state key must not embed the count)
-- [ ] Right-click the "Merge Conflicts" node itself → "Resolve Conflicts…": acts on every conflicted file under it (same as clicking the inline "Resolve" link)
-- [ ] The changes-tree toolbar has a **"Resolve All Conflicts…"** button, visible only when the working copy has at least one conflict
-- [ ] Select a **non-conflicted** file in the tree, with `file.txt` still conflicted elsewhere: the toolbar button **stays visible and works** (it must not depend on tree selection — this is the specific regression the button's separate action implementation exists to prevent)
-- [ ] Clicking the toolbar button resolves every conflicted file in the working copy, same as the node's link
+- [ ] Right-click the "Merge Conflicts" node itself → "Resolve Conflicts…" / "Open Merge Tool…": same as the inline "Resolve" / "Merge Tool" links respectively
+- [ ] The changes-tree toolbar has a **"Resolve Conflicts in Editor"** button and, right after it, an **"Open Merge Tool…"** button, both visible only when the working copy has at least one conflict
+- [ ] Select a **non-conflicted** file in the tree, with `file.txt` still conflicted elsewhere: both toolbar buttons **stay visible and work** (it must not depend on tree selection — this is the specific regression the button's separate action implementation exists to prevent)
+- [ ] Clicking "Resolve Conflicts in Editor" opens the first conflicted file in the editor; clicking "Open Merge Tool…" opens the merge tool for every conflicted file — same as the node's two links
 - [ ] With no conflicts at all: neither the "Merge Conflicts" node nor the toolbar button appear
 - [ ] Mixed jj + Git project: the node contains only jj conflicts, never Git-tracked conflicts from a co-located Git root
 
@@ -2732,7 +2733,7 @@ a user pick exactly which file(s) to act on instead.
       "Modify/delete conflicts" section above for how to set one up). Each row in the "Merge
       Conflicts" node shows jj's own shape text after the file name (e.g. "2-sided conflict" /
       "2-sided conflict including 1 deletion"), matching `jj resolve --list` verbatim
-- [ ] **Double-click** one conflicted row (not multi-selected): only that file's merge tool opens,
+- [ ] **Double-click** one conflicted row (not multi-selected): only that file opens **in the editor** at its first conflict block (jj-idea-z9tp; the merge tool is the "Open Merge Tool…" context-menu action),
       not a queue over the whole node
 - [ ] Double-click a **non-conflicted** row elsewhere in the tree: unaffected, still opens the
       normal diff preview
@@ -2790,7 +2791,7 @@ a user pick exactly which file(s) to act on instead.
 
 #### "Resolve Conflicts" context menu action (selection-scoped)
 
-There is a single `Jujutsu.ResolveSelectedConflicts` action behind "Resolve Conflicts…";
+`Jujutsu.ResolveSelectedConflicts` ("Resolve Conflicts…", opens the first conflicted file in the editor) and its sibling `Jujutsu.OpenMergeToolSelected` ("Open Merge Tool…", the modal) share one scoping rule;
 it's wired into both the Working Copy panel / commit details pane's file context menu and
 the Project view / editor "Jujutsu" submenu. It always resolves an explicit selection when
 there is one, and otherwise falls back to the single focused file (editor/project view) or
@@ -2806,9 +2807,9 @@ conflicted file reachable from the working copy).
 - [ ] Multi-select: selecting two conflicted files → both open in turn (second opens after the first is resolved)
 - [ ] Multi-select: selecting two **non-conflicted** files (with some other file elsewhere in the repo conflicted): "Resolve Conflicts…" is **not visible**
 - [ ] Right-clicking a **directory**, or the project root, in the Project view → Jujutsu submenu: "Resolve Conflicts…" is **not present** (no single file in scope to act on — there is no "resolve every conflicted file in the project" entry point at the file/project-view level; use the log row context menu for that, see below)
-- [ ] Right-clicking `file.txt` itself in the Project view → Jujutsu → Resolve Conflicts…: opens the merge tool for `file.txt`
-- [ ] Opening `file.txt` in the editor, right-clicking → Jujutsu → Resolve Conflicts…: opens the merge tool for **only** `file.txt` (scoped to the focused editor file, not every conflicted file)
-- [ ] **On IntelliJ/RustRover 2026.2 (build 262) specifically**: triggering "Resolve Conflicts…" opens the merge tool at all (jj-idea-qfgl / GitHub #55 — this used to silently do nothing)
+- [ ] Right-clicking `file.txt` itself in the Project view → Jujutsu → Resolve Conflicts…: opens `file.txt` in the editor at its first conflict (and Jujutsu → Open Merge Tool… opens the merge tool for it)
+- [ ] Opening `file.txt` in the editor, right-clicking → Jujutsu → Resolve Conflicts…: opens **only** `file.txt` in the editor; Open Merge Tool… opens the merge tool for **only** `file.txt` (scoped to the focused editor file, not every conflicted file)
+- [ ] **On IntelliJ/RustRover 2026.2 (build 262) specifically**: triggering "Open Merge Tool…" opens the merge tool at all (jj-idea-qfgl / GitHub #55 — this used to silently do nothing)
 
 #### Three-way merge tool — content correctness
 

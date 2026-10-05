@@ -3,11 +3,13 @@ package `in`.kkkev.jjidea.actions.file
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.actions.change.resolveConflicts
+import `in`.kkkev.jjidea.actions.change.openMergeTool
+import `in`.kkkev.jjidea.actions.change.resolveConflictsInEditor
 import `in`.kkkev.jjidea.actions.change.resolveSelectedAvailability
 import `in`.kkkev.jjidea.actions.changes
 import `in`.kkkev.jjidea.actions.file
@@ -32,14 +34,29 @@ import `in`.kkkev.jjidea.vcs.possibleJujutsuVcs
 internal fun scopeToConflicted(changes: List<FileChange>): List<FileChange>? =
     changes.takeIf { it.isNotEmpty() }?.filter { it.isConflicted }
 
-class ResolveSelectedConflictsAction : DumbAwareAction(
-    JujutsuBundle.message("action.resolve.selected.conflicts"),
-    JujutsuBundle.message("action.resolve.selected.conflicts.description"),
-    null
-) {
+/** Default: open the first selected conflicted file in the editor (design doc S6, jj-idea-z9tp). */
+class ResolveSelectedConflictsAction : SelectedConflictsAction(
+    "action.resolve.selected.conflicts",
+    ::resolveConflictsInEditor
+)
+
+/** Secondary: the modal three-way merge tool for the same selection. */
+class OpenMergeToolForSelectedConflictsAction : SelectedConflictsAction(
+    "action.open.merge.tool.selected",
+    ::openMergeTool
+)
+
+abstract class SelectedConflictsAction(
+    private val bundleKey: String,
+    private val perform: (Project, List<VirtualFile>) -> Unit
+) : DumbAwareAction(
+        JujutsuBundle.message(bundleKey),
+        JujutsuBundle.message("$bundleKey.description"),
+        null
+    ) {
     override fun actionPerformed(e: AnActionEvent) {
         val project = e.project ?: return
-        resolveConflicts(project, conflictedFilesFromContext(e))
+        perform(project, conflictedFilesFromContext(e))
     }
 
     override fun update(e: AnActionEvent) {
@@ -52,7 +69,7 @@ class ResolveSelectedConflictsAction : DumbAwareAction(
         e.presentation.isVisible = availability.visible
         e.presentation.isEnabled = availability.enabled
         if (availability.needsEditHint) {
-            e.presentation.text = JujutsuBundle.message("action.resolve.conflicts.needsEdit")
+            e.presentation.text = JujutsuBundle.message("$bundleKey.needsEdit")
             e.presentation.description = JujutsuBundle.message("action.resolve.conflicts.needsEdit.description")
         }
     }

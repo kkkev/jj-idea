@@ -137,7 +137,7 @@ class UnifiedWorkingCopyPanelBindingTest {
 
     /**
      * Regression test for jj-idea-lisi (GitHub #84): the changes toolbar must offer Restore
-     * alongside Resolve all conflicts, so it's reachable without first right-clicking a file.
+     * alongside Resolve all conflicts (and its Open Merge Tool sibling), so it's reachable without first right-clicking a file.
      */
     @Test
     fun `changes toolbar includes Restore after Resolve all conflicts`() {
@@ -146,11 +146,13 @@ class UnifiedWorkingCopyPanelBindingTest {
             val actions = panel.createChangesToolbar().actionGroup.getChildren(null).toList()
 
             val restoreIndex = actions.indexOf(ManagedActions["Jujutsu.RestoreFile"])
+            val mergeToolIndex = actions.indexOf(ManagedActions["Jujutsu.OpenMergeToolAll"])
             val resolveIndex = actions.indexOf(ManagedActions["Jujutsu.ResolveAllConflicts"])
 
             restoreIndex shouldNotBe -1
             resolveIndex shouldNotBe -1
-            restoreIndex shouldBe resolveIndex + 1 // immediately after, no separator between them
+            mergeToolIndex shouldBe resolveIndex + 1 // secondary "Open Merge Tool" sits right after the default
+            restoreIndex shouldBe mergeToolIndex + 1 // immediately after, no separator between them
         } finally {
             Disposer.dispose(panel)
         }

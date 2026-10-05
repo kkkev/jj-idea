@@ -98,6 +98,7 @@ object JujutsuLogContextMenuActions {
         // TODO Allow abandon on multiple if all entries are immutable
         add(abandonChangeAction(project, entry?.takeIf { !it.immutable }))
         add(resolveConflictsAction(project, entry))
+        add(openMergeToolAction(project, entry))
 
         addSeparator()
 
