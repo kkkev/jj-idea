@@ -57,6 +57,8 @@
     <projectService serviceImplementation="in.kkkev.jjidea.vcs.MutableContentRegistry"/>
     <vcs name="Jujutsu" vcsClass="in.kkkev.jjidea.vcs.JujutsuVcs" administrativeAreaName=".jj"/>
     <vcsRootChecker implementation="in.kkkev.jjidea.vcs.JujutsuRootChecker" order="first"/>
+    <!-- IntelliJ Tasks: a task is a bookmark (jj-idea-n3u0) -->
+    <vcs.taskHandler implementation="in.kkkev.jjidea.vcs.JujutsuTaskHandler"/>
     <!-- Promotes Jujutsu.ShowChangesDiff over built-in Compare.SameVersion/LastVersion for Ctrl+D -->
     <actionPromoter implementation="in.kkkev.jjidea.vcs.JujutsuActionPromoter"/>
 

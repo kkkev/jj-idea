@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- IntelliJ **Tasks** integration: with the Tasks plugin, opening a task can create a bookmark for it (the task's commit message becomes the new change's description), "Use branch" switches to an existing bookmark, and switching or closing tasks moves your working copy between them. Switching goes to the latest change in the task's stack (or starts a new change on top if the bookmark is immutable), and uncommitted edits are never lost because jj snapshots them. Closing a task with "Merge branch" ticked asks whether to rebase the whole task stack onto the original, make a merge change, or just switch back, and moves the task bookmark (and a mutable original bookmark) forward; the task bookmark is never deleted. ([#102](https://github.com/kkkev/jj-idea/issues/102))
+
 ### Changed
 - Per-project plugin settings are now stored in `.idea/workspace.xml` (which the IDE already keeps out of version control) instead of `.idea/jujutsu.xml`, so they no longer show up as a change in your repo. Existing settings carry over automatically and the old file is removed the next time the IDE saves; if you had committed `.idea/jujutsu.xml`, commit its deletion.
 

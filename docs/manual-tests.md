@@ -3872,6 +3872,46 @@ uses.
 - [ ] Change the selection, close and reopen the project (or restart the IDE) → the choice persisted
 - [ ] With the Drag and Drop preview feature off, all three icon buttons are entirely absent
 
+### MT-TASKS
+
+**IntelliJ Tasks integration (`vcs.taskHandler`, jj-idea-n3u0, GitHub #102)**
+
+**Code:** `vcs/JujutsuTaskHandler.kt`, `META-INF/plugin.xml` (`vcs.taskHandler`)
+**Also re-run:** MT-WORKINGCOPY (switching moves `@`); MT-BOOKMARK (task bookmarks appear in the widget and panel)
+
+Requires the bundled Tasks plugin (Tools → Tasks & Contexts). Use a repo with a pushed/immutable
+`main` bookmark and a mutable change on top.
+
+- [ ] Tools → Tasks & Contexts → Open Task… → create a local task "PROJ-1 test": the dialog offers
+      **Create branch**, **From:** lists bookmarks, and the suggested name is a valid bookmark
+- [ ] Commit the dialog with Create branch: `jj log` shows a bookmark with that name on a new
+      change that is `@`, described with the task's commit message
+- [ ] Same, when `@` was already empty and undescribed: no extra empty change is left behind
+- [ ] A name with a space or `@` is rejected by the dialog
+- [ ] Create a second task, then Switch to the first (Tools → Tasks & Contexts): `@` returns to
+      the first task's newest change; uncommitted edits in the second task are still there when
+      you switch back (no shelving needed)
+- [ ] A task whose bookmark is on an immutable change (e.g. `main`): switching to it creates a new
+      change on top instead of editing
+- [ ] **Use branch** with an existing bookmark switches `@` to it
+- [ ] Close Task (Tools → Tasks & Contexts → Close Task…): the **Commit changes** box is Tasks' own
+      and is expected to show "Jujutsu tracks changes automatically" if ticked - nothing to commit
+- [ ] Close Task with **Merge branch** ticked: a dialog offers *Rebase onto \<original\>*, *Merge* and
+      *Just Switch Back* (plus "Remember my choice")
+- [ ] Rebase: do two changes of work past the task bookmark first. After closing, the bookmark is on the
+      newest of them (not left behind), the whole stack sits on the original bookmark, and a mutable
+      original bookmark has fast-forwarded to it; `@` is on that stack
+- [ ] Rebase onto an immutable original (e.g. `main`): `main` does not move; `@` is a new change on `main`
+- [ ] Merge: a "Merge \<task\>" change with both as parents, a fresh empty `@` on top, mutable original
+      bookmark on the merge change
+- [ ] Just Switch Back: nothing is rewritten and no bookmark moves; the task bookmark is always kept
+- [ ] "Remember my choice" ticked: the next close skips the dialog (reset by clearing
+      `jj.tasks.closeMode` in `options/other.xml` of the IDE config)
+- [ ] Cancelling the dialog leaves the repo untouched
+- [ ] Switch task, then check the Undo balloon reverts the switch
+- [ ] Multi-root project: the task applies to every jj root that has the bookmark
+- [ ] Project with no jj root: the branch options are hidden in the Open Task dialog
+
 ### MT-CROSS
 
 **Multi-repository, visual consistency, edge cases, and error handling**
