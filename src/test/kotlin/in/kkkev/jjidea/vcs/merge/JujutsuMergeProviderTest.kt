@@ -34,7 +34,13 @@ class JujutsuMergeProviderTest {
     // acceptFilesRevisions's toolFor() then falls back to the pre-existing :ours/:theirs
     // mapping (see JujutsuMergeProviderTest's "acceptFilesRevisions" section below).
     private val extractor = mockk<ConflictExtractor>().also { every { it.extract(any()) } returns null }
-    private val provider = JujutsuMergeProvider(project, extractor, repoFor = { null }, refreshEditorNotifications = {})
+    private val provider = JujutsuMergeProvider(
+        project,
+        extractor,
+        repoFor = { null },
+        refreshEditorNotifications = {},
+        iterativeMergeEnabled = { false }
+    )
 
     private fun extractedConflict(
         current: String = "ours",
@@ -66,6 +72,41 @@ class JujutsuMergeProviderTest {
         result.CURRENT.toString(Charsets.UTF_8) shouldBe "ours"
         result.ORIGINAL.toString(Charsets.UTF_8) shouldBe "base"
         result.LAST.toString(Charsets.UTF_8) shouldBe "theirs"
+    }
+
+    @Test
+    fun `loadRevisions - iterative merge enabled - throws without reading the file`() {
+        val file = mockk<VirtualFile>()
+        var notified = 0
+        val iterative = JujutsuMergeProvider(
+            project,
+            extractor,
+            repoFor = { null },
+            refreshEditorNotifications = {},
+            notifyRefused = { notified++ },
+            iterativeMergeEnabled = { true }
+        )
+
+        shouldThrow<VcsException> { iterative.loadRevisions(file) }.message shouldContain "Resolve Conflicts"
+        notified shouldBe 1
+        verify(exactly = 0) { file.contentsToByteArray() }
+    }
+
+    @Test
+    fun `loadConflict - iterative merge enabled - still returns data`() {
+        val bytes = "content".toByteArray()
+        val file = mockk<VirtualFile>()
+        every { file.contentsToByteArray() } returns bytes
+        every { extractor.extract(bytes) } returns extractedConflict()
+        val iterative = JujutsuMergeProvider(
+            project,
+            extractor,
+            repoFor = { null },
+            refreshEditorNotifications = {},
+            iterativeMergeEnabled = { true }
+        )
+
+        iterative.loadConflict(file).mergeData.CURRENT.toString(Charsets.UTF_8) shouldBe "ours"
     }
 
     @Test

@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.actions.change
 
+import com.intellij.openapi.application.runReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
@@ -50,11 +51,14 @@ internal fun firstConflictToOpen(files: List<VirtualFile>): VirtualFile? = files
 internal fun resolveConflictsInEditor(
     project: Project,
     files: List<VirtualFile>,
+    // Tree link clicks arrive on the EDT without a read lock, which 2026.2 asserts on.
+    documentText: (VirtualFile) -> CharSequence? = { file ->
+        runReadAction { FileDocumentManager.getInstance().getDocument(file)?.immutableCharSequence }
+    },
     open: (VirtualFile, Int) -> Unit = { file, offset -> OpenFileDescriptor(project, file, offset).navigate(true) }
 ) {
     val file = firstConflictToOpen(files) ?: return
-    val offset = FileDocumentManager.getInstance().getDocument(file)
-        ?.let { firstConflictBlockOffset(it.immutableCharSequence) } ?: 0
+    val offset = documentText(file)?.let { firstConflictBlockOffset(it) } ?: 0
     open(file, offset)
 }
 

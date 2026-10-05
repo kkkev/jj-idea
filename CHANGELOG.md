@@ -24,6 +24,8 @@ This plugin now supports drag-and-drop: rebase, duplicate, move bookmarks and ta
 - **Long lines in the log graph** (50 rows or more) now show as a short line with an arrow at each end instead of running the whole way, and the lane in between is freed for other branches, so graphs with very long edges stay narrow. Hover either arrow to highlight the whole line, and click it to jump to the other end.
 
 ### Fixed
+- The IDE's built-in Commit tool window "Merge Conflicts → Resolve" link can no longer silently discard one side of a jj conflict when you cancel the merge dialog; it now shows a message pointing to Jujutsu's own **Resolve Conflicts…** / **Open Merge Tool…**, plus a notification with an **Open Working Copy** button. (IntelliJ 2026.2+; older versions' merge dialog was already safe.)
+- Clicking **Resolve** on the Working Copy tool window's "Merge Conflicts" node no longer throws a threading error on IntelliJ 2026.2.
 - The working-copy status bar widget no longer logs an "Access is allowed from Event Dispatch Thread" error on startup, and now reliably shows its initial state and tracks status bar resizes.
 - Undoing a conflict resolution (from the balloon, **Undo Last Operation**, or `jj undo`) now brings the conflict banner back in the editor.
 - Opening the log's **Reference** dropdown no longer freezes the IDE in repositories with thousands of bookmarks or tags (reported at 17 seconds); the **Author** dropdown had the same slowdown with many authors. Building the menu used to take time quadratic in the number of entries and now takes linear time. ([#136](https://github.com/kkkev/jj-idea/issues/136))

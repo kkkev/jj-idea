@@ -1,7 +1,9 @@
 package `in`.kkkev.jjidea.vcs.merge
 
+import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vcs.merge.MergeData
@@ -9,6 +11,7 @@ import com.intellij.openapi.vcs.merge.MergeProvider2
 import com.intellij.openapi.vcs.merge.MergeSession
 import com.intellij.openapi.vcs.merge.MergeSessionEx
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ui.EditorNotifications
 import com.intellij.util.ui.ColumnInfo
 import `in`.kkkev.jjidea.JujutsuBundle
@@ -21,6 +24,8 @@ import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.jj.relativePathOf
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
+import `in`.kkkev.jjidea.ui.services.addExpiringAction
+import `in`.kkkev.jjidea.ui.workingcopy.WorkingCopyToolWindowFactory
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
@@ -34,10 +39,54 @@ class JujutsuMergeProvider(
     },
     private val notifyError: (title: String, message: String) -> Unit = { title, message ->
         JujutsuNotifications.notify(project, title, message, NotificationType.ERROR)
+    },
+    // Fired when [loadRevisions] refuses: the platform dialog can only show our exception as an
+    // error, so also offer a friendlier info balloon that leads to the Working Copy window.
+    private val notifyRefused: () -> Unit = { showRefusedNotification(project) },
+    // Defaults to false: the key doesn't exist on older builds, whose merge flow is one-shot.
+    private val iterativeMergeEnabled: () -> Boolean = {
+        Registry.`is`("vcs.merge.conflict.iterative.resolution", false)
     }
 ) : MergeProvider2 {
-    // Called on a background thread by the merge framework
-    override fun loadRevisions(file: VirtualFile): MergeData = loadConflict(file).mergeData
+    /**
+     * Called on a background thread by the merge framework.
+     *
+     * Refuses (jj-idea-ddcd) when the platform's iterative merge flow is on. The platform's native
+     * `MultipleFileMergeDialog` (the Commit tool window's "Merge Conflicts → Resolve" link, which
+     * jj-idea can't suppress) calls this before every path that edits the real file's Document -
+     * "Merge...", "Resolve automatically" and iterative Accept Yours/Theirs - and in that flow
+     * cancelling saves the Document without restoring it, silently discarding a side of the
+     * conflict (see [JujutsuConflictResolver], GitHub #63). The dialog catches [VcsException] and
+     * shows it as an error, leaving the file untouched.
+     *
+     * jj-idea's own code must use [loadConflict], which never refuses.
+     *
+     * ### Why refuse instead of disabling the native flow for jj repos?
+     * Every way of switching that flow off is unavailable or too broad:
+     * - The "Merge Conflicts" node and its "Resolve" link are built by the platform
+     *   (`ChangesBrowserConflictsNode`, `@ApiStatus.Internal`) and have no suppression API.
+     * - The one extension point that touches that link (`MergeResolveActionProvider`) can only add
+     *   alternatives beside it, is `@ApiStatus.Internal`, and exists on 2026.2+ only. Registering
+     *   into it on older builds needs `@TestOnly`/internal API at runtime.
+     * - `vcs.merge.conflict.iterative.resolution=false` is an application-wide registry flag that
+     *   would also change Git's merge UX, and can't be toggled per-VCS or just in time.
+     * - Reporting jj conflicts under a plugin-defined `FileStatus` (so the node never appears)
+     *   was rejected: it would lose platform affordances and touch every consumer of
+     *   `MERGED_WITH_CONFLICTS` (see jj-idea-ddcd notes).
+     * - For jj-only projects the whole standard Commit tool window is already hidden (jj-idea-wb5l),
+     *   so this only matters in mixed jj + Git projects, or when the user un-hides that window.
+     *
+     * Refusing here is the one lever that is both public API and scoped to jj. Revisit if the
+     * platform stops routing the dialog through [loadRevisions], renames or removes the registry
+     * key, or exposes a supported way to suppress or replace the native link.
+     */
+    override fun loadRevisions(file: VirtualFile): MergeData {
+        if (iterativeMergeEnabled()) {
+            notifyRefused()
+            throw VcsException(JujutsuBundle.message("merge.nativeDialog.unsafe"))
+        }
+        return loadConflict(file).mergeData
+    }
 
     /**
      * Like [loadRevisions], but also returns jj's own label for whichever side landed in
@@ -174,6 +223,22 @@ class JujutsuMergeProvider(
     }
 
     private companion object {
+        fun showRefusedNotification(project: Project) {
+            val notification = NotificationGroupManager.getInstance()
+                .getNotificationGroup("Jujutsu")
+                .createNotification(
+                    JujutsuBundle.message("merge.nativeDialog.notification.title"),
+                    JujutsuBundle.message("merge.nativeDialog.notification.message"),
+                    NotificationType.INFORMATION
+                )
+            notification.addExpiringAction("merge.nativeDialog.notification.open") {
+                ToolWindowManager.getInstance(project)
+                    .getToolWindow(WorkingCopyToolWindowFactory.TOOL_WINDOW_ID)
+                    ?.activate(null, true)
+            }
+            notification.notify(project)
+        }
+
         // See the comment on getMergeInfoColumns above for why these exist. valueOf is blank —
         // the names alone are what the platform needs.
         val yoursColumn = createColumn("merge.column.yours")

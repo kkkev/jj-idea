@@ -101,16 +101,9 @@ class WorkingCopyConflictsTest {
     fun `resolveConflictsInEditor opens exactly one file regardless of how many are conflicted`() {
         val opened = mutableListOf<Pair<VirtualFile, Int>>()
         val files = (1..50).map { n -> mockk<VirtualFile> { every { path } returns "/repo/f$n.txt" } }
-        val doc = mockk<com.intellij.openapi.editor.Document> {
-            every { immutableCharSequence } returns "x\n<<<<<<< c\na\n>>>>>>> e\n"
-        }
-        val fdm = mockk<com.intellij.openapi.fileEditor.FileDocumentManager> {
-            every { getDocument(any()) } returns doc
-        }
-        mockkStatic(com.intellij.openapi.fileEditor.FileDocumentManager::class)
-        every { com.intellij.openapi.fileEditor.FileDocumentManager.getInstance() } returns fdm
+        val text = "x\n<<<<<<< c\na\n>>>>>>> e\n"
 
-        resolveConflictsInEditor(project, files) { f, off -> opened += f to off }
+        resolveConflictsInEditor(project, files, documentText = { text }) { f, off -> opened += f to off }
 
         opened.size shouldBe 1
         opened.single().first.path shouldBe "/repo/f1.txt"

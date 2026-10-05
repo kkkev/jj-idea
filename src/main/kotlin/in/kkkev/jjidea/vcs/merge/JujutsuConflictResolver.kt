@@ -40,19 +40,16 @@ import java.nio.file.Files
  * when the tool reports a non-cancel result. Files resolve one at a time; cancelling stops the
  * remaining queue, matching `showMergeDialog`'s one-shot-per-invocation semantics.
  *
- * ### Known residual gap: the native Commit tool window's own "Resolve" link (jj-idea-ddcd)
+ * ### The native Commit tool window's own "Resolve" link (jj-idea-ddcd)
  * The standard Commit / Local Changes tool window renders its own "Merge Conflicts" node
  * (`ChangesBrowserConflictsNode` in the platform) with a built-in "Resolve" link that calls
- * `AbstractVcsHelper.showMergeDialog` directly — bypassing this class entirely — so it has the
- * exact same discard-on-cancel bug described above. jj-idea cannot intercept, replace, or
- * suppress that link: there's no extension point to remove/override it, and the one EP that can
- * add an *alternative* link next to it (`MergeResolveActionProvider`) is unusable — it's
- * `@ApiStatus.Internal` and only exists on 2026.2+, and the only way to register into it at
- * runtime without a hard compile-time dependency on that missing class is a platform method
- * marked `@TestOnly` (see jj-idea-ddcd's notes for the full investigation). Since jj-idea-wb5l,
- * this is masked for the common case by hiding the standard Commit tool window entirely for
- * jj-only projects; the gap only remains reachable if a user opts back into that window, or in
- * a mixed jj + Git project.
+ * `AbstractVcsHelper.showMergeDialog` directly - bypassing this class - so it would have the
+ * same discard-on-cancel bug. jj-idea can't intercept or suppress that link (the only EP that
+ * could add an alternative, `MergeResolveActionProvider`, is `@ApiStatus.Internal` and 2026.2+
+ * only), so instead [JujutsuMergeProvider.loadRevisions] refuses while the iterative flow is
+ * enabled: every dialog path that edits the real Document loads revisions first, so the user
+ * gets an error pointing here and the file is untouched. Reachable only in mixed jj + Git
+ * projects, or jj-only with the standard Commit tool window un-hidden (jj-idea-wb5l).
  *
  * The Working Copy tool window's own replacement for that grouped affordance is
  * [in.kkkev.jjidea.ui.common.JujutsuConflictsNode] (GitHub #56, jj-idea-uoeg) — a "Merge

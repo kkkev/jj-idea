@@ -88,7 +88,6 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 
 - **jj-idea-7d9p** — "Compare with Another Commit" missing from Details Changes Panel / Working Copy Panel.
 - **jj-idea-zvzk** — "Compare with local" missing from editors for historical versions.
-- **jj-idea-ddcd** — native Commit tool window's "Resolve" link discards a side on cancel; use jj-idea's own "Resolve Conflicts…" entries instead, never this one.
 
 ## Test Sections
 
@@ -2705,7 +2704,8 @@ onto `modified externally` so it conflicts.
 - [ ] A **merge** conflict (two arbitrary commits combined, not a rebase) and a **squash**
       conflict still show today's unswapped ordering — confirm neither reads backwards now that
       rebase conflicts do reorient
-- [ ] In the platform's native multi-file merge dialog (Commit tool window, if enabled) for the
+- [ ] In the platform's native multi-file merge dialog (Commit tool window, if enabled; only on
+      an IDE where the iterative flow is off — otherwise it refuses, see below) for the
       same rebase conflict, bulk **"Accept Yours"** and the interactive dialog's left pane resolve
       to the **same content** — confirm with `jj status`/file content after each — and likewise
       for **"Accept Theirs"** and the right pane
@@ -2997,8 +2997,14 @@ right after a manual marker edit, before the next jj snapshot).
 - [ ] Repeat all three checks above for each marker style (git, snapshot, diff)
 - [ ] Multi-file: with two conflicted files, cancel the merge tool for the first → the second file's merge tool **never opens** and remains conflicted untouched
 
-The native Commit tool window's own "Resolve" link is a known gap for this invariant — see
-jj-idea-ddcd in [Known gaps](#known-gaps).
+Native Commit tool window (jj-idea-ddcd; mixed jj + Git project, or jj-only with "Hide the standard
+Commit tool window" unchecked; **IntelliJ 2026.2+ only** — on 2025.3 and older the dialog is the one-shot flow whose Accept Yours/Theirs buttons work via `jj resolve` and whose cancel restores the file, so there is nothing to refuse):
+
+- [ ] Commit tool window → Merge Conflicts → **Resolve** → select `file.txt` → **Merge…**: an error dialog says the dialog can discard a side and points to Resolve Conflicts / Open Merge Tool; `file.txt` stays conflicted with its markers intact (`jj status`, file content)
+- [ ] Same dialog, **Resolve automatically** and **Accept Yours** / **Accept Theirs**: same error, file untouched
+- [ ] Each refusal also shows an info balloon "Use the Working Copy window to resolve conflicts" with an **Open Working Copy** button that activates the Working Copy tool window
+- [ ] Closing that dialog (`x`/Cancel) leaves the file conflicted
+- [ ] Working Copy tool window → Merge Conflicts node → **Resolve** opens the first conflicted file at its first conflict with no exception (2026.2 read-lock regression)
 
 #### Accept Yours / Accept Theirs (in the merge tool)
 
