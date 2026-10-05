@@ -27,8 +27,8 @@ interface LayoutCalculator<I : Any> {
  * point, which [in.kkkev.jjidea.ui.log.JujutsuCommitGraph.CommitGraphBuilder] uses directly
  * for the merged-log fast path instead of going through this wrapper.
  */
-class LayoutCalculatorImpl<I : Any> : LayoutCalculator<I> {
-    private val engine = IncrementalLayout<I>()
+class LayoutCalculatorImpl<I : Any>(longEdgeRows: Int = LONG_EDGE_ROWS) : LayoutCalculator<I> {
+    private val engine = IncrementalLayout<I>(longEdgeRows)
 
     /**
      * Work-count of per-row passthrough/lane bookkeeping in the last [calculate] call.

@@ -11,6 +11,7 @@ import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.mockk.mockk
 import org.junit.jupiter.api.Test
 
@@ -373,5 +374,59 @@ class GraphEdgeIndexTest {
         up.emphasized(5) shouldBe true
         up.emphasized(4) shouldBe true
         up.emphasized(8) shouldBe false
+    }
+
+    // --- jj-idea-66rr: long edges collapse to two arrowed caps with the lane freed between ---
+
+    /** `top` (row 0) has parents `m0` (a 60-commit chain on lane 0) and `z` (row 61): a long edge. */
+    private fun longEdgeEntries(): List<LogEntry> {
+        val gap = 60
+        val fillers = (0 until gap).map { i -> entry("m$i", listOf(if (i + 1 < gap) "m${i + 1}" else "z")) }
+        return listOf(entry("top", listOf("m0", "z"))) + fillers + entry("z")
+    }
+
+    private val longEdge get() = GraphEdge(key("top"), key("z"), null)
+
+    @Test
+    fun `a long edge is two caps with arrows and nothing in between`() {
+        val index = buildIndex(longEdgeEntries())
+        val topLane = index.outgoingEdges(0).first { it.edge == longEdge }.lane
+        val bottomLane = index.incomingEdges(61).first { it.edge == longEdge }.lane
+
+        index.capArrows(1).map { it.edge to it.direction } shouldContain (longEdge to EdgeDirection.DOWN)
+        index.capArrows(60).map { it.edge to it.direction } shouldContain (longEdge to EdgeDirection.UP)
+        index.edgeAt(1, topLane) shouldBe longEdge
+        index.edgeAt(60, bottomLane) shouldBe longEdge
+        // The freed middle: no passthrough line for it, and nothing resolves to it there.
+        for (row in 2..59) {
+            index.passthroughLanes(row) shouldNotContain topLane
+            index.edgeAt(row, topLane) shouldNotBe longEdge
+        }
+    }
+
+    @Test
+    fun `collapsing a long edge narrows the middle rows of the graph`() {
+        val index = buildIndex(longEdgeEntries())
+        // Only lane 0 (the filler chain) is active between the caps.
+        for (row in 3..58) index.rightmostLane(row) shouldBe 0
+    }
+
+    @Test
+    fun `a collapsed edge is navigable from either cap even with both ends on screen`() {
+        val index = buildIndex(longEdgeEntries())
+        val topLane = index.outgoingEdges(0).first { it.edge == longEdge }.lane
+        val bottomLane = index.incomingEdges(61).first { it.edge == longEdge }.lane
+        val everything = 0..61
+
+        val top = index.hoveredEdgeAt(1, topLane, everything).shouldNotBeNull()
+        top.direction shouldBe EdgeDirection.DOWN
+        top.targetKey shouldBe key("z")
+        top.emphasized(1) shouldBe true
+        top.emphasized(60) shouldBe true // both caps light up together
+
+        val bottom = index.hoveredEdgeAt(60, bottomLane, everything).shouldNotBeNull()
+        bottom.direction shouldBe EdgeDirection.UP
+        bottom.targetKey shouldBe key("top")
+        bottom.emphasized(1) shouldBe true
     }
 }

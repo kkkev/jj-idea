@@ -4,8 +4,15 @@ private data class ChildInfo<I : Any>(val id: I, val lane: Int)
 
 private data class Passthrough<I : Any>(
     val lane: Int, // The lane this passthrough blocks
-    val targetParentId: I
+    val targetParentId: I,
+    /** The row whose step 2 removes this passthrough (the lane is free for that row's own node). */
+    val endRow: Int,
+    /** Set on a long edge's bottom cap: the child it belongs to, recorded on the parent's row when removed. */
+    val capChildId: I? = null
 )
+
+/** A long edge's bottom cap, to be allocated a lane when row `parent - LONG_EDGE_PART_ROWS` is processed. */
+private data class PendingCap<I : Any>(val childId: I, val parentId: I, val preferredLane: Int)
 
 /**
  * Cross-row forward-pass state as of just before processing row [rowIndex] - enough to
@@ -15,7 +22,8 @@ private data class Passthrough<I : Any>(
 private class Checkpoint<I : Any>(
     val rowIndex: Int,
     val passthroughs: Set<Passthrough<I>>,
-    val reservedLanes: Map<I, Int>
+    val reservedLanes: Map<I, Int>,
+    val pendingCaps: Map<Int, List<PendingCap<I>>>
 )
 
 /**
@@ -61,7 +69,11 @@ private class Checkpoint<I : Any>(
  * case, where `allIds` is a superset of a *different* visible subset, is only ever used
  * via a fresh `reset()` + one full [append] - never mixed with a resumed one).
  */
-class IncrementalLayout<I : Any> {
+class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS) {
+    init {
+        require(longEdgeRows > 2 * LONG_EDGE_PART_ROWS + 1) { "longEdgeRows too small for two caps: $longEdgeRows" }
+    }
+
     private companion object {
         /**
          * Rows between two checkpoints. A resume lands on the latest checkpoint at or
@@ -91,10 +103,14 @@ class IncrementalLayout<I : Any> {
     private val passthroughLanesByEntry = HashMap<I, Map<I, Int>>()
     private val unresolvedParentsByEntry = HashMap<I, MutableMap<I, ParentState>>()
     private val stubLaneByEntry = HashMap<I, Int>()
+    private val capLanesByEntry = HashMap<I, MutableMap<I, Int>>()
 
     // Cross-row state threaded through the forward pass; snapshotted into [checkpoints].
     private var passthroughs = HashSet<Passthrough<I>>()
     private var reservedLanes = HashMap<I, Int>()
+
+    // Long edges' bottom caps awaiting allocation, keyed by the row that allocates them.
+    private var pendingCaps = HashMap<Int, MutableList<PendingCap<I>>>()
 
     // For each parent id currently referenced but not loaded, the lowest row index that
     // references it - the earliest row an append resolving that id must reprocess from.
@@ -115,8 +131,10 @@ class IncrementalLayout<I : Any> {
         passthroughLanesByEntry.clear()
         unresolvedParentsByEntry.clear()
         stubLaneByEntry.clear()
+        capLanesByEntry.clear()
         passthroughs = HashSet()
         reservedLanes = HashMap()
+        pendingCaps = HashMap()
         unresolvedParentRow.clear()
         checkpoints.clear()
         rows.clear()
@@ -152,7 +170,9 @@ class IncrementalLayout<I : Any> {
 
         for (rowIndex in resumeFrom until newSize) {
             if (rowIndex % CHECKPOINT_INTERVAL == 0) {
-                checkpoints.add(Checkpoint(rowIndex, HashSet(passthroughs), HashMap(reservedLanes)))
+                checkpoints.add(
+                    Checkpoint(rowIndex, HashSet(passthroughs), HashMap(reservedLanes), copyOf(pendingCaps))
+                )
             }
             processRow(rowIndex)
         }
@@ -214,12 +234,14 @@ class IncrementalLayout<I : Any> {
             }
             passthroughLanesByEntry.remove(e.current)
             stubLaneByEntry.remove(e.current)
+            capLanesByEntry.remove(e.current)
         }
 
         rows.subList(resumeFrom, rows.size).clear()
 
         passthroughs = if (checkpointIndex >= 0) HashSet(checkpoints[checkpointIndex].passthroughs) else HashSet()
         reservedLanes = if (checkpointIndex >= 0) HashMap(checkpoints[checkpointIndex].reservedLanes) else HashMap()
+        pendingCaps = if (checkpointIndex >= 0) copyOf(checkpoints[checkpointIndex].pendingCaps) else HashMap()
         while (checkpoints.isNotEmpty() && checkpoints.last().rowIndex >= resumeFrom) {
             checkpoints.removeAt(checkpoints.size - 1)
         }
@@ -227,13 +249,22 @@ class IncrementalLayout<I : Any> {
         return resumeFrom to oldLanes
     }
 
+    private fun copyOf(caps: Map<Int, List<PendingCap<I>>>) =
+        caps.mapValuesTo(HashMap()) { (_, list) -> list.toMutableList() }
+
     /** One row of the forward pass - identical shape to the original [LayoutCalculatorImpl] loop body. */
     private fun processRow(rowIndex: Int) {
         val entry = entries[rowIndex]
 
         // Step 2: Terminate passthroughs that end at this entry
         operationCount += passthroughs.size
-        passthroughs.removeAll { it.targetParentId == entry.current }
+        passthroughs.removeAll { pt ->
+            (pt.endRow == rowIndex).also { ended ->
+                if (ended && pt.capChildId != null) {
+                    capLanesByEntry.getOrPut(entry.current) { mutableMapOf() }[pt.capChildId] = pt.lane
+                }
+            }
+        }
 
         // Step 1: Determine lane (after terminating passthroughs so lane may become available)
         operationCount += passthroughs.size
@@ -266,32 +297,78 @@ class IncrementalLayout<I : Any> {
                 continue
             }
             val isAdjacent = parentRow == rowIndex + 1
+            val isLong = parentRow - rowIndex >= longEdgeRows
+
+            // A long edge's lane is only held for its top cap; its bottom cap is allocated at
+            // parentRow - LONG_EDGE_PART_ROWS (jj-idea-66rr).
+            fun openPassthrough(passLane: Int) {
+                if (isLong) {
+                    newPassthroughs.add(
+                        Passthrough(passLane, parentId, endRow = rowIndex + LONG_EDGE_PART_ROWS + 1)
+                    )
+                    pendingCaps.getOrPut(parentRow - LONG_EDGE_PART_ROWS) { mutableListOf() }
+                        .add(PendingCap(entry.current, parentId, passLane))
+                } else {
+                    newPassthroughs.add(Passthrough(passLane, parentId, endRow = parentRow))
+                }
+            }
 
             operationCount += childrenByParent[parentId]?.size ?: 0
             val parentHasOtherChildren = childrenByParent[parentId]?.any { it.id != entry.current } == true
 
-            if (!childHasMultipleParents || parentHasOtherChildren) {
+            if (isLong && childHasMultipleParents) {
+                // A merge's long edge never shares the child's lane with a sibling connector: its
+                // arrow would sit on the sibling's line, and edgeAt/hover resolve that lane to the
+                // longer-spanning sibling, leaving the arrow unclickable. Fresh lane, unreserved.
+                val capLane = firstFreeLane(usedLanes)
+                usedLanes.add(capLane)
+                openPassthrough(capLane)
+            } else if (!childHasMultipleParents || parentHasOtherChildren) {
                 childLaneUsed = true
-                if (!isAdjacent) newPassthroughs.add(Passthrough(lane = lane, targetParentId = parentId))
+                if (!isAdjacent) openPassthrough(lane)
             } else if (!childLaneUsed) {
                 childLaneUsed = true
-                if (!isAdjacent) newPassthroughs.add(Passthrough(lane = lane, targetParentId = parentId))
+                if (!isAdjacent) openPassthrough(lane)
             } else {
                 val newLane = firstFreeLane(usedLanes)
                 usedLanes.add(newLane)
-                reservedLanes[parentId] = newLane
-                if (!isAdjacent) newPassthroughs.add(Passthrough(lane = newLane, targetParentId = parentId))
+                // No reservation for a long edge: holding the lane (and forcing the parent onto it)
+                // for the whole span would defeat releasing it.
+                if (!isLong) reservedLanes[parentId] = newLane
+                if (!isAdjacent) openPassthrough(newLane)
             }
         }
 
         val unresolvedHere = unresolvedParentsByEntry[entry.current]
         if (!unresolvedHere.isNullOrEmpty() && entry.parents.any { rowByChangeId.containsKey(it) }) {
             operationCount += usedLanes.size
-            stubLaneByEntry[entry.current] = firstFreeLane(usedLanes)
+            val stubLane = firstFreeLane(usedLanes)
+            stubLaneByEntry[entry.current] = stubLane
+            usedLanes.add(stubLane)
+        }
+
+        // Allocate the bottom caps of long edges whose parent is LONG_EDGE_PART_ROWS below. Done
+        // last so every lane this row already needs (node, connectors, stub) takes precedence.
+        val newCaps = mutableListOf<Passthrough<I>>()
+        pendingCaps.remove(rowIndex)?.let { caps ->
+            operationCount += caps.size
+            for (cap in caps) {
+                val capLane = if (cap.preferredLane !in usedLanes) cap.preferredLane else firstFreeLane(usedLanes)
+                usedLanes.add(capLane)
+                newCaps.add(
+                    Passthrough(
+                        capLane,
+                        cap.parentId,
+                        endRow = rowByChangeId.getValue(cap.parentId),
+                        capChildId = cap.childId
+                    )
+                )
+            }
         }
 
         lanes[entry.current] = lane
         passthroughs.addAll(newPassthroughs)
+        passthroughs.addAll(newCaps)
         if (newPassthroughs.isNotEmpty()) {
             passthroughLanesByEntry[entry.current] = newPassthroughs.associate { it.targetParentId to it.lane }
         }
@@ -306,6 +383,7 @@ class IncrementalLayout<I : Any> {
         val entryPassthroughLanes = passthroughLanesByEntry[entry.current] ?: emptyMap()
         val unresolvedParents = unresolvedParentsByEntry[entry.current] ?: emptyMap()
         val stubLane = stubLaneByEntry[entry.current]
+        val capLanes = capLanesByEntry[entry.current] ?: emptyMap()
 
         return RowLayout(
             entry.current,
@@ -314,7 +392,8 @@ class IncrementalLayout<I : Any> {
             parentLanes,
             entryPassthroughLanes,
             unresolvedParents,
-            stubLane
+            stubLane,
+            capLanes
         )
     }
 

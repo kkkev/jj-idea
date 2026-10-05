@@ -19,6 +19,7 @@ This plugin now supports drag-and-drop: rebase, duplicate, move bookmarks and ta
 ### Changed
 - **Resolve Conflicts** now opens the conflicted file in the editor, with the caret on its first conflict and the conflict banner showing, instead of the three-way merge tool. This applies to the Merge Conflicts node link, the toolbar button, the log and file context menus, and double-clicking a conflicted file in the Working Copy tree; only the first conflicted file opens. The merge tool is still one click away as **Open Merge Tool…** at each of these places.
 - Per-project plugin settings are now stored in `.idea/workspace.xml` (which the IDE already keeps out of version control) instead of `.idea/jujutsu.xml`, so they no longer show up as a change in your repo. Existing settings carry over automatically and the old file is removed the next time the IDE saves; if you had committed `.idea/jujutsu.xml`, commit its deletion.
+- **Long lines in the log graph** (50 rows or more) now show as a short line with an arrow at each end instead of running the whole way, and the lane in between is freed for other branches, so graphs with very long edges stay narrow. Hover either arrow to highlight the whole line, and click it to jump to the other end.
 
 ### Fixed
 - The working-copy status bar widget no longer logs an "Access is allowed from Event Dispatch Thread" error on startup, and now reliably shows its initial state and tracks status bar resizes.

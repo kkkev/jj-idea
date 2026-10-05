@@ -1,5 +1,15 @@
 package `in`.kkkev.jjidea.ui.log.graph
 
+/**
+ * An edge spanning at least this many rows is drawn as short end caps with arrows, and its lane is
+ * released between them (jj-idea-66rr). IntelliJ's vcs-log uses 30
+ * (`LONG_EDGE_SIZE` in `PrintElementGeneratorImpl`); 50 collapses fewer, less-obviously-long edges.
+ */
+const val LONG_EDGE_ROWS = 50
+
+/** Rows of line kept at each end of a long edge, arrow included - IntelliJ's `LONG_EDGE_PART_SIZE`. */
+const val LONG_EDGE_PART_ROWS = 1
+
 // === Input ===
 
 data class GraphEntry<I : Any>(
@@ -48,5 +58,12 @@ data class RowLayout<I : Any>(
      * Scoped to this row only - not a passthrough, not reserved for any other row. Null when no
      * separate lane is needed (row has no loaded parent at all, so the stub can use [lane]).
      */
-    val stubLane: Int? = null
+    val stubLane: Int? = null,
+    /**
+     * For each *long* edge (see [LONG_EDGE_ROWS]) arriving at this row, the lane of its bottom cap
+     * (child id → lane). Its top cap is the child's own [passthroughLanes] entry for this row's id;
+     * between the two caps the edge occupies no lane at all. Recorded on the parent so a rewind that
+     * rebuilds this row re-derives it from the threaded passthrough state.
+     */
+    val longEdgeCapLanes: Map<I, Int> = emptyMap()
 )

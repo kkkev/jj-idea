@@ -38,7 +38,9 @@ data class GraphNode(
     /** See [in.kkkev.jjidea.ui.log.graph.RowLayout.unresolvedParents]. */
     val unresolvedParents: Map<ChangeKey, ParentState> = emptyMap(),
     /** See [in.kkkev.jjidea.ui.log.graph.RowLayout.stubLane]. */
-    val stubLane: Int? = null
+    val stubLane: Int? = null,
+    /** See [in.kkkev.jjidea.ui.log.graph.RowLayout.longEdgeCapLanes]. */
+    val longEdgeCapLanes: Map<ChangeKey, Int> = emptyMap()
 ) {
     /** Always [lane]'s color - there is no case where a node's line color differs from its own
      * lane's, so this is derived rather than a separate field callers could pass out of sync with
@@ -170,6 +172,7 @@ class CommitGraphBuilder {
         childLanes = childLanes,
         passthroughLanes = passthroughLanes,
         unresolvedParents = unresolvedParents,
-        stubLane = stubLane
+        stubLane = stubLane,
+        longEdgeCapLanes = longEdgeCapLanes
     )
 }

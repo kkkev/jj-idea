@@ -115,4 +115,66 @@ class IncrementalLayoutEquivalenceTest {
         val all = (0 until 50).map { i -> entry("e$i", if (i + 1 < 50) listOf("e${i + 1}") else emptyList()) }
         assertEquivalent(all.map { listOf(it) })
     }
+
+    // jj-idea-66rr: long edges' bottom caps are allocated rows after the child, so a page boundary
+    // (or a rewind) between the two must reproduce exactly what a from-scratch layout does.
+    private fun assertEquivalentLong(pages: List<List<GraphEntry<String>>>, longEdgeRows: Int = 6) {
+        val engine = IncrementalLayout<String>(longEdgeRows)
+        var layout = GraphLayout<String>(emptyList())
+        for (page in pages) layout = engine.append(page)
+        layout shouldBe LayoutCalculatorImpl<String>(longEdgeRows).calculate(pages.flatten())
+    }
+
+    private fun longEdgeGraph(n: Int) = (0 until n).map { i ->
+        // Every 5th commit also points 12 rows down: plenty of overlapping long edges.
+        val parents = buildList {
+            if (i + 1 < n) add("e${i + 1}")
+            if (i % 5 == 0 && i + 12 < n) add("e${i + 12}")
+        }
+        entry("e$i", parents)
+    }
+
+    @Test
+    fun `long edge whose bottom cap row is in a later page`() {
+        val all = longEdgeGraph(60)
+        for (split in listOf(3, 7, 11, 20, 31)) {
+            assertEquivalentLong(listOf(all.subList(0, split), all.subList(split, 60)))
+        }
+    }
+
+    @Test
+    fun `many small pages across checkpoints with long edges`() {
+        val all = longEdgeGraph(700)
+        assertEquivalentLong(all.chunked(37))
+    }
+
+    @Test
+    fun `not-loaded parent resolved later into a long edge`() {
+        // e0's second parent is far below and absent from page one (a NOT_LOADED stub); page two
+        // supplies it, turning the stub into a long edge and forcing a rewind.
+        val page1 = (0 until 10).map { i ->
+            entry(
+                "e$i",
+                buildList {
+                    if (i + 1 < 10) add("e${i + 1}") else add("e10")
+                    if (i == 0) add("late")
+                }
+            )
+        }
+        val page2 =
+            (10 until 30).map { i ->
+                entry(
+                    "e$i",
+                    if (i + 1 <
+                        30
+                    ) {
+                        listOf("e${i + 1}", "late").take(if (i == 29) 0 else 1)
+                    } else {
+                        listOf("late")
+                    }
+                )
+            } +
+                entry("late")
+        assertEquivalentLong(listOf(page1, page2))
+    }
 }

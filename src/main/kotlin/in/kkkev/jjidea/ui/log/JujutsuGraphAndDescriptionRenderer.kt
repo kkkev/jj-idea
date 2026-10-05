@@ -44,6 +44,7 @@ class JujutsuGraphAndDescriptionRenderer(
         internal val HORIZONTAL_PADDING = JBValue.UIInteger("Jujutsu.Graph.horizontalPadding", 4)
         private val ELIDED_WAVE_AMPLITUDE = JBValue.UIInteger("Jujutsu.Graph.elidedWaveAmplitude", 2)
         private val ELIDED_WAVE_LENGTH = JBValue.UIInteger("Jujutsu.Graph.elidedWaveLength", 6)
+        private val ARROW_SIZE = JBValue.UIInteger("Jujutsu.Graph.arrowSize", 3)
         private val EDGE_HOVER_STROKE_WIDTH = JBValue.Float(2.6f)
 
         // Lane colors - the single source of truth GraphNode.color derives from (jj-idea-a0wp).
@@ -300,6 +301,7 @@ class JujutsuGraphAndDescriptionRenderer(
             val commitY = height / 2
 
             drawLinesToParents(g2d, commitX, commitY, row, startX, laneWidth)
+            drawCapArrows(g2d, startX, laneWidth)
             edgeIndex(model).stubEdgeAt(row)?.let { (stubLane, stubEdge) ->
                 val stubX = laneX(stubLane, startX, laneWidth)
                 val state = stubEdge.state ?: return@let
@@ -387,6 +389,27 @@ class JujutsuGraphAndDescriptionRenderer(
             g2d.color = color
             g2d.draw(path)
             g2d.stroke = originalStroke
+        }
+
+        /**
+         * Paints this row's long-edge cap arrows (jj-idea-66rr): the lane segment from the cap's
+         * outer edge to the row's middle, ending in a chevron pointing along the cap's direction -
+         * "the line continues off-screen this way". Goes through [drawLaneLine] so a hovered edge's
+         * thickening applies to both caps.
+         */
+        private fun drawCapArrows(g2d: Graphics2D, graphStartX: Int, laneWidth: Int) {
+            val model = table.model as? JujutsuLogTableModel ?: return
+            val mid = height / 2
+            val size = ARROW_SIZE.get()
+            for ((lane, edge, direction) in edgeIndex(model).capArrows(row)) {
+                val x = laneX(lane, graphStartX, laneWidth)
+                val color = colorForLane(lane)
+                val down = direction == EdgeDirection.DOWN
+                drawLaneLine(g2d, edge, color, x, if (down) 0 else height, x, mid)
+                val backY = if (down) mid - size else mid + size
+                drawLaneLine(g2d, edge, color, x - size, backY, x, mid)
+                drawLaneLine(g2d, edge, color, x + size, backY, x, mid)
+            }
         }
 
         private fun drawPassThroughLines(g2d: Graphics2D, graphStartX: Int, laneWidth: Int) {

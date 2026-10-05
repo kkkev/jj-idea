@@ -148,6 +148,26 @@ For each row, processed top to bottom:
 
 - The set of active passthroughs (minus those terminated in step 2, plus those created in step 4) carries forward to the next row
 
+## Long Edges (jj-idea-66rr)
+
+An edge spanning at least `LONG_EDGE_ROWS` (50; IntelliJ vcs-log's `LONG_EDGE_SIZE` is 30) rows keeps a
+lane only for two short caps of `LONG_EDGE_PART_ROWS` (1) rows each; the lane between them is free
+for other edges, so the graph stays narrow when edges are hundreds of rows long.
+
+- **Top cap** - lane A, chosen exactly as for any passthrough (it is the child's `passthroughLanes`
+  entry). Its passthrough lives only through row `c + K` and is removed at row `c + K + 1`. The
+  row `c + K` paints a down arrow.
+- **Bottom cap** - lane B, allocated at the *end* of processing row `p - K` (after the row's own
+  node, connectors and stub lane, so those keep priority): A if free there, else the first free
+  lane. The pending allocation is keyed by row in `pendingCaps` and snapshotted in every
+  `Checkpoint`. Row `p - K` paints an up arrow. The cap is a passthrough that row `p` removes in
+  step 2, recording its lane on the *parent's* `RowLayout.longEdgeCapLanes` (child id -> lane).
+- A long edge of a merge's extra parent skips the usual lane *reservation* - holding the lane for
+  the whole span would defeat releasing it.
+
+Recording B on the parent keeps incremental layout equivalent to a full one: any rewind that
+rebuilds row `p` re-derives B from threaded state, with no extra patch-up pass.
+
 ## Handling Multiple Parents
 
 When an entry has multiple parents (a merge commit):

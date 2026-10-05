@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.ui.log.graph.LONG_EDGE_PART_ROWS
 import `in`.kkkev.jjidea.ui.log.graph.ParentState
 
 /**
@@ -17,6 +18,12 @@ enum class EdgeDirection { UP, DOWN }
 /** One connector's endpoint at a specific row/lane - [edge] plus which [lane] it occupies there,
  * as returned by [GraphEdgeIndex.incomingEdges]/[GraphEdgeIndex.outgoingEdges]. */
 data class RowEdge(val lane: Int, val edge: GraphEdge)
+
+/**
+ * The arrow glyph a collapsed long edge's cap paints at a row (jj-idea-66rr): [direction] [DOWN] on
+ * the top cap (the line continues towards the parent), [UP] on the bottom cap (towards the child).
+ */
+data class CapArrow(val lane: Int, val edge: GraphEdge, val direction: EdgeDirection)
 
 /**
  * A [GraphEdge] currently under the pointer - see [GraphEdgeIndex.hoveredEdgeAt] for how
@@ -121,6 +128,8 @@ class GraphEdgeIndex private constructor(
     private val outgoingByRow: Map<Int, List<RowEdge>>,
     private val stubByRow: Map<Int, RowEdge>,
     private val ownLaneByRow: Map<Int, Int>,
+    private val arrowsByRow: Map<Int, List<CapArrow>>,
+    private val collapsedEdges: Set<GraphEdge>,
     val operationCount: Long
 ) {
     private val rowSummaries = java.util.concurrent.ConcurrentHashMap<Int, RowSummary>()
@@ -162,6 +171,9 @@ class GraphEdgeIndex private constructor(
     /** Every real edge leaving [row] towards one of its own parents (`row -> parentRow`) - i.e.
      * [row] is the *child* end. The outgoing counterpart to [incomingEdges]. */
     fun outgoingEdges(row: Int): List<RowEdge> = outgoingByRow[row] ?: emptyList()
+
+    /** The long-edge cap arrows to paint at [row] (jj-idea-66rr) - empty for nearly every row. */
+    fun capArrows(row: Int): List<CapArrow> = arrowsByRow[row] ?: emptyList()
 
     /** The unresolved-parent stub at [row] ([GraphNode.stubLane] or the row's own lane), or null
      * when [row] has no unresolved parent - the paint-time equivalent of [stubTargetFor]. */
@@ -224,6 +236,21 @@ class GraphEdgeIndex private constructor(
         }
         val childRow = rowOfKey[edge.child] ?: return null
         val parentRow = rowOfKey[edge.parent] ?: return null
+        if (edge in collapsedEdges) {
+            // A collapsed long edge (jj-idea-66rr): its arrows are the affordance, so it's
+            // navigable even with both ends on screen. The cap under the pointer picks the
+            // direction; the pivot sits at the span's far end so both caps are emphasized.
+            val capSpan = maxOf(childRow, visibleRows.first)..minOf(parentRow, visibleRows.last)
+            val onTopCap = row <= childRow + LONG_EDGE_PART_ROWS
+            return HoveredEdge(
+                edge = edge,
+                lane = lane,
+                direction = if (onTopCap) EdgeDirection.DOWN else EdgeDirection.UP,
+                span = capSpan,
+                pivotRow = if (onTopCap) capSpan.first else capSpan.last,
+                navigable = true
+            )
+        }
         val childVisible = childRow in visibleRows
         val parentVisible = parentRow in visibleRows
         if (childVisible && parentVisible) return null
@@ -274,6 +301,8 @@ class GraphEdgeIndex private constructor(
             val incomingByRow = HashMap<Int, MutableList<RowEdge>>()
             val outgoingByRow = HashMap<Int, MutableList<RowEdge>>()
             val stubByRow = HashMap<Int, RowEdge>()
+            val arrowsByRow = HashMap<Int, MutableList<CapArrow>>()
+            val collapsedEdges = HashSet<GraphEdge>()
             val spansByLane = ArrayList<MutableList<LaneSpan>?>()
             var seq = 0
 
@@ -303,9 +332,28 @@ class GraphEdgeIndex private constructor(
                     // Recorded once per edge, not per row it spans - what a row's own paint
                     // (jj-idea-a0wp) needs is "which edges touch my row as an endpoint"; the
                     // passthrough extent is one interval on the lane (jj-idea-2570.6).
+                    // A long edge (jj-idea-66rr) is two caps on two lanes, with no lane held between:
+                    // the top cap on the child's passthrough lane, the bottom cap on the lane the
+                    // layout allocated at the parent row.
+                    val capLane = if (passThroughLane != null) parentNode.longEdgeCapLanes[key] else null
                     outgoingByRow.getOrPut(row) { mutableListOf() }.add(RowEdge(lane, edge))
-                    incomingByRow.getOrPut(parentRow) { mutableListOf() }.add(RowEdge(lane, edge))
-                    if (parentRow >= row) record(lane, row, parentRow, edge)
+                    incomingByRow.getOrPut(parentRow) { mutableListOf() }.add(RowEdge(capLane ?: lane, edge))
+                    if (capLane != null) {
+                        operationCount += 2
+                        collapsedEdges += edge
+                        val topArrowRow = row + LONG_EDGE_PART_ROWS
+                        val bottomArrowRow = parentRow - LONG_EDGE_PART_ROWS
+                        record(lane, row, topArrowRow, edge)
+                        record(capLane, bottomArrowRow, parentRow, edge)
+                        arrowsByRow.getOrPut(topArrowRow) {
+                            mutableListOf()
+                        }.add(CapArrow(lane, edge, EdgeDirection.DOWN))
+                        arrowsByRow.getOrPut(bottomArrowRow) {
+                            mutableListOf()
+                        }.add(CapArrow(capLane, edge, EdgeDirection.UP))
+                    } else if (parentRow >= row) {
+                        record(lane, row, parentRow, edge)
+                    }
                 }
 
                 // Stub for unresolved parents - one row, `stubLane` or the row's own lane.
@@ -335,6 +383,8 @@ class GraphEdgeIndex private constructor(
                 outgoingByRow = outgoingByRow,
                 stubByRow = stubByRow,
                 ownLaneByRow = ownLaneByRow,
+                arrowsByRow = arrowsByRow,
+                collapsedEdges = collapsedEdges,
                 operationCount = operationCount
             )
         }

@@ -50,4 +50,35 @@ class GraphLayoutScaleTest {
         // would be ~n²/2 (≈2*10^8 for n=20k) — far above this bound, which scales with n * width.
         calculator.operationCount shouldBeLessThan (20L * n * width)
     }
+
+    @Test
+    fun `long edges stay linear and release their lanes (jj-idea-66rr)`() {
+        val n = 10_000
+        val span = 400
+        // 200 staggered long edges: every 50th commit also points `span` rows down.
+        val entries = (0 until n).map { i ->
+            val parents = buildList {
+                if (i + 1 < n) add("e${i + 1}")
+                if (i % 50 == 0 && i + span < n) add("e${i + span}")
+            }
+            entry("e$i", parents)
+        }
+
+        val collapsed = LayoutCalculatorImpl<String>()
+        val collapsedLayout = collapsed.calculate(entries)
+        val plain = LayoutCalculatorImpl<String>(Int.MAX_VALUE)
+        val plainLayout = plain.calculate(entries)
+
+        collapsed.operationCount shouldBeLessThan (20L * n)
+        collapsed.operationCount shouldBeLessThan plain.operationCount
+        val width = { l: GraphLayout<String> ->
+            l.rows.maxOf { r ->
+                maxOf(
+                    r.lane,
+                    r.passthroughLanes.values.maxOrNull() ?: 0
+                )
+            }
+        }
+        width(collapsedLayout) shouldBeLessThan width(plainLayout)
+    }
 }

@@ -409,6 +409,23 @@ handler — commit-onto-commit rebase — so gestures other than that one still 
       (jj-idea-lm3o); each sub-menu is labelled with the same colored bookmark
       (tracked/plain) or tag glyph its own chip would show
 
+#### Long-edge collapsing (jj-idea-66rr)
+
+Reuse FX-STRESS (its 200-commit deep branch and long branches have edges well over 50 rows).
+
+- [ ] An edge spanning 50+ rows shows as a short line from its child with a **down arrow**
+      one row below, and a short line into its parent with an **up arrow** one row above;
+      nothing is drawn between the two
+- [ ] The column the long edge used is reused by other branches in the rows between the
+      caps, and the graph is visibly narrower there than before (compare against the
+      previous release, or against rows just outside the long edge)
+- [ ] Hovering either cap thickens **both** caps and shows the directional cursor even
+      when both ends are on screen; the tooltip names the target and the row distance
+- [ ] Clicking either cap jumps to the other end (down arrow → parent, up arrow → child),
+      loading it first if needed
+- [ ] Scroll through a long edge's middle with the paged log: no stray vertical line, no
+      shifting of other lanes as the arrows scroll in and out of view
+
 #### Long-edge navigation (jj-idea-sc8m)
 
 Reuse FX-STRESS with `SCALE=6 WITH_REMOTE=1` and the paged log flag on, per MT-LOG-REFRESH's

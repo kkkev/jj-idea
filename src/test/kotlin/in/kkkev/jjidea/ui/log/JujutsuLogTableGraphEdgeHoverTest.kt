@@ -159,14 +159,15 @@ class JujutsuLogTableGraphEdgeHoverTest {
 
     @Test
     fun `when both ends are off-screen, direction pivots once at the viewport's middle row`() {
-        // e0's long edge to e59 (chainWithLongEdge) passes through every row via a passthrough
-        // lane. Viewed through a real scrolled JScrollPane (an unparented table's visibleRect is
+        // e0's edge to e24 (chainWithLongEdge) passes through every row via a passthrough
+        // lane. 24 rows is under LONG_EDGE_ROWS, so it is not collapsed (jj-idea-66rr: a collapsed
+        // edge has no lane in its middle rows to hover). Viewed through a real scrolled JScrollPane (an unparented table's visibleRect is
         // just its own bounds, always starting at row 0 - not enough to put a *child* off-screen,
         // only a parent), scroll so both e0 (child) and e59 (parent) are off-screen in opposite
         // directions - the row nearest the top of the viewport should point up (towards e0), the
         // row nearest the bottom should point down (towards e59), one stable transition point
         // rather than a per-row/per-pixel split (jj-idea-sc8m round 3).
-        val entries = chainWithLongEdge(n = 60)
+        val entries = chainWithLongEdge(n = 25)
         val table = tableWith(entries)
         // Wrapping in a real scroll pane requires the table to already have real column widths
         // (from tableWith's own setSize/doLayout) before it's added as the view, and the
@@ -178,7 +179,7 @@ class JujutsuLogTableGraphEdgeHoverTest {
         scrollPane.doLayout()
         scrollPane.viewport.doLayout()
         val rowHeight = table.getCellRect(0, 0, true).height
-        scrollPane.viewport.viewPosition = Point(0, 30 * rowHeight)
+        scrollPane.viewport.viewPosition = Point(0, 3 * rowHeight)
 
         val childKey = ChangeKey(repo, ChangeId("e0", "e0", null))
         val parentKey = ChangeKey(repo, ChangeId("e${entries.size - 1}", null, null))
@@ -197,6 +198,29 @@ class JujutsuLogTableGraphEdgeHoverTest {
         table.hoveredEdge!!.direction shouldBe EdgeDirection.DOWN
         table.hoveredEdge!!.targetKey shouldBe parentKey
         table.cursor shouldBe Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
+    }
+
+    @Test
+    fun `a collapsed long edge is hoverable at its cap even with both ends on screen (jj-idea-66rr)`() {
+        // 60 rows is over LONG_EDGE_ROWS, and a tall enough table shows both ends at once: the
+        // arrow cap is still the affordance, and the freed middle is not hoverable.
+        val entries = chainWithLongEdge(n = 60)
+        val table = tableWith(entries)
+        table.setSize(2000, 60 * table.rowHeight)
+        table.doLayout()
+        table.updateGraph(CommitGraphBuilder().buildGraph(entries))
+
+        val childKey = ChangeKey(repo, ChangeId("e0", "e0", null))
+        val parentKey = ChangeKey(repo, ChangeId("e59", "e59", null))
+        val topLane = table.graphNodes.getValue(childKey).passthroughLanes.getValue(parentKey)
+
+        moveMouseTo(table, edgePoint(table, 1, topLane))
+        table.hoveredEdge.shouldNotBeNull()
+        table.hoveredEdge!!.direction shouldBe EdgeDirection.DOWN
+        table.hoveredEdge!!.targetKey shouldBe parentKey
+
+        moveMouseTo(table, edgePoint(table, 30, topLane))
+        table.hoveredEdge shouldBe null
     }
 
     @Test
