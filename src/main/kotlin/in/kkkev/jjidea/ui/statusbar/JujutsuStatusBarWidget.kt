@@ -27,6 +27,9 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
     private val panel = WidgetPanel()
     private var currentRepo: JujutsuRepository? = null
     private var statusBarComponent: JComponent? = null
+
+    @Volatile
+    private var disposed = false
     private val resizeListener = object : ComponentAdapter() {
         override fun componentResized(e: ComponentEvent) {
             panel.statusBarWidth = e.component.width
@@ -40,7 +43,11 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
     override fun install(statusBar: StatusBar) {
         panel.onClick = ::openPopup
 
-        statusBar.component?.let { component ->
+        // The platform calls install() on a worker thread (IdeStatusBarImpl.doInit), but setting
+        // statusBarWidth re-renders Swing, which must happen on the EDT (jj-idea-wfz7).
+        val component = statusBar.component
+        runLater {
+            if (disposed || component == null) return@runLater
             statusBarComponent = component
             panel.statusBarWidth = component.width
             component.addComponentListener(resizeListener)
@@ -77,6 +84,7 @@ class JujutsuStatusBarWidget(private val project: Project) : CustomStatusBarWidg
     }
 
     override fun dispose() {
+        disposed = true
         currentRepo = null
         statusBarComponent?.removeComponentListener(resizeListener)
         statusBarComponent = null
