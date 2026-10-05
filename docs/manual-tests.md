@@ -105,6 +105,12 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
       `jj log -r 'all()'` in a terminal), and paging/scrolling to load more never reshuffles rows
       already shown
 
+#### Selection after refresh (jj-idea-vd5j)
+
+- [ ] Scroll part way down the log, do **Accept side** on a conflicted file, then click **Undo**:
+      the log selects and shows `@` (it does not land on an unrelated row), and scrolling to load
+      more history afterwards does not snap back to it
+
 #### Entry points (jj-idea-biqp, GitHub #118)
 
 - [ ] With the Version Control tool window closed/hidden, **VCS → Jujutsu → Open Jujutsu Log**

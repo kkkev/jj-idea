@@ -9,6 +9,7 @@ import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -35,13 +36,13 @@ class JujutsuLogTableScrollPreservationTest {
     private val project = projectFixture()
     private val repo = mockk<JujutsuRepository>()
 
-    private fun entry(changeId: String) = LogEntry(
+    private fun entry(changeId: String, isWorkingCopy: Boolean = false) = LogEntry(
         repo = repo,
         id = ChangeId(changeId, changeId, null),
         commitId = CommitId("0".repeat(40)),
         underlyingDescription = "Test commit $changeId",
         parentIds = emptyList(),
-        isWorkingCopy = false,
+        isWorkingCopy = isWorkingCopy,
         hasConflict = false,
         isEmpty = false,
         authorTimestamp = null,
@@ -198,5 +199,31 @@ class JujutsuLogTableScrollPreservationTest {
         table.setEntries(listOf(entry("target")) + entries)
 
         scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, table.getCellRect(0, 0, true).y)
+    }
+
+    /**
+     * jj-idea-vd5j: Undo fires `logRefresh` then `changeSelection(@)`. The selection used to resolve
+     * against the stale model (old `@` row) and be dropped, so the fresh rows - where `@` had moved -
+     * were never scrolled to.
+     */
+    @Test
+    fun `selection requested while a refresh is pending scrolls to the fresh row once`() {
+        val staleIds = (0 until 50).map { "e%03d".format(it) }
+        fun rows(wcIndex: Int) = staleIds.mapIndexed { i, id -> entry(id, isWorkingCopy = i == wcIndex) }
+        val (table, scrollPane) = tableInScrollPane(rows(wcIndex = 10))
+        scrollPane.viewport.viewPosition = java.awt.Point(0, 0)
+
+        table.markRefreshPending()
+        table.requestSelection(ChangeKey(repo, WorkingCopy))
+        table.setEntries(rows(wcIndex = 45))
+
+        table.selectedRow shouldBe 45
+        val viewRect = scrollPane.viewport.viewRect
+        viewRect.contains(table.getCellRect(45, 0, true).let { java.awt.Point(it.x, it.y) }) shouldBe true
+
+        // Fulfilled: a later page load must not snap back (jj-idea-3r7s).
+        scrollPane.viewport.viewPosition = java.awt.Point(0, 0)
+        table.setEntries(rows(wcIndex = 45))
+        scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, 0)
     }
 }

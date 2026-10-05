@@ -182,6 +182,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
 
     private fun setupStateListener() {
         project.stateModel.logRefresh.connect(this) { _ ->
+            logTable.markRefreshPending()
             refresh()
             // jj-idea-vqpn (GitHub #116): a write can create/abandon commits the revset filter
             // matches, so its resolved id set needs re-checking on the same trigger as the rest

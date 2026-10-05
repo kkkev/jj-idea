@@ -123,12 +123,27 @@ class JujutsuLogTable(
 
     var onSelectionExpansionNeeded: ((ChangeKey) -> Unit)? = null
 
+    // True between a logRefresh and the setEntries() it produces: the model is stale, so a
+    // selection requested now must wait for the fresh rows (jj-idea-vd5j).
+    private var refreshPending = false
+
+    /**
+     * Call when a refresh of the model has been started. A [requestSelection] arriving before the
+     * next [setEntries] (e.g. Undo's `invalidate(select = WorkingCopy)`) is then deferred to the
+     * fresh rows instead of resolving against - and scrolling to - the stale ones, where the target
+     * row may since have moved.
+     */
+    fun markRefreshPending() {
+        refreshPending = true
+    }
+
     fun requestSelection(changeKey: ChangeKey) {
         // Try immediate selection from current model data (e.g., annotation click with no pending refresh).
         // Stored as pending until found, so setEntries() can apply it once a refresh/expansion lands it.
         pendingSelection = changeKey
         pendingSelectionIsExplicit = true
         expansionPending = false
+        if (refreshPending) return
         if (selectEntry(changeKey.repo, changeKey.revision)) {
             // Done: a later setEntries() carries the (now selected) row through on its own. Left
             // pending, it would scroll back to this row on the next page load, however far the
@@ -740,6 +755,7 @@ class JujutsuLogTable(
         }
 
     fun setEntries(entries: List<LogEntry>) {
+        refreshPending = false
         // Capture current selection for re-selection after model update,
         // but only if no explicit selection was requested (e.g., via changeSelection after edit/abandon).
         // A selection captured here is merely carried through the refresh: never scroll to it,
