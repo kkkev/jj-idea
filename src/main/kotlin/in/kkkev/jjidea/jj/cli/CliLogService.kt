@@ -135,6 +135,14 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         revset
     )
 
+    override fun getEmptiness(commitIds: Collection<CommitId>): Result<Map<CommitId, Boolean>> {
+        if (commitIds.isEmpty()) return Result.success(emptyMap())
+        // Plain commit ids (not present()): every id came from a loaded entry, so a missing one is a bug and
+        // jj's own error is the right outcome (see MergeEmptiness).
+        val revset = Expression(commitIds.joinToString(" | ") { it.full })
+        return getLog(logTemplates.commitIdEmptyTemplate, revset).map { rows -> rows.toMap() }
+    }
+
     override fun getBookmarks() = getRefs("bookmark", logTemplates.bookmarkListTemplate) {
         executor.bookmarkList(it)
     }
@@ -354,7 +362,19 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val description = singleField("description") { it.removeSuffix("\n") }
         val currentWorkingCopy = booleanField("current_working_copy")
         val conflict = booleanField("conflict")
-        val empty = booleanField("empty")
+
+        // jj's `empty` on a merge has to merge every parent tree before comparing: ~2 s per 500
+        // rows on git/git (193 of 500 rows are merges), vs ~0.1 s without it (jj-idea-2570.8).
+        // So the log template skips it for immutable merges - see [isEmptyDeferred] - and
+        // MergeEmptiness fetches the real value in the background. (`if(c, false, empty)` doesn't
+        // type-check in a jj template - the result is `Any` - hence the boolean `&&` form.)
+        val empty = booleanField("!(immutable && parents.len() > 1) && empty")
+
+        /** [empty] by itself: the exact, expensive value, for [getEmptiness]. */
+        val exactEmpty = booleanField("empty")
+
+        /** Mirrors the guard in [empty]'s spec: the rows whose parsed `empty` is not meaningful. */
+        fun isEmptyDeferred(immutable: Boolean, parentCount: Int) = immutable && parentCount > 1
 
         // b.tracking_ahead_count()/tracking_behind_count() error ("Not a tracked remote ref") on
         // a local ref, so they're guarded the same way bookmarkListTemplate already guards them
@@ -428,20 +448,32 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 }
             }
             return logTemplate(*fields.toTypedArray()) {
+                // Taken in template order; the iterator is consumed once.
+                val changeId = changeId.take(it)
+                val commitId = commitId.take(it)
+                val description = description.take(it)
+                val bookmarks = bookmarks.take(it)
+                val tags = tags.take(it)
+                val parents = parents.take(it)
+                val currentWorkingCopy = currentWorkingCopy.take(it)
+                val conflict = conflict.take(it)
+                val empty = empty.take(it)
+                val immutable = immutable.take(it)
                 LogEntry(
                     repo,
-                    changeId.take(it),
-                    commitId.take(it),
-                    description.take(it),
-                    bookmarks.take(it),
-                    tags.take(it),
-                    parents.take(it),
-                    currentWorkingCopy.take(it),
-                    conflict.take(it),
-                    empty.take(it),
-                    immutable = immutable.take(it),
+                    changeId,
+                    commitId,
+                    description,
+                    bookmarks,
+                    tags,
+                    parents,
+                    currentWorkingCopy,
+                    conflict,
+                    empty,
+                    immutable = immutable,
                     hasPushedAncestor = if (includePushedAncestor) hasPushedAncestor.take(it) else false,
-                    isDanglingHead = if (includePushedAncestor) isDanglingHead.take(it) else false
+                    isDanglingHead = if (includePushedAncestor) isDanglingHead.take(it) else false,
+                    emptyDeferred = isEmptyDeferred(immutable, parents.size)
                 )
             }
         }
@@ -462,6 +494,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val basicLogTemplateWithoutPushedAncestor = buildBasicTemplate(includePushedAncestor = false)
         val fullLogTemplate = buildFullTemplate(basicLogTemplate)
         val fullLogTemplateWithoutPushedAncestor = buildFullTemplate(basicLogTemplateWithoutPushedAncestor)
+
+        /** (commit id, exact `empty`) pairs, for [getEmptiness]. */
+        val commitIdEmptyTemplate = logTemplate(commitId, exactEmpty) { commitId.take(it) to exactEmpty.take(it) }
 
         /** Just the (offset-qualified) change id — for [getLogHeads]'s frontier-seed query. */
         val changeIdOnlyTemplate = logTemplate(changeId) { changeId.take(it) }

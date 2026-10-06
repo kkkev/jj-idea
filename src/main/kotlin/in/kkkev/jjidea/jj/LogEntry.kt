@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.jj
 
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.ui.log.DagNode
 import `in`.kkkev.jjidea.ui.log.GraphableEntry
@@ -19,7 +20,11 @@ data class LogEntry(
     override val parentIds: List<ChangeId> = emptyList(),
     override val isWorkingCopy: Boolean = false,
     override val hasConflict: Boolean = false,
-    override val isEmpty: Boolean = false,
+    /**
+     * What the log template reported for `empty`. Exact unless [emptyDeferred]; deliberately private
+     * so nothing can read a deferred `false` as truth. Use [emptiness] to render, [resolveEmpty] to act.
+     */
+    private val isEmpty: Boolean = false,
     override val authorTimestamp: Instant? = null,
     val committerTimestamp: Instant? = null,
     override val author: VcsUser? = null,
@@ -41,9 +46,34 @@ data class LogEntry(
      * rendering (bookmarks/tags/status badges/a `jjc://` navigation link), which a pending entry
      * structurally can't support.
      */
-    val pending: Boolean = false
+    val pending: Boolean = false,
+    /**
+     * True when the template skipped `empty` for this row (an immutable merge: jj merges every
+     * parent tree to answer it, ~2 s per 500 rows on git/git - jj-idea-2570.8), so [isEmpty] is
+     * not meaningful and the real value comes from [MergeEmptiness]. Immutable commits can't change,
+     * so the answer is cached per commit id.
+     */
+    val emptyDeferred: Boolean = false
 ) : GraphableEntry, ChangeStatus, ChangeDetail, DagNode<LogEntry> {
     override val description = Description(underlyingDescription)
+
+    /** The template's `empty` value; exact only when not [emptyDeferred]. For [MergeEmptiness] and tests. */
+    internal val templateEmpty get() = isEmpty
+
+    /** Non-blocking emptiness for rendering: [Emptiness.PENDING] while a deferred value is being fetched. */
+    val emptiness: Emptiness
+        get() = when {
+            emptyDeferred -> repo.mergeEmptiness.peek(this)
+            isEmpty -> Emptiness.EMPTY
+            else -> Emptiness.NOT_EMPTY
+        }
+
+    /**
+     * Definite emptiness for code that acts on it. Blocks for one `jj` call if [emptyDeferred] and not
+     * yet fetched, so call from a background thread.
+     */
+    @RequiresBackgroundThread
+    fun resolveEmpty(): Boolean = if (emptyDeferred) repo.mergeEmptiness.resolve(this) else isEmpty
 
     /** See [DagNode.withParents] - used by [in.kkkev.jjidea.ui.rebase.RebaseSimulator] to reparent a simulated entry. */
     override fun withParents(parentIds: List<ChangeId>): LogEntry = copy(parentIds = parentIds)

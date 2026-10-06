@@ -92,4 +92,10 @@ interface LogService {
      * @return List of change ids matching [revset], in jj's own returned order
      */
     fun getChangeIds(revset: Revset = Expression.ALL): Result<List<ChangeId>>
+
+    /**
+     * Exact `empty` for each of [commitIds] in one `jj log` call - the expensive keyword the log template skips for
+     * immutable merges (see [MergeEmptiness]). Fails if any id can't be resolved.
+     */
+    fun getEmptiness(commitIds: Collection<CommitId>): Result<Map<CommitId, Boolean>>
 }

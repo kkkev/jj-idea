@@ -43,7 +43,7 @@ class LogTemplateTest {
         entry.parentIds.shouldBeEmpty()
         entry.isWorkingCopy shouldBe false
         entry.hasConflict shouldBe false
-        entry.isEmpty shouldBe false
+        entry.templateEmpty shouldBe false
         entry.immutable shouldBe false
         entry.hasPushedAncestor shouldBe false
         entry.isDanglingHead shouldBe false
@@ -139,7 +139,36 @@ class LogTemplateTest {
         val entry = basicLogTemplate.take(fields.iterator())
 
         entry.description.empty shouldBe true
-        entry.isEmpty shouldBe true
+        entry.templateEmpty shouldBe true
+    }
+
+    private fun entryFor(parents: String, immutable: Boolean) = basicLogTemplate.take(
+        listOf(
+            "qpvuntsm~q~",
+            "abc123def456~ab",
+            "",
+            "", // bookmarks
+            "", // tags
+            parents,
+            "false",
+            "false",
+            "false", // empty, as the template reports it
+            immutable.toString(),
+            "false",
+            "false"
+        ).iterator()
+    )
+
+    @Test
+    fun `an immutable merge defers its emptiness, since the template skips it`() {
+        entryFor("aaaa~a~,bbbb~b~", immutable = true).emptyDeferred shouldBe true
+    }
+
+    @Test
+    fun `mutable merges and immutable non-merges keep the template's emptiness`() {
+        entryFor("aaaa~a~,bbbb~b~", immutable = false).emptyDeferred shouldBe false
+        entryFor("aaaa~a~", immutable = true).emptyDeferred shouldBe false
+        entryFor("", immutable = true).emptyDeferred shouldBe false
     }
 
     @Test
@@ -162,7 +191,7 @@ class LogTemplateTest {
         val entry = basicLogTemplate.take(fields.iterator())
 
         entry.description.actual shouldBe ""
-        entry.isEmpty shouldBe false
+        entry.templateEmpty shouldBe false
         entry.description.empty shouldBe true // Empty description but not empty commit
     }
 

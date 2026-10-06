@@ -22,7 +22,7 @@ log-load pipeline split by component:
 
 | Component | Finding |
 |---|---|
-| `hasPushedAncestor`/`immutable` template predicates | Real (~30% of raw jj time) but not dominant |
+| `hasPushedAncestor`/`immutable` template predicates | Real (~30% of raw jj time) but not dominant on keycloak-shaped repos; see the jj-idea-2570.8 note below for merge-heavy repos |
 | Kotlin-side field parsing | Cheap (tens to ~200ms even at N≈6,000) |
 | `CommitGraphBuilder`/graph layout | Linear, cheap (confirmed twice — an initial 2-4s reading was a MockK call-recording artifact from the test harness, not real cost) |
 | jj's own per-invocation walk over N commits | **The dominant cost**, and it barely depends on the template's field list — a signature-only template over the same N still cost most of what the full template cost |
@@ -394,3 +394,43 @@ The large/many-head fixtures used for validation above were session-scratch, bui
 test) and cleaned up after use; the shell snippets to reproduce them are straightforward
 (a root commit, N branches forked from it via fast-import, `jj git init --colocate`) if this
 matrix needs to be re-run against a newer jj version or a different machine.
+
+## Merge-heavy repos: the `empty` keyword dominates (jj-idea-2570.8)
+
+On git/git (86k commits, ~39% merges in the first page) a 500-row page took 4.6 s with the
+plugin's template. Bisecting field by field on jj 0.44.0 showed the cost is jj's `empty` keyword,
+not the predicates or the frontier revset: on a merge, jj merges every parent tree to compare
+against the commit's own tree.
+
+| 500 rows on r80k-git | first page | deep page (frontier at 40k rows) |
+|---|---|---|
+| `commit_id` only | 0.08 s | 0.2-0.5 s |
+| `commit_id ++ empty` | 1.7-2.3 s | 1.5-2.2 s |
+| full plugin template | 4.6 s | n/a |
+| full template, `empty` skipped on merges | 0.25-0.45 s | 0.25 s |
+
+Most merges *are* empty: a clean merge equals the auto-merge of its parents, so jj reports
+`empty = true` (openNDS 372 of 376, keycloak 2,944 of 3,000, git/git 2,503 of 3,000, newest
+first). Only "evil" merges (conflict resolutions, edits made in the merge) are non-empty, and
+that is exactly what the "(empty)" marker lets you spot. So the template can't just say `false`
+for the merges it skips.
+
+Design: `LogFields.empty` evaluates `!(immutable && parents.len() > 1) && empty` (a boolean `&&`;
+`if(c, false, empty)` doesn't type-check in a jj template - the result is `Any`), and the parser
+marks those rows `LogEntry.emptyDeferred`. `MergeEmptiness` (per repo) fetches the real value in
+the background, in batches of 50 ids per `jj log` call (~4.5 ms/merge: 1 merge 0.03 s, 193
+merges ~1 s, 1,000 ~5 s, linear). Rows render "(...)" until it lands. Notes:
+
+- The cache is keyed by commit id and never invalidated: a commit id hashes the tree and
+  parents, so emptiness is a pure function of it. Each merge is fetched at most once per session.
+- Priority: ids painted on screen (`peek`) are fetched ahead of the page-landing backlog
+  (`prefetch`), newest request first; backlog batches run at the idle trickle's ~25% duty cycle.
+- Landed batches repaint the table; they don't go through `onDataLoaded`, so they cost none of the
+  per-page apply/layout work (jj-idea-2570.9).
+- Errors throw (a failed call, or a result missing a requested id, is a bug). Failed ids stay
+  pending and are not retried, so repainting can't turn one failure into a flood.
+- Callers that act on emptiness (`LogEntry.resolveEmpty()`) block for one call on a miss; the
+  field is private so a deferred `false` can't be read as truth.
+
+Complexity: page fetch O(rows) with the cheap template; background work O(immutable merges
+loaded), batched, each at most once.

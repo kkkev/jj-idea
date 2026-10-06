@@ -174,9 +174,9 @@ class JujutsuTaskHandlerTest {
             underlyingDescription = desc,
             isEmpty = empty
         )
-        wc(empty = true, desc = "").isBlank shouldBe true
-        wc(empty = true, desc = "x").isBlank shouldBe false
-        wc(empty = false, desc = "").isBlank shouldBe false
+        wc(empty = true, desc = "").isBlank() shouldBe true
+        wc(empty = true, desc = "x").isBlank() shouldBe false
+        wc(empty = false, desc = "").isBlank() shouldBe false
     }
 
     /** A log service answering by revset: the task head, the original bookmark entry, or the switch target. */

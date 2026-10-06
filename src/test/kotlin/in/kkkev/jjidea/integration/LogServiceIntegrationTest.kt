@@ -120,7 +120,7 @@ class LogServiceIntegrationTest {
             val entries = logService.getLogBasic().getOrThrow()
             val wc = entries.first { it.isWorkingCopy }
 
-            wc.isEmpty shouldBe true
+            wc.templateEmpty shouldBe true
         }
 
         @Test
@@ -130,7 +130,7 @@ class LogServiceIntegrationTest {
             val entries = logService.getLogBasic().getOrThrow()
             val wc = entries.first { it.isWorkingCopy }
 
-            wc.isEmpty shouldBe false
+            wc.templateEmpty shouldBe false
         }
 
         @Test

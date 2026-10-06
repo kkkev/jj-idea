@@ -60,7 +60,7 @@ class JujutsuTaskHandler(private val project: Project) : VcsTaskHandler() {
             // cached working copy would still show the old `@`, leaving an extra empty change behind.
             repo.createCommand {
                 val wc = repo.logService.getLogBasic(WorkingCopy, limit = 1).getOrNull()?.firstOrNull()
-                startTask(BookmarkName(taskName), comment, blankWorkingCopy = wc != null && wc.isBlank)
+                startTask(BookmarkName(taskName), comment, blankWorkingCopy = wc != null && wc.isBlank())
             }
                 .onSuccess { invalidate(select = WorkingCopy, vfsChanged = true) }
                 .onFailure { tellUser("task.start.error") }
@@ -135,7 +135,7 @@ class JujutsuTaskHandler(private val project: Project) : VcsTaskHandler() {
 }
 
 /** Empty and undescribed: nothing to preserve, so a task can claim it rather than stacking another change. */
-internal val LogEntry.isBlank get() = isEmpty && description.empty
+internal fun LogEntry.isBlank() = resolveEmpty() && description.empty
 
 private const val NAME_PATTERN = "[A-Za-z0-9_/]+(?:[.+-][A-Za-z0-9_/]+)*"
 private val validTaskName = Regex(NAME_PATTERN)

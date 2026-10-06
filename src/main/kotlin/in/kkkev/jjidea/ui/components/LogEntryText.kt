@@ -223,11 +223,16 @@ fun TextCanvas.appendSummary(entry: LogEntry) {
  */
 fun TextCanvas.appendDescriptionAndEmptyIndicator(entry: LogEntry) {
     appendSummary(entry.description)
-    if (entry.isEmpty) {
+    val suffix = when (entry.emptiness) {
+        Emptiness.EMPTY -> "description.empty.suffix"
+        Emptiness.PENDING -> "description.empty.pending.suffix"
+        Emptiness.NOT_EMPTY -> null
+    }
+    if (suffix != null) {
         grey {
             italic {
                 append(" ")
-                append(message("description.empty.suffix"))
+                append(message(suffix))
             }
         }
     }
@@ -463,8 +468,10 @@ fun TextCanvas.appendSummaryAndStatuses(entry: LogEntry, danglingHeadClosest: Cl
             }
         }
     }
-    if (entry.isEmpty) {
-        statusParts.add { append(message("status.empty")) }
+    when (entry.emptiness) {
+        Emptiness.EMPTY -> statusParts.add { append(message("status.empty")) }
+        Emptiness.PENDING -> statusParts.add { grey { italic { append(message("status.empty.pending")) } } }
+        Emptiness.NOT_EMPTY -> {}
     }
     if (entry.isDivergent) {
         statusParts.add { colored(JujutsuColors.DIVERGENT) { append(message("status.divergent")) } }

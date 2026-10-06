@@ -110,6 +110,20 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
       and issue links in descriptions still hover/click correctly
 - [ ] Turn it back off: the padding disappears at once
 
+#### Immutable merges: emptiness is fetched in the background (jj-idea-2570.8)
+
+Fixture: FX-SCALE-SET `r80k-git` (about 40% of rows are merges, most of them empty).
+
+- [ ] On first load the page appears quickly (well under a second after the project is ready), and
+      immutable merge rows show a greyed "(…)" in the description instead of "(empty)"
+- [ ] Within about a second the "(…)" markers on the visible rows turn into "(empty)" (most merges)
+      or disappear (a merge that changed something, an "evil" merge) - no row is left on "(…)"
+- [ ] Scroll quickly to a deep page: the rows on screen resolve first, rows further down later
+- [ ] Select an immutable merge that still shows "(…)": the details panel status line shows
+      "Checking whether empty…", then changes to "Empty" (or the item goes away if the merge is not empty)
+- [ ] A mutable merge (`jj new a b` on two of your own changes) shows "(empty)" immediately, never "(…)"
+- [ ] Non-merge rows and mutable rows never show "(…)"
+
 #### Row order (jj-idea-2570.7)
 
 - [ ] In a single-repo project, log rows follow `jj log` order (compare the top ~50 rows with

@@ -23,6 +23,7 @@ internal val TODO_REPO: JujutsuRepository = object : JujutsuRepository {
     override val commandExecutor get() = throw UnsupportedOperationException()
     override val logService get() = throw UnsupportedOperationException()
     override val logCache get() = throw UnsupportedOperationException()
+    override val mergeEmptiness get() = throw UnsupportedOperationException()
     override val isInitialised get() = throw UnsupportedOperationException()
     override val gitRemotes get() = throw UnsupportedOperationException()
     override val cachedGitRemotes get() = throw UnsupportedOperationException()

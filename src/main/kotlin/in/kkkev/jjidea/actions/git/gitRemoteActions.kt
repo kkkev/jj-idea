@@ -146,7 +146,7 @@ fun gitPushAction(project: Project, repo: JujutsuRepository?, entries: List<LogE
  */
 internal fun changeTargetsFor(repo: JujutsuRepository, entries: List<LogEntry>): List<Revision> =
     entries.map { it.id }.ifEmpty {
-        listOf(if (repo.workingCopy.isEmpty) WorkingCopy.parent else WorkingCopy)
+        listOf(if (repo.workingCopy.resolveEmpty()) WorkingCopy.parent else WorkingCopy)
     }
 
 /**

@@ -397,6 +397,10 @@ class UnifiedJujutsuLogDataLoader(
         } else {
             fullMergeAndNotify(correctionsByRepo)
         }
+        // jj-idea-2570.8: start fetching the emptiness of any immutable merges that just landed (the template skips
+        // it), so the "calculating" rows resolve without waiting to be painted. Only the new rows on an append.
+        (if (failure == null) delta!! else data.entries).filter { it.emptyDeferred }.groupBy { it.repo }
+            .forEach { (repo, entries) -> repo.mergeEmptiness.prefetch(entries) }
         val readyAt = System.nanoTime()
         runLater { notify(data, readyAt) }
     }

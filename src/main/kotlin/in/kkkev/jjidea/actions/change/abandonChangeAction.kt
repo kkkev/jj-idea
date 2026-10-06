@@ -65,7 +65,8 @@ internal fun abandonConfirmMessage(entry: LogEntry): String? {
     val localBookmarks = entry.bookmarks.filter { !it.isRemote && !it.deleted }
 
     val reasons = buildList {
-        if (!entry.isEmpty) add(JujutsuBundle.message("log.action.abandon.confirm.reason.files"))
+        // Abandon is only offered for mutable changes (see the log context menu), whose emptiness is never deferred.
+        if (!entry.resolveEmpty()) add(JujutsuBundle.message("log.action.abandon.confirm.reason.files"))
         if (!entry.description.empty) add(JujutsuBundle.message("log.action.abandon.confirm.reason.description"))
         if (localBookmarks.isNotEmpty()) {
             val names = localBookmarks.joinToString(", ") { it.localName }

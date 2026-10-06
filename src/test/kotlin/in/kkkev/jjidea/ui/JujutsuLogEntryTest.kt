@@ -79,7 +79,7 @@ class JujutsuLogEntryTest {
             isEmpty = true
         )
 
-        entry.isEmpty shouldBe true
+        entry.templateEmpty shouldBe true
     }
 
     @Test

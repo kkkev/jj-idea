@@ -31,6 +31,9 @@ interface JujutsuRepository : Displayable {
     val commandExecutor: CommandExecutor
     val logService: LogService
     val logCache: LogCache
+
+    /** Background-fetched emptiness of immutable merges, which the log template doesn't compute. */
+    val mergeEmptiness: MergeEmptiness
     val isInitialised: Boolean
 
     /** Git remotes for this repository. Call from BGT only — may block on first access if not yet loaded. */
@@ -80,6 +83,9 @@ data class JujutsuRepositoryImpl(
 
     override val logService: LogService by lazy { CliLogService(this) }
     override val logCache: LogCache by lazy { RepoLogCache(this) }
+    override val mergeEmptiness: MergeEmptiness by lazy {
+        RepoMergeEmptiness({ ids -> logService.getEmptiness(ids).getOrThrow() })
+    }
 
     /**
      * Git remotes for this repository. Delegates to [JujutsuStateModel.gitRemotes] via

@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -10,6 +11,8 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.LogWindowConfig
@@ -222,7 +225,25 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         logTable.updateGraph(graph)
     }
 
+    // jj-idea-2570.8: repos whose background emptiness fetches (immutable merges) we repaint for.
+    private val emptinessWatched = HashSet<JujutsuRepository>()
+
+    private fun watchMergeEmptiness(entries: List<LogEntry>) {
+        for (repo in entries.mapTo(LinkedHashSet()) { it.repo }) {
+            if (!emptinessWatched.add(repo)) continue
+            repo.mergeEmptiness.addListener(this) { landed ->
+                ApplicationManager.getApplication().invokeLater({
+                    // Cells are rebuilt on every paint, so a repaint is all the rows need - no re-apply.
+                    logTable.repaint()
+                    val selected = logTable.selectedEntries
+                    if (selected.any { it.commitId in landed }) detailsPanel.showCommits(selected)
+                }, { project.isDisposed })
+            }
+        }
+    }
+
     override fun onDataLoaded(newData: UnifiedJujutsuLogDataLoader.Data) {
+        watchMergeEmptiness(newData.entries)
         // Store the full-set graph before setEntries() so refreshDisplayedGraph() can reuse it
         // immediately when no filter is active.
         fullGraphNodes = newData.graphNodes
