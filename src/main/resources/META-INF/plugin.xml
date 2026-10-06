@@ -239,7 +239,7 @@
     </action>
 
     <!-- "Describe": edits the selected change's description. Log toolbar button (GitHub #78);
-         the context-menu entry is a separate, factory-built action (describeAction). -->
+         the context-menu entry is the same registered action. -->
     <action id="Jujutsu.DescribeChangeToolbar" class="in.kkkev.jjidea.actions.change.DescribeChangeAction">
       <keyboard-shortcut first-keystroke="control shift D" keymap="$default"/>
       <keyboard-shortcut first-keystroke="meta shift D" keymap="Mac OS X"/>
@@ -247,7 +247,7 @@
     </action>
 
     <!-- "Rebase": opens the rebase dialog for the selected change(s). Log toolbar button
-         (GitHub #78); the context-menu entry is a separate, factory-built action (rebaseAction). -->
+         (GitHub #78); the context-menu entry is the same registered action. -->
     <action id="Jujutsu.RebaseChangeToolbar" class="in.kkkev.jjidea.actions.change.RebaseChangeAction">
       <keyboard-shortcut first-keystroke="control shift R" keymap="$default"/>
       <keyboard-shortcut first-keystroke="meta shift R" keymap="Mac OS X"/>

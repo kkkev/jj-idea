@@ -1,11 +1,13 @@
 package `in`.kkkev.jjidea.ui.log
 
-import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.project.Project
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.id
+import `in`.kkkev.jjidea.actions.withLogEntry
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
@@ -16,16 +18,9 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Tag as JupiterTag
 
 /**
- * Tests for [JujutsuLogContextMenuActions.createActionGroup]'s `liveSelection` parameter
- * (jj-idea-crt0): when the passed-in [LogEntry] list genuinely reflects the log table's current
- * selection (the default, `liveSelection = true` - the log-row right-click path,
- * `JujutsuLogTable.showContextMenu`), Rebase/Describe must be added as the SAME registered
- * `Jujutsu.RebaseChangeToolbar`/`Jujutsu.DescribeChangeToolbar` instances the toolbar uses, so
- * IntelliJ can show their keyboard shortcut hint next to the menu item - a freshly-built anonymous
- * action per menu-open can never do that. When `liveSelection = false` (the change-id-link menu,
- * `clickActionGroup`'s `ChangeNavigationClick` branch, whose entry is a synthesized target that
- * isn't necessarily the table's live selection), those registered actions must NOT be used, since
- * they'd read the table's actual selection instead of the synthesized target.
+ * Tests that [JujutsuLogContextMenuActions.createActionGroup] always uses the registered log actions (the SAME
+ * instances the toolbar uses, so IntelliJ can show keyboard shortcut hints), and that [withLogEntry] is what lets
+ * those actions act on a menu target that isn't the table's selection (a change-id link, jj-idea-eir1).
  */
 @JupiterTag("platform")
 @TestApplication
@@ -43,41 +38,35 @@ class JujutsuLogContextMenuActionsLiveSelectionTest {
         immutable = immutable
     )
 
-    private fun actionIds(entries: List<LogEntry>, liveSelection: Boolean): List<String?> {
-        val group = JujutsuLogContextMenuActions.createActionGroup(project, entries, liveSelection)
-        val actionManager = ActionManager.getInstance()
-        return group.getChildren(null).map { it.id }
+    private fun actionIds(entries: List<LogEntry>): List<String?> =
+        JujutsuLogContextMenuActions.createActionGroup(project, entries).getChildren(null).map { it.id }
+
+    @Test
+    fun `menu uses the registered toolbar and keymappable actions`() {
+        val ids = actionIds(listOf(entry()))
+
+        listOf(
+            "Jujutsu.NewChange",
+            "Jujutsu.EditChange",
+            "Jujutsu.RebaseChangeToolbar",
+            "Jujutsu.DescribeChangeToolbar",
+            "Jujutsu.MoveChangeUp",
+            "Jujutsu.MoveChangeDown"
+        ).forEach { (ids.contains(it)) shouldBe true }
     }
 
     @Test
-    fun `live selection reuses the registered Rebase and Describe toolbar actions`() {
-        val ids = actionIds(listOf(entry()), liveSelection = true)
+    fun `withLogEntry supplies the entry and hides the parent's neighbours`() {
+        val target = entry()
+        val parent = SimpleDataContext.builder()
+            .add(JujutsuDataKeys.LOG_ENTRY, entry())
+            .add(JujutsuDataKeys.LOG_NEIGHBOURS, JujutsuDataKeys.LogNeighbours(entry(), entry()))
+            .build()
 
-        (ids.contains("Jujutsu.RebaseChangeToolbar")) shouldBe true
-        (ids.contains("Jujutsu.DescribeChangeToolbar")) shouldBe true
-    }
+        val context = parent.withLogEntry(target)
 
-    @Test
-    fun `non-live selection (change-id link menu) does not use the registered toolbar actions`() {
-        val ids = actionIds(listOf(entry()), liveSelection = false)
-
-        (ids.contains("Jujutsu.RebaseChangeToolbar")) shouldBe false
-        (ids.contains("Jujutsu.DescribeChangeToolbar")) shouldBe false
-    }
-
-    @Test
-    fun `non-live selection omits New and Edit entirely (no fixed-target equivalent)`() {
-        val ids = actionIds(listOf(entry()), liveSelection = false)
-
-        (ids.contains("Jujutsu.NewChange")) shouldBe false
-        (ids.contains("Jujutsu.EditChange")) shouldBe false
-    }
-
-    @Test
-    fun `live selection includes New and Edit by their registered ids`() {
-        val ids = actionIds(listOf(entry()), liveSelection = true)
-
-        (ids.contains("Jujutsu.NewChange")) shouldBe true
-        (ids.contains("Jujutsu.EditChange")) shouldBe true
+        JujutsuDataKeys.LOG_ENTRY.getData(context) shouldBe target
+        JujutsuDataKeys.LOG_ENTRIES.getData(context) shouldBe listOf(target)
+        JujutsuDataKeys.LOG_NEIGHBOURS.getData(context) shouldBe null
     }
 }

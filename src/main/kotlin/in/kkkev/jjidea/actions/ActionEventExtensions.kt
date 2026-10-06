@@ -2,6 +2,8 @@ package `in`.kkkev.jjidea.actions
 
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
@@ -26,6 +28,20 @@ val AnActionEvent.logEntry: LogEntry? get() = this.getData(JujutsuDataKeys.LOG_E
 
 /** The full multi-select log table selection, or empty if none (e.g. focus is outside the log table). */
 val AnActionEvent.logEntries: List<LogEntry> get() = this.getData(JujutsuDataKeys.LOG_ENTRIES) ?: emptyList()
+
+/**
+ * This context, as if [entry] were the single selected log row: [JujutsuDataKeys.LOG_ENTRY] and
+ * [JujutsuDataKeys.LOG_ENTRIES] are overridden, so the registered log actions (which read the selection from the
+ * event) act on [entry] wherever the menu is opened from - e.g. a change-id link, which isn't a table selection.
+ * [JujutsuDataKeys.LOG_NEIGHBOURS] is explicitly nulled rather than inherited, because neighbours are only known for
+ * the table's real selection and would otherwise describe the wrong row.
+ */
+fun DataContext.withLogEntry(entry: LogEntry): DataContext = SimpleDataContext.builder()
+    .setParent(this)
+    .add(JujutsuDataKeys.LOG_ENTRY, entry)
+    .add(JujutsuDataKeys.LOG_ENTRIES, listOf(entry))
+    .addNull(JujutsuDataKeys.LOG_NEIGHBOURS)
+    .build()
 
 /** The row-adjacent entries around a single-row log selection, or `null` if none (see [JujutsuDataKeys.LOG_NEIGHBOURS]). */
 val AnActionEvent.logNeighbours: JujutsuDataKeys.LogNeighbours? get() = this.getData(JujutsuDataKeys.LOG_NEIGHBOURS)

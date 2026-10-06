@@ -488,7 +488,7 @@ class JujutsuBookmarksPanel(
      * Appends the log's own change actions (New Change/Edit/Rebase/Duplicate, jj-idea-p35f) for a
      * bookmark row. The registered `Jujutsu.NewChange`/`EditChange`/`RebaseChangeToolbar` are the
      * *same instances* the log toolbar uses (so IntelliJ can resolve and show a keymap shortcut
-     * hint, matching `JujutsuLogContextMenuActions`'s `liveSelection` path) and read the live
+     * hint, matching `JujutsuLogContextMenuActions`) and read the live
      * selection [uiDataSnapshot] just published - they self-disable when [entries] is empty, with
      * no extra guard needed here. The fixed-target "…From These"/Duplicate factories have no such
      * data-context enablement, so they're only added once [entries] actually resolved to

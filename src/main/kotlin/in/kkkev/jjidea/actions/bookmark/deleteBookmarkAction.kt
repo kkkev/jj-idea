@@ -20,7 +20,7 @@ private val log = Logger.getInstance("in.kkkev.jjidea.actions.bookmark.deleteBoo
  * Confirms, then runs `jj bookmark delete`. Shared implementation behind [deleteBookmarkAction]
  * (fixed-target factory) and [DeleteBookmarkAction] (jj-idea-ib1i, registered/keymap-assignable) -
  * one implementation, two entry points, mirroring
- * [in.kkkev.jjidea.actions.change.rebaseAction]/`performRebase`.
+ * [in.kkkev.jjidea.actions.change.RebaseChangeAction].
  */
 internal fun performDeleteBookmark(repo: JujutsuRepository, bookmark: Bookmark) {
     if (Messages.showYesNoDialog(

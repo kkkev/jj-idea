@@ -14,7 +14,7 @@ object ManagedActions {
      * fixed-target factories in [in.kkkev.jjidea.actions.bookmark] - the *same instance* the
      * Keymap settings page resolves a shortcut for, so it can show a hint here too (jj-idea-ib1i),
      * exactly as [in.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.createActionGroup]'s
-     * `liveSelection` path already does for New Change/Edit/Rebase. Push stays on the
+     * log context menu already does for New Change/Edit/Rebase. Push stays on the
      * fixed-target [pushBookmarkAction] submenu below - it's shared with call sites (the bookmark
      * widget, the log's chip submenu) that never publish [JujutsuDataKeys.BOOKMARK_TARGET], so
      * swapping it there would make Push silently disable itself in every *other* context instead.

@@ -28,7 +28,7 @@ import `in`.kkkev.jjidea.jj.stateModel
  * Each also has a keymap-assignable, registered counterpart below (jj-idea-ib1i) that reads its
  * target from [in.kkkev.jjidea.actions.JujutsuDataKeys.BOOKMARK_TARGET] rather than a fixed
  * closure - both call the same `perform…` function, so there's one implementation behind the two
- * entry points (mirrors [in.kkkev.jjidea.actions.change.rebaseAction]/`performRebase`).
+ * entry points (mirrors [in.kkkev.jjidea.actions.change.RebaseChangeAction]).
  */
 internal fun performFilterLogToBookmark(repo: JujutsuRepository, name: String) =
     repo.project.stateModel.filterToReference.notify(name)

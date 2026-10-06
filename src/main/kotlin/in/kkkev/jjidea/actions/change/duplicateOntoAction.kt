@@ -30,7 +30,7 @@ fun duplicateOntoAction(
  * [duplicateOntoAction] (dialog path) and [in.kkkev.jjidea.ui.dnd.DropPerformers] (drag-and-drop
  * path, jj-idea-p6nb) - one wiring path for both means the dialog action also gains the undo
  * balloon it didn't have before, same trade already accepted for `executeRebase`
- * (`actions/change/rebaseAction.kt`). Invalidates with no `select` - unlike rebase, `jj duplicate`
+ * (`actions/change/executeRebase.kt`). Invalidates with no `select` - unlike rebase, `jj duplicate`
  * mints a new change id we don't know until after the command runs.
  */
 internal fun executeDuplicate(

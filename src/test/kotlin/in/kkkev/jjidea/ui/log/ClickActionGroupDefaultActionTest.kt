@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ToggleAction
@@ -8,6 +9,7 @@ import com.intellij.testFramework.TestActionEvent
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
@@ -158,14 +160,16 @@ class ClickActionGroupDefaultActionTest {
     }
 
     @Test
-    fun `change-id link menu reuses the resolved commit's log-row context menu`() {
+    fun `change-id link menu reuses the resolved commit's log-row context menu and supplies its entry`() {
         val changeId = ChangeId("qpvuntsm", "qp", 2)
-        every { repo.getLogEntry(changeId as Revision) } returns entry()
+        val resolved = entry()
+        every { repo.getLogEntry(changeId as Revision) } returns resolved
         val target = ChangeNavigationClick(ChangeKey(repo, changeId))
 
-        val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
+        val menu = JujutsuLogContextMenuActions.clickMenu(project, target, DataContext.EMPTY_CONTEXT)
 
-        children.isEmpty() shouldBe false
+        menu.group.nonSeparatorChildren().isEmpty() shouldBe false
+        JujutsuDataKeys.LOG_ENTRY.getData(menu.dataContext) shouldBe resolved
     }
 
     @Test
@@ -174,8 +178,9 @@ class ClickActionGroupDefaultActionTest {
         every { repo.getLogEntry(changeId as Revision) } throws IllegalArgumentException("not found")
         val target = ChangeNavigationClick(ChangeKey(repo, changeId))
 
-        val children = JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
+        val menu = JujutsuLogContextMenuActions.clickMenu(project, target, DataContext.EMPTY_CONTEXT)
 
-        children.isEmpty() shouldBe true
+        menu.group.nonSeparatorChildren().isEmpty() shouldBe true
+        JujutsuDataKeys.LOG_ENTRY.getData(menu.dataContext) shouldBe null
     }
 }

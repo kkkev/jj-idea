@@ -2,7 +2,6 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.diff.tools.util.DiffDataKeys
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
@@ -120,10 +119,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
                     val uri = runCatching { java.net.URI(href) }.getOrNull() ?: return
                     LogClickTarget.resolve(uri, project, currentEntries) ?: return
                 }
-                val actionGroup = JujutsuLogContextMenuActions.clickActionGroup(project, target)
-                val popupMenu = ActionManager.getInstance().createActionPopupMenu("JujutsuRefPopup", actionGroup)
-                popupMenu.setTargetComponent(metadataPane)
-                popupMenu.component.show(metadataPane, e.x, e.y)
+                JujutsuLogContextMenuActions.showClickMenu(project, target, metadataPane, e.point)
                 e.consume()
             }
         })

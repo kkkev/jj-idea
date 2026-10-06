@@ -6,7 +6,6 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.openapi.util.Condition
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.DoubleClickListener
 import com.intellij.ui.JBColor
@@ -398,25 +397,7 @@ class JujutsuLogTable(
                     when (val target = clickTargetAt(syntheticEvent.point)) {
                         null -> showContextMenu(comp, x, y)
                         is MoreRefsClick -> showMoreRefsPopup(comp, x, y, target)
-                        else -> {
-                            // Highlighted-default ListPopup (same idiom as JujutsuFilterComponent's
-                            // toolbar popups) instead of a plain JPopupMenu, so the action mirroring
-                            // this element's left-click default is pre-selected (jj-idea-iesq).
-                            val group = clickActionGroup(project, target)
-                            JBPopupFactory.getInstance()
-                                .createActionGroupPopup(
-                                    null,
-                                    group,
-                                    DataManager.getInstance().getDataContext(comp),
-                                    JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
-                                    true,
-                                    null,
-                                    -1,
-                                    Condition { it is DefaultClickAction },
-                                    null
-                                )
-                                .show(RelativePoint(comp, Point(x, y)))
-                        }
+                        else -> JujutsuLogContextMenuActions.showClickMenu(project, target, comp, Point(x, y))
                     }
                 }
             }

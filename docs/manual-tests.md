@@ -522,6 +522,9 @@ more lanes than the 3-4 needed here.
       details) opens that commit's full log-row context menu (Show Diff, New/Edit, Describe,
       Abandon, Rebase, etc.) — this previously showed an empty "Nothing Here" placeholder
       (jj-idea-in2h). Left-click still navigates/selects that commit as before
+- [ ] Right-clicking a bookmark/tag chip, author/committer email or change-id link in the details pane
+      now opens a highlighted-default popup list (same as in the log table) instead of a plain
+      context menu; items work as before (jj-idea-eir1)
 - [ ] Right-click a change-id link whose target has since become invalid (e.g. abandon that
       commit via the CLI in another terminal, then right-click the now-stale link without
       refreshing) — shows an empty menu rather than throwing or crashing
@@ -715,7 +718,7 @@ shared with MT-LOG-GRAPH/MT-LOG-FILTER's other stress fixtures) so most commits 
 #### Context-menu shortcut hints (jj-idea-crt0)
 
 - [ ] Right-click a log row → the **Rebase** and **Describe** entries show their keyboard shortcut hint next to the label (e.g. "Ctrl+Shift+R"), matching the toolbar buttons — this previously showed no hint even though the toolbar shortcut existed
-- [ ] Right-click a change-id link (e.g. a parent reference in the commit details panel) → its menu's **Rebase**/**Describe** entries do **not** show a shortcut hint (this menu acts on the link's target, not the table's live selection, so it deliberately keeps using a non-registered action) and that menu has no **New**/**Edit** entries at all
+- [ ] Right-click a change-id link (e.g. a parent reference in the commit details panel) → its menu acts on the link's target, not the log table's selection (jj-idea-eir1): **New Change**, **Edit**, **Describe** and **Rebase** show their keyboard shortcut hints like a log-row right-click, and use the linked change (select a *different* row first to confirm); **Move Up**/**Move Down** are shown disabled
 - [ ] Multi-select several mutable rows (same repo), right-click → **Rebase** is enabled and opens with all of them as source; multi-select spanning two repos → **Rebase** is disabled
 - [ ] Multi-select several rows, right-click → **Describe** is disabled (only meaningful for a single selection)
 - [ ] Open a file's history (right-click a file > Show History) — confirm its toolbar still shows only Refresh/search, with no Rebase/Describe buttons
@@ -3590,7 +3593,7 @@ centre band runs `jj rebase --onto`; the top/bottom bands run `-A`/`-B`. Applies
 confirmation dialog, with an undo balloon on success. `RebaseSourceMode` defaults to `-r` (only the
 dragged commit(s) move); see "Rebase source scope" below for `-s`/`-b`.
 
-**Code:** `ui/dnd/DropPerformers.kt`, `ui/log/JujutsuLogTableDnD.kt`, `actions/change/rebaseAction.kt`
+**Code:** `ui/dnd/DropPerformers.kt`, `ui/log/JujutsuLogTableDnD.kt`, `actions/change/executeRebase.kt`
 
 - [ ] Drag a mutable commit onto another's **centre** band → row outline, tooltip "Rebase &lt;id&gt;
       onto &lt;id&gt;", release applies; confirm the new parent with `jj log` in a terminal

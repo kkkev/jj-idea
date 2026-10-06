@@ -1,8 +1,12 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.ide.BrowserUtil
+import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.Condition
+import com.intellij.ui.awt.RelativePoint
 import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
@@ -18,10 +22,13 @@ import `in`.kkkev.jjidea.actions.tag.deleteTagAction
 import `in`.kkkev.jjidea.actions.tag.pushTagAction
 import `in`.kkkev.jjidea.actions.tag.setTagAction
 import `in`.kkkev.jjidea.actions.uniqueRepo
+import `in`.kkkev.jjidea.actions.withLogEntry
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.remoteEntriesFor
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
+import java.awt.Component
+import java.awt.Point
 import java.net.URI
 
 /**
@@ -42,23 +49,15 @@ object JujutsuLogContextMenuActions {
      * Create the action group for the context menu.
      * Different actions are shown depending on whether the selected entry is the working copy.
      *
-     * [liveSelection] (default `true`) says whether [entries] genuinely reflects the log table's
-     * current selection, which is what the popup's target component (see
-     * `JujutsuLogTable.showContextMenu`) will supply to any registered action's data context. When
-     * `true`, New/Edit/Rebase/Describe are added via `ActionManager.getInstance().getAction(id)` -
-     * the SAME instance the log toolbar uses - so IntelliJ can resolve a keymap shortcut and show
-     * its hint next to the menu item (jj-idea-crt0); those registered actions read the table's live
-     * selection themselves via [in.kkkev.jjidea.actions.logEntry]/[in.kkkev.jjidea.actions.logEntries].
-     * When `false` (the `ChangeNavigationClick` link-menu path below, whose [entries] is a
-     * synthesized single target that is *not* necessarily the table's current selection), New/Edit
-     * are omitted (they have no fixed-target factory equivalent) and Rebase/Describe fall back to
-     * the fixed-target factory functions [rebaseAction]/[describeAction], which can never show a
-     * shortcut hint but do act on the right commit regardless of what's selected in the table.
+     * New/Edit/Describe/Rebase/Move are the registered actions (the SAME instances the log toolbar uses), so
+     * IntelliJ can resolve a keymap shortcut and show its hint next to the menu item (jj-idea-crt0). They read
+     * their target from the event's data context: the log table's live selection for a row right-click, or a
+     * context built with [in.kkkev.jjidea.actions.withLogEntry] for a menu opened from elsewhere
+     * (see [clickMenu]).
      */
     fun createActionGroup(
         project: Project,
-        entries: List<LogEntry>,
-        liveSelection: Boolean = true
+        entries: List<LogEntry>
     ): DefaultActionGroup = BackgroundActionGroup().apply {
         add(ManagedActions["Jujutsu.ShowChangesDiff"])
 
@@ -77,22 +76,14 @@ object JujutsuLogContextMenuActions {
         // dialog-based variant is offered as a secondary "with description" option.
         val uniqueRepo = entries.uniqueRepo
 
-        if (liveSelection) {
-            add(ManagedActions["Jujutsu.NewChange"])
-        }
+        add(ManagedActions["Jujutsu.NewChange"])
         add(newChangeFromAction(project, uniqueRepo, entries))
 
         // Offer "Edit" for non-working-copy, non-immutable changes
-        if (liveSelection) {
-            add(ManagedActions["Jujutsu.EditChange"])
-        }
+        add(ManagedActions["Jujutsu.EditChange"])
 
         // Offer "Describe" for mutable changes
-        if (liveSelection) {
-            add(ManagedActions["Jujutsu.DescribeChangeToolbar"])
-        } else {
-            add(describeAction(project, entry?.takeUnless { it.immutable }))
-        }
+        add(ManagedActions["Jujutsu.DescribeChangeToolbar"])
 
         // Can abandon any mutable change including working copy
         // TODO Allow abandon on multiple if all entries are immutable
@@ -103,22 +94,13 @@ object JujutsuLogContextMenuActions {
         addSeparator()
 
         // Offer "Rebase" for mutable changes (single or multi-select, same root)
-        val mutableEntries = entries.filter { !it.immutable }
-        val rebaseRepo = uniqueRepo?.takeIf { mutableEntries.isNotEmpty() }
-        if (liveSelection) {
-            add(ManagedActions["Jujutsu.RebaseChangeToolbar"])
-        } else {
-            add(rebaseAction(project, rebaseRepo, mutableEntries))
-        }
+        add(ManagedActions["Jujutsu.RebaseChangeToolbar"])
 
-        // "Move Up"/"Move Down" (jj-idea-owje, GitHub #93): registered actions only - they read
-        // their neighbour from JujutsuDataKeys.LOG_NEIGHBOURS, which only the live log-table
-        // selection publishes, so there's no fixed-target factory equivalent for the
-        // liveSelection = false (link-menu) path.
-        if (liveSelection) {
-            add(ManagedActions["Jujutsu.MoveChangeUp"])
-            add(ManagedActions["Jujutsu.MoveChangeDown"])
-        }
+        // "Move Up"/"Move Down" (jj-idea-owje, GitHub #93): they read their neighbour from
+        // JujutsuDataKeys.LOG_NEIGHBOURS, which only the live log-table selection publishes - so they show
+        // disabled in menus opened from a change-id link (see withLogEntry).
+        add(ManagedActions["Jujutsu.MoveChangeUp"])
+        add(ManagedActions["Jujutsu.MoveChangeDown"])
 
         // Duplicate works on any change, including immutable ones
         add(duplicateChangeAction(project, uniqueRepo, entries))
@@ -227,18 +209,9 @@ object JujutsuLogContextMenuActions {
                 }
 
                 is IssueLinkClick -> add(OpenIssueLinkAction(target.uri))
-                // jjc:// change-navigation links resolve their target LogEntry (may shell out to
-                // jj if it's outside the loaded window) and reuse the same menu a right-click on
-                // that commit's log row would show. A revision that no longer resolves (e.g.
-                // abandoned since the link was rendered) falls back to an empty menu rather than
-                // throwing.
-                is ChangeNavigationClick -> {
-                    val entry = runCatching { target.repo.getLogEntry(target.changeKey.revision) }.getOrNull()
-                    entry?.let {
-                        val group = createActionGroup(project, listOf(it), liveSelection = false)
-                        addAll(group.childActionsOrStubs.toList())
-                    }
-                }
+                // jjc:// change-navigation links reuse the full log-row menu - built by [clickMenu], which has
+                // to resolve the link's LogEntry for its data context as well.
+                is ChangeNavigationClick -> Unit
                 // MoreRefsClick (the "+N more" overflow chip, jj-idea-w61m) is handled separately by
                 // JujutsuLogTable, which shows a popup over the hidden refs instead of this menu.
                 is MoreRefsClick -> Unit
@@ -247,6 +220,46 @@ object JujutsuLogContextMenuActions {
                 is WorkingCopyClick -> Unit
             }
         }
+
+    /** A click-target menu together with the data context its actions must be run with. */
+    class ClickMenu(val group: DefaultActionGroup, val dataContext: DataContext)
+
+    /**
+     * The menu for [target], plus the data context to show it with: [parent] itself, except for a
+     * [ChangeNavigationClick], which reuses the log-row menu for the linked change (it may shell out to jj if it's
+     * outside the loaded window) and so needs its entry supplied via [withLogEntry] - the link isn't a table
+     * selection, so the registered actions couldn't otherwise find it. A revision that no longer resolves (e.g.
+     * abandoned since the link was rendered) yields an empty menu rather than throwing.
+     */
+    fun clickMenu(project: Project, target: LogClickTarget, parent: DataContext): ClickMenu {
+        if (target !is ChangeNavigationClick) return ClickMenu(clickActionGroup(project, target), parent)
+        val entry = runCatching { target.repo.getLogEntry(target.changeKey.revision) }.getOrNull()
+        val group = BackgroundActionGroup().apply {
+            entry?.let { addAll(createActionGroup(project, listOf(it)).childActionsOrStubs.toList()) }
+        }
+        return ClickMenu(group, entry?.let(parent::withLogEntry) ?: parent)
+    }
+
+    /**
+     * Show [target]'s [clickMenu] as a highlighted-default popup (same idiom as JujutsuFilterComponent's toolbar
+     * popups), so the action mirroring the element's left-click default is pre-selected (jj-idea-iesq).
+     */
+    fun showClickMenu(project: Project, target: LogClickTarget, component: Component, point: Point) {
+        val menu = clickMenu(project, target, DataManager.getInstance().getDataContext(component))
+        JBPopupFactory.getInstance()
+            .createActionGroupPopup(
+                null,
+                menu.group,
+                menu.dataContext,
+                JBPopupFactory.ActionSelectionAid.SPEEDSEARCH,
+                true,
+                null,
+                -1,
+                Condition { it is DefaultClickAction },
+                null
+            )
+            .show(RelativePoint(component, point))
+    }
 
     /**
      * Right-click default for a bookmark/tag chip (jj-idea-wkcz — chips have no left-click action):
