@@ -250,7 +250,8 @@ jobs:
         # and embedding the real key in a snapshot build shipped on every push would leak it far more
         # often than a real release. Non-release builds simply can't validate JJP1 codes, same as any
         # local dev build - only the legacy access-codes.txt path works there. See
-        # generatePreviewCodeKey in build.gradle.kts.
+        # generatePreviewCodeKey in build.gradle.kts. The Marketplace publish step further down
+        # rebuilds the plugin and needs the same key + flag (jj-idea-cxg5).
         run: |
           if [ "${{ steps.version.outputs.is_release }}" = "true" ]; then
             PREVIEW_CODE_KEY="${{ secrets.PREVIEW_CODE_KEY }}" ./gradlew buildPlugin -PrequirePreviewCodeKey
@@ -293,6 +294,17 @@ jobs:
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Verify built plugin contains the preview code key
+        if: steps.version.outputs.is_release == 'true'
+        run: |
+          mkdir -p /tmp/built-check
+          unzip -oq build/distributions/*.zip -d /tmp/built-check
+          for jar in /tmp/built-check/*/lib/jj-idea-*.jar; do
+            unzip -l "$jar" | grep -q ' preview/code-key.bin$' && exit 0
+          done
+          echo "::error::preview/code-key.bin missing from the release build."
+          exit 1
 
       # Create release (from tag push or workflow_dispatch)
       - name: Create GitHub Release
@@ -419,7 +431,24 @@ jobs:
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           PRIVATE_KEY_PASSWORD: ${{ secrets.PRIVATE_KEY_PASSWORD }}
-        run: ./gradlew publishPlugin
+          # jj-idea-cxg5: publishPlugin re-runs buildPlugin, and generatePreviewCodeKey always
+          # re-runs and DELETES preview/code-key.bin when it finds no key. Without the key here
+          # (as in 0.8.18/0.8.19) the Marketplace jar shipped without it and every JJP1 code was
+          # rejected for Marketplace installs, though the GitHub Release zip was fine.
+          PREVIEW_CODE_KEY: ${{ secrets.PREVIEW_CODE_KEY }}
+        run: ./gradlew publishPlugin -PrequirePreviewCodeKey
+
+      - name: Verify published plugin still contains the preview code key
+        if: steps.version.outputs.is_release == 'true' && env.PUBLISH_TOKEN != ''
+        run: |
+          # publishPlugin rebuilt build/distributions/*.zip; check what it actually uploaded.
+          mkdir -p /tmp/published-check
+          unzip -oq build/distributions/*.zip -d /tmp/published-check
+          for jar in /tmp/published-check/*/lib/jj-idea-*.jar; do
+            unzip -l "$jar" | grep -q ' preview/code-key.bin$' && exit 0
+          done
+          echo "::error::preview/code-key.bin missing from the plugin that publishPlugin uploaded - JJP1 codes would be rejected on Marketplace installs."
+          exit 1
 
       # publishPlugin succeeding only means the upload was accepted — Marketplace then runs its
       # own automated compatibility check (its own plugin-verifier run against its full IDE

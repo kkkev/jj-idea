@@ -3486,24 +3486,32 @@ file), which no automated test can supply — see contributing.md § Manual regr
       bottom of the panel, below **Support**, with only an "Access code:" field and a one-line
       explanation — no feature
       names anywhere
-- [ ] Enter an invalid code, click Apply: a "Not a valid access code." line appears; no feature
-      list appears; nothing crashes
-- [ ] Enter a valid legacy code, click Apply, then reopen Settings (or the panel) — no status
-      line appears (nothing to add beyond what the checkboxes show), a checkbox for every preview
-      feature appears underneath, and a single shared comment (noting it's unfinished and that
-      reopening the IDE is needed for a toggle change to take effect) appears once below the
-      whole list, not repeated per checkbox
+- [ ] Type or paste an invalid code (no Apply, no reopening): a red "Not a valid access code…"
+      line appears under the field as soon as the text changes; no feature list appears; nothing
+      crashes
+- [ ] Replace it with a valid legacy code: the line turns grey and reads "Code accepted. Choose the
+      features to enable below, then click Apply.", a checkbox for every preview feature appears
+      underneath, and a single shared comment (noting it's unfinished and that reopening the IDE
+      is needed for a toggle change to take effect) appears once below the whole list, not
+      repeated per checkbox — all without leaving Settings
+- [ ] Clear the field: the status line, checkboxes and shared comment all disappear immediately
 - [ ] Enter a valid, single-feature `JJP1-...` code (needs a build whose signing key resolves —
       either `PREVIEW_CODE_KEY` set, or the local key at `~/.config/jj-idea/preview-code-key` that
       `previewCode keygen`/`mint` use by default — e.g. minted for yourself via `./gradlew
-      previewCode --args="mint --features pagedLogLoad"`), click Apply, reopen Settings — no
-      status line, and only that one feature's checkbox appears
-- [ ] Mint a `JJP1` code with `--expires` set to a future month, enter it — a "Valid through ..."
-      line appears above its checkbox(es)
-- [ ] Mint a `JJP1` code with `--expires` set to last month, enter it — a "This code expired on
-      ..." line appears instead of a feature list, and no checkboxes appear
-- [ ] Clear the code and click Apply, reopen Settings — the status line and feature checkboxes
-      disappear again
+      previewCode --args="mint --features pagedLogLoad"`): "Code accepted…" and only that one
+      feature's checkbox appears
+- [ ] Mint a `JJP1` code with `--expires` set to a future month, enter it — "Code accepted, valid
+      until …" appears above its checkbox(es)
+- [ ] Mint a `JJP1` code with `--expires` set to last month, enter it — a red "This code expired
+      on …" line appears instead of a feature list, and no checkboxes appear
+- [ ] On a build **without** the signing key (CI artifact from a non-release run, or a dev build
+      with no `PREVIEW_CODE_KEY` and no local key file), enter any `JJP1-…` code: a red "This build
+      of the plugin can't check codes that start with JJP1…" line appears — not "Not a valid
+      access code" — and a legacy code still works there
+- [ ] Install from the JetBrains Marketplace (not a GitHub zip): a valid `JJP1-…` code is accepted
+      (regression check for jj-idea-cxg5)
+- [ ] With a feature ticked and a code accepted, click Apply, reopen Settings — the checkbox is
+      still ticked; clear the code and Apply — the feature stays off after reopening the IDE
 
 → see MT-DND below for the effect of the toggle on the log table
 

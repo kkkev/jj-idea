@@ -63,6 +63,26 @@ object AccessCode {
         }
     }
 
+    /** Whether this build carries the signing key, i.e. can validate `JJP1` codes at all. */
+    val canVerifySignedCodes: Boolean get() = signingKey != null
+
+    /** What the Settings field should say about [code] as typed - see [PreviewCodeStatus]. */
+    fun status(code: String, today: LocalDate = LocalDate.now()): PreviewCodeStatus {
+        val trimmed = code.trim()
+        if (trimmed.isEmpty()) return PreviewCodeStatus.Empty
+        return when (val grant = grant(trimmed, today)) {
+            is PreviewCode.Grant.Valid -> PreviewCodeStatus.Accepted(grant.features, grant.expiry)
+            is PreviewCode.Grant.Expired -> PreviewCodeStatus.Expired(grant.lastValidDate)
+            is PreviewCode.Grant.Revoked -> PreviewCodeStatus.Revoked
+            is PreviewCode.Grant.Invalid ->
+                if (trimmed.startsWith("JJP1", ignoreCase = true) && !canVerifySignedCodes) {
+                    PreviewCodeStatus.CannotVerify
+                } else {
+                    PreviewCodeStatus.Invalid
+                }
+        }
+    }
+
     /** The set of [PreviewFeature]s [code] currently grants - empty if invalid, expired or revoked. */
     fun grantedFeatures(code: String, today: LocalDate = LocalDate.now()): Set<PreviewFeature> =
         (grant(code, today) as? PreviewCode.Grant.Valid)?.features ?: emptySet()

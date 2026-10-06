@@ -122,6 +122,10 @@ sourceSets {
 // silently ship without the key - wired into the "Build and Release" workflow's buildPlugin step
 // for release runs only (see .github/workflows/build.yml); that workflow's CI runner has no local
 // key file, so it only ever gets the key from the env var, same as before.
+// Any Gradle invocation that repackages the plugin - including `publishPlugin`, which re-runs
+// buildPlugin - needs the env var AND -PrequirePreviewCodeKey in a release context: this task
+// re-runs every time and deletes code-key.bin when it finds no key, so a bare `publishPlugin`
+// silently ships a jar that rejects every JJP1 code (jj-idea-cxg5).
 val previewKeyOutputDir = layout.buildDirectory.dir("generated/previewKey")
 val localPreviewKeyFile = File(System.getProperty("user.home"), ".config/jj-idea/preview-code-key")
 val generatePreviewCodeKey = tasks.register("generatePreviewCodeKey") {

@@ -5,13 +5,17 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import com.intellij.ui.components.JBCheckBox
+import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.InstallMethod
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JjExecutableFinder
 import `in`.kkkev.jjidea.jj.JjVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.preview.PreviewFeature
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -20,6 +24,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import javax.swing.JEditorPane
 
 /**
  * Regression tests for jj-idea-bwdk: the settings panel's preferred width exceeded the
@@ -53,6 +58,33 @@ import org.junit.jupiter.api.Test
 @RunInEdt
 class JujutsuConfigurablePanelTest {
     private val project = projectFixture()
+
+    @Test
+    fun `access code feedback and feature list update as the code is typed`() {
+        // Previously the status line and checkboxes were decided once when the panel opened, so a
+        // typo or a good code showed nothing until Apply and reopening Settings.
+        val panel = JujutsuConfigurable(project.get()).createPanel()
+        val field = UIUtil.findComponentsOfType(panel, JBTextField::class.java)
+            .single { it.name == JujutsuConfigurable.PREVIEW_CODE_FIELD_NAME }
+        fun status(): List<String> = UIUtil.findComponentsOfType(panel, JEditorPane::class.java)
+            .filter { it.isVisible && it.text.contains("code", ignoreCase = true) && it.text.contains("valid") }
+            .map { it.text }
+        fun visibleFeatureBoxes() = UIUtil.findComponentsOfType(panel, JBCheckBox::class.java)
+            .filter { box -> PreviewFeature.entries.any { it.displayName == box.text } && box.isVisible }
+
+        visibleFeatureBoxes() shouldBe emptyList()
+
+        field.text = "wrong-code-0000"
+        status().any { it.contains(JujutsuBundle.message("settings.preview.code.status.invalid")) } shouldBe true
+        visibleFeatureBoxes() shouldBe emptyList()
+
+        field.text = "onyx-amber-9769"
+        visibleFeatureBoxes().map { it.text }.toSet() shouldBe PreviewFeature.entries.map { it.displayName }.toSet()
+
+        field.text = ""
+        visibleFeatureBoxes() shouldBe emptyList()
+        status() shouldBe emptyList()
+    }
 
     @Test
     fun `settings panel fits within the settings dialog's available width`() {

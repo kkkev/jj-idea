@@ -18,6 +18,7 @@ import com.intellij.ui.SimpleListCellRenderer
 import com.intellij.ui.components.*
 import com.intellij.ui.dsl.builder.*
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.NamedColorUtil
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.git.GitPushDialog
@@ -26,7 +27,7 @@ import `in`.kkkev.jjidea.jj.cli.Config
 import `in`.kkkev.jjidea.jj.cli.config
 import `in`.kkkev.jjidea.jj.cli.rootlessConfig
 import `in`.kkkev.jjidea.preview.AccessCode
-import `in`.kkkev.jjidea.preview.PreviewCode
+import `in`.kkkev.jjidea.preview.PreviewCodeStatus
 import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
@@ -694,8 +695,9 @@ class JujutsuConfigurable(
         }
 
         group(JujutsuBundle.message("settings.group.preview")) {
+            val codeField = JBTextField().also { it.name = PREVIEW_CODE_FIELD_NAME }
             row(JujutsuBundle.message("settings.preview.code.label")) {
-                textField()
+                cell(codeField)
                     .bindText(appSettings.state::previewAccessCode)
                     .columns(COLUMNS_SHORT)
                     .comment(
@@ -703,54 +705,57 @@ class JujutsuConfigurable(
                         maxLineLength = NARROW_COMMENT_WIDTH
                     )
             }
-            // Which features are offered is decided once, when the panel opens: entering a new
-            // code and clicking Apply needs Settings reopened to reveal the feature list, the
-            // same "reopen/restart to take effect" tradeoff as the DnD install-time guard itself
-            // (in.kkkev.jjidea.ui.log.installDragAndDrop).
-            // The feature checkboxes below already say what the code unlocks, so the status line
-            // only needs to cover the cases the checkboxes can't show on their own: an expiring
-            // code's date, or why no checkboxes appeared at all.
-            val grant = AccessCode.grant(appSettings.state.previewAccessCode)
-            val statusMessage = when (grant) {
-                is PreviewCode.Grant.Valid ->
-                    grant.expiry?.let { JujutsuBundle.message("settings.preview.code.status.validUntil", it) }
-                is PreviewCode.Grant.Expired ->
-                    JujutsuBundle.message("settings.preview.code.status.expired", grant.lastValidDate)
-                is PreviewCode.Grant.Revoked -> JujutsuBundle.message("settings.preview.code.status.revoked")
-                is PreviewCode.Grant.Invalid ->
-                    if (appSettings.state.previewAccessCode.isNotBlank()) {
-                        JujutsuBundle.message("settings.preview.code.status.invalid")
-                    } else {
-                        null
-                    }
-            }
-            if (statusMessage != null) {
-                row("") {
-                    comment(statusMessage, maxLineLength = NARROW_COMMENT_WIDTH)
+            // Everything below the field reacts to what is typed, not to what was last saved, so a
+            // bad or good code is reported immediately instead of after Apply and reopening
+            // Settings. The rows all exist up front and only their visibility changes. The
+            // status line also covers what the checkboxes can't show: why none appeared, an
+            // expiring code's date, or a build that can't check the code at all.
+            lateinit var statusLabel: JEditorPane
+            val statusRow = row("") {
+                statusLabel = comment("", maxLineLength = NARROW_COMMENT_WIDTH).component
+            }.visible(false)
+            val featureRows = mutableListOf<Pair<PreviewFeature, Row>>()
+            lateinit var featuresNoteRow: Row
+            indent {
+                for (feature in PreviewFeature.entries) {
+                    val featureRow = row {
+                        checkBox(feature.displayName)
+                            .bindSelected(
+                                { isPreviewFeatureEnabled(feature) },
+                                { setPreviewFeatureEnabled(feature, it) }
+                            )
+                    }.visible(false)
+                    featureRows += feature to featureRow
                 }
+                // One shared note below the whole list, rather than repeating it per
+                // checkbox - it says the same thing regardless of which feature it's under.
+                featuresNoteRow = row("") {
+                    comment(
+                        JujutsuBundle.message("settings.preview.features.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
+                }.visible(false)
             }
-            val granted = (grant as? PreviewCode.Grant.Valid)?.features.orEmpty()
-            if (granted.isNotEmpty()) {
-                indent {
-                    for (feature in PreviewFeature.entries.filter { it in granted }) {
-                        row {
-                            checkBox(feature.displayName)
-                                .bindSelected(
-                                    { isPreviewFeatureEnabled(feature) },
-                                    { setPreviewFeatureEnabled(feature, it) }
-                                )
-                        }
-                    }
-                    // One shared note below the whole list, rather than repeating it per
-                    // checkbox - it says the same thing regardless of which feature it's under.
-                    row("") {
-                        comment(
-                            JujutsuBundle.message("settings.preview.features.comment"),
-                            maxLineLength = NARROW_COMMENT_WIDTH
-                        )
-                    }
+
+            fun refreshPreviewCodeFeedback() {
+                val status = AccessCode.status(codeField.text)
+                val message = previewCodeStatusMessage(status)
+                statusLabel.text = message.orEmpty()
+                statusLabel.foreground = if (status.isProblem) {
+                    NamedColorUtil.getErrorForeground()
+                } else {
+                    JBUI.CurrentTheme.ContextHelp.FOREGROUND
                 }
+                statusRow.visible(message != null)
+                featureRows.forEach { (feature, row) -> row.visible(feature in status.features) }
+                featuresNoteRow.visible(status.features.isNotEmpty())
             }
+            codeField.document.addDocumentListener(object : javax.swing.event.DocumentListener {
+                override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
+                override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
+                override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
+            })
+            refreshPreviewCodeFeedback()
         }
 
         // Load global identity values asynchronously
@@ -1242,6 +1247,21 @@ class JujutsuConfigurable(
     private fun defaultPushScope(): GitPushDialog.PushScope =
         GitPushDialog.parsePushScope(settings.state.defaultPushScope)
 
+    /** The line to show under the access-code field for [status], or null when there's nothing to add. */
+    internal fun previewCodeStatusMessage(status: PreviewCodeStatus): String? = when (status) {
+        is PreviewCodeStatus.Empty -> null
+        is PreviewCodeStatus.Accepted ->
+            status.expiry?.let { JujutsuBundle.message("settings.preview.code.status.acceptedUntil", it) }
+                ?: JujutsuBundle.message("settings.preview.code.status.accepted")
+        is PreviewCodeStatus.Expired -> JujutsuBundle.message(
+            "settings.preview.code.status.expired",
+            status.lastValidDate
+        )
+        is PreviewCodeStatus.Revoked -> JujutsuBundle.message("settings.preview.code.status.revoked")
+        is PreviewCodeStatus.CannotVerify -> JujutsuBundle.message("settings.preview.code.status.cannotVerify")
+        is PreviewCodeStatus.Invalid -> JujutsuBundle.message("settings.preview.code.status.invalid")
+    }
+
     private fun isPreviewFeatureEnabled(feature: PreviewFeature): Boolean =
         appSettings.state.enabledPreviewFeatures.split(",").map { it.trim() }.contains(feature.id)
 
@@ -1447,6 +1467,9 @@ class JujutsuConfigurable(
     }
 
     companion object {
+        /** Component name of the preview access-code field, so tests can find it. */
+        internal const val PREVIEW_CODE_FIELD_NAME = "previewAccessCode"
+
         /** Max width (unscaled px) for wrapped validation-result labels (jj-idea-bwdk). */
         private const val VALIDATION_MESSAGE_WIDTH = 320
 

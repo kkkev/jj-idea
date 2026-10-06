@@ -46,6 +46,30 @@ class AccessCodeTest {
     }
 
     @Test
+    fun `status distinguishes empty, accepted, invalid and cannot-verify`() {
+        AccessCode.status("   ") shouldBe PreviewCodeStatus.Empty
+        AccessCode.status("valid-code-1234") shouldBe
+            PreviewCodeStatus.Accepted(PreviewFeature.entries.toSet(), expiry = null)
+        AccessCode.status("wrong-code-0000") shouldBe PreviewCodeStatus.Invalid
+        // A garbage JJP1 code is the build's problem (not a typo) only when there is no signing key
+        // to check it against - CI has none, a dev machine with ~/.config/jj-idea/preview-code-key does.
+        val expected =
+            if (AccessCode.canVerifySignedCodes) PreviewCodeStatus.Invalid else PreviewCodeStatus.CannotVerify
+        AccessCode.status("JJP1-AAAA-AAAA-AAAA-AAAA") shouldBe expected
+        AccessCode.status("jjp1-aaaa") shouldBe expected
+    }
+
+    @Test
+    fun `only problem statuses are flagged as problems`() {
+        PreviewCodeStatus.Empty.isProblem shouldBe false
+        PreviewCodeStatus.Accepted(emptySet(), null).isProblem shouldBe false
+        PreviewCodeStatus.Invalid.isProblem shouldBe true
+        PreviewCodeStatus.CannotVerify.isProblem shouldBe true
+        PreviewCodeStatus.Revoked.isProblem shouldBe true
+        PreviewCodeStatus.Expired(java.time.LocalDate.of(2026, 1, 31)).isProblem shouldBe true
+    }
+
+    @Test
     fun `a JJP1-shaped code is invalid without a shipped signing key`() {
         // No preview/code-key.bin on the unit test classpath - this must fail closed, not throw.
         AccessCode.grant("JJP1-AAAA-AAAA-AAAA-AAAA") shouldBe PreviewCode.Grant.Invalid
