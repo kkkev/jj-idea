@@ -19,6 +19,7 @@ import `in`.kkkev.jjidea.util.snakeToCamelCase
  */
 enum class PreviewFeature(val bit: Int) {
     /** bit 0 retired (was DRAG_AND_DROP, graduated in jj-idea-jxii) - never reuse */
+    /** bit 2 retired (was CONFLICT_GUTTER, graduated in jj-idea-n6fz.4) - never reuse */
 
     /**
      * jj-idea-2c8k (GitHub #69), early access: loads the log in pages (500 rows each,
@@ -27,17 +28,7 @@ enum class PreviewFeature(val bit: Int) {
      * see docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated
      * (and not-yet-validated) boundaries.
      */
-    PAGED_LOG_LOAD(1),
-
-    /**
-     * In-editor jj conflict marker regions: per-side gutter icons with accept actions
-     * (jj-idea-82fo), per-side background tints, and hover feedback (jj-idea-sr42), all gated as
-     * one unit under jj-idea-n6fz.1 - a large, already-built surface withheld from a gradual
-     * release. Gates [in.kkkev.jjidea.ui.editor.conflict.JujutsuConflictGutterInstaller] alone;
-     * the S1 editor banner (jj-idea-lkrt, `JujutsuConflictEditorNotificationProvider`) is
-     * unaffected and keeps shipping ungated.
-     */
-    CONFLICT_GUTTER(2);
+    PAGED_LOG_LOAD(1);
 
     val id = name.snakeToCamelCase()
     val displayName get() = JujutsuBundle.message("preview.$id.name")

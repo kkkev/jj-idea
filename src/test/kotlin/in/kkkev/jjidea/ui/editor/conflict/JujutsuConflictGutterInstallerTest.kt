@@ -9,8 +9,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.JujutsuStateModel
-import `in`.kkkev.jjidea.preview.PreviewEntitlement
-import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.util.NotifiableState
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry
 import io.kotest.matchers.shouldBe
@@ -18,7 +16,6 @@ import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.slot
 import io.mockk.unmockkAll
@@ -41,10 +38,6 @@ import org.junit.jupiter.api.Test
  * initialised - is why [shouldInstall][JujutsuConflictGutterInstaller.shouldInstall] resolves
  * the repository via [in.kkkev.jjidea.vcs.jujutsuRepositoryByAncestry] instead; see that
  * function's own KDoc.)
- *
- * `editorCreated is a no-op when the preview feature is off` covers the jj-idea-n6fz.1 gate:
- * [PreviewEntitlement] is stubbed on by default in [setup] (the pre-existing tests below predate
- * that gate and don't care about it) so only that one test needs to turn it off.
  */
 class JujutsuConflictGutterInstallerTest {
     private val project = mockk<Project>(relaxed = true)
@@ -52,7 +45,6 @@ class JujutsuConflictGutterInstallerTest {
     private val file = mockk<VirtualFile>(relaxed = true)
     private val repo = mockk<JujutsuRepository>()
     private val fileDocumentManager = mockk<FileDocumentManager>()
-    private val previewEntitlement = mockk<PreviewEntitlement>()
     private val editor = mockk<Editor>(relaxed = true) {
         every { editorKind } returns EditorKind.MAIN_EDITOR
         every { this@mockk.project } returns this@JujutsuConflictGutterInstallerTest.project
@@ -66,9 +58,6 @@ class JujutsuConflictGutterInstallerTest {
         every { fileDocumentManager.getFile(document) } returns file
         mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
         every { project.isDisposed } returns false
-        mockkObject(PreviewEntitlement.Companion)
-        every { PreviewEntitlement.getInstance() } returns previewEntitlement
-        every { previewEntitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) } returns true
     }
 
     @AfterEach
@@ -159,20 +148,5 @@ class JujutsuConflictGutterInstallerTest {
 
         // Installed exactly once - ConflictGutterController's own listener plus ConflictSideHover's.
         verify(exactly = 2) { document.addDocumentListener(any(), any()) }
-    }
-
-    @Test
-    fun `editorCreated is a no-op when the preview feature is off`() {
-        every { previewEntitlement.isEnabled(PreviewFeature.CONFLICT_GUTTER) } returns false
-        val stateModel = mockk<JujutsuStateModel>()
-        every { project.getService(JujutsuStateModel::class.java) } returns stateModel
-        val event = mockk<EditorFactoryEvent> {
-            every { this@mockk.editor } returns this@JujutsuConflictGutterInstallerTest.editor
-        }
-
-        JujutsuConflictGutterInstaller().editorCreated(event)
-
-        verify(exactly = 0) { stateModel.initialisedRepositories }
-        verify(exactly = 0) { document.addDocumentListener(any(), any()) }
     }
 }

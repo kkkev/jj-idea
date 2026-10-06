@@ -40,7 +40,7 @@ Components whose blast radius exceeds their own package:
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
 | `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
-| `ui/editor/conflict/JujutsuConflictGutterInstaller.kt` (plugin-wide `editorFactoryListener` — fires on every editor the platform creates, gated to a no-op outside a main editor on a jj-tracked file, and to a no-op everywhere while `PreviewFeature.CONFLICT_GUTTER` is off, jj-idea-n6fz.1) | [MT-CONFLICT](#mt-conflict), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview), [MT-DIFFBASE](#mt-diffbase) (shares the gutter), [MT-WORKINGCOPY](#mt-workingcopy) (its preview tabs open editors this listener sees), [MT-CROSS](#mt-cross) (multi-repo scoping of the repo-detection gate) |
+| `ui/editor/conflict/JujutsuConflictGutterInstaller.kt` (plugin-wide `editorFactoryListener` — fires on every editor the platform creates, gated to a no-op outside a main editor on a jj-tracked file) | [MT-CONFLICT](#mt-conflict), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview), [MT-DIFFBASE](#mt-diffbase) (shares the gutter), [MT-WORKINGCOPY](#mt-workingcopy) (its preview tabs open editors this listener sees), [MT-CROSS](#mt-cross) (multi-repo scoping of the repo-detection gate) |
 | `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
 | `actions/diffbase/SetDiffbaseAction.kt` (quick action, jj-idea-g1io) | [MT-DIFFBASE](#mt-diffbase), [MT-CTXMENU](#mt-ctxmenu) (shares `RevisionSelectorPopup`), [MT-CROSS](#mt-cross) (multi-repo submenu) |
 | `actions/JujutsuMainMenuGroup.kt` ("Jujutsu" submenu in `Vcs.MainMenu`) | [MT-DIFFBASE](#mt-diffbase) |
@@ -2910,15 +2910,6 @@ tooltips.
 
 #### In-editor conflict gutter: per-side colors and accept icons (jj-idea-82fo)
 
-**Preview-gated (jj-idea-n6fz.1):** this whole subsection, plus the hover-feedback subsection
-below it, is behind `PreviewFeature.CONFLICT_GUTTER`, off by default. Enable it via Settings →
-Jujutsu → Preview features (access code + "In-Editor Conflict Actions" checkbox, reopen the IDE),
-or `-Djjidea.preview.conflictGutter=true` for a quick local check, before running the checks below.
-
-- [ ] With the feature **off** (default, no code/flag): open a conflicted file — the whole-file
-      banner above still appears, but **no** per-side colors, gutter icons, or hover feedback show
-      up at all
-
 Alongside the whole-file banner above, each conflict block gets its own in-editor affordance:
 a background color per side (`side1`/`base`/`side2`) covering exactly that side's own lines,
 and one gutter icon per side for accepting it directly. Reuses the platform's own
@@ -3075,9 +3066,9 @@ In a project with two jj roots each having conflicts:
 - [ ] Right-clicking a conflicted file in root B's → merge tool opens only for root B's conflicts
 - [ ] Global action (VCS menu) → merge tool opens for conflicts from both roots, one after another
 
-#### Conflict gutter: marker dividers and DIFF-line tidy (preview `CONFLICT_GUTTER`, jj-idea-6ja9 / jj-idea-8u0g)
+#### Conflict gutter: marker dividers and DIFF-line tidy (jj-idea-6ja9 / jj-idea-8u0g)
 
-Run with `-Djjidea.preview.conflictGutter=true`. Repeat for each `ui.conflict-marker-style` (`git`, `snapshot`, `diff`), in light and dark themes:
+Repeat for each `ui.conflict-marker-style` (`git`, `snapshot`, `diff`), in light and dark themes:
 
 - [ ] With the caret **outside** the block, every run of marker lines (`<<<<<<<`, `|||||||`/`-------`, `=======`/`+++++++`, `%%%%%%%`+`\\\\`, `>>>>>>>`) is a full-width coloured rule, labelled with the following side's label; the closing rule is unlabelled
 - [ ] Rule colours match their side's tint (side 1 / base / side 2) and are legible on both themes

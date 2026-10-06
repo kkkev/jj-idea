@@ -7,9 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This plugin now supports drag-and-drop: rebase, duplicate, move bookmarks and tags, and squash or split files by dragging them in the log, the bookmarks panel and the changes tree.
+This release brings some big new features:
+- Drag-and-drop support: rebase, duplicate, move bookmarks and tags, and squash or split files by dragging them in the log, the bookmarks panel and the changes tree.
+- In-editor conflict actions: embrace Jujutsu's first-class conflict model by editing your conflicts however you like, in any order you like, alongside edits, using a new in-editor conflict resolution experience with gutter and toolbar-initiated actions. 
 
 ### Added
+- **In-editor conflict actions**: in a conflicted file, each side of a conflict block (and its base, where present) is tinted with the same colors as the built-in 3-way merge viewer and gets its own gutter icon. Clicking an icon asks for confirmation naming that side before applying it; right-clicking offers Accept side #1 / side #2 / Both / Base. Hovering a side strengthens its tint so it's clear what an icon acts on. The conflict marker lines are folded into labelled, colored dividers (the raw markers reappear while the caret is inside the block), and in `diff`-style markers the `-`/`+` prefixes are dimmed. Works with all three conflict marker styles.
 - **Copy Commit ID** in the log's right-click menu copies the full Git commit hash. **Copy Change ID** and **Copy Commit ID** can now be bound to keyboard shortcuts in Settings → Keymap. ([#137](https://github.com/kkkev/jj-idea/issues/137))
 - **Drag and drop** in the log: drag a commit onto another commit to rebase it there (drop on the middle of a row to rebase onto it, near the top or bottom edge to insert it after or before). Hold the copy modifier (Option on macOS, Ctrl on Windows/Linux) to duplicate instead. Three buttons next to View Options choose whether a drag moves just that commit, it and its descendants, or its whole branch. Every change shows an Undo option. ([#93](https://github.com/kkkev/jj-idea/issues/93), [#97](https://github.com/kkkev/jj-idea/issues/97))
 - Drag a bookmark or tag chip, from the log, the bookmarks panel or the commit details, onto a commit to move it there. Drag a local bookmark onto its own remote-tracking bookmark to open Git Push pre-filled. Drag the working-copy `@` marker onto a commit to edit it, or just above a commit to create a new change on top of it.

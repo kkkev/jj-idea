@@ -56,7 +56,7 @@ class PreviewCodeTest {
     fun `expiry - valid through the last day of the granted month`() {
         val month = YearMonth.of(2026, 6)
         val code = PreviewCode.encode(
-            setOf(PreviewFeature.CONFLICT_GUTTER),
+            setOf(PreviewFeature.PAGED_LOG_LOAD),
             expiryMonth = PreviewCode.monthsSinceEpoch(month),
             serial = 1,
             key
@@ -68,7 +68,7 @@ class PreviewCodeTest {
     fun `expiry - expired the day after the granted month ends`() {
         val month = YearMonth.of(2026, 6)
         val code = PreviewCode.encode(
-            setOf(PreviewFeature.CONFLICT_GUTTER),
+            setOf(PreviewFeature.PAGED_LOG_LOAD),
             expiryMonth = PreviewCode.monthsSinceEpoch(month),
             serial = 1,
             key
@@ -80,7 +80,7 @@ class PreviewCodeTest {
 
     @Test
     fun `expiry month 0 never expires`() {
-        val code = PreviewCode.encode(setOf(PreviewFeature.CONFLICT_GUTTER), expiryMonth = 0, serial = 1, key)
+        val code = PreviewCode.encode(setOf(PreviewFeature.PAGED_LOG_LOAD), expiryMonth = 0, serial = 1, key)
         PreviewCode.verify(code, key, LocalDate.of(2099, 1, 1)).shouldBeInstanceOf<PreviewCode.Grant.Valid>()
     }
 

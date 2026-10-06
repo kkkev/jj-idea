@@ -24,11 +24,8 @@ import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-
-private const val PREVIEW_PROPERTY = "jjidea.preview.conflictGutter"
 
 /**
  * End-to-end sanity check for [JujutsuConflictGutterInstaller] against a *real* platform
@@ -47,11 +44,6 @@ private const val PREVIEW_PROPERTY = "jjidea.preview.conflictGutter"
  * (and did, the first time this test was written - two gutter icons instead of one, which is
  * exactly the kind of double-install bug a real dispatch path catches that a mocked `Editor`
  * never could).
- *
- * All but one test below enable `PreviewFeature.CONFLICT_GUTTER` via the same system-property
- * escape hatch the Drag and Drop / Paged Log Load preview tests use, since the feature is
- * off by default (jj-idea-n6fz.1) and these tests exercise the real, plugin.xml-registered
- * listener rather than calling [JujutsuConflictGutterInstaller.editorCreated] directly.
  */
 @Tag("platform")
 @TestApplication
@@ -59,16 +51,8 @@ private const val PREVIEW_PROPERTY = "jjidea.preview.conflictGutter"
 class JujutsuConflictGutterInstallerRenderingTest {
     private val project = projectFixture()
 
-    @BeforeEach
-    fun setup() {
-        System.setProperty(PREVIEW_PROPERTY, "true")
-    }
-
     @AfterEach
-    fun tearDown() {
-        System.clearProperty(PREVIEW_PROPERTY)
-        unmockkAll()
-    }
+    fun tearDown() = unmockkAll()
 
     private fun stubJjRepo(repo: JujutsuRepository?) {
         mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
@@ -167,25 +151,6 @@ class JujutsuConflictGutterInstallerRenderingTest {
     @Test
     fun `no icon or highlighter for a file outside any jj repo, even though its text has conflict markers`() {
         stubJjRepo(null)
-
-        WriteIntentReadAction.run {
-            val file = LightVirtualFile("file.txt", ConflictMarkerFixtures.gitWithBase)
-            val document = requireNotNull(FileDocumentManager.getInstance().getDocument(file))
-            val factory = EditorFactory.getInstance()
-            val editor = factory.createEditor(document, project.get(), file, false, EditorKind.MAIN_EDITOR)
-            try {
-                editor.markupModel.allHighlighters.mapNotNull { it.gutterIconRenderer } shouldBe emptyList()
-                colorHighlighters(editor.markupModel.allHighlighters) shouldBe emptyList()
-            } finally {
-                factory.releaseEditor(editor)
-            }
-        }
-    }
-
-    @Test
-    fun `no icon or highlighter for a conflicted file when the preview feature is off`() {
-        System.clearProperty(PREVIEW_PROPERTY)
-        stubJjRepo(mockk<JujutsuRepository>())
 
         WriteIntentReadAction.run {
             val file = LightVirtualFile("file.txt", ConflictMarkerFixtures.gitWithBase)

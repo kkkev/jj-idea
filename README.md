@@ -18,7 +18,7 @@ Native IntelliJ integration for [Jujutsu (jj)](https://jj-vcs.github.io/jj/), a 
 - **Bookmarks & Tags** — Actions to create, move, advance, track, untrack, delete and push bookmarks, and set and delete tags.
 - **Hunk-Level Squash & Split** — Line/hunk granularity for moving changes between commits, plus a live preview panel for the Squash Into dialog.
 - **Bookmark Management & Branches Panel** — Interactive bookmark decorations, pending-deletion visibility, distinguishing local from tracked-remote drift, and a dedicated branches panel (the main-toolbar bookmark widget has shipped)
-- **Conflicts** — Support for viewing and resolving conflicts in any order.
+- **Conflicts** — Support for viewing and resolving conflicts in any order, including per-side accept actions right in the editor gutter.
 
 ### Working Copy
 
