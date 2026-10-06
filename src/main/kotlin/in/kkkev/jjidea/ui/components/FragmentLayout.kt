@@ -87,6 +87,7 @@ object FragmentLayout {
 
     fun fragmentWidth(fragment: Fragment, baseFont: Font, frc: FontRenderContext) = when (fragment) {
         is Fragment.Text -> textWidth(fragment.text, baseFont.deriveFont(fragment.style), frc)
+        is Fragment.Gap -> fragment.width
         is Fragment.Icon -> {
             val w = IconResolver.resolveIcon(fragment.icon.qualified)?.iconWidth?.toDouble() ?: 0.0
             if (fragment.style.isSmaller) w * SMALLER_SCALE else w

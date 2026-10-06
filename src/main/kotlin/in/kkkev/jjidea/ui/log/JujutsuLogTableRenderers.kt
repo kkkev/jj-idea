@@ -71,10 +71,16 @@ fun entryCanvas(
 
 /** Append status indicators: immutable/public icon and conflict warning. */
 fun TextCanvas.appendStatusIndicators(entry: LogEntry) {
-    smaller {
-        if (entry.immutable) append(icon(JujutsuIcons::Immutable))
-        appendConflict(entry)
-    }
+    if (entry.immutable) appendImmutableIndicator()
+    if (entry.hasConflict) appendConflictIndicator()
+}
+
+/** The immutable-commit icon alone - measured by [LogRowBudget] (jj-idea-t04a). */
+internal fun TextCanvas.appendImmutableIndicator() = smaller { append(icon(JujutsuIcons::Immutable)) }
+
+/** The conflict icon alone - see [appendImmutableIndicator]. */
+internal fun TextCanvas.appendConflictIndicator() = smaller {
+    colored(JujutsuColors.CONFLICT) { append(icon(JujutsuIcons::Conflict)) }
 }
 
 /** Append right-side decorations: bookmarks, tags, and working copy indicator. Uncapped — used by the

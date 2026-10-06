@@ -39,6 +39,12 @@ class FragmentRecordingCanvas(
             val style: SimpleTextAttributes,
             override val linkTarget: Any? = null
         ) : Fragment
+
+        /** A fixed-width blank, used to pad a run to a column-wide pixel budget (jj-idea-t04a). */
+        data class Gap(val width: Double) : Fragment {
+            override val truncatable get() = false
+            override val linkTarget: Any? get() = null
+        }
     }
 
     private val _fragments = initialFragments.toMutableList()
@@ -62,6 +68,10 @@ class FragmentRecordingCanvas(
 
     override fun append(icon: IconSpec) {
         _fragments.add(Fragment.Icon(applyCurrentColor(icon), inTruncate, style, currentLinkTarget))
+    }
+
+    override fun gap(width: Double) {
+        if (width > 0) _fragments.add(Fragment.Gap(width))
     }
 
     override fun truncate(builder: TextCanvas.() -> Unit) {

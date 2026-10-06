@@ -25,6 +25,7 @@ import kotlinx.datetime.Instant
 import org.apache.commons.lang3.ArrayUtils.addAll
 import java.awt.*
 import java.awt.event.*
+import java.awt.font.FontRenderContext
 import javax.swing.JTable
 import javax.swing.JViewport
 import javax.swing.ListSelectionModel
@@ -534,7 +535,8 @@ class JujutsuLogTable(
             linkifier,
             JBColor.BLACK,
             font,
-            frc
+            frc,
+            budget = rowBudget(frc)
         )
         val uri = laidOut.linkTargetAt(localX) ?: return null
         if (uri.toString().contains("&kind=overflow&")) {
@@ -548,6 +550,12 @@ class JujutsuLogTable(
     // the whole row/lane pass on every event (jj-idea-sc8m's scale requirement) - and so there is
     // only ever one such index alive per graph, not a second copy independently cached here
     // (jj-idea-a0wp: this field used to build its own, right alongside the renderer's).
+    private fun rowBudget(frc: FontRenderContext): LogRowBudget = when {
+        !alignLogColumns() -> LogRowBudget.NONE
+        else -> graphRenderer?.rowBudget(logModel, font, frc)
+            ?: LogRowBudget.of(logModel.getFilteredEntries(), font, frc)
+    }
+
     private fun edgeIndex(): GraphEdgeIndex =
         graphRenderer?.edgeIndex(logModel) ?: GraphEdgeIndex.build(logModel.getFilteredEntries(), graphNodes)
 

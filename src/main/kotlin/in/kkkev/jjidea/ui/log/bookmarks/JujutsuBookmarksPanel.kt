@@ -709,6 +709,9 @@ class JujutsuBookmarksPanel(
                     is FragmentRecordingCanvas.Fragment.Icon ->
                         icon = IconResolver.resolveIcon(fragment.icon.qualified)
 
+                    // Pixel padding is only ever recorded for the log table's id column.
+                    is FragmentRecordingCanvas.Fragment.Gap -> Unit
+
                     is FragmentRecordingCanvas.Fragment.Text -> {
                         val target = fragment.linkTarget
                         if (target != null) {

@@ -31,11 +31,7 @@ import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Point
-import javax.swing.Box
-import javax.swing.BoxLayout
-import javax.swing.Icon
-import javax.swing.JComponent
-import javax.swing.JPanel
+import javax.swing.*
 import javax.swing.table.TableColumn
 import kotlin.reflect.KMutableProperty1
 
@@ -526,6 +522,7 @@ abstract class CommitTablePanel<D>(
         addAction(StripedRowsAction())
         addAction(CommitTooltipsAction())
         addAction(BookmarkDivergenceAction())
+        addAction(AlignLogColumnsAction())
     }
 
     /**
@@ -618,6 +615,24 @@ abstract class CommitTablePanel<D>(
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {
             JujutsuApplicationSettings.getInstance().state.showBookmarkDivergence = state
+            ProjectManager.getInstance().openProjects.forEach { it.stateModel.logRefresh.notify(Unit) }
+        }
+    }
+
+    /**
+     * Toggle for padding the log's status icons and change id to fixed widths so descriptions line
+     * up (jj-idea-t04a, GitHub #91). Off by default. Display-only and application-wide, like
+     * [BookmarkDivergenceAction]; broadcasts logRefresh so open logs repaint immediately.
+     */
+    private class AlignLogColumnsAction : ToggleAction(
+        JujutsuBundle.message("log.action.align.columns"),
+        JujutsuBundle.message("log.action.align.columns.tooltip"),
+        null
+    ) {
+        override fun isSelected(e: AnActionEvent) = JujutsuApplicationSettings.getInstance().state.alignLogColumns
+
+        override fun setSelected(e: AnActionEvent, state: Boolean) {
+            JujutsuApplicationSettings.getInstance().state.alignLogColumns = state
             ProjectManager.getInstance().openProjects.forEach { it.stateModel.logRefresh.notify(Unit) }
         }
     }

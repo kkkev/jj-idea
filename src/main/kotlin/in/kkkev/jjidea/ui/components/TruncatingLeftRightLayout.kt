@@ -10,10 +10,12 @@ import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.Graphics
+import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.BoxLayout.X_AXIS
 import javax.swing.JLabel
 import javax.swing.JPanel
+import kotlin.math.ceil
 
 /** Scale factor applied to icons inside `smaller { }` blocks, matching the text scale in [FragmentLayout]. */
 internal const val SMALLER_SCALE = 0.85f
@@ -69,6 +71,12 @@ open class TextCanvasPanel : JPanel() {
                         }
                     }
                     currentScc.append(fragment.text, fragment.style, fragment.linkTarget)
+                }
+
+                is Fragment.Gap -> {
+                    currentScc = null
+                    currentSccTarget = null
+                    add(Box.createRigidArea(Dimension(ceil(fragment.width).toInt(), 0)))
                 }
 
                 is Fragment.Icon -> {

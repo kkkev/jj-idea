@@ -58,5 +58,8 @@ data class JujutsuApplicationSettingsState(
     var enabledPreviewFeatures: String = "",
     // jj-idea-qr78 (GitHub #128): display-only switch for the ↑n↓m ahead/behind counts on bookmark
     // chips. App-level because TextCanvas.appendBookmarkChip has no Project to read from.
-    var showBookmarkDivergence: Boolean = true
+    var showBookmarkDivergence: Boolean = true,
+    // jj-idea-t04a (GitHub #91): pad the log's status icons and change id to fixed pixel widths so
+    // descriptions line up. Off by default - the free-flowing layout is the historical behaviour.
+    var alignLogColumns: Boolean = false
 )

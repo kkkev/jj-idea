@@ -10,6 +10,7 @@ import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.components.*
 import `in`.kkkev.jjidea.ui.log.graph.ParentState
 import java.awt.*
+import java.awt.font.FontRenderContext
 import java.awt.geom.Path2D
 import java.net.URI
 import javax.swing.JPanel
@@ -83,6 +84,21 @@ class JujutsuGraphAndDescriptionRenderer(
         val index = GraphEdgeIndex.build(model.getFilteredEntries(), graphNodes)
         edgeIndexCache = index
         return index
+    }
+
+    private var budgetCache: Triple<Font, FontRenderContext, LogRowBudget>? = null
+
+    /**
+     * The shared status-icon/change-id pixel budget (jj-idea-t04a), computed once per renderer instance - like
+     * [edgeIndex], a fresh renderer per graph update means no invalidation logic - and recomputed
+     * only if the font/render context changes.
+     */
+    internal fun rowBudget(model: JujutsuLogTableModel, font: Font, frc: FontRenderContext): LogRowBudget {
+        if (!alignLogColumns()) return LogRowBudget.NONE
+        budgetCache?.let { (f, c, b) -> if (f == font && c == frc) return b }
+        val budget = LogRowBudget.of(model.getFilteredEntries(), font, frc)
+        budgetCache = Triple(font, frc, budget)
+        return budget
     }
 
     override fun getTableCellRendererComponent(
@@ -229,7 +245,9 @@ class JujutsuGraphAndDescriptionRenderer(
                 linkifier,
                 fg,
                 table.font,
-                frc
+                frc,
+                budget = (table.model as? JujutsuLogTableModel)?.let { rowBudget(it, table.font, frc) }
+                    ?: LogRowBudget.NONE
             )
 
             val hovered = hoveredLinkTarget(laidOut)

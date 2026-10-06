@@ -77,6 +77,13 @@ interface TextCanvas {
      */
     val linkifier: Linkifier get() = Linkifier.None
 
+    /**
+     * A blank of [width] pixels, for padding a run to a fixed pixel budget so what follows lines up
+     * across rows (jj-idea-t04a). No-op by default: only the fragment-recording backend paints
+     * pixel-measured layouts.
+     */
+    fun gap(width: Double) {}
+
     fun append(icon: IconSpec) = control("<icon src='${icon.qualified}'/>")
 
     fun truncate(builder: TextCanvas.() -> Unit) = builder()

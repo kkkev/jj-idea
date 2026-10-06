@@ -98,6 +98,18 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 **Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/components/LogEntryText.kt` (`appendBookmarks`, `bookmarkRefChips`, jj-idea-e4ln's `@git` filter), `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch), `ui/log/JujutsuCustomLogTabManager.kt`, `actions/top/OpenJujutsuLogTabAction.kt`
 **Also re-run:** MT-LOG-DETAILS (issue-tracker link rendering is shared with the details panel)
 
+#### Change-id alignment (jj-idea-t04a, GitHub #91)
+
+- [ ] With the View Options toggle **Align Status and Change ID Columns** off (the default),
+      the log lays out exactly as before (description follows the id directly)
+- [ ] Turn it **on** in a repo whose change ids have different unique-prefix lengths (and ideally a
+      divergent `/N` id, the bold `@` row, and immutable/conflicted commits): every row's
+      description starts at the same x position, and the immutable/conflict icons share one status
+      column sized to the widest icon run on screen (rows without icons keep the id and description
+      x unchanged); open logs update immediately, hiding Status or Change ID removes that padding,
+      and issue links in descriptions still hover/click correctly
+- [ ] Turn it back off: the padding disappears at once
+
 #### Row order (jj-idea-2570.7)
 
 - [ ] In a single-repo project, log rows follow `jj log` order (compare the top ~50 rows with
