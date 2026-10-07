@@ -411,7 +411,7 @@ class JujutsuGraphAndDescriptionRenderer(
 
         /**
          * Paints this row's long-edge cap arrows (jj-idea-66rr): the lane segment from the cap's
-         * outer edge to the row's middle, ending in a chevron pointing along the cap's direction -
+         * outer edge to just short of the row's middle, ending in a chevron pointing along the cap's direction -
          * "the line continues off-screen this way". Goes through [drawLaneLine] so a hovered edge's
          * thickening applies to both caps.
          */
@@ -423,10 +423,13 @@ class JujutsuGraphAndDescriptionRenderer(
                 val x = laneX(lane, graphStartX, laneWidth)
                 val color = colorForLane(lane)
                 val down = direction == EdgeDirection.DOWN
-                drawLaneLine(g2d, edge, color, x, if (down) 0 else height, x, mid)
-                val backY = if (down) mid - size else mid + size
-                drawLaneLine(g2d, edge, color, x - size, backY, x, mid)
-                drawLaneLine(g2d, edge, color, x + size, backY, x, mid)
+                // The tip stops short of the centre so it never touches a connector leaving (or a circle
+                // sitting at) the row's middle - the other half of the lane is free for those.
+                val tipY = if (down) mid - size else mid + size
+                val backY = if (down) tipY - size else tipY + size
+                drawLaneLine(g2d, edge, color, x, if (down) 0 else height, x, tipY)
+                drawLaneLine(g2d, edge, color, x - size, backY, x, tipY)
+                drawLaneLine(g2d, edge, color, x + size, backY, x, tipY)
             }
         }
 

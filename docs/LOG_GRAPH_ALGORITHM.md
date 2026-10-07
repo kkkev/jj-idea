@@ -156,12 +156,19 @@ for other edges, so the graph stays narrow when edges are hundreds of rows long.
 
 - **Top cap** - lane A, chosen exactly as for any passthrough (it is the child's `passthroughLanes`
   entry). Its passthrough lives only through row `c + K` and is removed at row `c + K + 1`. The
-  row `c + K` paints a down arrow.
+  row `c + K` paints a down arrow, whose tip stops short of the row's centre (the arrow covers only the
+  upper half of the row). So on that row the lane is free for the row's own *downward* connectors
+  (`Passthrough.topCap`), and only the node circle and bottom caps still avoid it.
 - **Bottom cap** - lane B, allocated at the *end* of processing row `p - K` (after the row's own
-  node, connectors and stub lane, so those keep priority): A if free there, else the first free
-  lane. The pending allocation is keyed by row in `pendingCaps` and snapshotted in every
+  node, connectors and stub lane, so those keep priority). It prefers the lane the parent will take
+  (jj-idea-9ghx), so the up arrow lines up with the node below: with `K = 1` that lane is already
+  determined, as `laneFor` over the passthroughs that survive into row `p`. Otherwise A if free
+  there, else the first free lane. The pending allocation is keyed by row in `pendingCaps` and snapshotted in every
   `Checkpoint`. Row `p - K` paints an up arrow. The cap is a passthrough that row `p` removes in
   step 2, recording its lane on the *parent's* `RowLayout.longEdgeCapLanes` (child id -> lane).
+- A merge whose loaded parents are *all* long edges (an octopus merge) sends its first one straight down
+  on its own lane; the rest take fresh lanes. With any short parent, every long edge of the merge takes
+  a fresh lane, so no arrow shares a sibling connector's line.
 - A long edge of a merge's extra parent skips the usual lane *reservation* - holding the lane for
   the whole span would defeat releasing it.
 

@@ -427,6 +427,11 @@ Reuse FX-STRESS (its 200-commit deep branch and long branches have edges well ov
 - [ ] An edge spanning 50+ rows shows as a short line from its child with a **down arrow**
       one row below, and a short line into its parent with an **up arrow** one row above;
       nothing is drawn between the two
+- [ ] An octopus merge whose parents are all far away fans out compactly: its first line drops
+      straight down from the circle, and the rest use the nearest free columns (including one
+      whose arrow from the commit above ends on the merge's row), not a gap of empty columns
+- [ ] Long-edge arrow tips stop short of the row's centre (down arrows above it, up arrows below
+      it) and never touch a circle or a connector leaving the middle of the row
 - [ ] The column the long edge used is reused by other branches in the rows between the
       caps, and the graph is visibly narrower there than before (compare against the
       previous release, or against rows just outside the long edge)

@@ -28,6 +28,7 @@ This release brings some big new features:
 - **Long lines in the log graph** (50 rows or more) now show as a short line with an arrow at each end instead of running the whole way, and the lane in between is freed for other branches, so graphs with very long edges stay narrow. Hover either arrow to highlight the whole line, and click it to jump to the other end.
 
 ### Fixed
+- In the log graph, the up arrow of a collapsed long edge now sits on its parent's lane instead of kinking into it, and an octopus merge of long edges fans out into the nearest free columns (its first line drops straight down, and a column whose arrow ends on the merge's row can be reused). Long-edge arrow tips also stop short of the row centre so they no longer touch circles or connectors.
 - The IDE's built-in Commit tool window "Merge Conflicts → Resolve" link can no longer silently discard one side of a jj conflict when you cancel the merge dialog; it now shows a message pointing to Jujutsu's own **Resolve Conflicts…** / **Open Merge Tool…**, plus a notification with an **Open Working Copy** button. (IntelliJ 2026.2+; older versions' merge dialog was already safe.)
 - Clicking **Resolve** on the Working Copy tool window's "Merge Conflicts" node no longer throws a threading error on IntelliJ 2026.2.
 - The working-copy status bar widget no longer logs an "Access is allowed from Event Dispatch Thread" error on startup, and now reliably shows its initial state and tracks status bar resizes.

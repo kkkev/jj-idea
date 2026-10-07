@@ -8,7 +8,13 @@ private data class Passthrough<I : Any>(
     /** The row whose step 2 removes this passthrough (the lane is free for that row's own node). */
     val endRow: Int,
     /** Set on a long edge's bottom cap: the child it belongs to, recorded on the parent's row when removed. */
-    val capChildId: I? = null
+    val capChildId: I? = null,
+    /**
+     * Set on a long edge's top cap. Its arrow occupies only the upper half of its last row
+     * ([endRow] - 1), so from that row's own downward connectors the lane is already free - only
+     * the row's node circle (and bottom caps) must still avoid it.
+     */
+    val topCap: Boolean = false
 )
 
 /** A long edge's bottom cap, to be allocated a lane when row `parent - LONG_EDGE_PART_ROWS` is processed. */
@@ -279,14 +285,28 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
         }
 
         // Step 4: Classify each parent and, for non-adjacent ones, create a passthrough.
-        operationCount += currentPassthroughLanes.size + reservedLanes.size
-        val usedLanes = HashSet(currentPassthroughLanes)
+        // Lanes held only by a top cap whose arrow ends on this row are free for this row's downward
+        // connectors; they stay off-limits to the node (laneFor above) and to bottom caps (below).
+        operationCount += passthroughs.size + reservedLanes.size
+        val heldLanes = HashSet<Int>()
+        val endingTopCapLanes = HashSet<Int>()
+        for (pt in passthroughs) {
+            if (pt.topCap && pt.endRow == rowIndex + 1) endingTopCapLanes.add(pt.lane) else heldLanes.add(pt.lane)
+        }
+        endingTopCapLanes.removeAll(heldLanes) // a sibling passthrough sharing the stem lane keeps it held
+        val usedLanes = HashSet(heldLanes)
         usedLanes.add(lane)
         usedLanes.addAll(reservedLanes.values)
 
         val newPassthroughs = mutableSetOf<Passthrough<I>>()
         val childHasMultipleParents = entry.parents.size > 1
         var childLaneUsed = false
+        // A merge whose loaded parents are all long edges has no short connector wanting its own lane, so
+        // its first long edge may leave straight down on it (an octopus merge fans out without a gap).
+        val onlyLongEdges = childHasMultipleParents &&
+            entry.parents.all { id ->
+                rowByChangeId[id]?.let { it - rowIndex >= longEdgeRows } != false
+            }
 
         operationCount += entry.parents.size
         for (parentId in entry.parents) {
@@ -304,7 +324,7 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
             fun openPassthrough(passLane: Int) {
                 if (isLong) {
                     newPassthroughs.add(
-                        Passthrough(passLane, parentId, endRow = rowIndex + LONG_EDGE_PART_ROWS + 1)
+                        Passthrough(passLane, parentId, endRow = rowIndex + LONG_EDGE_PART_ROWS + 1, topCap = true)
                     )
                     pendingCaps.getOrPut(parentRow - LONG_EDGE_PART_ROWS) { mutableListOf() }
                         .add(PendingCap(entry.current, parentId, passLane))
@@ -316,7 +336,10 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
             operationCount += childrenByParent[parentId]?.size ?: 0
             val parentHasOtherChildren = childrenByParent[parentId]?.any { it.id != entry.current } == true
 
-            if (isLong && childHasMultipleParents) {
+            if (isLong && childHasMultipleParents && onlyLongEdges && !childLaneUsed) {
+                childLaneUsed = true
+                openPassthrough(lane)
+            } else if (isLong && childHasMultipleParents) {
                 // A merge's long edge never shares the child's lane with a sibling connector: its
                 // arrow would sit on the sibling's line, and edgeAt/hover resolve that lane to the
                 // longer-spanning sibling, leaving the arrow unclickable. Fresh lane, unreserved.
@@ -349,11 +372,27 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
 
         // Allocate the bottom caps of long edges whose parent is LONG_EDGE_PART_ROWS below. Done
         // last so every lane this row already needs (node, connectors, stub) takes precedence.
+        usedLanes.addAll(endingTopCapLanes)
         val newCaps = mutableListOf<Passthrough<I>>()
         pendingCaps.remove(rowIndex)?.let { caps ->
             operationCount += caps.size
+            // The cap row is LONG_EDGE_PART_ROWS (1) above the parent, so the parent is the next row and
+            // its lane is already determined: prefer it so the up arrow lines up with the node below.
+            // Caps end at the parent's row, so only the other passthroughs still block it there.
+            val parentRow = rowIndex + LONG_EDGE_PART_ROWS
+            val predictedParentLane = run {
+                operationCount += passthroughs.size + newPassthroughs.size
+                val surviving = HashSet<Int>()
+                passthroughs.forEach { if (it.endRow != parentRow) surviving.add(it.lane) }
+                newPassthroughs.forEach { if (it.endRow != parentRow) surviving.add(it.lane) }
+                laneFor(entries[parentRow], surviving, reservedLanes, childrenByParent)
+            }
             for (cap in caps) {
-                val capLane = if (cap.preferredLane !in usedLanes) cap.preferredLane else firstFreeLane(usedLanes)
+                val capLane = when {
+                    predictedParentLane !in usedLanes -> predictedParentLane
+                    cap.preferredLane !in usedLanes -> cap.preferredLane
+                    else -> firstFreeLane(usedLanes)
+                }
                 usedLanes.add(capLane)
                 newCaps.add(
                     Passthrough(

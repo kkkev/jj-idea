@@ -2,10 +2,12 @@ package `in`.kkkev.jjidea.ui.log.graph
 
 import `in`.kkkev.jjidea.ui.log.entry
 import io.kotest.matchers.collections.shouldBeEmpty
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.maps.shouldContainKey
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
 
@@ -57,6 +59,33 @@ class LongEdgeLayoutTest {
         z.longEdgeCapLanes.getValue("top") shouldBe rows.first().passthroughLanes.getValue("z")
     }
 
+    /** `m` merges `parents` long edges; `y` is a child of `z` whose long edge's top cap ends on `m`'s row. */
+    private fun octopus(parents: Int, withCapAbove: Boolean): List<GraphEntry<String>> {
+        val targets = (0 until parents).map { "p$it" }
+        val fillers = (0 until threshold + 2).map { entry("f$it") }
+        val head = if (withCapAbove) listOf(entry("y", listOf("z"))) else emptyList()
+        return head + entry("m", targets) + fillers + (if (withCapAbove) listOf(entry("z")) else emptyList()) +
+            targets.map { entry(it) }
+    }
+
+    @Test
+    fun `an octopus merge of long edges leaves its first one straight down on its own lane`() {
+        val m = layout(octopus(3, withCapAbove = false)).rows.first()
+        m.passthroughLanes.getValue("p0") shouldBe m.lane
+        m.passthroughLanes.values.toSet().size shouldBe 3
+    }
+
+    @Test
+    fun `a merge's long edges reuse the lane of a top cap whose arrow ends on the merge's row`() {
+        val rows = layout(octopus(3, withCapAbove = true)).rows
+        val (y, m) = rows
+        val capLane = y.passthroughLanes.getValue("z")
+        // The arrow only covers the upper half of m's row: m's circle avoids the lane, its connectors may use it.
+        m.lane shouldNotBe capLane
+        m.passthroughLanes.values shouldContain capLane
+        m.passthroughLanes.values.toSet().size shouldBe 3
+    }
+
     @Test
     fun `random DAGs never place two things on one lane at one row, and never get wider`() {
         val random = Random(66)
@@ -75,6 +104,7 @@ class LongEdgeLayoutTest {
             val collapsed = layout(entries)
             val plain = layout(entries, Int.MAX_VALUE)
             interiorCollisions(entries, collapsed, threshold).shouldBeEmpty()
+            unalignedUpArrows(entries, collapsed, threshold).shouldBeEmpty()
             val width = { l: GraphLayout<String> ->
                 l.rows.maxOf { r ->
                     maxOf(
@@ -85,6 +115,39 @@ class LongEdgeLayoutTest {
             }
             // Not a hard guarantee of a greedy allocator, so reported with the seed round if it ever breaks.
             width(collapsed).let { w -> check(w <= width(plain) + 1) { "round $round: width $w vs ${width(plain)}" } }
+        }
+    }
+
+    /**
+     * jj-idea-9ghx: a parent whose lane is free on the row above should get its long edge's up arrow on that
+     * lane, so the arrow lines up with the node instead of kinking into it. Reports parents where it did not.
+     */
+    private fun unalignedUpArrows(
+        entries: List<GraphEntry<String>>,
+        layout: GraphLayout<String>,
+        longEdgeRows: Int
+    ): List<String> {
+        val rowOf = entries.withIndex().associate { (i, e) -> e.current to i }
+        val occupied = HashSet<Pair<Int, Int>>()
+        layout.rows.forEachIndexed { r, row -> occupied += r to row.lane }
+        layout.rows.forEachIndexed { c, row ->
+            for ((parent, lane) in row.passthroughLanes) {
+                val p = rowOf.getValue(parent)
+                if (p - c >= longEdgeRows) {
+                    occupied += (c + LONG_EDGE_PART_ROWS) to lane
+                } else {
+                    for (r in c + 1 until p) occupied += r to lane
+                }
+            }
+        }
+        return layout.rows.withIndex().mapNotNull { (p, row) ->
+            val caps = row.longEdgeCapLanes.values
+            val blocked = occupied.any { it.first == p - LONG_EDGE_PART_ROWS && it.second == row.lane }
+            if (caps.isNotEmpty() && row.lane !in caps && !blocked) {
+                "${row.id}@$p lane ${row.lane}, caps $caps"
+            } else {
+                null
+            }
         }
     }
 
