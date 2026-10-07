@@ -132,8 +132,14 @@ class JujutsuFileAnnotation(
     fun handleAnnotationClick(lineNumber: Int) {
         getAnnotationLine(lineNumber)?.let { line ->
             log.info("Annotation clicked for line $lineNumber, change ID: ${line.id}")
-            project.stateModel.changeSelection.notify(ChangeKey(repo, line.id))
-            JujutsuCustomLogTabManager.getInstance(project).activateLogTab()
+            val key = ChangeKey(repo, line.id)
+            val tabManager = JujutsuCustomLogTabManager.getInstance(project)
+            // Activate first: a selection notified while no log panel exists is lost (jj-idea-7rxm).
+            if (tabManager.activateLogTab()) {
+                project.stateModel.changeSelection.notify(key)
+            } else {
+                tabManager.openCustomLogTab(activate = true) { project.stateModel.changeSelection.notify(key) }
+            }
         }
     }
 

@@ -63,6 +63,8 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     /**
      * Opens (or restores) all persisted log windows.
      *
+     * @param onReady run on the EDT once the tabs exist, so a caller can e.g. request a selection
+     *   from a panel that didn't exist yet (jj-idea-7rxm).
      * @param activate when true, also brings the tool window to the front and focuses the
      *   selected tab - used for explicit user invocation (e.g. [in.kkkev.jjidea.actions.top.OpenJujutsuLogTabAction],
      *   GitHub #118: with the window merely hidden rather than closed, re-running the action
@@ -70,7 +72,7 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
      *   [in.kkkev.jjidea.ui.services.JujutsuUiEnabler] (startup / roots-changed), matching
      *   [in.kkkev.jjidea.ui.services.WorkingCopySignpost]'s deliberate no-focus-steal behaviour.
      */
-    fun openCustomLogTab(activate: Boolean = false) {
+    fun openCustomLogTab(activate: Boolean = false, onReady: () -> Unit = {}) {
         log.info("Opening Jujutsu log tab(s)")
 
         runInBackground {
@@ -98,6 +100,7 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
                         changesViewContentManager.setSelectedContent(it.content)
                         if (activate) activateToolWindowFor(it.content)
                     }
+                    onReady()
                 }
 
                 log.info("Jujutsu log tab(s) opened successfully")
@@ -173,12 +176,18 @@ class JujutsuCustomLogTabManager(private val project: Project) : Disposable {
     /**
      * Activate the Jujutsu log tab: select it and bring the tool window to the front.
      * Used when navigating to a commit from annotations or other entry points.
+     * Returns false if no log tab is open.
      */
-    fun activateLogTab() {
-        val handle = openTabs[JujutsuSettings.DEFAULT_LOG_WINDOW_ID] ?: openTabs.values.firstOrNull() ?: return
+    fun activateLogTab(): Boolean {
+        val handle = openTabs[JujutsuSettings.DEFAULT_LOG_WINDOW_ID] ?: openTabs.values.firstOrNull()
+        if (handle == null) {
+            log.info("activateLogTab: no log tab is open")
+            return false
+        }
         val changesViewContentManager = ChangesViewContentManager.getInstance(project)
         changesViewContentManager.setSelectedContent(handle.content)
         activateToolWindowFor(handle.content)
+        return true
     }
 
     /** Brings the tool window hosting [content] to the front and focuses it. */

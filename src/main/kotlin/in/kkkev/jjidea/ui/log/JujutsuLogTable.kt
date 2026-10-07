@@ -123,6 +123,12 @@ class JujutsuLogTable(
 
     var onSelectionExpansionNeeded: ((ChangeKey) -> Unit)? = null
 
+    /**
+     * Called when an explicit selection target is loaded but hidden by an active filter, so it
+     * can never become a row (jj-idea-7rxm). The pending selection is dropped first.
+     */
+    var onSelectionHiddenByFilter: ((ChangeKey) -> Unit)? = null
+
     // True between a logRefresh and the setEntries() it produces: the model is stale, so a
     // selection requested now must wait for the fresh rows (jj-idea-vd5j).
     private var refreshPending = false
@@ -149,6 +155,10 @@ class JujutsuLogTable(
             // pending, it would scroll back to this row on the next page load, however far the
             // user had since scrolled away.
             pendingSelection = null
+        } else if (logModel.isLoaded(changeKey)) {
+            log.info("requestSelection: $changeKey is loaded but hidden by a filter")
+            clearNavigation()
+            onSelectionHiddenByFilter?.invoke(changeKey)
         } else {
             log.info("requestSelection: entry not in current model, triggering expansion")
             expansionPending = true
@@ -765,6 +775,12 @@ class JujutsuLogTable(
                 expansionPending = false
                 // pendingSelectionIsExplicit stays true: if a concurrent loadCommits later
                 // overwrites this expansion result, the next setEntries() will re-fire from cache.
+            } else if (pendingSelectionIsExplicit && !carried && logModel.isLoaded(it)) {
+                // Loaded (e.g. by the expansion just requested) but filtered out: expanding
+                // again can't help.
+                log.info("setEntries: $it is loaded but hidden by a filter")
+                clearNavigation()
+                onSelectionHiddenByFilter?.invoke(it)
             } else if (pendingSelectionIsExplicit && !expansionPending) {
                 expansionPending = true
                 onSelectionExpansionNeeded?.invoke(it)
@@ -1225,6 +1241,9 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
     /** Look up a loaded entry by its [ChangeKey], or `null` if it's outside the loaded window. */
     fun entryFor(key: ChangeKey): LogEntry? = entriesByKey[key]
+
+    /** True if [key] is among the loaded entries, whether or not a filter currently hides it. */
+    fun isLoaded(key: ChangeKey): Boolean = entriesByKey.containsKey(key)
 
     /** The entry whose only parent is [key], or `null` if it has none or more than one loaded
      * child - the Move Up target (jj-idea-owje). O(1) after [setEntries]'s O(N) index build. */

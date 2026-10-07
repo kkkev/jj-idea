@@ -16,6 +16,7 @@ import com.intellij.openapi.vcs.changes.VcsDirtyScopeManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.performAction
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JjFeature
 import `in`.kkkev.jjidea.jj.JjVersion
@@ -193,6 +194,28 @@ object JujutsuNotifications {
      * Unlike [notifyUnreadableRoot] this is not deduplicated per root - it fires once per failed
      * user action, which is inherently already rate-limited by the user re-triggering the action.
      */
+    /** The log target of a navigation (e.g. annotation click) isn't a known change any more. */
+    fun notifyNavigationTargetMissing(project: Project, id: ChangeId) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("log.navigate.notFound", id.short),
+                NotificationType.INFORMATION
+            ).notify(project)
+    }
+
+    /** The log target of a navigation is loaded but hidden by filters; [resetAndSelect] fixes that. */
+    fun notifyNavigationTargetFiltered(project: Project, id: ChangeId, resetAndSelect: () -> Unit) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("log.navigate.hiddenByFilter", id.short),
+                NotificationType.INFORMATION
+            ).apply {
+                addExpiringAction("log.navigate.resetFilters", resetAndSelect)
+            }.notify(project)
+    }
+
     fun notifyWorkingCopyUnavailable(
         project: Project,
         repo: JujutsuRepository,

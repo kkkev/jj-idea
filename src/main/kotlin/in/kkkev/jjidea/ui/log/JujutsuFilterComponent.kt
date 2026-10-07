@@ -249,7 +249,7 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         }
     }
 
-    private fun resetFilter() {
+    fun resetFilter() {
         doResetFilter()
     }
 

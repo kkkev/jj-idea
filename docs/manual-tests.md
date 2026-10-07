@@ -2509,6 +2509,9 @@ below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, w
 
 - [ ] Jujutsu menu has "Show Diff", "Compare with Another Commit", and "Annotate"
 - [ ] Annotate fetches annotations for the correct revision
+- [ ] jj-idea-7rxm (GitHub #140): clicking an annotation's change id / author selects that change in the Jujutsu log, including a change older than the log's change limit (use FX-STRESS with `SCALE=6`)
+- [ ] jj-idea-7rxm: with the log's date (or author) filter excluding that change, the same click shows a "hidden by the current log filters" balloon; **Reset Filters** clears every filter chip and the search text and selects the change
+- [ ] jj-idea-7rxm: close the Jujutsu log tab, then click an annotation: the tab reopens and the change is selected (not a silent no-op)
 - [ ] "Annotate Previous Revision" on a line owned by a single-parent commit re-annotates at that commit's parent
 - [ ] "Annotate Previous Revision" on a line owned by a merge commit is unavailable/no-op (no incorrect ancestor shown)
 - [ ] jj-idea-xssw: "Annotate Previous Revision" on a line whose own change added the file (no

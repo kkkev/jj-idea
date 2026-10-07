@@ -19,6 +19,7 @@ import `in`.kkkev.jjidea.settings.LogWindowConfig
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.ui.log.bookmarks.BookmarksStripeButton
 import `in`.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 
 /**
@@ -159,8 +160,22 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             // onMissing (GitHub #76): the selected change was abandoned/rewritten since it was
             // rendered - drop the stale pending selection rather than retrying it on every refresh.
             if (rev is ChangeId) {
-                (dataLoader as UnifiedJujutsuLogDataLoader)
-                    .loadExpanding(key.repo, rev, onMissing = { logTable.clearNavigation() })
+                (dataLoader as UnifiedJujutsuLogDataLoader).loadExpanding(key.repo, rev, onMissing = {
+                    logTable.clearNavigation()
+                    log.info("Navigation target $key not found; it may have been abandoned or rewritten")
+                    JujutsuNotifications.notifyNavigationTargetMissing(project, rev)
+                })
+            }
+        }
+
+        // jj-idea-7rxm (GitHub #140): a loaded target hidden by a filter used to fail silently.
+        logTable.onSelectionHiddenByFilter = { key ->
+            val rev = key.revision
+            if (rev is ChangeId) {
+                JujutsuNotifications.notifyNavigationTargetFiltered(project, rev) {
+                    resetAllFilters()
+                    logTable.requestSelection(key)
+                }
             }
         }
 

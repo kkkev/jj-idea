@@ -68,6 +68,15 @@ abstract class CommitTablePanel<D>(
     // Details panel position (true = right, false = bottom)
     var detailsOnRight = initialDetailsOnRight
 
+    // Every filter chip in the toolbar, kept so [resetAllFilters] can clear them (jj-idea-7rxm).
+    private var allFilterComponents: List<JujutsuFilterComponent> = emptyList()
+
+    /** Clears the search text and every filter chip, so all loaded rows are visible again. */
+    fun resetAllFilters() {
+        searchField.text = ""
+        allFilterComponents.forEach { it.resetFilter() }
+    }
+
     // Search field with regex/match-case/whole-words toggles, and history (jj-idea-lpbv).
     protected val searchField: LogSearchField = LogSearchField(
         placeholder = JujutsuBundle.message("log.filter.text.placeholder"),
@@ -225,6 +234,7 @@ abstract class CommitTablePanel<D>(
      */
     private fun createFilterComponents(): JComponent {
         val filters = mutableListOf<JujutsuFilterComponent>()
+        allFilterComponents = filters
         filters += createOtherFilterComponents()
 
         // Reference filter (bookmarks, tags, @)
