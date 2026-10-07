@@ -302,20 +302,78 @@ class SplitDialogTest {
         disposeDialog(dialog)
     }
 
+    private val authPath = LocalFilePath("src/Auth.kt", false)
+
     @Test
-    fun `newParent mode still rejects an empty selection even with an override present`() {
+    fun `newParent hunks-only split validates and carries the picked new-commit content`() {
         val authChange = change("src/Auth.kt")
-        val changes = listOf(authChange)
+        val loggerChange = change("src/Logger.kt")
         val source = createEntry("src1", description = "desc")
-        val dialog = SplitDialog(project.get(), source, changes, newParent = true)
+        val dialog = SplitDialog(project.get(), source, listOf(authChange, loggerChange), newParent = true)
         waitForRefresh(dialog.fileSelection)
 
-        // Pick Hunks is hidden in newParent mode, but exercise the seam directly to confirm
-        // isPartialSplit stays mode-gated even if an override somehow existed.
-        val authPath = LocalFilePath("src/Auth.kt", false)
+        // Nothing ticked, but Auth.kt has a genuine partial pick: that's real content for the new parent.
         dialog.setFirstCommitOverrideForTest(authPath, "partial content\n")
 
-        dialog.doValidateForTest() shouldNotBe null
+        dialog.doValidateForTest() shouldBe null
+        dialog.performOKForTest()
+        val result = dialog.result!!
+        result.insertBefore shouldBe source.id
+        result.filePaths shouldBe emptyList()
+        result.hunkSelection!!.files.first { it.filePath == authPath }.content shouldBe "partial content\n"
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent ticked deletion goes into the deletion manifest, unticked one does not`() {
+        val gone = deletion("src/Gone.kt")
+        val auth = change("src/Auth.kt")
+        val source = createEntry("src1", description = "desc")
+
+        val ticked = SplitDialog(project.get(), source, listOf(gone, auth), newParent = true)
+        waitForRefresh(ticked.fileSelection)
+        ticked.fileSelection.changesTree.setIncludedChanges(listOf(gone))
+        UIUtil.dispatchAllInvocationEvents()
+        ticked.setFirstCommitOverrideForTest(authPath, "partial\n")
+        ticked.performOKForTest()
+        // The new parent is the lower commit, so a ticked deletion lands there.
+        ticked.result!!.hunkSelection!!.deletedPaths shouldBe setOf("src/Gone.kt")
+        disposeDialog(ticked)
+
+        val unticked = SplitDialog(project.get(), source, listOf(gone, auth), newParent = true)
+        waitForRefresh(unticked.fileSelection)
+        unticked.setFirstCommitOverrideForTest(authPath, "partial\n")
+        unticked.performOKForTest()
+        unticked.result!!.hunkSelection!!.deletedPaths shouldBe emptySet()
+        disposeDialog(unticked)
+    }
+
+    @Test
+    fun `newParent computePreviewLeftContent is mirrored - ticked shows after, unticked shows base`() {
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
+
+        dialog.computePreviewLeftContent(true, null, "base", "after") shouldBe "after"
+        dialog.computePreviewLeftContent(false, null, "base", "after") shouldBe "base"
+        dialog.computePreviewLeftContent(true, "picked", "base", "after") shouldBe "picked"
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `newParent applyPickedContent ticks on all-changes, unticks on no-changes, and keeps tick on a partial`() {
+        val authChange = change("src/Auth.kt")
+        val source = createEntry("src1", description = "desc")
+        val dialog = SplitDialog(project.get(), source, listOf(authChange), newParent = true)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.applyPickedContent(authPath, "after", "base", "after")
+        dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
+
+        dialog.applyPickedContent(authPath, "mixed", "base", "after")
+        dialog.fileSelection.includedChanges.toSet() shouldBe setOf(authChange)
+
+        dialog.applyPickedContent(authPath, "base", "base", "after")
+        dialog.fileSelection.includedChanges.toSet() shouldBe emptySet()
         disposeDialog(dialog)
     }
 
@@ -461,11 +519,11 @@ class SplitDialogTest {
     }
 
     @Test
-    fun `newParent mode hides Pick Hunks (unverified content polarity under -B)`() {
+    fun `newParent mode shows Pick Hunks`() {
         val source = createEntry("src1", description = "desc")
         val dialog = SplitDialog(project.get(), source, emptyList(), newParent = true)
 
-        dialog.pickHunksButton.isVisible shouldBe false
+        dialog.pickHunksButton.isVisible shouldBe true
         disposeDialog(dialog)
     }
 
@@ -524,7 +582,7 @@ class SplitDialogTest {
         val dialog = SplitDialog(project.get(), source, emptyList())
 
         val content = dialog.computePreviewLeftContent(
-            isIncludedInChild = false,
+            isTicked = false,
             override = null,
             baseContent = "before\n",
             afterContent = "after\n"
@@ -539,7 +597,7 @@ class SplitDialogTest {
         val dialog = SplitDialog(project.get(), source, emptyList())
 
         val content = dialog.computePreviewLeftContent(
-            isIncludedInChild = true,
+            isTicked = true,
             override = null,
             baseContent = "before\n",
             afterContent = "after\n"
@@ -554,7 +612,7 @@ class SplitDialogTest {
         val dialog = SplitDialog(project.get(), source, emptyList())
 
         val content = dialog.computePreviewLeftContent(
-            isIncludedInChild = true,
+            isTicked = true,
             override = "partial\n",
             baseContent = "before\n",
             afterContent = "after\n"
@@ -569,8 +627,8 @@ class SplitDialogTest {
             content = "after\n",
             baseContent = "before\n",
             afterContent = "after\n",
-            parentLabel = "Parent",
-            childLabel = "Child"
+            lowerLabel = "Parent",
+            upperLabel = "Child"
         )
         parentTitle shouldContain "all changes"
         childTitle shouldContain "no changes"
@@ -582,8 +640,8 @@ class SplitDialogTest {
             content = "before\n",
             baseContent = "before\n",
             afterContent = "after\n",
-            parentLabel = "Parent",
-            childLabel = "Child"
+            lowerLabel = "Parent",
+            upperLabel = "Child"
         )
         parentTitle shouldContain "no changes"
         parentTitle shouldNotContain "unchanged"
@@ -596,8 +654,8 @@ class SplitDialogTest {
             content = "partial\n",
             baseContent = "before\n",
             afterContent = "after\n",
-            parentLabel = "Parent",
-            childLabel = "Child"
+            lowerLabel = "Parent",
+            upperLabel = "Child"
         )
         parentTitle shouldContain "partial"
         childTitle shouldContain "partial"
@@ -613,8 +671,8 @@ class SplitDialogTest {
         val (left, right) = splitPreviewPanes(
             content = "before\n",
             contents = contents,
-            parentLabel = "Parent",
-            childLabel = "Child"
+            lowerLabel = "Parent",
+            upperLabel = "Child"
         )
 
         left.text shouldBe "before\n"
@@ -631,8 +689,8 @@ class SplitDialogTest {
         val (left, right) = splitPreviewPanes(
             content = "after\n",
             contents = contents,
-            parentLabel = "Parent",
-            childLabel = "Child"
+            lowerLabel = "Parent",
+            upperLabel = "Child"
         )
 
         left.text shouldBe "after\n"
@@ -648,8 +706,8 @@ class SplitDialogTest {
         val (left, right) = splitPreviewPanes(
             content = "partial\n",
             contents = contents,
-            parentLabel = "Parent",
-            childLabel = "Child"
+            lowerLabel = "Parent",
+            upperLabel = "Child"
         )
 
         left.text shouldBe "partial\n"
@@ -668,8 +726,8 @@ class SplitDialogTest {
             content = "after\n",
             baseContent = "before\n",
             afterContent = "after\n",
-            parentLabel = "Second",
-            childLabel = "First"
+            lowerLabel = "Second",
+            upperLabel = "First"
         )
         staysAllChanges shouldContain "all changes"
         newNoChanges shouldContain "no changes"
@@ -678,8 +736,8 @@ class SplitDialogTest {
             content = "before\n",
             baseContent = "before\n",
             afterContent = "after\n",
-            parentLabel = "Second",
-            childLabel = "First"
+            lowerLabel = "Second",
+            upperLabel = "First"
         )
         staysNoChanges shouldContain "no changes"
         staysNoChanges shouldNotContain "unchanged"

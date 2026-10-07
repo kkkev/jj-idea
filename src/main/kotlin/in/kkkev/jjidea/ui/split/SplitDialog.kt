@@ -51,6 +51,10 @@ import javax.swing.*
  * [insertBefore], while the remaining changes keep [revision]'s original change ID and location.
  * When null (the default, "Split into New Child" mode), [filePaths] stays on [revision]'s
  * original change ID and everything else becomes a new child commit instead.
+ *
+ * [hunkSelection], when non-null, is the content the diff editor writes into the **lower** commit
+ * (the "stays" side by default, the new parent under `-B`); files it doesn't cover fall back to
+ * the [filePaths] fileset.
  */
 data class SplitSpec(
     val revision: Revision,
@@ -78,8 +82,14 @@ data class SplitSpec(
  * existing children onto both siblings, turning them into merges), or a parent (`-B`/[newParent],
  * jj-idea-tkog, GitHub #74). Nothing is ticked by default. "Pick Hunks…" opens IDEA's merge
  * window to move a subset of a file's hunks to the new commit, leaving the remainder where it
- * stays; disabled in [newParent] mode, where its content-polarity math hasn't been verified
- * against `-B`.
+ * stays - in every mode, including [newParent] (jj-idea-p6bo, GitHub #139/#132).
+ *
+ * Hunk content is modelled by the **lower** (older) of the two resulting commits, because that is
+ * what `jj split --tool` reads back from `$right`: the "stays" commit by default and with
+ * `--parallel`, but the *new* commit under `-B` (verified against jj 0.44 in
+ * `SplitHunkContractCliTest`). A file's lower content is its pre-change (`base`) content exactly
+ * when `ticked xor newParent`, and its full (`after`) content otherwise - see
+ * [computePreviewLeftContent]. [firstCommitOverrides] holds a picked lower-commit content.
  *
  * This identity-first wording is deliberately mode-invariant in the UI even though jj's own
  * fileset-argument polarity is not: the fileset passed on the command line is whichever side
@@ -117,17 +127,19 @@ class SplitDialog(
             firstCommitOverrides[fp] ?: computePreviewLeftContent(included, null, contents.before, contents.after)
         },
         previewPanes = { content, contents ->
-            splitPreviewPanes(content, contents, firstCommitLabel, secondCommitLabel)
+            // The left pane is the lower commit: "stays" by default, the new commit under -B.
+            if (newParent) {
+                splitPreviewPanes(content, contents, secondCommitLabel, firstCommitLabel)
+            } else {
+                splitPreviewPanes(content, contents, firstCommitLabel, secondCommitLabel)
+            }
         },
         isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } }
     )
     private val diffPreview get() = previewController.preview
 
     // --- "Pick Hunks…" button ---
-    // Hidden entirely in newParent mode - see class KDoc for why partial hunk selection isn't
-    // supported there.
     internal val pickHunksButton = previewController.pickHunksButton.apply {
-        isVisible = !newParent
         addActionListener { onPickHunks() }
     }
 
@@ -290,19 +302,20 @@ class SplitDialog(
     }
 
     /**
-     * Compute the left-side (parent-remainder) content for the diff preview: an explicit
-     * override wins, otherwise it's derived from whether the file is ticked to move to the
-     * child (parent ends up empty) or stays put (parent keeps everything).
+     * Compute the left-side (lower-commit) content for the diff preview: an explicit override
+     * wins, otherwise it's derived from the tick. By default the lower commit is the "stays"
+     * side, so a ticked file leaves it with the pre-change content and an unticked one keeps
+     * everything; under [newParent] the lower commit is the *new* commit, so that flips.
      * Extracted for test seaming; takes plain strings so [FileContents] is not exposed.
      */
     internal fun computePreviewLeftContent(
-        isIncludedInChild: Boolean,
+        isTicked: Boolean,
         override: String?,
         baseContent: String,
         afterContent: String
     ): String = when {
         override != null -> override
-        isIncludedInChild -> baseContent
+        isTicked != newParent -> baseContent
         else -> afterContent
     }
 
@@ -311,11 +324,11 @@ class SplitDialog(
     private fun onPickHunks() {
         val fp = previewController.currentFile ?: return
         val data = previewController.cachedContents(fp) ?: return
-        val isChild = fileSelection.includedChanges.any { it.filePath == fp }
+        val isTicked = fileSelection.includedChanges.any { it.filePath == fp }
 
         // Resume any existing partial pick; otherwise start from the tick-derived default.
         val initialContent = firstCommitOverrides[fp]
-            ?: computePreviewLeftContent(isChild, null, data.before, data.after)
+            ?: computePreviewLeftContent(isTicked, null, data.before, data.after)
 
         val pickedContent: String? = hunkPickerForTest?.invoke(fp)
             ?: HunkPicker.pickRemainderContent(
@@ -325,7 +338,11 @@ class SplitDialog(
                 baseContent = data.before,
                 afterContent = data.after,
                 initialContent = initialContent,
-                labels = HunkPickerLabels.forSplit(firstCommitLabel, secondCommitLabel)
+                labels = if (newParent) {
+                    HunkPickerLabels.forSplitNewParent(firstCommitLabel, secondCommitLabel)
+                } else {
+                    HunkPickerLabels.forSplit(firstCommitLabel, secondCommitLabel)
+                }
             )
 
         if (pickedContent == null) return // user cancelled — keep prior state
@@ -337,7 +354,8 @@ class SplitDialog(
 
     /**
      * Apply a hunk-picker result for [fp]. Fully-none/fully-all results are genuinely resolved
-     * states and adjust the tick accordingly; anything else is a genuine partial, which stores
+     * states and adjust the tick accordingly (which tick each maps to flips under [newParent],
+     * see [computePreviewLeftContent]); anything else is a genuine partial, which stores
      * the parent-remainder override but **deliberately leaves the tick state untouched**.
      *
      * The tick is inert once an override exists — every downstream read of a file's content
@@ -349,15 +367,16 @@ class SplitDialog(
     internal fun applyPickedContent(fp: FilePath, pickedContent: String, baseContent: String, afterContent: String) {
         when (pickedContent) {
             baseContent -> {
-                // Nothing left for the parent → file fully moved to child, tick it.
+                // Lower commit gets nothing: by default the file fully moved to the new commit
+                // (tick); under -B the new commit is the lower one, so nothing moved (untick).
                 firstCommitOverrides.remove(fp)
-                ensureFileIncluded(fp)
+                if (newParent) ensureFileExcluded(fp) else ensureFileIncluded(fp)
             }
 
             afterContent -> {
-                // Parent keeps everything → nothing moved to child, untick it.
+                // Lower commit gets everything: the mirror image of the case above.
                 firstCommitOverrides.remove(fp)
-                ensureFileExcluded(fp)
+                if (newParent) ensureFileIncluded(fp) else ensureFileExcluded(fp)
             }
 
             else -> {
@@ -562,11 +581,8 @@ class SplitDialog(
      * A genuine partial pick deliberately leaves the tick untouched (see [applyPickedContent]'s
      * KDoc), so this is the only signal that a hunks-only selection (nothing ticked, but a file
      * partially picked via "Pick Hunks…") actually has something to split off.
-     *
-     * Never true in [newParent] mode ("Pick Hunks…" is hidden there), so a hunks-only selection
-     * can't rescue an otherwise-empty `-B` split.
      */
-    private val isPartialSplit: Boolean get() = !newParent && firstCommitOverrides.isNotEmpty()
+    private val isPartialSplit: Boolean get() = firstCommitOverrides.isNotEmpty()
 
     override fun doValidate(): ValidationInfo? {
         val included = fileSelection.includedChanges // ticked = moving to the new commit
@@ -610,16 +626,16 @@ class SplitDialog(
 
         val hunkSelection: HunkSelection? = if (isPartialSplit) {
             // Build the first commit's content for every changed file.
-            // newParent mode never reaches here - "Pick Hunks…" is hidden in that mode.
             // buildHunkSelection's "included" means "written into the staging tree", i.e. the change
-            // lands in the FIRST commit - the UNticked files here (ticked ones move to the child).
-            // Deletions of such files go through the deletion manifest (an empty `after` would
-            // otherwise be written as an empty file, jj-idea-5g8h).
+            // lands in the LOWER commit: the unticked files by default (ticked ones move to the
+            // child), the ticked files under -B (the new parent). Deletions of such files go
+            // through the deletion manifest (an empty `after` would otherwise be written as an
+            // empty file, jj-idea-5g8h).
             buildHunkSelection(
                 changes = allChanges,
                 root = sourceEntry.repo.directory,
                 overrides = firstCommitOverrides,
-                isIncluded = { it !in tickedPaths },
+                isIncluded = { (it in tickedPaths) == newParent },
                 isDeletion = { it.afterRevision == null },
                 contentFor = { change, landsInFirstCommit ->
                     if (landsInFirstCommit) previewController.cachedContents(change.filePath)?.after else null
@@ -724,7 +740,7 @@ private fun IconAwareHtmlPane.setStyledText(messageKey: String, id: ChangeId, bo
 
 /**
  * Describe the split state of [content] (relative to [baseContent]/[afterContent]) as a pair
- * of (left title, right title) label fragments, for the main file preview's diff titles —
+ * of (lower title, upper title) label fragments, for the main file preview's diff titles —
  * e.g. an untouched (unticked) file reads "Stays (all changes)" / "New commit (no changes)"; a
  * fully-moved (ticked) file reads "Stays (no changes)" / "New commit (all changes)"; anything
  * else is "partial". Mode-agnostic (jj-idea-8khi, GitHub #101 UX follow-up): the labels passed in
@@ -737,45 +753,45 @@ internal fun describeSplitState(
     content: String,
     baseContent: String,
     afterContent: String,
-    parentLabel: String,
-    childLabel: String
+    lowerLabel: String,
+    upperLabel: String
 ): Pair<String, String> = when (content) {
     afterContent -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.allChanges", parentLabel),
-        JujutsuBundle.message("dialog.split.hunks.noChanges", childLabel)
+        JujutsuBundle.message("dialog.split.hunks.allChanges", lowerLabel),
+        JujutsuBundle.message("dialog.split.hunks.noChanges", upperLabel)
     )
 
     baseContent -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.noChanges", parentLabel),
-        JujutsuBundle.message("dialog.split.hunks.allChanges", childLabel)
+        JujutsuBundle.message("dialog.split.hunks.noChanges", lowerLabel),
+        JujutsuBundle.message("dialog.split.hunks.allChanges", upperLabel)
     )
 
     else -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.partial", parentLabel),
-        JujutsuBundle.message("dialog.split.hunks.partial", childLabel)
+        JujutsuBundle.message("dialog.split.hunks.partial", lowerLabel),
+        JujutsuBundle.message("dialog.split.hunks.partial", upperLabel)
     )
 }
 
 /**
  * The (left, right) [DiffPane]s for the main file preview: left is [content] itself (the
- * stays-side remainder — see [SplitDialog.computePreviewLeftContent]), right is always
- * [FileContents.after] (the new commit is the tip of the split, so it always holds the full
- * original content). Titles come from [describeSplitState], evaluated on the same [content] that
+ * lower commit's content — see [SplitDialog.computePreviewLeftContent]), right is always
+ * [FileContents.after] (the upper commit is the tip of the split, so it always holds the full
+ * original content). The lower commit is "stays" by default and the new commit under `-B`. Titles come from [describeSplitState], evaluated on the same [content] that
  * decides the left pane's text, so a pane's text and its own title can never disagree
  * (jj-idea-jb2q, GitHub #101).
  */
 internal fun splitPreviewPanes(
     content: String,
     contents: FileContents,
-    parentLabel: String,
-    childLabel: String
+    lowerLabel: String,
+    upperLabel: String
 ): Pair<DiffPane, DiffPane> {
-    val (parentTitle, childTitle) = describeSplitState(
+    val (lowerTitle, upperTitle) = describeSplitState(
         content,
         contents.before,
         contents.after,
-        parentLabel,
-        childLabel
+        lowerLabel,
+        upperLabel
     )
-    return Pair(DiffPane(content, parentTitle), DiffPane(contents.after, childTitle))
+    return Pair(DiffPane(content, lowerTitle), DiffPane(contents.after, upperTitle))
 }

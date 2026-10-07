@@ -13,6 +13,7 @@ import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -237,5 +238,17 @@ class HunkPickerDialogTest {
         squash.rightTitle shouldNotBe split.rightTitle
         squash.middleArrowTooltip shouldNotBe split.middleArrowTooltip
         squash.rightArrowTooltip shouldNotBe split.rightArrowTooltip
+    }
+
+    @Test
+    fun `forSplitNewParent makes the middle pane the new commit, with arrows pointing the right way`() {
+        val labels = HunkPickerLabels.forSplitNewParent(staysLabel = "Existing", newLabel = "New")
+
+        labels.leftTitle shouldBe "New"
+        labels.middleTitle shouldContain "New"
+        labels.rightTitle shouldContain "Existing"
+        // The right-gutter arrow pulls a hunk INTO the middle (new) pane; the middle arrow pushes it back out.
+        labels.rightArrowTooltip shouldContain "New"
+        labels.middleArrowTooltip shouldContain "Existing"
     }
 }

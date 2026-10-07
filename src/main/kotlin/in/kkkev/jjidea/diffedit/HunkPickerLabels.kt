@@ -9,7 +9,8 @@ import `in`.kkkev.jjidea.JujutsuBundle
  * always starts at either [HunkPickerDialog]'s `baseContent` (the left, fixed pane) or
  * `afterContent` (the right, fixed pane) and moves between them one hunk at a time. Only the
  * *wording* differs between callers: Split's middle pane represents the content staying at the
- * original revision id ("parent"), with hunks moving out to a new child; Squash's middle pane
+ * original revision id ("parent"), with hunks moving out to a new child (or, for [forSplitNewParent],
+ * the new commit itself, with hunks moving in from the existing one); Squash's middle pane
  * represents the content landing in the destination, with hunks moving in from the source. See
  * [forSplit] / [forSquash].
  *
@@ -42,6 +43,19 @@ data class HunkPickerLabels(
             rightTitle = JujutsuBundle.message("dialog.hunks.split.side.moves", movesToLabel),
             middleArrowTooltip = JujutsuBundle.message("dialog.hunks.split.arrow.toChild", movesToLabel),
             rightArrowTooltip = JujutsuBundle.message("dialog.hunks.split.arrow.toParent", staysLabel)
+        )
+
+        /**
+         * Split into New Parent (`-B`) wording: the middle pane is the *new* commit (the lower of
+         * the two, which is what the diff editor's `$right` becomes), so left = nothing moved,
+         * right = the full change that stays on the existing commit when nothing moves.
+         */
+        fun forSplitNewParent(staysLabel: String, newLabel: String) = HunkPickerLabels(
+            leftTitle = newLabel,
+            middleTitle = JujutsuBundle.message("dialog.hunks.split.side.parent", newLabel),
+            rightTitle = JujutsuBundle.message("dialog.hunks.split.side.stays", staysLabel),
+            middleArrowTooltip = JujutsuBundle.message("dialog.hunks.split.arrow.toParent", staysLabel),
+            rightArrowTooltip = JujutsuBundle.message("dialog.hunks.split.arrow.toChild", newLabel)
         )
 
         /**

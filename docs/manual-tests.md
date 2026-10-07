@@ -1492,7 +1492,7 @@ confirmation dialogs anywhere in this picker.
 
 #### Log row → "Split into New Parent…" (jj-idea-xvgl, GitHub #132)
 - [ ] Right-click a **mutable** log row → **Split into New Parent…** appears directly below **Split into New Child…**
-- [ ] Invoking it opens the "Split into New Parent" dialog (same as the file-list entry below) with **nothing ticked**; no "Create parallel commits" checkbox and no "Pick Hunks…"
+- [ ] Invoking it opens the "Split into New Parent" dialog (same as the file-list entry below) with **nothing ticked**; no "Create parallel commits" checkbox, but "Pick Hunks…" is shown
 - [ ] Tick a file and Split → `jj log` shows a new commit inserted as the parent holding that file; the original row keeps its own change ID
 - [ ] The entry is disabled on an **immutable** row and when **multiple** rows are selected (same gating as "Split into New Child…")
 - [ ] The Working Copy toolbar's Split button is unchanged (still child mode)
@@ -1511,7 +1511,11 @@ the right-clicked files now tick **directly**, same as "Split into New Child".
 - [ ] Dialog title reads "Split into New Parent"; the note under "Source" reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new commit inserted below it."; above the ticked description editor, the label reads **"Description for new commit (parent of &lt;shortid&gt;)"**, and above the unticked one, **"Description for existing commit (&lt;shortid&gt;)"** — the same identity-first wording as the other two modes, with only the parenthetical spelling out that this mode makes the new commit the *parent* (jj-idea-8khi: one combined label per editor, not a separate header plus sub-label)
 - [ ] The **"Description for existing commit …"** block is on top, **"Description for new commit …"** below — the reverse of "Split into New Child"'s order (new-commit block on top, existing-commit block below) — matching each side's actual position in the log: the existing commit keeps the more-recent position, the new commit becomes the older parent one row further down
 - [ ] The "Create parallel commits" checkbox is **not shown** (mutually exclusive with `-B`)
-- [ ] "Pick Hunks…" is **not shown** (hunk-level partial selection isn't supported in this mode)
+- [ ] "Pick Hunks…" **is shown** (jj-idea-p6bo, GitHub #139/#132). On a file with two separate hunks: click it → a 3-pane dialog opens as **New commit (live) in the middle**, with "Stays in <existing>" on the right; move one hunk into the middle pane (right-gutter arrow, tooltip "Move this hunk to New commit") → Apply → the file shows half-checked → Split → the **new parent** holds only that hunk and the original change ID keeps the other (`jj show`/`jj diff -r`)
+- [ ] Hunks-only `-B` split: with **nothing ticked** but one file partially picked → OK is enabled; result is as above
+- [ ] Picking *all* hunks into the middle pane ticks the file; moving them all back out unticks it (the mirror image of the New Child mode)
+- [ ] Split a revision where a **ticked file is a deletion** and another file is partially picked → the new parent shows the deletion (`D`), not an empty file
+- [ ] Working-copy variant: repeat on `@` → `@` stays on the original change ID with the remaining hunk
 - [ ] Split → via `jj log`/`jj show`: the ticked files land in a **new commit inserted as the parent** of the original; the original commit (unticked files) keeps its **own original change ID**, now with the new commit as its parent
 - [ ] Editing the new-commit description field and splitting → the new commit gets that description (passed as `-m`); the existing-commit field, if left unedited, leaves the original commit's description untouched
 - [ ] Editing the existing-commit description field and splitting → after the split completes, the original commit's description updates to match (chained via a follow-up `jj describe` on the same, unchanged change ID)
