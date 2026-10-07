@@ -69,12 +69,7 @@ class LaidOutCellIdAlignmentTest {
     fun `with the shared budget every description starts at the same x`() {
         val budget = LogRowBudget.of(entries, font, frc)
         val starts = entries.map { descriptionStartX(it, budget) }
-        val space = FragmentLayout.fragmentWidth(
-            Fragment.Text(" ", com.intellij.ui.SimpleTextAttributes.REGULAR_ATTRIBUTES, false),
-            font,
-            frc
-        )
-        starts.forEach { it shouldBe (budget.id + space).plusOrMinus(1e-6) }
+        starts.forEach { it shouldBe budget.id.plusOrMinus(1e-6) }
     }
 
     @Test

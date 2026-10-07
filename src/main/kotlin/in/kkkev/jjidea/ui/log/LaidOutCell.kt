@@ -96,9 +96,10 @@ internal class LaidOutCell(
                     if (columnManager.showStatus) appendStatusSlots(entry, budget)
                     if (columnManager.showChangeId) {
                         append(entry.id)
-                        // Pad the id run to the shared budget so descriptions line up (jj-idea-t04a).
-                        if (budget.id > 0) gap(budget.id - changeIdRunWidth(entry, font, frc))
                         append(" ")
+                        // Pad the id run (separator included, so a bold row's wider space is absorbed)
+                        // to the shared budget so descriptions line up (jj-idea-t04a).
+                        if (budget.id > 0) gap(budget.id - changeIdRunWidth(entry, font, frc))
                     }
                     if (columnManager.showDescription) {
                         appendDescriptionAndEmptyIndicator(entry)
@@ -121,9 +122,15 @@ internal class LaidOutCell(
             )
         }
 
-        /** Pixel width of [entry]'s rendered change id, in the row's own styling (bold for the working copy). */
+        /**
+         * Pixel width of [entry]'s rendered change id plus its trailing separator space, in the row's
+         * own styling (bold for the working copy).
+         */
         internal fun changeIdRunWidth(entry: LogEntry, font: Font, frc: FontRenderContext): Double =
-            entryCanvas(entry, Color.BLACK) { append(entry.id) }.fragments
+            entryCanvas(entry, Color.BLACK) {
+                append(entry.id)
+                append(" ")
+            }.fragments
                 .sumOf { FragmentLayout.fragmentWidth(it, font, frc) }
     }
 }
