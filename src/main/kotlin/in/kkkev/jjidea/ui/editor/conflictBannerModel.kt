@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.editor
 
+import com.intellij.openapi.util.text.StringUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.conflict.ExtractedConflict
 import `in`.kkkev.jjidea.jj.conflict.sideDisplayLabels
@@ -20,6 +21,12 @@ internal data class SideAction(val label: String, val tool: String) {
      * link's tooltip ([JujutsuConflictEditorNotificationProvider]).
      */
     val displayLabel: String get() = truncateForBanner(label, MAX_SIDE_LABEL_LENGTH)
+
+    /**
+     * [label] as an HTML tooltip: jj's labels include the change description, which may contain
+     * `<...>` text that an unescaped tooltip would swallow as a tag (GitHub #138).
+     */
+    val tooltipHtml: String get() = "<html>${StringUtil.escapeXmlEntities(label)}</html>"
 }
 
 /** Right-truncates [text] to [maxLength] chars (including the ellipsis), trimming trailing whitespace first. */

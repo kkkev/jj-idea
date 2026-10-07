@@ -91,12 +91,12 @@ class JujutsuConflictEditorNotificationProvider : EditorNotificationProvider, Du
         model.acceptCurrent?.let { side ->
             panel.createActionLabel(JujutsuBundle.message("notification.conflict.accept", side.displayLabel)) {
                 acceptSide(project, file, side.tool)
-            }.toolTipText = side.label
+            }.toolTipText = side.tooltipHtml
         }
         model.acceptLast?.let { side ->
             panel.createActionLabel(JujutsuBundle.message("notification.conflict.accept", side.displayLabel)) {
                 acceptSide(project, file, side.tool)
-            }.toolTipText = side.label
+            }.toolTipText = side.tooltipHtml
         }
         panel.createActionLabel(JujutsuBundle.message("notification.conflict.mergeTool")) {
             openMergeTool(project, listOf(file))

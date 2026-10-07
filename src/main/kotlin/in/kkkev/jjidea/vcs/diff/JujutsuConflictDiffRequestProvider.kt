@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.conflict.ConflictExtractor
 import `in`.kkkev.jjidea.jj.conflict.JjMarkerConflictExtractor
 import `in`.kkkev.jjidea.vcs.filePath
+import `in`.kkkev.jjidea.vcs.merge.conflictPaneTitles
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
 
 /**
@@ -101,11 +102,7 @@ class JujutsuConflictDiffRequestProvider(
             val contents = listOf(mergeData.CURRENT, mergeData.ORIGINAL, mergeData.LAST).map {
                 contentFor(project, String(it, Charsets.UTF_8), filePath)
             }
-            val titles = listOf(
-                c.currentTitle ?: JujutsuBundle.message("merge.column.side1"),
-                JujutsuBundle.message("merge.column.base"),
-                c.lastTitle ?: JujutsuBundle.message("merge.column.side2")
-            )
+            val titles = conflictPaneTitles(c, JujutsuBundle.message("merge.column.base"))
             SimpleDiffRequest(title, contents, titles)
         }
             ?: // Binary conflict, unresolvable content, or the revision no longer has markers

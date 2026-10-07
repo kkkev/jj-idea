@@ -237,6 +237,22 @@ class JujutsuConflictDiffRequestProviderTest {
         request.contentTitles[2] shouldBe "destination (rebase destination)"
     }
 
+    @Test
+    fun `process - angle brackets in jj's commit labels are HTML-escaped for the title label (GitHub #138)`() {
+        val after = revision("markers")
+        every { extractor.extract("markers".toByteArray(Charsets.UTF_8)) } returns
+            extractedConflict(
+                currentTitle = "fix <foo@bar> (rebased revision)",
+                lastTitle = "A & B (rebase destination)"
+            )
+
+        val request = provider.process(presentableFor(conflictedChange(null, after)), mockk(), mockk())
+            as SimpleDiffRequest
+
+        request.contentTitles[0] shouldBe "fix &lt;foo@bar&gt; (rebased revision)"
+        request.contentTitles[2] shouldBe "A &amp; B (rebase destination)"
+    }
+
     // Neither fallback test below calls into ChangeDiffRequestProducer.createSimpleRequest -
     // that method is private on some floor IDE versions despite being public on the compile
     // target (caught by verifyPlugin as an IllegalAccessError risk), so the fallback is built

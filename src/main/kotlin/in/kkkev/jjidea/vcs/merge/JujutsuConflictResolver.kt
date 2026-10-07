@@ -123,14 +123,9 @@ class JujutsuConflictResolver(
                 listOf(mergeData.CURRENT, mergeData.ORIGINAL, mergeData.LAST)
                     .map { String(it, Charsets.UTF_8) },
                 JujutsuBundle.message("dialog.resolve.conflict.title", file.name),
-                listOf(
-                    // jj's own commit + role label (GitHub #112) when it has one, e.g.
-                    // `ulmlywnv c280fd5d "my change" (rebased revision)`; falls back to a plain
-                    // side number for markers with no commit identity (snapshot style).
-                    conflict.currentTitle ?: JujutsuBundle.message("merge.column.side1"),
-                    JujutsuBundle.message("merge.column.result"),
-                    conflict.lastTitle ?: JujutsuBundle.message("merge.column.side2")
-                )
+                // jj's own commit + role label (GitHub #112) when it has one, e.g.
+                // `ulmlywnv c280fd5d "my change" (rebased revision)`, HTML-escaped (GitHub #138).
+                conflictPaneTitles(conflict, JujutsuBundle.message("merge.column.result"))
             ) { result ->
                 if (result != MergeResult.CANCEL) {
                     resolved = outputDocument.text.toByteArray(Charsets.UTF_8)

@@ -46,6 +46,14 @@ class ConflictBannerModelTest {
     }
 
     @Test
+    fun `tooltip HTML-escapes angle brackets in the label (GitHub #138)`() {
+        val action = SideAction("fix <foo@bar> & co", ":ours")
+
+        action.label shouldBe "fix <foo@bar> & co"
+        action.tooltipHtml shouldBe "<html>fix &lt;foo@bar&gt; &amp; co</html>"
+    }
+
+    @Test
     fun `no title text - falls back to Side #1 - Side #2, same as the merge tool pane titles`() {
         val model = conflictBannerModel(conflict())
 

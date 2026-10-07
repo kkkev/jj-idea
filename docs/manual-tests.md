@@ -2697,6 +2697,10 @@ confirm that's no longer possible (below).
 - [ ] Under each marker style, "Resolve Conflicts…" shows correctly-oriented, commit-labelled
       panes (see "Rebase conflict pane orientation and titles" below) — not just that the file is
       detected as conflicted
+- [ ] (GitHub #138) Give one conflicting commit a description containing angle brackets, e.g.
+      `fix <foo@bar> & co` — in "Resolve Conflicts…" and in the conflict diff tab, the pane title
+      shows `<foo@bar> & co` literally (nothing dropped); the editor banner's "Accept …" link
+      and tooltip show the same text, also unescaped
 
 #### Rebase conflict pane orientation and titles (GitHub #112, jj-idea-l192)
 
