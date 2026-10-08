@@ -9,9 +9,11 @@ import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.util.drainBackgroundLoads
 import `in`.kkkev.jjidea.vcs.VcsUserImpl
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 
@@ -26,6 +28,14 @@ import org.junit.jupiter.api.Test
 class JujutsuLogTableNavigationTest {
     private val project = projectFixture()
     private val repo = mockk<JujutsuRepository>()
+
+    // stateModel.init fires fire-and-forget pooled-thread loaders that capture this fixture's
+    // project (see PlatformTestSupport.drainBackgroundLoads); drain them before projectFixture
+    // disposes the project, to avoid a LeakHunter retained-Project report (jj-idea-q49j).
+    @AfterEach
+    fun cleanUp() {
+        drainBackgroundLoads()
+    }
 
     private fun entry(changeId: String, email: String) = LogEntry(
         repo = repo,
