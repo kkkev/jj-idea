@@ -53,9 +53,14 @@ import java.util.concurrent.atomic.AtomicInteger
  *                                                  ├─→ logRefresh.notify()
  *                                                  └─→ JujutsuUiEnabler (connects separately)
  *
- * VFS (working-copy file / .gitignore /  ─→ 300ms debounce ─→ scheduleRepositoryRefresh():
- *      external jj op via op_heads)                            invalidateRepositoryState()
+ * VFS (external jj op via op_heads) ──────→ 300ms debounce ─→ scheduleRepositoryRefresh():
+ *                                                              invalidateRepositoryState()
  *                                                              + logRefresh.notify()
+ *
+ * VFS (working-copy file / .gitignore) ────→ dirty scope ─→ getChanges runs `jj status`, which snapshots.
+ *   Only a real change to a tracked file records a new operation, which then arrives as an op_heads
+ *   event above (or via checkOperationHeads where the watch delivers nothing). Ignored files record
+ *   none, so saving e.g. .idea/workspace.xml never reloads repo state or the log (jj-idea-2570.12).
  *
  * jj became available ──────────────────→ invalidateRepositoryState() + logRefresh.notify()
  *
@@ -377,9 +382,27 @@ class JujutsuStateModel(private val project: Project) : Disposable {
             JujutsuRepositoryHealth.healthFor(repo.directory.path)?.let { repo to it }
         }
 
+    private val opHeadsTracker = OpHeadsTracker { readOpHeadIds(Path.of(it)) }
+
+    /**
+     * Call after a plugin `jj` command that may have snapshotted the working copy (jj-idea-2570.12). If the
+     * operation heads moved since last seen - a file edit that really changed `@` - reloads repo state and the
+     * log, exactly as an `op_heads` file event would. This is the fallback for setups where that watch delivers
+     * nothing; where it works, the 300 ms alarm below merges the two into one refresh. Safe off the EDT only.
+     */
+    fun checkOperationHeads(repo: JujutsuRepository) {
+        if (opHeadsTracker.update(repo.directory.path) && refreshSuppression.get() == 0) {
+            log.info("Operation heads of ${repo.displayName} changed, scheduling refresh")
+            scheduleRepositoryRefresh()
+        }
+    }
+
     private fun scheduleRepositoryRefresh() {
         repositoryStateAlarm.cancelAllRequests()
         repositoryStateAlarm.addRequest({
+            // Re-baseline first: this refresh covers every operation up to now, so checkOperationHeads must not
+            // report the same one again.
+            initialisedRepositories.value.values.forEach { opHeadsTracker.update(it.directory.path) }
             invalidateRepositoryState()
             logRefresh.notify(Unit)
         }, 300)
@@ -445,8 +468,6 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                                 }
                             }
                     }
-                    var hasRepoChanges = dirtyFiles.isNotEmpty()
-
                     // When .gitignore or .git/info/exclude changes, invalidate the ignore cache
                     // and mark the repo dirty recursively so getChanges re-enumerates ignored files.
                     val ignoreService = JujutsuIgnoreService.getInstance(project)
@@ -466,7 +487,6 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                         ignoreService.invalidate(repo)
                         JujutsuIgnoredFilesService.getInstance(project).invalidate(repo)
                         dirtyScopeManager.dirDirtyRecursively(repo.directory)
-                        hasRepoChanges = true
                     }
 
                     // An external jj operation (e.g. terminal `jj bookmark create`) rewrites the
@@ -477,7 +497,11 @@ class JujutsuStateModel(private val project: Project) : Disposable {
                     // restored) — recheck readability rather than waiting for the user to notice.
                     val hasRepoRepair = events.any { it.file?.let { f -> isRepoRootChange(f) } == true }
 
-                    if (hasRepoChanges || hasExternalJjOp || hasRepoRepair) {
+                    // jj-idea-2570.12: a plain working-copy file change does NOT reload repo state or the log. It only
+                    // dirties the file (above), so getChanges runs `jj status`, which snapshots; if a tracked file
+                    // really changed that records a new operation, which arrives here as an op_heads change (or via
+                    // checkOperationHeads where the watcher can't deliver it). Ignored files record no operation.
+                    if (hasExternalJjOp || hasRepoRepair) {
                         if (refreshSuppression.get() > 0) {
                             log.info("File changes detected but refresh suppressed, skipping")
                             return
@@ -606,6 +630,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         runInBackground {
             val paths = repos.map { "${jjRepoDirPath(it.directory.toNioPath())}/op_heads" }.toSet()
             opHeadsDirs = paths
+            repos.forEach { opHeadsTracker.update(it.directory.path) } // baseline for checkOperationHeads
             val requests = fs.addRootsToWatch(paths, true)
             synchronized(opHeadsLock) {
                 fs.removeWatchedRoots(opHeadsWatchRequests)

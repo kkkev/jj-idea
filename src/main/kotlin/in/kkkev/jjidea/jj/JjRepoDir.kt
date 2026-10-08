@@ -40,3 +40,15 @@ internal fun jjRepoDirPath(workspaceRoot: Path): String =
 /** True if [path] equals or is under any of [dirs], respecting `/` boundaries (`op_heads2` is not under `op_heads`). */
 internal fun isUnderAnyDir(path: String, dirs: Collection<String>): Boolean =
     dirs.any { path == it || path.startsWith("$it/") }
+
+/**
+ * The operation-head ids of [workspaceRoot]'s repo (the file names under `op_heads/heads`), or `null` if the
+ * directory can't be listed. A few entries at most, so cheap enough to read after every working-copy `jj` call.
+ */
+internal fun readOpHeadIds(workspaceRoot: Path): Set<String>? = try {
+    Files.list(resolveJjRepoDir(workspaceRoot).resolve("op_heads").resolve("heads")).use { entries ->
+        entries.map { it.fileName.toString() }.toList().toSet()
+    }
+} catch (_: IOException) {
+    null
+}

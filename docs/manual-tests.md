@@ -875,7 +875,15 @@ already-loaded log table shows — it never changes what jj loads for this or an
 
 **Code:** `ui/log/UnifiedJujutsuLogDataLoader.kt`, `ui/common/BackgroundDataLoader.kt`
 
-- [ ] Log refreshes when files change in working copy
+- [ ] Log refreshes when a **tracked** file changes in the working copy (edit and save it): the `@` row
+      updates (no longer empty) within ~1 s, and `idea.log` shows a single `Refreshing log entries`
+      (via the snapshot `jj status` records, not the file event itself)
+- [ ] jj-idea-2570.12: saving an **ignored** file causes no log refresh — `touch .idea/workspace.xml`
+      (repo with `/workspace.xml` in `.idea/.gitignore`) twice: `idea.log` shows no
+      `Refreshing log entries` and no `perf: graph-layout`
+- [ ] jj-idea-2570.12: with `JAVA_TOOL_OPTIONS=-Didea.filewatcher.disabled=true ./gradlew runIde`, edit and
+      save a tracked file, then refocus the IDE → the `@` row still updates (the `Operation heads of … changed`
+      fallback in `idea.log`)
 - [ ] Log refreshes after VCS operations (describe, new, edit)
 - [ ] Log refreshes after an **external** jj operation run in a terminal (e.g. `jj new`,
       `jj bookmark create`) within ~300 ms, without saving a file (op-heads watch) — this is the

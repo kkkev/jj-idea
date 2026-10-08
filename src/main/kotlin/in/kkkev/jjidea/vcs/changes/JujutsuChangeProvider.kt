@@ -51,6 +51,9 @@ class JujutsuChangeProvider(private val vcs: JujutsuVcsBase) : ChangeProvider {
                             return@measurePerf
                         }
 
+                        // jj status snapshots the working copy; if that recorded an operation, reload the rest.
+                        vcs.project.stateModel.checkOperationHeads(repo)
+
                         val conflictInfos = if (workingCopyInConflict(result.stdout)) {
                             val resolveResult = repo.commandExecutor.resolveList()
                             if (resolveResult is CommandExecutor.CommandResult.Success) {

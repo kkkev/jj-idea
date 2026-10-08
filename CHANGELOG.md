@@ -31,6 +31,7 @@ This release brings some big new features:
 - **Long lines in the log graph** (50 rows or more) now show as a short line with an arrow at each end instead of running the whole way, and the lane in between is freed for other branches, so graphs with very long edges stay narrow. Hover either arrow to highlight the whole line, and click it to jump to the other end.
 
 ### Fixed
+- Saving a file that jj ignores and doesn't track (such as the IDE's own `.idea/workspace.xml`) no longer reloads the log, bookmarks and working-copy state. On large repositories this removes a periodic multi-second relayout and about ten `jj` calls. Changing a tracked file still updates the log, once.
 - Reverting or restoring a file in a merge working copy (for example one you just resolved a conflict in) no longer fails with "Failed to restore selection"; the file returns to its pre-resolution state.
 - Clicking an annotation in the editor gutter no longer silently does nothing when the change can't be shown: if the log's filters hide it, a notification offers **Reset Filters** and selects it; if the change no longer exists, you're told; and if the Jujutsu log tab was closed, it reopens with the change selected. ([#140](https://github.com/kkkev/jj-idea/issues/140))
 - Merge tool and conflict diff pane titles, and the tooltips on the conflict banner's "Accept …" links, no longer drop text in angle brackets (e.g. `<foo@bar>`) from change descriptions. ([#138](https://github.com/kkkev/jj-idea/issues/138))
