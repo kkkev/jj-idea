@@ -2147,6 +2147,9 @@ with the commit tooltip) the target commit's change id/commit id/author/date/des
       A "Restore" balloon with an inline **Undo** link appears (one per repo); clicking it brings
       the changes back. Also recoverable via Operations Log → Undo. In a colocated Git project, Rollback of a file under the
       Git root still routes to Git (MT-CROSS)
+- [ ] (jj-idea-tov5) On a merge working copy (two parents) with a conflicted file, resolve it in the
+      editor (status becomes modified) → Rollback / Restore that file → succeeds with no "Failed to
+      restore selection" error, and the file returns to its conflicted state
 - [ ] With a clean working copy (no pending changes), Restore shows a "Nothing to restore"
       notification instead of opening an empty dialog
 - [ ] After confirming a restore, an undo balloon reading "Restore" appears with an inline

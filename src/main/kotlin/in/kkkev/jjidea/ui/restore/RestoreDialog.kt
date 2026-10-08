@@ -9,8 +9,8 @@ import com.intellij.openapi.vcs.changes.Change
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
-import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
@@ -137,7 +137,7 @@ class RestoreDialog(
  */
 internal fun performRestore(
     repo: JujutsuRepository,
-    revision: Revision,
+    restore: CommandExecutor.(List<FilePath>) -> CommandExecutor.CommandResult,
     targetLabel: String,
     preSelected: Set<FilePath>,
     errorMessageKey: String,
@@ -149,7 +149,7 @@ internal fun performRestore(
         retry = {
             performRestore(
                 repo,
-                revision,
+                restore,
                 targetLabel,
                 preSelected,
                 errorMessageKey,
@@ -179,7 +179,7 @@ internal fun performRestore(
                 val paths = dialog.result.orEmpty()
                 if (paths.isEmpty()) return@runLater
 
-                repo.createCommand { restore(paths, revision) }
+                repo.createCommand { restore(paths) }
                     .onSuccess { onRestored(paths) }
                     .onFailure { tellUser(errorMessageKey) }
                     .addUndoTracking(undoLabelKey)

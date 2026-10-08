@@ -46,7 +46,7 @@ class RestoreToChangeAction : DumbAwareAction(
 
         performRestore(
             repo = repo,
-            revision = changeId,
+            restore = { restore(it, changeId) },
             targetLabel = changeId.short,
             preSelected = filePaths.toSet(),
             errorMessageKey = "action.restore.to.revision.error",

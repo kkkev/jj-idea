@@ -133,6 +133,11 @@ internal fun restoreArgs(filePaths: List<FilePath>, revision: Revision, root: Vi
     listOf("restore", "-f", revision.toString()) + filePaths.map { it.relativeTo(root!!).toFileset() }
 )
 
+internal fun restoreChangesInArgs(filePaths: List<FilePath>, revision: Revision, root: VirtualFile?) = JjInvocation(
+    REVERSIBLE,
+    listOf("restore", "-c", revision.toString()) + filePaths.map { it.relativeTo(root!!).toFileset() }
+)
+
 internal fun gitRemoteListArgs() = JjInvocation(READ_ONLY, "git", "remote", "list")
 
 internal fun configGetArgs(key: String) =
@@ -851,6 +856,9 @@ class CliExecutor(
 
     override fun restore(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
         execute(root, restoreArgs(filePaths, revision, root))
+
+    override fun restoreChangesIn(filePaths: List<FilePath>, revision: Revision): CommandExecutor.CommandResult =
+        execute(root, restoreChangesInArgs(filePaths, revision, root))
 
     override fun fileTrack(filePaths: List<FilePath>): CommandExecutor.CommandResult =
         execute(root, fileTrackArgs(filePaths.map { it.relativeTo(root!!) }))

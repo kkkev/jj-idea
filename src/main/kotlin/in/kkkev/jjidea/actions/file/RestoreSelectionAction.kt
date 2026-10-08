@@ -17,7 +17,7 @@ import `in`.kkkev.jjidea.ui.restore.performRestore
 
 /**
  * Opens [in.kkkev.jjidea.ui.restore.RestoreDialog] pre-checked with the current selection,
- * restoring the ticked files to their state in the parent revision (@-) - for revision
+ * restoring the ticked files to their state in the parent revision(s) of @ - for revision
  * selection use file history "Get".
  *
  * Works in three contexts:
@@ -50,7 +50,7 @@ class RestoreSelectionAction : DumbAwareAction(
 
         performRestore(
             repo = repo,
-            revision = WorkingCopy.parent,
+            restore = { restoreChangesIn(it, WorkingCopy) },
             targetLabel = JujutsuBundle.message("dialog.restore.target.parent"),
             preSelected = preSelected,
             errorMessageKey = "action.restore.selection.error",

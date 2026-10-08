@@ -50,7 +50,7 @@ class JujutsuRollbackEnvironment(
         for ((repo, repoChanges) in byRepo) {
             // Renames contribute both paths, so the old file returns and the new one goes away.
             val paths = repoChanges.flatMap { it.paths }.distinct()
-            when (val result = repo.commandExecutor.withUndoTracking().restore(paths, WorkingCopy.parent)) {
+            when (val result = repo.commandExecutor.withUndoTracking().restoreChangesIn(paths, WorkingCopy)) {
                 is CommandResult.Success -> {
                     repoChanges.forEach(listener::accept)
                     onRestored(repo)

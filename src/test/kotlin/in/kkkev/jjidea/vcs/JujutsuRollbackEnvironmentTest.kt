@@ -34,7 +34,7 @@ class JujutsuRollbackEnvironmentTest {
     private fun executor(result: CommandResult = success()) =
         mockk<CommandExecutor> {
             every { withUndoTracking() } returns this
-            every { restore(any(), any()) } returns result
+            every { restoreChangesIn(any(), any()) } returns result
         }
 
     private fun success() = CommandResult.Success.Irreversible(
@@ -73,7 +73,7 @@ class JujutsuRollbackEnvironmentTest {
         env { repo }.rollbackChanges(listOf(c1, c2), errors, listener)
 
         errors.shouldBeEmpty()
-        verify(exactly = 1) { exec.restore(listOf(a, b), WorkingCopy.parent) }
+        verify(exactly = 1) { exec.restoreChangesIn(listOf(a, b), WorkingCopy) }
         accepted.size shouldBe 2
         (accepted[0] === c1) shouldBe true
         (accepted[1] === c2) shouldBe true
@@ -88,7 +88,7 @@ class JujutsuRollbackEnvironmentTest {
 
         env { repo(exec) }.rollbackChanges(listOf(change(old, new)), mutableListOf(), listener)
 
-        verify { exec.restore(listOf(old, new), WorkingCopy.parent) }
+        verify { exec.restoreChangesIn(listOf(old, new), WorkingCopy) }
     }
 
     @Test
@@ -102,8 +102,8 @@ class JujutsuRollbackEnvironmentTest {
 
         env { repoByPath[it] }.rollbackChanges(files.map { change(it, it) }, mutableListOf(), listener)
 
-        verify(exactly = 1) { exec1.restore(any(), any()) }
-        verify(exactly = 1) { exec2.restore(any(), any()) }
+        verify(exactly = 1) { exec1.restoreChangesIn(any(), any()) }
+        verify(exactly = 1) { exec2.restoreChangesIn(any(), any()) }
     }
 
     @Test

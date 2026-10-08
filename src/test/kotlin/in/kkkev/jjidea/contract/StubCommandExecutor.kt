@@ -216,6 +216,11 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         revision: Revision
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun restoreChangesIn(
+        filePaths: List<FilePath>,
+        revision: Revision
+    ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
     override fun fileTrack(filePaths: List<FilePath>): CommandExecutor.CommandResult =
         TODO("Not needed for integration tests")
 

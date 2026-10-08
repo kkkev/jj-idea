@@ -359,6 +359,13 @@ interface CommandExecutor {
     fun restore(filePaths: List<FilePath>, revision: Revision): CommandResult
 
     /**
+     * Undo the changes in [revision] for the specified files, relative to the merge of its parents
+     * (`jj restore --changes-in`). Unlike [restore] from `revision-`, this works when [revision] is a merge.
+     * Callers must pass a non-empty list: an empty list restores everything.
+     */
+    fun restoreChangesIn(filePaths: List<FilePath>, revision: Revision): CommandResult
+
+    /**
      * Force-include the specified files even if they match `.gitignore` (`jj file track`).
      */
     fun fileTrack(filePaths: List<FilePath>): CommandResult

@@ -72,6 +72,56 @@ class MutatingCommandsContractCliTest : MutatingCommandsContractTest() {
     }
 
     @Test
+    fun `restore changes-in at works when the working copy is a merge`() {
+        // jj-idea-tov5: `restore -f @-` fails on a merge because @- is two revisions.
+        jj.createFile("foo.txt", "base\n")
+        jj.describe("base")
+        jj.newChange()
+        jj.createFile("foo.txt", "left\n")
+        jj.describe("left")
+        val left = jj.run("log", "-r", "@", "--no-graph", "-T", "change_id").stdout.trim()
+        jj.run("new", "description(substring:base)", "-m", "right").isSuccess shouldBe true
+        jj.createFile("foo.txt", "right\n")
+        val right = jj.run("log", "-r", "@", "--no-graph", "-T", "change_id").stdout.trim()
+        jj.run("new", left, right, "-m", "merge").isSuccess shouldBe true
+        jj.createFile("foo.txt", "resolved\n")
+
+        jj.run("restore", "-f", "@-", "foo.txt").isSuccess shouldBe false
+
+        val result = jj.run("restore", "-c", "@", "foo.txt")
+
+        result.isSuccess shouldBe true
+        jj.run("diff", "--summary").stdout.trim() shouldBe ""
+    }
+
+    @Test
+    fun `restore changes-in at undoes modify, add, delete and rename for a single parent`() {
+        jj.createFile("modified.txt", "orig\n")
+        jj.createFile("deleted.txt", "gone\n")
+        jj.createFile("renamed-old.txt", "r\n")
+        jj.describe("Base")
+        jj.newChange()
+        jj.createFile("modified.txt", "changed\n")
+        jj.createFile("added.txt", "new\n")
+        java.nio.file.Files.delete(tempDir.resolve("deleted.txt"))
+        jj.renameFile("renamed-old.txt", "renamed-new.txt")
+
+        val result = jj.run(
+            "restore",
+            "-c",
+            "@",
+            "modified.txt",
+            "added.txt",
+            "deleted.txt",
+            "renamed-old.txt",
+            "renamed-new.txt"
+        )
+
+        result.isSuccess shouldBe true
+        jj.run("diff", "--summary").stdout.trim() shouldBe ""
+    }
+
+    @Test
     fun `file untrack and re-track succeed for a path with parens and brackets when wrapped as a fileset`() {
         // `jj file untrack` requires the path to be ignored (docs/jj-track-untrack-model.md), so
         // gitignore it first. `[` and `]` are also gitignore glob meta-characters and must be
