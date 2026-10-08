@@ -258,6 +258,8 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     }
 
     override fun onDataLoaded(newData: UnifiedJujutsuLogDataLoader.Data) {
+        // A background load can land after the project/panel started closing (jj-idea-mrcv).
+        if (Disposer.isDisposed(this) || project.isDisposed) return
         watchMergeEmptiness(newData.entries)
         // Store the full-set graph before setEntries() so refreshDisplayedGraph() can reuse it
         // immediately when no filter is active.

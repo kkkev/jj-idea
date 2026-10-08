@@ -46,7 +46,7 @@ interface MergeEmptiness {
     @RequiresBackgroundThread
     fun resolve(entry: LogEntry): Boolean
 
-    /** [listener] gets the commit ids each landed batch resolved (on a background thread), until [parent] is disposed. */
+    /** [listener] gets the commit ids each landed batch resolved (on a background thread), until [parent] is disposed (a no-op if it already is). */
     fun addListener(parent: Disposable, listener: (Set<CommitId>) -> Unit)
 }
 
@@ -87,7 +87,8 @@ internal class RepoMergeEmptiness(
 
     override fun addListener(parent: Disposable, listener: (Set<CommitId>) -> Unit) {
         listeners += listener
-        Disposer.register(parent) { listeners -= listener }
+        // The parent may already be disposed (e.g. a log load landing after its panel closed): then it's a no-op.
+        if (!Disposer.tryRegister(parent) { listeners -= listener }) listeners -= listener
     }
 
     private fun enqueue(ids: Collection<CommitId>, highPriority: Boolean) {

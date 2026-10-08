@@ -155,6 +155,19 @@ class MergeEmptinessTest {
     }
 
     @Test
+    fun `addListener on an already-disposed parent is a no-op`() {
+        val landed = mutableListOf<Set<CommitId>>()
+        val parent = Disposer.newDisposable()
+        Disposer.dispose(parent)
+
+        emptiness.addListener(parent) { landed += it }
+
+        emptiness.prefetch(listOf(entry(1)))
+        runWorker()
+        landed shouldBe emptyList()
+    }
+
+    @Test
     fun `a non-deferred entry reports its template value without touching the repository`() {
         entry(1, deferred = false).emptiness shouldBe Emptiness.NOT_EMPTY
         entry(1, deferred = false).resolveEmpty() shouldBe false
