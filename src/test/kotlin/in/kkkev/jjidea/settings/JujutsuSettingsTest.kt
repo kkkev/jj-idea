@@ -10,6 +10,15 @@ import org.junit.jupiter.api.Test
 
 class JujutsuSettingsTest {
     @Test
+    fun `mergeDescriptionTemplate defaults to git-style phrasing and round-trips`() {
+        val settings = JujutsuSettings()
+        settings.state.mergeDescriptionTemplate shouldBe "Merge branch '{source}' into {destination}"
+
+        settings.loadState(JujutsuSettingsState(mergeDescriptionTemplate = "Merge {source} into {destination}"))
+        settings.state.mergeDescriptionTemplate shouldBe "Merge {source} into {destination}"
+    }
+
+    @Test
     fun `logChangeLimit returns project default when no repo override`() {
         val settings = JujutsuSettings()
         val state = JujutsuSettingsState(logChangeLimit = 300)

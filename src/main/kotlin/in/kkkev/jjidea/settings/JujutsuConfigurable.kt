@@ -29,6 +29,7 @@ import `in`.kkkev.jjidea.jj.cli.rootlessConfig
 import `in`.kkkev.jjidea.preview.AccessCode
 import `in`.kkkev.jjidea.preview.PreviewCodeStatus
 import `in`.kkkev.jjidea.preview.PreviewFeature
+import `in`.kkkev.jjidea.ui.newchange.isValidMergeTemplate
 import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
@@ -244,6 +245,23 @@ class JujutsuConfigurable(
                     )
                     .comment(
                         JujutsuBundle.message("settings.general.default.push.scope.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
+            }
+            row(JujutsuBundle.message("settings.general.merge.template.label")) {
+                textField()
+                    .bindText(settings.state::mergeDescriptionTemplate)
+                    .columns(COLUMNS_MEDIUM)
+                    .align(AlignX.FILL)
+                    .validationOnApply {
+                        if (!isValidMergeTemplate(it.text)) {
+                            error(JujutsuBundle.message("settings.general.merge.template.error"))
+                        } else {
+                            null
+                        }
+                    }
+                    .comment(
+                        JujutsuBundle.message("settings.general.merge.template.comment"),
                         maxLineLength = NARROW_COMMENT_WIDTH
                     )
             }

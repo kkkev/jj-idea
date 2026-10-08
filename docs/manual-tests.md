@@ -1179,6 +1179,15 @@ Build a small stack `A → B → C` (three plain changes) for this section.
 - [ ] Right-clicking a `jjc://` change-navigation link (e.g. a parent reference in the commit
       details panel) still offers **New Change...** and it acts on the link's target
 
+**Merge description prefill (jj-idea-b0p2, GitHub #103)** — needs two sibling changes with bookmarks `feat` (newer) and `main` (older):
+
+- [ ] Select both → **New Change...** (the dialog, not the quick **New Change From These**): description is prefilled `Merge branch 'feat' into main` (older tip = destination), with an **Other phrasings** link below the editor
+- [ ] **Other phrasings** lists the primary, the flipped form, and `Merge branches 'feat' and 'main'`; picking one replaces the text
+- [ ] Type extra text, then pick a phrasing: a confirmation asks before replacing; No keeps your text
+- [ ] One change, three changes, or a change with no bookmark (or two different bookmarks): description empty, no link
+- [ ] Two bookmarks only as remotes (`main@origin`): prefilled using the local names
+- [ ] Same flow from the bookmarks panel (multi-select two bookmarks)
+
 #### Move Up / Move Down (jj-idea-owje, GitHub #93)
 
 Move Up/Down swap the selected commit with its single child/single parent **in the commit
@@ -3420,6 +3429,11 @@ failing on 0.42+ with `error: unexpected argument '--allow-new'`:
 - [ ] Narrow the Settings window/pane as much as the IDE allows — nothing should need horizontal
       scrolling to stay fully visible: the "JJ executable path:" row's field + Test button, and
       Installation Help's command rows + Copy buttons
+
+#### Merge description template (jj-idea-b0p2)
+
+- [ ] **General** section: "Merge description:" defaults to `Merge branch '{source}' into {destination}`; changing it (e.g. `Merge {source} into {destination}`) changes the New Change... prefill for a two-bookmark merge
+- [ ] Clearing it or omitting `{source}`/`{destination}` shows an inline error on Apply
 
 #### Default push scope (jj-idea-fmzr, jj-idea-ikof)
 

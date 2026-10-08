@@ -3,12 +3,16 @@ package `in`.kkkev.jjidea.ui.newchange
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.OnePixelSplitter
+import com.intellij.ui.components.ActionLink
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
+import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.createSourcePanel
 import `in`.kkkev.jjidea.ui.common.createVerticalPanel
 import `in`.kkkev.jjidea.ui.components.*
@@ -76,6 +80,15 @@ class NewChangeDialog(
         Disposer.register(disposable, this)
     }
 
+    // jj-idea-b0p2: prefilled merge description for a two-bookmark merge, null otherwise.
+    private val mergeSuggestion = mergeDescriptionSuggestion(
+        targetEntries,
+        JujutsuSettings.getInstance(project).state.mergeDescriptionTemplate
+    )
+
+    /** The text last put into the editor by a suggestion; lets us tell "untouched" from "user-edited". */
+    private var lastSuggestion: String? = null
+
     private val destModeOnto = JRadioButton(JujutsuBundle.message("dialog.newchange.placement.onto")).apply {
         toolTipText = JujutsuBundle.message("dialog.newchange.placement.onto.description")
         isSelected = true
@@ -111,6 +124,8 @@ class NewChangeDialog(
         descriptionEditor.addTextChangeListener { updatePreviewPanel() }
 
         init()
+
+        mergeSuggestion?.let { applySuggestion(it.primary) }
 
         loadRepoEntries()
     }
@@ -179,10 +194,52 @@ class NewChangeDialog(
      * [in.kkkev.jjidea.ui.workingcopy.WorkingCopyControlsPanel]'s. CommitMessage scrolls itself -
      * no JScrollPane wrapper needed, unlike the old JBTextArea.
      */
-    private fun createDescriptionPanel() = descriptionEditor.component.apply {
-        alignmentX = JPanel.LEFT_ALIGNMENT
-        minimumSize = JBUI.size(200, 70)
-        preferredSize = JBUI.size(400, 90)
+    private fun createDescriptionPanel(): JComponent {
+        val editor = descriptionEditor.component.apply {
+            alignmentX = JPanel.LEFT_ALIGNMENT
+            minimumSize = JBUI.size(200, 70)
+            preferredSize = JBUI.size(400, 90)
+        }
+        val suggestion = mergeSuggestion ?: return editor
+        return JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
+            alignmentX = JPanel.LEFT_ALIGNMENT
+            add(editor)
+            add(createPhrasingsLink(suggestion))
+        }
+    }
+
+    private fun createPhrasingsLink(suggestion: MergeDescriptionSuggestion) =
+        ActionLink(JujutsuBundle.message("dialog.newchange.description.phrasings")) { event ->
+            JBPopupFactory.getInstance()
+                .createPopupChooserBuilder(suggestion.all)
+                .setItemChosenCallback { chosen -> chooseSuggestion(chosen) }
+                .createPopup()
+                .showUnderneathOf(event.source as JComponent)
+        }.apply {
+            setDropDownLinkIcon()
+            alignmentX = JPanel.LEFT_ALIGNMENT
+        }
+
+    private fun applySuggestion(text: String) {
+        descriptionEditor.text = Description(text)
+        lastSuggestion = text
+    }
+
+    /** Never clobbers user edits silently: anything other than blank/the previous suggestion asks first. */
+    private fun chooseSuggestion(text: String) {
+        val current = descriptionEditor.text.actual
+        val untouched = current.isBlank() || current == lastSuggestion
+        val replace = untouched ||
+            Messages.showYesNoDialog(
+                project,
+                JujutsuBundle.message("dialog.newchange.description.replace.message"),
+                JujutsuBundle.message("dialog.newchange.description.replace.title"),
+                Messages.getQuestionIcon()
+            ) == Messages.YES
+        if (replace) {
+            applySuggestion(text)
+        }
     }
 
     private fun createTargetPanel() = createSourcePanel(project, targetEntries)

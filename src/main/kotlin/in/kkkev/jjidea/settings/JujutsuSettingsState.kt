@@ -46,5 +46,8 @@ data class JujutsuSettingsState(
     // scope" group. Stored as in.kkkev.jjidea.jj.RebaseSourceMode's enum name, same as
     // defaultPushScope above - an unrecognised value falls back to REVISION
     // (in.kkkev.jjidea.jj.parseRebaseSourceMode).
-    var dragRebaseSourceMode: String = "REVISION"
+    var dragRebaseSourceMode: String = "REVISION",
+    // jj-idea-b0p2: description prefilled in New Change... for a two-bookmark merge. Must contain
+    // {source} and {destination} (ui.newchange.isValidMergeTemplate); invalid values fall back to the default.
+    var mergeDescriptionTemplate: String = "Merge branch '{source}' into {destination}"
 )
