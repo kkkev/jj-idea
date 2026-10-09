@@ -10,6 +10,7 @@ import com.intellij.openapi.options.ShowSettingsUtil
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.text.StringUtil
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.ui.ScrollPaneFactory
@@ -30,10 +31,23 @@ import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.Point
 import javax.swing.*
 import javax.swing.table.TableColumn
 import kotlin.reflect.KMutableProperty1
+
+/**
+ * Builds the label for a one-line status message (jj-idea-v17o, GitHub #142). Messages can embed
+ * raw jj stderr, so the text is collapsed to a single line and the label is allowed to shrink to
+ * zero width (JLabel then ellipsizes) rather than forcing the tool window's minimum width to the
+ * full message length. The complete text is available as a tooltip.
+ */
+internal fun statusMessageLabel(text: String): JBLabel =
+    JBLabel(text.trim().replace(Regex("\\s+"), " ")).apply {
+        minimumSize = Dimension(0, preferredSize.height)
+        toolTipText = "<html>" + StringUtil.escapeXmlEntities(text.trim()).replace("\n", "<br>") + "</html>"
+    }
 
 abstract class CommitTablePanel<D>(
     protected val project: Project,
@@ -697,7 +711,7 @@ abstract class CommitTablePanel<D>(
      */
     protected fun showStatusMessage(text: String) {
         statusBar.removeAll()
-        statusBar.add(JBLabel(text))
+        statusBar.add(statusMessageLabel(text))
         statusBar.isVisible = true
     }
 

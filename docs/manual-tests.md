@@ -845,6 +845,9 @@ already-loaded log table shows — it never changes what jj loads for this or an
       outline and jj's own parse error shows under it; the popup stays open, letting you fix it
 - [ ] Press **Esc** instead of fixing it — the popup closes and the previous filter state (if any)
       is unchanged
+- [ ] With a revset applied, make jj fail on refresh (e.g. make the workspace stale from another
+      workspace) — the strip below the log shows one truncated line, hovering shows the full jj
+      error, and the log tool window can still be dragged narrow (jj-idea-v17o, GitHub #142)
 - [ ] In Settings → Version Control → Jujutsu, set a repo-level Log Revset (e.g. `::@`), then set
       the chip to `all()` — the result stays within `::@` (the repo-level setting always wins)
 - [ ] Change the repo-level Log Revset (or Log Limit) override and click OK/Apply — the log window

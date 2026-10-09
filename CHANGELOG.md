@@ -31,6 +31,7 @@ This release brings some big new features:
 - **Long lines in the log graph** (50 rows or more) now show as a short line with an arrow at each end instead of running the whole way, and the lane in between is freed for other branches, so graphs with very long edges stay narrow. Hover either arrow to highlight the whole line, and click it to jump to the other end.
 
 ### Fixed
+- A long jj error shown below the log (e.g. a stale working copy with a revset filter active) no longer stops you shrinking the log window; it is truncated to one line, with the full message in a tooltip. ([#142](https://github.com/kkkev/jj-idea/issues/142))
 - The bookmarks panel no longer freezes the IDE for seconds when refreshing a repository with many bookmarks and tags; restoring which groups are expanded is now a single bulk operation instead of one per group. ([#141](https://github.com/kkkev/jj-idea/issues/141))
 - **Annotate** no longer fails with an error on a file that did not exist at the configured diff base; it now says there is nothing to annotate instead.
 - Saving a file that jj ignores and doesn't track (such as the IDE's own `.idea/workspace.xml`) no longer reloads the log, bookmarks and working-copy state. On large repositories this removes a periodic multi-second relayout and about ten `jj` calls. Changing a tracked file still updates the log, once.
