@@ -96,7 +96,12 @@ class JujutsuBookmarksPanel(
 ) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val root = DefaultMutableTreeNode()
     private val treeModel = DefaultTreeModel(root)
-    val tree = Tree(treeModel).apply {
+    val tree = object : Tree(treeModel) {
+        override fun getExpandedDescendants(parent: TreePath?): java.util.Enumeration<TreePath>? {
+            expandedDescendantsScans++
+            return super.getExpandedDescendants(parent)
+        }
+    }.apply {
         isRootVisible = false
         showsRootHandles = true
         cellRenderer = BookmarkNodeRenderer(project)
@@ -110,6 +115,12 @@ class JujutsuBookmarksPanel(
     /** Test seam for the rebuild fan-out scale guard: how many times [rebuild] actually ran. */
     var rebuildCount = 0
         private set
+
+    /**
+     * Test seam for the expansion scale guard (jj-idea-trqj): how many times the tree scanned its
+     * expanded paths. Per-path `expandPath` makes this grow with E; a bulk expand keeps it constant.
+     */
+    internal var expandedDescendantsScans = 0
 
     /**
      * Guards [recordExpansion] while [rebuild] is programmatically replaying [expansionState] onto
@@ -203,35 +214,43 @@ class JujutsuBookmarksPanel(
         // per-path expansion tracking, so every rebuild must explicitly re-apply expansionState
         // instead of the old unconditional TreeUtil.expandAll (jj-idea-a7a7).
         treeModel.reload()
+        applyExpansionState()
+    }
+
+    /**
+     * Expands every node [expansionState] (falling back to the node's own default) says should be
+     * open, in one [Tree.expandPaths] bulk operation (jj-idea-trqj, GitHub #141). Per-path
+     * `expandPath` calls each fire `updateExpandedDescendants`, which scans every expanded path —
+     * O(E²) per rebuild. Nodes that should be collapsed need no call: `reload()` already reset
+     * the tree to all-collapsed.
+     */
+    internal fun applyExpansionState() {
+        val toExpand = mutableListOf<TreePath>()
+        for (i in 0 until root.childCount) {
+            collectExpandedPaths(root.getChildAt(i) as DefaultMutableTreeNode, "", toExpand)
+        }
         applyingExpansionState = true
         try {
-            for (i in 0 until root.childCount) {
-                applyExpansionState(root.getChildAt(i) as DefaultMutableTreeNode, "")
-            }
+            tree.expandPaths(toExpand)
         } finally {
             applyingExpansionState = false
         }
     }
 
     /**
-     * Recursively expands or collapses [treeNode] per [expansionState] (falling back to the
-     * node's own default), continuing into its children only if it ends up expanded — a collapsed
-     * node's descendants are left untouched rather than force-expanded, since [javax.swing.JTree]
-     * expanding a path also makes its ancestors visible.
+     * Collects [treeNode] into [out] if it should be expanded, continuing into its children only
+     * then — a collapsed node's descendants are left alone rather than force-expanded, since
+     * [javax.swing.JTree] expanding a path also makes its ancestors visible.
      */
-    private fun applyExpansionState(treeNode: DefaultMutableTreeNode, parentPath: String) {
+    private fun collectExpandedPaths(treeNode: DefaultMutableTreeNode, parentPath: String, out: MutableList<TreePath>) {
         val node = treeNode.userObject as? BookmarkNode ?: return
         if (treeNode.isLeaf) return
         val path = node.expansionPathKey(parentPath)
-        val expanded = expansionState[path] ?: node.defaultExpanded()
-        val treePath = TreePath(treeNode.path)
-        if (expanded) {
-            tree.expandPath(treePath)
+        if (expansionState[path] ?: node.defaultExpanded()) {
+            out.add(TreePath(treeNode.path))
             for (i in 0 until treeNode.childCount) {
-                applyExpansionState(treeNode.getChildAt(i) as DefaultMutableTreeNode, path)
+                collectExpandedPaths(treeNode.getChildAt(i) as DefaultMutableTreeNode, path, out)
             }
-        } else {
-            tree.collapsePath(treePath)
         }
     }
 

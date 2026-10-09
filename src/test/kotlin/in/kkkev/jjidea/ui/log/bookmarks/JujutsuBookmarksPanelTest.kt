@@ -6,6 +6,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
+import com.intellij.ui.tree.ui.DefaultTreeUI
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.jj.Bookmark
@@ -18,6 +19,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
+import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
@@ -93,6 +95,52 @@ class JujutsuBookmarksPanelTest {
             panel.flushRebuildQueue()
 
             saveCount shouldBe 0
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    // jj-idea-trqj (GitHub #141): replaying expansion state used one tree.expandPath per node, each
+    // scanning every expanded path (O(E^2)). A bulk expand keeps the scan count constant in E.
+
+    @Test
+    fun `applying expansion state scans expanded paths a constant number of times, not once per node`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val groupCount = 500
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            // The headless test LaF installs MetalTreeUI; the IDE's DefaultTreeUI is what honours
+            // Tree's bulk-expand operation, so measure against that.
+            panel.tree.setUI(DefaultTreeUI())
+            spliceCategoryWithPrefixes(panel, repo, groupCount)
+            panel.tree.collapseRow(0)
+            val before = panel.expandedDescendantsScans
+
+            panel.applyExpansionState()
+
+            // Bound: a per-path expandPath regression scans once per expanded node (> groupCount).
+            (panel.expandedDescendantsScans - before) shouldBeLessThan 10
+            panel.tree.rowCount shouldBe 1 + groupCount * 3
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `applying expansion state honours collapsed overrides and leaves their descendants collapsed`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val panel = JujutsuBookmarksPanel(project.get(), mutableMapOf("Local/g1" to false))
+        try {
+            spliceCategoryWithPrefixes(panel, repo, 3)
+
+            panel.applyExpansionState()
+
+            val category = (panel.tree.model.root as DefaultMutableTreeNode).getChildAt(0) as DefaultMutableTreeNode
+            panel.tree.isExpanded(TreePath(category.path)) shouldBe true
+            val g0 = category.getChildAt(0) as DefaultMutableTreeNode
+            val g1 = category.getChildAt(1) as DefaultMutableTreeNode
+            panel.tree.isExpanded(TreePath(g0.path)) shouldBe true
+            panel.tree.isExpanded(TreePath(g1.path)) shouldBe false
         } finally {
             Disposer.dispose(panel)
         }
@@ -305,4 +353,28 @@ private fun selectLeaves(panel: JujutsuBookmarksPanel, vararg nodes: BookmarkNod
     val treeNodes = nodes.map { DefaultMutableTreeNode(it).also(root::add) }
     model.reload()
     panel.tree.selectionPaths = treeNodes.map { TreePath(it.path) }.toTypedArray()
+}
+
+/** Splices `Local ▸ g0..g{n-1}`, each Prefix holding two leaves, onto the panel's tree (all collapsed). */
+private fun spliceCategoryWithPrefixes(panel: JujutsuBookmarksPanel, repo: JujutsuRepository, groups: Int) {
+    val model = panel.tree.model as DefaultTreeModel
+    val root = model.root as DefaultMutableTreeNode
+    root.removeAllChildren()
+    val category = DefaultMutableTreeNode(
+        BookmarkNode.Category(repo, "Local", RefKind.BOOKMARK, emptyList())
+    ).also(root::add)
+    repeat(groups) { i ->
+        val prefix = DefaultMutableTreeNode(
+            BookmarkNode.Prefix(repo, "g$i", RefKind.BOOKMARK, emptyList(), groupLabel = "Local", fullPath = "g$i")
+        ).also(category::add)
+        repeat(2) { j ->
+            val id = ChangeId("aaaaaaaa", "a")
+            prefix.add(
+                DefaultMutableTreeNode(
+                    BookmarkNode.Local(repo, BookmarkItem(Bookmark("g$i/b$j"), id), "b$j", onWorkingCopy = false)
+                )
+            )
+        }
+    }
+    model.reload()
 }
