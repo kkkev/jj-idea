@@ -4,15 +4,17 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatusManager
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
-import `in`.kkkev.jjidea.vcs.projectLevelVcsManager
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -43,12 +45,35 @@ class DiffbaseService(private val project: Project) {
     // ancestor) is simply absent too — both cases fall through to the default @-.
     private val cache = ConcurrentHashMap<String, ChangeId>()
 
+    // "Is this file absent at the resolved base" per (repo, base, path), so repeatedly building
+    // the editor context menu costs one `jj file list` per file, not one per menu open. Cleared
+    // alongside [cache]: a base that is rewritten or re-resolved invalidates the answer.
+    private val absentAtBaseCache = ConcurrentHashMap<String, Boolean>()
+
     private val invalidationSubscribed = AtomicBoolean(false)
 
     private fun ensureInvalidationSubscribed() {
         if (invalidationSubscribed.compareAndSet(false, true)) {
-            project.stateModel.logRefresh.connect(project) { cache.clear() }
+            project.stateModel.logRefresh.connect(project) {
+                cache.clear()
+                absentAtBaseCache.clear()
+            }
         }
+    }
+
+    /**
+     * True when a diff base is configured and resolves, and [filePath] does not exist at it (it was
+     * added after the base). Annotate has nothing to show for such a file, so the Jujutsu editor
+     * menu hides it (jj-idea-bia2). False when no custom base is configured (the platform already
+     * hides Annotate for files that are new relative to `@-`) or when the check can't be made.
+     *
+     * Runs `jj` on a cache miss: **call from a background thread only.**
+     */
+    fun isAbsentAtBase(repo: JujutsuRepository, filePath: FilePath): Boolean {
+        val base = resolve(repo) ?: return false
+        val key = "${repo.directory.path}|${base.full}|${filePath.path}"
+        absentAtBaseCache[key]?.let { return it }
+        return repo.isAbsentAt(filePath, base).also { absentAtBaseCache[key] = it }
     }
 
     /**
@@ -113,28 +138,24 @@ class DiffbaseService(private val project: Project) {
 
     /**
      * Called after the diff base setting changes (from [in.kkkev.jjidea.settings.JujutsuConfigurable]).
-     * Clears the resolution cache, asks the platform to refresh every open editor's gutter
+     * Clears the resolution cache and asks the platform to refresh every open editor's gutter
      * markers — this reaches `LineStatusTrackerManager.onEverythingChanged()`, which re-runs
-     * [DiffbaseContentLoader.isTrackedFile] and reloads content for every tracked file — and
-     * forces any *already-open* Annotate gutter to re-fetch and redisplay.
+     * [DiffbaseContentLoader.isTrackedFile] and reloads content for every tracked file.
      *
-     * The last part matters: an open gutter's line-number mapping is driven by the *live*
-     * `LineStatusTracker` diff (`UpToDateLineNumberProviderImpl` re-reads it on every paint),
-     * so once `fileStatusesChanged()` moves the tracker to the new base, a still-displayed but
-     * un-refreshed `FileAnnotation` (computed against the *old* base) gets remapped through the
-     * new diff and shows misattributed lines. `reloadAnnotations()` calls `reload(null)` on
-     * every currently-registered `FileAnnotation`
-     * ([com.intellij.openapi.vcs.actions.AnnotateToggleAction] registers one whenever a gutter
-     * opens), which re-invokes the Annotate provider and swaps in a fresh, correctly-based
-     * `FileAnnotation` — the same pattern git4idea's own annotation-affecting toggles use
-     * (`GitToggleAnnotationOptionsActionProvider.resetAllAnnotations`). Annotate's own
-     * *cache* is still cleared separately by
-     * [in.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider], for editors that aren't open yet.
+     * An *already-open* Annotate gutter is handled by the [in.kkkev.jjidea.jj.JujutsuStateModel.diffbaseChanged]
+     * notification, to which [in.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider] responds by
+     * closing it. The gutter's line-number mapping is driven by the *live* `LineStatusTracker` diff, so
+     * once the tracker moves to the new base a still-displayed `FileAnnotation` (computed against the
+     * *old* base) is remapped through the new diff and shows misattributed lines. It is closed rather
+     * than reloaded (`VcsAnnotationLocalChangesListener.reloadAnnotations()`, as jj-idea-fwea first
+     * did): for a file absent at the new base the reloaded annotation is closed and empty, and
+     * `AnnotateToggleAction.doAnnotate` then leaves the old gutter in place and an "Number of lines
+     * annotated ... is not equal" error banner on the editor (jj-idea-bia2).
      */
     fun notifyDiffbaseChanged() {
         cache.clear()
+        absentAtBaseCache.clear()
         FileStatusManager.getInstance(project).fileStatusesChanged()
-        project.projectLevelVcsManager.annotationLocalChangesListener.reloadAnnotations()
         project.stateModel.diffbaseChanged.notify(Unit)
     }
 
@@ -172,4 +193,16 @@ fun resolveExactlyOne(repo: JujutsuRepository, revset: String): ResolveResult {
         entries.size > 1 -> ResolveResult.Ambiguous(entries.size)
         else -> ResolveResult.Single(entries.first().id)
     }
+}
+
+/**
+ * True if [filePath] does not exist at [revision]. `jj file list` succeeds with empty output when
+ * the path is absent, whereas a genuine failure (jj error) is non-success — so only the former
+ * counts as absent. Shared by [DiffbaseContentLoader] (gutter: empty base) and
+ * [in.kkkev.jjidea.vcs.annotate.JujutsuAnnotationProvider] (annotate: no attributions) so the two
+ * treat a file added after the diff base identically (jj-idea-zf1j, jj-idea-bia2).
+ */
+fun JujutsuRepository.isAbsentAt(filePath: FilePath, revision: Revision): Boolean {
+    val result = commandExecutor.fileList(listOf(filePath), revision)
+    return result is CommandExecutor.CommandResult.Success && result.stdout.isBlank()
 }

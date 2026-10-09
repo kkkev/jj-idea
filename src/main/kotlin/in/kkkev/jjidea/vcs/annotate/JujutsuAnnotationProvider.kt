@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.vcs.annotate
 
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
@@ -26,14 +27,18 @@ import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.jj.reconstructMergeParentContent
 import `in`.kkkev.jjidea.jj.stateModel
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.contentLocator
 import `in`.kkkev.jjidea.vcs.contentLocator
 import `in`.kkkev.jjidea.vcs.diffbase.DiffbaseService
+import `in`.kkkev.jjidea.vcs.diffbase.isAbsentAt
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.history.JujutsuFileRevision
 import `in`.kkkev.jjidea.vcs.jujutsuRepositoryFor
+import java.util.Collections
+import java.util.WeakHashMap
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -44,7 +49,15 @@ import java.util.concurrent.atomic.AtomicBoolean
 class JujutsuAnnotationProvider(
     private val project: Project,
     private val vcs: JujutsuVcsBase,
-    private val nowMs: () -> Long = System::currentTimeMillis
+    private val nowMs: () -> Long = System::currentTimeMillis,
+    private val notifyAbsentAtBase: (Project, String) -> Unit = { project, fileName ->
+        JujutsuNotifications.notify(
+            project,
+            JujutsuBundle.message("annotation.absentAtBase.title"),
+            JujutsuBundle.message("annotation.absentAtBase.content", fileName),
+            NotificationType.INFORMATION
+        )
+    }
 ) : AnnotationProvider,
     AnnotationProviderEx,
     CacheableAnnotationProvider {
@@ -70,8 +83,33 @@ class JujutsuAnnotationProvider(
             project.stateModel.workingCopies.connect(project) { _ -> cache.clear() }
             // jj-idea-fwea: every cached FileAnnotation for @ is computed against the
             // configured diff base and would otherwise go stale silently when it changes.
-            project.stateModel.diffbaseChanged.connect(project) { cache.clear() }
+            project.stateModel.diffbaseChanged.connect(project) {
+                cache.clear()
+                closeOpenAnnotations()
+            }
         }
+    }
+
+    // Annotations handed out by annotate(file) that may still be open in an editor gutter. Weak so
+    // an abandoned annotation is collectable; guarded by its own monitor.
+    private val openAnnotations: MutableSet<FileAnnotation> =
+        Collections.newSetFromMap(WeakHashMap<FileAnnotation, Boolean>())
+
+    /**
+     * jj-idea-bia2: an annotation already shown in a gutter was computed against the old diff base,
+     * so after a base change it no longer lines up with the gutter markers (e.g. blame left on one
+     * line of a file that is now entirely "added"). Close them; [FileAnnotation.close] makes the
+     * platform remove the gutter columns and untick the Annotate toggle. The user can re-annotate
+     * against the new base.
+     */
+    private fun closeOpenAnnotations() {
+        val toClose = synchronized(openAnnotations) { openAnnotations.toList().also { openAnnotations.clear() } }
+        toClose.forEach { it.close() }
+    }
+
+    /** Test seam: annotations from [annotate] not yet closed by a base change. */
+    internal fun openAnnotationsForTest(): List<FileAnnotation> = synchronized(openAnnotations) {
+        openAnnotations.toList()
     }
 
     override fun populateCache(file: VirtualFile) {
@@ -118,8 +156,13 @@ class JujutsuAnnotationProvider(
      * When a custom diff base is configured (jj-idea-fwea / GitHub #43), annotate at that
      * revision instead, via [DiffbaseService] — the same service [in.kkkev.jjidea.vcs.diffbase.DiffbaseContentLoader]
      * uses for the LineStatusTracker base, so the two never disagree and blame lines stay aligned.
+     * A file absent at that base yields a closed, empty annotation plus a notification (see [nothingToAnnotate]).
+     * Limitation: a file renamed after the base also counts as absent (jj-idea-i2e2).
      */
-    override fun annotate(file: VirtualFile): FileAnnotation {
+    override fun annotate(file: VirtualFile): FileAnnotation =
+        annotateWorkingFile(file).also { synchronized(openAnnotations) { openAnnotations.add(it) } }
+
+    private fun annotateWorkingFile(file: VirtualFile): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
 
         // 1. Find the content locator
@@ -128,7 +171,15 @@ class JujutsuAnnotationProvider(
         if (contentLocator is WorkingCopy) {
             DiffbaseService.getInstance(project).resolve(repo)?.let { base ->
                 repo.getVirtualFile(FileAtVersion(file.filePath, base))?.let { baseFile ->
-                    return annotateInternal(baseFile, base, repo)
+                    return try {
+                        annotateInternal(baseFile, base, repo)
+                    } catch (e: VcsException) {
+                        // jj-idea-bia2: a file added after the base fails `jj file annotate` with
+                        // "No such path". Every line is "added" relative to the base (the gutter
+                        // shows that, jj-idea-zf1j), so there is nothing to attribute: tell the user
+                        // instead of raising an error.
+                        if (repo.isAbsentAt(file.filePath, base)) nothingToAnnotate(baseFile, repo) else throw e
+                    }
                 }
             }
         }
@@ -332,6 +383,24 @@ class JujutsuAnnotationProvider(
         // Weight new samples equally with history so backoff engages/recovers within a couple of
         // file opens rather than being dragged out by a long history of fast samples.
         private const val EMA_ALPHA = 0.5
+    }
+
+    /**
+     * Returns an already-closed, empty annotation and notifies the user. The platform's
+     * `AnnotateToggleAction.doAnnotate` registers no gutter columns for a closed annotation, so the
+     * Annotate toggle stays unticked. An open zero-line annotation instead leaves zero-width columns
+     * registered: the strip vanishes on the next tracker refresh while the toggle stays ticked.
+     */
+    private fun nothingToAnnotate(file: VirtualFile, repo: JujutsuRepository): FileAnnotation {
+        notifyAbsentAtBase(project, file.name)
+        return JujutsuFileAnnotation(
+            project = project,
+            repo = repo,
+            file = file,
+            annotationLines = emptyList(),
+            vcsKey = vcs.keyInstanceMethod,
+            workingCopyChangeId = repo.workingCopy.id
+        ).also { it.close() }
     }
 
     internal fun annotateInternal(

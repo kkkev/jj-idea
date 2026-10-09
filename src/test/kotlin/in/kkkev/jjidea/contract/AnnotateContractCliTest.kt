@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.contract
 
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
+import `in`.kkkev.jjidea.jj.cli.toFileset
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -24,5 +25,21 @@ class AnnotateContractCliTest : AnnotateContractTest() {
         val result = jj.run("file", "annotate", "-r", "@", "-T", AnnotationParser.TEMPLATE, path)
 
         result.isSuccess shouldBe true
+    }
+
+    // jj-idea-bia2: JujutsuAnnotationProvider falls back to an empty annotation when annotate at
+    // the diff base fails and `file list` shows the path absent there. Pins both halves of that.
+    @Test
+    fun `annotate fails but file list is empty for a path absent at the revision`() {
+        jj.createFile("base.txt", "base\n")
+        jj.newChange("base done")
+        jj.createFile("foo.rs", "foo\n")
+
+        val annotate = jj.run("file", "annotate", "-r", "@-", "-T", AnnotationParser.TEMPLATE, "foo.rs")
+        val list = jj.run("file", "list", "-r", "@-", "foo.rs".toFileset())
+
+        annotate.isSuccess shouldBe false
+        list.isSuccess shouldBe true
+        list.stdout.isBlank() shouldBe true
     }
 }

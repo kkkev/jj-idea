@@ -2624,6 +2624,15 @@ Requires a repo with at least one immutable ancestor and a few mutable commits a
       then `echo bar>>foo.rs` — with base "Latest immutable ancestor" or "Previous commit", every
       line of `foo.rs` shows an *added* marker (the file doesn't exist at the base); with
       "Working copy parent" only the new line is marked
+- [ ] jj-idea-bia2: with the same setup, Jujutsu → Annotate on `foo.rs` (base "Latest immutable
+      ancestor" or "Previous commit"), the editor right-click **Jujutsu** submenu has no Annotate
+      entry (it is present for files that exist at the base, and with "Working copy parent");
+      the platform's other Annotate entry points (main menu, gutter) still work and show a
+      "Nothing to annotate" balloon with no strip and the item unticked
+- [ ] jj-idea-bia2: show Annotate on a file with base "Working copy parent", then change the base
+      to "Latest immutable ancestor" and Apply — the open annotation is removed and the Annotate
+      menu item unticks (no stale blame left on a line of a now fully-added file); Annotate again
+      to get blame against the new base
 - [ ] Select "Latest immutable ancestor (trunk)", click Apply — without touching the editor,
       every open file's gutter markers expand to the full diff vs trunk (not just vs `@-`)
 - [ ] jj-idea-g1io: select "Previous commit (grandparent)", click Apply — gutter markers narrow
@@ -2642,14 +2651,12 @@ Requires a repo with at least one immutable ancestor and a few mutable commits a
       concurrent branches) and click **Test** — reports it resolves to N revisions, not one,
       as an error rather than success; Apply is blocked the same way an unresolvable revset is
 - [ ] Leaving "Custom revset" selected with an empty field shows a validation error on Apply
-- [ ] **Live update with an editor already open** (the scenario this feature exists to get
-      right): with a file's Annotate gutter already showing (from a prior "Latest immutable
-      ancestor" run), switch the setting back to "Working copy parent" and click Apply —
-      *without* closing the editor or manually re-running Annotate, the gutter's blame updates
-      in place to the new base and stays correctly aligned (no line showing the wrong change's
-      author). Repeat switching between all four strategies with the gutter left open each
-      time — each switch is reflected immediately, never requiring a close/reopen to correct
-      itself
+- [ ] **Live update with an editor already open** (changed by jj-idea-bia2): with a file's
+      Annotate gutter already showing, switch the base (any strategy) and click Apply — *without*
+      closing the editor, the annotation columns are removed and the Annotate menu item unticks.
+      No stale blame stays on any line, no balloon appears and no "Number of lines annotated by
+      Jujutsu is not equal to number of lines in the file" banner appears at the top of the
+      editor; Annotate again to get blame against the new base. Repeat across all four strategies
 - [ ] Multi-repo project: set a per-repo override (Repository Settings → the repo's group →
       "Override diff base") on one repo only — confirm only that repo's files use the
       override, in both the gutter and Annotate; the other repo keeps using the project default

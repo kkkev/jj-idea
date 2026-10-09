@@ -1,17 +1,21 @@
 package `in`.kkkev.jjidea.vcs.diffbase
 
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatusManager
+import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.changes.VcsAnnotationLocalChangesListener
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.JujutsuStateModel
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.LogService
+import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.settings.DiffbaseStrategy
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.JujutsuSettingsState
@@ -209,22 +213,87 @@ class DiffbaseServiceTest {
         }
     }
 
-    // Regression test: an already-open Annotate gutter is backed by a FileAnnotation that isn't
-    // touched by cache.clear() alone. Its line-number mapping is driven by the *live*
-    // LineStatusTracker diff, so once fileStatusesChanged() moves that to the new base, a
-    // still-displayed but un-refreshed annotation shows misattributed lines until something
-    // forces it to reload. reloadAnnotations() is that "something" — see notifyDiffbaseChanged's
-    // doc comment for the full mechanism (AnnotateToggleAction / VcsAnnotationLocalChangesListener).
+    // jj-idea-bia2: open annotations are closed by JujutsuAnnotationProvider (diffbaseChanged), not
+    // reloaded here — a reload of an annotation for a file absent at the new base leaves the old gutter
+    // and an error banner behind. See notifyDiffbaseChanged's doc comment.
     @Test
-    fun `notifyDiffbaseChanged reloads every currently-open annotation`() {
+    fun `notifyDiffbaseChanged notifies diffbaseChanged and does not reload annotations`() {
         val annotationListener = mockk<VcsAnnotationLocalChangesListener>(relaxed = true)
         val vcsManager = mockk<ProjectLevelVcsManager> {
             every { annotationLocalChangesListener } returns annotationListener
         }
         every { project.getService(ProjectLevelVcsManager::class.java) } returns vcsManager
+        val stateModel = mockk<JujutsuStateModel>(relaxed = true)
+        every { project.getService(JujutsuStateModel::class.java) } returns stateModel
 
         service.notifyDiffbaseChanged()
 
-        verify(exactly = 1) { annotationListener.reloadAnnotations() }
+        verify(exactly = 1) { stateModel.diffbaseChanged.notify(Unit) }
+        verify(exactly = 0) { annotationListener.reloadAnnotations() }
+    }
+
+    // ── isAbsentAtBase (jj-idea-bia2) ────────────────────────────────────────
+
+    private val filePath: FilePath = LocalFilePath("/repo/foo.rs", false)
+
+    private fun stubResolvesTo(id: String, executor: CommandExecutor) {
+        stubSettings(strategy = DiffbaseStrategy.IMMUTABLE_ANCESTOR)
+        every {
+            logService.getLog(revset = Expression(DiffbaseStrategy.IMMUTABLE_ANCESTOR_REVSET), limit = 2, quiet = true)
+        } returns Result.success(listOf(entry(id)))
+        every { repo.commandExecutor } returns executor
+    }
+
+    @Test
+    fun `isAbsentAtBase is false without a custom base and never lists files`() {
+        stubSettings(strategy = DiffbaseStrategy.WORKING_COPY_PARENT)
+        val executor = mockk<CommandExecutor>()
+        every { repo.commandExecutor } returns executor
+
+        service.isAbsentAtBase(repo, filePath) shouldBe false
+
+        verify { executor wasNot Called }
+    }
+
+    @Test
+    fun `isAbsentAtBase is true when file list is empty at the resolved base`() {
+        val executor = mockk<CommandExecutor>()
+        stubResolvesTo("abc", executor)
+        every { executor.fileList(listOf(filePath), ChangeId("abc", "abc", null)) } returns commandResult(0, "")
+
+        service.isAbsentAtBase(repo, filePath) shouldBe true
+    }
+
+    @Test
+    fun `isAbsentAtBase is false when the file exists at the base`() {
+        val executor = mockk<CommandExecutor>()
+        stubResolvesTo("abc", executor)
+        every { executor.fileList(listOf(filePath), ChangeId("abc", "abc", null)) } returns commandResult(0, "foo.rs\n")
+
+        service.isAbsentAtBase(repo, filePath) shouldBe false
+    }
+
+    @Test
+    fun `isAbsentAtBase caches per file so repeated menu builds run jj once`() {
+        val executor = mockk<CommandExecutor>()
+        stubResolvesTo("abc", executor)
+        every { executor.fileList(any(), any()) } returns commandResult(0, "")
+
+        repeat(5) { service.isAbsentAtBase(repo, filePath) }
+
+        verify(exactly = 1) { executor.fileList(any(), any()) }
+    }
+
+    @Test
+    fun `notifyDiffbaseChanged drops the cached absence answer`() {
+        val executor = mockk<CommandExecutor>()
+        stubResolvesTo("abc", executor)
+        every { executor.fileList(any(), any()) } returns commandResult(0, "")
+        service.isAbsentAtBase(repo, filePath)
+
+        service.notifyDiffbaseChanged()
+        service.isAbsentAtBase(repo, filePath)
+
+        verify(exactly = 2) { executor.fileList(any(), any()) }
     }
 }

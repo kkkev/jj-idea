@@ -51,7 +51,12 @@ class JujutsuAnnotationProviderTest {
     private val repo = mockk<JujutsuRepository>()
     private val commandExecutor = mockk<CommandExecutor>()
     private val file = MockVirtualFile("test.txt")
-    private val provider = JujutsuAnnotationProvider(project, vcs)
+    private val absentNotifications = mutableListOf<String>()
+    private val provider = JujutsuAnnotationProvider(
+        project,
+        vcs,
+        notifyAbsentAtBase = { _, name -> absentNotifications += name }
+    )
 
     @Test
     fun `rethrows ProcessCanceledException instead of wrapping it in VcsException`() {
@@ -219,6 +224,93 @@ class JujutsuAnnotationProviderTest {
         } finally {
             unmockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
         }
+    }
+
+    // jj-idea-bia2: a file added after the diff base makes `jj file annotate -r <base>` fail. The
+    // gutter (jj-idea-zf1j) diffs against an empty base, so annotate must yield an empty
+    // annotation rather than an error.
+    private fun withDiffbaseSetup(block: (base: ChangeId, baseFile: MockVirtualFile) -> Unit) {
+        mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        try {
+            val filePath = LocalFilePath("/repo/file.txt", false)
+            every { file.filePath } returns filePath
+            every { file.contentLocator } returns WorkingCopy
+            every { project.jujutsuRepositoryFor(file) } returns repo
+            val diffbaseService = mockk<DiffbaseService>()
+            every { project.getService(DiffbaseService::class.java) } returns diffbaseService
+            val base = ChangeId("base", "base")
+            every { diffbaseService.resolve(repo) } returns base
+            val baseFile = MockVirtualFile("file.txt")
+            every { repo.getVirtualFile(FileAtVersion(filePath, base)) } returns baseFile
+            every { repo.commandExecutor } returns commandExecutor
+            every { repo.directory } returns MockVirtualFile("repo")
+            every { repo.workingCopy } returns mockk { every { id } returns ChangeId("wc", "wc") }
+            block(base, baseFile)
+        } finally {
+            unmockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
+        }
+    }
+
+    @Test
+    fun `annotate(file) returns a closed empty annotation and notifies when the file is absent at the diff base`() =
+        withDiffbaseSetup { base, baseFile ->
+            every { commandExecutor.annotate(baseFile, base, any()) } returns
+                commandResult(exitCode = 1, stdout = "", stderr = "Error: No such path")
+            every { commandExecutor.fileList(any(), base) } returns commandResult(0, "", "Warning: No matching entries")
+
+            val annotation = provider.annotate(file)
+
+            // Closed => the platform registers no gutter columns, so the Annotate toggle stays unticked.
+            annotation.isClosed shouldBe true
+            annotation.lineCount shouldBe 0
+            absentNotifications shouldBe listOf("file.txt")
+        }
+
+    @Test
+    fun `annotate(file) rethrows when annotate fails but the file does exist at the diff base`() =
+        withDiffbaseSetup { base, baseFile ->
+            every { commandExecutor.annotate(baseFile, base, any()) } returns
+                commandResult(exitCode = 1, stdout = "", stderr = "boom")
+            every { commandExecutor.fileList(any(), base) } returns commandResult(0, "file.txt\n")
+
+            shouldThrow<VcsException> { provider.annotate(file) }
+        }
+
+    @Test
+    fun `annotate(file) does not call jj file list when annotate at the diff base succeeds`() =
+        withDiffbaseSetup { base, baseFile ->
+            every { commandExecutor.annotate(baseFile, base, any()) } returns
+                commandResult(exitCode = 0, stdout = "", stderr = "")
+
+            provider.annotate(file)
+
+            verify(exactly = 0) { commandExecutor.fileList(any(), any()) }
+        }
+
+    // jj-idea-bia2: a diff-base change must close annotations already open in a gutter, since they
+    // were computed against the old base and would be misaligned with the gutter markers.
+    @Test
+    fun `diff base change closes annotations that are open in a gutter`() = withDiffbaseSetup { base, baseFile ->
+        val listenerSlot = slot<Notifier.Listener<Unit>>()
+        val workingCopies = mockk<NotifiableState<Map<String, LogEntry>>> { every { connect(any(), any()) } just Runs }
+        val diffbaseChanged = mockk<Notifier<Unit>> { every { connect(any(), capture(listenerSlot)) } just Runs }
+        val stateModel = mockk<JujutsuStateModel> {
+            every { this@mockk.workingCopies } returns workingCopies
+            every { this@mockk.diffbaseChanged } returns diffbaseChanged
+        }
+        every { project.getService(JujutsuStateModel::class.java) } returns stateModel
+        every { commandExecutor.annotate(baseFile, base, any()) } returns
+            commandResult(exitCode = 0, stdout = "", stderr = "")
+        provider.getFromCache(file) // first cache access subscribes to the diff-base change
+
+        val annotation = provider.annotate(file)
+        annotation.isClosed shouldBe false
+        provider.openAnnotationsForTest() shouldBe listOf(annotation)
+
+        listenerSlot.captured.onEvent(Unit)
+
+        annotation.isClosed shouldBe true
+        provider.openAnnotationsForTest() shouldBe emptyList()
     }
 
     @Test

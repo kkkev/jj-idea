@@ -16,7 +16,6 @@ import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.ContentInfo
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.TrackerContent
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.JujutsuVirtualFile
 import `in`.kkkev.jjidea.vcs.filePath
@@ -84,18 +83,8 @@ class DiffbaseContentLoader : LineStatusTrackerContentLoader {
             // `jj file show` fails when the file doesn't exist at the base (e.g. it was added after
             // it): diff against an empty base so every line shows as added, rather than dropping
             // the base and showing no markers (jj-idea-zf1j / GitHub #133).
-            ?: if (isAbsentAtBase(info)) "" else return null
+            ?: if (info.repo.isAbsentAt(info.filePath, info.base)) "" else return null
         return DiffbaseTrackerContent(StringUtil.convertLineSeparators(text))
-    }
-
-    /**
-     * `jj file list -r <base> <path>` succeeds with empty output when the path is absent, whereas
-     * a genuine failure (jj error) is non-success — so only the former yields an empty base.
-     * Runs only when `file show` already failed: at most one extra jj call per file per reload.
-     */
-    private fun isAbsentAtBase(info: DiffbaseContentInfo): Boolean {
-        val result = info.repo.commandExecutor.fileList(listOf(info.filePath), info.base)
-        return result is CommandExecutor.CommandResult.Success && result.stdout.isBlank()
     }
 
     override fun setLoadedContent(tracker: LocalLineStatusTracker<*>, content: TrackerContent) {
