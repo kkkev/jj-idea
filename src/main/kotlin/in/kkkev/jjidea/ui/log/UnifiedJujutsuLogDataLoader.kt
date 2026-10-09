@@ -214,7 +214,8 @@ class UnifiedJujutsuLogDataLoader(
                         allEntries,
                         allEntries.mapTo(HashSet()) { it.key },
                         allEntries.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
-                        correctionsByRepo
+                        correctionsByRepo,
+                        graphNodes = graphNodes
                     )
                 }
                 readyAtNanos = System.nanoTime()
@@ -395,7 +396,8 @@ class UnifiedJujutsuLogDataLoader(
         val data = if (failure == null) {
             fastMergeAndNotify(delta!!, current!!, correctionsByRepo)
         } else {
-            fullMergeAndNotify(correctionsByRepo)
+            // null = nothing changed since the last notify (jj-idea-43qg): no relayout, no table apply.
+            fullMergeAndNotify(correctionsByRepo) ?: return@withLock
         }
         // jj-idea-2570.8: start fetching the emptiness of any immutable merges that just landed (the template skips
         // it), so the "calculating" rows resolve without waiting to be painted. Only the new rows on an append.
@@ -424,12 +426,21 @@ class UnifiedJujutsuLogDataLoader(
             current.keys + enrichedDelta.mapTo(HashSet()) { it.key },
             minOf(current.minTimestamp, deltaMinTimestamp),
             correctionsByRepo,
-            current.repos + enrichedDelta.mapTo(HashSet()) { it.repo }
+            graphNodes = graphNodes,
+            repos = current.repos + enrichedDelta.mapTo(HashSet()) { it.repo }
         )
         return Data(mergedEntries, graphNodes, lastLimit)
     }
 
-    private fun fullMergeAndNotify(correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>): Data {
+    /**
+     * Recomputes the merged set from every repo's cache. Returns `null` when it is identical to the
+     * last published [snapshot] - the caller then skips the notify entirely (jj-idea-43qg). When only
+     * row contents changed (same keys, same parents, same order: describe, edit, bookmark move), the
+     * previous [MergedSnapshot.graphNodes] are reused and the O(rows x lanes) layout is skipped
+     * (jj-idea-2570.13); layout depends only on `(key, parentKeys)`, and the incremental engine's inputs
+     * are unchanged so it stays a valid base for a later append.
+     */
+    private fun fullMergeAndNotify(correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>): Data? {
         val allEntries = repositories().flatMap { r ->
             val regular = r.logCache.all
             val expanded = expansionEntriesByRepo[r] ?: emptyList()
@@ -439,12 +450,29 @@ class UnifiedJujutsuLogDataLoader(
             }
         }
         val merged = logOrder(allEntries.distinctBy { it.key })
-        val graphNodes = graphBuilder.buildGraph(merged)
+        val previous = snapshot
+        if (previous != null && previous.entries == merged) {
+            snapshot = MergedSnapshot(
+                previous.entries,
+                previous.keys,
+                previous.minTimestamp,
+                correctionsByRepo,
+                graphNodes = previous.graphNodes
+            )
+            return null
+        }
+        val graphNodes = if (previous != null && sameTopology(previous.entries, merged)) {
+            previous.graphNodes
+        } else {
+            log.debug("log merge: relayout (${topologyDifference(previous?.entries, merged)})")
+            graphBuilder.buildGraph(merged)
+        }
         snapshot = MergedSnapshot(
             merged,
             merged.mapTo(HashSet()) { it.key },
             merged.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
-            correctionsByRepo
+            correctionsByRepo,
+            graphNodes = graphNodes
         )
         return Data(merged, graphNodes, lastLimit)
     }
@@ -853,8 +881,24 @@ internal class MergedSnapshot(
     val keys: Set<ChangeKey>,
     val minTimestamp: Instant,
     val correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>,
-    val repos: Set<JujutsuRepository> = entries.mapTo(HashSet()) { it.repo }
+    val repos: Set<JujutsuRepository> = entries.mapTo(HashSet()) { it.repo },
+    /** The layout published with [entries]; reused when a refresh leaves the topology unchanged. */
+    val graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
 )
+
+/** Why [old] and [new] lay out differently, for the relayout debug log: sizes and the first differing row. */
+internal fun topologyDifference(old: List<LogEntry>?, new: List<LogEntry>): String {
+    if (old == null) return "no previous snapshot"
+    val i = (0 until minOf(old.size, new.size)).firstOrNull {
+        old[it].key != new[it].key || old[it].parentKeys != new[it].parentKeys
+    }
+    return "rows ${old.size} -> ${new.size}, first difference at " +
+        (i?.let { "row $it: ${old[it].id.short} vs ${new[it].id.short}" } ?: "none within common prefix")
+}
+
+/** Whether [a] and [b] lay out identically: same keys and parent keys in the same order. O(rows). */
+internal fun sameTopology(a: List<LogEntry>, b: List<LogEntry>): Boolean =
+    a.size == b.size && a.indices.all { a[it].key == b[it].key && a[it].parentKeys == b[it].parentKeys }
 
 /** The timestamp [logOrder] interleaves repositories by. */
 internal fun LogEntry.sortTimestamp(): Instant = authorTimestamp ?: committerTimestamp ?: Instant.DISTANT_PAST

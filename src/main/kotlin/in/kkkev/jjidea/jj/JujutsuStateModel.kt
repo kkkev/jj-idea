@@ -491,17 +491,16 @@ class JujutsuStateModel(private val project: Project) : Disposable {
 
                     // An external jj operation (e.g. terminal `jj bookmark create`) rewrites the
                     // operation head under .jj/repo/op_heads/. We refresh on it but never mark .jj/ files dirty.
-                    val hasExternalJjOp = events.any { it.file?.let { f -> isOpHeadsChange(f) } == true }
+                    val files = events.map { it.file }
 
                     // A previously-unreadable repo's .jj/repo/ directory changed (e.g. store/ was
                     // restored) — recheck readability rather than waiting for the user to notice.
-                    val hasRepoRepair = events.any { it.file?.let { f -> isRepoRootChange(f) } == true }
 
                     // jj-idea-2570.12: a plain working-copy file change does NOT reload repo state or the log. It only
                     // dirties the file (above), so getChanges runs `jj status`, which snapshots; if a tracked file
                     // really changed that records a new operation, which arrives here as an op_heads change (or via
                     // checkOperationHeads where the watcher can't deliver it). Ignored files record no operation.
-                    if (hasExternalJjOp || hasRepoRepair) {
+                    if (triggersRepositoryRefresh(files, ::isOpHeadsChange, ::isRepoRootChange)) {
                         if (refreshSuppression.get() > 0) {
                             log.info("File changes detected but refresh suppressed, skipping")
                             return
@@ -775,3 +774,14 @@ fun JujutsuRepository.invalidate(
         stateModel.changeSelection.notify(ChangeKey(this, select))
     }
 }
+
+/**
+ * Whether a batch of VFS events (their [files]) should reload repository state and the log (jj-idea-2570.12):
+ * only an op_heads change (an external or snapshotting jj operation) or a repo-root repair. A plain
+ * working-copy file - ignored or not - never does. O([files]) predicate calls.
+ */
+internal fun triggersRepositoryRefresh(
+    files: List<VirtualFile?>,
+    isOpHeadsChange: (VirtualFile) -> Boolean,
+    isRepoRootChange: (VirtualFile) -> Boolean
+): Boolean = files.any { f -> f != null && (isOpHeadsChange(f) || isRepoRootChange(f)) }

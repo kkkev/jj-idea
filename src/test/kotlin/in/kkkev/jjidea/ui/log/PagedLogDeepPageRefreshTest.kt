@@ -68,6 +68,9 @@ class PagedLogDeepPageRefreshTest {
         /** Full change ids whose entries are currently served with `hasConflict = true`. */
         val conflicted = CopyOnWriteArraySet<String>()
 
+        /** Full change ids currently served with a rewritten commit id (describe/edit: same change, same parents). */
+        val rewritten = CopyOnWriteArraySet<String>()
+
         override fun getLogHeads(revset: Revset): Result<List<ChangeId>> = Result.success(listOf(chain.first().id))
 
         override fun getLog(
@@ -81,7 +84,14 @@ class PagedLogDeepPageRefreshTest {
                 chain.indexOfFirst { it.id.full == id }.takeIf { it >= 0 }
             }.minOrNull() ?: return Result.success(emptyList())
             val page = chain.drop(startIndex).take(limit ?: chain.size)
-            return Result.success(page.map { it.copy(hasConflict = it.id.full in conflicted) })
+            return Result.success(
+                page.map {
+                    it.copy(
+                        hasConflict = it.id.full in conflicted,
+                        commitId = if (it.id.full in rewritten) CommitId("rewritten-${it.id.full}") else it.commitId
+                    )
+                }
+            )
         }
     }
 
@@ -116,12 +126,18 @@ class PagedLogDeepPageRefreshTest {
         val stored = CopyOnWriteArrayList<List<LogEntry>>()
         every { repo.logCache } returns mockk<LogCache>(relaxed = true) {
             every { store(any()) } answers { stored.add(firstArg<List<LogEntry>>()) }
+            // The full merge re-reads the cache, so it must serve what was last stored.
+            every { all } answers { stored.lastOrNull() ?: emptyList() }
         }
         return FakeRepo(repo, logService, stored)
     }
 
+    /** Every [UnifiedJujutsuLogDataLoader.Data] the loader has handed to its panel, in order. */
+    private val applied = CopyOnWriteArrayList<UnifiedJujutsuLogDataLoader.Data>()
+
     private fun loader(repo: JujutsuRepository): UnifiedJujutsuLogDataLoader {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
+        every { panel.onDataLoaded(any()) } answers { applied.add(firstArg()) }
         return UnifiedJujutsuLogDataLoader(projectFx.get(), { listOf(repo) }, panel)
             // jj-idea-2570.5: this test counts/orders fetches itself - no background trickle
             .also {
@@ -170,6 +186,46 @@ class PagedLogDeepPageRefreshTest {
 
         fake.stored.last().size shouldBe 20 // scroll depth preserved
         fake.hasConflictInCurrentView(DEEP_ROW) shouldBe false
+    }
+
+    // jj-idea-43qg / jj-idea-2570.13: a post-write refresh must not relayout when nothing about the
+    // topology changed. Operation count: layouts per refresh = 0 for no-op and content-only changes.
+
+    @Test
+    fun `refresh with nothing changed applies nothing and lays nothing out`() {
+        val fake = fakeChainRepo("a", length = 30)
+        val log = loader(fake.repo)
+        log.loadCommits()
+        drainBackgroundLoads(1_000)
+        log.loadMore()
+        drainBackgroundLoads(1_000)
+        val appliedBefore = applied.size
+
+        log.refresh()
+        drainBackgroundLoads(1_000)
+
+        applied.size shouldBe appliedBefore
+    }
+
+    @Test
+    fun `refresh after a content-only change reuses the graph nodes instead of relaying out`() {
+        val fake = fakeChainRepo("a", length = 30)
+        val log = loader(fake.repo)
+        log.loadCommits()
+        drainBackgroundLoads(1_000)
+        log.loadMore()
+        drainBackgroundLoads(1_000)
+        val before = applied.last()
+        val appliedBefore = applied.size
+
+        fake.logService.rewritten += "a-2"
+        log.refresh()
+        drainBackgroundLoads(1_000)
+
+        applied.size shouldBe appliedBefore + 1
+        val after = applied.last()
+        after.entries.single { it.id.full == "a-2" }.commitId shouldBe CommitId("rewritten-a-2")
+        (after.graphNodes === before.graphNodes) shouldBe true
     }
 
     private companion object {
