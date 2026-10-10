@@ -649,10 +649,15 @@ version's heading:
 ### Minting preview access codes
 
 Preview features (`preview/PreviewFeature.kt`) are gated behind a `JJP1-...` access code a tester
-enters in Settings. Minting one needs no build or release:
+enters in Settings. Nothing is in preview right now (the last gated feature, paged log loading,
+graduated in jj-idea-2570.4), so the Settings group is hidden and the enum is empty; add an entry
+to `PreviewFeature` to gate the next one, using a bit that has never been used (see the retired-bit
+comments there). Gated work records its changelog entries in `docs/preview-changelog.md` (recreate
+it, and re-add it to the changelog gate in `.github/workflows/build.yml`) until it graduates -
+see `docs/design/graduating-preview-features.md`. Minting a code needs no build or release:
 
 ```bash
-./gradlew previewCode --args="mint --features pagedLogLoad --for someUser --ref 'GitHub #123'"
+./gradlew previewCode --args="mint --features <featureId> --for someUser --ref 'GitHub #123'"
 ./gradlew previewCode --args="inspect JJP1-ABCD-EFGH-JKMN-PQRS"
 ```
 

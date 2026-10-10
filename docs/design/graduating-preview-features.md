@@ -5,6 +5,13 @@ Single source of truth for taking a `PreviewFeature` out of preview. Every "Grad
 points here; per-feature specifics stay in the bead. Background on the gating layer itself:
 [preview-gating-and-dnd-sequencing.md](preview-gating-and-dnd-sequencing.md).
 
+## Status
+
+All three features (drag-and-drop, paged log, conflict gutter) have graduated; `PreviewFeature` is
+empty and `docs/preview-changelog.md` is retired. The access-code machinery is kept for the next
+gated feature and is tested through the `PreviewFeatureSpec` seam (`TestPreviewFeature` in test
+sources), since the enum has no entries to exercise it with.
+
 ## Plan
 
 Graduate **all** preview features in one release and cut it as a **minor** bump:

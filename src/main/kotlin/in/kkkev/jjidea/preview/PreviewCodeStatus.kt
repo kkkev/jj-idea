@@ -12,12 +12,12 @@ import java.time.LocalDate
  */
 sealed interface PreviewCodeStatus {
     /** Features this status unlocks - empty for everything but [Accepted]. */
-    val features: Set<PreviewFeature> get() = emptySet()
+    val features: Set<PreviewFeatureSpec> get() = emptySet()
 
     /** Nothing entered. */
     data object Empty : PreviewCodeStatus
 
-    data class Accepted(override val features: Set<PreviewFeature>, val expiry: LocalDate?) : PreviewCodeStatus
+    data class Accepted(override val features: Set<PreviewFeatureSpec>, val expiry: LocalDate?) : PreviewCodeStatus
 
     data class Expired(val lastValidDate: LocalDate) : PreviewCodeStatus
 

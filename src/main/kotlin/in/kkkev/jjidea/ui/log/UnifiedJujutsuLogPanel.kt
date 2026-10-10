@@ -269,7 +269,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         // before the first load, and to replace any graph from a previous load.
         refreshDisplayedGraph()
         updateRootFilterVisibility()
-        updateStatusBar(newData.entries.size, newData.limit)
+        updateStatusBar(newData.entries.size, newData.limit, newData.paged)
         // jj-idea-vqpn (GitHub #116): a narrow revset filter over a deep/paged history can match
         // commits outside the currently loaded window - say so explicitly rather than letting a
         // short or empty filtered graph look like the filter silently found nothing.

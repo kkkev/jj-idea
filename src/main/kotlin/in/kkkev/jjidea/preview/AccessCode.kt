@@ -40,24 +40,32 @@ object AccessCode {
     private var lastCode: String? = null
 
     @Volatile
+    private var lastCatalog: Collection<PreviewFeatureSpec>? = null
+
+    @Volatile
     private var lastGrant: PreviewCode.Grant = PreviewCode.Grant.Invalid
 
     /** What [code] currently grants. See [PreviewCode.Grant]. */
-    fun grant(code: String, today: LocalDate = LocalDate.now()): PreviewCode.Grant {
+    fun grant(
+        code: String,
+        today: LocalDate = LocalDate.now(),
+        catalog: Collection<PreviewFeatureSpec> = PreviewFeature.entries
+    ): PreviewCode.Grant {
         val normalised = code.trim()
         if (normalised.isEmpty()) return PreviewCode.Grant.Invalid
 
         if (normalised.startsWith("JJP1", ignoreCase = true)) {
-            if (normalised == lastCode) return lastGrant
+            if (normalised == lastCode && catalog == lastCatalog) return lastGrant
             val key = signingKey ?: return PreviewCode.Grant.Invalid
-            val result = PreviewCode.verify(normalised, key, today, revokedSerials)
+            val result = PreviewCode.verify(normalised, key, today, revokedSerials, catalog)
             lastCode = normalised
+            lastCatalog = catalog
             lastGrant = result
             return result
         }
 
         return if (hash(normalise(normalised)) in legacyHashes) {
-            PreviewCode.Grant.Valid(PreviewFeature.entries.toSet(), expiry = null, serial = -1)
+            PreviewCode.Grant.Valid(catalog.toSet(), expiry = null, serial = -1)
         } else {
             PreviewCode.Grant.Invalid
         }
@@ -67,10 +75,14 @@ object AccessCode {
     val canVerifySignedCodes: Boolean get() = signingKey != null
 
     /** What the Settings field should say about [code] as typed - see [PreviewCodeStatus]. */
-    fun status(code: String, today: LocalDate = LocalDate.now()): PreviewCodeStatus {
+    fun status(
+        code: String,
+        today: LocalDate = LocalDate.now(),
+        catalog: Collection<PreviewFeatureSpec> = PreviewFeature.entries
+    ): PreviewCodeStatus {
         val trimmed = code.trim()
         if (trimmed.isEmpty()) return PreviewCodeStatus.Empty
-        return when (val grant = grant(trimmed, today)) {
+        return when (val grant = grant(trimmed, today, catalog)) {
             is PreviewCode.Grant.Valid -> PreviewCodeStatus.Accepted(grant.features, grant.expiry)
             is PreviewCode.Grant.Expired -> PreviewCodeStatus.Expired(grant.lastValidDate)
             is PreviewCode.Grant.Revoked -> PreviewCodeStatus.Revoked
@@ -84,8 +96,11 @@ object AccessCode {
     }
 
     /** The set of [PreviewFeature]s [code] currently grants - empty if invalid, expired or revoked. */
-    fun grantedFeatures(code: String, today: LocalDate = LocalDate.now()): Set<PreviewFeature> =
-        (grant(code, today) as? PreviewCode.Grant.Valid)?.features ?: emptySet()
+    fun grantedFeatures(
+        code: String,
+        today: LocalDate = LocalDate.now(),
+        catalog: Collection<PreviewFeatureSpec> = PreviewFeature.entries
+    ): Set<PreviewFeatureSpec> = (grant(code, today, catalog) as? PreviewCode.Grant.Valid)?.features ?: emptySet()
 
     private fun normalise(code: String): String = code.trim().lowercase().replace(Regex("\\s+"), "")
 

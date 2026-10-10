@@ -19,13 +19,10 @@ import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
-
-private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
 
 /**
  * jj-idea-2570.5 operation-count tests for the paged log's idle trickle: each
@@ -40,14 +37,8 @@ class PagedLogTrickleTest {
     private val projectFx = projectFixture()
     private val pageSize = 10
 
-    @BeforeEach
-    fun enablePaging() {
-        System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-    }
-
     @AfterEach
     fun cleanup() {
-        System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
         drainBackgroundLoads(2_000)
     }
 
@@ -142,16 +133,6 @@ class PagedLogTrickleTest {
         val log = loaded(fake)
         val delay = log.trickleTick()
         (delay!! in TricklePolicy.MIN_DELAY_MS..TricklePolicy.MAX_DELAY_MS) shouldBe true
-    }
-
-    @Test
-    fun `paging off means the trickle does nothing`() {
-        System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
-        val fake = fakeRepo(length = 100)
-        val log = loaded(fake)
-        val afterLoad = fake.calls.get()
-        log.trickleTick() shouldBe null
-        fake.calls.get() shouldBe afterLoad
     }
 
     @Test

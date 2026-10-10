@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 This release brings some big new features:
 - Drag-and-drop support: rebase, duplicate, move bookmarks and tags, and squash or split files by dragging them in the log, the bookmarks panel and the changes tree.
+- Faster large repositories: the log now loads 500 changes at a time as you scroll instead of re-reading the whole configured history after every change, so New Change, Describe, Edit and other operations show up in about the cost of one page, however much history there is. ([#69](https://github.com/kkkev/jj-idea/issues/69))
 - In-editor conflict actions: embrace Jujutsu's first-class conflict model by editing your conflicts however you like, in any order you like, alongside edits, using a new in-editor conflict resolution experience with gutter and toolbar-initiated actions. 
 
 ### Added
@@ -24,6 +25,7 @@ This release brings some big new features:
 - **Merge descriptions**: **New Change...** on two bookmarked changes now prefills a description such as `Merge branch 'feature' into main` (the older bookmark is the destination), with an **Other phrasings** link for the flipped direction or `Merge branches 'a' and 'b'`. The wording is configurable under Settings → Jujutsu → General → Merge description. ([#103](https://github.com/kkkev/jj-idea/issues/103))
 
 ### Changed
+- **Paged log loading** is now on for everyone (it was an early-access preview). Scrolling loads more history on demand, and older history keeps loading quietly in the background when the log is idle. The "Showing N changes — scroll for more" strip is gone, and scrolling to load more no longer jumps the view back to the selection. The "Changes to show" setting is now **Fallback change limit** and only applies when paging isn't available (an unusual log revset, or a repository with a very large number of branch heads). The Preview features section in Settings is hidden while nothing is in preview. ([#69](https://github.com/kkkev/jj-idea/issues/69))
 - Log pages load much faster on merge-heavy repositories (e.g. git/git: about 4 s down to about 0.3 s per 500-row page). Whether an immutable merge commit is empty is now worked out in the background: its row briefly shows a greyed "(…)" and then "(empty)" or nothing.
 - Right-clicking a change-id link (e.g. a parent in the commit details) now shows the same menu as right-clicking that commit's row, including **New Change**, **Edit**, shortcut hints, and so on, always acting on the linked commit. Right-clicking a bookmark, tag or email in the details pane now opens the same highlighted-default popup as in the log table.
 - **Resolve Conflicts** now opens the conflicted file in the editor, with the caret on its first conflict and the conflict banner showing, instead of the three-way merge tool. This applies to the Merge Conflicts node link, the toolbar button, the log and file context menus, and double-clicking a conflicted file in the Working Copy tree; only the first conflicted file opens. The merge tool is still one click away as **Open Merge Tool…** at each of these places.
@@ -31,6 +33,7 @@ This release brings some big new features:
 - **Long lines in the log graph** (50 rows or more) now show as a short line with an arrow at each end instead of running the whole way, and the lane in between is freed for other branches, so graphs with very long edges stay narrow. Hover either arrow to highlight the whole line, and click it to jump to the other end.
 
 ### Fixed
+- A multi-row selection in the log now survives refreshes, background history loading and filter changes instead of collapsing to one row or nothing; rows that no longer exist are dropped and the rest stay selected. ([#145](https://github.com/kkkev/jj-idea/issues/145))
 - A long jj error shown below the log (e.g. a stale working copy with a revset filter active) no longer stops you shrinking the log window; it is truncated to one line, with the full message in a tooltip. ([#142](https://github.com/kkkev/jj-idea/issues/142))
 - The bookmarks panel no longer freezes the IDE for seconds when refreshing a repository with many bookmarks and tags; restoring which groups are expanded is now a single bulk operation instead of one per group. ([#141](https://github.com/kkkev/jj-idea/issues/141))
 - **Annotate** no longer fails with an error on a file that did not exist at the configured diff base; it now says there is nothing to annotate instead.

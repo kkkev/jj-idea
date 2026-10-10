@@ -2,7 +2,10 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.ide.DataManager
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -21,19 +24,20 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.IssueLinkifier
 import `in`.kkkev.jjidea.ui.components.installIconAwareTableTooltip
 import `in`.kkkev.jjidea.ui.log.JujutsuLogContextMenuActions.clickActionGroup
+import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel.Companion.COLUMN_ROOT_GUTTER
+import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel.Companion.COLUMN_TRAILING_SPACER
+import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel.Companion.columnKey
 import kotlinx.datetime.Instant
-import org.apache.commons.lang3.ArrayUtils.addAll
-import java.awt.*
+import java.awt.Component
+import java.awt.Cursor
+import java.awt.Point
+import java.awt.Rectangle
 import java.awt.event.*
 import java.awt.font.FontRenderContext
 import javax.swing.JTable
 import javax.swing.JViewport
 import javax.swing.ListSelectionModel
-import javax.swing.event.ChangeEvent
-import javax.swing.event.ChangeListener
-import javax.swing.event.ListSelectionEvent
-import javax.swing.event.TableColumnModelEvent
-import javax.swing.event.TableColumnModelListener
+import javax.swing.event.*
 import javax.swing.table.AbstractTableModel
 
 /**
@@ -191,7 +195,7 @@ class JujutsuLogTable(
     private fun updateGutterColumnWidth() {
         for (i in 0 until columnModel.columnCount) {
             val column = columnModel.getColumn(i)
-            if (column.modelIndex == JujutsuLogTableModel.COLUMN_ROOT_GUTTER) {
+            if (column.modelIndex == COLUMN_ROOT_GUTTER) {
                 val newWidth = if (isRootGutterExpanded) gutterExpandedWidth else gutterCollapsedWidth
                 column.minWidth = newWidth
                 column.maxWidth = newWidth
@@ -220,10 +224,9 @@ class JujutsuLogTable(
         // waiting in InvisibleResizableHeader.canMoveOrResizeColumn.
         setTableHeader(
             object : InvisibleResizableHeader() {
-                override fun canMoveOrResizeColumn(modelIndex: Int) =
-                    super.canMoveOrResizeColumn(modelIndex) &&
-                        modelIndex != JujutsuLogTableModel.COLUMN_ROOT_GUTTER &&
-                        modelIndex != JujutsuLogTableModel.COLUMN_TRAILING_SPACER
+                override fun canMoveOrResizeColumn(modelIndex: Int) = super.canMoveOrResizeColumn(modelIndex) &&
+                    modelIndex != COLUMN_ROOT_GUTTER &&
+                    modelIndex != COLUMN_TRAILING_SPACER
             }
         )
         tableHeader.resizingAllowed = true
@@ -312,7 +315,7 @@ class JujutsuLogTable(
                     val viewColumn = columnAtPoint(e.point)
                     if (viewColumn >= 0) {
                         val modelColumn = convertColumnIndexToModel(viewColumn)
-                        if (modelColumn == JujutsuLogTableModel.COLUMN_ROOT_GUTTER) {
+                        if (modelColumn == COLUMN_ROOT_GUTTER) {
                             toggleRootGutter()
                             e.consume()
                         }
@@ -389,7 +392,7 @@ class JujutsuLogTable(
                 if (graphEdgeHoverAt(e.point)?.navigable == true) return false
                 val viewColumn = columnAtPoint(e.point)
                 if (viewColumn >= 0 &&
-                    convertColumnIndexToModel(viewColumn) == JujutsuLogTableModel.COLUMN_ROOT_GUTTER
+                    convertColumnIndexToModel(viewColumn) == COLUMN_ROOT_GUTTER
                 ) {
                     return false
                 }
@@ -437,9 +440,9 @@ class JujutsuLogTable(
         // CommitTablePanel's deferred, dedup'd selection listener rather than being fought here -
         // see the comment on the listener in CommitTablePanel.kt.
         logModel.withSelectionPreserved = { rebuild ->
-            val key = selectedEntry?.key
+            val snapshot = captureSelection()
             rebuild()
-            if (key != null && !selectEntry(key.repo, key.revision)) {
+            if (snapshot != null && !restoreSelection(snapshot, scrollIntoView = true)) {
                 clearSelection()
             }
         }
@@ -654,8 +657,10 @@ class JujutsuLogTable(
             cursor = when {
                 newHoveredEdge?.navigable == true && newHoveredEdge.direction == EdgeDirection.UP ->
                     Cursor.getPredefinedCursor(Cursor.N_RESIZE_CURSOR)
+
                 newHoveredEdge?.navigable == true ->
                     Cursor.getPredefinedCursor(Cursor.S_RESIZE_CURSOR)
+
                 showsHoverCue -> Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
                 else -> Cursor.getDefaultCursor()
             }
@@ -761,7 +766,10 @@ class JujutsuLogTable(
         // even though pendingSelectionIsExplicit lingers from an earlier requestSelection() (it
         // would otherwise yank the viewport back on every later page load).
         val carried = pendingSelection == null
-        if (carried) {
+        // A multi-row selection is carried as a whole (GitHub #145): pendingSelection holds only one
+        // key, so it can't. It is restored below, silently dropping rows that no longer exist.
+        val carriedMulti = if (carried) captureSelection()?.takeIf { it.keys.size > 1 } else null
+        if (carried && carriedMulti == null) {
             selectedEntry?.let {
                 pendingSelection = it.key
             }
@@ -769,6 +777,7 @@ class JujutsuLogTable(
         val anchor = captureViewportAnchor()
         logModel.setEntries(entries)
         restoreViewportAnchor(anchor)
+        if (carriedMulti != null) restoreSelection(carriedMulti, scrollIntoView = false)
         pendingSelection?.let {
             if (selectEntry(it.repo, it.revision, scrollIntoView = pendingSelectionIsExplicit && !carried)) {
                 pendingSelection = null
@@ -786,6 +795,58 @@ class JujutsuLogTable(
                 onSelectionExpansionNeeded?.invoke(it)
             }
         }
+    }
+
+    /** The selected rows by identity, plus which one is the lead and which the anchor (for Shift-extend). */
+    private class SelectionSnapshot(val keys: List<ChangeKey>, val lead: ChangeKey?, val anchor: ChangeKey?)
+
+    /**
+     * Captures the whole selection by entry identity, so it can be put back after the model is
+     * rebuilt (a refresh page landing, a filter change) - a raw row index would point at the wrong
+     * commit once rows shift. `null` when nothing is selected. O(selected rows).
+     */
+    private fun captureSelection(): SelectionSnapshot? {
+        fun keyAt(row: Int) = if (row in 0 until rowCount) logModel.getEntry(convertRowIndexToModel(row))?.key else null
+
+        return selectedRows.takeIf { it.isNotEmpty() }
+            ?.toList()
+            ?.mapNotNull(::keyAt)
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { keys ->
+                SelectionSnapshot(
+                    keys,
+                    keyAt(selectionModel.leadSelectionIndex),
+                    keyAt(selectionModel.anchorSelectionIndex)
+                )
+            }
+    }
+
+    /**
+     * Reselects every entry in [snapshot] that still exists, in one batched selection change so
+     * listeners see a single update, and restores the anchor/lead. Rows that are gone (abandoned,
+     * filtered out) are dropped silently. Returns false if none survived. A single surviving row
+     * goes through [selectEntry], keeping its scroll behaviour. O(selected) map lookups.
+     */
+    private fun restoreSelection(snapshot: SelectionSnapshot, scrollIntoView: Boolean): Boolean {
+        val survivors = snapshot.keys.filter { logModel.rowOf(it) != null }
+        if (survivors.isEmpty()) return false
+        if (survivors.size == 1) {
+            val key = survivors.single()
+            return selectEntry(key.repo, key.revision, scrollIntoView)
+        }
+        selectionModel.valueIsAdjusting = true
+        try {
+            clearSelection()
+            // The lead is added last so addSelectionInterval leaves it as both lead and anchor;
+            // the real anchor is then put back without touching the selected set.
+            val ordered =
+                survivors.filter { it != snapshot.lead } + listOfNotNull(snapshot.lead?.takeIf { it in survivors })
+            for (key in ordered) logModel.rowOf(key)?.let { addRowSelectionInterval(it, it) }
+            snapshot.anchor?.let { key -> logModel.rowOf(key) }?.let { selectionModel.anchorSelectionIndex = it }
+        } finally {
+            selectionModel.valueIsAdjusting = false
+        }
+        return true
     }
 
     /**
@@ -920,7 +981,7 @@ class JujutsuLogTable(
         if (storage != null) {
             for (i in 0 until columnModel.columnCount) {
                 val column = columnModel.getColumn(i)
-                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> storage[key] = column.preferredWidth }
+                columnKey(column.modelIndex)?.let { key -> storage[key] = column.preferredWidth }
             }
             onColumnWidthsSaved?.invoke()
         } else {
@@ -928,7 +989,7 @@ class JujutsuLogTable(
             val widths = settings.state.columnWidths.toMutableMap()
             for (i in 0 until columnModel.columnCount) {
                 val column = columnModel.getColumn(i)
-                JujutsuLogTableModel.columnKey(column.modelIndex)?.let { key -> widths[key] = column.preferredWidth }
+                columnKey(column.modelIndex)?.let { key -> widths[key] = column.preferredWidth }
             }
             settings.state.columnWidths = widths
         }
@@ -945,7 +1006,7 @@ class JujutsuLogTable(
         if (savedWidths.isNotEmpty()) {
             for (i in 0 until columnModel.columnCount) {
                 val column = columnModel.getColumn(i)
-                val key = JujutsuLogTableModel.columnKey(column.modelIndex) ?: continue
+                val key = columnKey(column.modelIndex) ?: continue
                 val savedWidth = savedWidths[key]
                 if (savedWidth != null && savedWidth > 0) {
                     column.preferredWidth = savedWidth
@@ -1004,14 +1065,11 @@ class JujutsuLogTable(
         // Root gutter and the trailing spacer are both fixed-width - not columns this layout shrinks.
         val pinnedWidth = columns
             .filter {
-                it.modelIndex == JujutsuLogTableModel.COLUMN_ROOT_GUTTER ||
-                    it.modelIndex == JujutsuLogTableModel.COLUMN_TRAILING_SPACER
+                it.modelIndex == COLUMN_ROOT_GUTTER || it.modelIndex == COLUMN_TRAILING_SPACER
             }
             .sumOf { it.width }
         val fixedColumns = columns.filter {
-            it != descColumn &&
-                it.modelIndex != JujutsuLogTableModel.COLUMN_ROOT_GUTTER &&
-                it.modelIndex != JujutsuLogTableModel.COLUMN_TRAILING_SPACER
+            it != descColumn && it.modelIndex != COLUMN_ROOT_GUTTER && it.modelIndex != COLUMN_TRAILING_SPACER
         }
 
         val layout = fitColumnWidths(

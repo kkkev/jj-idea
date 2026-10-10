@@ -25,4 +25,11 @@ class PreviewFeatureTest {
             (bit in 0..6) shouldBe true
         }
     }
+
+    @Test
+    fun `retired bits are never reused`() {
+        // 0 = DRAG_AND_DROP, 1 = PAGED_LOG_LOAD, 2 = CONFLICT_GUTTER (all graduated). An old,
+        // still-valid access code could otherwise grant whatever new feature claims the bit.
+        PreviewFeature.entries.map { it.bit }.filter { it in 0..2 } shouldBe emptyList()
+    }
 }

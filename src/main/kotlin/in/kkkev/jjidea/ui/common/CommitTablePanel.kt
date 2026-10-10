@@ -23,8 +23,6 @@ import `in`.kkkev.jjidea.actions.LazyActionById
 import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.parseRebaseSourceMode
 import `in`.kkkev.jjidea.jj.stateModel
-import `in`.kkkev.jjidea.preview.PreviewEntitlement
-import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.LogSearchField
@@ -672,7 +670,7 @@ abstract class CommitTablePanel<D>(
 
     /**
      * Update the status bar to indicate when the log is truncated by a hard limit and offer a
-     * way to raise it. With jj-idea-2c8k's paged loading enabled, more history is always just a
+     * way to raise it. With jj-idea-2c8k's paged loading active ([paged]), more history is always just a
      * scroll away, so there is nothing useful to say here - the scrollbar itself already
      * communicates "there's more," and a permanent "showing N changes" strip below the table was
      * found to be pointless noise in manual testing; the status bar stays hidden entirely in that
@@ -680,8 +678,8 @@ abstract class CommitTablePanel<D>(
      * see [in.kkkev.jjidea.ui.log.PagedLogWindow]), which is exactly why the truncation message
      * below (written for the non-paged, hard-limit case) would be actively wrong there.
      */
-    protected fun updateStatusBar(entryCount: Int, limit: Int) {
-        if (PreviewEntitlement.getInstance().isEnabled(PreviewFeature.PAGED_LOG_LOAD)) {
+    protected fun updateStatusBar(entryCount: Int, limit: Int, paged: Boolean) {
+        if (paged) {
             statusBar.isVisible = false
             return
         }

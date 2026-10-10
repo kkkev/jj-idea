@@ -43,7 +43,7 @@ object PreviewCode {
     /** Result of decoding and verifying a code string. */
     sealed interface Grant {
         /** A syntactically and cryptographically valid, currently-active grant. */
-        data class Valid(val features: Set<PreviewFeature>, val expiry: LocalDate?, val serial: Int) : Grant
+        data class Valid(val features: Set<PreviewFeatureSpec>, val expiry: LocalDate?, val serial: Int) : Grant
 
         /** Valid and well-formed, but its expiry date has passed. */
         data class Expired(val lastValidDate: LocalDate) : Grant
@@ -63,7 +63,7 @@ object PreviewCode {
      * feature (including ones added after minting) regardless of [features].
      */
     fun encode(
-        features: Set<PreviewFeature>,
+        features: Set<PreviewFeatureSpec>,
         expiryMonth: Int,
         serial: Int,
         key: ByteArray,
@@ -85,13 +85,15 @@ object PreviewCode {
 
     /**
      * Decodes and verifies [code] against [key], returning what it grants as of [today].
-     * [revokedSerials] is checked only for a structurally/cryptographically valid code.
+     * [revokedSerials] is checked only for a structurally/cryptographically valid code. [catalog] is the
+     * set of features a bit can resolve to (all of [PreviewFeature] outside tests).
      */
     fun verify(
         code: String,
         key: ByteArray,
         today: LocalDate = LocalDate.now(),
-        revokedSerials: Set<Int> = emptySet()
+        revokedSerials: Set<Int> = emptySet(),
+        catalog: Collection<PreviewFeatureSpec> = PreviewFeature.entries
     ): Grant {
         val normalised = normalise(code)
         if (!normalised.startsWith(PREFIX)) return Grant.Invalid
@@ -118,9 +120,9 @@ object PreviewCode {
         if (expiryDate != null && today.isAfter(expiryDate)) return Grant.Expired(expiryDate)
 
         val features = if ((featureByte shr ALL_BIT) and 1 == 1) {
-            PreviewFeature.entries.toSet()
+            catalog.toSet()
         } else {
-            PreviewFeature.entries.filter { (featureByte shr it.bit) and 1 == 1 }.toSet()
+            catalog.filter { (featureByte shr it.bit) and 1 == 1 }.toSet()
         }
         return Grant.Valid(features, expiryDate, serial)
     }

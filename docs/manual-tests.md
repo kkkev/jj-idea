@@ -57,7 +57,7 @@ directory as a project in the plugin IDE (`./gradlew runIde`).
 | FX-CONFLICT | `scripts/fixtures/fx-conflict.sh [target-dir] [marker-style] [wc-position]` | A content conflict on `file.txt` (change A rebased onto change B); `marker-style` is `git` (default), `snapshot`, or `diff` — rerun with a different style against the same repo to test all three. `wc-position` is `conflicted` (default, working copy on the conflict) or `sibling` (working copy on change B, a clean commit unrelated to the conflict — GitHub #119 / jj-idea-ct7e's repro position) |
 | FX-MD-CONFLICT | `scripts/fixtures/fx-md-conflict.sh [target-dir]` | A modify/delete conflict on `a.txt` — one side deletes the file entirely, so "accept" on that side must remove it from disk, not leave an empty file; a different case from FX-CONFLICT's content conflict |
 | FX-STRESS | `scripts/fixtures/fx-stress.sh [target-dir]` | A ~1084-commit repo with ~26 concurrent heads (main trunk, 20 short feature branches, 5 long branches, a 200-commit deep-branch, an octopus-merge, a hotfix/* cluster), for log-graph/filter stress testing. Reused as `jj-stress-test` by MT-LOG-GRAPH's stress bullet and its "Graph layout under filtering" subsection, and by MT-LOG-FILTER's Reference filter fixture — don't build a separate throwaway multi-branch repo for those, this one already has far more lanes than any of them need. Two env knobs for larger-scale work (jj-idea-2c8k): `SCALE=<n>` multiplies the main trunk / deep-branch / long-branch lengths (e.g. `SCALE=6` for ~7,000 commits, matching GitHub #69's repo size), and `WITH_REMOTE=1` pushes `main` and a few branch bookmarks to a bare repo created alongside the target, so `remote_bookmarks()` is non-empty — a plain `jj git init` leaves it empty, which makes the log template's `hasPushedAncestor` predicate (`descendants(::remote_bookmarks())`) trivially cheap and would understate its real cost |
-| FX-SCALE-SET | `scripts/fixtures/fx-scale-set.sh [target-dir]` (default `~/workspace/jj-scale`; `ONLY="name ..."` builds a subset) | A ladder of repo sizes for tuning large-repo log behaviour (paged loading, the idle trickle, first-page size, prefetch distance — jj-idea-2570.x, GitHub #69): `s1k-synthetic` (~1.1k commits) and `s6k-synthetic` (~6k, `WITH_REMOTE`, #69's reporter's shape) via FX-STRESS, plus real code cloned with `jj git clone --colocate`: `r2k-openNDS` (~2k, C), `r6k-longhorn` (~6.3k, Go — #69-sized with real code), `r36k-keycloak` (~35k, Java/Maven — the IDE does Maven import and indexing on open, so first-page latency is measured against real project-opening load) and `r80k-git` (~86k, C — well past the 10,000-row idle-trickle cap). Local checkouts under `~/workspace` are cloned from when present (read-only), else GitHub. To reproduce #69's reporter set Settings → Version Control → Jujutsu → Log → *Changes to show* to 10000 with the paged-log preview on. Each load logs `perf: log-load`, `perf: log-edt-wait` and `perf: log-apply` lines to idea.log (grep `perf:`) for timing |
+| FX-SCALE-SET | `scripts/fixtures/fx-scale-set.sh [target-dir]` (default `~/workspace/jj-scale`; `ONLY="name ..."` builds a subset) | A ladder of repo sizes for tuning large-repo log behaviour (paged loading, the idle trickle, first-page size, prefetch distance — jj-idea-2570.x, GitHub #69): `s1k-synthetic` (~1.1k commits) and `s6k-synthetic` (~6k, `WITH_REMOTE`, #69's reporter's shape) via FX-STRESS, plus real code cloned with `jj git clone --colocate`: `r2k-openNDS` (~2k, C), `r6k-longhorn` (~6.3k, Go — #69-sized with real code), `r36k-keycloak` (~35k, Java/Maven — the IDE does Maven import and indexing on open, so first-page latency is measured against real project-opening load) and `r80k-git` (~86k, C — well past the 10,000-row idle-trickle cap). Local checkouts under `~/workspace` are cloned from when present (read-only), else GitHub. `s6k-synthetic` reproduces #69's reporter (paged loading is always on; the old *Changes to show* limit is now only the fallback). Each load logs `perf: log-load`, `perf: log-edt-wait` and `perf: log-apply` lines to idea.log (grep `perf:`) for timing |
 
 Each script fails loudly (non-zero exit, explanatory message) if the jj version installed
 produces a different topology than expected, rather than silently leaving a broken fixture —
@@ -458,7 +458,7 @@ Reuse FX-STRESS (its 200-commit deep branch and long branches have edges well ov
 
 #### Long-edge navigation (jj-idea-sc8m)
 
-Reuse FX-STRESS with `SCALE=6 WITH_REMOTE=1` and the paged log flag on, per MT-LOG-REFRESH's
+Reuse FX-STRESS with `SCALE=6 WITH_REMOTE=1`, per MT-LOG-REFRESH's
 "Paged log loading" fixture below.
 
 - [ ] Hovering a long line whose child (upper) end is visible always points **down**, toward
@@ -853,14 +853,13 @@ already-loaded log table shows — it never changes what jj loads for this or an
 - [ ] Change the repo-level Log Revset (or Log Limit) override and click OK/Apply — the log window
       updates immediately, with **no need to click the toolbar Refresh button first** (jj-idea-vqpn
       regression: the config change wasn't reaching the log window at all until Refresh was hit
-      explicitly; test with paged log loading both on and off, since the paged path had a second,
-      separate staleness bug of its own — see `UnifiedJujutsuLogDataLoader.refreshOneRepoLocked`)
+      explicitly; also covers the paged path, which had a second, separate staleness bug of its own — see `UnifiedJujutsuLogDataLoader.refreshOneRepoLocked`)
 - [ ] Set the chip to a revset that references a bookmark (e.g. `my-bookmark::`), then delete that
       bookmark and trigger a refresh (a write, or the toolbar **Refresh** button) — the chip turns
       red with a tooltip showing jj's error, and the status bar shows the same error; the graph
       keeps showing the last successfully-resolved set rather than going blank
 - [ ] Restart the IDE — the chip's revset persists per log tab
-- [ ] With paged log loading enabled (Settings → preview features) and a filter active, scroll to
+- [ ] With a filter active, scroll to
       load more pages — newly loaded rows are filtered correctly with no extra `jj log` calls
       (check `idea.log` for repeated revset queries if in doubt)
 - [ ] A narrow revset over a deep/paged history that matches commits outside the currently loaded
@@ -925,18 +924,18 @@ delivered).
       and re-run the same steps — Refresh should now reload log rows but leave the bookmark
       stale; then restore the fix
 
-#### Paged log loading (jj-idea-2c8k, GitHub #69, early access)
+#### Paged log loading (jj-idea-2c8k, GitHub #69; graduated from preview, jj-idea-2570.4)
 
 **Code:** `ui/log/PagedLogWindow.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt`,
 `ui/common/CommitTablePanel.kt`, `ui/log/graph/LayoutCalculator.kt`
 
 See docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated (and
-not-yet-validated) boundaries. Enable via Settings → Version Control → Jujutsu → Log →
-"Load log in pages (early access)". Use FX-STRESS's `SCALE=6 WITH_REMOTE=1` fixture
+not-yet-validated) boundaries. Paged loading is always on, with no access code or setting
+needed. Use FX-STRESS's `SCALE=6 WITH_REMOTE=1` fixture
 (`jj-stress-test`, ~5,952 commits) for a repo large enough that the difference from the
 non-paged behavior is perceptible.
 
-- [ ] With the flag **on**, open the log: loads fast, showing the first page (500 rows,
+- [ ] Open the log: loads fast, showing the first page (500 rows,
       independent of the "Changes to show" setting); the status strip below the table stays hidden the whole time
       (no "Showing N changes" message in this mode — the scrollbar already says there's more)
 - [ ] On a wide multi-branch repo (e.g. FX-STRESS), rows whose parent didn't make it into any
@@ -953,8 +952,7 @@ non-paged behavior is perceptible.
       of the rows between, and the IDE stays responsive. It stops when the whole log is loaded or
       ~10,000 rows are in memory, after which stubs remain clickable (sc8m) and scrolling to the
       bottom still loads more, uncapped. Check Activity Monitor: the IDE/jj stay well under a core
-      while it trickles. With the flag off, nothing loads on its own. Closing the log window
-      stops it
+      while it trickles. Closing the log window stops it
 - [ ] Scroll to the bottom of the loaded rows: more history loads in automatically before you
       reach the literal end (eager one-page-ahead prefetch); scrolling repeatedly keeps loading
       further pages at a consistent, flat pace — not slowing down page over page; the viewport
@@ -969,6 +967,11 @@ non-paged behavior is perceptible.
       viewport holding its old pixel position and hiding it
 - [ ] After scrolling several pages deep, perform a write near `@`: still fast, and the
       previously-scrolled-to deeper pages remain visible/unaffected
+- [ ] jj-idea-3mjy (GitHub #145): Ctrl/Cmd+click three rows (and Shift+click a range), then let the idle trickle
+      run for ~10 s, and separately run a write such as `jj describe` on an unselected commit from a
+      terminal: all selected rows stay selected, the lead row (focus ring) is unchanged, the viewport
+      doesn't move, and a diff opened for the selection doesn't blank. Abandon one selected row: the
+      others stay selected. Apply an author filter that hides one selected row: the rest stay selected
 - [ ] Perform a write whose effect lands on a commit deep in history you haven't scrolled to
       (e.g. move a bookmark via a picker to an off-screen commit): it's still found/selected
       correctly (falls back to the existing loadContext/GitHub #76 mechanism), even though
@@ -977,16 +980,19 @@ non-paged behavior is perceptible.
       total loaded row count is preserved (not collapsed back to one page), and total time is
       proportional to pages loaded, not instant (deliberate — Explicit Refresh re-verifies
       everything currently loaded, it doesn't just reload page 1)
-- [ ] Toggle the flag **off**: behavior reverts to today's full-reload shape (confirms the flag
-      actually gates the new code path), including the status strip reappearing with the old
-      "Showing N of limit — change the limit in Settings" message once the log is truncated
+- [ ] Fallback (rare, automated-test covered): in a repository with more than 8,000 branch heads the
+      log loads the **Fallback change limit** worth of changes in one go instead of paging, logs
+      a warning (`idea.log`: "Log frontier ... exceeded 8000 ids"), and shows no error. Only
+      worth a manual check if you have such a repository to hand
 - [ ] Click a bookmark/reference filter entry that's currently off-screen (explicit navigation,
       not a data refresh): the viewport still scrolls to make it visible, unlike the loadMore
       case above — confirms the scroll-suppression fix didn't break real navigation
-- [ ] Raise "Changes to show" to a large value (e.g. 10,000) with the flag on: nothing changes —
-      the first paint and every page are still 500 rows (the setting only caps the non-paged
-      path), and a write near `@` stays fast. With the flag off the same setting is a hard limit
-      again (status strip and "change the limit" link return)
+- [ ] Settings → Version Control → Jujutsu → Log: the limit field reads **Fallback change limit** and
+      its comment says it only applies when paging is unavailable. Raise it to a large value
+      (e.g. 10,000): nothing changes — the first paint and every page are still 500 rows, and a
+      write near `@` stays fast
+- [ ] With no access code entered and no `jjidea.preview.*` system property, none of the above
+      needs any setup (paged loading is the default for everyone)
 
 ### MT-CTXMENU
 
@@ -3550,6 +3556,12 @@ file), which no automated test can supply — see contributing.md § Manual regr
 
 #### Preview features (jj-idea-vpvz, jj-idea-0x06)
 
+- [ ] While nothing is in preview (currently the case: drag-and-drop, paged log loading and the
+      conflict gutter have all graduated), Settings has **no** Preview features group and no
+      Access code field. The steps below apply only once a feature is gated again; until
+      then the group's behaviour is covered by `JujutsuConfigurablePanelTest` with a test-only
+      feature
+
 - [ ] Open **Settings → Version Control → Jujutsu**: a **Preview features** group appears at the
       bottom of the panel, below **Support**, with only an "Access code:" field and a one-line
       explanation — no feature
@@ -3566,7 +3578,7 @@ file), which no automated test can supply — see contributing.md § Manual regr
 - [ ] Enter a valid, single-feature `JJP1-...` code (needs a build whose signing key resolves —
       either `PREVIEW_CODE_KEY` set, or the local key at `~/.config/jj-idea/preview-code-key` that
       `previewCode keygen`/`mint` use by default — e.g. minted for yourself via `./gradlew
-      previewCode --args="mint --features pagedLogLoad"`): "Code accepted…" and only that one
+      previewCode --args="mint --features <featureId>"`): "Code accepted…" and only that one
       feature's checkbox appears
 - [ ] Mint a `JJP1` code with `--expires` set to a future month, enter it — "Code accepted, valid
       until …" appears above its checkbox(es)
@@ -3593,7 +3605,7 @@ file), which no automated test can supply — see contributing.md § Manual regr
       and drag a commit row — the drag initiates (drag label, drop hint)
 - [ ] The same with no code in the bookmarks panel, the Working Copy changes tree and a bookmark
       chip in the commit details panel
-- [ ] Settings → Preview features has no Drag and Drop checkbox, even with a valid legacy code
+- [ ] Settings has no Preview features group at all (nothing is in preview)
 
 #### Drag image (mirrors the Project view's file drag)
 

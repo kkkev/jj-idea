@@ -13,9 +13,11 @@ import org.junit.jupiter.api.Test
  *   itself and [PreviewEntitlementTest] for the legacy path against the real shipped resource.
  */
 class AccessCodeTest {
+    private val catalog = TestPreviewFeature.entries
+
     @Test
     fun `the shipped legacy code is valid and grants every feature`() {
-        AccessCode.grantedFeatures("valid-code-1234") shouldBe PreviewFeature.entries.toSet()
+        AccessCode.grantedFeatures("valid-code-1234", catalog = catalog) shouldBe catalog.toSet()
     }
 
     @Test
@@ -25,8 +27,8 @@ class AccessCodeTest {
 
     @Test
     fun `whitespace and case normalise to the same legacy code`() {
-        AccessCode.grantedFeatures("  Valid-Code-1234  ") shouldBe PreviewFeature.entries.toSet()
-        AccessCode.grantedFeatures("VALID-CODE-1234") shouldBe PreviewFeature.entries.toSet()
+        AccessCode.grantedFeatures("  Valid-Code-1234  ", catalog = catalog) shouldBe catalog.toSet()
+        AccessCode.grantedFeatures("VALID-CODE-1234", catalog = catalog) shouldBe catalog.toSet()
     }
 
     @Test
@@ -37,7 +39,7 @@ class AccessCodeTest {
 
     @Test
     fun `a second, rotated legacy hash is also honoured`() {
-        AccessCode.grantedFeatures("second-valid-code") shouldBe PreviewFeature.entries.toSet()
+        AccessCode.grantedFeatures("second-valid-code", catalog = catalog) shouldBe catalog.toSet()
     }
 
     @Test
@@ -48,8 +50,8 @@ class AccessCodeTest {
     @Test
     fun `status distinguishes empty, accepted, invalid and cannot-verify`() {
         AccessCode.status("   ") shouldBe PreviewCodeStatus.Empty
-        AccessCode.status("valid-code-1234") shouldBe
-            PreviewCodeStatus.Accepted(PreviewFeature.entries.toSet(), expiry = null)
+        AccessCode.status("valid-code-1234", catalog = catalog) shouldBe
+            PreviewCodeStatus.Accepted(catalog.toSet(), expiry = null)
         AccessCode.status("wrong-code-0000") shouldBe PreviewCodeStatus.Invalid
         // A garbage JJP1 code is the build's problem (not a typo) only when there is no signing key
         // to check it against - CI has none, a dev machine with ~/.config/jj-idea/preview-code-key does.

@@ -5,8 +5,6 @@ import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.util.concurrency.AppExecutorUtil
 import `in`.kkkev.jjidea.jj.*
-import `in`.kkkev.jjidea.preview.PreviewEntitlement
-import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
@@ -31,15 +29,13 @@ import kotlin.concurrent.withLock
  * - Updates the table model and graph on EDT
  * - Subscribes to changeSelection for handling selection requests
  *
- * jj-idea-2c8k (GitHub #69), early access: when `JujutsuSettings.state.pagedLogLoading` is on,
- * the main window is loaded a page at a time via [PagedLogWindow] instead of one full-limit
+ * jj-idea-2c8k (GitHub #69): the main window is loaded a page at a time via [PagedLogWindow] instead of one full-limit
  * fetch — see docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism, its correctness
  * invariant, and validation data. [refresh] (the post-write path) only ever refetches page 1;
  * [forceRefresh] (explicit Refresh) re-walks every currently-loaded page, preserving scroll
  * depth; [loadMore] (scroll) fetches exactly one more page. Falls back to today's full
- * [LogCache.reload] per repo whenever paging isn't viable for that repo (the setting is off,
- * the configured revset is [Revset.Default], or [PagedLogWindow.FRONTIER_CAP] would be
- * exceeded) — this loader never behaves worse than before the flag existed.
+ * [LogCache.reload] per repo whenever paging isn't viable for that repo (the configured
+ * revset is [Revset.Default], [PagedLogWindow.FRONTIER_CAP] would be exceeded, or a fetch fails).
  */
 class UnifiedJujutsuLogDataLoader(
     private val project: Project,
@@ -48,7 +44,13 @@ class UnifiedJujutsuLogDataLoader(
 ) : BackgroundDataLoader(project, "Loading Jujutsu Commits") {
     private val graphBuilder = CommitGraphBuilder()
 
-    data class Data(val entries: List<LogEntry>, val graphNodes: Map<ChangeKey, GraphNode>, val limit: Int)
+    data class Data(
+        val entries: List<LogEntry>,
+        val graphNodes: Map<ChangeKey, GraphNode>,
+        val limit: Int,
+        /** True when at least one repo is paged: [limit] is then a page size, not a hard cap. */
+        val paged: Boolean = false
+    )
 
     @Volatile
     private var lastLimit: Int = 0
@@ -94,8 +96,6 @@ class UnifiedJujutsuLogDataLoader(
     // loadMore()-shaped append can extend it instead of re-flattening every repo's logCache
     // and re-sorting/re-laying-out the whole thing from scratch. Mutated only under mergeLock.
     private var snapshot: MergedSnapshot? = null
-
-    private val pagedLoading = PreviewEntitlement.getInstance().isEnabled(PreviewFeature.PAGED_LOG_LOAD)
 
     override fun load() = loadCommits()
 
@@ -224,7 +224,7 @@ class UnifiedJujutsuLogDataLoader(
                 // A cancelled wait throws ProcessCanceledException above, which routes to onCancel()
                 // instead of here - so reaching onSuccess means the load actually completed.
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) return@executeInBackground
-                notify(Data(allEntries, graphNodes, defaultLimit), readyAtNanos)
+                notify(Data(allEntries, graphNodes, defaultLimit, pagedWindowByRepo.isNotEmpty()), readyAtNanos)
             }
         )
     }
@@ -240,10 +240,6 @@ class UnifiedJujutsuLogDataLoader(
         lockFor(repo).withLock { loadFirstPageOrFallbackLocked(repo, settings) }
 
     private fun loadFirstPageOrFallbackLocked(repo: JujutsuRepository, settings: JujutsuSettings): List<LogEntry> {
-        if (!pagedLoading) {
-            pagedWindowByRepo.remove(repo)
-            return repo.logCache.reload()
-        }
         val revset = settings.resolvedLogRevset(repo)
         if (revset == Revset.Default) {
             // heads() of an *implicit* default revset has no revset syntax to express - can't
@@ -429,7 +425,7 @@ class UnifiedJujutsuLogDataLoader(
             graphNodes = graphNodes,
             repos = current.repos + enrichedDelta.mapTo(HashSet()) { it.repo }
         )
-        return Data(mergedEntries, graphNodes, lastLimit)
+        return Data(mergedEntries, graphNodes, lastLimit, pagedWindowByRepo.isNotEmpty())
     }
 
     /**
@@ -474,7 +470,7 @@ class UnifiedJujutsuLogDataLoader(
             correctionsByRepo,
             graphNodes = graphNodes
         )
-        return Data(merged, graphNodes, lastLimit)
+        return Data(merged, graphNodes, lastLimit, pagedWindowByRepo.isNotEmpty())
     }
 
     /**
@@ -524,16 +520,12 @@ class UnifiedJujutsuLogDataLoader(
      * currently-paging repo, refetches *only page 1* per repo (reseeding the frontier fresh) and
      * splices it ahead of whatever deeper pages were already loaded — O(page size), never O(total
      * scrolled depth). This is the fix for GitHub #69. Falls back to [loadCommits] (today's full
-     * reload) for any repo that isn't currently being paged (paging off, unpageable revset, or a
+     * reload) for any repo that isn't currently being paged (unpageable revset, or a
      * previous fallback already happened).
      */
     override fun refresh() {
         log.info("Refreshing unified log")
         val settings = JujutsuSettings.getInstance(project)
-        if (!pagedLoading) {
-            loadCommits()
-            return
-        }
         val repos = repositories()
         val pagedRepos = repos.filter { pagedWindowByRepo.containsKey(it) }
         if (pagedRepos.isEmpty()) {
@@ -620,7 +612,7 @@ class UnifiedJujutsuLogDataLoader(
         log.info("Force-refreshing unified log (explicit Refresh)")
         val settings = JujutsuSettings.getInstance(project)
         val repos = repositories()
-        if (!pagedLoading || repos.isEmpty()) {
+        if (repos.isEmpty()) {
             loadCommits()
             return
         }
@@ -687,7 +679,6 @@ class UnifiedJujutsuLogDataLoader(
      * completes) will simply try again — no need to queue up redundant work behind a busy repo.
      */
     override fun loadMore() {
-        if (!pagedLoading) return
         loadMoreFrom(repositories().filter { pagedWindowByRepo[it]?.let { w -> !w.isExhausted } == true })
     }
 
@@ -750,7 +741,7 @@ class UnifiedJujutsuLogDataLoader(
 
     /** Starts the trickle if it isn't already running. Idempotent; every load path ends in [notify]. */
     private fun ensureTrickle() {
-        if (!pagedLoading || !trickleEnabled) return
+        if (!trickleEnabled) return
         if (trickleScheduled.compareAndSet(false, true)) scheduleTrickle(TricklePolicy.MIN_DELAY_MS)
     }
 

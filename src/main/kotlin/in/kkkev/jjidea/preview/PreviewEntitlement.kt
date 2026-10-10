@@ -24,11 +24,11 @@ import `in`.kkkev.jjidea.settings.JujutsuApplicationSettings
  */
 @Service(Service.Level.APP)
 class PreviewEntitlement {
-    fun isEnabled(feature: PreviewFeature): Boolean {
+    fun isEnabled(feature: PreviewFeatureSpec): Boolean {
         if (System.getProperty("jjidea.preview.${feature.id}").toBoolean()) return true
 
         val state = JujutsuApplicationSettings.getInstance().state
-        val granted = feature in AccessCode.grantedFeatures(state.previewAccessCode)
+        val granted = feature in AccessCode.grantedFeatures(state.previewAccessCode, catalog = listOf(feature))
         val optedIn = state.enabledPreviewFeatures.split(",").map { it.trim() }.contains(feature.id)
         return granted && optedIn
     }

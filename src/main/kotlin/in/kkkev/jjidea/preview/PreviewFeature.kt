@@ -4,6 +4,18 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.util.snakeToCamelCase
 
 /**
+ * What the access-code machinery ([PreviewCode], [AccessCode], [PreviewEntitlement]) needs to know about
+ * a gated feature. [PreviewFeature] is the only production implementation; the interface exists so
+ * the machinery stays testable while the enum has no entries (nothing is in preview) - tests pass
+ * a test-only implementation as the `catalog`/feature argument.
+ */
+interface PreviewFeatureSpec {
+    val id: String
+    val bit: Int
+    val displayName: String
+}
+
+/**
  * A plugin feature that is gated behind [PreviewEntitlement] because it isn't finished enough
  * to show every Marketplace user - see `docs/design/preview-gating-and-dnd-sequencing.md`.
  *
@@ -17,20 +29,13 @@ import `in`.kkkev.jjidea.util.snakeToCamelCase
  * expiry, tracked in the private access-code registry) has expired - reusing it sooner would let
  * a still-valid old code silently grant whatever new feature claims the bit.
  */
-enum class PreviewFeature(val bit: Int) {
+enum class PreviewFeature(override val bit: Int) : PreviewFeatureSpec {
     /** bit 0 retired (was DRAG_AND_DROP, graduated in jj-idea-jxii) - never reuse */
+    /** bit 1 retired (was PAGED_LOG_LOAD, graduated in jj-idea-2570.4) - never reuse */
     /** bit 2 retired (was CONFLICT_GUTTER, graduated in jj-idea-n6fz.4) - never reuse */
+    ;
 
-    /**
-     * jj-idea-2c8k (GitHub #69), early access: loads the log in pages (500 rows each,
-     * [in.kkkev.jjidea.ui.log.PagedLogWindow.PAGE_ROWS]; "Changes to show" no longer sets the page
-     * size) instead of reloading the whole configured limit on every write. Off by default —
-     * see docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated
-     * (and not-yet-validated) boundaries.
-     */
-    PAGED_LOG_LOAD(1);
-
-    val id = name.snakeToCamelCase()
-    val displayName get() = JujutsuBundle.message("preview.$id.name")
+    override val id = name.snakeToCamelCase()
+    override val displayName get() = JujutsuBundle.message("preview.$id.name")
     val comment get() = JujutsuBundle.message("preview.$id.comment")
 }

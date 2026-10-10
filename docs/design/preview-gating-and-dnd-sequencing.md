@@ -170,7 +170,7 @@ feeds Marketplace `changeNotes`), the release-notes awk (`.github/workflows/buil
 the changelog-rewrite awk (`build.yml:304`). All three read `[Unreleased]`, so anything landing
 there ships publicly at the next release.
 
-**Hold preview entries in `docs/preview-changelog.md`**, a plain file no automation reads. Same
+*(Historical: the holding file was retired when the last feature graduated, jj-idea-2570.4.)* **Hold preview entries in `docs/preview-changelog.md`**, a plain file no automation reads. Same
 user-facing voice as `CHANGELOG.md` (no class names, no internal terms), so entries transplant
 verbatim at GA.
 

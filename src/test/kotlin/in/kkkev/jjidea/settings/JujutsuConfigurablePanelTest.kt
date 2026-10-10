@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.jj.JjExecutableFinder
 import `in`.kkkev.jjidea.jj.JjVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.preview.PreviewFeature
+import `in`.kkkev.jjidea.preview.TestPreviewFeature
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.ints.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
@@ -63,14 +64,16 @@ class JujutsuConfigurablePanelTest {
     fun `access code feedback and feature list update as the code is typed`() {
         // Previously the status line and checkboxes were decided once when the panel opened, so a
         // typo or a good code showed nothing until Apply and reopening Settings.
-        val panel = JujutsuConfigurable(project.get()).createPanel()
+        // Nothing is in preview in production, so the group is driven by a test-only feature.
+        val panel = JujutsuConfigurable(project.get()).apply { previewFeatures = TestPreviewFeature.entries }
+            .createPanel()
         val field = UIUtil.findComponentsOfType(panel, JBTextField::class.java)
             .single { it.name == JujutsuConfigurable.PREVIEW_CODE_FIELD_NAME }
         fun status(): List<String> = UIUtil.findComponentsOfType(panel, JEditorPane::class.java)
             .filter { it.isVisible && it.text.contains("code", ignoreCase = true) && it.text.contains("valid") }
             .map { it.text }
         fun visibleFeatureBoxes() = UIUtil.findComponentsOfType(panel, JBCheckBox::class.java)
-            .filter { box -> PreviewFeature.entries.any { it.displayName == box.text } && box.isVisible }
+            .filter { box -> TestPreviewFeature.entries.any { it.displayName == box.text } && box.isVisible }
 
         visibleFeatureBoxes() shouldBe emptyList()
 
@@ -79,11 +82,20 @@ class JujutsuConfigurablePanelTest {
         visibleFeatureBoxes() shouldBe emptyList()
 
         field.text = "onyx-amber-9769"
-        visibleFeatureBoxes().map { it.text }.toSet() shouldBe PreviewFeature.entries.map { it.displayName }.toSet()
+        visibleFeatureBoxes().map { it.text }.toSet() shouldBe TestPreviewFeature.entries.map { it.displayName }.toSet()
 
         field.text = ""
         visibleFeatureBoxes() shouldBe emptyList()
         status() shouldBe emptyList()
+    }
+
+    @Test
+    fun `the preview group is absent while nothing is in preview`() {
+        PreviewFeature.entries shouldBe emptyList()
+        val panel = JujutsuConfigurable(project.get()).createPanel()
+
+        UIUtil.findComponentsOfType(panel, JBTextField::class.java)
+            .none { it.name == JujutsuConfigurable.PREVIEW_CODE_FIELD_NAME } shouldBe true
     }
 
     @Test

@@ -19,14 +19,11 @@ import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
-
-private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
 
 /**
  * Regression coverage for jj-idea-5gof: [UnifiedJujutsuLogDataLoader]'s per-repo
@@ -37,8 +34,7 @@ private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
  * `runIde` testing (rapid scroll events each spawning an independent background task racing on the
  * same window's backing list). See docs/design/jj-idea-2c8k-paged-log-loading.md, bug 9.
  *
- * Platform-tagged (not a plain unit test): constructing the loader needs a live `Application` for
- * [in.kkkev.jjidea.preview.PreviewEntitlement] (a field initializer) and for the real
+ * Platform-tagged (not a plain unit test): constructing the loader needs a live `Application` for the real
  * `executeOnPooledThread`/`invokeLater` dispatch these methods use — the race lives in genuinely
  * concurrent pooled-thread work, so faking that dispatch would test nothing. [JujutsuSettings] is
  * used for real (its `logRevset` state defaults to `"all()"`, already non-blank, so paging engages
@@ -59,14 +55,8 @@ private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
 class PagedLogLoaderConcurrencyTest {
     private val projectFx = projectFixture()
 
-    @BeforeEach
-    fun enablePaging() {
-        System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-    }
-
     @AfterEach
     fun cleanup() {
-        System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
         // The last drain before projectFixture disposes the project - generous on purpose (see
         // jj-idea-5gof): this class's fake repos do real concurrent pooled-thread work (unlike
         // most drainBackgroundLoads() callers, which only wait out JujutsuStateModel's init

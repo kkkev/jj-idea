@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
@@ -11,7 +12,9 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogCache
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.RepositoryReferences
+import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.util.SimpleNotifiableState
@@ -65,6 +68,17 @@ class BookmarkCorrectionsReapplyTest {
             underlyingDescription = "desc",
             bookmarks = listOf(Bookmark("main"))
         )
+        // Paged loading is the only path (jj-idea-2570.4): serve the single row as page 1.
+        every { repo.logService } returns object : LogService by mockk(relaxed = true) {
+            override fun getLogHeads(revset: Revset): Result<List<ChangeId>> = Result.success(listOf(entry.id))
+
+            override fun getLog(
+                revset: Revset,
+                filePaths: List<FilePath>,
+                limit: Int?,
+                quiet: Boolean
+            ): Result<List<LogEntry>> = Result.success(listOf(entry))
+        }
         val stored = CopyOnWriteArrayList<List<LogEntry>>()
         every { repo.logCache } returns mockk<LogCache>(relaxed = true) {
             every { reload() } returns listOf(entry)

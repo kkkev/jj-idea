@@ -18,13 +18,10 @@ import io.kotest.matchers.shouldBe
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CopyOnWriteArraySet
-
-private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
 
 /**
  * Pins the page-1-only contract of [UnifiedJujutsuLogDataLoader.refresh] against a content change
@@ -51,14 +48,8 @@ private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
 class PagedLogDeepPageRefreshTest {
     private val projectFx = projectFixture()
 
-    @BeforeEach
-    fun enablePaging() {
-        System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-    }
-
     @AfterEach
     fun cleanup() {
-        System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
         // Longer than the sibling paged-log tests' drain: these also run loadMore() and
         // forceRefresh(), leaving more pooled-thread work in flight when the project is torn down.
         drainBackgroundLoads(5_000)

@@ -29,6 +29,7 @@ import `in`.kkkev.jjidea.jj.cli.rootlessConfig
 import `in`.kkkev.jjidea.preview.AccessCode
 import `in`.kkkev.jjidea.preview.PreviewCodeStatus
 import `in`.kkkev.jjidea.preview.PreviewFeature
+import `in`.kkkev.jjidea.preview.PreviewFeatureSpec
 import `in`.kkkev.jjidea.ui.newchange.isValidMergeTemplate
 import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
@@ -57,6 +58,12 @@ class JujutsuConfigurable(
     // constructor is the plain-Kotlin fix, and doubles as the test seam so a width-guard test
     // can exercise the per-repo "Repository Settings" group without a real jj repository on disk.
     constructor(project: Project) : this(project, project.stateModel.initialisedRepositories.value.values)
+
+    /**
+     * The features the Preview group offers; empty (group hidden) while nothing is in preview.
+     * A test seam: set before [createPanel] to exercise the group with a test-only feature.
+     */
+    internal var previewFeatures: List<PreviewFeatureSpec> = PreviewFeature.entries
 
     private val log = Logger.getInstance(javaClass)
     private val settings = JujutsuSettings.getInstance(project)
@@ -712,68 +719,72 @@ class JujutsuConfigurable(
             }
         }
 
-        group(JujutsuBundle.message("settings.group.preview")) {
-            val codeField = JBTextField().also { it.name = PREVIEW_CODE_FIELD_NAME }
-            row(JujutsuBundle.message("settings.preview.code.label")) {
-                cell(codeField)
-                    .bindText(appSettings.state::previewAccessCode)
-                    .columns(COLUMNS_SHORT)
-                    .comment(
-                        JujutsuBundle.message("settings.preview.code.comment"),
-                        maxLineLength = NARROW_COMMENT_WIDTH
-                    )
-            }
-            // Everything below the field reacts to what is typed, not to what was last saved, so a
-            // bad or good code is reported immediately instead of after Apply and reopening
-            // Settings. The rows all exist up front and only their visibility changes. The
-            // status line also covers what the checkboxes can't show: why none appeared, an
-            // expiring code's date, or a build that can't check the code at all.
-            lateinit var statusLabel: JEditorPane
-            val statusRow = row("") {
-                statusLabel = comment("", maxLineLength = NARROW_COMMENT_WIDTH).component
-            }.visible(false)
-            val featureRows = mutableListOf<Pair<PreviewFeature, Row>>()
-            lateinit var featuresNoteRow: Row
-            indent {
-                for (feature in PreviewFeature.entries) {
-                    val featureRow = row {
-                        checkBox(feature.displayName)
-                            .bindSelected(
-                                { isPreviewFeatureEnabled(feature) },
-                                { setPreviewFeatureEnabled(feature, it) }
-                            )
-                    }.visible(false)
-                    featureRows += feature to featureRow
+        // Nothing is in preview right now (the last feature graduated in jj-idea-2570.4); the access-code
+        // UI stays wired so the next gated feature only has to add an enum entry.
+        if (previewFeatures.isNotEmpty()) {
+            group(JujutsuBundle.message("settings.group.preview")) {
+                val codeField = JBTextField().also { it.name = PREVIEW_CODE_FIELD_NAME }
+                row(JujutsuBundle.message("settings.preview.code.label")) {
+                    cell(codeField)
+                        .bindText(appSettings.state::previewAccessCode)
+                        .columns(COLUMNS_SHORT)
+                        .comment(
+                            JujutsuBundle.message("settings.preview.code.comment"),
+                            maxLineLength = NARROW_COMMENT_WIDTH
+                        )
                 }
-                // One shared note below the whole list, rather than repeating it per
-                // checkbox - it says the same thing regardless of which feature it's under.
-                featuresNoteRow = row("") {
-                    comment(
-                        JujutsuBundle.message("settings.preview.features.comment"),
-                        maxLineLength = NARROW_COMMENT_WIDTH
-                    )
+                // Everything below the field reacts to what is typed, not to what was last saved, so a
+                // bad or good code is reported immediately instead of after Apply and reopening
+                // Settings. The rows all exist up front and only their visibility changes. The
+                // status line also covers what the checkboxes can't show: why none appeared, an
+                // expiring code's date, or a build that can't check the code at all.
+                lateinit var statusLabel: JEditorPane
+                val statusRow = row("") {
+                    statusLabel = comment("", maxLineLength = NARROW_COMMENT_WIDTH).component
                 }.visible(false)
-            }
-
-            fun refreshPreviewCodeFeedback() {
-                val status = AccessCode.status(codeField.text)
-                val message = previewCodeStatusMessage(status)
-                statusLabel.text = message.orEmpty()
-                statusLabel.foreground = if (status.isProblem) {
-                    NamedColorUtil.getErrorForeground()
-                } else {
-                    JBUI.CurrentTheme.ContextHelp.FOREGROUND
+                val featureRows = mutableListOf<Pair<PreviewFeatureSpec, Row>>()
+                lateinit var featuresNoteRow: Row
+                indent {
+                    for (feature in previewFeatures) {
+                        val featureRow = row {
+                            checkBox(feature.displayName)
+                                .bindSelected(
+                                    { isPreviewFeatureEnabled(feature) },
+                                    { setPreviewFeatureEnabled(feature, it) }
+                                )
+                        }.visible(false)
+                        featureRows += feature to featureRow
+                    }
+                    // One shared note below the whole list, rather than repeating it per
+                    // checkbox - it says the same thing regardless of which feature it's under.
+                    featuresNoteRow = row("") {
+                        comment(
+                            JujutsuBundle.message("settings.preview.features.comment"),
+                            maxLineLength = NARROW_COMMENT_WIDTH
+                        )
+                    }.visible(false)
                 }
-                statusRow.visible(message != null)
-                featureRows.forEach { (feature, row) -> row.visible(feature in status.features) }
-                featuresNoteRow.visible(status.features.isNotEmpty())
+
+                fun refreshPreviewCodeFeedback() {
+                    val status = AccessCode.status(codeField.text, catalog = previewFeatures)
+                    val message = previewCodeStatusMessage(status)
+                    statusLabel.text = message.orEmpty()
+                    statusLabel.foreground = if (status.isProblem) {
+                        NamedColorUtil.getErrorForeground()
+                    } else {
+                        JBUI.CurrentTheme.ContextHelp.FOREGROUND
+                    }
+                    statusRow.visible(message != null)
+                    featureRows.forEach { (feature, row) -> row.visible(feature in status.features) }
+                    featuresNoteRow.visible(status.features.isNotEmpty())
+                }
+                codeField.document.addDocumentListener(object : javax.swing.event.DocumentListener {
+                    override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
+                    override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
+                    override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
+                })
+                refreshPreviewCodeFeedback()
             }
-            codeField.document.addDocumentListener(object : javax.swing.event.DocumentListener {
-                override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
-                override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
-                override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = refreshPreviewCodeFeedback()
-            })
-            refreshPreviewCodeFeedback()
         }
 
         // Load global identity values asynchronously
@@ -1280,10 +1291,10 @@ class JujutsuConfigurable(
         is PreviewCodeStatus.Invalid -> JujutsuBundle.message("settings.preview.code.status.invalid")
     }
 
-    private fun isPreviewFeatureEnabled(feature: PreviewFeature): Boolean =
+    private fun isPreviewFeatureEnabled(feature: PreviewFeatureSpec): Boolean =
         appSettings.state.enabledPreviewFeatures.split(",").map { it.trim() }.contains(feature.id)
 
-    private fun setPreviewFeatureEnabled(feature: PreviewFeature, enabled: Boolean) {
+    private fun setPreviewFeatureEnabled(feature: PreviewFeatureSpec, enabled: Boolean) {
         val ids = appSettings.state.enabledPreviewFeatures
             .split(",")
             .map { it.trim() }

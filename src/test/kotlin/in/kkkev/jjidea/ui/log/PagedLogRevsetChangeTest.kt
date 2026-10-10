@@ -22,12 +22,10 @@ import io.kotest.matchers.string.shouldNotContain
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CopyOnWriteArrayList
-
-private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Regression coverage for jj-idea-vqpn: [UnifiedJujutsuLogDataLoader.refresh]'s cheap per-write
@@ -51,24 +49,21 @@ private const val PAGED_LOG_LOAD_PROPERTY = "jjidea.preview.pagedLogLoad"
 class PagedLogRevsetChangeTest {
     private val projectFx = projectFixture()
 
-    @BeforeEach
-    fun enablePaging() {
-        System.setProperty(PAGED_LOG_LOAD_PROPERTY, "true")
-    }
-
     @AfterEach
     fun cleanup() {
-        System.clearProperty(PAGED_LOG_LOAD_PROPERTY)
         JujutsuSettings.getInstance(projectFx.get()).state.logRevset = "all()"
         drainBackgroundLoads(2_000)
     }
 
     /** Records every revset [getLogHeads] is called with, in order — see the class doc. */
-    private class FakeLogService(private val chain: List<LogEntry>) : LogService by mockk(relaxed = true) {
+    private class FakeLogService(private val chain: List<LogEntry>, private val headCount: Int = 1) :
+        LogService by mockk(relaxed = true) {
         val headsRevsets = CopyOnWriteArrayList<String>()
+        val pageFetches = AtomicInteger()
 
         override fun getLogHeads(revset: Revset): Result<List<ChangeId>> {
             headsRevsets.add(revset.toString())
+            if (headCount > 1) return Result.success((0 until headCount).map { ChangeId("h$it", "h$it") })
             return Result.success(listOf(chain.first().id))
         }
 
@@ -78,6 +73,7 @@ class PagedLogRevsetChangeTest {
             limit: Int?,
             quiet: Boolean
         ): Result<List<LogEntry>> {
+            pageFetches.incrementAndGet()
             val ids = Regex("""present\(([^)]+)\)""").findAll(revset.toString()).map { it.groupValues[1] }.toSet()
             val startIndex = ids.mapNotNull { id ->
                 chain.indexOfFirst { it.id.full == id }.takeIf { it >= 0 }
@@ -87,9 +83,14 @@ class PagedLogRevsetChangeTest {
     }
 
     /** [storedDepths] records the size of every [LogCache.store] call — see the third test below. */
-    private class FakeRepo(val repo: JujutsuRepository, val logService: FakeLogService, val storedDepths: List<Int>)
+    private class FakeRepo(
+        val repo: JujutsuRepository,
+        val logService: FakeLogService,
+        val storedDepths: List<Int>,
+        val reloads: AtomicInteger
+    )
 
-    private fun fakeChainRepo(name: String, length: Int): FakeRepo {
+    private fun fakeChainRepo(name: String, length: Int, headCount: Int = 1): FakeRepo {
         val repo = mockk<JujutsuRepository>(relaxed = true)
         every { repo.displayName } returns name
         every { repo.directory } returns mockk<VirtualFile>(relaxed = true) { every { path } returns "/fake/$name" }
@@ -108,13 +109,18 @@ class PagedLogRevsetChangeTest {
             )
         }
 
-        val logService = FakeLogService(chain)
+        val logService = FakeLogService(chain, headCount)
         every { repo.logService } returns logService
         val storedDepths = CopyOnWriteArrayList<Int>()
+        val reloads = AtomicInteger()
         every { repo.logCache } returns mockk<LogCache>(relaxed = true) {
             every { store(any()) } answers { storedDepths.add(firstArg<List<LogEntry>>().size) }
+            every { reload() } answers {
+                reloads.incrementAndGet()
+                chain
+            }
         }
-        return FakeRepo(repo, logService, storedDepths)
+        return FakeRepo(repo, logService, storedDepths, reloads)
     }
 
     private fun loader(repo: JujutsuRepository): UnifiedJujutsuLogDataLoader {
@@ -193,5 +199,20 @@ class PagedLogRevsetChangeTest {
         drainBackgroundLoads(1_000)
 
         fake.storedDepths.last() shouldBe 20
+    }
+
+    @Test
+    fun `a frontier wider than the cap falls back to a full reload instead of paging`() {
+        // jj-idea-2570.4 graduation criterion: the heads ceiling (PagedLogWindow.FRONTIER_CAP) is the
+        // one case where paging is unsafe, so the loader must take the legacy full-window load -
+        // never an error and never a page fetch against the oversized frontier.
+        val fake = fakeChainRepo("a", length = 30, headCount = PagedLogWindow.FRONTIER_CAP + 1)
+        val log = loader(fake.repo)
+
+        log.loadCommits()
+        drainBackgroundLoads(1_000)
+
+        fake.reloads.get() shouldBe 1
+        fake.logService.pageFetches.get() shouldBe 0
     }
 }
