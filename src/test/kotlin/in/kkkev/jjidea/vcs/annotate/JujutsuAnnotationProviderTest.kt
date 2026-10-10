@@ -3,9 +3,11 @@ package `in`.kkkev.jjidea.vcs.annotate
 import com.intellij.mock.MockVirtualFile
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.FileStatus
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vcs.annotate.FileAnnotation
+import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.testFramework.LoggedErrorProcessor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
@@ -264,6 +266,34 @@ class JujutsuAnnotationProviderTest {
             annotation.isClosed shouldBe true
             annotation.lineCount shouldBe 0
             absentNotifications shouldBe listOf("file.txt")
+        }
+
+    // Opening a file triggers populateCache (background preload) — the user hasn't asked to annotate,
+    // so no balloon, and the closed placeholder must not be cached over a later real Annotate.
+    @Test
+    fun `populateCache neither notifies nor caches when the file is absent at the diff base`() =
+        withDiffbaseSetup { base, baseFile ->
+            every { commandExecutor.annotate(baseFile, base, any()) } returns
+                commandResult(exitCode = 1, stdout = "", stderr = "Error: No such path")
+            every { commandExecutor.fileList(any(), base) } returns commandResult(0, "", "Warning: No matching entries")
+            every { project.isDisposed } returns false
+            every { project.isDefault } returns false
+            val changeListManager = mockk<ChangeListManager> { every { getStatus(file) } returns FileStatus.ADDED }
+            every { project.getService(ChangeListManager::class.java) } returns changeListManager
+            val workingCopies = mockk<NotifiableState<Map<String, LogEntry>>> {
+                every { connect(any(), any()) } just
+                    Runs
+            }
+            val diffbaseChanged = mockk<Notifier<Unit>> { every { connect(any(), any()) } just Runs }
+            every { project.getService(JujutsuStateModel::class.java) } returns mockk {
+                every { this@mockk.workingCopies } returns workingCopies
+                every { this@mockk.diffbaseChanged } returns diffbaseChanged
+            }
+
+            provider.populateCache(file)
+
+            absentNotifications shouldBe emptyList()
+            provider.cacheForTest().isEmpty() shouldBe true
         }
 
     @Test

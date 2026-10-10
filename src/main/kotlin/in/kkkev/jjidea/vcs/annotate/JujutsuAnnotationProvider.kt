@@ -129,7 +129,13 @@ class JujutsuAnnotationProvider(
                 log.debug("Skipping annotation preload for ${file.path}: annotate has been slow on this repository")
                 return
             }
-            cache[file] = annotate(file)
+            // Background preload: a user who never asked to annotate must not get the
+            // "nothing to annotate" balloon, and the closed placeholder must not be cached (the
+            // platform would then reuse it on a real Annotate click, which would never notify).
+            val annotation = annotateWorkingFile(file, notifyIfAbsent = false)
+            if (annotation.isClosed) return
+            synchronized(openAnnotations) { openAnnotations.add(annotation) }
+            cache[file] = annotation
         } catch (e: ProcessCanceledException) {
             throw e
         } catch (e: Exception) {
@@ -159,10 +165,13 @@ class JujutsuAnnotationProvider(
      * A file absent at that base yields a closed, empty annotation plus a notification (see [nothingToAnnotate]).
      * Limitation: a file renamed after the base also counts as absent (jj-idea-i2e2).
      */
-    override fun annotate(file: VirtualFile): FileAnnotation =
-        annotateWorkingFile(file).also { synchronized(openAnnotations) { openAnnotations.add(it) } }
+    override fun annotate(file: VirtualFile): FileAnnotation {
+        val annotation = annotateWorkingFile(file, notifyIfAbsent = true)
+        synchronized(openAnnotations) { openAnnotations.add(annotation) }
+        return annotation
+    }
 
-    private fun annotateWorkingFile(file: VirtualFile): FileAnnotation {
+    private fun annotateWorkingFile(file: VirtualFile, notifyIfAbsent: Boolean): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
 
         // 1. Find the content locator
@@ -178,7 +187,11 @@ class JujutsuAnnotationProvider(
                         // "No such path". Every line is "added" relative to the base (the gutter
                         // shows that, jj-idea-zf1j), so there is nothing to attribute: tell the user
                         // instead of raising an error.
-                        if (repo.isAbsentAt(file.filePath, base)) nothingToAnnotate(baseFile, repo) else throw e
+                        if (repo.isAbsentAt(file.filePath, base)) {
+                            nothingToAnnotate(baseFile, repo, notifyIfAbsent)
+                        } else {
+                            throw e
+                        }
                     }
                 }
             }
@@ -391,8 +404,8 @@ class JujutsuAnnotationProvider(
      * Annotate toggle stays unticked. An open zero-line annotation instead leaves zero-width columns
      * registered: the strip vanishes on the next tracker refresh while the toggle stays ticked.
      */
-    private fun nothingToAnnotate(file: VirtualFile, repo: JujutsuRepository): FileAnnotation {
-        notifyAbsentAtBase(project, file.name)
+    private fun nothingToAnnotate(file: VirtualFile, repo: JujutsuRepository, notify: Boolean): FileAnnotation {
+        if (notify) notifyAbsentAtBase(project, file.name)
         return JujutsuFileAnnotation(
             project = project,
             repo = repo,
