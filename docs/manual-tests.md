@@ -891,6 +891,11 @@ already-loaded log table shows — it never changes what jj loads for this or an
       `jj bookmark create`) within ~300 ms, without saving a file (op-heads watch) — this is the
       canonical auto-refresh check; other sections (bookmark widget, reference filter) reference
       it rather than repeating it
+- [ ] jj-idea-2570.14: on a large repo scrolled well past the first page, run `jj new` (then `jj new` on an
+      empty `@`, then `jj abandon @`) → the graph at the top and far below stays correct (no shifted or
+      missing lanes, long-edge arrows intact), further scrolling still loads cleanly, and `idea.log` shows
+      `perf: graph-layout-replace` with an `operations` count in the thousands, not tens of thousands
+      (one-off, not per loaded row)
 - [ ] jj-idea-xhnw: in a **secondary workspace** (`jj workspace add ../ws2` from the sandbox
       repo, open `ws2` as the project), run `jj new` in a terminal in `ws2`, then `jj new` in the
       primary workspace → the log refreshes within ~300 ms both times, without saving a file

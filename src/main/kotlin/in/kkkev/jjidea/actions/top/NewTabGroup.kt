@@ -43,7 +43,9 @@ class NewTabGroup : ActionGroup(
 
     /** Only reached when [update] marked this a perform-group, i.e. there is no menu to show. */
     override fun actionPerformed(e: AnActionEvent) {
-        ActionManager.getInstance().getAction(NEW_LOG_TAB)?.let { ActionUtil.performActionDumbAwareWithCallbacks(it, e) }
+        ActionManager.getInstance().getAction(NEW_LOG_TAB)?.let {
+            ActionUtil.performActionDumbAwareWithCallbacks(it, e)
+        }
     }
 
     private companion object {

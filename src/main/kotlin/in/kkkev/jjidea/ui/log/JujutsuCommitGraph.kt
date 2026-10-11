@@ -122,20 +122,38 @@ class CommitGraphBuilder {
         log.measurePerf("graph-layout") { report ->
             report.count("rows", entries.size.toLong())
             val graphEntries = entries.map { GraphEntry(it.key, it.parentKeys) }
-            val allIds = allEntries.mapTo(HashSet()) { it.key }
-            val layout = layoutCalculator.calculate(graphEntries, allIds)
-            report.count("operations", layoutCalculator.operationCount)
-            // jj-idea-jnqi bugfix: reseed the incremental engine so a later appendGraph() call
-            // has a correct base to extend, instead of silently treating its first delta as the
-            // whole log (losing every previously-loaded row's GraphNode). Only for the
-            // unfiltered case (entries === allEntries) - appendGraph()'s contract requires
-            // allIds to track entries' own ids exactly, which only holds there; a filtered call
-            // (entries !== allEntries, e.g. UnifiedJujutsuLogPanel's own instance) leaves
-            // incrementalEngine untouched, per IncrementalLayout's doc.
-            if (entries === allEntries) {
+            val layout = if (entries === allEntries) {
+                // jj-idea-jnqi bugfix: the unfiltered layout runs on the incremental engine so a later
+                // appendGraph() call has a correct base to extend, instead of silently treating its first
+                // delta as the whole log (losing every previously-loaded row's GraphNode). Only for the
+                // unfiltered case - appendGraph()'s contract requires allIds to track entries' own ids
+                // exactly, which only holds there. jj-idea-2570.15: this is the layout, not a second pass.
                 incrementalEngine.reset()
-                incrementalEngine.append(graphEntries)
+                val appended = incrementalEngine.append(graphEntries)
+                report.count("operations", incrementalEngine.operationCount)
+                appended
+            } else {
+                // Filtered (e.g. UnifiedJujutsuLogPanel's own instance): leaves incrementalEngine untouched.
+                val allIds = allEntries.mapTo(HashSet()) { it.key }
+                val calculated = layoutCalculator.calculate(graphEntries, allIds)
+                report.count("operations", layoutCalculator.operationCount)
+                calculated
             }
+            layout.rows.associate { it.id to it.toGraphNode() }
+        }
+
+    /**
+     * Re-lays out [entries] - the full unfiltered list, replacing what [buildGraph]/[appendGraph] last
+     * laid out - reusing the previous layout below the part that changed (jj-idea-2570.14). The post-write
+     * path: `jj new` prepends a row, so everything below it keeps its lanes. Same result as [buildGraph],
+     * at a layout cost of the changed rows plus about one checkpoint window instead of every loaded row;
+     * see [IncrementalLayout.replace]. Same locking contract as [appendGraph].
+     */
+    fun relayoutGraph(entries: List<GraphableEntry>): Map<ChangeKey, GraphNode> =
+        log.measurePerf("graph-layout-replace") { report ->
+            report.count("rows", entries.size.toLong())
+            val layout = incrementalEngine.replace(entries.map { GraphEntry(it.key, it.parentKeys) })
+            report.count("operations", incrementalEngine.operationCount)
             layout.rows.associate { it.id to it.toGraphNode() }
         }
 

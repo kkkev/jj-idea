@@ -90,4 +90,42 @@ class IncrementalLayoutScaleTest {
         // (the whole accumulated set); a true append-only fast path costs ~pageSize.
         lastPageOperations shouldBeLessThan (10L * pageSize)
     }
+
+    // jj-idea-2570.14: a post-write refresh prepends a row (jj new); the layout work must not grow with the
+    // number of rows already loaded.
+    @Test
+    fun `replace after prepending a head costs the same at 5k and 20k rows and far less than a full layout`() {
+        val width = 8
+        fun graph(total: Int) = (0 until total).map { i ->
+            entry("e$i", if (i + width < total) listOf("e${i + width}") else emptyList())
+        }
+
+        fun replaceOperations(total: Int): Pair<Long, Long> {
+            val old = graph(total)
+            val engine = IncrementalLayout<String>()
+            engine.append(old)
+            val fullOperations = engine.operationCount
+            engine.replace(listOf(entry("new", listOf("e0"))) + old)
+            return engine.operationCount to fullOperations
+        }
+
+        val (small, smallFull) = replaceOperations(5_000)
+        val (large, largeFull) = replaceOperations(20_000)
+
+        large shouldBeLessThan (2L * small + 1_000)
+        large shouldBeLessThan (largeFull / 20)
+        small shouldBeLessThan (smallFull / 5)
+    }
+
+    @Test
+    fun `replace after dropping the top row is independent of loaded rows`() {
+        fun operations(total: Int): Long {
+            val old = (0 until total).map { i -> entry("e$i", if (i + 1 < total) listOf("e${i + 1}") else emptyList()) }
+            val engine = IncrementalLayout<String>()
+            engine.append(old)
+            engine.replace(old.drop(1))
+            return engine.operationCount
+        }
+        operations(20_000) shouldBeLessThan (2L * operations(5_000) + 1_000)
+    }
 }

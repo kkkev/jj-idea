@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Editing an immutable working copy (`jj edit --ignore-immutable`) no longer leaves you confused when your edits end up in a new change on top. That is jj's own protection, applied by any command that snapshots, including the plugin's background refreshes. The plugin now says so in a notification, and **Squash into Immutable Commit...** (also on the child's right-click menu) folds the edits back into the immutable commit after confirmation. ([#143](https://github.com/kkkev/jj-idea/issues/143))
 
+### Changed
+- **Faster log refresh on large repositories**: after New Change, Commit, or abandoning an empty working copy, the log graph is re-laid out only where it changed instead of for every loaded row, so the refresh no longer slows down as you scroll deeper into history. Loading the log for the first time is also quicker, since the graph is now laid out once rather than twice.
+
 ## [0.9.1] - 2026-10-10
 
 ## [0.9.0] - 2026-10-10

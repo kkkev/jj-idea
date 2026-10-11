@@ -24,13 +24,35 @@ private data class PendingCap<I : Any>(val childId: I, val parentId: I, val pref
  * Cross-row forward-pass state as of just before processing row [rowIndex] - enough to
  * resume [IncrementalLayout]'s single forward pass from that point without replaying
  * everything from row 0. See [IncrementalLayout.append].
+ *
+ * [IncrementalLayout.replace] can keep a checkpoint whose row moved by `k` rows without touching its
+ * contents: [shiftBy] moves [rowIndex] and records `k` in [shift], and the accessors apply it to the
+ * absolute row numbers inside (passthrough end rows, pending-cap rows) when the state is read.
  */
 private class Checkpoint<I : Any>(
-    val rowIndex: Int,
-    val passthroughs: Set<Passthrough<I>>,
-    val reservedLanes: Map<I, Int>,
-    val pendingCaps: Map<Int, List<PendingCap<I>>>
-)
+    var rowIndex: Int,
+    private val passthroughs: Set<Passthrough<I>>,
+    private val reservedLanes: Map<I, Int>,
+    private val pendingCaps: Map<Int, List<PendingCap<I>>>
+) {
+    private var shift = 0
+
+    fun shiftBy(rows: Int) {
+        rowIndex += rows
+        shift += rows
+    }
+
+    /** The state as it would be after [extraShift] further rows of shift, without applying it. */
+    fun passthroughs(extraShift: Int = 0): HashSet<Passthrough<I>> {
+        val by = shift + extraShift
+        return passthroughs.mapTo(HashSet()) { if (by == 0) it else it.copy(endRow = it.endRow + by) }
+    }
+
+    fun reservedLanes(): HashMap<I, Int> = HashMap(reservedLanes)
+
+    fun pendingCaps(extraShift: Int = 0): HashMap<Int, MutableList<PendingCap<I>>> =
+        pendingCaps.entries.associateTo(HashMap()) { (row, caps) -> (row + shift + extraShift) to caps.toMutableList() }
+}
 
 /**
  * Resumable engine behind [LayoutCalculatorImpl.calculate] (jj-idea-jnqi). A full
@@ -176,9 +198,7 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
 
         for (rowIndex in resumeFrom until newSize) {
             if (rowIndex % CHECKPOINT_INTERVAL == 0) {
-                checkpoints.add(
-                    Checkpoint(rowIndex, HashSet(passthroughs), HashMap(reservedLanes), copyOf(pendingCaps))
-                )
+                checkpoints.add(snapshotCheckpoint(rowIndex))
             }
             processRow(rowIndex)
         }
@@ -206,6 +226,152 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
     }
 
     /**
+     * Replaces the accumulated entries with [newEntries], re-laying out only what the change can affect
+     * (jj-idea-2570.14) - the post-write counterpart of [append] for a list whose *top* changed (`jj new`
+     * prepends a row, `jj abandon` of an empty working copy swaps one). [newEntries] must be in valid
+     * topological order and, like [append]'s input, track [allIds] exactly (no filtered subset).
+     *
+     * Old = A + S and new = B + S, where S is the longest common suffix. Rows of S depend only on the
+     * forward-pass state at their row, their own children, and their distance to their parents, so the pass
+     * is replayed from row 0 and stops at the first row `r` where all of these hold:
+     * - `r` is past B and the old layout has a [Checkpoint] at the matching row `r - k`
+     *   (`k = |B| - |A|`), and the replayed cross-row state equals that checkpoint's, shifted by `k`;
+     * - every parent of a row that was added, removed or changed lane is above `r`, so no row from `r` on
+     *   has a different set of children or children lanes (those rows' `laneFor` and `childLanes` inputs).
+     *
+     * From `r` on the old rows, lanes and checkpoints (shifted by `k`, see [Checkpoint.shiftBy]) are exactly
+     * what a full pass would produce, and are kept. If the replay never converges it simply runs to the
+     * end, which is a full layout, so the result is always what [reset] + [append] would give.
+     *
+     * Cost: O(rows) hash and list bookkeeping, plus layout work for the rows replayed - |B| plus the
+     * distance to convergence (about one [CHECKPOINT_INTERVAL] window), not the loaded row count.
+     */
+    fun replace(newEntries: List<GraphEntry<I>>): GraphLayout<I> {
+        operationCount = 0
+        val oldSize = entries.size
+        val newSize = newEntries.size
+        var suffix = 0
+        while (suffix < minOf(oldSize, newSize) && entries[oldSize - 1 - suffix] == newEntries[newSize - 1 - suffix]) {
+            suffix++
+        }
+        if (suffix == oldSize && suffix == newSize) return layout
+        if (suffix == 0) {
+            reset()
+            return append(newEntries)
+        }
+        val aSize = oldSize - suffix
+        val bSize = newSize - suffix
+        val shift = bSize - aSize
+
+        // The layout being replaced, kept for the converged tail.
+        val oldCheckpoints = checkpoints.filter { it.rowIndex >= aSize }
+        val oldPassthroughs = passthroughs
+        val oldReservedLanes = reservedLanes
+        val oldPendingCaps = pendingCaps
+
+        val removedParents = ArrayList<I>()
+        for (i in 0 until aSize) {
+            val e = entries[i]
+            discardRowState(e)
+            unresolvedParentsByEntry.remove(e.current)
+            rowByChangeId.remove(e.current)
+            allIds.remove(e.current)
+            removedParents.addAll(e.parents)
+        }
+        entries.subList(0, aSize).clear()
+        entries.addAll(0, newEntries.subList(0, bSize))
+        for (i in 0 until bSize) allIds.add(entries[i].current)
+        for (i in entries.indices) rowByChangeId[entries[i].current] = i
+
+        // Rows whose parents must be replayed so their children set / lanes are recomputed.
+        var maxDirtyRow = -1
+        fun markDirty(parents: List<I>) {
+            for (p in parents) rowByChangeId[p]?.let { if (it > maxDirtyRow) maxDirtyRow = it }
+        }
+        markDirty(removedParents)
+
+        checkpoints.clear()
+        passthroughs = HashSet()
+        reservedLanes = HashMap()
+        pendingCaps = HashMap()
+
+        var converged: Checkpoint<I>? = null
+        var convergedAt = newSize
+        var next = 0
+        for (rowIndex in 0 until newSize) {
+            if (rowIndex >= bSize && rowIndex > maxDirtyRow) {
+                val oldRow = rowIndex - shift
+                while (next < oldCheckpoints.size && oldCheckpoints[next].rowIndex < oldRow) next++
+                val candidate = oldCheckpoints.getOrNull(next)
+                if (candidate != null && candidate.rowIndex == oldRow && matches(candidate, shift)) {
+                    converged = candidate
+                    convergedAt = rowIndex
+                    break
+                }
+            }
+            if (rowIndex % CHECKPOINT_INTERVAL == 0) checkpoints.add(snapshotCheckpoint(rowIndex))
+            val e = entries[rowIndex]
+            if (rowIndex < bSize) {
+                processRow(rowIndex)
+                markDirty(e.parents)
+            } else {
+                val oldLane = discardRowState(e)
+                unresolvedParentsByEntry.remove(e.current)
+                processRow(rowIndex)
+                if (lanes[e.current] != oldLane) markDirty(e.parents)
+            }
+        }
+
+        val rebuilt = (0 until convergedAt).map { buildRow(it) }
+        if (converged != null) {
+            rows.subList(0, converged.rowIndex).clear()
+            rows.addAll(0, rebuilt)
+            for (cp in oldCheckpoints.subList(next, oldCheckpoints.size)) {
+                cp.shiftBy(shift)
+                checkpoints.add(cp)
+            }
+            passthroughs = oldPassthroughs.mapTo(HashSet()) { it.copy(endRow = it.endRow + shift) }
+            reservedLanes = oldReservedLanes
+            pendingCaps = oldPendingCaps.entries.associateTo(HashMap()) { (row, caps) -> (row + shift) to caps }
+
+            // A replayed child was re-registered at the end of its parent's children, after the children from
+            // the kept tail; restore row order (it is `childLanes`' order) for parents below the replay.
+            val reordered = LinkedHashSet<I>()
+            for (rowIndex in 0 until convergedAt) {
+                for (parentId in entries[rowIndex].parents) {
+                    if ((rowByChangeId[parentId] ?: -1) >= convergedAt) reordered.add(parentId)
+                }
+            }
+            for (parentId in reordered) {
+                val children = childrenByParent.getValue(parentId)
+                operationCount += children.size
+                val inRowOrder = children.sortedBy { rowByChangeId.getValue(it.id) }
+                children.clear()
+                children.addAll(inRowOrder)
+                rows[rowByChangeId.getValue(parentId)] = buildRow(rowByChangeId.getValue(parentId))
+            }
+        } else {
+            rows.clear()
+            rows.addAll(rebuilt)
+        }
+
+        unresolvedParentRow.clear()
+        for ((id, unresolved) in unresolvedParentsByEntry) {
+            val row = rowByChangeId.getValue(id)
+            for (parentId in unresolved.keys) unresolvedParentRow.merge(parentId, row) { old, new -> minOf(old, new) }
+        }
+        return layout
+    }
+
+    /** Whether the live cross-row state equals [checkpoint]'s moved by [shift] rows - the point where a replay has converged. */
+    private fun matches(checkpoint: Checkpoint<I>, shift: Int): Boolean {
+        operationCount += passthroughs.size + reservedLanes.size + pendingCaps.size
+        return passthroughs == checkpoint.passthroughs(shift) &&
+            reservedLanes == checkpoint.reservedLanes() &&
+            pendingCaps == checkpoint.pendingCaps(shift)
+    }
+
+    /**
      * Discards computed layout state for rows from the latest checkpoint at or before
      * [restart] onward, restoring cross-row state ([passthroughs]/[reservedLanes]) from
      * that checkpoint. [entries]/[rowByChangeId] are untouched - under the append-only
@@ -223,31 +389,19 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
         val oldLanes = HashMap<I, Int>(entries.size - resumeFrom)
         for (rowIndex in resumeFrom until entries.size) {
             val e = entries[rowIndex]
-            val lane = lanes.remove(e.current)
-            if (lane != null) {
-                oldLanes[e.current] = lane
-                for (parentId in e.parents) {
-                    childrenByParent[parentId]?.let { children ->
-                        children.remove(ChildInfo(e.current, lane))
-                        if (children.isEmpty()) childrenByParent.remove(parentId)
-                    }
-                }
-            }
+            discardRowState(e)?.let { oldLanes[e.current] = it }
             unresolvedParentsByEntry.remove(e.current)?.let { unresolved ->
                 for (parentId in unresolved.keys) {
                     if (unresolvedParentRow[parentId] == rowIndex) unresolvedParentRow.remove(parentId)
                 }
             }
-            passthroughLanesByEntry.remove(e.current)
-            stubLaneByEntry.remove(e.current)
-            capLanesByEntry.remove(e.current)
         }
 
         rows.subList(resumeFrom, rows.size).clear()
 
-        passthroughs = if (checkpointIndex >= 0) HashSet(checkpoints[checkpointIndex].passthroughs) else HashSet()
-        reservedLanes = if (checkpointIndex >= 0) HashMap(checkpoints[checkpointIndex].reservedLanes) else HashMap()
-        pendingCaps = if (checkpointIndex >= 0) copyOf(checkpoints[checkpointIndex].pendingCaps) else HashMap()
+        passthroughs = if (checkpointIndex >= 0) checkpoints[checkpointIndex].passthroughs() else HashSet()
+        reservedLanes = if (checkpointIndex >= 0) checkpoints[checkpointIndex].reservedLanes() else HashMap()
+        pendingCaps = if (checkpointIndex >= 0) checkpoints[checkpointIndex].pendingCaps() else HashMap()
         while (checkpoints.isNotEmpty() && checkpoints.last().rowIndex >= resumeFrom) {
             checkpoints.removeAt(checkpoints.size - 1)
         }
@@ -255,8 +409,32 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
         return resumeFrom to oldLanes
     }
 
+    private fun snapshotCheckpoint(rowIndex: Int) =
+        Checkpoint(rowIndex, HashSet(passthroughs), HashMap(reservedLanes), copyOf(pendingCaps))
+
     private fun copyOf(caps: Map<Int, List<PendingCap<I>>>) =
         caps.mapValuesTo(HashMap()) { (_, list) -> list.toMutableList() }
+
+    /**
+     * Drops [e]'s computed layout state (lane, its registration as a child of each parent, passthrough,
+     * stub and cap lanes) - everything except [unresolvedParentsByEntry], which callers also need to
+     * reconcile with [unresolvedParentRow]. Returns the lane it had, or null if it had none.
+     */
+    private fun discardRowState(e: GraphEntry<I>): Int? {
+        val lane = lanes.remove(e.current)
+        if (lane != null) {
+            for (parentId in e.parents) {
+                childrenByParent[parentId]?.let { children ->
+                    children.remove(ChildInfo(e.current, lane))
+                    if (children.isEmpty()) childrenByParent.remove(parentId)
+                }
+            }
+        }
+        passthroughLanesByEntry.remove(e.current)
+        stubLaneByEntry.remove(e.current)
+        capLanesByEntry.remove(e.current)
+        return lane
+    }
 
     /** One row of the forward pass - identical shape to the original [LayoutCalculatorImpl] loop body. */
     private fun processRow(rowIndex: Int) {
@@ -334,7 +512,10 @@ class IncrementalLayout<I : Any>(private val longEdgeRows: Int = LONG_EDGE_ROWS)
             }
 
             operationCount += childrenByParent[parentId]?.size ?: 0
-            val parentHasOtherChildren = childrenByParent[parentId]?.any { it.id != entry.current } == true
+            // Only children above this row count: during replace() later rows may still hold stale
+            // registrations from the layout being replaced.
+            val parentHasOtherChildren = childrenByParent[parentId]
+                ?.any { it.id != entry.current && rowByChangeId.getValue(it.id) < rowIndex } == true
 
             if (isLong && childHasMultipleParents && onlyLongEdges && !childLaneUsed) {
                 childLaneUsed = true

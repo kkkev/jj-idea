@@ -175,6 +175,18 @@ for other edges, so the graph stays narrow when edges are hundreds of rows long.
 Recording B on the parent keeps incremental layout equivalent to a full one: any rewind that
 rebuilds row `p` re-derives B from threaded state, with no extra patch-up pass.
 
+## Replacing the Top of a Loaded Layout
+
+A post-write refresh (`jj new`, `jj abandon` of an empty working copy) changes the top of the loaded log but
+leaves everything below it alone. `IncrementalLayout.replace` re-lays out only what that can affect
+(jj-idea-2570.14): it finds the common suffix of the old and new rows, replays the forward pass from row 0,
+and stops at the first row `r` past the changed rows where the cross-row state (passthroughs, reserved lanes,
+pending caps) equals an old `Checkpoint` moved by the row shift, and no parent of a changed row lies at or
+below `r`. From `r` on, the old rows, lanes and checkpoints are kept - checkpoints shift lazily
+(`Checkpoint.shiftBy`), so the work does not grow with the number of loaded rows. If it never converges the
+replay simply runs to the end, which is a full layout. A parent whose children were replayed has its children
+re-ordered to row order so `childLanes` matches a from-scratch layout exactly.
+
 ## Handling Multiple Parents
 
 When an entry has multiple parents (a merge commit):

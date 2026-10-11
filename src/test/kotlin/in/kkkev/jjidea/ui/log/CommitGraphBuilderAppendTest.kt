@@ -112,4 +112,32 @@ class CommitGraphBuilderAppendTest {
 
         nodes.getValue(pageA[0].key).unresolvedParents shouldBe emptyMap()
     }
+
+    // jj-idea-2570.14: the post-write path re-lays out a list whose top changed (jj new).
+    @Test
+    fun `relayoutGraph after a prepended head matches a fresh buildGraph and stays a valid append base`() {
+        val chain = (0 until 12).map { logEntry("c$it", if (it < 11) "c${it + 1}" else null) }
+        val head = logEntry("head", "c0")
+        val older = listOf(logEntry("z0", "z1"), logEntry("z1", null))
+
+        val builder = CommitGraphBuilder()
+        builder.buildGraph(chain)
+        val relaid = builder.relayoutGraph(listOf(head) + chain)
+
+        relaid shouldContainExactly CommitGraphBuilder().buildGraph(listOf(head) + chain)
+        builder.appendGraph(older) shouldContainExactly CommitGraphBuilder().buildGraph(listOf(head) + chain + older)
+    }
+
+    // jj-idea-2570.15: buildGraph's unfiltered path is one layout pass, not a layout plus a reseed.
+    @Test
+    fun `unfiltered buildGraph lays out once`() {
+        val chain = (0 until 50).map { logEntry("c$it", if (it < 49) "c${it + 1}" else null) }
+        val builder = CommitGraphBuilder()
+        builder.buildGraph(chain)
+        val once = builder.incrementalOperationCount
+
+        val engine = `in`.kkkev.jjidea.ui.log.graph.IncrementalLayout<`in`.kkkev.jjidea.jj.ChangeKey>()
+        engine.append(chain.map { `in`.kkkev.jjidea.ui.log.graph.GraphEntry(it.key, it.parentKeys) })
+        once shouldBe engine.operationCount
+    }
 }

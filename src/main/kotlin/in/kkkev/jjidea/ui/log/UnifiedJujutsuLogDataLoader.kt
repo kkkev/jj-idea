@@ -434,7 +434,8 @@ class UnifiedJujutsuLogDataLoader(
      * row contents changed (same keys, same parents, same order: describe, edit, bookmark move), the
      * previous [MergedSnapshot.graphNodes] are reused and the O(rows x lanes) layout is skipped
      * (jj-idea-2570.13); layout depends only on `(key, parentKeys)`, and the incremental engine's inputs
-     * are unchanged so it stays a valid base for a later append.
+     * are unchanged so it stays a valid base for a later append. When the topology changed (`jj new`
+     * prepends a row), only the changed top and a convergence window are re-laid out (jj-idea-2570.14).
      */
     private fun fullMergeAndNotify(correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>): Data? {
         val allEntries = repositories().flatMap { r ->
@@ -461,7 +462,11 @@ class UnifiedJujutsuLogDataLoader(
             previous.graphNodes
         } else {
             log.debug("log merge: relayout (${topologyDifference(previous?.entries, merged)})")
-            graphBuilder.buildGraph(merged)
+            // The engine always holds the previous snapshot's rows (every snapshot write goes through
+            // buildGraph/appendGraph on the unfiltered list, under mergeLock), so only the changed top
+            // plus a convergence window is re-laid out (jj-idea-2570.14). replace() diffs against the
+            // engine's own rows, so it is correct even if that ever stops holding - only slower.
+            if (previous != null) graphBuilder.relayoutGraph(merged) else graphBuilder.buildGraph(merged)
         }
         snapshot = MergedSnapshot(
             merged,
