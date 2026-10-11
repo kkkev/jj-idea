@@ -479,13 +479,17 @@ interface CommandExecutor {
      * @param filePaths Specific files to squash (empty = all files)
      * @param description Description for the combined result at [destination] (null = let jj merge)
      * @param keepEmptied Keep emptied source changes
+     * @param ignoreImmutable Allow [destination] to be immutable (`--ignore-immutable`)
+     * @param useDestinationMessage Keep the destination's description (`-u`), never opening an editor
      */
     fun squashInto(
         sources: List<Revision>,
         destination: Revision,
         filePaths: List<FilePath> = emptyList(),
         description: Description? = null,
-        keepEmptied: Boolean = false
+        keepEmptied: Boolean = false,
+        ignoreImmutable: Boolean = false,
+        useDestinationMessage: Boolean = false
     ): CommandResult
 
     /**

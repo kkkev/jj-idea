@@ -21,6 +21,7 @@ import `in`.kkkev.jjidea.jj.JjAvailabilityStatus
 import `in`.kkkev.jjidea.jj.JjFeature
 import `in`.kkkev.jjidea.jj.JjVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.OperationId
 import `in`.kkkev.jjidea.jj.RepositoryHealth
 import `in`.kkkev.jjidea.jj.stateModel
@@ -215,6 +216,32 @@ object JujutsuNotifications {
                 addExpiringAction("log.navigate.resetFilters", resetAndSelect)
             }.notify(project)
     }
+
+    /**
+     * jj left immutable commit [parent] unchanged and moved the user's edits into a new child on top
+     * (jj-idea-bzkf, GitHub #143). Sticky; [onSquash] squashes the child back. Returns the
+     * notification so the caller can expire it once the child is gone.
+     */
+    fun notifyImmutableWorkingCopyMoved(
+        project: Project,
+        repo: JujutsuRepository,
+        parent: LogEntry,
+        onSquash: () -> Unit
+    ): Notification = NotificationGroupManager.getInstance()
+        .getNotificationGroup(GROUP_ID)
+        .createNotification(
+            JujutsuBundle.message("notification.immutable.moved.title"),
+            JujutsuBundle.message(
+                "notification.immutable.moved.content",
+                parent.id.short,
+                parent.description.summary,
+                repo.displayName
+            ),
+            NotificationType.INFORMATION
+        ).apply {
+            isImportant = true
+            addExpiringAction("notification.immutable.moved.action.squash", onSquash)
+        }.also { it.notify(project) }
 
     fun notifyWorkingCopyUnavailable(
         project: Project,

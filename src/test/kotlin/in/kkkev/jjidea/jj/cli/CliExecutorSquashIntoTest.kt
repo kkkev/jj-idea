@@ -31,6 +31,36 @@ class CliExecutorSquashIntoTest {
     }
 
     @Nested
+    inner class `immutable destination (jj-idea-bzkf)` {
+        @Test
+        fun `squash back into an immutable commit passes -u and --ignore-immutable`() {
+            val result = squashIntoArgs(
+                listOf(src1),
+                dest,
+                ignoreImmutable = true,
+                useDestinationMessage = true
+            )
+
+            result.args shouldBe listOf(
+                "squash",
+                "--into",
+                "fff111222333",
+                "--from",
+                "abc123def456",
+                "--use-destination-message",
+                "--ignore-immutable"
+            )
+            result.reversibility shouldBe Reversibility.REVERSIBLE
+        }
+
+        @Test
+        fun `neither flag is passed by default`() {
+            squashIntoArgs(listOf(src1), dest).args shouldBe
+                listOf("squash", "--into", "fff111222333", "--from", "abc123def456")
+        }
+    }
+
+    @Nested
     inner class `multiple sources` {
         @Test
         fun `squash with two sources`() {

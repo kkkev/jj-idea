@@ -1290,7 +1290,7 @@ jj new; jj new; jj new` then `jj bookmark create -r A base` and set the diff bas
 
 **Squash Into…**
 
-**Code:** `ui/squash/SquashIntoDialog.kt`, `ui/squash/SquashFilePreview.kt`, `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/squashIntoAction.kt`, `actions/change/squashFromAction.kt`, `actions/filechange/SquashIntoFilesAction.kt`
+**Code:** `ui/squash/SquashIntoDialog.kt`, `ui/squash/SquashFilePreview.kt`, `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/squashIntoAction.kt`, `actions/change/squashFromAction.kt`, `actions/filechange/SquashIntoFilesAction.kt`, `actions/change/squashIntoImmutableParentAction.kt`, `jj/ImmutableWorkingCopyTracker.kt`
 **Fixture:** FX-STACK
 **Also re-run:** MT-CTXMENU (shares the commit picker); MT-SPLIT (shares `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, the hunk picker, and the staging protocol); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer)
 
@@ -1482,6 +1482,29 @@ confirmation dialogs.
 2. Select the merge commit → "Squash Into..."
 - [ ] Merge commit appears as a valid destination in the picker
 - [ ] Squashing into the merge commit succeeds
+
+#### Edited immutable working copy (jj-idea-bzkf, GitHub #143)
+
+jj never edits an immutable `@` in place: the first snapshot with edits moves them into a new child. The plugin lets jj do that, says so, and offers to squash the child back.
+
+**Setup:** FX-STACK with an immutable base, e.g. `jj config set --repo 'revset-aliases."immutable_heads()"' 'bookmarks()'`, then in a terminal `jj edit --ignore-immutable <bookmarked change>`.
+1. Edit and save a tracked file in the IDE
+- [ ] A sticky **Immutable Commit Left Unchanged** notification appears once, naming the immutable commit and the repo, with a **Squash into Immutable Commit...** action
+- [ ] The log shows `@` as a new change on top of the immutable commit; the immutable commit itself is unchanged
+2. Keep editing, or run `jj status` in a terminal
+- [ ] No second notification for the same child
+3. Click **Squash into Immutable Commit...**
+- [ ] A confirmation names the immutable commit and warns it may be shared; **No** changes nothing
+- [ ] **Yes** squashes the edits into the immutable commit (`jj diff -r <it>` shows them); `@` is an empty change on top; the notification disappears; the log refreshes
+- [ ] Undo (Operations tab / `jj op undo`) reverts the squash
+4. Repeat steps 1–2, then dismiss the notification and right-click the new child in the log
+- [ ] **Squash into Immutable Parent...** is present, and only on that child (not on `@` after the squash, nor on ordinary changes above trunk)
+5. Repeat step 1, then in a terminal `jj abandon @` (or `jj undo`)
+- [ ] The notification expires once the child is gone
+6. **Terminal-triggered:** with the IDE idle, edit a file on disk, then run `jj status` in a terminal
+- [ ] Once the IDE refreshes, the notification still appears (detected from repo state)
+7. **No false positives:** from an immutable `@`, use the status-bar switcher's **New on Top**; push `@` so a fetch/push makes it immutable
+- [ ] Neither shows the notification
 
 ### MT-SPLIT
 

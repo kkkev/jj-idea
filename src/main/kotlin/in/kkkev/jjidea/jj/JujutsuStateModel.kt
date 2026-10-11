@@ -572,6 +572,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         // Only dirty repos whose state actually changed to avoid flooding FileStatusManager.
         var previousStateKeys = emptyMap<String, LogEntry.StateKey>()
         workingCopies.connect(this) { new ->
+            project.immutableWorkingCopyTracker.onWorkingCopiesChanged(new)
             val newKeys = new.mapValues { it.value.stateKey }
             val changedEntries = new.filter { entry -> previousStateKeys[entry.key] != entry.value.stateKey }
             previousStateKeys = newKeys

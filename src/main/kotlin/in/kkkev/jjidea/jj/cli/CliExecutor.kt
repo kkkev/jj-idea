@@ -534,17 +534,27 @@ internal fun gitCloneArgs(source: String, destination: String, colocate: Boolean
     }
 )
 
-/** Build the argument list for `jj squash --from ... --into ...`. */
+/**
+ * Build the argument list for `jj squash --from ... --into ...`.
+ *
+ * [ignoreImmutable] lets the destination be an immutable commit (jj-idea-bzkf: squashing back the
+ * child jj created on top of an immutable working copy); [useDestinationMessage] keeps jj from
+ * opening an editor to merge descriptions. Both default off.
+ */
 internal fun squashIntoArgs(
     sources: List<Revision>,
     destination: Revision,
     filePaths: List<String> = emptyList(),
     description: Description? = null,
-    keepEmptied: Boolean = false
+    keepEmptied: Boolean = false,
+    ignoreImmutable: Boolean = false,
+    useDestinationMessage: Boolean = false
 ) = JjInvocation(
     REVERSIBLE,
     buildList {
         addAll(squashIntoPrefixArgs(sources, destination, description, keepEmptied))
+        if (useDestinationMessage) add("--use-destination-message")
+        if (ignoreImmutable) add("--ignore-immutable")
         if (filePaths.isNotEmpty()) {
             add("--")
             addAll(filePaths.map { it.toFileset() })
@@ -707,7 +717,8 @@ class CliExecutor(
     private val root: VirtualFile?,
     private val executableProvider: () -> String = { "jj" },
     private val onJjNotFound: (() -> Unit)? = null,
-    private val trackUndo: Boolean = false
+    private val trackUndo: Boolean = false,
+    private val onImmutableWorkingCopyMoved: (() -> Unit)? = null
 ) : CommandExecutor {
     private val log = Logger.getInstance(javaClass)
     private val defaultTimeout = TimeUnit.SECONDS.toMillis(30)
@@ -922,7 +933,9 @@ class CliExecutor(
         destination: Revision,
         filePaths: List<FilePath>,
         description: Description?,
-        keepEmptied: Boolean
+        keepEmptied: Boolean,
+        ignoreImmutable: Boolean,
+        useDestinationMessage: Boolean
     ) = execute(
         root,
         squashIntoArgs(
@@ -930,7 +943,9 @@ class CliExecutor(
             destination,
             filePaths.map { it.relativeTo(root!!) },
             description,
-            keepEmptied
+            keepEmptied,
+            ignoreImmutable,
+            useDestinationMessage
         )
     )
 
@@ -1163,6 +1178,10 @@ class CliExecutor(
                 val message = "jj $cmdName failed with exit code $exitCode:\n$stderr"
                 if (warnOnFailure) log.warn(message) else log.info(message)
             }
+        }
+
+        if (onImmutableWorkingCopyMoved != null && immutableWorkingCopyMoved(output.stderr)) {
+            onImmutableWorkingCopyMoved.invoke()
         }
 
         val result = output.toCommandResult(cmdName, timeout, invocation.reversibility)

@@ -110,6 +110,7 @@ object JujutsuLogContextMenuActions {
         val squashIntoSrcs = squashIntoSources(entries)
         add(squashIntoAction(uniqueRepo?.takeIf { squashIntoSrcs.isNotEmpty() }, squashIntoSrcs))
         add(squashFromAction(entry?.takeIf { !it.immutable }))
+        add(squashIntoImmutableParentAction(project, entry))
         add(splitAction(project, entry?.takeIf { !it.immutable }))
         add(splitAction(project, entry?.takeIf { !it.immutable }, newParent = true))
 

@@ -276,7 +276,9 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
         destination: Revision,
         filePaths: List<FilePath>,
         description: Description?,
-        keepEmptied: Boolean
+        keepEmptied: Boolean,
+        ignoreImmutable: Boolean,
+        useDestinationMessage: Boolean
     ): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
     override fun squashIntoInteractive(
