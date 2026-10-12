@@ -70,7 +70,7 @@ private val REVISION_NAME_PATTERN = Regex("^[A-Za-z0-9][A-Za-z0-9_/-]*$")
 /**
  * Quotes [text] as a jj revset double-quoted string literal, escaping backslashes and quotes.
  */
-private fun quoteRevsetString(text: String): String {
+internal fun quoteRevsetString(text: String): String {
     val escaped = text.replace("\\", "\\\\").replace("\"", "\\\"")
     return "\"$escaped\""
 }

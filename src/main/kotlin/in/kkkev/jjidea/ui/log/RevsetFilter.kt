@@ -28,8 +28,16 @@ import `in`.kkkev.jjidea.jj.Revset
  * with the already-loaded entries (themselves bounded by jj's own default) still limits what's
  * shown to what jj's default loaded.
  */
-internal fun revsetFilterQuery(base: Revset, filter: String): Revset =
-    if (base == Revset.Default) Expression("($filter)") else Expression("($base) & ($filter)")
+internal fun revsetFilterQuery(base: Revset, filter: String): Revset = andRevsets(base, listOf(filter))
+
+/**
+ * [base] (unless it is [Revset.Default]) ANDed with each of [terms], every operand parenthesised so
+ * an operator inside one term (`|`, `~`) can't change how the others bind. [terms] must be non-empty.
+ */
+internal fun andRevsets(base: Revset, terms: List<String>): Revset {
+    val operands = terms.map { "($it)" }
+    return Expression((if (base == Revset.Default) operands else listOf("($base)") + operands).joinToString(" & "))
+}
 
 /**
  * The outcome of resolving a revset filter across every repo in a log tab: the matched
