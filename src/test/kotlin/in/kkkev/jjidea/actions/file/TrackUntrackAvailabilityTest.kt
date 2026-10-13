@@ -155,3 +155,79 @@ class TrackUntrackAvailabilityTest {
 }
 
 private fun path(i: Int) = LocalFilePath("/project/file$i.txt", false)
+
+/** jj-idea-otwq: [selectionIsOnlyUntrackedIgnored] decision logic and its scale bounds. */
+class SelectionIsOnlyUntrackedIgnoredTest {
+    private val root = mockk<VirtualFile>()
+
+    private fun path(name: String, dir: Boolean = false) = LocalFilePath("/repo/$name", dir)
+
+    private fun check(
+        paths: List<com.intellij.openapi.vcs.FilePath>,
+        isIgnored: (com.intellij.openapi.vcs.FilePath) -> Boolean = { true },
+        tracked: (com.intellij.openapi.vcs.FilePath) -> Boolean? = { false }
+    ) = selectionIsOnlyUntrackedIgnored(paths, root, { p, _ -> isIgnored(p) }, tracked)
+
+    @Test
+    fun `all ignored and untracked disables`() {
+        check(listOf(path("a"), path("b"))) shouldBe true
+    }
+
+    @Test
+    fun `tracked ignored file stays enabled`() {
+        check(listOf(path("a")), tracked = { true }) shouldBe false
+    }
+
+    @Test
+    fun `one tracked file in a mixed selection keeps it enabled`() {
+        check(listOf(path("a"), path("b")), tracked = { it.name == "b" }) shouldBe false
+    }
+
+    @Test
+    fun `unknown tracked state fails open`() {
+        check(listOf(path("a")), tracked = { null }) shouldBe false
+    }
+
+    @Test
+    fun `non-ignored file stays enabled and tracked state is never consulted`() {
+        var lookups = 0
+        check(listOf(path("a")), isIgnored = { false }, tracked = {
+            lookups++
+            false
+        }) shouldBe false
+        lookups shouldBe 0
+    }
+
+    @Test
+    fun `directory and empty selection fail open`() {
+        check(listOf(path("d", dir = true))) shouldBe false
+        check(emptyList()) shouldBe false
+    }
+
+    @Test
+    fun `selection beyond the limit does no lookups and stays enabled`() {
+        var ignoredCalls = 0
+        var trackedCalls = 0
+        val paths = (0..10_000).map { path("f$it") }
+        check(paths, isIgnored = {
+            ignoredCalls++
+            true
+        }, tracked = {
+            trackedCalls++
+            false
+        }) shouldBe false
+        ignoredCalls shouldBe 0
+        trackedCalls shouldBe 0
+    }
+
+    @Test
+    fun `ordinary selection stops at the first non-ignored path`() {
+        var ignoredCalls = 0
+        val paths = (0 until TRACKED_TOGGLE_SELECTION_LIMIT).map { path("f$it") }
+        check(paths, isIgnored = {
+            ignoredCalls++
+            false
+        }) shouldBe false
+        ignoredCalls shouldBe 1
+    }
+}

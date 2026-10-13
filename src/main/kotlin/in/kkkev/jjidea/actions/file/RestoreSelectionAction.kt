@@ -71,5 +71,6 @@ class RestoreSelectionAction : DumbAwareAction(
         // In that case, RestoreToChangeAction should be used instead
         val isHistoricalContext = entry != null && !entry.isWorkingCopy
         e.presentation.isEnabledAndVisible = !isHistoricalContext && repoFor(e) != null
+        e.disableIfOnlyUntrackedIgnored()
     }
 }

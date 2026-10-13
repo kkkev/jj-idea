@@ -57,6 +57,7 @@ class CompareFileWithBranchAction : DumbAwareAction(
 
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabledAndVisible = e.project != null && (e.repoForFile ?: e.singleRepoForFiles) != null
+        e.disableIfOnlyUntrackedIgnored()
     }
 
     fun showDiff(repo: JujutsuRepository, files: List<VirtualFile>, leftRevision: Revision) {

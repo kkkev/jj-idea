@@ -6,6 +6,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.util.ProgressIndicatorUtils
 import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.actions.file
+import `in`.kkkev.jjidea.actions.singleRepoForFiles
 import `in`.kkkev.jjidea.vcs.diffbase.DiffbaseService
 import `in`.kkkev.jjidea.vcs.filePath
 import `in`.kkkev.jjidea.vcs.possibleJujutsuRepositoryFor
@@ -33,8 +34,15 @@ class JujutsuEditorActionGroup : DefaultActionGroup() {
     override fun getChildren(e: AnActionEvent?): Array<AnAction> {
         val children = super.getChildren(e)
         val annotate = ManagedActions["Annotate"]
-        val hideAnnotate = e != null && (isInDiffEditor(e) || isAbsentAtDiffbase(e))
+        val hideAnnotate = e != null && (isInDiffEditor(e) || isOnlyUntrackedIgnored(e) || isAbsentAtDiffbase(e))
         return if (hideAnnotate) children.filter { it !== annotate }.toTypedArray() else children
+    }
+
+    /** jj-idea-otwq: nothing to annotate for a file jj doesn't version (ignored and untracked). */
+    private fun isOnlyUntrackedIgnored(e: AnActionEvent): Boolean {
+        val project = e.project ?: return false
+        val repo = e.singleRepoForFiles ?: return false
+        return e.isOnlyUntrackedIgnored(project, repo)
     }
 
     private fun isInDiffEditor(e: AnActionEvent) = e.getData(CommonDataKeys.EDITOR)?.let(DiffUtil::isDiffEditor) == true

@@ -44,5 +44,6 @@ class ShowFileHistoryForSelectionAction :
             editor != null &&
             editor.selectionModel.hasSelection() &&
             e.repoForFile != null
+        e.disableIfOnlyUntrackedIgnored()
     }
 }

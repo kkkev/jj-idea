@@ -6,6 +6,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.change.executeSquashInto
+import `in`.kkkev.jjidea.actions.file.disableIfOnlyUntrackedIgnored
 import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
@@ -73,6 +74,7 @@ class SquashIntoFilesAction : DumbAwareAction(
     override fun update(e: AnActionEvent) {
         val entry = resolveEntry(e)
         e.presentation.isEnabledAndVisible = entry != null && !entry.immutable
+        e.disableIfOnlyUntrackedIgnored()
     }
 
     override fun actionPerformed(e: AnActionEvent) {

@@ -59,6 +59,7 @@ class ShowFileHistoryAction : DumbAwareAction(
 
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabledAndVisible = hasTreeTarget(e) || hasEditorTarget(e)
+        e.disableIfOnlyUntrackedIgnored()
     }
 
     override fun actionPerformed(e: AnActionEvent) {

@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Abandon Changes**: select several changes in the log and abandon them together from the right-click menu. It is available when every selected change is mutable and in the same repository, runs as a single operation (one Undo restores all of them), and asks once, summarising what would be lost, including any local bookmarks that will be deleted. Selecting 10 or more changes always asks first.
 
 ### Fixed
+- Jujutsu menu actions (history, restore, compare, squash, split, diff) are now disabled for files that are ignored and not tracked, since jj has nothing to offer for them; **Annotate** is hidden. Tick **Tracked** to bring such a file under jj, and tracked-but-ignored files are unaffected.
 - Editing an immutable working copy (`jj edit --ignore-immutable`) no longer leaves you confused when your edits end up in a new change on top. That is jj's own protection, applied by any command that snapshots, including the plugin's background refreshes. The plugin now says so in a notification, and **Squash into Immutable Commit...** (also on the child's right-click menu) folds the edits back into the immutable commit after confirmation. ([#143](https://github.com/kkkev/jj-idea/issues/143))
 
 ### Changed

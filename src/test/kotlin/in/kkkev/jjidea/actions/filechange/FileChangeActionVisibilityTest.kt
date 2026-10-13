@@ -63,6 +63,7 @@ class FileChangeActionVisibilityTest {
         presentation = Presentation()
         event = mockk(relaxed = true)
         every { event.presentation } returns presentation
+        every { event.project } returns null // no project: ignored-file disabling (jj-idea-otwq) is a no-op
         every { event.getData(CommonDataKeys.PROJECT) } returns null
         every { event.getData(JujutsuDataKeys.LOG_ENTRY) } returns null
         every { event.getData(VcsDataKeys.SELECTED_CHANGES) } returns null
@@ -281,6 +282,11 @@ class FileChangeActionVisibilityTest {
 
     @Nested
     inner class `RestoreToChange` {
+        @BeforeEach
+        fun setupProject() {
+            every { event.project } returns mockk(relaxed = true)
+        }
+
         @Test
         fun `hidden when no LOG_ENTRY (working copy panel context)`() {
             withChanges(historicalChange("Main.kt"))
@@ -401,6 +407,7 @@ class FileChangeActionVisibilityTest {
     inner class `OpenChangeFile` {
         @BeforeEach
         fun setupProject() {
+            every { event.project } returns mockk(relaxed = true)
             every { event.getData(CommonDataKeys.PROJECT) } returns mockk(relaxed = true)
         }
 

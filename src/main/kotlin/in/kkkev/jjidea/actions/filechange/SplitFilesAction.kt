@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.change.executeSplit
+import `in`.kkkev.jjidea.actions.file.disableIfOnlyUntrackedIgnored
 import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntry
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
@@ -64,6 +65,7 @@ class SplitFilesAction : DumbAwareAction(
     override fun update(e: AnActionEvent) {
         val entry = resolveSplitEntry(e)
         e.presentation.isEnabledAndVisible = entry?.immutable == false
+        e.disableIfOnlyUntrackedIgnored()
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -92,6 +94,7 @@ class SplitIntoNewParentFilesAction : DumbAwareAction(
     override fun update(e: AnActionEvent) {
         val entry = resolveSplitEntry(e)
         e.presentation.isEnabledAndVisible = entry?.immutable == false
+        e.disableIfOnlyUntrackedIgnored()
     }
 
     override fun actionPerformed(e: AnActionEvent) {

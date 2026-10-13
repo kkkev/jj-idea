@@ -10,6 +10,7 @@ import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.changes
+import `in`.kkkev.jjidea.actions.file.disableIfOnlyUntrackedIgnored
 import `in`.kkkev.jjidea.actions.fileList
 import `in`.kkkev.jjidea.actions.filesFor
 import `in`.kkkev.jjidea.actions.logEntry
@@ -73,5 +74,6 @@ class ShowDiffAction :
             hasChanges ||
             hasLogEntry ||
             (hasRepo && e.place != ActionPlaces.KEYBOARD_SHORTCUT)
+        e.disableIfOnlyUntrackedIgnored()
     }
 }

@@ -3205,6 +3205,16 @@ Repeat for each `ui.conflict-marker-style` (`git`, `snapshot`, `diff`), in light
 → automate: jj-idea-aah2 (.gitignore coloring/propagation checks above are file-classification
 logic, testable without rendering)
 
+#### Jujutsu menu on ignored, untracked files (jj-idea-otwq)
+
+- [ ] Right-click an ignored untracked file (e.g. a file under `build/`) in the Project view → Jujutsu:
+      History, Restore, Compare with Branch, Squash/Split and Show Diff are visible but disabled
+      (the explanatory description is set on the action, but menus don't reliably surface it for
+      disabled items — don't fail the test if no text appears); Annotate is absent
+- [ ] Tracked toggle stays enabled; ticking it enables the items above on the next menu open
+- [ ] A tracked-but-ignored file (tracked via the toggle, then re-open the menu) has all items enabled
+- [ ] A mixed selection (one ordinary tracked file + one ignored untracked file) leaves items enabled
+
 #### Local Changes — Ignored Files node
 
 - [ ] Version Control → Local Changes shows an "Ignored Files" group

@@ -4,8 +4,6 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction
-import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.changes.ChangeListManager
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.filePaths
 import `in`.kkkev.jjidea.actions.logEntryForFile
@@ -162,27 +160,9 @@ class TrackedToggleAction : ToggleAction(
             .toList()
         if (predictedIgnored.isEmpty()) return emptyList()
 
-        val changeListManager = ChangeListManager.getInstance(project)
-        val trackedService = JujutsuTrackedFilesService.getInstance(project)
-        val unresolved = mutableListOf<FilePath>()
-        val resolved = predictedIgnored.map { path ->
-            // Cache first (authoritative once set, including a just-clicked optimistic write via
-            // setKnown) - only fall back to the free ChangeListManager shortcut, then the safe
-            // default, when the cache has no answer at all. Checking the free shortcut FIRST would
-            // let a stale pending-change entry override a just-written optimistic value (e.g. right
-            // after untracking a modified file, before ChangeListManager has re-run to notice).
-            val tracked = trackedService.trackedStateOrNull(repo, path) ?: run {
-                val hasPendingChange = path.virtualFile?.let { changeListManager.getChange(it) != null } == true
-                if (hasPendingChange) {
-                    true
-                } else {
-                    unresolved.add(path)
-                    false // safe default until the async refresh below resolves it
-                }
-            }
-            TrackedPath(path, tracked)
+        // Unknown state reads as "untracked" here - safe for a checkbox until the async refresh lands.
+        return resolveTrackedStates(project, repo, predictedIgnored).map { (path, tracked) ->
+            TrackedPath(path, tracked ?: false)
         }
-        if (unresolved.isNotEmpty()) trackedService.requestRefresh(repo, unresolved)
-        return resolved
     }
 }
