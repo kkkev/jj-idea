@@ -389,9 +389,9 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
 
     override fun createOtherFilterComponents(): List<JujutsuFilterComponent> {
         // Root filter (only shown when multiple roots)
-        rootFilterComponent = JujutsuRootFilterComponent(logTable.logModel).apply {
+        rootFilterComponent = JujutsuRootFilterComponent { logTable.logModel.getAllRoots() }.apply {
             initUi()
-            initialize()
+            initialize { logTable.logModel.setRootFilter(it.included, it.excluded) }
             // Initially hidden, will show when data loads if multiple roots
             isVisible = false
             // Persist root selection changes

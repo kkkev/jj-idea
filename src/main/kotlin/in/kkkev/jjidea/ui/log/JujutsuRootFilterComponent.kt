@@ -26,7 +26,7 @@ import javax.swing.Icon
  * colored square icon matching the gutter color: filled when included, outlined when
  * unset, outlined-and-struck-through when excluded.
  */
-class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
+class JujutsuRootFilterComponent(private val roots: () -> List<JujutsuRepository>) :
     JujutsuFilterComponent(JujutsuBundle.message("log.filter.root")) {
     private val includedRoots = mutableSetOf<JujutsuRepository>()
     private val excludedRoots = mutableSetOf<JujutsuRepository>()
@@ -41,12 +41,22 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
 
     override fun isValueSelected(): Boolean = currentSelection().isActive
 
-    private fun currentSelection() = RootFilterSelection(includedRoots, excludedRoots)
+    private fun currentSelection() = selection()
 
-    fun initialize() {
-        addChangeListener {
-            tableModel.setRootFilter(includedRoots, excludedRoots)
-        }
+    /** A snapshot of the current tri-state selection. */
+    fun selection() = RootFilterSelection(includedRoots.toSet(), excludedRoots.toSet())
+
+    /** Replaces the selection with [included] only (no exclusions) and notifies listeners. */
+    fun select(included: Set<JujutsuRepository>) {
+        includedRoots.clear()
+        excludedRoots.clear()
+        includedRoots.addAll(included)
+        notifyFilterChanged()
+    }
+
+    /** Calls [onChange] with the new selection whenever the user (or [select]/[setSelectedRoots]) changes it. */
+    fun initialize(onChange: (RootFilterSelection) -> Unit) {
+        addChangeListener { onChange(selection()) }
     }
 
     /** Returns the paths of all currently included roots (defensive copy). */
@@ -63,7 +73,7 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
     fun setSelectedRoots(included: Set<String>, excluded: Set<String> = emptySet()) {
         includedRoots.clear()
         excludedRoots.clear()
-        val allRoots = tableModel.getAllRoots()
+        val allRoots = roots()
         allRoots.filterTo(includedRoots) { it.directory.path in included }
         allRoots.filterTo(excludedRoots) { it.directory.path in excluded }
         notifyFilterChanged()
@@ -73,19 +83,19 @@ class JujutsuRootFilterComponent(private val tableModel: JujutsuLogTableModel) :
      * Check if this filter should be visible.
      * Only show when there are multiple roots.
      */
-    fun shouldBeVisible(): Boolean = tableModel.getAllRoots().size > 1
+    fun shouldBeVisible(): Boolean = roots().size > 1
 
     // Widened from the base class's `protected` so tests can drive the popup's real actions
     // (CycleRootAction, SelectAllRootsAction) directly instead of the persistence-facing API.
     public override fun createActionGroup(): ActionGroup {
         val group = BackgroundActionGroup()
 
-        val roots = tableModel.getAllRoots()
-        if (roots.isNotEmpty()) {
-            group.add(SelectAllRootsAction(roots))
+        val allRoots = roots()
+        if (allRoots.isNotEmpty()) {
+            group.add(SelectAllRootsAction(allRoots))
             group.addSeparator()
         }
-        roots.forEach { root ->
+        allRoots.forEach { root ->
             group.add(CycleRootAction(root))
         }
 

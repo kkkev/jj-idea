@@ -10,7 +10,6 @@ import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.Messages
 import com.intellij.ui.PopupHandler
 import com.intellij.ui.ScrollPaneFactory
@@ -25,18 +24,24 @@ import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
+import `in`.kkkev.jjidea.ui.log.JujutsuRootFilterComponent
+import `in`.kkkev.jjidea.ui.log.JujutsuRootGutterRenderer
 import `in`.kkkev.jjidea.ui.services.performUndo
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import kotlinx.datetime.Instant
 import java.awt.BorderLayout
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.JPanel
 import javax.swing.ListSelectionModel
 import javax.swing.table.AbstractTableModel
 import javax.swing.table.DefaultTableCellRenderer
+import javax.swing.table.TableColumn
 
 /**
- * The "Operations" tab: a browsable `jj op log` for one repository at a time (jj-idea-aii0),
+ * The "Operations" tab: a browsable `jj op log` for the repositories picked by the roots filter, merged
+ * newest first (jj-idea-aii0, jj-idea-qz9d),
  * modelled on IntelliJ's Local History. The primary row action is **Revert** (`jj op revert`),
  * which undoes exactly one operation and composes safely with later ones; **Restore** (`jj op
  * restore`) is a reset, so it lives in its own menu section behind a confirmation. See
@@ -48,29 +53,37 @@ import javax.swing.table.DefaultTableCellRenderer
 internal class JujutsuOperationLogPanel(private val project: Project, initialRepo: JujutsuRepository) :
     JPanel(BorderLayout()),
     Disposable {
-    private val repos = project.stateModel.initialisedRepositories.value.values.toList()
-    private var repo: JujutsuRepository = initialRepo
+    private fun repos() = project.stateModel.initialisedRepositories.value.values.toList()
     private val loaders = mutableMapOf<JujutsuRepository, OperationLogLoader>()
 
-    private var all: List<OperationEntry> = emptyList()
+    private var perRepo: Map<JujutsuRepository, List<OperationEntry>> = emptyMap()
     private var showSnapshots = false
-    private var shown: List<OperationEntry> = emptyList()
+    private var shown: List<OperationRow> = emptyList()
+
+    /** Root gutter state, like the log's: expanded shows the repo name, collapsed a thin coloured strip. */
+    private var gutterExpanded = true
+    private lateinit var gutterColumn: TableColumn
+    private var gutterVisible = false
+
+    private val rootFilter = JujutsuRootFilterComponent(::repos)
 
     private val model = object : AbstractTableModel() {
-        private val columns = listOf("description", "command", "time")
+        private val columns = listOf("description", "command", "time", "gutter")
 
         override fun getRowCount() = shown.size
 
         override fun getColumnCount() = columns.size
 
-        override fun getColumnName(column: Int) = JujutsuBundle.message("oplog.column.${columns[column]}")
+        override fun getColumnName(column: Int) =
+            if (column == GUTTER_MODEL_COLUMN) "" else JujutsuBundle.message("oplog.column.${columns[column]}")
 
         override fun getValueAt(row: Int, column: Int): Any {
-            val entry = shown[row]
+            val shownRow = shown[row]
             return when (column) {
-                0 -> entry.title()
-                1 -> entry.args.removePrefix("args: ")
-                else -> entry.time
+                0 -> shownRow.entry.title()
+                GUTTER_MODEL_COLUMN -> shownRow
+                1 -> shownRow.entry.args.removePrefix("args: ")
+                else -> shownRow.entry.time
             }
         }
     }
@@ -87,14 +100,20 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
         }
     }
 
-    private fun selected(): OperationEntry? = table.selectedRow.takeIf { it >= 0 }?.let { shown.getOrNull(it) }
+    private fun selected(): OperationRow? = table.selectedRow.takeIf { it >= 0 }?.let { shown.getOrNull(it) }
 
     init {
+        installGutter()
         add(buildNorth(), BorderLayout.NORTH)
         add(ScrollPaneFactory.createScrollPane(table), BorderLayout.CENTER)
         PopupHandler.installPopupMenu(table, buildRowActions(), "JujutsuOperationLogPopup")
         project.stateModel.logRefresh.connect(this) { refresh() }
-        refresh()
+        // Start focused on the repo the tab was opened from; any later change reloads what is newly shown.
+        rootFilter.initialize {
+            applyFilter()
+            refresh()
+        }
+        if (repos().size > 1) rootFilter.select(setOf(initialRepo)) else refresh()
     }
 
     private fun buildNorth(): JPanel {
@@ -129,20 +148,9 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
         val toolbar = ActionManager.getInstance().createActionToolbar("JujutsuOperationLogToolbar", group, true)
         toolbar.targetComponent = table
         north.add(toolbar.component, BorderLayout.CENTER)
-        if (repos.size > 1) {
-            val combo = ComboBox(repos.toTypedArray()).apply {
-                selectedItem = repo
-                addActionListener {
-                    (selectedItem as? JujutsuRepository)?.let {
-                        repo = it
-                        all = emptyList()
-                        applyFilter()
-                        refresh()
-                    }
-                }
-            }
-            north.add(combo, BorderLayout.EAST)
-        }
+        rootFilter.initUi()
+        rootFilter.isVisible = repos().size > 1
+        north.add(rootFilter, BorderLayout.EAST)
         north.border = JBUI.Borders.empty()
         return north
     }
@@ -156,11 +164,11 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
         ) {
             override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
-            override fun update(e: AnActionEvent) = applyState(e, revertState(selected()))
+            override fun update(e: AnActionEvent) = applyState(e, revertState(selected()?.entry))
 
             override fun actionPerformed(e: AnActionEvent) {
-                val entry = selected() ?: return
-                performUndo(project, repo, entry.id)
+                val row = selected() ?: return
+                performUndo(project, row.repo, row.entry.id)
             }
         })
         add(Separator.getInstance())
@@ -171,11 +179,15 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
         ) {
             override fun getActionUpdateThread() = ActionUpdateThread.EDT
 
-            override fun update(e: AnActionEvent) = applyState(e, restoreState(selected(), all.firstOrNull()))
+            override fun update(e: AnActionEvent) = applyState(
+                e,
+                selected()?.let { restoreState(it.entry, perRepo[it.repo]?.firstOrNull()) }
+                    ?: restoreState(null, null)
+            )
 
             override fun actionPerformed(e: AnActionEvent) {
-                val entry = selected() ?: return
-                restore(entry)
+                val row = selected() ?: return
+                restore(row)
             }
         })
     }
@@ -185,18 +197,18 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
         state.disabledReason?.let { e.presentation.description = it }
     }
 
-    private fun restore(entry: OperationEntry) {
-        val later = all.indexOfFirst { it.id == entry.id }.coerceAtLeast(0)
+    private fun restore(row: OperationRow) {
+        val later = perRepo[row.repo].orEmpty().indexOfFirst { it.id == row.entry.id }.coerceAtLeast(0)
         val choice = Messages.showYesNoDialog(
             project,
-            restoreConfirmMessage(entry, later),
+            restoreConfirmMessage(row.entry, later),
             JujutsuBundle.message("oplog.restore.confirm.title"),
             JujutsuBundle.message("oplog.action.restore.confirm"),
             Messages.getCancelButton(),
             Messages.getWarningIcon()
         )
         if (choice != Messages.YES) return
-        restoreOperation(repo, entry.id)
+        restoreOperation(row.repo, row.entry.id)
     }
 
     private fun restoreOperation(target: JujutsuRepository, id: OperationId) {
@@ -207,33 +219,104 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
     }
 
     private fun refresh() {
-        val target = repo
-        val loader = loaders.getOrPut(target) { OperationLogLoader(target.commandExecutor) }
+        val selection = rootFilter.selection()
+        val all = repos()
         runInBackground {
-            val result = loader.load()
+            val results = loadShown(all, selection) { loaders.getOrPut(it) { OperationLogLoader(it.commandExecutor) } }
             runLater {
-                if (target != repo) return@runLater
-                when (result) {
-                    is OperationLogLoader.Result.Loaded -> if (result.changed) {
-                        all = result.entries
-                        applyFilter()
+                // A newer filter change supersedes this load; its own refresh will land.
+                if (selection != rootFilter.selection()) return@runLater
+                var changed = perRepo.keys != results.keys
+                val next = results.mapNotNull { (repo, result) ->
+                    when (result) {
+                        is OperationLogLoader.Result.Loaded -> {
+                            changed = changed || result.changed
+                            repo to result.entries
+                        }
+                        is OperationLogLoader.Result.Failed -> {
+                            if (perRepo.isEmpty()) table.emptyText.text = result.message
+                            null
+                        }
                     }
-                    is OperationLogLoader.Result.Failed -> table.emptyText.text = result.message
+                }.toMap()
+                updateGutterVisibility()
+                if (changed) {
+                    perRepo = next
+                    applyFilter()
                 }
             }
         }
     }
 
-    /** Re-applies the snapshot filter, keeping the selected operation selected when it is still visible. */
+    /** Re-merges the loaded repos under the current filters, keeping the selected operation when still visible. */
     private fun applyFilter() {
-        val keep = selected()?.id
-        shown = all.visibleOperations(showSnapshots)
+        val keep = selected()?.let { it.repo to it.entry.id }
+        shown = mergeOperations(perRepo, rootFilter.selection(), showSnapshots)
         model.fireTableDataChanged()
-        keep?.let { id -> shown.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
+        keep?.let { (repo, id) -> shown.indexOfFirst { it.repo == repo && it.entry.id == id }.takeIf { it >= 0 } }
             ?.let { table.setRowSelectionInterval(it, it) }
     }
 
     override fun dispose() = Unit
+
+    private fun rowRepo(row: Int) = shown.getOrNull(row)?.repo
+
+    /** Same width rule as the log's gutter: a thin strip collapsed, or the longest repo name expanded. */
+    private fun gutterWidth(): Int {
+        if (!gutterExpanded) return JBUI.scale(GUTTER_COLLAPSED_WIDTH)
+        val fm = table.getFontMetrics(table.font)
+        return (repos().maxOfOrNull { fm.stringWidth(it.displayName) } ?: 0) + GUTTER_EXPANDED_PADDING
+    }
+
+    private fun applyGutterWidth() {
+        val width = gutterWidth()
+        gutterColumn.apply {
+            minWidth = width
+            maxWidth = width
+            preferredWidth = width
+            this.width = width
+        }
+        table.revalidate()
+        table.repaint()
+    }
+
+    /** Makes the gutter the leftmost column; it is dropped again unless the project has several roots (like the log). */
+    private fun installGutter() {
+        gutterColumn = table.columnModel.getColumn(GUTTER_MODEL_COLUMN).apply {
+            cellRenderer = JujutsuRootGutterRenderer(
+                repoAt = { _, row -> rowRepo(row) },
+                isExpanded = { gutterExpanded }
+            )
+            resizable = false
+        }
+        table.moveColumn(GUTTER_MODEL_COLUMN, 0)
+        gutterVisible = true
+        applyGutterWidth()
+        updateGutterVisibility()
+        table.addMouseListener(object : MouseAdapter() {
+            override fun mouseClicked(e: MouseEvent) {
+                val viewColumn = table.columnAtPoint(e.point)
+                if (viewColumn >= 0 && table.convertColumnIndexToModel(viewColumn) == GUTTER_MODEL_COLUMN) {
+                    gutterExpanded = !gutterExpanded
+                    applyGutterWidth()
+                    e.consume()
+                }
+            }
+        })
+    }
+
+    private fun updateGutterVisibility() {
+        val wanted = repos().size > 1
+        if (wanted == gutterVisible) return
+        if (wanted) {
+            table.addColumn(gutterColumn)
+            table.moveColumn(table.columnCount - 1, 0)
+            applyGutterWidth()
+        } else {
+            table.removeColumn(gutterColumn)
+        }
+        gutterVisible = wanted
+    }
 
     private class TimeCellRenderer : DefaultTableCellRenderer() {
         override fun setValue(value: Any?) {
@@ -245,6 +328,9 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
 
     private companion object {
         const val TIME_COLUMN = 2
+        const val GUTTER_MODEL_COLUMN = 3
+        const val GUTTER_COLLAPSED_WIDTH = 8
+        const val GUTTER_EXPANDED_PADDING = 16
         const val TIME_COLUMN_WIDTH = 140
     }
 }

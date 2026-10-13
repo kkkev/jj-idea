@@ -4096,8 +4096,8 @@ Requires the bundled Tasks plugin (Tools → Tasks & Contexts). Use a repo with 
 
 **Operations tab (`jj op log` browser, jj-idea-aii0) - preview feature `OPERATION_LOG`**
 
-**Code:** `ui/oplog/*`, `actions/undo/ShowOperationLogAction.kt`, `jj/cli/CliExecutor.kt` (`opRestoreArgs`), `preview/PreviewFeature.kt`
-**Also re-run:** MT-WORKINGCOPY (revert/restore invalidate repo state and the working copy); MT-LOG-REFRESH (the tab refreshes on the same funnel); MT-CTXMENU (VCS → Jujutsu submenu entry); MT-SETTINGS (Preview features group)
+**Code:** `ui/oplog/*`, `ui/log/JujutsuRootFilterComponent.kt`, `actions/undo/ShowOperationLogAction.kt`, `jj/cli/CliExecutor.kt` (`opRestoreArgs`), `preview/PreviewFeature.kt`
+**Also re-run:** MT-CROSS (the roots filter component is shared with the log); MT-WORKINGCOPY (revert/restore invalidate repo state and the working copy); MT-LOG-REFRESH (the tab refreshes on the same funnel); MT-CTXMENU (VCS → Jujutsu submenu entry); MT-SETTINGS (Preview features group)
 
 Precondition: the feature is gated. Either enable it with `-Djjidea.preview.operationLog=true`
 (runIde / VM options) or enter an access code granting **Operations tab** under Settings →
@@ -4131,8 +4131,15 @@ a few changes and a dirty working copy.
 - [ ] Confirming Restore resets the repo to that point (`jj log` matches the state after that
       operation), the tab gains a new top row, and the log/Working Copy panel refresh
 - [ ] Revert and Restore never raise an undo balloon
-- [ ] **Multi-root:** with two jj roots, a repo selector appears; switching it loads that repo's
-      operations and acts on that repo only. With one root there is no selector
+- [ ] **Multi-root (jj-idea-qz9d):** with two jj roots, a **Repository** chip (same as the log's) appears
+      at the right of the toolbar; with one root there is none. The tab opens showing only the repo it
+      was opened from
+- [ ] Cycling roots in the chip (include / exclude / unset) and **Select All** behaves like the log's; with
+      both repos shown, rows interleave by time, each with a repo-coloured square, and the repo name
+      shows in the Description tooltip. With one repo shown there are no squares
+- [ ] Revert and Restore act on the **row's own repo**; Restore's confirmation counts only that repo's
+      later operations
+- [ ] The log's own root filter is unchanged (see MT-CROSS)
 - [ ] Close the tab and reopen it: the list is rebuilt, no errors in idea.log
 - [ ] Disable the plugin dynamically (Settings → Plugins) with the tab open: the tab disappears
 

@@ -4,7 +4,7 @@ import com.intellij.ui.JBColor
 import com.intellij.ui.SimpleColoredComponent.getTextBaseLine
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
-import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import java.awt.Component
 import java.awt.Graphics
 import java.awt.Graphics2D
@@ -23,8 +23,17 @@ import javax.swing.table.TableCellRenderer
  *
  * The bar has slightly rounded ends and shows gaps when the next/previous row
  * is from a different repository.
+ *
+ * Table-agnostic: [repoAt] says which repository a row belongs to (null past the end) and
+ * [isExpanded] whether the gutter is currently expanded. The defaults serve the log table; the
+ * Operations tab passes its own (jj-idea-55cw).
  */
-class JujutsuRootGutterRenderer : TableCellRenderer {
+class JujutsuRootGutterRenderer(
+    private val repoAt: (JTable, Int) -> JujutsuRepository? = { table, row ->
+        (table.model as? JujutsuLogTableModel)?.getEntry(row)?.repo
+    },
+    private val isExpanded: (JTable) -> Boolean = { (it as? JujutsuLogTable)?.isRootGutterExpanded ?: false }
+) : TableCellRenderer {
     companion object {
         private val BAR_WIDTH = JBUI.scale(4)
         private val GAP_SIZE = JBUI.scale(2)
@@ -39,11 +48,9 @@ class JujutsuRootGutterRenderer : TableCellRenderer {
         row: Int,
         column: Int
     ): Component {
-        val logTable = table as? JujutsuLogTable
-        val isExpanded = logTable?.isRootGutterExpanded ?: false
         // Get the actual column width from the column model to ensure proper clipping
         val columnWidth = table.columnModel.getColumn(column).width
-        return GutterPanel(table, row, isSelected, isExpanded, columnWidth)
+        return GutterPanel(table, row, isSelected, isExpanded(table), columnWidth)
     }
 
     private inner class GutterPanel(
@@ -53,19 +60,17 @@ class JujutsuRootGutterRenderer : TableCellRenderer {
         private val isExpanded: Boolean,
         private val columnWidth: Int
     ) : JPanel() {
-        private var entry: LogEntry? = null
+        private var repo: JujutsuRepository? = null
 
         init {
             // Set opaque to false - we'll paint our own background explicitly
             isOpaque = false
 
-            // Get entry for this row
-            val model = table.model as? JujutsuLogTableModel
-            entry = model?.getEntry(row)
+            repo = repoAt(table, row)
 
             // Set tooltip
             toolTipText = JujutsuBundle.message("log.filter.root") + ": " +
-                (entry?.repo?.displayName ?: "") +
+                (repo?.displayName ?: "") +
                 if (!isExpanded) "\n(Click to expand)" else "\n(Click to collapse)"
         }
 
@@ -86,31 +91,26 @@ class JujutsuRootGutterRenderer : TableCellRenderer {
                 g2d.color = table.background
                 g2d.fillRect(0, 0, paintWidth, height)
 
-                val entry = this.entry ?: return
+                val repo = this.repo ?: return
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                 g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
 
-                val repoColor = RepositoryColors.getColor(entry.repo)
+                val repoColor = RepositoryColors.getColor(repo)
 
                 if (isExpanded) {
-                    paintExpanded(g2d, entry, repoColor, paintWidth)
+                    paintExpanded(g2d, repo, repoColor, paintWidth)
                 } else {
-                    paintCollapsed(g2d, entry, repoColor, paintWidth)
+                    paintCollapsed(g2d, repo, repoColor, paintWidth)
                 }
             } finally {
                 g2d.dispose()
             }
         }
 
-        private fun paintExpanded(g2d: Graphics2D, entry: LogEntry, repoColor: JBColor, clipWidth: Int) {
-            val model = table.model as? JujutsuLogTableModel ?: return
-
+        private fun paintExpanded(g2d: Graphics2D, repo: JujutsuRepository, repoColor: JBColor, clipWidth: Int) {
             // Check if previous/next rows are from the same repo
-            val prevEntry = if (row > 0) model.getEntry(row - 1) else null
-            val nextEntry = model.getEntry(row + 1)
-
-            val sameAsPrev = prevEntry?.repo == entry.repo
-            val sameAsNext = nextEntry?.repo == entry.repo
+            val sameAsPrev = row > 0 && repoAt(table, row - 1) == repo
+            val sameAsNext = repoAt(table, row + 1) == repo
 
             // Calculate rectangle position and size with gaps
             var rectY = 0
@@ -180,7 +180,7 @@ class JujutsuRootGutterRenderer : TableCellRenderer {
             g2d.font = smallFont
             g2d.color = table.foreground
 
-            val displayName = entry.repo.displayName
+            val displayName = repo.displayName
             val fm = g2d.fontMetrics
             val truncatedText = truncateText(displayName, fm, availableWidth)
             g2d.drawString(truncatedText, textX, getTextBaseLine(fm, height))
@@ -204,16 +204,10 @@ class JujutsuRootGutterRenderer : TableCellRenderer {
             return if (truncated.isEmpty()) "" else truncated + ellipsis
         }
 
-        @Suppress("UNUSED_PARAMETER")
-        private fun paintCollapsed(g2d: Graphics2D, entry: LogEntry, repoColor: java.awt.Color, clipWidth: Int) {
-            val model = table.model as? JujutsuLogTableModel ?: return
-
+        private fun paintCollapsed(g2d: Graphics2D, repo: JujutsuRepository, repoColor: java.awt.Color, clipWidth: Int) {
             // Check if previous/next rows are from the same repo
-            val prevEntry = if (row > 0) model.getEntry(row - 1) else null
-            val nextEntry = model.getEntry(row + 1)
-
-            val sameAsPrev = prevEntry?.repo == entry.repo
-            val sameAsNext = nextEntry?.repo == entry.repo
+            val sameAsPrev = row > 0 && repoAt(table, row - 1) == repo
+            val sameAsNext = repoAt(table, row + 1) == repo
 
             // Calculate bar position and size (use clipWidth for centering)
             val barX = (clipWidth - BAR_WIDTH) / 2

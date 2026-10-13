@@ -48,9 +48,9 @@ class JujutsuRootFilterComponentCycleTest {
     )
 
     private fun component(tableModel: JujutsuLogTableModel) =
-        JujutsuRootFilterComponent(tableModel).apply {
+        JujutsuRootFilterComponent { tableModel.getAllRoots() }.apply {
             initUi()
-            initialize()
+            initialize { tableModel.setRootFilter(it.included, it.excluded) }
         }
 
     private fun tableModel() = JujutsuLogTableModel().apply {
