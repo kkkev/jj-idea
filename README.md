@@ -86,7 +86,7 @@ Then install from `build/distributions/` via **Settings → Plugins → Install 
 This plugin is free and maintained in my spare time, with a lot of the work done using AI
 coding tools. If it saves you time, you can [sponsor me on GitHub](https://github.com/sponsors/kkkev)
 to help fund those tools and continued development — entirely optional. Feedback and issues
-are just as welcome.
+are just as welcome — see [Reporting bugs](docs/reporting-bugs.md).
 
 ### Sponsors
 

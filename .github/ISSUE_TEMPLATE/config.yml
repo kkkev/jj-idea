@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: How to report a bug (and gather repo stats)
+    url: https://github.com/kkkev/jj-idea/blob/master/docs/reporting-bugs.md
+    about: What to include, where the IDE logs are, and a script to measure repo size

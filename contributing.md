@@ -694,6 +694,7 @@ When making changes that affect users (features, fixes, behavior changes):
 ## Task Tracking
 
 Tasks (features, bugs, etc.) are managed in [Beads](https://github.com/steveyegge/beads).
+When asking a reporter for repo-size context, point them at [docs/reporting-bugs.md](docs/reporting-bugs.md).
 
 ```bash
 bd list --status=open    # All open issues

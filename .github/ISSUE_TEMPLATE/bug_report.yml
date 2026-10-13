@@ -1,0 +1,97 @@
+name: Bug report
+description: Something in the Jujutsu plugin isn't working, is slow, or freezes the IDE
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Right-click ...
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      description: Settings → Plugins → Installed → Jujutsu
+    validations:
+      required: true
+  - type: input
+    id: ide
+    attributes:
+      label: IDE and build
+      description: Help → About, e.g. "IntelliJ IDEA 2025.2 (Build #IU-252.12345)"
+    validations:
+      required: true
+  - type: input
+    id: jj-version
+    attributes:
+      label: jj version
+      description: Output of `jj --version`
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 15 / Windows 11 / Ubuntu 24.04
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or stack trace
+      description: From Help → Show Log in Finder/Explorer, or the exception dialog. Optional.
+      render: shell
+  - type: markdown
+    attributes:
+      value: |
+        ## Repository scale (optional)
+
+        For slow or freezing reports, the size of your repository helps me work out where the
+        problem is, and how much to invest in large-repo support. **Everything below is optional**
+        — skip anything you're unsure of. Nothing is collected automatically.
+
+        Run the [one-shot script](https://github.com/kkkev/jj-idea/blob/master/docs/reporting-bugs.md)
+        in your repo root to get all of these at once.
+  - type: input
+    id: files
+    attributes:
+      label: Approximate tracked files
+      description: "`jj file list | wc -l`"
+  - type: input
+    id: commits
+    attributes:
+      label: Approximate commits
+      description: "`jj log --no-graph -r 'all()' -T '\"x\\n\"' | wc -l`"
+  - type: input
+    id: refs
+    attributes:
+      label: Bookmarks and tags
+      description: "`jj bookmark list --all | wc -l` and `jj tag list | wc -l`"
+  - type: dropdown
+    id: colocated
+    attributes:
+      label: Colocated with git?
+      description: Does the repo have a `.git` directory next to `.jj`?
+      options:
+        - Not sure
+        - "Yes"
+        - "No"
+  - type: dropdown
+    id: usage
+    attributes:
+      label: How are you using the plugin?
+      description: Helps me prioritise; never required.
+      options:
+        - Prefer not to say
+        - Personal projects
+        - Open source
+        - At work (commercial)

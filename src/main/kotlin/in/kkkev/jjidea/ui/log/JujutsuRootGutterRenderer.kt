@@ -204,7 +204,12 @@ class JujutsuRootGutterRenderer(
             return if (truncated.isEmpty()) "" else truncated + ellipsis
         }
 
-        private fun paintCollapsed(g2d: Graphics2D, repo: JujutsuRepository, repoColor: java.awt.Color, clipWidth: Int) {
+        private fun paintCollapsed(
+            g2d: Graphics2D,
+            repo: JujutsuRepository,
+            repoColor: java.awt.Color,
+            clipWidth: Int
+        ) {
             // Check if previous/next rows are from the same repo
             val sameAsPrev = row > 0 && repoAt(table, row - 1) == repo
             val sameAsNext = repoAt(table, row + 1) == repo
