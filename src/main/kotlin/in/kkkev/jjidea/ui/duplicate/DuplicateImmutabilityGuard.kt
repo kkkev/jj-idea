@@ -48,5 +48,6 @@ fun invalidDestinationIds(entries: List<LogEntry>, mode: RebaseDestinationMode):
  */
 fun validPlacementModes(entries: List<LogEntry>, selected: Set<ChangeId>): Set<RebaseDestinationMode> =
     RebaseDestinationMode.entries.filterTo(mutableSetOf()) { mode ->
-        selected.none { it in invalidDestinationIds(entries, mode) }
+        val invalid = invalidDestinationIds(entries, mode)
+        selected.none { it in invalid }
     }

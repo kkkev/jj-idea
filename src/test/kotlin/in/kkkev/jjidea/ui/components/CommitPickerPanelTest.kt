@@ -95,6 +95,33 @@ class CommitPickerPanelTest {
     }
 
     @Test
+    fun `reloadFor runs the factory once per reload, not once per entry (jj-idea-i3bh)`() {
+        val fake = FakeRepo()
+        val n = 10_000
+        val all = (0 until n).map { entry(fake.repo, "e$it") }
+        every { fake.repo.logCache.all } returns all
+
+        val picker = CommitPickerPanel(project.get(), fake.repo, "search", multiSelect = true)
+        waitForInitialLoad(picker)
+
+        var factoryCalls = 0
+        var seenSize = -1
+        picker.reloadFor { entries ->
+            factoryCalls++
+            seenSize = entries.size
+            val excluded = setOf(all[0].id)
+            ({ it.id !in excluded })
+        }
+
+        factoryCalls shouldBe 1
+        seenSize shouldBe n
+        picker.rowCount shouldBe n - 1
+
+        picker.searchField.text = "e1"
+        factoryCalls shouldBe 2
+    }
+
+    @Test
     fun `search text further narrows the predicate-filtered set`() {
         val fake = FakeRepo()
         val a = entry(fake.repo, "aaaaaa", "alpha")

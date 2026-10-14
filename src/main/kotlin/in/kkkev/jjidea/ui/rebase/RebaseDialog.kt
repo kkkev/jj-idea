@@ -179,8 +179,10 @@ class RebaseDialog(
 
     private fun reloadDestinations() {
         val sourceIds = sourceEntries.map { it.id }.toSet()
-        picker.reload { entry ->
-            entry.id !in RebaseSimulator.excludedDestinationIds(picker.entries, sourceIds, selectedSourceMode)
+        val sourceMode = selectedSourceMode
+        picker.reloadFor { entries ->
+            val excluded = RebaseSimulator.excludedDestinationIds(entries, sourceIds, sourceMode)
+            ({ entry -> entry.id !in excluded })
         }
     }
 

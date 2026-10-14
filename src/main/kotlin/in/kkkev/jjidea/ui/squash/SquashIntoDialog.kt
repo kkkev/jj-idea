@@ -518,15 +518,14 @@ class SquashIntoDialog(
     }
 
     private fun reloadCandidates() {
-        picker.reload { entry ->
+        picker.reloadFor { entries ->
             when (mode) {
                 is SquashMode.PickDestination -> {
-                    val excluded =
-                        RebaseSimulator.excludedDestinationIds(picker.entries, sourceIds, RebaseSourceMode.REVISION)
-                    entry.id !in excluded && !entry.immutable
+                    val excluded = RebaseSimulator.excludedDestinationIds(entries, sourceIds, RebaseSourceMode.REVISION)
+                    ({ entry -> entry.id !in excluded && !entry.immutable })
                 }
 
-                is SquashMode.PickSources -> entry.id != mode.destination.id && !entry.immutable
+                is SquashMode.PickSources -> ({ entry -> entry.id != mode.destination.id && !entry.immutable })
             }
         }
     }

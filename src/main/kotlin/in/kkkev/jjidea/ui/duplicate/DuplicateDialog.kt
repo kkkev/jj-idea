@@ -138,14 +138,15 @@ class DuplicateDialog(
         val sourceIds = sourceEntries.map { it.id }.toSet()
         updating = true
         try {
-            picker.reload { entry ->
+            val placement = selectedDestinationMode
+            picker.reloadFor { entries ->
                 // Destinations that would make jj rewrite an immutable commit under the current
                 // placement mode (see DuplicateImmutabilityGuard) — never offered as a target.
                 // Unlike rebase, duplicating onto a descendant (or even a source itself, once
                 // it's a copy) is meaningful, so beyond the immutability guard, the only
                 // revisions excluded from the picker are the sources themselves.
-                val invalid = invalidDestinationIds(picker.entries, selectedDestinationMode)
-                entry.id !in sourceIds && entry.id !in invalid
+                val invalid = invalidDestinationIds(entries, placement)
+                ({ entry -> entry.id !in sourceIds && entry.id !in invalid })
             }
         } finally {
             updating = false

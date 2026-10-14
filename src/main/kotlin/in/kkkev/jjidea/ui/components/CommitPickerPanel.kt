@@ -82,7 +82,7 @@ class CommitPickerPanel(
         disposed = true
     }
 
-    private var predicate: (LogEntry) -> Boolean = { true }
+    private var predicateFor: (List<LogEntry>) -> (LogEntry) -> Boolean = { { true } }
     private var graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
 
     val searchField: LogSearchField = LogSearchField(
@@ -131,8 +131,16 @@ class CommitPickerPanel(
     }
 
     /** Applies [predicate] as the picker's exclusion rule and re-renders. Call on any change to it. */
-    fun reload(predicate: (LogEntry) -> Boolean) {
-        this.predicate = predicate
+    fun reload(predicate: (LogEntry) -> Boolean) = reloadFor { predicate }
+
+    /**
+     * Like [reload], but [predicateFor] is invoked once per reload with the current [entries] and
+     * returns the per-row predicate. Do whole-set work (exclusion/descendant sets) in the factory,
+     * never in the per-row predicate — that is O(n²) over the loaded log (jj-idea-i3bh). The factory
+     * is re-run on every reload so it sees entries merged in by a whole-repo search.
+     */
+    fun reloadFor(predicateFor: (entries: List<LogEntry>) -> (LogEntry) -> Boolean) {
+        this.predicateFor = predicateFor
         applyReload()
     }
 
@@ -166,6 +174,7 @@ class CommitPickerPanel(
 
     private fun applyReload() {
         val matcher = searchField.matcher()
+        val predicate = predicateFor(entries)
         val filtered = entries.filter { predicate(it) && (matcher?.matches(it) ?: true) }
 
         val previousSelection = selectedIds()
@@ -192,7 +201,7 @@ class CommitPickerPanel(
     /**
      * Whole-repo search (jj-idea-lpbv/jj-idea-tq4b): runs [in.kkkev.jjidea.jj.logSearchRevset]
      * against [repo], stores any hits into [in.kkkev.jjidea.jj.LogCache] and [entries], and
-     * re-applies [predicate] so the caller's exclusion rules still cover the new commits.
+     * re-applies the predicate so the caller's exclusion rules still cover the new commits.
      * [ModalityState.any] is required — this runs from a modal dialog, and the default modality
      * would defer the `runLater` callback until the dialog closes.
      */
