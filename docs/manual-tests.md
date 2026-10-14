@@ -35,6 +35,7 @@ Components whose blast radius exceeds their own package:
 | Shared commit picker (`ui/components/CommitPickerPanel.kt`, `ui/components/LogSearchField.kt`, used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split), [MT-BOOKMARK](#mt-bookmark), [MT-LOG-FILTER](#mt-log-filter) |
 | `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
+| Shared post-operation graph preview (`ui/rebase/RebasePreviewPanel.kt`, `ui/rebase/RebaseSimulator.kt`, `ui/squash/SquashSimulator.kt`) | [MT-CTXMENU](#mt-ctxmenu) (Rebase / New Change dialogs), [MT-SQUASH](#mt-squash) |
 | In-dialog file diff preview shell (`ui/common/FileDiffPreviewPanel.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
 | Shared hunk-pick preview cache/renderer (`ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`) and the diff-editor staging protocol (`diffedit/DiffEditTool.kt`, `diffedit/HunkApplyMain.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
@@ -1295,7 +1296,7 @@ jj new; jj new; jj new` then `jj bookmark create -r A base` and set the diff bas
 
 **Squash Into…**
 
-**Code:** `ui/squash/SquashIntoDialog.kt`, `ui/squash/SquashFilePreview.kt`, `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/squashIntoAction.kt`, `actions/change/squashFromAction.kt`, `actions/filechange/SquashIntoFilesAction.kt`, `actions/change/squashIntoImmutableParentAction.kt`, `jj/ImmutableWorkingCopyTracker.kt`
+**Code:** `ui/squash/SquashIntoDialog.kt`, `ui/squash/SquashSimulator.kt`, `ui/rebase/RebasePreviewPanel.kt`, `ui/squash/SquashFilePreview.kt`, `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/squashIntoAction.kt`, `actions/change/squashFromAction.kt`, `actions/filechange/SquashIntoFilesAction.kt`, `actions/change/squashIntoImmutableParentAction.kt`, `jj/ImmutableWorkingCopyTracker.kt`
 **Fixture:** FX-STACK
 **Also re-run:** MT-CTXMENU (shares the commit picker); MT-SPLIT (shares `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, the hunk picker, and the staging protocol); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer)
 
@@ -1334,6 +1335,26 @@ wrapping the platform's `CommitMessage`) instead of a plain text area:
       from other dialogs/changes; picking one previews it, Escape reverts, and it doesn't close
       the dialog
 - [ ] Enter inserts a newline (does not submit/click OK); Ctrl+Enter (Cmd+Enter) submits
+
+#### Graph preview (jj-idea-uuy9)
+
+The top of the right-hand side shows the log graph as it will look after the squash
+(source green, destination blue), with a one-line summary underneath.
+
+- [ ] Right-click a mutable change → **Squash Into…** → a "Result preview" graph appears above
+      the file diff; before a destination is picked it shows the unchanged graph
+- [ ] Pick a destination → it is highlighted blue and the summary reads
+      "<source> → squash into <dest> (source kept)" (checkbox unticked by default)
+- [ ] Tick **Delete empty source change…** → the source row disappears, its children hang off its
+      parent, and the summary says "source abandoned"; untick → the source row returns
+- [ ] With the checkbox ticked, untick one file (or hunk-pick a file) → the checkbox greys out and
+      the source row comes back (a partial squash can't empty it)
+- [ ] Squash the working copy with the checkbox ticked → the `@` marker moves to the destination
+- [ ] **Squash Into Here from…** (multi-select sources) → selecting/deselecting sources updates the
+      preview; the summary says "N changes"
+- [ ] **Squash into Parent…** → preview shows the source and its parent
+- [ ] Click OK → the real log matches what the preview showed
+- [ ] The dialog still fits at its default size (graph, file diff and Pick Hunks… button all visible)
 
 #### Per-file diff preview (jj-idea-8a8z)
 

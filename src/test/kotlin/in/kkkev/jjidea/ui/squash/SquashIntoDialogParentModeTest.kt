@@ -15,6 +15,8 @@ import `in`.kkkev.jjidea.jj.mockRepo
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.vcs.filePath
+import io.kotest.matchers.collections.shouldContainExactly
+import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -239,6 +241,52 @@ class SquashIntoDialogParentModeTest {
         dialog.result?.deleteEmptyAndMoveWorkingCopy shouldBe true
         JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove shouldBe true
         JujutsuSettings.getInstance(project.get()).state.squashDeleteEmptyAndMove = false
+        disposeDialog(dialog)
+    }
+
+    // ---- Post-squash graph preview (jj-idea-uuy9) ----
+
+    @Test
+    fun `graph preview shows source and parent while the source is kept`() {
+        val changes = listOf(change("src/Main.kt"))
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.graphPreviewIdsForTest() shouldContainExactlyInAnyOrder listOf(source.id, parent.id)
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `graph preview drops the source when delete-empty is ticked and restores it when unticked`() {
+        val changes = listOf(change("src/Main.kt"))
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.deleteEmptyAndMoveIsSelected = true
+        dialog.graphPreviewIdsForTest() shouldContainExactly listOf(parent.id)
+
+        dialog.deleteEmptyAndMoveIsSelected = false
+        dialog.graphPreviewIdsForTest() shouldContainExactlyInAnyOrder listOf(source.id, parent.id)
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `graph preview keeps the source when a hunk override makes the squash partial`() {
+        val changes = listOf(change("src/Main.kt"))
+        val fp = LocalFilePath("src/Main.kt", false)
+        val source = createEntry("src1", description = "desc")
+        val parent = createEntry("par1", description = "")
+        val dialog = dialog(source, listOf(parent), changes)
+        waitForRefresh(dialog.fileSelection)
+        dialog.deleteEmptyAndMoveIsSelected = true
+
+        dialog.setDestinationOverrideForTest(fp, "partial content\n")
+
+        dialog.graphPreviewIdsForTest() shouldContainExactlyInAnyOrder listOf(source.id, parent.id)
         disposeDialog(dialog)
     }
 

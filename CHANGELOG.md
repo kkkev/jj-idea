@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Squash preview**: the Squash Into… dialogs (Squash Into…, Squash Into Here from…, Squash into Parent…) now show the log graph as it will look after the squash. The destination is highlighted, and the source row disappears (or stays, if it will keep a remainder or you keep emptied sources), with its children re-parented, so you can see the result before clicking OK.
 - **Abandon Changes**: select several changes in the log and abandon them together from the right-click menu. It is available when every selected change is mutable and in the same repository, runs as a single operation (one Undo restores all of them), and asks once, summarising what would be lost, including any local bookmarks that will be deleted. Selecting 10 or more changes always asks first.
 
 ### Fixed

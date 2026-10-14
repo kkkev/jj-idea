@@ -141,6 +141,66 @@ class DagNodeReparentTest {
         }
     }
 
+    @Nested
+    inner class `removeNodes` {
+        @Test
+        fun `children of a removed node take over its parents`() {
+            val base = node("base")
+            val mid = node("mid", "base")
+            val child = node("child", "mid")
+
+            val result = RebaseSimulator.removeNodes(listOf(child, mid, base), setOf(id("mid")))
+
+            result.map { it.id.full } shouldContainExactly listOf("child", "base")
+            parentNames(result.first()) shouldContainExactly listOf("base")
+        }
+
+        @Test
+        fun `a chain of removed nodes resolves to the first surviving ancestor`() {
+            val base = node("base")
+            val r1 = node("r1", "base")
+            val r2 = node("r2", "r1")
+            val child = node("child", "r2")
+
+            val result = RebaseSimulator.removeNodes(listOf(child, r2, r1, base), setOf(id("r1"), id("r2")))
+
+            parentNames(result.first()) shouldContainExactly listOf("base")
+        }
+
+        @Test
+        fun `untouched nodes are returned as the same instances`() {
+            val base = node("base")
+            val other = node("other", "base")
+            val gone = node("gone", "base")
+
+            val result = RebaseSimulator.removeNodes(listOf(other, gone, base), setOf(id("gone")))
+
+            (result[0] === other) shouldBe true
+            (result[1] === base) shouldBe true
+        }
+
+        /** Scale deliverable (jj-idea-uuy9): removing half of a 10k chain reads parent lists O(n), not O(n²). */
+        @Test
+        fun `operation count stays linear on a 10k chain`() {
+            var reads = 0
+            class Counting(override val id: ChangeId, private val parents: List<ChangeId>) : DagNode<Counting> {
+                override val parentIds: List<ChangeId> get() = parents.also { reads++ }
+                override fun withParents(parentIds: List<ChangeId>) = Counting(id, parentIds)
+            }
+            val n = 10_000
+            // chain: c(n-1) -> ... -> c0, newest first
+            val entries = (n - 1 downTo 0).map { i ->
+                Counting(id("c$i"), if (i == 0) emptyList() else listOf(id("c${i - 1}")))
+            }
+            val removed = (1 until n step 2).map { id("c$it") }.toSet()
+
+            val result = RebaseSimulator.removeNodes(entries, removed)
+
+            result.size shouldBe n - removed.size
+            (reads <= 6 * n) shouldBe true
+        }
+    }
+
     @Test
     fun `topologicalSort orders children before parents`() {
         val a = node("a")

@@ -249,6 +249,24 @@ class SquashIntoDialogPickSourcesModeTest {
         disposeDialog(dialog)
     }
 
+    // ---- Post-squash graph preview (jj-idea-uuy9) ----
+
+    @Test
+    fun `graph preview follows the selected sources`() {
+        val dest = createEntry("dest1", description = "destination")
+        val src = createEntry("src1", description = "source")
+        val dialog = dialog(dest, listOf(src))
+
+        // Nothing selected: sources are empty, so no simulation yet but the destination is known
+        dialog.selectPickerRowsForTest(0)
+        dialog.deleteEmptyAndMoveIsSelected = true
+        dialog.graphPreviewIdsForTest() shouldBe listOf(dest.id)
+
+        dialog.deleteEmptyAndMoveIsSelected = false
+        dialog.graphPreviewIdsForTest().toSet() shouldBe setOf(dest.id, src.id)
+        disposeDialog(dialog)
+    }
+
     private fun dialog(
         destination: LogEntry,
         candidates: List<LogEntry>

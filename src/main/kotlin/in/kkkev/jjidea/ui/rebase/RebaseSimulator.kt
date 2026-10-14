@@ -376,9 +376,56 @@ object RebaseSimulator {
     }
 
     /**
+     * Remove [removed] nodes from the graph, re-parenting their children onto the removed nodes'
+     * (transitively resolved) parents - the shape `jj abandon` leaves behind. Used by
+     * [in.kkkev.jjidea.ui.squash.SquashSimulator] for abandoned squash sources.
+     *
+     * O(n + E): each removed node's surviving ancestors are resolved once (memoised), and only
+     * entries whose parent list actually changes are copied.
+     */
+    internal fun <T : DagNode<T>> removeNodes(entries: List<T>, removed: Set<ChangeId>): List<T> {
+        if (removed.isEmpty()) return entries
+        val entryById = entries.associateBy { it.id }
+        val resolved = HashMap<ChangeId, List<ChangeId>>()
+
+        // Surviving ancestors standing in for a removed node. Iterative so a long chain of
+        // removed nodes can't overflow the stack.
+        fun survivingParents(start: ChangeId): List<ChangeId> {
+            resolved[start]?.let { return it }
+            val stack = kotlin.collections.ArrayDeque<ChangeId>().apply { addLast(start) }
+            while (stack.isNotEmpty()) {
+                val id = stack.last()
+                if (id in resolved) {
+                    stack.removeLast()
+                    continue
+                }
+                val parents = entryById[id]?.parentIds ?: emptyList()
+                val pending = parents.filter { it in removed && it !in resolved }
+                if (pending.isNotEmpty()) {
+                    pending.forEach { stack.addLast(it) }
+                    continue
+                }
+                resolved[id] = parents.flatMap { if (it in removed) resolved.getValue(it) else listOf(it) }.distinct()
+                stack.removeLast()
+            }
+            return resolved.getValue(start)
+        }
+
+        return entries.filter { it.id !in removed }.map { entry ->
+            if (entry.parentIds.none { it in removed }) {
+                entry
+            } else {
+                entry.withParents(
+                    entry.parentIds.flatMap { if (it in removed) survivingParents(it) else listOf(it) }.distinct()
+                )
+            }
+        }
+    }
+
+    /**
      * Build a map of parent → set of children.
      */
-    private fun <T : DagNode<T>> buildChildrenMap(entries: List<T>): Map<ChangeId, Set<ChangeId>> {
+    internal fun <T : DagNode<T>> buildChildrenMap(entries: List<T>): Map<ChangeId, Set<ChangeId>> {
         val childrenOf = mutableMapOf<ChangeId, MutableSet<ChangeId>>()
         for (entry in entries) {
             for (parentId in entry.parentIds) {

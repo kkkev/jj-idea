@@ -16,6 +16,7 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.*
 import `in`.kkkev.jjidea.ui.components.CommitPickerPanel
 import `in`.kkkev.jjidea.ui.components.DescriptionEditor
+import `in`.kkkev.jjidea.ui.rebase.RebasePreviewPanel
 import `in`.kkkev.jjidea.ui.rebase.RebaseSimulator
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.filePath
@@ -104,6 +105,9 @@ class SquashIntoDialog(
     private val hasPredefinedCandidates = mode.candidates != null
     private val sourceIds = (mode as? SquashMode.PickDestination)?.sources?.map { it.id }?.toSet() ?: emptySet()
 
+    // Live post-squash graph (jj-idea-uuy9) - shares RebasePreviewPanel with RebaseDialog.
+    private val graphPreview = RebasePreviewPanel(project)
+
     // Candidate picker — search + log-style table (jj-idea-tq4b). For predefined-candidates mode
     // (parent mode), autoLoad is off: the fixed candidate list is pushed in directly via
     // setupPredefinedCandidates() instead of loading/searching the whole repo.
@@ -114,6 +118,10 @@ class SquashIntoDialog(
             if (pickingSources) "dialog.squash.into.source.search" else "dialog.squash.into.destination.search"
         ),
         multiSelect = pickingSources,
+        onReloaded = {
+            refreshGraphPreviewEntries()
+            updateGraphPreview()
+        },
         autoLoad = !hasPredefinedCandidates,
         onInitialLoad = { if (pickingSources) picker.selectFirstMatching { it.isWorkingCopy } }
     )
@@ -172,6 +180,10 @@ class SquashIntoDialog(
     @org.jetbrains.annotations.TestOnly
     internal fun performOKForTest() = doOKAction()
 
+    /** Change ids of the rows currently shown in the post-squash graph preview, in display order. */
+    @org.jetbrains.annotations.TestOnly
+    internal fun graphPreviewIdsForTest(): List<ChangeId> = graphPreview.renderedIds()
+
     @org.jetbrains.annotations.TestOnly
     internal fun selectPickerRowsForTest(vararg rows: Int) {
         pickerTable.clearSelection()
@@ -226,7 +238,10 @@ class SquashIntoDialog(
             updateDescription()
             updatePickHunksVisibility()
             if (pickingSources) reloadChangesForSelection()
+            updateGraphPreview()
         }
+
+        deleteEmptyAndMoveCheckBox.addItemListener { updateGraphPreview() }
 
         descriptionEditor.addTextChangeListener { userEditedDescription = true }
 
@@ -258,6 +273,44 @@ class SquashIntoDialog(
         // A partial squash (any file has a hunk-picked override) can never empty the source, so
         // the checkbox is meaningless once hunk-picking is in play - see doOKAction's KDoc.
         deleteEmptyAndMoveCheckBox.isEnabled = fileSelection.allIncluded && destinationOverrides.isEmpty()
+        updateGraphPreview()
+    }
+
+    // ---- Post-squash graph preview ----
+
+    /**
+     * Gives the preview the entries it can simulate over: the picker's loaded set plus the fixed
+     * side and any predefined candidates, which the picker may have filtered out (sources and
+     * immutable changes are excluded from the destination list) or never loaded (parent mode).
+     */
+    private fun refreshGraphPreviewEntries() {
+        val extra = when (mode) {
+            is SquashMode.PickDestination -> mode.sources
+            is SquashMode.PickSources -> listOf(mode.destination)
+        } + (mode.candidates ?: emptyList())
+        val known = picker.entries.mapTo(HashSet()) { it.id }
+        graphPreview.setEntries(picker.entries + extra.filter { known.add(it.id) })
+    }
+
+    private fun updateGraphPreview() {
+        val sources: List<LogEntry>
+        val destination: LogEntry?
+        when (mode) {
+            is SquashMode.PickDestination -> {
+                sources = mode.sources
+                destination = selectedDestinationEntry()
+            }
+
+            is SquashMode.PickSources -> {
+                sources = selectedSourceEntries()
+                destination = mode.destination
+            }
+        }
+        graphPreview.updateSquash(
+            sources,
+            destination,
+            abandonSources = deleteEmptyAndMoveCheckBox.isEnabled && deleteEmptyAndMoveCheckBox.isSelected
+        )
     }
 
     // ---- File inclusion sync ----
@@ -415,9 +468,18 @@ class SquashIntoDialog(
 
         preview.addFooterComponent(pickHunksButton)
 
+        val graphSection = JPanel(BorderLayout()).apply {
+            add(createSectionLabel(JujutsuBundle.message("dialog.squash.into.graph.preview")), BorderLayout.NORTH)
+            add(graphPreview, BorderLayout.CENTER)
+        }
+        val rightSide = OnePixelSplitter(true, 0.35f).apply {
+            firstComponent = graphSection
+            secondComponent = preview
+        }
+
         val centerContent = OnePixelSplitter(false, 0.45f).apply {
             firstComponent = pickerAndFiles
-            secondComponent = preview
+            secondComponent = rightSide
         }
 
         val wrapper = JPanel(BorderLayout()).apply {
@@ -447,6 +509,7 @@ class SquashIntoDialog(
     private fun setupPredefinedCandidates() {
         val candidates = mode.candidates!!
         picker.setEntries(candidates)
+        refreshGraphPreviewEntries()
         if (candidates.isNotEmpty()) {
             if (!pickingSources) pickerTable.setRowSelectionInterval(0, 0)
         } else {

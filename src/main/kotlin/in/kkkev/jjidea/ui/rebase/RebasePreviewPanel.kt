@@ -13,18 +13,21 @@ import `in`.kkkev.jjidea.ui.log.GraphNode
 import `in`.kkkev.jjidea.ui.log.JujutsuLogTableModel
 import `in`.kkkev.jjidea.ui.log.hideAllButGraphColumn
 import `in`.kkkev.jjidea.ui.log.setGraphRenderer
+import `in`.kkkev.jjidea.ui.squash.SquashSimulation
+import `in`.kkkev.jjidea.ui.squash.SquashSimulator
 import java.awt.BorderLayout
 import java.awt.Color
 import javax.swing.JPanel
 import javax.swing.ListSelectionModel
 
 /**
- * Preview panel showing a simulated post-rebase commit graph.
+ * Preview panel showing a simulated post-rebase (or post-squash) commit graph.
  *
  * Source commits are highlighted green, destination commits blue.
  * Below the graph, a text summary describes the operation.
  *
- * Driven entirely by [setEntries] and [update] calls — no data in constructor.
+ * Driven entirely by [setEntries] and [update] (rebase) / [updateSquash] calls — no data in
+ * constructor. Both funnel into [render], so the two simulators share one panel.
  */
 class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
     private val tableModel = JujutsuLogTableModel()
@@ -86,31 +89,84 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
             destinationMode
         )
 
-        tableModel.setEntries(simulation.entries)
+        render(
+            simulation.entries,
+            simulation.sourceIds,
+            destinationIds,
+            rebaseSummary(simulation.sourceIds, destinationIds, sourceMode, destinationMode, sourceLabel)
+        )
+    }
 
-        val baseNodes = CommitGraphBuilder().buildGraph(simulation.entries)
+    /**
+     * Update the preview by simulating `jj squash` of [sources] into [destination] and rebuilding
+     * the graph. [abandonSources] mirrors the dialog's "delete empty source" option.
+     */
+    fun updateSquash(sources: List<LogEntry>, destination: LogEntry?, abandonSources: Boolean) {
+        val simulation = SquashSimulator.simulate(allEntries, sources, destination, abandonSources)
+        val destinationIds = setOfNotNull(simulation.destinationId)
+        render(
+            simulation.entries,
+            simulation.sourceIds,
+            destinationIds,
+            squashSummary(sources, simulation, destination)
+        )
+    }
+
+    /**
+     * Render [entries] as the preview graph, highlighting [sourceIds] green and [destinationIds]
+     * blue, with [summaryHtml] (an `<html>` string, or empty) below. The common tail of
+     * [update] and [updateSquash].
+     */
+    fun render(
+        entries: List<LogEntry>,
+        sourceIds: Set<ChangeId>,
+        destinationIds: Set<ChangeId>,
+        summaryHtml: String
+    ) {
+        tableModel.setEntries(entries)
+
+        val baseNodes = CommitGraphBuilder().buildGraph(entries)
         graphNodes = baseNodes.mapValues { (key, node) ->
             when (key.revision) {
-                in simulation.sourceIds -> node.copy(highlightColor = JujutsuColors.SOURCE_HIGHLIGHT)
-                in simulation.destinationIds -> node.copy(highlightColor = JujutsuColors.DESTINATION_HIGHLIGHT)
+                in sourceIds -> node.copy(highlightColor = JujutsuColors.SOURCE_HIGHLIGHT)
+                in destinationIds -> node.copy(highlightColor = JujutsuColors.DESTINATION_HIGHLIGHT)
                 else -> node
             }
         }
 
         table.setGraphRenderer(graphNodes)
-        updateDescription(simulation.sourceIds, destinationIds, sourceMode, destinationMode, sourceLabel)
+        descriptionLabel.text = summaryHtml
     }
 
-    private fun updateDescription(
+    /** Ids of the rows currently rendered, in display order. */
+    @org.jetbrains.annotations.TestOnly
+    internal fun renderedIds(): List<ChangeId> = (0 until tableModel.rowCount).mapNotNull {
+        tableModel.getEntry(it)?.id
+    }
+
+    private fun legend() = buildString {
+        append("<font color='${colorHex(JujutsuColors.SOURCE_HIGHLIGHT)}'>&#9632;</font> source &nbsp; ")
+        append(
+            "<font color='${colorHex(JujutsuColors.DESTINATION_HIGHLIGHT)}'>&#9632;</font> destination &nbsp;&nbsp; "
+        )
+    }
+
+    private fun squashSummary(sources: List<LogEntry>, simulation: SquashSimulation, destination: LogEntry?): String {
+        if (sources.isEmpty() || destination == null) return ""
+        val sourceText = if (sources.size == 1) sources.first().id.short else "${sources.size} changes"
+        val outcome = if (simulation.abandonedIds.isEmpty()) "source kept" else "source abandoned"
+        return "<html>${legend()}$sourceText → squash into ${findDisplayName(destination.id)} ($outcome)</html>"
+    }
+
+    private fun rebaseSummary(
         sourceIds: Set<ChangeId>,
         destinationIds: Set<ChangeId>,
         sourceMode: RebaseSourceMode,
         destinationMode: RebaseDestinationMode,
         sourceLabel: String? = null
-    ) {
+    ): String {
         if (sourceIds.isEmpty() || destinationIds.isEmpty()) {
-            descriptionLabel.text = ""
-            return
+            return ""
         }
 
         val sourceText = sourceLabel ?: if (sourceIds.size == 1) {
@@ -133,17 +189,7 @@ class RebasePreviewPanel(project: Project) : JPanel(BorderLayout()) {
             RebaseDestinationMode.INSERT_BEFORE -> "insert before $destText"
         }
 
-        descriptionLabel.text = buildString {
-            append("<html>")
-            append("<font color='${colorHex(JujutsuColors.SOURCE_HIGHLIGHT)}'>&#9632;</font> source &nbsp; ")
-            append(
-                "<font color='${colorHex(
-                    JujutsuColors.DESTINATION_HIGHLIGHT
-                )}'>&#9632;</font> destination &nbsp;&nbsp; "
-            )
-            append("$sourceText$modeText → $operationText")
-            append("</html>")
-        }
+        return "<html>${legend()}$sourceText$modeText → $operationText</html>"
     }
 
     private fun findDisplayName(id: ChangeId): String {
