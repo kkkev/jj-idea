@@ -59,6 +59,12 @@ class LogFilterRevsetTest {
         }
 
         @Test
+        fun `date cutoff drops fractional seconds, which jj cannot parse`() {
+            compile(LogFilterState(dateCutoff = Instant.parse("2026-10-08T15:49:48.895622Z")), Revset.Default) shouldBe
+                "(author_date(after:\"2026-10-08T15:49:48Z\"))"
+        }
+
+        @Test
         fun `date cutoff is an author_date after clause`() {
             compile(LogFilterState(dateCutoff = Instant.parse("2026-10-01T12:00:00Z")), Revset.Default) shouldBe
                 "(author_date(after:\"2026-10-01T12:00:00Z\"))"

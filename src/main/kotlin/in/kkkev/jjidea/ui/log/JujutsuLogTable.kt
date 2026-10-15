@@ -758,7 +758,7 @@ class JujutsuLogTable(
             )
         }
 
-    fun setEntries(entries: List<LogEntry>) {
+    fun setEntries(entries: List<LogEntry>, filterMatches: Set<ChangeKey>? = null) {
         refreshPending = false
         // Capture current selection for re-selection after model update,
         // but only if no explicit selection was requested (e.g., via changeSelection after edit/abandon).
@@ -775,7 +775,7 @@ class JujutsuLogTable(
             }
         }
         val anchor = captureViewportAnchor()
-        logModel.setEntries(entries)
+        logModel.setEntries(entries, filterMatches)
         restoreViewportAnchor(anchor)
         if (carriedMulti != null) restoreSelection(carriedMulti, scrollIntoView = false)
         pendingSelection?.let {
@@ -1209,13 +1209,34 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var rootFilter = RootFilterSelection() // Filter by repository root (jj-idea-qcks)
 
     /**
-     * Custom revset filter (jj-idea-vqpn, GitHub #116): repo-scoped change keys resolved from a
-     * user-typed revset via [resolveRevsetFilter]. `null` means the filter is inactive (show
-     * everything) - unlike [bookmarkFilter]'s empty-set-means-inactive convention, an active
-     * revset filter that resolves to *no* matches is a real, distinct state that must show an
-     * empty graph, not fall back to unfiltered.
+     * The tab's scope revset (the Revset chip, jj-idea-ehwm): a base revset the other filters narrow within.
+     * Has no client-side form, so it only takes effect through [filterMatches] when [revsetDriven].
      */
-    private var revsetFilter: Set<ChangeKey>? = null
+    private var scopeRevset: String = ""
+
+    /** The Reference chip's selection in revset form (jj-idea-ehwm). Client-side it is [bookmarkFilter]. */
+    private var referenceFilter: LogFilterReference? = null
+
+    /**
+     * When true (the unified log tab), every filter except Root is resolved by jj - see
+     * [UnifiedJujutsuLogDataLoader.applyFilter] - and this model only shows the rows jj matched
+     * ([filterMatches]). When false (file history) the client-side predicates run as before.
+     */
+    var revsetDriven = false
+
+    /**
+     * The keys jj matched for the filter the loader last applied (jj-idea-ehwm.3); null until a result
+     * arrives. Deliberately *not* cleared when the filter changes: the table holds the last result
+     * until jj answers the new one, instead of flashing a client-side approximation.
+     */
+    private var filterMatches: Set<ChangeKey>? = null
+
+    /**
+     * Invoked (on the EDT) when a filter that jj resolves changes - everything except Root - in
+     * [revsetDriven] mode. `immediate` is false for search text and its toggles, which the owner
+     * should debounce, and true for chip changes.
+     */
+    var onFilterStateChanged: ((immediate: Boolean) -> Unit)? = null
 
     /**
      * Invoked on the EDT after [applyFilter] rebuilds [filteredEntries], except when called
@@ -1321,7 +1342,8 @@ class JujutsuLogTableModel : AbstractTableModel() {
      * Update the table with new log entries.
      * Called on EDT after background loading.
      */
-    fun setEntries(newEntries: List<LogEntry>) {
+    fun setEntries(newEntries: List<LogEntry>, matches: Set<ChangeKey>? = null) {
+        if (revsetDriven) filterMatches = matches
         entries.clear()
         entries.addAll(newEntries)
         entriesByKey = newEntries.associateBy { it.key }
@@ -1338,11 +1360,20 @@ class JujutsuLogTableModel : AbstractTableModel() {
      * Set the filter text and options, then update the filtered entries.
      */
     fun setFilter(text: String, regex: Boolean = false, caseSensitive: Boolean = false, wholeWords: Boolean = false) {
+        // jj resolves a changed filter, so repeating the current one would only cost a pointless jj call.
+        if (revsetDriven &&
+            text == filterText &&
+            regex == useRegex &&
+            caseSensitive == matchCase &&
+            wholeWords == matchWholeWords
+        ) {
+            return
+        }
         filterText = text
         useRegex = regex
         matchCase = caseSensitive
         matchWholeWords = wholeWords
-        applyFilter()
+        filterChanged(immediate = false)
     }
 
     /**
@@ -1351,7 +1382,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
      */
     fun setAuthorFilter(authors: Set<String>) {
         authorFilter = authors
-        applyFilter()
+        filterChanged()
     }
 
     /**
@@ -1364,7 +1395,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
      */
     fun setBookmarkFilter(keys: Set<ChangeKey>) {
         bookmarkFilter = keys
-        applyFilter()
+        filterChanged()
     }
 
     /**
@@ -1373,7 +1404,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
      */
     fun setDateFilter(cutoff: Instant?) {
         dateFilterCutoff = cutoff
-        applyFilter()
+        filterChanged()
     }
 
     /**
@@ -1382,7 +1413,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
      */
     fun setPathsFilter(paths: Set<String>) {
         pathsFilter = paths
-        applyFilter()
+        filterChanged()
     }
 
     /**
@@ -1396,14 +1427,43 @@ class JujutsuLogTableModel : AbstractTableModel() {
         applyFilter()
     }
 
+    /** Sets the tab's scope revset (the Revset chip, jj-idea-ehwm); blank means no scope. */
+    fun setScope(revset: String) {
+        if (revset.trim() == scopeRevset) return
+        scopeRevset = revset.trim()
+        filterChanged()
+    }
+
+    /** Sets the Reference chip's selection in revset form (jj-idea-ehwm); null clears it. */
+    internal fun setReferenceFilter(reference: LogFilterReference?) {
+        if (reference == referenceFilter) return
+        referenceFilter = reference
+        filterChanged()
+    }
+
+    /** Everything jj resolves, as the input to [compileLogFilterRevset]. Root is excluded: it picks repos. */
+    internal fun filterState() = LogFilterState(
+        scope = scopeRevset,
+        reference = referenceFilter,
+        authorEmails = authorFilter,
+        dateCutoff = dateFilterCutoff,
+        paths = pathsFilter,
+        searchText = filterText,
+        useRegex = useRegex,
+        matchCase = matchCase,
+        wholeWords = matchWholeWords
+    )
+
     /**
-     * Set the custom revset filter (jj-idea-vqpn, GitHub #116) by its already-resolved
-     * [ChangeKey] set. `null` means no revset filtering; a non-null (possibly empty) set means
-     * the filter is active and only these keys pass.
+     * A jj-resolved filter changed. In [revsetDriven] mode the rows don't change until the loader
+     * delivers the new matches, so this only notifies; otherwise it re-filters client-side.
      */
-    fun setRevsetFilter(keys: Set<ChangeKey>?) {
-        revsetFilter = keys
-        applyFilter()
+    private fun filterChanged(immediate: Boolean = true) {
+        if (revsetDriven) {
+            onFilterStateChanged?.invoke(immediate)
+        } else {
+            applyFilter()
+        }
     }
 
     /**
@@ -1452,53 +1512,16 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private fun rebuildFilteredEntries() {
         filteredEntries.clear()
 
-        val matcher = LogFilterMatcher.create(filterText, useRegex, matchCase, matchWholeWords)
-
-        // Filter entries by all active filters
-        filteredEntries.addAll(
-            entries.filter { entry ->
-                // Text filter (if active)
-                val matchesText = matcher?.matches(entry) ?: true
-
-                // Author filter (if active)
-                val matchesAuthor = if (authorFilter.isNotEmpty()) {
-                    entry.author?.email?.let { authorFilter.contains(it) } == true
-                } else {
-                    true
-                }
-
-                // Bookmark filter (if active) - filter by repo-scoped change key
-                val matchesBookmark = if (bookmarkFilter.isNotEmpty()) {
-                    bookmarkFilter.contains(entry.key)
-                } else {
-                    true
-                }
-
-                // Date filter (if active)
-                val matchesDate = dateFilterCutoff?.let { cutoff ->
-                    val timestamp = entry.authorTimestamp ?: entry.committerTimestamp
-                    timestamp != null && timestamp >= cutoff
-                } ?: true
-
-                // Paths filter (if active) - placeholder for now
-                // TODO: Implement path filtering once file changes are available in LogEntry
-                val matchesPaths = pathsFilter.isEmpty()
-
-                // Root filter (if active)
-                val matchesRoot = rootFilter.shows(entry.repo)
-
-                // Revset filter (if active) - jj-idea-vqpn, GitHub #116
-                val matchesRevset = revsetFilter?.contains(entry.key) ?: true
-
-                matchesText &&
-                    matchesAuthor &&
-                    matchesBookmark &&
-                    matchesDate &&
-                    matchesPaths &&
-                    matchesRoot &&
-                    matchesRevset
-            }
-        )
+        if (revsetDriven) {
+            // jj did the filtering (jj-idea-ehwm.3); only the Root filter is still ours. A null
+            // filterMatches means nothing has been resolved yet, so show everything.
+            val matches = filterMatches.takeIf { filterState().isActive }
+            filteredEntries.addAll(
+                entries.filter { entry -> rootFilter.shows(entry.repo) && (matches == null || entry.key in matches) }
+            )
+        } else {
+            addClientFilteredEntries()
+        }
         filteredRowByKey = buildMap(filteredEntries.size) {
             filteredEntries.forEachIndexed { row, entry -> put(entry.key, row) }
         }
@@ -1515,5 +1538,33 @@ class JujutsuLogTableModel : AbstractTableModel() {
         filteredEntries.clear()
         filteredRowByKey = emptyMap()
         fireTableDataChanged()
+    }
+
+    /** The client-side predicates, used when jj isn't resolving the filters (file history). */
+    private fun addClientFilteredEntries() {
+        val matcher = LogFilterMatcher.create(filterText, useRegex, matchCase, matchWholeWords)
+        filteredEntries.addAll(
+            entries.filter { entry ->
+                val matchesText = matcher?.matches(entry) ?: true
+                val matchesAuthor = if (authorFilter.isNotEmpty()) {
+                    entry.author?.email?.let { authorFilter.contains(it) } == true
+                } else {
+                    true
+                }
+                val matchesBookmark = if (bookmarkFilter.isNotEmpty()) bookmarkFilter.contains(entry.key) else true
+                val matchesDate = dateFilterCutoff?.let { cutoff ->
+                    val timestamp = entry.authorTimestamp ?: entry.committerTimestamp
+                    timestamp != null && timestamp >= cutoff
+                } ?: true
+                // TODO: Implement path filtering once file changes are available in LogEntry
+                val matchesPaths = pathsFilter.isEmpty()
+                matchesText &&
+                    matchesAuthor &&
+                    matchesBookmark &&
+                    matchesDate &&
+                    matchesPaths &&
+                    rootFilter.shows(entry.repo)
+            }
+        )
     }
 }

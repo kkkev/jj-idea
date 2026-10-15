@@ -35,7 +35,16 @@ internal data class LogFilterState(
     val matchCase: Boolean = false,
     val wholeWords: Boolean = false,
     val revsetMode: Boolean = false
-)
+) {
+    /** True when at least one term would be compiled, i.e. [compileLogFilterRevset] would not return null. */
+    val isActive: Boolean
+        get() = scope.isNotBlank() ||
+            reference != null ||
+            authorEmails.isNotEmpty() ||
+            dateCutoff != null ||
+            paths.isNotEmpty() ||
+            searchText.isNotBlank()
+}
 
 /**
  * Compiles [state] to one revset for a single repo: `(base) & (scope) & (reference) & (authors) &
@@ -59,7 +68,7 @@ internal fun compileLogFilterRevset(base: Revset, state: LogFilterState): Revset
         if (state.authorEmails.isNotEmpty()) {
             add(state.authorEmails.sorted().joinToString(" | ") { "author_email(exact:${quoteRevsetString(it)})" })
         }
-        state.dateCutoff?.let { add("author_date(after:${quoteRevsetString(it.toString())})") }
+        state.dateCutoff?.let { add("author_date(after:${quoteRevsetString(wholeSeconds(it))})") }
         if (state.paths.isNotEmpty()) {
             add(state.paths.sorted().joinToString(" | ") { "files(root:${quoteRevsetString(it)})" })
         }
@@ -67,6 +76,12 @@ internal fun compileLogFilterRevset(base: Revset, state: LogFilterState): Revset
     }
     return if (terms.isEmpty()) null else andRevsets(base, terms)
 }
+
+/**
+ * jj's date parser rejects fractional seconds (`...48.895622Z` fails with "expected timezone"), and
+ * the Date chip's cutoff is "now minus a period", so truncate to whole seconds.
+ */
+private fun wholeSeconds(instant: Instant): String = Instant.fromEpochSeconds(instant.epochSeconds).toString()
 
 private fun referenceTerm(reference: LogFilterReference): String = when (reference) {
     LogFilterReference.WorkingCopy -> "@"

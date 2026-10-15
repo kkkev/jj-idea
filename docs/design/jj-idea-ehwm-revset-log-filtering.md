@@ -57,7 +57,34 @@ Gotchas found:
   *loaded* hidden ancestors, which is its designed scope. A bounded `connected()` fetch, used
   only when the loaded span is small, is a possible later optimisation and is not required.
 
+## Shipped in ehwm.3: `FilterPageCursor`, not `PagedLogWindow`
+
+Section (a) recommended paging the compiled revset with `PagedLogWindow`. Implementing it showed that
+is **wrong for a sparse filter**: `PagedLogWindow` resumes from the *parents* of the rows shown. A
+match's parent is usually not a match, and the ancestors of that parent include matches that were
+already shown, so each page re-fetches the first matches and never advances (it only ever terminates
+on an empty page). It is correct only for a revset closed under ancestry, i.e. the base log.
+
+`FilterPageCursor` (`ui/log/FilterPageCursor.kt`) resumes from the **heads of the matches not yet
+shown** instead. What is left is exactly `R & ::frontier`, because log order lists children before
+parents, so a page leaves behind an ancestry-closed remainder:
+
+- seed: `heads(R)`
+- page: `(R) & ::(frontier)` with `--limit N`
+- next frontier: `heads(((R) & ::(frontier)) ~ (present(<page commit ids>)))`; a page shorter than
+  `N` is the last one and needs no remainder query.
+
+Cost per page: two `jj log` calls, with arguments bounded by branch count plus `N` (not by how much has
+been shown). `FilterPageCursorContractTest` walks sparse filters on linear and many-branch real
+histories and checks the result equals jj's single-query result, with nothing repeated or skipped.
+Too wide a frontier (`PagedLogWindow.FRONTIER_CAP`) falls back to one unpaged, capped fetch.
+
+Everything else in (a)-(c) stands: rows are fetched directly (no id query), kept in a per-repo bucket
+beside `logCache`, deep matches get `NOT_LOADED` stubs, the Root filter stays client-side. While a
+filter change is being resolved the table holds its last result (no client-side approximation), with
+a "Filtering…" hint.
+
 ## Impact on follow-ups
-- ehwm.3: use `PagedLogWindow` + `compileLogFilterRevset`; fetch by commit id; no separate id
-  cursor. Root filter stays client-side (selects which repos to query).
+- ehwm.3: use `FilterPageCursor` + `compileLogFilterRevset` (see above); fetch by commit id; no
+  separate id cursor. Root filter stays client-side (selects which repos to query).
 - hlu3: unchanged scope; ehwm's deep matches show navigable stubs.

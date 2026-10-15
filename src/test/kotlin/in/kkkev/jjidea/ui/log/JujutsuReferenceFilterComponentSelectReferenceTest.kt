@@ -214,4 +214,52 @@ class JujutsuReferenceFilterComponentSelectReferenceTest {
             Disposer.dispose(disposable)
         }
     }
+
+    @Test
+    fun `in revset mode selectReference hands the reference to jj instead of walking loaded ancestors`() {
+        val tableModel = JujutsuLogTableModel().apply { revsetDriven = true }
+        // Neither the bookmark nor its ancestry is loaded: nothing needs loading first, jj resolves ::main.
+        tableModel.setEntries(listOf(entry("aaa111"), entry("bbb222")))
+        var expansionRequested = false
+        var filterRequests = 0
+        tableModel.onFilterStateChanged = { filterRequests++ }
+        val disposable = Disposer.newDisposable()
+        try {
+            val comp = component(tableModel, disposable)
+            comp.onReferenceExpansionNeeded = { expansionRequested = true }
+
+            comp.selectReference("main")
+
+            tableModel.filterState().reference shouldBe LogFilterReference.Bookmark("main")
+            filterRequests shouldBe 1
+            expansionRequested shouldBe false
+            tableModel.getFilteredEntries().size shouldBe 2 // rows only change when jj's matches arrive
+
+            comp.clearReference()
+
+            tableModel.filterState().reference shouldBe null
+        } finally {
+            Disposer.dispose(disposable)
+        }
+    }
+
+    @Test
+    fun `in revset mode a tag and the working copy map to their own reference kinds`() {
+        (project.get().stateModel.references as SimpleNotifiableState).value = mapOf(
+            repo to RepositoryReferences(tags = listOf(TagItem(Tag("v1"), id = null)))
+        )
+        val tableModel = JujutsuLogTableModel().apply { revsetDriven = true }
+        val disposable = Disposer.newDisposable()
+        try {
+            val comp = component(tableModel, disposable)
+
+            comp.selectReference("v1")
+            tableModel.filterState().reference shouldBe LogFilterReference.Tag("v1")
+
+            comp.selectReference("@")
+            tableModel.filterState().reference shouldBe LogFilterReference.WorkingCopy
+        } finally {
+            Disposer.dispose(disposable)
+        }
+    }
 }

@@ -16,8 +16,8 @@ import org.junit.jupiter.api.io.TempDir
 import java.nio.file.Path
 
 /**
- * Real-jj coverage for [CliLogService.getChangeIds] — the ids-only query jj-idea-vqpn's revset log
- * filter chip (GitHub #116, see [in.kkkev.jjidea.ui.log.resolveRevsetFilter]) resolves against.
+ * Real-jj coverage for [CliLogService.getChangeIds] — the ids-only query behind
+ * [in.kkkev.jjidea.jj.LogService.getLogHeads].
  * Same fixture/harness pattern as [PagedLogWindowContractTest].
  */
 @Tag("contract")

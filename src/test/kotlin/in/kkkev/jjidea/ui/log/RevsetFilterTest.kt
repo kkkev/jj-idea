@@ -1,11 +1,12 @@
 package `in`.kkkev.jjidea.ui.log
 
-import `in`.kkkev.jjidea.jj.ChangeId
-import `in`.kkkev.jjidea.jj.ChangeKey
+import com.intellij.openapi.vcs.FilePath
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.LogService
 import `in`.kkkev.jjidea.jj.Revset
+import io.kotest.matchers.maps.shouldBeEmpty
 import io.kotest.matchers.maps.shouldContainExactly
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -15,10 +16,9 @@ import org.junit.jupiter.api.Test
 
 /**
  * Unit coverage for jj-idea-vqpn (GitHub #116)'s custom revset log filter: the pure query-building
- * ([revsetFilterQuery]) and resolve ([resolveRevsetFilter]) logic behind
+ * ([revsetFilterQuery]) and validate ([validateRevsetFilter]) logic behind
  * [JujutsuRevsetFilterComponent]. See [RevsetFilter.kt][revsetFilterQuery]'s own doc for the
- * design — resolved client-side, ANDed with the repo-level revset, never touching
- * [in.kkkev.jjidea.jj.LogCache] or what the data loader fetches.
+ * design — ANDed with the repo-level revset, never touching [in.kkkev.jjidea.jj.LogCache].
  */
 class RevsetFilterTest {
     @Nested
@@ -37,22 +37,27 @@ class RevsetFilterTest {
 
     /**
      * A real implementation (delegating everything else to a relaxed mockk) rather than stubbing
-     * [LogService.getChangeIds] via mockk's `every {}` matchers — [Revset] is a sealed interface
+     * [LogService.getLog] via mockk's `every {}` matchers — [Revset] is a sealed interface
      * backed by an inline value class ([Expression]), which mockk's matcher machinery can't
      * handle (`IllegalStateException: null packRef`); the same workaround already used by
      * `ClosestBookmarksTest`/`PagedLogLoaderConcurrencyTest`'s `FakeLogService`s.
      */
-    private class FakeLogService(private val result: Result<List<ChangeId>>) : LogService by mockk(relaxed = true) {
-        val revsets = mutableListOf<Revset>()
+    private class FakeLogService(private val result: Result<List<LogEntry>>) : LogService by mockk(relaxed = true) {
+        val calls = mutableListOf<Pair<Revset, Int?>>()
 
-        override fun getChangeIds(revset: Revset): Result<List<ChangeId>> {
-            revsets.add(revset)
+        override fun getLog(
+            revset: Revset,
+            filePaths: List<FilePath>,
+            limit: Int?,
+            quiet: Boolean
+        ): Result<List<LogEntry>> {
+            calls.add(revset to limit)
             return result
         }
     }
 
     @Nested
-    inner class `resolveRevsetFilter` {
+    inner class `validateRevsetFilter` {
         private fun repoWithService(service: LogService): JujutsuRepository {
             val repo = mockk<JujutsuRepository>()
             every { repo.logService } returns service
@@ -60,40 +65,26 @@ class RevsetFilterTest {
         }
 
         @Test
-        fun `issues exactly one getChangeIds call per repo, passing the ANDed revset`() {
-            val base = Expression("::@")
-            val service = FakeLogService(Result.success(listOf(ChangeId("abc", "abc", null))))
+        fun `issues exactly one single-row getLog call per repo, passing the ANDed revset`() {
+            val service = FakeLogService(Result.success(emptyList()))
             val repo = repoWithService(service)
 
-            resolveRevsetFilter(listOf(repo), "foo()") { base }
+            validateRevsetFilter(listOf(repo), "foo()") { Expression("::@") }.shouldBeEmpty()
 
-            service.revsets shouldBe listOf(Expression("(::@) & (foo())"))
+            service.calls shouldBe listOf(Expression("(::@) & (foo())") to 1)
         }
 
         @Test
-        fun `keys are repo-scoped - the same change id in two repos does not cross over`() {
-            val id = ChangeId("abc", "abc", null)
-            val serviceA = FakeLogService(Result.success(listOf(id)))
-            val serviceB = FakeLogService(Result.success(listOf(id)))
-            val repoA = repoWithService(serviceA)
-            val repoB = repoWithService(serviceB)
-
-            val result = resolveRevsetFilter(listOf(repoA, repoB), "foo()") { Expression("all()") }
-
-            result.keys shouldBe setOf(ChangeKey(repoA, id), ChangeKey(repoB, id))
-        }
-
-        @Test
-        fun `a failing repo is reported in errors with jj's message, other repos still resolve`() {
-            val id = ChangeId("abc", "abc", null)
-            val ok = repoWithService(FakeLogService(Result.success(listOf(id))))
+        fun `a failing repo is reported with jj's message, other repos still validate`() {
+            val ok = FakeLogService(Result.success(emptyList()))
+            val okRepo = repoWithService(ok)
             val failing =
                 repoWithService(FakeLogService(Result.failure(RuntimeException("Error from jj log: bad revset"))))
 
-            val result = resolveRevsetFilter(listOf(ok, failing), "foo()") { Expression("all()") }
+            val errors = validateRevsetFilter(listOf(okRepo, failing), "foo()") { Expression("all()") }
 
-            result.keys shouldBe setOf(ChangeKey(ok, id))
-            result.errors shouldContainExactly mapOf(failing to "Error from jj log: bad revset")
+            errors shouldContainExactly mapOf(failing to "Error from jj log: bad revset")
+            ok.calls.size shouldBe 1
         }
     }
 }

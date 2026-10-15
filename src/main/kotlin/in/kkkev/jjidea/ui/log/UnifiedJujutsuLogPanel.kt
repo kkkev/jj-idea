@@ -7,6 +7,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.OnePixelSplitter
+import com.intellij.util.Alarm
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -87,7 +88,14 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
      */
     var onTitleChanged: ((String) -> Unit)? = null
 
+    // jj-idea-ehwm.3: every filter except Root is resolved by jj, which the loader runs after this delay
+    // for search text (chips apply at once). Nothing applies before the first load - see onDataLoaded.
+    private val filterAlarm = Alarm(Alarm.ThreadToUse.SWING_THREAD, this)
+    private var initialFilterApplied = false
+
     init {
+        logTable.logModel.revsetDriven = true
+        logTable.logModel.onFilterStateChanged = { immediate -> scheduleFilterApply(immediate) }
         Disposer.register(this, bookmarksPanel)
         bookmarksStripe.setExpanded(config.bookmarksPanelVisible)
         bookmarksSplitter = installLeftComponent(
@@ -179,18 +187,6 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             }
         }
 
-        referenceFilterComponent.onReferenceExpansionNeeded = { referenceName ->
-            project.stateModel.references.value.forEach { (repo, references) ->
-                val changeId =
-                    references.bookmarks.firstOrNull { it.bookmark.name.name == referenceName }?.id
-                        ?: references.tags.firstOrNull { it.tag.name == referenceName }?.id
-                changeId?.let {
-                    (dataLoader as UnifiedJujutsuLogDataLoader)
-                        .loadExpanding(repo, it, onMissing = { logTable.clearNavigation() })
-                }
-            }
-        }
-
         // Rebuild the graph layout synchronously before fireTableDataChanged() so the
         // renderer is correct when Swing first paints the filtered rows (no intermediate flash).
         logTable.logModel.onFilterApplied = { refreshDisplayedGraph() }
@@ -201,12 +197,8 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     private fun setupStateListener() {
         project.stateModel.logRefresh.connect(this) { _ ->
             logTable.markRefreshPending()
+            // The loader's refresh also re-fetches the active filter's matches (jj-idea-ehwm.3).
             refresh()
-            // jj-idea-vqpn (GitHub #116): a write can create/abandon commits the revset filter
-            // matches, so its resolved id set needs re-checking on the same trigger as the rest
-            // of the log - see JujutsuRevsetFilterComponent.reresolve's doc for why this doesn't
-            // silently drop the filter on a transient failure.
-            revsetFilterComponent?.reresolve()
         }
         // jj-idea-dii4 (GitHub #128): rows and references reload in parallel, so a row's bookmark
         // ahead/behind can be merged against the previous references - re-merge once they land.
@@ -215,9 +207,26 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         }
     }
 
-    /** jj-idea-vqpn (GitHub #116): an explicit Refresh re-resolves the revset filter too. */
-    override fun onManualRefresh() {
-        revsetFilterComponent?.reresolve()
+    /** Runs [applyFilterNow] - at once, or after a short pause for search text so typing doesn't spawn a jj call per key. */
+    private fun scheduleFilterApply(immediate: Boolean) {
+        if (!initialFilterApplied) return
+        filterAlarm.cancelAllRequests()
+        showStatusMessage(JujutsuBundle.message("log.status.filtering"))
+        filterAlarm.addRequest(::applyFilterNow, if (immediate) 0 else FILTER_DEBOUNCE_MS)
+    }
+
+    /** Has jj resolve the model's current filters; the matches arrive with the next [onDataLoaded]. */
+    private fun applyFilterNow() {
+        if (Disposer.isDisposed(this) || project.isDisposed) return
+        (dataLoader as UnifiedJujutsuLogDataLoader).applyFilter(logTable.logModel.filterState()) { errors ->
+            if (errors.isEmpty()) {
+                clearStatusMessage()
+            } else {
+                showStatusMessage(
+                    JujutsuBundle.message("log.status.revset.error", errors.values.distinct().joinToString("; "))
+                )
+            }
+        }
     }
 
     /**
@@ -264,24 +273,19 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         // Store the full-set graph before setEntries() so refreshDisplayedGraph() can reuse it
         // immediately when no filter is active.
         fullGraphNodes = newData.graphNodes
-        logTable.setEntries(newData.entries)
+        logTable.setEntries(newData.entries, newData.filterMatches)
         // Rebuild immediately (no debounce) to handle any filter that was restored from config
         // before the first load, and to replace any graph from a previous load.
         refreshDisplayedGraph()
         updateRootFilterVisibility()
         updateStatusBar(newData.entries.size, newData.limit, newData.paged)
-        // jj-idea-vqpn (GitHub #116): a narrow revset filter over a deep/paged history can match
-        // commits outside the currently loaded window - say so explicitly rather than letting a
-        // short or empty filtered graph look like the filter silently found nothing.
-        revsetFilterComponent?.getMatchedKeys()?.let { keys ->
-            val loadedKeys = newData.entries.mapTo(HashSet()) { it.key }
-            val beyondWindow = keys.count { it !in loadedKeys }
-            if (beyondWindow > 0) {
-                showStatusMessage(JujutsuBundle.message("log.status.revset.beyondWindow", beyondWindow))
-            }
-        }
         detailsPanel.showCommits(logTable.selectedEntries)
-        referenceFilterComponent.retryFilter()
+        if (!initialFilterApplied) {
+            // Filters restored from config only reach jj now that there is a base log to merge into.
+            initialFilterApplied = true
+            referenceFilterComponent.retryFilter()
+            if (logTable.logModel.filterState().isActive) scheduleFilterApply(immediate = true)
+        }
         // Restore root filter after data loads (roots are only available once the model is populated)
         if (config.selectedRootPaths.isNotEmpty() || config.excludedRootPaths.isNotEmpty()) {
             rootFilterComponent?.setSelectedRoots(config.selectedRootPaths.toSet(), config.excludedRootPaths.toSet())
@@ -289,26 +293,10 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     }
 
     /**
-     * Runs a whole-repo search (jj-idea-lpbv) when Enter is pressed with non-blank search text,
-     * so a pasted Git hash or a match in an older commit's description/author is found even when
-     * it's outside the loaded log window. Results merge into the table (see
-     * [UnifiedJujutsuLogDataLoader.searchWholeRepo]); the outcome replaces whatever the status bar
-     * was showing (e.g. the truncation notice set by [onDataLoaded] as part of the same reload).
+     * Enter in the search field applies the filter without waiting out the typing pause. (The search
+     * itself already covers the whole repository - it is part of the revset jj resolves, jj-idea-ehwm.3.)
      */
-    override fun onSearchSubmitted(text: String) {
-        (dataLoader as UnifiedJujutsuLogDataLoader).searchWholeRepo(
-            text,
-            useRegex,
-            matchCase,
-            matchWholeWords
-        ) { found ->
-            if (found > 0) {
-                showStatusMessage(JujutsuBundle.message("log.status.search.found", found, text))
-            } else {
-                showStatusMessage(JujutsuBundle.message("log.status.search.none", text))
-            }
-        }
-    }
+    override fun onSearchSubmitted(text: String) = scheduleFilterApply(immediate = true)
 
     /**
      * One-click New/Edit/Rebase/Describe buttons ahead of Refresh, for the most-used log
@@ -409,10 +397,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         revsetFilterComponent = JujutsuRevsetFilterComponent(
             repos = { config.selectedRepos(project.initialisedJujutsuRepositories) },
             baseFor = { repo -> JujutsuSettings.getInstance(project).resolvedLogRevset(repo) },
-            tableModel = logTable.logModel,
-            onReresolveError = { message ->
-                showStatusMessage(JujutsuBundle.message("log.status.revset.error", message))
-            }
+            tableModel = logTable.logModel
         ).apply {
             initUi()
             initialize()
@@ -441,3 +426,5 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         // detailsPanel is registered as a child via Disposer — no manual dispose needed
     }
 }
+
+private const val FILTER_DEBOUNCE_MS = 300

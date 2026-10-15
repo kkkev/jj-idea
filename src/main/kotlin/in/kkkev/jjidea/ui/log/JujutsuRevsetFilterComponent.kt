@@ -11,7 +11,6 @@ import com.intellij.util.ui.NamedColorUtil
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
-import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.util.runInBackground
@@ -26,10 +25,10 @@ import javax.swing.event.DocumentEvent
 /**
  * Custom revset log filter chip (jj-idea-vqpn, GitHub #116).
  *
- * Client-side, like [JujutsuPathsFilterComponent]: resolves the typed revset to a [ChangeKey] set
- * (one ids-only `jj log` call per repo, ANDed with the repo-level revset — see
- * [resolveRevsetFilter]/[revsetFilterQuery]) and hands that set to [tableModel], which intersects
- * it with every other active chip in [JujutsuLogTableModel]'s existing filter pipeline.
+ * Validates the typed revset against jj (one `--limit 1` call per repo, see [validateRevsetFilter])
+ * and hands it to [tableModel] as the tab's scope. The table's owner then has jj resolve it together
+ * with every other filter ([UnifiedJujutsuLogDataLoader.applyFilter]), so matches anywhere in
+ * history show up, not only those in the loaded window.
  *
  * Unlike every other chip here, editing this one needs free-text entry rather than a fixed list
  * of choices, so [showPopup] is overridden with a small non-modal popup (a history-backed
@@ -40,25 +39,12 @@ import javax.swing.event.DocumentEvent
 class JujutsuRevsetFilterComponent(
     private val repos: () -> Collection<JujutsuRepository>,
     private val baseFor: (JujutsuRepository) -> Revset,
-    private val tableModel: JujutsuLogTableModel,
-    /** Called from [reresolve] (never from the interactive edit popup, which shows its own
-     * inline error) when a background re-resolve fails, so the owning panel can surface it as a
-     * status-bar message alongside the chip's own [setErrorText] state. */
-    private val onReresolveError: (String) -> Unit = {}
+    private val tableModel: JujutsuLogTableModel
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.revset")) {
     private var currentRevset: String = ""
 
-    /**
-     * The full resolved id set for [currentRevset] — every match, not just the ones currently
-     * loaded. Exposed so the panel can report matches that exist but fall outside the loaded log
-     * window (jj-idea-vqpn, GitHub #116) instead of a narrow filter over a deep history looking
-     * like it silently found nothing.
-     */
-    private var matchedKeys: Set<ChangeKey>? = null
-
-    // Bumped on every resolve (interactive edit, or a background re-resolve) so a stale
-    // in-flight result (e.g. the popup was reopened with a new value, or forceRefresh() fired a
-    // re-resolve while an edit was still in flight) can't clobber a newer one.
+    // Bumped on every validation (and reset) so a stale in-flight result (e.g. the popup was
+    // reopened with a new value, or the filter was reset while an edit was in flight) can't clobber a newer one.
     private var generation = 0
 
     override fun getCurrentText(): String = currentRevset
@@ -74,9 +60,6 @@ class JujutsuRevsetFilterComponent(
      */
     fun getRevsetText(): String = currentRevset
 
-    /** See [matchedKeys]'s doc. `null` when the filter is inactive or its last resolve failed. */
-    fun getMatchedKeys(): Set<ChangeKey>? = matchedKeys
-
     fun initialize() {
         // No-op: unlike the other chips, applying happens from the popup's Enter handler, not a
         // generic addChangeListener callback — kept for symmetry with the other filter
@@ -84,42 +67,15 @@ class JujutsuRevsetFilterComponent(
     }
 
     /**
-     * Restores a persisted revset from [in.kkkev.jjidea.settings.LogWindowConfig.revsetFilter]
-     * and re-resolves it — without [notifyFilterChanged] (that would immediately re-persist the
-     * value that was just read from persistence, and the panel's own restore-from-config path
-     * doesn't need it). A blank [revset] leaves the filter inactive with nothing to resolve.
+     * Restores a persisted revset from [in.kkkev.jjidea.settings.LogWindowConfig.revsetFilter] as
+     * the table's scope — without [notifyFilterChanged] (that would immediately re-persist the value
+     * that was just read from persistence). The panel applies the restored filters once after the
+     * first load. A blank [revset] leaves the filter inactive.
      */
     fun setInitialRevset(revset: String) {
         currentRevset = revset
         refreshPresentation()
-        if (revset.isNotEmpty()) reresolve()
-    }
-
-    /**
-     * Re-resolves the currently-applied revset in the background and re-applies it — used when
-     * the loaded set can have changed under the filter (an operation via
-     * [in.kkkev.jjidea.jj.JujutsuStateModel.logRefresh], an explicit Refresh, or the tab's repo
-     * selection changing), not just when the user edits the text. A resolve failure here (e.g. a
-     * persisted revset referencing a bookmark that's since been deleted) sets the chip's error
-     * state via [setErrorText] rather than silently clearing or falling back to unfiltered — the
-     * last successfully-resolved key set stays applied to [tableModel] so the graph doesn't
-     * suddenly appear empty or unfiltered because of a transient resolve failure.
-     *
-     * No-op while the filter is inactive (nothing persisted to re-resolve).
-     */
-    fun reresolve() {
-        if (currentRevset.isEmpty()) return
-        resolve(currentRevset, onResolved = { result ->
-            if (result.errors.isEmpty()) {
-                matchedKeys = result.keys
-                tableModel.setRevsetFilter(result.keys)
-                setErrorText(null)
-            } else {
-                val message = formatErrors(result.errors)
-                setErrorText(message)
-                onReresolveError(message)
-            }
-        })
+        tableModel.setScope(revset)
     }
 
     override fun createActionGroup(): ActionGroup = BackgroundActionGroup()
@@ -127,9 +83,8 @@ class JujutsuRevsetFilterComponent(
     override fun doResetFilter() {
         generation++
         currentRevset = ""
-        matchedKeys = null
         setErrorText(null)
-        tableModel.setRevsetFilter(null)
+        tableModel.setScope("")
         notifyFilterChanged()
     }
 
@@ -146,14 +101,14 @@ class JujutsuRevsetFilterComponent(
         popup.showUnderneathOf(this)
     }
 
-    /** Runs [resolveRevsetFilter] in the background for [revset] and applies [onResolved] on EDT. */
-    private fun resolve(revset: String, onResolved: (RevsetFilterResult) -> Unit) {
+    /** Runs [validateRevsetFilter] in the background for [revset] and applies [onValidated] on EDT. */
+    private fun validate(revset: String, onValidated: (Map<JujutsuRepository, String>) -> Unit) {
         val gen = ++generation
         val repoSnapshot = repos()
         runInBackground {
-            val result = resolveRevsetFilter(repoSnapshot, revset, baseFor)
+            val errors = validateRevsetFilter(repoSnapshot, revset, baseFor)
             runLater {
-                if (gen == generation) onResolved(result)
+                if (gen == generation) onValidated(errors)
             }
         }
     }
@@ -212,18 +167,17 @@ class JujutsuRevsetFilterComponent(
             statusLabel.text = JujutsuBundle.message("log.filter.revset.resolving")
             statusLabel.foreground = UIUtil.getLabelInfoForeground()
             searchField.isEnabled = false
-            resolve(text) { result ->
+            validate(text) { errors ->
                 searchField.isEnabled = true
-                if (result.errors.isEmpty()) {
+                if (errors.isEmpty()) {
                     searchField.addCurrentTextToHistory()
                     currentRevset = text
-                    matchedKeys = result.keys
-                    tableModel.setRevsetFilter(result.keys)
+                    tableModel.setScope(text)
                     setErrorText(null)
                     notifyFilterChanged()
                     popup?.cancel()
                 } else {
-                    setError(formatErrors(result.errors))
+                    setError(formatErrors(errors))
                 }
             }
         }

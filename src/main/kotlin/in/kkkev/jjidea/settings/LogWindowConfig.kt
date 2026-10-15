@@ -43,10 +43,10 @@ data class LogWindowConfig(
     var selectedReference: String = "",
     /**
      * The custom revset log filter chip's text (jj-idea-vqpn, GitHub #116), or "" for none.
-     * Resolved client-side against the loaded entries — see
+     * The tab's scope revset: resolved by jj together with the other filters - see
      * [in.kkkev.jjidea.ui.log.JujutsuRevsetFilterComponent] and
-     * [in.kkkev.jjidea.ui.log.resolveRevsetFilter] — not sent to the data loader, so it doesn't
-     * affect what's fetched from jj for this or any other tab.
+     * [in.kkkev.jjidea.ui.log.UnifiedJujutsuLogDataLoader.applyFilter] - so it doesn't affect what's
+     * loaded for any other tab or dialog.
      */
     var revsetFilter: String = "",
     /**

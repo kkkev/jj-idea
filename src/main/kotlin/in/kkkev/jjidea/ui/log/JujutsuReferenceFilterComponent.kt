@@ -84,7 +84,13 @@ class JujutsuReferenceFilterComponent(
     private val project: Project,
     parentDisposable: Disposable
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.reference")), Disposable {
-    private data class SelectedRef(val name: String, val type: ReferenceType)
+    private data class SelectedRef(val name: String, val type: ReferenceType) {
+        fun toFilterReference(): LogFilterReference = when (type) {
+            ReferenceType.WORKING_COPY -> LogFilterReference.WorkingCopy
+            ReferenceType.BOOKMARK, ReferenceType.REMOTE_BOOKMARK -> LogFilterReference.Bookmark(name)
+            ReferenceType.TAG -> LogFilterReference.Tag(name)
+        }
+    }
 
     private var selectedReference: SelectedRef? = null
 
@@ -93,11 +99,12 @@ class JujutsuReferenceFilterComponent(
     private var bookmarkRefs: Map<String, ReferenceType> = emptyMap()
     private var allTagNames: Set<String> = emptySet()
 
-    // Prevents re-triggering loadExpanding while one is already in flight.
+    // Prevents re-triggering loadExpanding while one is already in flight (client-side mode only).
     private var expansionInFlight = false
 
     /**
-     * Invoked when the selected reference is not in the current loaded entries and needs expanding.
+     * Client-side mode only (the table is not [JujutsuLogTableModel.revsetDriven], i.e. file history):
+     * invoked when the selected reference is not in the current loaded entries and needs expanding.
      * The handler should trigger a context-window load and call [retryFilter] when done.
      */
     var onReferenceExpansionNeeded: ((String) -> Unit)? = null
@@ -124,7 +131,11 @@ class JujutsuReferenceFilterComponent(
         addChangeListener { applyFilter() }
     }
 
-    /** Re-run the current filter — called by the panel after an expansion completes. */
+    /**
+     * Re-run the current filter. In client-side mode the panel calls it after an expansion completes;
+     * in revset mode it pushes a reference restored from config into the table model, once, after
+     * the first load (jj then resolves it - see [JujutsuLogTableModel.setReferenceFilter]).
+     */
     fun retryFilter() {
         if (selectedReference != null) applyFilter()
     }
@@ -215,6 +226,11 @@ class JujutsuReferenceFilterComponent(
         // (jj-idea-iesq) - every mutation of selectedReference (dropdown pick, clear, or
         // selectReference()'s toggle) ends up here via notifyFilterChanged().
         project.stateModel.activeReferenceFilter = selectedReference?.name ?: ""
+        if (tableModel.revsetDriven) {
+            // jj resolves ::ref over the whole history, so nothing needs to be loaded first.
+            tableModel.setReferenceFilter(selectedReference?.toFilterReference())
+            return
+        }
         val ref = selectedReference ?: run {
             tableModel.setBookmarkFilter(emptySet())
             return

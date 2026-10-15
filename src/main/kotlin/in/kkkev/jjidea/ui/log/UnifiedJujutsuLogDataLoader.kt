@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -49,7 +50,12 @@ class UnifiedJujutsuLogDataLoader(
         val graphNodes: Map<ChangeKey, GraphNode>,
         val limit: Int,
         /** True when at least one repo is paged: [limit] is then a page size, not a hard cap. */
-        val paged: Boolean = false
+        val paged: Boolean = false,
+        /**
+         * Keys of the rows jj matched for the active filter (jj-idea-ehwm.3), or null when no filter
+         * is active or nothing has been resolved yet. The log tab shows exactly these rows.
+         */
+        val filterMatches: Set<ChangeKey>? = null
     )
 
     @Volatile
@@ -59,10 +65,21 @@ class UnifiedJujutsuLogDataLoader(
     // Never discarded by loadCommits — only cleared on explicit Refresh (clearExpansions).
     private val expansionEntriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
 
-    // Per-repo whole-repo search results (jj-idea-lpbv), accumulated the same way as
-    // expansionEntriesByRepo above. Never discarded by loadCommits — only cleared on explicit
-    // Refresh (clearExpansions).
-    private val searchEntriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
+    // jj-idea-ehwm.3: the log tab's filters (search, chips, scope) compile to one revset per repo, which
+    // is paged like the base log (see FilterPageCursor for why not with a PagedLogWindow). filterCursorByRepo
+    // holds each repo's cursor (absent when the result came from the unpaged fallback), filterEntriesByRepo
+    // an immutable snapshot of the rows fetched so far (what the merge reads, so it needn't touch the
+    // thread-unsafe cursor). Both are replaced wholesale by applyFilter and re-walked by refresh; neither
+    // is cleared by clearExpansions.
+    private val filterCursorByRepo = ConcurrentHashMap<JujutsuRepository, FilterPageCursor>()
+    private val filterEntriesByRepo = ConcurrentHashMap<JujutsuRepository, List<LogEntry>>()
+
+    /** The filter the buckets above answer; null when none is active. */
+    @Volatile
+    private var filterState: LogFilterState? = null
+
+    // Bumped by every applyFilter so a superseded run drops its result instead of overwriting a newer one.
+    private val filterGeneration = AtomicInteger()
 
     // jj-idea-2c8k: per-repo paged-loading window state, present only for a repo currently being
     // paged (absent means "not paging this repo" - paging disabled, an unpageable revset, or a
@@ -84,7 +101,7 @@ class UnifiedJujutsuLogDataLoader(
     // non-thread-safe layout engines (see CommitGraphBuilder.incrementalEngine's doc - "one
     // instance lays out one graph at a time" is a caller contract, not enforced). Every one of
     // mergeAndNotify()'s callers (loadMore, refresh, forceRefresh, loadExpanding,
-    // searchWholeRepo) runs on raw runInBackground (not BackgroundDataLoader's coalesced
+    // applyFilter) runs on raw runInBackground (not BackgroundDataLoader's coalesced
     // executeInBackground - see that class's doc), so several merges can be in flight with no
     // ordering guarantee between them - AND loadCommits() itself must take this same lock
     // around its own snapshot/graphBuilder writes (bugfix: it originally didn't, so an eager
@@ -188,7 +205,10 @@ class UnifiedJujutsuLogDataLoader(
                     return@executeInBackground
                 }
 
-                val sorted = logOrder(entriesByRepo.values.flatten())
+                // The base rows were just reloaded from scratch, so bring any active filter's rows up to date too.
+                rewalkFilters(repos)
+                val filterRows = filterEntriesByRepo.values.flatten()
+                val sorted = logOrder((entriesByRepo.values.flatten() + filterRows).distinctBy { it.key })
                 // jj-idea-jnqi bugfix: graphBuilder.buildGraph() and the snapshot write must be
                 // one atomic unit under mergeLock, exactly like fastMergeAndNotify/
                 // fullMergeAndNotify already do - loadCommits() previously called buildGraph()
@@ -215,7 +235,8 @@ class UnifiedJujutsuLogDataLoader(
                         allEntries.mapTo(HashSet()) { it.key },
                         allEntries.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
                         correctionsByRepo,
-                        graphNodes = graphNodes
+                        graphNodes = graphNodes,
+                        filterMatches = currentFilterMatches()
                     )
                 }
                 readyAtNanos = System.nanoTime()
@@ -224,7 +245,10 @@ class UnifiedJujutsuLogDataLoader(
                 // A cancelled wait throws ProcessCanceledException above, which routes to onCancel()
                 // instead of here - so reaching onSuccess means the load actually completed.
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) return@executeInBackground
-                notify(Data(allEntries, graphNodes, defaultLimit, pagedWindowByRepo.isNotEmpty()), readyAtNanos)
+                notify(
+                    Data(allEntries, graphNodes, defaultLimit, pagedWindowByRepo.isNotEmpty(), currentFilterMatches()),
+                    readyAtNanos
+                )
             }
         )
     }
@@ -316,48 +340,114 @@ class UnifiedJujutsuLogDataLoader(
     }
 
     /**
-     * Runs the whole-repo search revset (jj-idea-lpbv) against every repository and merges any
-     * commits found into the loaded set, so results outside the log window (e.g. a pasted Git
-     * hash or a match in an older commit's description) become visible. One `jj log -r` call per
-     * repository, same cost envelope as [loadExpanding].
+     * Applies [state] as the log's filter (jj-idea-ehwm.3): per repo, compiles it with the repo-level
+     * revset ([compileLogFilterRevset]) and fetches the first page of matches, wherever they are in
+     * history - not just in the loaded window. Per repo: `getLogHeads` to seed, one `getLog` for the page and,
+     * if the page is full, `getLogHeads` for what remains ([FilterPageCursor]); more pages follow from [loadMore]. An inactive [state] drops the filter's rows.
      *
-     * [onComplete] is invoked on EDT after the table has been updated, with the number of
-     * returned entries that were not already part of the currently loaded set — so the caller
-     * can distinguish "found nothing" from "found only what was already showing".
+     * A repo whose revset fails (e.g. a typo in the scope) keeps its previous rows and is reported in
+     * [onComplete]'s map (message by repo, empty on success) - the table holds its last result rather
+     * than flashing. [onComplete] runs on EDT, and not at all if a newer call superseded this one.
      */
-    fun searchWholeRepo(
-        query: String,
-        useRegex: Boolean,
-        matchCase: Boolean,
-        wholeWords: Boolean,
-        onComplete: (Int) -> Unit
-    ) {
-        val revset = logSearchRevset(query, useRegex, matchCase, wholeWords)
-        if (revset == null) {
-            onComplete(0)
-            return
-        }
+    internal fun applyFilter(state: LogFilterState, onComplete: (Map<JujutsuRepository, String>) -> Unit = {}) {
+        val generation = filterGeneration.incrementAndGet()
+        filterState = state.takeIf { it.isActive }
         val repos = repositories()
         val settings = JujutsuSettings.getInstance(project)
         runInBackground {
-            val alreadyLoaded = repos.flatMap { it.logCache.all + (expansionEntriesByRepo[it] ?: emptyList()) }
-                .mapTo(HashSet()) { it.key }
-            val resultsByRepo = fetchSearchResults(repos, revset) { repo -> settings.logChangeLimit(repo) }
-            var newCount = 0
-            resultsByRepo.forEach { (repo, entries) ->
-                repo.logCache.store(entries)
-                searchEntriesByRepo[repo] = entries
-                newCount += entries.count { it.key !in alreadyLoaded }
+            val errors = LinkedHashMap<JujutsuRepository, String>()
+            for (repo in repos) {
+                if (generation != filterGeneration.get()) return@runInBackground
+                lockFor(repo).withLock {
+                    loadFilterLocked(repo, settings, state, 1) { generation == filterGeneration.get() }
+                        ?.let { errors[repo] = it }
+                }
             }
+            if (generation != filterGeneration.get()) return@runInBackground
             mergeAndNotify()
-            runLater { onComplete(newCount) }
+            runLater { if (generation == filterGeneration.get()) onComplete(errors) }
         }
     }
 
     /**
-     * Rebuilds the merged (loaded + expansion + search) entry set for every repo, sorts it, and
+     * Fetches [pages] pages of [state]'s matches for [repo] into a fresh window and publishes them.
+     * Returns jj's error message on failure (leaving the previous rows in place), else null. Must hold
+     * [lockFor]. [isCurrent] is checked after the fetch so a superseded call never publishes.
+     */
+    private fun loadFilterLocked(
+        repo: JujutsuRepository,
+        settings: JujutsuSettings,
+        state: LogFilterState,
+        pages: Int,
+        isCurrent: () -> Boolean
+    ): String? {
+        val compiled = compileLogFilterRevset(settings.resolvedLogRevset(repo), state)
+        if (compiled == null) {
+            if (isCurrent()) {
+                filterCursorByRepo.remove(repo)
+                filterEntriesByRepo.remove(repo)
+            }
+            return null
+        }
+        val cursor = FilterPageCursor(compiled, pageRows)
+        for (i in 0 until pages) {
+            if (cursor.isExhausted) break
+            val failure = cursor.fetchNextPage(repo.logService).exceptionOrNull() ?: continue
+            if (failure !is FrontierTooWide) {
+                log.info("Failed to page the log filter of ${repo.displayName}: ${failure.message}")
+                return failure.message ?: failure.toString()
+            }
+            // Too many matching branches to page safely: take one capped, unpaged fetch instead.
+            val rows = repo.logService.getLog(compiled, limit = settings.logChangeLimit(repo), quiet = true)
+                .getOrElse { return it.message ?: it.toString() }
+            if (isCurrent()) {
+                filterCursorByRepo.remove(repo)
+                publishFilterRows(repo, rows)
+            }
+            return null
+        }
+        if (isCurrent()) {
+            filterCursorByRepo[repo] = cursor
+            publishFilterRows(repo, cursor.entries)
+        }
+        return null
+    }
+
+    private fun publishFilterRows(repo: JujutsuRepository, rows: List<LogEntry>) {
+        repo.logCache.store(rows)
+        filterEntriesByRepo[repo] = rows
+    }
+
+    /**
+     * Re-fetches the active filter's rows for every repo in [repos], each for as many pages as it had
+     * (at least one), so a write or Refresh shows up in the filtered view and scroll depth survives.
+     * Same cost envelope as [forceRefresh]. Failures keep the previous rows. No-op without a filter.
+     */
+    private fun rewalkFilters(repos: Collection<JujutsuRepository>) {
+        val state = filterState ?: return
+        val generation = filterGeneration.get()
+        val settings = JujutsuSettings.getInstance(project)
+        for (repo in repos) {
+            lockFor(repo).withLock {
+                val pages = (filterCursorByRepo[repo]?.pageCount ?: 1).coerceAtLeast(1)
+                loadFilterLocked(repo, settings, state, pages) { generation == filterGeneration.get() }
+                    ?.let { log.info("Re-applying the log filter failed for ${repo.displayName}: $it") }
+            }
+        }
+    }
+
+    /** Keys of every row the active filter matched; null without a filter or before the first result. */
+    private fun currentFilterMatches(): Set<ChangeKey>? =
+        if (filterState == null || filterEntriesByRepo.isEmpty()) {
+            null
+        } else {
+            filterEntriesByRepo.values.flatMapTo(HashSet()) { rows -> rows.map { it.key } }
+        }
+
+    /**
+     * Rebuilds the merged (loaded + expansion + filter) entry set for every repo, sorts it, and
      * notifies the panel on EDT. The single choke point for every post-initial-load path
-     * ([loadMore], [refresh], [forceRefresh], [loadExpanding], [searchWholeRepo]) — all accumulate
+     * ([loadMore], [refresh], [forceRefresh], [loadExpanding], [applyFilter]) — all accumulate
      * additive per-repo buckets on top of [JujutsuRepository.logCache], never discarded except by
      * [clearExpansions] on an explicit Refresh. Must be called from a background thread, since it
      * reads [JujutsuRepository.logCache].
@@ -382,7 +472,7 @@ class UnifiedJujutsuLogDataLoader(
     private fun mergeAndNotify(delta: List<LogEntry>? = null) = mergeLock.withLock {
         val correctionsByRepo = bookmarkCorrectionsByRepo()
         val current = snapshot
-        val hasExpansionOrSearch = expansionEntriesByRepo.isNotEmpty() || searchEntriesByRepo.isNotEmpty()
+        val hasExpansionOrSearch = expansionEntriesByRepo.isNotEmpty() || filterEntriesByRepo.isNotEmpty()
         val failure = when {
             delta == null -> "no delta"
             current == null -> "no snapshot"
@@ -423,9 +513,11 @@ class UnifiedJujutsuLogDataLoader(
             minOf(current.minTimestamp, deltaMinTimestamp),
             correctionsByRepo,
             graphNodes = graphNodes,
-            repos = current.repos + enrichedDelta.mapTo(HashSet()) { it.repo }
+            repos = current.repos + enrichedDelta.mapTo(HashSet()) { it.repo },
+            filterMatches = currentFilterMatches()
         )
-        return Data(mergedEntries, graphNodes, lastLimit, pagedWindowByRepo.isNotEmpty())
+        val matches = currentFilterMatches()
+        return Data(mergedEntries, graphNodes, lastLimit, pagedWindowByRepo.isNotEmpty(), matches)
     }
 
     /**
@@ -441,20 +533,22 @@ class UnifiedJujutsuLogDataLoader(
         val allEntries = repositories().flatMap { r ->
             val regular = r.logCache.all
             val expanded = expansionEntriesByRepo[r] ?: emptyList()
-            val searched = searchEntriesByRepo[r] ?: emptyList()
-            (regular + expanded + searched).map { entry ->
+            val filtered = filterEntriesByRepo[r] ?: emptyList()
+            (regular + expanded + filtered).map { entry ->
                 enrichBookmarks(entry, correctionsByRepo[r] ?: EMPTY_CORRECTIONS)
             }
         }
         val merged = logOrder(allEntries.distinctBy { it.key })
         val previous = snapshot
-        if (previous != null && previous.entries == merged) {
+        val matches = currentFilterMatches()
+        if (previous != null && previous.entries == merged && previous.filterMatches == matches) {
             snapshot = MergedSnapshot(
                 previous.entries,
                 previous.keys,
                 previous.minTimestamp,
                 correctionsByRepo,
-                graphNodes = previous.graphNodes
+                graphNodes = previous.graphNodes,
+                filterMatches = matches
             )
             return null
         }
@@ -473,9 +567,10 @@ class UnifiedJujutsuLogDataLoader(
             merged.mapTo(HashSet()) { it.key },
             merged.minOfOrNull { it.sortTimestamp() } ?: Instant.DISTANT_FUTURE,
             correctionsByRepo,
-            graphNodes = graphNodes
+            graphNodes = graphNodes,
+            filterMatches = matches
         )
-        return Data(merged, graphNodes, lastLimit, pagedWindowByRepo.isNotEmpty())
+        return Data(merged, graphNodes, lastLimit, pagedWindowByRepo.isNotEmpty(), matches)
     }
 
     /**
@@ -515,9 +610,9 @@ class UnifiedJujutsuLogDataLoader(
         }
     }
 
+    // The filter's rows are deliberately kept: they are re-walked by the Refresh that calls this.
     override fun clearExpansions() {
         expansionEntriesByRepo.clear()
-        searchEntriesByRepo.clear()
     }
 
     /**
@@ -545,6 +640,7 @@ class UnifiedJujutsuLogDataLoader(
                 if (lockFor(repo).withLock { refreshOneRepoLocked(repo, settings) }) anyUpdated = true
             }
             if (anyUpdated) {
+                rewalkFilters(repos)
                 mergeAndNotify()
             } else {
                 // Every previously-paged repo fell back this round - a full reload is the only
@@ -633,6 +729,7 @@ class UnifiedJujutsuLogDataLoader(
                         repo.logCache.store(window.entries)
                     }
                 }
+                rewalkFilters(repos)
                 mergeAndNotify()
             }
         }
@@ -684,7 +781,40 @@ class UnifiedJujutsuLogDataLoader(
      * completes) will simply try again — no need to queue up redundant work behind a busy repo.
      */
     override fun loadMore() {
+        // While a filter is active the user is scrolling its matches, so page those, not the base log.
+        if (filterState != null) {
+            loadMoreFilter()
+            return
+        }
         loadMoreFrom(repositories().filter { pagedWindowByRepo[it]?.let { w -> !w.isExhausted } == true })
+    }
+
+    /** [loadMore] for an active filter: one more page of matches for each repo that has more (jj-idea-ehwm.3). */
+    private fun loadMoreFilter() {
+        val candidates = repositories().filter { filterCursorByRepo[it]?.isExhausted == false }
+        if (candidates.isEmpty()) return
+        runInBackground {
+            var loaded = false
+            for (repo in candidates) {
+                val lock = lockFor(repo)
+                if (!lock.tryLock()) continue
+                try {
+                    if (loadMoreFilterOneLocked(repo)) loaded = true
+                } finally {
+                    lock.unlock()
+                }
+            }
+            if (loaded) mergeAndNotify()
+        }
+    }
+
+    private fun loadMoreFilterOneLocked(repo: JujutsuRepository): Boolean {
+        val cursor = filterCursorByRepo[repo] ?: return false
+        if (cursor.isExhausted) return false
+        val before = cursor.pageCount
+        if (cursor.fetchNextPage(repo.logService).isFailure || cursor.pageCount <= before) return false
+        publishFilterRows(repo, cursor.entries)
+        return true
     }
 
     /**
@@ -769,6 +899,8 @@ class UnifiedJujutsuLogDataLoader(
      * [ensureTrickle]). Synchronous so tests can drive it directly.
      */
     internal fun trickleTick(): Long? {
+        // A filtered view pages its own matches on demand; extra base pages would only churn the merge.
+        if (filterState != null) return null
         val windows = repositories().mapNotNull { r -> pagedWindowByRepo[r]?.let { r to it } }
         val candidates = windows.filter { !it.second.isExhausted }.map { it.first }
         if (!TricklePolicy.wantsMore(windows.sumOf { it.second.loadedCount }, candidates.isNotEmpty(), trickleRowCap)) {
@@ -879,7 +1011,9 @@ internal class MergedSnapshot(
     val correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>,
     val repos: Set<JujutsuRepository> = entries.mapTo(HashSet()) { it.repo },
     /** The layout published with [entries]; reused when a refresh leaves the topology unchanged. */
-    val graphNodes: Map<ChangeKey, GraphNode> = emptyMap()
+    val graphNodes: Map<ChangeKey, GraphNode> = emptyMap(),
+    /** The filter matches published with [entries] (jj-idea-ehwm.3); part of "did anything change". */
+    val filterMatches: Set<ChangeKey>? = null
 )
 
 /** Why [old] and [new] lay out differently, for the relayout debug log: sizes and the first differing row. */
@@ -907,7 +1041,7 @@ internal fun LogEntry.sortTimestamp(): Instant = authorTimestamp ?: committerTim
  * the platform dependencies [UnifiedJujutsuLogDataLoader] itself needs.
  *
  * @param hasExpansionOrSearch whether an expansion ([UnifiedJujutsuLogDataLoader.loadExpanding])
- *   or whole-repo search ([UnifiedJujutsuLogDataLoader.searchWholeRepo]) bucket is in play -
+ *   or filter ([UnifiedJujutsuLogDataLoader.applyFilter]) bucket is in play -
  *   those can insert anywhere in history, not just at the tail, so their presence alone means
  *   the merged set isn't append-only.
  */

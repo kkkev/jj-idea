@@ -501,72 +501,169 @@ class JujutsuLogTableModelFilterTest {
     }
 
     /**
-     * jj-idea-vqpn (GitHub #116): the custom revset filter chip, resolved client-side to a
-     * [ChangeKey] set (see [resolveRevsetFilter]) and applied here exactly like [Bookmark filter]'s
-     * `bookmarkFilter` — except `null` (inactive) is distinct from an empty set (active, matches
-     * nothing), unlike every other filter's empty-means-inactive convention.
+     * jj-idea-ehwm.3: in [JujutsuLogTableModel.revsetDriven] mode (the log tab) jj resolves every filter
+     * except Root, and the model shows exactly the rows jj matched. A filter change alone does not
+     * change the rows - the loader delivers new matches with the next [JujutsuLogTableModel.setEntries].
      */
     @Nested
-    inner class `Revset filter` {
-        @Test
-        fun `null shows everything (inactive)`() {
-            model.setEntries(listOf(createEntry("abc123"), createEntry("def456")))
+    inner class `Revset-driven filtering` {
+        private fun keys(vararg entries: LogEntry) = entries.mapTo(HashSet()) { it.key }
 
-            model.setRevsetFilter(null)
+        @BeforeEach
+        fun driven() {
+            model.revsetDriven = true
+        }
+
+        @Test
+        fun `shows everything while no filter is active, whatever the matches say`() {
+            model.setEntries(listOf(createEntry("abc123"), createEntry("def456")), matches = emptySet())
 
             model.rowCount shouldBe 2
         }
 
         @Test
-        fun `an empty set (active, no matches) shows nothing`() {
+        fun `shows everything while an active filter has no result yet`() {
             model.setEntries(listOf(createEntry("abc123"), createEntry("def456")))
 
-            model.setRevsetFilter(emptySet())
+            model.setFilter("abc")
+
+            model.rowCount shouldBe 2
+        }
+
+        @Test
+        fun `an active filter shows exactly the matched rows`() {
+            val a = createEntry("abc123", description = "no hit")
+            val b = createEntry("def456", description = "no hit either")
+            model.setFilter("something jj matched by other means")
+
+            model.setEntries(listOf(a, b), matches = keys(b))
+
+            model.getFilteredEntries().map { it.id.short } shouldContainExactly listOf("def456")
+        }
+
+        @Test
+        fun `an active filter with an empty result shows nothing`() {
+            model.setFilter("x")
+
+            model.setEntries(listOf(createEntry("abc123")), matches = emptySet())
 
             model.rowCount shouldBe 0
         }
 
         @Test
-        fun `intersects with the author filter`() {
-            val entry1 = createEntry("abc123", author = alice)
-            val entry2 = createEntry("def456", author = bob)
-            model.setEntries(listOf(entry1, entry2))
+        fun `a filter change holds the previous rows until new matches arrive`() {
+            val a = createEntry("abc123")
+            val b = createEntry("def456")
+            model.setFilter("x")
+            model.setEntries(listOf(a, b), matches = keys(a))
+            model.rowCount shouldBe 1
 
-            // Both filters individually match both entries' union, but only entry1 matches both.
-            model.setRevsetFilter(setOf(ChangeKey(repo, entry1.id), ChangeKey(repo, entry2.id)))
-            model.setAuthorFilter(setOf("alice@example.com"))
-
+            model.setAuthorFilter(setOf("bob@example.com"))
             model.rowCount shouldBe 1
             model.getEntry(0)?.id?.short shouldBe "abc123"
-        }
 
-        @Test
-        fun `intersects with the date filter`() {
-            val old = createEntry("abc123", timestamp = Instant.fromEpochMilliseconds(0L))
-            val new = createEntry("def456", timestamp = Instant.fromEpochMilliseconds(2000000000L))
-            model.setEntries(listOf(old, new))
-
-            model.setRevsetFilter(setOf(ChangeKey(repo, old.id), ChangeKey(repo, new.id)))
-            model.setDateFilter(Instant.fromEpochMilliseconds(1000000000L))
-
-            model.rowCount shouldBe 1
+            model.setEntries(listOf(a, b), matches = keys(b))
             model.getEntry(0)?.id?.short shouldBe "def456"
         }
 
         @Test
-        fun `a later setEntries call, such as a paged append, is filtered against the same id set`() {
-            val entry1 = createEntry("abc123")
-            val entry2 = createEntry("def456")
-            model.setEntries(listOf(entry1))
-            model.setRevsetFilter(setOf(ChangeKey(repo, entry1.id), ChangeKey(repo, entry2.id)))
-            model.rowCount shouldBe 1
+        fun `clearing every filter shows all rows again`() {
+            val a = createEntry("abc123")
+            val b = createEntry("def456")
+            model.setFilter("x")
+            model.setEntries(listOf(a, b), matches = keys(a))
 
-            // A page-2 append (loadMore) reuses the id set resolved for page 1 - change ids are
-            // stable across pages, so no re-query is needed for the newly loaded entry to be
-            // filtered correctly.
-            model.setEntries(listOf(entry1, entry2))
+            model.setFilter("")
+            model.setEntries(listOf(a, b), matches = null)
 
             model.rowCount shouldBe 2
+        }
+
+        @Test
+        fun `the root filter still applies on top of the matches`() {
+            val repoB = mockk<JujutsuRepository>()
+            val a = createEntry("abc123")
+            val b = createEntry("def456", repo = repoB)
+            model.setFilter("x")
+            model.setEntries(listOf(a, b), matches = keys(a, b))
+
+            model.setRootFilter(setOf(repoB))
+
+            model.getFilteredEntries().map { it.id.short } shouldContainExactly listOf("def456")
+        }
+
+        @Test
+        fun `client-side predicates are not applied`() {
+            val alice1 = createEntry("abc123", author = alice)
+            val bob1 = createEntry("def456", author = bob)
+            model.setAuthorFilter(setOf("alice@example.com"))
+
+            // jj decided both match (e.g. the filter was changed and not yet re-resolved).
+            model.setEntries(listOf(alice1, bob1), matches = keys(alice1, bob1))
+
+            model.rowCount shouldBe 2
+        }
+
+        @Test
+        fun `filterState maps every jj-resolved filter`() {
+            val cutoff = Instant.fromEpochMilliseconds(1000000000L)
+            model.setFilter("hello", regex = true, caseSensitive = true, wholeWords = true)
+            model.setAuthorFilter(setOf("alice@example.com"))
+            model.setDateFilter(cutoff)
+            model.setPathsFilter(setOf("src"))
+            model.setReferenceFilter(LogFilterReference.Tag("v1"))
+            model.setScope("  mine()  ")
+
+            model.filterState() shouldBe LogFilterState(
+                scope = "mine()",
+                reference = LogFilterReference.Tag("v1"),
+                authorEmails = setOf("alice@example.com"),
+                dateCutoff = cutoff,
+                paths = setOf("src"),
+                searchText = "hello",
+                useRegex = true,
+                matchCase = true,
+                wholeWords = true
+            )
+        }
+
+        @Test
+        fun `text changes ask for a debounced apply, chip changes for an immediate one`() {
+            val requests = mutableListOf<Boolean>()
+            model.onFilterStateChanged = { requests.add(it) }
+
+            model.setFilter("a")
+            model.setAuthorFilter(setOf("alice@example.com"))
+            model.setDateFilter(Instant.fromEpochMilliseconds(0L))
+            model.setReferenceFilter(LogFilterReference.WorkingCopy)
+            model.setScope("mine()")
+
+            requests shouldContainExactly listOf(false, true, true, true, true)
+        }
+
+        @Test
+        fun `repeating the current filter asks for nothing`() {
+            model.setFilter("a")
+            model.setReferenceFilter(LogFilterReference.WorkingCopy)
+            model.setScope("mine()")
+            val requests = mutableListOf<Boolean>()
+            model.onFilterStateChanged = { requests.add(it) }
+
+            model.setFilter("a")
+            model.setReferenceFilter(LogFilterReference.WorkingCopy)
+            model.setScope(" mine() ")
+
+            requests.shouldBeEmpty()
+        }
+
+        @Test
+        fun `the root filter does not ask for a re-resolve`() {
+            val requests = mutableListOf<Boolean>()
+            model.onFilterStateChanged = { requests.add(it) }
+
+            model.setRootFilter(setOf(mockk<JujutsuRepository>()))
+
+            requests.shouldBeEmpty()
         }
     }
 
@@ -1041,16 +1138,6 @@ class JujutsuLogTableModelFilterTest {
             callCount = 0
 
             model.setBookmarkFilter(setOf(ChangeKey(repo, ChangeId("aaa111", "aaa111", null))))
-
-            callCount shouldBe 1
-        }
-
-        @Test
-        fun `setRevsetFilter fires callback`() {
-            model.setEntries(listOf(createEntry("aaa111")))
-            callCount = 0
-
-            model.setRevsetFilter(setOf(ChangeKey(repo, ChangeId("aaa111", "aaa111", null))))
 
             callCount shouldBe 1
         }

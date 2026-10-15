@@ -671,7 +671,7 @@ not Swing's, so that's the path that must carry the chip text (a context menu ha
 
 **Toolbar, filters, and reference filter**
 
-**Code:** `ui/log/JujutsuFilterComponent.kt`, `ui/log/JujutsuAuthorFilterComponent.kt`, `ui/log/JujutsuDateFilterComponent.kt`, `ui/log/JujutsuReferenceFilterComponent.kt`, `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/JujutsuPathsFilterComponent.kt`, `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`, `ui/log/LogFilterMatcher.kt`, `ui/common/FilterPriorityLayoutStrategy.kt`, `ui/common/CommitTablePanel.kt`, `ui/log/UnifiedJujutsuLogPanel.kt` (primaryActions), `actions/change/DescribeChangeAction.kt`, `actions/change/RebaseChangeAction.kt`
+**Code:** `ui/log/JujutsuFilterComponent.kt`, `ui/log/JujutsuAuthorFilterComponent.kt`, `ui/log/JujutsuDateFilterComponent.kt`, `ui/log/JujutsuReferenceFilterComponent.kt`, `ui/log/JujutsuRootFilterComponent.kt`, `ui/log/JujutsuPathsFilterComponent.kt`, `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`, `ui/log/LogFilterRevset.kt`, `ui/log/FilterPageCursor.kt`, `ui/log/LogFilterMatcher.kt`, `ui/common/FilterPriorityLayoutStrategy.kt`, `ui/common/CommitTablePanel.kt`, `ui/log/UnifiedJujutsuLogPanel.kt` (primaryActions), `actions/change/DescribeChangeAction.kt`, `actions/change/RebaseChangeAction.kt`
 
 #### Toolbar & filters
 
@@ -692,39 +692,53 @@ toggles are pure `LogFilterMatcher` logic, testable without rendering)
 - [ ] Paste just an abbreviated prefix of that hash — it still matches
 - [ ] Paste the hash in a different case (e.g. uppercase) — it still matches (case-insensitive
       by default)
-- [ ] Paste a hash for a commit that isn't currently loaded in the log window and press **Enter**
-      — see "Whole-repo search on Enter (jj-idea-lpbv)" below
+- [ ] Paste a hash for a commit that isn't currently loaded in the log window — after a brief
+      "Filtering…" it appears as the only row, no Enter needed — see "Whole-history filtering
+      (jj-idea-ehwm.3)" below
 
-#### Whole-repo search on Enter (jj-idea-lpbv)
+#### Whole-history filtering (jj-idea-lpbv, jj-idea-ehwm.3)
 
-**Code:** `jj/LogSearchRevset.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt` (`searchWholeRepo`,
-`fetchSearchResults`), `ui/log/UnifiedJujutsuLogPanel.kt` (`onSearchSubmitted`),
-`ui/common/CommitTablePanel.kt` (status bar), `ui/log/LogFilterMatcher.kt` (full-body matching)
+**Code:** `jj/LogSearchRevset.kt`, `ui/log/LogFilterRevset.kt` (`compileLogFilterRevset`),
+`ui/log/FilterPageCursor.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt` (`applyFilter`,
+`loadMoreFilter`, `rewalkFilters`), `ui/log/UnifiedJujutsuLogPanel.kt` (`scheduleFilterApply`),
+`ui/log/JujutsuLogTable.kt` (`revsetDriven`, `filterState`), `ui/common/CommitTablePanel.kt`
+(status bar), `ui/log/LogFilterMatcher.kt` (file history only)
 
-→ automate: `jj-idea-lpbv`'s own unit tests already cover revset construction
-(`LogSearchRevsetTest`) and per-repo fetch/merge logic (`UnifiedJujutsuLogDataLoaderTest`); this
-section is for the end-to-end wiring that only shows up when jj actually runs.
+In the main log tab every filter except Root (search text, Reference, Author, Date and the Revset
+chip) is compiled into one revset per repo and resolved by jj, so it covers the whole history, not
+just the loaded window. Matches arrive a page at a time. File history keeps the old client-side
+filtering (nothing here applies to it).
 
-Setup: lower "Number of changes to show" (Settings → Version Control → Jujutsu) to something
-small (e.g. 100) against `scripts/fixtures/fx-stress.sh`'s ~1084-commit repo (`jj-stress-test`,
-shared with MT-LOG-GRAPH/MT-LOG-FILTER's other stress fixtures) so most commits are off-window.
+→ automate: `LogFilterRevsetTest`, `RevsetLogFilterLoaderTest`, `FilterPageCursorTest` and the
+real-jj `FilterPageCursorContractTest` cover compilation, paging and the table model; this section is
+for the end-to-end wiring that only shows up when jj actually runs.
 
-- [ ] Find a commit hash/change-id well past the window (e.g. `jj log -r 'all()' -T commit_id
-      --no-graph --limit 2000`), paste it into the search field — typing alone shows no results;
-      pressing **Enter** fetches and shows it as the only visible row, and the status bar reports
-      it was found outside the current view
-- [ ] Type a word that appears only in an off-window commit's description **body** (not its first
-      line) — Enter finds it (full-body matching, not just the summary line)
-- [ ] Type gibberish that matches nothing — Enter leaves the table unchanged and the status bar
-      says no changes were found
-- [ ] Type free text containing punctuation (e.g. `fix: the . thing`) — Enter must not error (check
+Setup: `scripts/fixtures/fx-stress.sh`'s ~1084-commit repo (`jj-stress-test`, shared with
+MT-LOG-GRAPH/MT-LOG-FILTER's other stress fixtures); the first page is only 500 rows, so most
+commits are off-window.
+
+- [ ] Find a commit hash/change-id well past the first page (e.g. `jj log -r 'all()' -T commit_id
+      --no-graph --limit 2000`), paste it into the search field — after a brief "Filtering…"
+      (no Enter needed) it shows as the only visible row
+- [ ] Type a word that appears only in an old commit's description **body** (not its first line) —
+      the old commit shows (full-body matching, not just the summary line)
+- [ ] Type gibberish that matches nothing — the table goes empty, the "Filtering…" hint goes away
+- [ ] While typing a longer word, the table holds its previous rows until you pause (about 300 ms);
+      pressing **Enter** applies immediately
+- [ ] Type free text containing punctuation (e.g. `fix: the . thing`) — must not error (check
       `idea.log`); it just searches description/author as usual
-- [ ] Click **Refresh** — the merged-in search results disappear and the log returns to the
-      configured revset/limit
+- [ ] A search matching more than one page of commits (e.g. a single letter): scroll to the bottom
+      — more matches load, with no repeated rows and none skipped (compare the count with
+      `jj log -r 'description(substring-i:"x")' --no-graph -T commit_id | wc -l` once fully scrolled)
+- [ ] Combine search + Author + Date — the visible rows are exactly the commits matching all three
+- [ ] Click **Refresh**, or make a change in a terminal — the filtered view re-fetches and keeps its
+      scroll depth; clear the search and the log returns to the configured revset/limit
 - [ ] In a multi-repo project, repeat with a hash from a second repo — results from both roots
-      merge and the root gutter stays correct
-- [ ] Open a file's history (right-click a file → Show History) — Enter in its search field
-      behaves exactly as before (whole-repo search is log-window only, not wired to file history)
+      merge and the root gutter stays correct; the **Root** filter still hides/shows roots instantly
+- [ ] A match whose parent is not itself a match (sparse results) shows a faded "not loaded" stub
+      edge rather than a wrong connection; clicking the stub loads its target
+- [ ] Open a file's history (right-click a file → Show History) — its search field filters the
+      already-loaded rows instantly, exactly as before (no "Filtering…" hint)
 
 #### New/Edit toolbar buttons (jj-idea-e53e)
 
@@ -801,12 +815,12 @@ push a bookmark from another clone without running `jj bookmark track` in this o
 - [ ] A local bookmark whose remote is synced (tracked, same target) appears only **once**, as
       the plain local name — no duplicate `name@remote` row
 - [ ] Selecting the remote-only bookmark filters the log to that commit and its ancestors,
-      expanding the log window first if the target is outside the current limit
+      even if the target is outside the first page (jj resolves it - nothing is expanded first)
 - [ ] The currently-selected reference shows a checkmark next to its icon; no other row does
 - [ ] Hovering over rows or moving the keyboard selection up/down does **not** move the checkmark — it stays on the actually-selected reference
 - [ ] Creating/deleting a bookmark or tag in the terminal updates the dropdown after the auto-refresh (see MT-LOG-REFRESH) — without clicking Refresh or saving a file
 - [ ] Selecting a reference that **is** on a loaded row filters the log to that commit and its ancestors, and the dropdown closes
-- [ ] Selecting a reference whose target is **outside** the log limit expands the log to a context window around that commit, then applies the ancestor filter (no silent empty result)
+- [ ] Selecting a reference whose target is **outside** the first page shows that commit and its **complete** ancestry after a brief "Filtering…" (the true `::ref`, not just the ancestors that happened to be loaded); scrolling loads more of it. Never a silent empty result
 - [ ] Selecting "@" (working copy) filters to the working copy and its ancestors
 - [ ] Reopening the dropdown while a filter is active scrolls to and highlights the currently-selected reference
 - [ ] Arrow up/down moves the highlight; Enter applies the highlighted reference and closes the dropdown
@@ -827,13 +841,13 @@ alongside one other repo works.
 #### Custom revset filter (jj-idea-vqpn, GitHub #116)
 
 **Code:** `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`,
-`ui/log/JujutsuLogTable.kt` (`revsetFilter`), `ui/log/UnifiedJujutsuLogPanel.kt`
-(`revsetFilterComponent`), `settings/LogWindowConfig.kt` (`revsetFilter`),
-`jj/cli/CliLogService.kt` (`getChangeIds`)
+`ui/log/JujutsuLogTable.kt` (`setScope`), `ui/log/UnifiedJujutsuLogPanel.kt`
+(`revsetFilterComponent`), `settings/LogWindowConfig.kt` (`revsetFilter`)
 
-Client-side filter: resolves the typed revset to a change-id set (one `jj log` call per repo,
-ANDed with the repo-level revset from Settings) and intersects that set with whatever the
-already-loaded log table shows — it never changes what jj loads for this or any other tab.
+The typed revset is validated against jj (one single-row `jj log` call per repo) and becomes the
+tab's scope; jj then resolves it together with every other filter (see "Whole-history filtering"),
+ANDed with the repo-level revset from Settings. Matches anywhere in history show up, a page at a
+time. It never changes what jj loads for any other tab or dialog.
 
 - [ ] Click the **Revset** chip — a popup opens under it with a text field and a
       "Enter to apply · Esc to close" hint
@@ -846,9 +860,10 @@ already-loaded log table shows — it never changes what jj loads for this or an
       outline and jj's own parse error shows under it; the popup stays open, letting you fix it
 - [ ] Press **Esc** instead of fixing it — the popup closes and the previous filter state (if any)
       is unchanged
-- [ ] With a revset applied, make jj fail on refresh (e.g. make the workspace stale from another
-      workspace) — the strip below the log shows one truncated line, hovering shows the full jj
-      error, and the log tool window can still be dragged narrow (jj-idea-v17o, GitHub #142)
+- [ ] With a revset applied, make jj fail when the filter is re-applied (e.g. make the workspace
+      stale from another workspace, then change the Author filter) — the strip below the log shows
+      one truncated line, hovering shows the full jj error, and the log tool window can still be
+      dragged narrow (jj-idea-v17o, GitHub #142)
 - [ ] In Settings → Version Control → Jujutsu, set a repo-level Log Revset (e.g. `::@`), then set
       the chip to `all()` — the result stays within `::@` (the repo-level setting always wins)
 - [ ] Change the repo-level Log Revset (or Log Limit) override and click OK/Apply — the log window
@@ -856,16 +871,14 @@ already-loaded log table shows — it never changes what jj loads for this or an
       regression: the config change wasn't reaching the log window at all until Refresh was hit
       explicitly; also covers the paged path, which had a second, separate staleness bug of its own — see `UnifiedJujutsuLogDataLoader.refreshOneRepoLocked`)
 - [ ] Set the chip to a revset that references a bookmark (e.g. `my-bookmark::`), then delete that
-      bookmark and trigger a refresh (a write, or the toolbar **Refresh** button) — the chip turns
-      red with a tooltip showing jj's error, and the status bar shows the same error; the graph
-      keeps showing the last successfully-resolved set rather than going blank
+      bookmark and change another filter (e.g. Author) — the status bar shows jj's error and the
+      graph keeps showing the last successfully-resolved set rather than going blank
 - [ ] Restart the IDE — the chip's revset persists per log tab
-- [ ] With a filter active, scroll to
-      load more pages — newly loaded rows are filtered correctly with no extra `jj log` calls
-      (check `idea.log` for repeated revset queries if in doubt)
-- [ ] A narrow revset over a deep/paged history that matches commits outside the currently loaded
-      window shows a status-bar message reporting how many extra matches exist, instead of just
-      looking like the filter found less than it should
+- [ ] With a filter active, scroll to the bottom — the next page of matches loads (one page and one
+      remainder query per scroll, check `idea.log`), and once every match is loaded further
+      scrolling makes no `jj log` calls
+- [ ] A revset matching commits only deep in history (outside the first 500 rows) shows them, with
+      no "outside the loaded window" notice (that notice no longer exists)
 - [ ] Open a second log tab with no revset filter — it still shows the full log; opening the "New
       Change" picker or another dialog that reads the log cache is unaffected by the first tab's
       filter

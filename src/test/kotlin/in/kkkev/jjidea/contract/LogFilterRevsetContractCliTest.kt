@@ -79,6 +79,8 @@ class LogFilterRevsetContractCliTest {
         matching(LogFilterState(dateCutoff = Instant.parse("2020-01-01T00:00:00Z"))) shouldContainExactlyInAnyOrder
             listOf("one", "two", "three")
         matching(LogFilterState(dateCutoff = Instant.parse("2999-01-01T00:00:00Z"))) shouldBe emptyList()
+        // The Date chip's cutoff is "now - period", with sub-second precision jj's parser rejects.
+        matching(LogFilterState(dateCutoff = Instant.parse("2999-01-01T00:00:00.895622Z"))) shouldBe emptyList()
     }
 
     @Test
