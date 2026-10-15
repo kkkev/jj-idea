@@ -254,23 +254,19 @@ private fun confirmAdvance(repo: JujutsuRepository, name: BookmarkName) = Messag
 ) == Messages.YES
 
 /**
- * Advances [names] to `@` and notifies on success, since advancing otherwise has no visible
- * effect anywhere and no dialog to imply it worked. `to` defaults to `WorkingCopy` for every
- * caller here, so `repo.workingCopy` read before the command runs is already the destination.
- * That read is null-safe (jj-idea-27b4): a stale/unavailable working copy here would also fail
- * `bookmarkAdvance` itself, which [JujutsuRepository.createCommand] now intercepts centrally and
- * offers the workspace-stale remedy for - the "@" fallback below is only ever shown alongside a
- * genuine success, for the rare case this read raced ahead of a workspace repair.
+ * Advances [names] to jj's configured target (`revsets.bookmark-advance-to`, `@` by default —
+ * no `--to` is passed) and notifies on success, since advancing otherwise has no visible effect
+ * anywhere and no dialog to imply it worked. The destination isn't named in the notification
+ * because the plugin doesn't resolve that revset.
  */
 private fun advanceBookmarks(repo: JujutsuRepository, names: List<BookmarkName>) {
-    val target = repo.whenWorkingCopyAvailable { it.id.short } ?: "@"
     repo.createCommand { bookmarkAdvance(names) }
         .onSuccess {
             invalidate()
             JujutsuNotifications.notify(
                 project,
                 JujutsuBundle.message("action.bookmark.advance.success.title"),
-                JujutsuBundle.message("action.bookmark.advance.success.message", quotedNames(names), target),
+                JujutsuBundle.message("action.bookmark.advance.success.message", quotedNames(names)),
                 NotificationType.INFORMATION
             )
         }

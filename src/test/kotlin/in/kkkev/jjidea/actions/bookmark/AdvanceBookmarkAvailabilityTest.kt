@@ -91,7 +91,7 @@ class AdvanceBookmarkAvailabilityTest {
             closestAdvanceTooltip(
                 ClosestBookmarks(listOf(BookmarkName("main")), distance = 1, distanceCapped = false)
             ) shouldBe
-                "Move 'main' forward to the working copy (jj bookmark advance)"
+                "Move 'main' forward (jj bookmark advance)"
         }
 
         @Test
@@ -102,13 +102,13 @@ class AdvanceBookmarkAvailabilityTest {
                     distance = 2,
                     distanceCapped = false
                 )
-            ) shouldBe "Move 'main', 'feature' forward to the working copy (jj bookmark advance)"
+            ) shouldBe "Move 'main', 'feature' forward (jj bookmark advance)"
         }
 
         @Test
         fun `null falls back to the generic wording`() {
             closestAdvanceTooltip(null) shouldBe
-                "Move the nearest bookmark forward to the working copy (jj bookmark advance)"
+                "Move the nearest bookmark forward (jj bookmark advance)"
         }
     }
 
@@ -116,19 +116,19 @@ class AdvanceBookmarkAvailabilityTest {
     inner class `closest-advance label text (jj-idea-0dq3, GitHub #104)` {
         // A per-row log context menu makes "Here" read as "to this row" - jj bookmark advance
         // always targets @, never the clicked row - so the label must name the working copy
-        // explicitly instead, matching the per-bookmark action's own "Advance 'x' to Working Copy".
+        // explicitly instead, matching the per-bookmark action's own "Advance 'x'".
         @Test
         fun `label names the working copy, not the generic 'Here' wording`() {
-            JujutsuBundle.message("action.bookmark.advance.closest") shouldBe "Advance Bookmark to Working Copy"
+            JujutsuBundle.message("action.bookmark.advance.closest") shouldBe "Advance Bookmark"
             JujutsuBundle.message("action.bookmark.advance.closest") shouldNotContain "Here"
         }
 
         @Test
         fun `disabled-reason suffixes also name the working copy`() {
             JujutsuBundle.message("action.bookmark.advance.closest.disabled.none.suffix") shouldBe
-                "Advance Bookmark to Working Copy (nothing to advance)"
+                "Advance Bookmark (nothing to advance)"
             JujutsuBundle.message("action.bookmark.advance.closest.disabled.version", "0.39") shouldBe
-                "Advance Bookmark to Working Copy (needs jj 0.39+)"
+                "Advance Bookmark (needs jj 0.39+)"
         }
     }
 }

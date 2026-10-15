@@ -276,14 +276,19 @@ internal fun bookmarkSetArgs(name: BookmarkName, revision: Revision = WorkingCop
     )
 
 /**
- * Build `jj bookmark advance --to`, moving bookmarks forward to [to]. With an empty [names], jj
- * advances every bookmark eligible per `revsets.bookmark-advance-from`; a non-empty [names]
- * restricts it to those bookmarks (jj then ignores the `bookmark-advance-from` revset for them).
- * Requires jj 0.39+ ([in.kkkev.jjidea.jj.JjFeature.BOOKMARK_ADVANCE]) — callers must gate on that
- * before invoking.
+ * Build `jj bookmark advance`, moving bookmarks forward. `--to` is passed only when [to] is given;
+ * otherwise jj picks the target from `revsets.bookmark-advance-to` (default `@`). With an empty
+ * [names], jj advances every bookmark eligible per `revsets.bookmark-advance-from`; a non-empty
+ * [names] restricts it to those bookmarks (jj then ignores the `bookmark-advance-from` revset for
+ * them). Requires jj 0.39+ ([in.kkkev.jjidea.jj.JjFeature.BOOKMARK_ADVANCE]) — callers must gate
+ * on that before invoking.
  */
-internal fun bookmarkAdvanceArgs(names: List<BookmarkName> = emptyList(), to: Revision = WorkingCopy) =
-    JjInvocation(REVERSIBLE, listOf("bookmark", "advance", "--to", to.toString()) + names.map { it.toString() })
+internal fun bookmarkAdvanceArgs(names: List<BookmarkName> = emptyList(), to: Revision? = null) =
+    JjInvocation(
+        REVERSIBLE,
+        listOf("bookmark", "advance") + to?.let { listOf("--to", it.toString()) }.orEmpty() +
+            names.map { it.toString() }
+    )
 
 internal fun tagSetArgs(tag: Tag, revision: Revision = WorkingCopy, allowMove: Boolean = false) =
     JjInvocation(
@@ -887,7 +892,7 @@ class CliExecutor(
     override fun bookmarkSet(name: BookmarkName, revision: Revision, allowBackwards: Boolean) =
         execute(root, bookmarkSetArgs(name, revision, allowBackwards))
 
-    override fun bookmarkAdvance(names: List<BookmarkName>, to: Revision) =
+    override fun bookmarkAdvance(names: List<BookmarkName>, to: Revision?) =
         execute(root, bookmarkAdvanceArgs(names, to))
 
     override fun bookmarkTrack(names: List<BookmarkName>) = execute(root, bookmarkTrackArgs(names))

@@ -4,6 +4,7 @@ import `in`.kkkev.jjidea.jj.BookmarkName
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.Remote
 import `in`.kkkev.jjidea.jj.WorkingCopy
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -118,13 +119,18 @@ class CliExecutorBookmarkTest {
     inner class `bookmark advance` {
         @Test
         fun `advance with no names lets jj pick eligible bookmarks`() {
-            bookmarkAdvanceArgs().args shouldBe listOf("bookmark", "advance", "--to", "@")
+            bookmarkAdvanceArgs().args shouldBe listOf("bookmark", "advance")
+        }
+
+        @Test
+        fun `advance without a target omits --to so jj uses revsets bookmark-advance-to`() {
+            bookmarkAdvanceArgs(listOf(BookmarkName("main"))).args shouldNotContain "--to"
         }
 
         @Test
         fun `advance restricted to specific names`() {
             bookmarkAdvanceArgs(listOf(BookmarkName("main"), BookmarkName("feature"))).args shouldBe
-                listOf("bookmark", "advance", "--to", "@", "main", "feature")
+                listOf("bookmark", "advance", "main", "feature")
         }
 
         @Test

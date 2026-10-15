@@ -326,12 +326,13 @@ interface CommandExecutor {
     ): CommandResult
 
     /**
-     * `jj bookmark advance`, moving bookmarks forward to [to]. With an empty [names], advances
-     * every bookmark eligible per `revsets.bookmark-advance-from`; a non-empty [names] restricts
-     * it to those bookmarks. Requires jj 0.39+ ([in.kkkev.jjidea.jj.JjFeature.BOOKMARK_ADVANCE])
-     * — callers must check that before invoking.
+     * `jj bookmark advance`, moving bookmarks forward. A `null` [to] lets jj choose the target from
+     * `revsets.bookmark-advance-to` (default `@`). With an empty [names], advances every bookmark
+     * eligible per `revsets.bookmark-advance-from`; a non-empty [names] restricts it to those
+     * bookmarks. Requires jj 0.39+ ([in.kkkev.jjidea.jj.JjFeature.BOOKMARK_ADVANCE]) — callers
+     * must check that before invoking.
      */
-    fun bookmarkAdvance(names: List<BookmarkName> = emptyList(), to: Revision = WorkingCopy): CommandResult
+    fun bookmarkAdvance(names: List<BookmarkName> = emptyList(), to: Revision? = null): CommandResult
 
     fun bookmarkForget(name: BookmarkName): CommandResult
 
