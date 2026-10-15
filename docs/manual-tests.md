@@ -564,6 +564,13 @@ more lanes than the 3-4 needed here.
       (see MT-WORKINGCOPY's "Restore dialog" for the full checklist) listing the files that
       differ between that commit and `@`, with the right-clicked file(s) pre-checked;
       confirming restores exactly the checked files via `jj restore -f <that revision>`
+- [ ] jj-idea-gl5e (GitHub #148): in a **mutable** historical commit that changed 3 files,
+      multi-select 2 of them → **Drop Changes from This…** opens the "Drop Changes" dialog with
+      those 2 pre-ticked (summary "Changes to 2 files will be dropped"); confirm → `jj diff -r <it>
+      --name-only` lists only the third, descendants are rebased, and the "Drop Changes" balloon's
+      **Undo** restores both files in one step. The item is hidden for an **immutable** commit and
+      for the working copy, and visible but **disabled** (tooltip "Select a single commit…") when
+      several commits are selected in the log
 
 #### Issue-tracker links in descriptions (jj-idea-10fo)
 
@@ -1093,6 +1100,9 @@ pending, see the last bullet below.
       the discarded content back and refreshes the working-copy tree
 - [ ] jj-idea-g2p8: same check for **Restore to This…** from a historical commit's changed
       files (see MT-LOG-DETAILS) → the balloon reads "Restore to This"
+- [ ] jj-idea-gl5e (GitHub #148): the Restore / Drop dialogs' summary line ("N files will be
+      restored" / "Changes to N files will be dropped") counts the pre-ticked files immediately on
+      open, not only after toggling a checkbox
 
 #### Duplicate Change (jj-idea-vu35)
 
@@ -2158,7 +2168,7 @@ with the commit tooltip) the target commit's change id/commit id/author/date/des
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `vcs/JujutsuRollbackEnvironment.kt` (jj-idea-ad5d), `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (jj-idea-g2p8, GitHub #84)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `vcs/JujutsuRollbackEnvironment.kt` (jj-idea-ad5d), `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (jj-idea-g2p8, GitHub #84), `actions/filechange/DropChangesAction.kt` (jj-idea-gl5e, GitHub #148)
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel

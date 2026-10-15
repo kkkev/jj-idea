@@ -33,6 +33,7 @@ class FileChangeActionGroupPlatformTest {
             "Jujutsu.ShowFileHistory",
             "Jujutsu.RestoreFile",
             "Jujutsu.RestoreToChange",
+            "Jujutsu.DropChanges",
             "Jujutsu.SquashFiles",
             "Jujutsu.SplitFiles",
             "Jujutsu.SplitIntoNewParentFiles",
@@ -95,7 +96,11 @@ class FileChangeActionGroupPlatformTest {
         val group = fileChangeActionGroup()
         val children = group.getChildren(null).toList()
         val blocks = splitBySeparators(children)
-        blocks[2].actionIds() shouldContainAll listOf("Jujutsu.RestoreFile", "Jujutsu.RestoreToChange")
+        blocks[2].actionIds() shouldContainAll listOf(
+            "Jujutsu.RestoreFile",
+            "Jujutsu.RestoreToChange",
+            "Jujutsu.DropChanges"
+        )
     }
 
     @Test

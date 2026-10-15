@@ -31,6 +31,16 @@ object JujutsuDataKeys {
     val LOG_ENTRIES: DataKey<List<LogEntry>> = DataKey.create("Jujutsu.LogEntries")
 
     /**
+     * Every commit whose changes the commit details panel is showing (multi-select aware).
+     * Deliberately not [LOG_ENTRIES]: that key means "the log table's selection" and drives
+     * log-row actions and [in.kkkev.jjidea.vcs.JujutsuActionPromoter]. File-level actions that can
+     * only target one commit (e.g. Drop Changes from This) use this to detect a multi-commit
+     * selection, where [LOG_ENTRY] is just the first entry.
+     */
+    @JvmField
+    val DETAILS_ENTRIES: DataKey<List<LogEntry>> = DataKey.create("Jujutsu.DetailsEntries")
+
+    /**
      * The DAG neighbours of a single-row selection - its single child and single parent, each
      * `null` if it has none or more than one (mirrors [LOG_ENTRY]'s own single-selection scope).
      * Backs Move Up/Down (jj-idea-owje, GitHub #93): moving a commit one position is

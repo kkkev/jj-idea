@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.actions.add
  * - Separator
  * - Restore (Jujutsu.RestoreFile) - visible in working copy context
  * - Restore to This (Jujutsu.RestoreToChange) - visible in historical context
+ * - Drop Changes from This (Jujutsu.DropChanges) - visible for mutable historical entries (GitHub #148)
  * - Resolve Conflicts (Jujutsu.ResolveSelectedConflicts) - visible when selection contains conflicted files
  * - Accept Side #1 / Accept Side #2 (Jujutsu.AcceptConflictCurrentSide/LastSide) - visible for an
  *   explicit multi-selection of conflicted files in the working copy; labelled with jj's own
@@ -61,6 +62,7 @@ fun fileChangeActionGroup(): DefaultActionGroup {
     // Restore actions self-filter: RestoreFile visible for working copy, RestoreToChange for historical
     group.add(ManagedActions["Jujutsu.RestoreFile"])
     group.add(ManagedActions["Jujutsu.RestoreToChange"])
+    group.add(ManagedActions["Jujutsu.DropChanges"])
     group.add(ManagedActions["Jujutsu.ResolveSelectedConflicts"])
     group.add(ManagedActions["Jujutsu.AcceptConflictCurrentSide"])
     group.add(ManagedActions["Jujutsu.AcceptConflictLastSide"])

@@ -41,11 +41,41 @@ import javax.swing.JPanel
 private val Change.allPaths: List<FilePath>
     get() = listOfNotNull(beforeRevision?.file, afterRevision?.file).distinct()
 
+/**
+ * Bundle keys for the dialog's user-visible text, so other flows that reuse the checklist (e.g.
+ * [DROP_WORDING] for "Drop Changes from This...") can say what they actually do. The warning takes
+ * the target label as `{0}`; the multi-file summary takes the count.
+ */
+data class RestoreWording(
+    val titleKey: String,
+    val warningKey: String,
+    val okKey: String,
+    val summarySingleKey: String,
+    val summaryMultipleKey: String
+)
+
+val RESTORE_WORDING = RestoreWording(
+    "dialog.restore.title",
+    "dialog.restore.warning",
+    "dialog.restore.ok",
+    "dialog.restore.summary.single",
+    "dialog.restore.summary.multiple"
+)
+
+val DROP_WORDING = RestoreWording(
+    "dialog.drop.title",
+    "dialog.drop.warning",
+    "dialog.drop.ok",
+    "dialog.drop.summary.single",
+    "dialog.drop.summary.multiple"
+)
+
 class RestoreDialog(
     project: Project,
     private val targetLabel: String,
     changes: List<Change>,
-    preSelectedPaths: Set<FilePath>
+    preSelectedPaths: Set<FilePath>,
+    private val wording: RestoreWording = RESTORE_WORDING
 ) : DialogWrapper(project) {
     var result: List<FilePath>? = null
         private set
@@ -54,20 +84,22 @@ class RestoreDialog(
 
     internal val fileSelection = FileSelectionPanel(project)
 
-    private val warningLabel = JBLabel(JujutsuBundle.message("dialog.restore.warning", targetLabel))
+    private val warningLabel = JBLabel(JujutsuBundle.message(wording.warningKey, targetLabel))
 
     internal val summaryLabel = JBLabel().apply {
         foreground = JBUI.CurrentTheme.Label.disabledForeground()
     }
 
     init {
-        title = JujutsuBundle.message("dialog.restore.title")
-        setOKButtonText(JujutsuBundle.message("dialog.restore.ok"))
+        title = JujutsuBundle.message(wording.titleKey)
+        setOKButtonText(JujutsuBundle.message(wording.okKey))
 
         val initialIncluded = allChanges.filter { change -> change.allPaths.any { it in preSelectedPaths } }
         fileSelection.setChanges(allChanges, initialIncluded)
         fileSelection.addInclusionListener { updateSummary() }
         updateSummary()
+        // The tree applies setChanges asynchronously, so the pre-selection isn't counted yet above.
+        fileSelection.changesTree.invokeAfterRefresh { updateSummary() }
 
         init()
     }
@@ -98,9 +130,9 @@ class RestoreDialog(
     private fun updateSummary() {
         val included = fileSelection.includedChanges.size
         summaryLabel.text = if (included == 1) {
-            JujutsuBundle.message("dialog.restore.summary.single")
+            JujutsuBundle.message(wording.summarySingleKey)
         } else {
-            JujutsuBundle.message("dialog.restore.summary.multiple", included)
+            JujutsuBundle.message(wording.summaryMultipleKey, included)
         }
     }
 
@@ -143,6 +175,7 @@ internal fun performRestore(
     errorMessageKey: String,
     undoLabelKey: String,
     loadChanges: () -> List<Change>,
+    wording: RestoreWording = RESTORE_WORDING,
     onRestored: (List<FilePath>) -> Unit
 ) {
     repo.runRecoverableInBackground(
@@ -155,6 +188,7 @@ internal fun performRestore(
                 errorMessageKey,
                 undoLabelKey,
                 loadChanges,
+                wording,
                 onRestored
             )
         }
@@ -174,7 +208,7 @@ internal fun performRestore(
                 return@runLater
             }
 
-            val dialog = RestoreDialog(project, targetLabel, changes, preSelected)
+            val dialog = RestoreDialog(project, targetLabel, changes, preSelected, wording)
             if (dialog.showAndGet()) {
                 val paths = dialog.result.orEmpty()
                 if (paths.isEmpty()) return@runLater

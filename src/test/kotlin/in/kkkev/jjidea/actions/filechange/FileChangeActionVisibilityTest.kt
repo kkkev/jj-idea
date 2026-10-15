@@ -66,6 +66,7 @@ class FileChangeActionVisibilityTest {
         every { event.project } returns null // no project: ignored-file disabling (jj-idea-otwq) is a no-op
         every { event.getData(CommonDataKeys.PROJECT) } returns null
         every { event.getData(JujutsuDataKeys.LOG_ENTRY) } returns null
+        every { event.getData(JujutsuDataKeys.DETAILS_ENTRIES) } returns null
         every { event.getData(VcsDataKeys.SELECTED_CHANGES) } returns null
         every { event.getData(VcsDataKeys.CHANGES) } returns null
         every { event.getData(CommonDataKeys.VIRTUAL_FILE) } returns null
@@ -327,6 +328,72 @@ class FileChangeActionVisibilityTest {
             every { event.getData(CommonDataKeys.VIRTUAL_FILE_ARRAY) } returns emptyArray()
             withChanges(deletedChange("Deleted.kt"))
             event.restorePaths shouldBe listOf(LocalFilePath("/project/Deleted.kt", false))
+        }
+    }
+
+    // ── DropChangesAction ─────────────────────────────────────────────────────
+
+    @Nested
+    inner class `DropChanges` {
+        @BeforeEach
+        fun setupProject() {
+            every { event.project } returns mockk(relaxed = true)
+        }
+
+        private fun withDetailsEntries(vararg entries: LogEntry) = also {
+            every { event.getData(JujutsuDataKeys.DETAILS_ENTRIES) } returns entries.toList()
+        }
+
+        @Test
+        fun `hidden when no LOG_ENTRY`() {
+            withChanges(historicalChange("Main.kt"))
+            DropChangesAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `hidden when LOG_ENTRY is working copy`() {
+            withLogEntry(workingCopyEntry())
+            withChanges(historicalChange("Main.kt"))
+            DropChangesAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `hidden when entry is immutable`() {
+            withLogEntry(historicalEntry(immutable = true))
+            withChanges(historicalChange("Main.kt"))
+            DropChangesAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `hidden when no changes selected`() {
+            withLogEntry(historicalEntry())
+            DropChangesAction().update(event)
+            presentation.isVisible shouldBe false
+        }
+
+        @Test
+        fun `visible and enabled for a mutable historical entry with several files selected`() {
+            val entry = historicalEntry()
+            withLogEntry(entry)
+            withDetailsEntries(entry)
+            withChanges(historicalChange("A.kt"), historicalChange("B.kt"))
+            DropChangesAction().update(event)
+            presentation.isVisible shouldBe true
+            presentation.isEnabled shouldBe true
+        }
+
+        @Test
+        fun `visible but disabled when the details panel shows several commits`() {
+            val entry = historicalEntry()
+            withLogEntry(entry)
+            withDetailsEntries(entry, historicalEntry())
+            withChanges(historicalChange("A.kt"))
+            DropChangesAction().update(event)
+            presentation.isVisible shouldBe true
+            presentation.isEnabled shouldBe false
         }
     }
 

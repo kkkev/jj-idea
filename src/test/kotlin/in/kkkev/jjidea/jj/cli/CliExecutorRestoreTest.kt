@@ -19,4 +19,16 @@ class CliExecutorRestoreTest {
 
         args.args shouldBe listOf("restore", "-c", "@", "cwd:\"foo.txt\"")
     }
+
+    @Test
+    fun `restoreChangesInArgs - historical revision with several files is one command`() {
+        val rev = `in`.kkkev.jjidea.jj.ChangeId("abc123abc123", "abc1")
+        val args = restoreChangesInArgs(
+            listOf(filePath("/repo/a.txt"), filePath("/repo/b.txt")),
+            rev,
+            root
+        )
+
+        args.args shouldBe listOf("restore", "-c", rev.toString(), "cwd:\"a.txt\"", "cwd:\"b.txt\"")
+    }
 }

@@ -345,6 +345,7 @@
 
     <action id="Jujutsu.ShowDiffInNewTab" class="in.kkkev.jjidea.actions.filechange.ShowDiffInNewTabAction"/>
     <action id="Jujutsu.RestoreToChange" class="in.kkkev.jjidea.actions.filechange.RestoreToChangeAction"/>
+    <action id="Jujutsu.DropChanges" class="in.kkkev.jjidea.actions.filechange.DropChangesAction"/>
     <action id="Jujutsu.SquashFiles" class="in.kkkev.jjidea.actions.filechange.SquashFilesAction"/>
     <action id="Jujutsu.SquashIntoFiles" class="in.kkkev.jjidea.actions.filechange.SquashIntoFilesAction"/>
     <action id="Jujutsu.SplitFiles" class="in.kkkev.jjidea.actions.filechange.SplitFilesAction"/>
@@ -381,6 +382,7 @@
       <separator/>
       <action id="Jujutsu.RestoreFile" class="in.kkkev.jjidea.actions.file.RestoreSelectionAction"/>
       <reference ref="Jujutsu.RestoreToChange"/>
+      <reference ref="Jujutsu.DropChanges"/>
       <separator/>
       <reference ref="Jujutsu.ResolveSelectedConflicts"/>
       <reference ref="Jujutsu.OpenMergeToolSelected"/>

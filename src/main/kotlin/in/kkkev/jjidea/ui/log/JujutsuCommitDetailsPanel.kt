@@ -134,6 +134,7 @@ class JujutsuCommitDetailsPanel(private val project: Project) : JPanel(BorderLay
         changesTree.additionalDataProvider = { sink ->
             val entry = currentEntries.firstOrNull { it.isWorkingCopy } ?: currentEntries.firstOrNull()
             entry?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
+            currentEntries.takeIf { it.isNotEmpty() }?.let { sink[JujutsuDataKeys.DETAILS_ENTRIES] = it }
         }
 
         // The changes shown here are change-id-based (ContentLogEntryImpl), even for the

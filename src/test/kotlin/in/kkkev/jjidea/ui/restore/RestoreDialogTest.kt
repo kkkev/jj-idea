@@ -9,6 +9,7 @@ import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
@@ -109,6 +110,39 @@ class RestoreDialogTest {
 
         dialog.performOKForTest()
         dialog.result!!.shouldContainExactlyInAnyOrder(path("src/Deleted.kt"), path("src/Main.kt"))
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `drop wording shows drop text and multi-file preselection yields every path`() {
+        val a = change("src/A.kt")
+        val b = change("src/B.kt")
+        val c = change("src/C.kt")
+        val dialog = RestoreDialog(
+            project.get(),
+            "abc1",
+            listOf(a, b, c),
+            setOf(a.filePath, b.filePath),
+            DROP_WORDING
+        )
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.title shouldBe JujutsuBundle.message("dialog.drop.title")
+        dialog.summaryLabel.text shouldBe JujutsuBundle.message("dialog.drop.summary.multiple", 2)
+
+        dialog.performOKForTest()
+        dialog.result!!.shouldContainExactlyInAnyOrder(path("src/A.kt"), path("src/B.kt"))
+        disposeDialog(dialog)
+    }
+
+    @Test
+    fun `default wording is the restore text`() {
+        val main = change("src/Main.kt")
+        val dialog = RestoreDialog(project.get(), "@-", listOf(main), setOf(main.filePath))
+        waitForRefresh(dialog.fileSelection)
+
+        dialog.title shouldBe JujutsuBundle.message("dialog.restore.title")
+        dialog.summaryLabel.text shouldBe JujutsuBundle.message("dialog.restore.summary.single")
         disposeDialog(dialog)
     }
 
