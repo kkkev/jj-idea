@@ -33,6 +33,7 @@ abstract class LogContractTest {
         fields.conflict,
         fields.empty,
         fields.immutable,
+        fields.hidden,
         fields.hasPushedAncestor,
         fields.isDanglingHead
     ).joinToString(" ++ ") { it.spec }
@@ -160,9 +161,9 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", fullSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        // Author timestamp at index 14, committer timestamp at index 17
-        val authorTs = fields[14]
-        val committerTs = fields[17]
+        // Author timestamp at index 15, committer timestamp at index 18
+        val authorTs = fields[15]
+        val committerTs = fields[18]
 
         authorTs.toLong() shouldBeGreaterThan 0L
         committerTs.toLong() shouldBeGreaterThan 0L
@@ -233,7 +234,7 @@ abstract class LogContractTest {
         jj.describe("Test")
 
         fun danglingField() = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
-            .stdout.trim().split("\u0000")[11]
+            .stdout.trim().split("\u0000")[12]
 
         danglingField() shouldBe "true"
 
@@ -243,7 +244,7 @@ abstract class LogContractTest {
     }
 
     companion object {
-        private const val BASIC_FIELD_COUNT = 12
-        private const val FULL_FIELD_COUNT = 18
+        private const val BASIC_FIELD_COUNT = 13
+        private const val FULL_FIELD_COUNT = 19
     }
 }

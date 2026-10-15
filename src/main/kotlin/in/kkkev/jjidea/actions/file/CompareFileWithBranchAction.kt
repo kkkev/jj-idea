@@ -18,6 +18,7 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.diffRequest
 import `in`.kkkev.jjidea.jj.fileAt
+import `in`.kkkev.jjidea.jj.resolveCommitId
 import `in`.kkkev.jjidea.ui.components.Filter
 import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup
 import `in`.kkkev.jjidea.util.runInBackground
@@ -62,9 +63,9 @@ class CompareFileWithBranchAction : DumbAwareAction(
 
     fun showDiff(repo: JujutsuRepository, files: List<VirtualFile>, leftRevision: Revision) {
         runInBackground {
-            // Locate change id in case revision is a bookmark or other expression
-            val leftChangeId = runCatching { repo.getLogEntry(leftRevision).id }.getOrNull()
-            if (leftChangeId == null) {
+            // Locate commit id in case revision is a bookmark or other expression
+            val leftCommitId = repo.resolveCommitId(leftRevision)
+            if (leftCommitId == null) {
                 runLater {
                     Messages.showErrorDialog(
                         repo.project,
@@ -75,7 +76,7 @@ class CompareFileWithBranchAction : DumbAwareAction(
             } else {
                 val diffManager = DiffManager.getInstance()
                 val diffRequests = files.map { file ->
-                    val leftSide = repo.createDiffSideFor(file.filePath.fileAt(leftChangeId))
+                    val leftSide = repo.createDiffSideFor(file.filePath.fileAt(leftCommitId))
                     val rightSide = repo.createDiffSideFor(file.fileAtVersion)
                     diffRequest(
                         JujutsuBundle.message("diff.title.compare", file.filePath.name, leftRevision.toString()),

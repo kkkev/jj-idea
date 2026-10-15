@@ -417,6 +417,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         val author = SignatureFields("author")
         val committer = SignatureFields("committer")
         val immutable = booleanField("immutable")
+        val hidden = booleanField("hidden")
         val hasPushedAncestor = booleanField("""self.contained_in("descendants(::remote_bookmarks())")""")
         val isDanglingHead =
             booleanField("""self.contained_in("heads(all()) ~ (bookmarks() | remote_bookmarks())")""")
@@ -442,6 +443,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 add(conflict)
                 add(empty)
                 add(immutable)
+                add(hidden)
                 if (includePushedAncestor) {
                     add(hasPushedAncestor)
                     add(isDanglingHead)
@@ -459,6 +461,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 val conflict = conflict.take(it)
                 val empty = empty.take(it)
                 val immutable = immutable.take(it)
+                val hidden = hidden.take(it)
                 LogEntry(
                     repo,
                     changeId,
@@ -471,6 +474,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                     conflict,
                     empty,
                     immutable = immutable,
+                    isHidden = hidden,
                     hasPushedAncestor = if (includePushedAncestor) hasPushedAncestor.take(it) else false,
                     isDanglingHead = if (includePushedAncestor) isDanglingHead.take(it) else false,
                     emptyDeferred = isEmptyDeferred(immutable, parents.size)

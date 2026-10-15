@@ -39,6 +39,11 @@ data class LogEntry(
      */
     val isDanglingHead: Boolean = false,
     /**
+     * True when this commit has been rewritten away but is still referenced (e.g. by a remote bookmark). Its [id] is
+     * then the same as the visible commit's, so it must not replace that commit in caches; address it by [commitId].
+     */
+    val isHidden: Boolean = false,
+    /**
      * True for a not-yet-created change previewed in a rebase-simulator preview (e.g.
      * [in.kkkev.jjidea.ui.newchange.NewChangeDialog]'s "the change about to be created" row).
      * [id]/[commitId] are placeholders with no real backing commit - the log-row renderer checks

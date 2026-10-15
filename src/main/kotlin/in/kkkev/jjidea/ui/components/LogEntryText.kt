@@ -366,6 +366,13 @@ fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyLis
         is RevisionChoice.Change -> {
             append(icon(AllIcons.Vcs::CommitNode))
             append(choice.id)
+            // Commit id too: the search matches it, and a hidden commit otherwise looks like the visible one
+            // sharing its change id (jj-idea-wiz0).
+            grey {
+                space()
+                append(choice.entry.commitId.short)
+                if (choice.entry.isHidden) append(" ${JujutsuBundle.message("dialog.revisionselector.hidden")}")
+            }
             append(" ")
             appendSummary(choice.description)
         }

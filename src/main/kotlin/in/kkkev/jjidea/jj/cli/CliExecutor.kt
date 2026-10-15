@@ -78,15 +78,18 @@ internal fun diffSummaryBetweenArgs(from: ContentLocator, to: ContentLocator, fi
             "diff",
             "--summary",
             "--from",
-            from.toString(),
+            from.readArg(),
             "--to",
-            to.toString(),
+            to.readArg(),
             filePath?.relativeTo(root!!)?.toFileset()
         )
     )
 
+/** Reads address a commit by its full id: a short prefix could later become ambiguous (docs/jj-commit-id-reads.md). */
+private fun Any.readArg() = if (this is CommitId) full else toString()
+
 internal fun showArgs(filePath: FilePath, revision: Revision, root: VirtualFile?) =
-    JjInvocation(READ_ONLY, "file", "show", "-r", revision, filePath.relativeTo(root!!).toFileset())
+    JjInvocation(READ_ONLY, "file", "show", "-r", revision.readArg(), filePath.relativeTo(root!!).toFileset())
 
 internal fun versionArgs() = JjInvocation(READ_ONLY, "--version")
 

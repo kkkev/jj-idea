@@ -109,7 +109,10 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
 
     // quiet=true: resolving a single revision commonly fails on purpose (e.g. a free-form revision
     // typed by the user that may not exist), so that case is logged at INFO rather than WARN.
-    private fun fetchOne(revision: Revision) = fetch(revision, quiet = true).firstOrNull()
+    // A CommitId renders as its short form, which may be a prefix of just a character or two and so can resolve to a
+    // different commit than the one meant (jj-idea-wiz0): query by the full id.
+    private fun fetchOne(revision: Revision) =
+        fetch(if (revision is CommitId) RevisionExpression(revision.full) else revision, quiet = true).firstOrNull()
 
     // Sorted so children always precede parents (newest first), matching what
     // UnifiedJujutsuLogDataLoader.loadCommits() stores after a main-log-window load - callers
@@ -153,7 +156,8 @@ internal class RepoLogCache(private val repo: JujutsuRepository) : LogCache {
     }
 
     override fun store(entries: List<LogEntry>) {
-        for (entry in entries) {
+        // A hidden commit shares its change id with the visible one; storing it would replace that entry.
+        for (entry in entries.filterNot { it.isHidden }) {
             store[entry.id]?.bookmarks?.forEach { byBookmark.remove(it.name) }
             store[entry.id] = entry
             byCommitId[entry.commitId] = entry.id

@@ -8,10 +8,15 @@ import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.RevisionExpression
 
 sealed class RevisionChoice(open val displayName: String, open val revision: Revision) {
+    /**
+     * A hidden commit shares its change id with the visible commit, so it is addressed by commit id (jj-idea-wiz0);
+     * otherwise choosing it would silently select the visible commit.
+     */
     data class Change(
         val entry: LogEntry,
-        override val displayName: String = "${entry.id.short} ${entry.description.summary}",
-        override val revision: Revision = entry.id
+        override val displayName: String =
+            "${if (entry.isHidden) entry.commitId.short else entry.id.short} ${entry.description.summary}",
+        override val revision: Revision = if (entry.isHidden) entry.commitId else entry.id
     ) : RevisionChoice(displayName, revision) {
         val id: ChangeId get() = entry.id
         val description: Description get() = entry.description

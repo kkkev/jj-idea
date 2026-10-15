@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
+import `in`.kkkev.jjidea.jj.resolveCommitId
 import `in`.kkkev.jjidea.ui.common.JujutsuCompareChangesPanel.Companion.showCompareChangesTab
 import `in`.kkkev.jjidea.ui.components.Filter
 import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup
@@ -59,15 +60,16 @@ fun compareBeforeWithRevisionAction(project: Project, logEntry: LogEntry?) =
     }
 
 /**
- * Resolve [chosen] to a [in.kkkev.jjidea.jj.ChangeId] and open a Changes-pane tab comparing [base]
+ * Resolve [chosen] to a [in.kkkev.jjidea.jj.CommitId] and open a Changes-pane tab comparing [base]
  * (left) with it (right), or show a "no differences" notification if they're identical. Shared by
  * [compareWithRevisionAction] and [compareBeforeWithRevisionAction].
  */
 private fun showRevisionComparison(project: Project, repo: JujutsuRepository, base: ContentLocator, chosen: Revision) {
     runInBackground {
-        // Locate change id in case revision is a bookmark or other expression
-        val chosenChangeId = runCatching { repo.getLogEntry(chosen).id }.getOrNull()
-        if (chosenChangeId == null) {
+        // Resolve to a commit id in case revision is a bookmark or other expression. A commit id (not the change
+        // id) so that a hidden commit is compared as itself rather than as the visible commit of its change.
+        val chosenCommitId = repo.resolveCommitId(chosen)
+        if (chosenCommitId == null) {
             runLater {
                 Messages.showErrorDialog(
                     repo.project,
@@ -80,7 +82,7 @@ private fun showRevisionComparison(project: Project, repo: JujutsuRepository, ba
 
         val baseLabel = base.title
         val chosenLabel = chosen.toString()
-        val changes = repo.logService.getFileChangesBetween(base, chosenChangeId).getOrNull().orEmpty()
+        val changes = repo.logService.getFileChangesBetween(base, chosenCommitId).getOrNull().orEmpty()
         if (changes.isEmpty()) {
             runLater {
                 JujutsuNotifications.notify(

@@ -31,6 +31,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -63,6 +64,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -82,6 +84,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "plkvukqt~p~,rlvkpnrz~rl~34", // parents
+            "false",
             "false",
             "false",
             "false",
@@ -111,6 +114,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -131,6 +135,7 @@ class LogTemplateTest {
             "false",
             "false",
             "true",
+            "false",
             "false",
             "false",
             "false"
@@ -154,6 +159,7 @@ class LogTemplateTest {
             "false",
             "false", // empty, as the template reports it
             immutable.toString(),
+            "false", // hidden
             "false",
             "false"
         ).iterator()
@@ -185,6 +191,7 @@ class LogTemplateTest {
             "false", // Not empty
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -209,6 +216,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -226,6 +234,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "false",
             "false",
             "false",
             "false",
@@ -268,6 +277,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "Original Author",
             "original@example.com",
             "1000000000",
@@ -300,6 +310,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -322,6 +333,7 @@ class LogTemplateTest {
             "false",
             "false",
             "false",
+            "false",
             "false"
         )
 
@@ -339,6 +351,7 @@ class LogTemplateTest {
             "main;true;false;0;0,feature@origin;true;true;3;1", // bookmarks
             "", // tags
             "", // parents
+            "false",
             "false",
             "false",
             "false",
@@ -430,6 +443,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "false",
             "false",
             "false",
             "false",

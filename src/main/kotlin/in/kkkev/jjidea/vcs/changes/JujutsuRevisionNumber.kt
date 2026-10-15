@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.vcs.changes
 import com.intellij.openapi.vcs.history.ShortVcsRevisionNumber
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.ContentLocator
 import `in`.kkkev.jjidea.jj.MergeParentOf
 import `in`.kkkev.jjidea.jj.Revision
@@ -24,6 +25,20 @@ data class MergeParentRevisionNumber(val childRevision: Revision) : JujutsuRevis
 
     override fun asString() = contentLocator.title
     override fun compareTo(other: VcsRevisionNumber?) = 0
+}
+
+/** Revision number for a specific commit, e.g. a hidden one that a change id would resolve away from. */
+data class CommitIdRevisionNumber(val commitId: CommitId) : JujutsuRevisionNumber {
+    override val contentLocator get() = commitId
+
+    override fun asString() = commitId.short
+
+    /** Equality only: ordering is meaningless for commit ids (see [ChangeIdRevisionNumber.compareTo]). */
+    override fun compareTo(other: VcsRevisionNumber?) = when {
+        other !is CommitIdRevisionNumber -> 0
+        commitId == other.commitId -> 0
+        else -> -1
+    }
 }
 
 /**

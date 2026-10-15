@@ -764,6 +764,7 @@ class JjStub(override val workDir: Path) : JjBackend {
         field("false") // conflict
         field(if (isEmpty) "true" else "false")
         field(if (change.immutable) "true" else "false")
+        field("false") // hidden (the stub doesn't model hidden commits)
         if (includesPushedAncestor) {
             field(if (change.hasPushedAncestor) "true" else "false")
             field(if (isDanglingHead(change)) "true" else "false")

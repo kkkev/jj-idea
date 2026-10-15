@@ -47,7 +47,8 @@ class RepoLogCacheTest {
         commitId: String = "commit-$id",
         bookmarks: List<Bookmark> = emptyList(),
         immutable: Boolean = false,
-        parentIds: List<String> = emptyList()
+        parentIds: List<String> = emptyList(),
+        hidden: Boolean = false
     ) = LogEntry(
         repo = repo,
         id = ChangeId(id, id, null),
@@ -55,7 +56,8 @@ class RepoLogCacheTest {
         underlyingDescription = "desc $id",
         bookmarks = bookmarks,
         parentIds = parentIds.map { ChangeId(it, it, null) },
-        immutable = immutable
+        immutable = immutable,
+        isHidden = hidden
     )
 
     private fun bookmark(name: String) = Bookmark(name, tracked = true)
@@ -76,6 +78,28 @@ class RepoLogCacheTest {
         cache.store(listOf(e))
 
         cache[e.commitId] shouldBe e
+    }
+
+    @Test
+    fun `storing a hidden commit does not replace the visible commit with the same change id`() {
+        val visible = entry("aaa", commitId = "visible")
+        val hidden = entry("aaa", commitId = "hidden", hidden = true)
+        cache.store(listOf(visible))
+
+        cache.store(listOf(hidden))
+
+        cache[visible.id] shouldBe visible
+        cache[visible.commitId] shouldBe visible
+    }
+
+    @Test
+    fun `a commit id miss is fetched by its full id, not its possibly ambiguous short form`() {
+        val hidden = entry("aaa", commitId = "d1ad588478f0", hidden = true)
+        val shortId = CommitId("d1ad588478f0", "d1")
+        every { logService.getLog(revset = RevisionExpression("d1ad588478f0"), quiet = true) } returns
+            Result.success(listOf(hidden))
+
+        cache[shortId] shouldBe hidden
     }
 
     @Test
@@ -198,7 +222,8 @@ class RepoLogCacheTest {
 
             cache.clear()
 
-            every { logService.getLog(revset = e.commitId, quiet = true) } returns Result.success(emptyList())
+            every { logService.getLog(revset = RevisionExpression(e.commitId.full), quiet = true) } returns
+                Result.success(emptyList())
             shouldThrow<IllegalArgumentException> { cache[e.commitId] }
         }
 

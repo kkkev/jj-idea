@@ -7,6 +7,7 @@ import com.intellij.openapi.vcs.changes.ByteBackedContentRevision
 import com.intellij.openapi.vcs.changes.ContentRevision
 import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.CommitIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
 
 private val contentRevisionLog = Logger.getInstance("in.kkkev.jjidea.jj.JujutsuContentRevisions")
@@ -62,6 +63,24 @@ internal data class ContentLogEntryImpl(
     }
 
     override fun getContentAsBytes(): ByteArray = repo.commandExecutor.showBytes(filePath, changeId)
+}
+
+/** A file's content at a specific commit, which stays correct after the commit's change is rewritten. */
+internal data class ContentCommitImpl(
+    private val repo: JujutsuRepository,
+    private val filePath: FilePath,
+    private val commitId: CommitId
+) : ByteBackedContentRevision {
+    override fun getFile() = filePath
+
+    override fun getRevisionNumber() = CommitIdRevisionNumber(commitId)
+
+    override fun getContent(): String? {
+        val result = repo.commandExecutor.show(filePath, commitId)
+        return result.stdout.takeIf { result is CommandExecutor.CommandResult.Success }
+    }
+
+    override fun getContentAsBytes(): ByteArray = repo.commandExecutor.showBytes(filePath, commitId)
 }
 
 /**

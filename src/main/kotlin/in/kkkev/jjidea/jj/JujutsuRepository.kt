@@ -157,14 +157,16 @@ data class JujutsuRepositoryImpl(
                 } else {
                     ContentLogEntryImpl(this, filePath, contentLocator)
                 }
+            is CommitId -> ContentCommitImpl(this, filePath, contentLocator)
             is ContentLocator.Empty -> EmptyContentRevisionImpl(filePath)
         }
 
     override fun createContentRevision(filePath: FilePath, logEntry: LogEntry): ContentRevision =
-        if (logEntry.isWorkingCopy) {
-            CurrentContentRevision(filePath)
-        } else {
-            ContentLogEntryImpl(this, filePath, logEntry.id)
+        when {
+            logEntry.isWorkingCopy -> CurrentContentRevision(filePath)
+            // A hidden commit shares its change id with the visible one, so only its commit id reads its content.
+            logEntry.isHidden -> ContentCommitImpl(this, filePath, logEntry.commitId)
+            else -> ContentLogEntryImpl(this, filePath, logEntry.id)
         }
 
     override fun createContentRevision(fileAtVersion: FileAtVersion) =
@@ -268,3 +270,12 @@ fun JujutsuRepository.reconstructMergeParentContent(childRevision: Revision, fil
     if (diffResult !is CommandExecutor.CommandResult.Success || diffResult.stdout.isBlank()) return afterContent
     return GitDiffReverseApplier.reverseApply(afterContent, diffResult.stdout) ?: afterContent
 }
+
+/**
+ * The commit [revision] points at, or null if it doesn't resolve to one. A [CommitId] is returned as is: re-resolving
+ * it through the log would be wasted work, and its short form may be ambiguous. Use this, not `getLogEntry(..).id`,
+ * wherever content is read for a revision the user picked, so a hidden commit isn't swapped for the visible commit
+ * sharing its change id (jj-idea-wiz0).
+ */
+fun JujutsuRepository.resolveCommitId(revision: Revision): CommitId? =
+    revision as? CommitId ?: runCatching { getLogEntry(revision).commitId }.getOrNull()

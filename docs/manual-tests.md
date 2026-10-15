@@ -1333,6 +1333,16 @@ jj new; jj new; jj new` then `jj bookmark create -r A base` and set the diff bas
 - [ ] Picking a revision identical in content to the base shows a "No Differences" notification, no tab opens
 - [ ] Typing an unresolvable revision in the picker shows a "Compare Failed" error dialog
 - [ ] Both actions also appear, and work identically, from a `jjc://` change-navigation link's menu
+- [ ] jj-idea-wiz0 (GitHub #130): in a repo, note `jj log -r @ -T commit_id`, edit a tracked file so `@`
+      is amended (the noted commit is now hidden), then **Compare with Another Commit...** on any
+      other commit and type the **old full commit id** in the picker: the right side shows the
+      file content **as of the old commit**, not the current working-copy content
+      Rows in the picker show the short commit id after the change id; the hidden commit's row is
+      marked `(hidden)`
+- [ ] Same hidden-commit check for the per-file actions: from a file's history (or a commit's changed
+      files) choose **Compare with Another Commit...** and **Compare Before with Another Commit...**,
+      type the old full commit id: the picked side shows the file as of the old commit, not the current
+      content
 
 #### Show Diff in New Tab, multi-file (jj-idea-vtdl)
 

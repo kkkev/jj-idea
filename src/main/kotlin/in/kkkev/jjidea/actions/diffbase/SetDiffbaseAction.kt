@@ -17,6 +17,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.repoForFile
 import `in`.kkkev.jjidea.actions.singleRepoForFiles
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.settings.DiffbaseStrategy
 import `in`.kkkev.jjidea.settings.JujutsuSettings
@@ -233,7 +234,10 @@ class SetDiffbaseAction : DumbAwareAction(
             "action.diffbase.pin.popup.title",
             repo,
             Filter(includeRemote = true, includeLogEntries = true)
-        ) { chosen -> validateAndApplyCustomRevset(repo, chosen.toString()) }
+        ) { chosen ->
+            // A commit id's short form may be a one- or two-character prefix that resolves to another commit.
+            validateAndApplyCustomRevset(repo, (chosen as? CommitId)?.full ?: chosen.toString())
+        }
     }
 
     /**

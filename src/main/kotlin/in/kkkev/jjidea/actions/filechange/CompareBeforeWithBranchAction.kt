@@ -17,6 +17,7 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
 import `in`.kkkev.jjidea.jj.diffRequest
 import `in`.kkkev.jjidea.jj.fileAt
+import `in`.kkkev.jjidea.jj.resolveCommitId
 import `in`.kkkev.jjidea.ui.components.Filter
 import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup
 import `in`.kkkev.jjidea.util.runInBackground
@@ -69,9 +70,9 @@ class CompareBeforeWithBranchAction :
         chosenRevision: Revision
     ) {
         runInBackground {
-            // Locate change id in case revision is a bookmark or other expression
-            val chosenChangeId = runCatching { repo.getLogEntry(chosenRevision).id }.getOrNull()
-            if (chosenChangeId == null) {
+            // Locate commit id in case revision is a bookmark or other expression
+            val chosenCommitId = repo.resolveCommitId(chosenRevision)
+            if (chosenCommitId == null) {
                 runLater {
                     Messages.showErrorDialog(
                         repo.project,
@@ -86,7 +87,7 @@ class CompareBeforeWithBranchAction :
                 change.before?.let { before ->
                     val filePath = before.filePath
                     val parentDiffSide = repo.createDiffSideFor(before)
-                    val chosenDiffSide = repo.createDiffSideFor(filePath.fileAt(chosenChangeId))
+                    val chosenDiffSide = repo.createDiffSideFor(filePath.fileAt(chosenCommitId))
 
                     diffRequest(
                         JujutsuBundle.message("diff.title.compare.before", filePath.name, chosenRevision.toString()),
@@ -101,7 +102,7 @@ class CompareBeforeWithBranchAction :
                         diffRequest(
                             JujutsuBundle.message("diff.title.compare.before", f.name, chosenRevision.toString()),
                             repo.createDiffSideFor(f.filePath.fileAt(logEntry.parentContentLocator)),
-                            repo.createDiffSideFor(f.filePath.fileAt(chosenChangeId))
+                            repo.createDiffSideFor(f.filePath.fileAt(chosenCommitId))
                         )
                     )
                 } ?: emptyList()
