@@ -45,6 +45,7 @@ Components whose blast radius exceeds their own package:
 | `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
 | `actions/diffbase/SetDiffbaseAction.kt` (quick action, jj-idea-g1io) | [MT-DIFFBASE](#mt-diffbase), [MT-CTXMENU](#mt-ctxmenu) (shares `RevisionSelectorPopup`), [MT-CROSS](#mt-cross) (multi-repo submenu) |
 | `actions/JujutsuMainMenuGroup.kt` ("Jujutsu" submenu in `Vcs.MainMenu`) | [MT-DIFFBASE](#mt-diffbase) |
+| `jj/cli/CliExecutor.kt` `execute`/`executeBytes` (process launch, timeout and cancellation for every jj call) | [MT-DIFF](#mt-diff) (Annotate cancel), [MT-LOG-REFRESH](#mt-log-refresh) (cancelled load), plus a smoke pass of any section that runs jj |
 
 ## Fixtures
 
@@ -949,6 +950,10 @@ delivered).
       temporarily revert `manualRefresh()` to call only `dataLoader.forceRefresh()`, rebuild,
       and re-run the same steps — Refresh should now reload log rows but leave the bookmark
       stale; then restore the fix
+
+- [ ] jj-idea-innq: on FX-STRESS with `SCALE=6`, click toolbar **Refresh** and then immediately cancel the
+      "Loading commits" progress (✕). `ps aux | grep 'jj log'` shows no leftover process, there is no error
+      report, and the next Refresh loads normally
 
 #### Paged log loading (jj-idea-2c8k, GitHub #69; graduated from preview, jj-idea-2570.4)
 
@@ -2632,6 +2637,11 @@ below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, w
 - [ ] Annotate on a file whose working copy is a merge commit succeeds (no "resolved to more than one revision" error)
 - [ ] Annotate on a merge commit with a resolved conflict shows no "line count" warning, and correctly attributes lines inherited from each parent plus the conflict-resolution line(s) to the merge commit itself
 - [ ] Annotate on a merge commit where the file exists in only some parents (e.g. a criss-cross merge) succeeds (no "No such path" error), attributing blame from whichever parents have the file
+- [ ] jj-idea-innq: on a repo where annotate is slow (FX-STRESS with `SCALE=6`, or GitHub #64's repo), start
+      Annotate and click the ✕ on the "Retrieving annotations" progress. Within about a second,
+      `ps aux | grep 'jj file annotate'` shows no process, and `idea.log` shows `Cancelled in … jj file annotate`
+      at INFO level with no error report. A fresh Annotate afterwards still works.
+      → automate: `CliExecutorCancellationPlatformTest` covers the executor; this checks the platform task really cancels
 - [ ] jj-idea-mn1a: with the IDE on a **light** theme, the change-id column in the annotation
       gutter is readable, not washed-out
 - [ ] Has open in -> remote (see Diffs above)

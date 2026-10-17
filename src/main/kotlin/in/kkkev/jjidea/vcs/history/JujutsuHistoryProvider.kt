@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.vcs.history
 
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsActions
@@ -57,6 +58,8 @@ class JujutsuHistoryProvider(private val project: Project) : VcsHistoryProvider 
             // Return history session
             val currentRevision = revisions.firstOrNull()?.revisionNumber
             return JujutsuHistorySession(revisions, currentRevision)
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
             throw VcsException("Error creating history session: ${e.message}", e)
         }

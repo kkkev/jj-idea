@@ -3,7 +3,10 @@ package `in`.kkkev.jjidea.jj.cli
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.*
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
+import com.intellij.openapi.progress.util.AbstractProgressIndicatorBase
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.VcsException
@@ -19,6 +22,7 @@ import `in`.kkkev.jjidea.vcs.pathRelativeTo
 import `in`.kkkev.jjidea.vcs.relativeTo
 import java.nio.charset.StandardCharsets
 import java.util.UUID
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
@@ -716,6 +720,50 @@ internal fun ProcessOutput.toCommandResult(
     }
 
 /**
+ * [CapturingProcessHandler.runProcess], but polling [cancelled] while it waits and destroying the process as
+ * soon as it returns true (jj-idea-innq); the returned output then has [ProcessOutput.isCancelled] set.
+ * Timeout handling is unchanged.
+ */
+internal fun CapturingProcessHandler.runCancellably(timeoutMillis: Int, cancelled: () -> Boolean): ProcessOutput =
+    runProcessWithProgressIndicator(
+        object : AbstractProgressIndicatorBase() {
+            override fun isCanceled() = cancelled()
+        },
+        timeoutMillis,
+        true
+    )
+
+/**
+ * True if the calling thread's progress indicator or coroutine job has been cancelled. Uses
+ * [ProgressManager.checkCanceled] rather than the global indicator because the platform's coroutine-based
+ * callers (e.g. the annotation preloader) have a job but no indicator. Always false on a thread with neither,
+ * such as a plain pooled thread.
+ */
+internal fun contextCancelled(): Boolean = try {
+    ProgressManager.checkCanceled()
+    false
+} catch (_: ProcessCanceledException) {
+    true
+} catch (_: CancellationException) {
+    true
+}
+
+/**
+ * Runs [block] ignoring the caller's cancellation. Used for work after which stopping halfway would misreport what
+ * already happened in the repo. Runs [block] directly when there is no application (plain unit tests).
+ */
+private fun <T> nonCancellable(block: () -> T): T {
+    val progressManager = ProgressManager.getInstanceOrNull() ?: return block()
+    return progressManager.computeInNonCancelableSection<T, Exception>(block)
+}
+
+/** Rethrows the caller's own cancellation exception after a jj process was killed for it. */
+private fun rethrowCancellation(): Nothing {
+    ProgressManager.checkCanceled()
+    throw ProcessCanceledException()
+}
+
+/**
  * CLI-based implementation of JujutsuCommandExecutor
  */
 class CliExecutor(
@@ -740,6 +788,9 @@ class CliExecutor(
 
         /** How many recent operations to scan for the one carrying our undo token. */
         private const val UNDO_WINDOW = 20
+
+        /** How often [executeBytes] checks whether its caller has been cancelled. */
+        private const val CANCEL_POLL_MILLIS = 100L
 
         /**
          * Creates a CliExecutor for operations that don't require an existing repository
@@ -782,6 +833,8 @@ class CliExecutor(
     override fun isAvailable() = try {
         val result = execute(null, versionArgs())
         result is CommandExecutor.CommandResult.Success
+    } catch (e: ProcessCanceledException) {
+        throw e
     } catch (e: Exception) {
         log.warn("Failed to check jj availability", e)
         false
@@ -794,6 +847,8 @@ class CliExecutor(
         } else {
             null
         }
+    } catch (e: ProcessCanceledException) {
+        throw e
     } catch (e: Exception) {
         log.warn("Failed to get jj version", e)
         null
@@ -1152,6 +1207,9 @@ class CliExecutor(
         val cmdName = cmdNameFor(args)
         log.info("Executing in ${workingDir?.path ?: "."}: jj $cmdName (${Thread.currentThread().name})")
 
+        // Don't start a read-only process for a caller that has already been cancelled.
+        if (invocation.reversibility == READ_ONLY) ProgressManager.checkCanceled()
+
         val startTime = System.currentTimeMillis()
 
         val processHandler = try {
@@ -1166,8 +1224,24 @@ class CliExecutor(
             )
         }
 
-        val output: ProcessOutput = processHandler.runProcess(timeout.toInt())
+        // jj-idea-innq: a read-only command is killed when its caller is cancelled, rather than left running until
+        // it exits or times out. Commands that change the repo always run to completion: killing one partway
+        // would leave the user unsure what it did.
+        val cancellable = invocation.reversibility == READ_ONLY
+        val output: ProcessOutput = if (cancellable) {
+            processHandler.runCancellably(timeout.toInt(), ::contextCancelled)
+        } else {
+            // Run outside the caller's cancellation: the process handler's own termination waiter inherits the
+            // calling context, so under a cancelled indicator it never reported the exit and this waited out the
+            // full timeout, reporting a command that had finished as timed out.
+            nonCancellable { processHandler.runProcess(timeout.toInt()) }
+        }
         val duration = System.currentTimeMillis() - startTime
+
+        if (output.isCancelled) {
+            log.info("Cancelled in ${workingDir?.path ?: "."}: jj $cmdName after ${duration}ms; process destroyed")
+            rethrowCancellation()
+        }
 
         log.info(
             "Completed in ${workingDir?.path ?: "."}: jj $cmdName in ${duration}ms " +
@@ -1191,7 +1265,8 @@ class CliExecutor(
 
         val result = output.toCommandResult(cmdName, timeout, invocation.reversibility)
         return if (undoToken != null && result is CommandExecutor.CommandResult.Success) {
-            identifyOperation(undoToken, result)
+            // The command has already changed the repo: a cancelled caller must still get back the undoable result.
+            nonCancellable { identifyOperation(undoToken, result) }
         } else {
             result
         }
@@ -1243,6 +1318,8 @@ class CliExecutor(
         val cmdName = cmdNameFor(args)
         log.info("Executing in ${workingDir?.path ?: "."}: jj $cmdName [bytes] (${Thread.currentThread().name})")
 
+        ProgressManager.checkCanceled()
+
         val startTime = System.currentTimeMillis()
         val process = try {
             commandLine.createProcess()
@@ -1273,7 +1350,15 @@ class CliExecutor(
         }
         fun remaining() = (deadline - System.currentTimeMillis()).coerceAtLeast(0)
         try {
-            if (!process.waitFor(timeout, TimeUnit.MILLISECONDS)) timedOut()
+            // Poll rather than one long wait, so a cancelled caller kills the process (jj-idea-innq).
+            while (!process.waitFor(minOf(CANCEL_POLL_MILLIS, remaining()), TimeUnit.MILLISECONDS)) {
+                if (contextCancelled()) {
+                    process.destroyForcibly()
+                    log.info("Cancelled: jj $cmdName [bytes]; process destroyed")
+                    rethrowCancellation()
+                }
+                if (remaining() == 0L) timedOut()
+            }
             val exitCode = process.exitValue()
             val bytes = try {
                 stdout.get(remaining(), TimeUnit.MILLISECONDS)
