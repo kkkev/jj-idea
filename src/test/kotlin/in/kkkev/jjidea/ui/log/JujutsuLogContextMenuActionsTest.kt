@@ -194,7 +194,7 @@ class JujutsuLogContextMenuActionsTest {
         fun `compare before with revision uses MergeParentOf for a merge commit`() {
             val entry = createEntry("abc123", parentIds = listOf("parent1", "parent2"))
 
-            entry.parentContentLocator shouldBe MergeParentOf(entry.id)
+            entry.parentContentLocator shouldBe MergeParentOf(entry.commitId)
         }
     }
 

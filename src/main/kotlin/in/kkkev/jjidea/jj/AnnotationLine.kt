@@ -15,6 +15,8 @@ data class AnnotationLine(
     override val authorTimestamp: Instant?,
     override val description: Description,
     val parentIds: List<ChangeId> = emptyList(),
+    /** Parallel to [parentIds]; what content reads address (jj-idea-wiz0). */
+    val parentCommitIds: List<CommitId> = emptyList(),
     val lineContent: String,
     val lineNumber: Int
 ) : ChangeDetail {

@@ -52,7 +52,7 @@ class RestoreToChangeAction : DumbAwareAction(
             errorMessageKey = "action.restore.to.revision.error",
             undoLabelKey = "action.restore.to.revision.undo",
             loadChanges = {
-                val changes = repo.logService.getFileChangesBetween(changeId, WorkingCopy).getOrNull().orEmpty()
+                val changes = repo.logService.getFileChangesBetween(entry.commitId, WorkingCopy).getOrNull().orEmpty()
                 buildChanges(project, changes, emptyList())
             }
         ) { restored ->

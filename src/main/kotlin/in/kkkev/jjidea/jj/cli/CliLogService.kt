@@ -176,14 +176,15 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
     }
 
     override fun getFileChanges(logEntry: LogEntry, filePath: FilePath?): Result<List<FileChange>> {
-        val changeId = logEntry.id
-        log.debug("Getting file changes for change: $changeId")
+        // Read by commit id: a hidden commit shares its change id with the visible one (jj-idea-wiz0).
+        val target = logEntry.readRevision
+        log.debug("Getting file changes for: $target")
 
-        val result = executor.diffSummary(changeId, filePath)
+        val result = executor.diffSummary(target, filePath)
 
         return if (result is CommandExecutor.CommandResult.Success) {
             toResult("Failed to parse file changes") {
-                parseFileChanges(result.stdout, changeId, logEntry.parentContentLocator).also {
+                parseFileChanges(result.stdout, logEntry.contentLocator, logEntry.parentContentLocator).also {
                     log.debug("Parsed ${it.size} file changes")
                 }
             }
@@ -414,6 +415,11 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         ) {
             it.splitByComma { p -> changeId.parse(p) }
         }
+
+        // Reads address parents by commit id: a parent's change id can resolve to a different (visible) commit.
+        val parentCommitIds = singleField("""parents.map(|c| c.commit_id()).join(",")""") {
+            it.splitByComma { p -> CommitId(p) }
+        }
         val author = SignatureFields("author")
         val committer = SignatureFields("committer")
         val immutable = booleanField("immutable")
@@ -439,6 +445,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 add(bookmarks)
                 add(tags)
                 add(parents)
+                add(parentCommitIds)
                 add(currentWorkingCopy)
                 add(conflict)
                 add(empty)
@@ -457,6 +464,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 val bookmarks = bookmarks.take(it)
                 val tags = tags.take(it)
                 val parents = parents.take(it)
+                val parentCommitIds = parentCommitIds.take(it)
                 val currentWorkingCopy = currentWorkingCopy.take(it)
                 val conflict = conflict.take(it)
                 val empty = empty.take(it)
@@ -475,6 +483,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                     empty,
                     immutable = immutable,
                     isHidden = hidden,
+                    parentCommitIds = parentCommitIds,
                     hasPushedAncestor = if (includePushedAncestor) hasPushedAncestor.take(it) else false,
                     isDanglingHead = if (includePushedAncestor) isDanglingHead.take(it) else false,
                     emptyDeferred = isEmptyDeferred(immutable, parents.size)

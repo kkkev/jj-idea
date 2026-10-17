@@ -44,6 +44,11 @@ data class LogEntry(
      */
     val isHidden: Boolean = false,
     /**
+     * Commit ids of the parents, parallel to [parentIds]. Content is read from these (see [parentContentLocator]):
+     * a parent's change id can resolve to a different commit (jj-idea-wiz0). Empty when unknown.
+     */
+    val parentCommitIds: List<CommitId> = emptyList(),
+    /**
      * True for a not-yet-created change previewed in a rebase-simulator preview (e.g.
      * [in.kkkev.jjidea.ui.newchange.NewChangeDialog]'s "the change about to be created" row).
      * [id]/[commitId] are placeholders with no real backing commit - the log-row renderer checks
@@ -81,7 +86,10 @@ data class LogEntry(
     fun resolveEmpty(): Boolean = if (emptyDeferred) repo.mergeEmptiness.resolve(this) else isEmpty
 
     /** See [DagNode.withParents] - used by [in.kkkev.jjidea.ui.rebase.RebaseSimulator] to reparent a simulated entry. */
-    override fun withParents(parentIds: List<ChangeId>): LogEntry = copy(parentIds = parentIds)
+    override fun withParents(parentIds: List<ChangeId>): LogEntry = copy(
+        parentIds = parentIds,
+        parentCommitIds = emptyList()
+    )
 
     val isDivergent get() = id.divergent
 
@@ -90,11 +98,20 @@ data class LogEntry(
      * For merge commits (multiple parents), returns [MergeParentOf] so that content is
      * reconstructed via reverse-apply of the entry's diff rather than using first-parent content.
      */
+    /**
+     * Where to read this entry's own content: its commit id, so a hidden entry reads as itself (jj-idea-wiz0). The
+     * working copy keeps its change id: its content is live ([in.kkkev.jjidea.vcs.changes.CurrentContentRevision]).
+     */
+    val contentLocator: ContentLocator get() = if (isWorkingCopy) id else commitId
+
+    /** [contentLocator] as a [Revision], for commands that take one. */
+    val readRevision: Revision get() = if (isWorkingCopy) id else commitId
+
     val parentContentLocator
         get() = when (parentIds.size) {
-            1 -> parentIds.first()
+            1 -> parentCommitIds.singleOrNull() ?: parentIds.first()
             0 -> ContentLocator.Empty
-            else -> MergeParentOf(id)
+            else -> MergeParentOf(readRevision)
         }
 
     /**

@@ -2625,6 +2625,18 @@ wrong and here's how to fix it."
 **Also re-run:** MT-DIFF-PREVIEW; MT-DIFFBASE (a configured diff base changes what `Annotate`
 below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, which recur across every surface in this section
 
+**Hidden-commit reads (jj-idea-wiz0, GitHub #130)**
+
+**Code:** `jj/LogEntry.kt` (`contentLocator`/`readRevision`/`parentContentLocator`), `jj/cli/CliLogService.kt` (`getFileChanges`), `vcs/history/JujutsuFileRevision.kt`, `vcs/annotate/`, `vcs/diffbase/DiffbaseService.kt`
+
+Setup: in a scratch repo, `echo v1 > f; jj describe -m A; echo v2 > f` (the change is amended, so the v1 commit is hidden but still referenced, e.g. by a remote bookmark or by copying its commit id from `jj log -r 'all()' --hidden` / the op log).
+
+- [ ] Select the amended change in the log: the details pane and Show Diff show the *current* content; Compare with Another Commit... with the old (hidden) commit id shows v1 → v2 (not identical)
+- [ ] File History of `f`: opening the revision's content shows that commit's content, and the row for the visible commit shows v2
+- [ ] Annotate `f`, then Annotate Previous Revision on a line → previous content is read from the parent *commit*, not whatever now carries the parent's change id
+- [ ] MT-DIFFBASE: set the diff base to a revset resolving to a commit, rewrite that commit in a terminal (`jj describe`), refocus the IDE → gutter base follows the refreshed resolution (cache cleared on log refresh), no stale content after refresh
+- [ ] Delete a commit's content from the store is not reproducible locally; instead, from a terminal run `jj op restore` to an op before a commit existed, then try opening a diff of that commit from an already-open details pane → "Commit … is no longer available. Refresh the log." (no stack trace)
+
 #### Diffs
 
 - [ ] Show diff for a directory with changed files shows diffs for each file in the directory

@@ -22,7 +22,7 @@ import `in`.kkkev.jjidea.util.runLater
 fun compareWithWorkingCopyAction(project: Project, logEntry: LogEntry?) =
     nullAndDumbAwareAction(logEntry, "log.action.compare.with.working.copy", AllIcons.Actions.Diff) {
         val repo = target.repo
-        val id = target.id
+        val id = target.commitId
         runInBackground {
             val changes = repo.logService.getFileChangesBetween(id, WorkingCopy).getOrNull().orEmpty()
             if (changes.isEmpty()) {

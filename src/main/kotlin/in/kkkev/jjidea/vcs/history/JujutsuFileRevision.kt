@@ -54,7 +54,7 @@ class JujutsuFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray = try {
-        entry.repo.commandExecutor.showBytes(filePath, entry.id)
+        entry.repo.commandExecutor.showBytes(filePath, entry.readRevision)
     } catch (e: VcsException) {
         throw VcsException("Failed to load file content at revision ${entry.id}: ${e.message}", e)
     }

@@ -11,8 +11,8 @@ import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.ContentInfo
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.commandResult
 import `in`.kkkev.jjidea.vcs.JujutsuVirtualFile
@@ -113,7 +113,7 @@ class DiffbaseContentLoaderTest {
     private fun contentInfo(
         revisionNumber: VcsRevisionNumber,
         charset: Charset = StandardCharsets.UTF_8,
-        base: ChangeId = ChangeId("base", "base")
+        base: CommitId = CommitId("base", "base")
     ): ContentInfo {
         val filePath: FilePath = LocalFilePath("/repo/file.txt", false)
         val file = mockk<VirtualFile> {
@@ -171,7 +171,7 @@ class DiffbaseContentLoaderTest {
 
     private fun infoWithContent(content: String?): ContentInfo {
         val filePath: FilePath = LocalFilePath("/repo/file.txt", false)
-        val base = ChangeId("base", "base")
+        val base = CommitId("base", "base")
         val file = mockk<VirtualFile> { every { this@mockk.charset } returns StandardCharsets.UTF_8 }
         every { file.filePath } returns filePath
         every { project.possibleJujutsuRepositoryFor(file) } returns repo

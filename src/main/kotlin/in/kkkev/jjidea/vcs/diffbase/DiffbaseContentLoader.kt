@@ -15,7 +15,7 @@ import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.ContentInfo
 import com.intellij.openapi.vcs.impl.LineStatusTrackerContentLoader.TrackerContent
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.vcs.JujutsuVirtualFile
 import `in`.kkkev.jjidea.vcs.filePath
@@ -100,7 +100,7 @@ class DiffbaseContentLoader : LineStatusTrackerContentLoader {
         val charset: Charset,
         val repo: JujutsuRepository,
         val filePath: FilePath,
-        val base: ChangeId
+        val base: CommitId
     ) : ContentInfo
 
     private data class DiffbaseTrackerContent(val text: CharSequence) : TrackerContent

@@ -537,6 +537,7 @@ class JjStub(override val workDir: Path) : JjBackend {
                     changes.firstOrNull { it.commitId == pid }?.changeId
                 }
                 field(parentChangeIds.joinToString(","))
+                field(change.parentIds.filter { pid -> changes.any { it.commitId == pid } }.joinToString(","))
                 // No trailing field separator after content: content's own trailing "\n" (from
                 // `line + "\n"`) is the record separator, matching the real template.
                 append(line + "\n")
@@ -749,7 +750,7 @@ class JjStub(override val workDir: Path) : JjBackend {
         val isWc = change === workingCopy
         val isEmpty = computeDiffs(change).isEmpty()
 
-        // 10 basic fields (changeId, commitId, description, bookmarks, tags, parents, ...)
+        // basic fields (changeId, commitId, description, bookmarks, tags, parents, parent commit ids, ...)
         field(qualifiedChangeId(change))
         field(qualifiedCommitId(change))
         field(desc)
@@ -760,6 +761,7 @@ class JjStub(override val workDir: Path) : JjBackend {
         field(change.bookmarks.joinToString(",") { "$it;true;false;0;0" })
         field("") // tags (not yet supported in stub)
         field(formatParents(change))
+        field(change.parentIds.filter { pid -> changes.any { it.commitId == pid } }.joinToString(","))
         field(if (isWc) "true" else "false")
         field("false") // conflict
         field(if (isEmpty) "true" else "false")

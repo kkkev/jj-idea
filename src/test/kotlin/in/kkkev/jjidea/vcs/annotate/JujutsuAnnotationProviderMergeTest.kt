@@ -70,7 +70,7 @@ class JujutsuAnnotationProviderMergeTest {
         // Mirrors AnnotationParser.TEMPLATE: fields joined by "\0", record ends with `content`'s
         // own trailing "\n" (no extra separator after it) — see jj-idea-3191.
         "${changeId.full}\u0000${changeId.short}\u0000\u0000c-${changeId.full}\u0000c-${changeId.short}\u0000" +
-            "Author\u0000author@example.com\u00001700000000\u0000\"desc\"\u0000\u0000$content",
+            "Author\u0000author@example.com\u00001700000000\u0000\"desc\"\u0000\u0000\u0000$content",
         ""
     )
 

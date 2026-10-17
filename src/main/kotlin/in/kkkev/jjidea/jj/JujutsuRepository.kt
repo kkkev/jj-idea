@@ -19,6 +19,7 @@ import `in`.kkkev.jjidea.jj.cli.CliLogService
 import `in`.kkkev.jjidea.util.GitDiffReverseApplier
 import `in`.kkkev.jjidea.vcs.*
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.CommitIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
 
 /**
@@ -139,6 +140,7 @@ data class JujutsuRepositoryImpl(
     override fun revisionNumberFor(filePath: FilePath) = when (val parent = workingCopy.parentContentLocator) {
         is MergeParentOf -> MergeParentRevisionNumber(parent.childRevision)
         is ChangeId -> ChangeIdRevisionNumber(parent)
+        is CommitId -> CommitIdRevisionNumber(parent)
         else -> throw VcsException("Cannot find revision number for $parent")
     }
 

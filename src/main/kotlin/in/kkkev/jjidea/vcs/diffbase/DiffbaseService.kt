@@ -7,8 +7,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.FileStatusManager
 import com.intellij.openapi.vfs.VirtualFile
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revision
@@ -43,7 +43,7 @@ class DiffbaseService(private val project: Project) {
     // (any VCS operation, not just working-copy edits) and on a settings change. A repo with
     // no entry means "not yet resolved"; a repo that resolved to nothing (e.g. no immutable
     // ancestor) is simply absent too — both cases fall through to the default @-.
-    private val cache = ConcurrentHashMap<String, ChangeId>()
+    private val cache = ConcurrentHashMap<String, CommitId>()
 
     // "Is this file absent at the resolved base" per (repo, base, path), so repeatedly building
     // the editor context menu costs one `jj file list` per file, not one per menu open. Cleared
@@ -95,7 +95,7 @@ class DiffbaseService(private val project: Project) {
     }
 
     /**
-     * Resolves the configured diff base for [repo] to a concrete [ChangeId], or `null` when no
+     * Resolves the configured diff base for [repo] to a concrete [CommitId] (reads address commits, so a rewritten base is not swapped for its successor), or `null` when no
      * custom diff base is configured (use `@-`), the configured revset failed to resolve (e.g.
      * no immutable ancestor exists, or a bad custom expression), or it resolved *ambiguously*
      * (matched more than one revision) — callers fall back to today's default behaviour in
@@ -109,7 +109,7 @@ class DiffbaseService(private val project: Project) {
      * cached per repo until the next [in.kkkev.jjidea.jj.JujutsuStateModel.logRefresh] or
      * [notifyDiffbaseChanged], so N open editors in the same repo share one resolution.
      */
-    fun resolve(repo: JujutsuRepository): ChangeId? {
+    fun resolve(repo: JujutsuRepository): CommitId? {
         ensureInvalidationSubscribed()
         val path = repo.directory.path
         cache[path]?.let { return it }
@@ -166,7 +166,7 @@ class DiffbaseService(private val project: Project) {
 
 /** Outcome of [resolveExactlyOne]: a diff base must resolve to exactly one revision. */
 sealed interface ResolveResult {
-    data class Single(val id: ChangeId) : ResolveResult
+    data class Single(val id: CommitId) : ResolveResult
     data object None : ResolveResult
     data class Ambiguous(val count: Int) : ResolveResult
 }
@@ -191,7 +191,7 @@ fun resolveExactlyOne(repo: JujutsuRepository, revset: String): ResolveResult {
     return when {
         entries.isEmpty() -> ResolveResult.None
         entries.size > 1 -> ResolveResult.Ambiguous(entries.size)
-        else -> ResolveResult.Single(entries.first().id)
+        else -> ResolveResult.Single(entries.first().commitId)
     }
 }
 

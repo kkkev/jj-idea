@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test
 
 class AnnotationParserTest {
     /**
-     * Builds one annotate record: 11 fields joined by "\0", terminated by "\n" (mirroring how
+     * Builds one annotate record: 12 fields joined by "\0", terminated by "\n" (mirroring how
      * jj's `content` field always ends with the source line's own trailing newline, which the
      * parser now uses as the record separator).
      */
@@ -26,6 +26,7 @@ class AnnotationParserTest {
         authorTimestamp: String = "1768575623",
         description: String = "Initial commit",
         parentIds: String = "",
+        parentCommitIds: String = "",
         content: String = "println(\"Hello\")"
     ): String {
         val fields = listOf(
@@ -39,6 +40,7 @@ class AnnotationParserTest {
             authorTimestamp,
             "\"$description\"",
             parentIds,
+            parentCommitIds,
             content
         )
         return fields.joinToString("\u0000") + "\n"
@@ -321,6 +323,15 @@ class AnnotationParserTest {
         val result = AnnotationParser.parse(output)
 
         result[0].parentIds.map { it.full } shouldContainExactly listOf("parentid1")
+    }
+
+    @Test
+    fun `parse annotation carries parent commit ids`() {
+        val output = record(parentIds = "parentid1", parentCommitIds = "aaaa1111,bbbb2222")
+
+        val result = AnnotationParser.parse(output)
+
+        result[0].parentCommitIds.map { it.full } shouldContainExactly listOf("aaaa1111", "bbbb2222")
     }
 
     @Test

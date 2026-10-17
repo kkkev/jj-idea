@@ -60,7 +60,7 @@ object ChangeService {
             val filePath = repo.directory.getChildPath(relativePath)
             Change(
                 repo.createContentRevision(filePath, entry.parentContentLocator),
-                repo.createContentRevision(filePath, entry.id),
+                repo.createContentRevision(filePath, entry.contentLocator),
                 FileStatus.MERGED_WITH_CONFLICTS
             )
         }

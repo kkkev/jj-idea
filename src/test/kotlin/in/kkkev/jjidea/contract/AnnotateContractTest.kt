@@ -77,9 +77,9 @@ abstract class AnnotateContractTest {
         val result = jj.run("file", "annotate", "-r", "@", "-T", AnnotationParser.TEMPLATE, "test.txt")
         val records = parseRawRecords(result.stdout)
 
-        records[0][10] shouldBe "first\n"
-        records[1][10] shouldBe "second\n"
-        records[2][10] shouldBe "third\n"
+        records[0][11] shouldBe "first\n"
+        records[1][11] shouldBe "second\n"
+        records[2][11] shouldBe "third\n"
     }
 
     @Test
@@ -150,7 +150,7 @@ abstract class AnnotateContractTest {
     }
 
     companion object {
-        private const val FIELDS_PER_LINE = 11
+        private const val FIELDS_PER_LINE = 12
         private const val FIELD_SEPARATOR = "\u0000"
         private val RECORD_SEPARATOR_KEEP_DELIMITER = Regex("(?<=\n)")
     }

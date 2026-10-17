@@ -68,7 +68,7 @@ internal fun diffArgs(filePath: String) = JjInvocation(READ_ONLY, "diff", filePa
 
 internal fun diffSummaryArgs(revision: Revision, filePath: FilePath?, root: VirtualFile?) = JjInvocation(
     READ_ONLY,
-    listOfNotNull("diff", "--summary", "-r", revision.toString(), filePath?.relativeTo(root!!)?.toFileset())
+    listOfNotNull("diff", "--summary", "-r", revision.readArg(), filePath?.relativeTo(root!!)?.toFileset())
 )
 
 internal fun diffSummaryBetweenArgs(from: ContentLocator, to: ContentLocator, filePath: FilePath?, root: VirtualFile?) =
@@ -135,14 +135,14 @@ internal fun tagListArgs(template: String? = null) = JjInvocation(
     }
 )
 
-internal fun diffGitArgs(revision: Revision) = JjInvocation(READ_ONLY, "diff", "--git", "-r", revision)
+internal fun diffGitArgs(revision: Revision) = JjInvocation(READ_ONLY, "diff", "--git", "-r", revision.readArg())
 
 internal fun diffGitFileArgs(revision: Revision, filePath: FilePath, root: VirtualFile?) = JjInvocation(
     READ_ONLY,
     "diff",
     "--git",
     "-r",
-    revision,
+    revision.readArg(),
     "--",
     filePath.relativeTo(root!!).toFileset()
 )
@@ -325,7 +325,7 @@ internal fun fileUntrackArgs(paths: List<String>) =
  */
 internal fun fileListArgs(paths: List<String>, revision: Revision = WorkingCopy) = JjInvocation(
     READ_ONLY,
-    listOf("file", "list") + (if (revision == WorkingCopy) emptyList() else listOf("-r", revision.toString())) +
+    listOf("file", "list") + (if (revision == WorkingCopy) emptyList() else listOf("-r", revision.readArg())) +
         paths.map { it.toFileset() }
 )
 
@@ -717,7 +717,7 @@ internal fun ProcessOutput.toCommandResult(
     } else {
         divergentChangeId(exitCode, stderr)
             ?.let { CommandExecutor.CommandResult.Failure.Divergent(stdout, stderr, it) }
-            ?: CommandExecutor.CommandResult.Failure.Exited(stdout, stderr, exitCode)
+            ?: CommandExecutor.CommandResult.Failure.Exited(stdout, missingCommitMessage(stderr) ?: stderr, exitCode)
     }
 
 /**
@@ -855,7 +855,7 @@ class CliExecutor(
     }
 
     override fun annotate(file: VirtualFile, revision: Revision, template: String?): CommandExecutor.CommandResult {
-        val args = mutableListOf("file", "annotate", "-r", revision.toString())
+        val args = mutableListOf("file", "annotate", "-r", revision.readArg())
         if (template != null) {
             args.add("-T")
             args.add(template)
@@ -1297,7 +1297,7 @@ class CliExecutor(
             if (exitCode != 0) {
                 val message = "jj $cmdName failed with exit code $exitCode:\n$errorText"
                 log.warn(message)
-                throw VcsException(message)
+                throw VcsException(missingCommitMessage(errorText) ?: message)
             }
             return bytes
         } catch (e: InterruptedException) {

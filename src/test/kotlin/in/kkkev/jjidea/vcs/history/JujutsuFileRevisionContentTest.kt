@@ -20,9 +20,10 @@ import org.junit.jupiter.api.Test
 class JujutsuFileRevisionContentTest {
     private val repo = mockRepo()
     private val changeId = ChangeId("abc123", "ab", null)
+    private val commitId = CommitId("c0ffee")
     private val filePath = LocalFilePath("/repo/img/logo.png", false)
     private val revision = JujutsuFileRevision(
-        LogEntry(repo = repo, id = changeId, commitId = CommitId("c0ffee"), underlyingDescription = ""),
+        LogEntry(repo = repo, id = changeId, commitId = commitId, underlyingDescription = ""),
         filePath,
         FileChange.Status.MODIFIED,
         emptyList()
@@ -31,14 +32,14 @@ class JujutsuFileRevisionContentTest {
     @Test
     fun `loadContent returns jj's exact bytes`() {
         val png = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
-        every { repo.commandExecutor.showBytes(filePath, changeId) } returns png
+        every { repo.commandExecutor.showBytes(filePath, commitId) } returns png
 
         revision.loadContent() shouldBe png
     }
 
     @Test
     fun `loadContent reports a jj failure as a VcsException naming the revision`() {
-        every { repo.commandExecutor.showBytes(filePath, changeId) } throws VcsException("No such path")
+        every { repo.commandExecutor.showBytes(filePath, commitId) } throws VcsException("No such path")
 
         val e = shouldThrow<VcsException> { revision.loadContent() }
 

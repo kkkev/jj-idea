@@ -29,6 +29,7 @@ abstract class LogContractTest {
         fields.bookmarks,
         fields.tags,
         fields.parents,
+        fields.parentCommitIds,
         fields.currentWorkingCopy,
         fields.conflict,
         fields.empty,
@@ -113,12 +114,13 @@ abstract class LogContractTest {
         val fields = result.stdout.trim().split("\u0000")
 
         val booleanFields = listOf(
-            6 to "currentWorkingCopy",
-            7 to "conflict",
-            8 to "empty",
-            9 to "immutable",
-            10 to "hasPushedAncestor",
-            11 to "isDanglingHead"
+            7 to "currentWorkingCopy",
+            8 to "conflict",
+            9 to "empty",
+            10 to "immutable",
+            11 to "hidden",
+            12 to "hasPushedAncestor",
+            13 to "isDanglingHead"
         )
         booleanFields.forEach { (idx, name) ->
             fields[idx] shouldMatch Regex("true|false")
@@ -135,7 +137,7 @@ abstract class LogContractTest {
 
         val allFields = result.stdout.trim().split("\u0000")
         val records = allFields.chunked(BASIC_FIELD_COUNT).filter { it.size == BASIC_FIELD_COUNT }
-        val workingCopyCount = records.count { it[6] == "true" }
+        val workingCopyCount = records.count { it[7] == "true" }
 
         workingCopyCount shouldBe 1
     }
@@ -161,9 +163,9 @@ abstract class LogContractTest {
         val result = jj.run("log", "-r", "@", "--no-graph", "-T", fullSpec)
         val fields = result.stdout.trim().split("\u0000")
 
-        // Author timestamp at index 15, committer timestamp at index 18
-        val authorTs = fields[15]
-        val committerTs = fields[18]
+        // Author timestamp at index 16, committer timestamp at index 19
+        val authorTs = fields[16]
+        val committerTs = fields[19]
 
         authorTs.toLong() shouldBeGreaterThan 0L
         committerTs.toLong() shouldBeGreaterThan 0L
@@ -226,7 +228,7 @@ abstract class LogContractTest {
         result.isSuccess shouldBe true
 
         val fields = result.stdout.trim().split("\u0000")
-        fields[10] shouldBe "false"
+        fields[12] shouldBe "false" // hasPushedAncestor
     }
 
     @Test
@@ -234,7 +236,7 @@ abstract class LogContractTest {
         jj.describe("Test")
 
         fun danglingField() = jj.run("log", "-r", "@", "--no-graph", "-T", basicSpec)
-            .stdout.trim().split("\u0000")[12]
+            .stdout.trim().split("\u0000")[13]
 
         danglingField() shouldBe "true"
 
@@ -244,7 +246,7 @@ abstract class LogContractTest {
     }
 
     companion object {
-        private const val BASIC_FIELD_COUNT = 13
-        private const val FULL_FIELD_COUNT = 19
+        private const val BASIC_FIELD_COUNT = 14
+        private const val FULL_FIELD_COUNT = 20
     }
 }

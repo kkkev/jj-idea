@@ -11,6 +11,7 @@ import com.intellij.openapi.vcs.changes.ChangeListManager
 import com.intellij.testFramework.LoggedErrorProcessor
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.FileAtVersion
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.JujutsuStateModel
@@ -105,6 +106,7 @@ class JujutsuAnnotationProviderTest {
         val parent2 = ChangeId("parent2", "parent2")
         val logEntry = mockk<LogEntry>()
         every { logEntry.parentIds } returns listOf(parent1, parent2)
+        every { logEntry.parentCommitIds } returns emptyList()
         every { repo.getLogEntry(child) } returns logEntry
 
         val result = provider.beforeRevisionFor(MergeParentOf(child), WorkingCopy, repo)
@@ -209,7 +211,7 @@ class JujutsuAnnotationProviderTest {
 
             val diffbaseService = mockk<DiffbaseService>()
             every { project.getService(DiffbaseService::class.java) } returns diffbaseService
-            val base = ChangeId("base", "base")
+            val base = CommitId("base", "base")
             every { diffbaseService.resolve(repo) } returns base
 
             val baseFile = MockVirtualFile("file.txt")
@@ -231,7 +233,7 @@ class JujutsuAnnotationProviderTest {
     // jj-idea-bia2: a file added after the diff base makes `jj file annotate -r <base>` fail. The
     // gutter (jj-idea-zf1j) diffs against an empty base, so annotate must yield an empty
     // annotation rather than an error.
-    private fun withDiffbaseSetup(block: (base: ChangeId, baseFile: MockVirtualFile) -> Unit) {
+    private fun withDiffbaseSetup(block: (base: CommitId, baseFile: MockVirtualFile) -> Unit) {
         mockkStatic("in.kkkev.jjidea.vcs.VcsExtensionsKt")
         try {
             val filePath = LocalFilePath("/repo/file.txt", false)
@@ -240,7 +242,7 @@ class JujutsuAnnotationProviderTest {
             every { project.jujutsuRepositoryFor(file) } returns repo
             val diffbaseService = mockk<DiffbaseService>()
             every { project.getService(DiffbaseService::class.java) } returns diffbaseService
-            val base = ChangeId("base", "base")
+            val base = CommitId("base", "base")
             every { diffbaseService.resolve(repo) } returns base
             val baseFile = MockVirtualFile("file.txt")
             every { repo.getVirtualFile(FileAtVersion(filePath, base)) } returns baseFile

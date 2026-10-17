@@ -29,7 +29,7 @@ object AnnotationParser {
     // preceding record instead of being consumed — see [parse].
     private val RECORD_SEPARATOR_KEEP_DELIMITER = Regex("(?<=\n)")
     private const val PARENT_SEPARATOR = ","
-    private const val FIELDS_PER_LINE = 11
+    private const val FIELDS_PER_LINE = 12
 
     /**
      * Template to use with `jj file annotate -T`
@@ -45,7 +45,8 @@ object AnnotationParser {
      * 8. author timestamp
      * 9. description, JSON-escaped onto a single line (decoded by [unescapeJson])
      * 10. comma-separated parent change ids
-     * 11. line content (may contain any byte, including \0 — must be split with a limit)
+     * 11. comma-separated parent commit ids (reads address commits, not changes - jj-idea-wiz0)
+     * 12. line content (may contain any byte, including \0 — must be split with a limit)
      *
      * Note: In annotate context, use `commit` instead of `commit_id`
      */
@@ -61,6 +62,7 @@ object AnnotationParser {
         commit.author().timestamp().utc().format("%s") ++ "\0" ++
         commit.description().escape_json() ++ "\0" ++
         commit.parents().map(|c| c.change_id()).join(",") ++ "\0" ++
+        commit.parents().map(|c| c.commit_id()).join(",") ++ "\0" ++
         content
         """.trimIndent().replace("\n", "")
 
@@ -94,8 +96,8 @@ object AnnotationParser {
 
     /**
      * Parse a single annotation line from chunked fields
-     * @param chunk Array of 11 fields: [fullChangeId, shortChangeId, changeOffset, fullCommitId, shortCommitId,
-     *   authorName, authorEmail, authorTimestamp, description, parentIds, lineContent]
+     * @param chunk Array of 12 fields: [fullChangeId, shortChangeId, changeOffset, fullCommitId, shortCommitId,
+     *   authorName, authorEmail, authorTimestamp, description, parentIds, parentCommitIds, lineContent]
      * @param lineNumber Line number (1-indexed)
      * @return Parsed annotation line
      */
@@ -114,7 +116,8 @@ object AnnotationParser {
         val authorTimestamp = chunk[7].toLongOrNull()?.let(Instant::fromEpochSeconds)
         val description = Description(unescapeJson(chunk[8]))
         val parentIds = chunk[9].split(PARENT_SEPARATOR).filter { it.isNotEmpty() }.map { ChangeId(it) }
-        val lineContent = chunk[10]
+        val parentCommitIds = chunk[10].split(PARENT_SEPARATOR).filter { it.isNotEmpty() }.map { CommitId(it) }
+        val lineContent = chunk[11]
 
         return AnnotationLine(
             id = ChangeId(fullChangeId, shortChangeId, changeOffset),
@@ -123,6 +126,7 @@ object AnnotationParser {
             authorTimestamp = authorTimestamp,
             description = description,
             parentIds = parentIds,
+            parentCommitIds = parentCommitIds,
             lineContent = lineContent,
             lineNumber = lineNumber
         )

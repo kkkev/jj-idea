@@ -242,7 +242,9 @@ class JujutsuAnnotationProvider(
         return try {
             val mergeCommit = repo.getLogEntry(childRevision)
             val mergeContent = repo.reconstructMergeParentContent(childRevision, file.filePath)
-            val parentAnnotations = mergeCommit.parentIds.mapNotNull { parentId ->
+            val parentAnnotations = mergeCommit.parentCommitIds.ifEmpty {
+                mergeCommit.parentIds
+            }.mapNotNull { parentId ->
                 annotationLinesOrNull(file, parentId, repo, childRevision)
             }
             if (parentAnnotations.isEmpty()) {
@@ -295,7 +297,11 @@ class JujutsuAnnotationProvider(
     ): Revision {
         (beforeLocator as? Revision)?.let { return it }
         (beforeLocator as? MergeParentOf)?.let { mergeParent ->
-            repo.getLogEntry(mergeParent.childRevision).parentIds.firstOrNull()?.let { return it }
+            repo.getLogEntry(mergeParent.childRevision).let {
+                it.parentCommitIds.firstOrNull()
+                    ?: it.parentIds.firstOrNull()
+            }
+                ?.let { return it }
         }
         return ((contentLocator as? Revision) ?: WorkingCopy).parent
     }
@@ -303,7 +309,7 @@ class JujutsuAnnotationProvider(
     /** Annotate a file at a specific revision (used for "Annotate This/Previous Revision"). */
     override fun annotate(file: VirtualFile, revision: VcsFileRevision?): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
-        val revisionId = (revision as? JujutsuFileRevision)?.entry?.id
+        val revisionId = (revision as? JujutsuFileRevision)?.entry?.readRevision
             ?: (revision?.revisionNumber as? ChangeIdRevisionNumber)?.changeId
             ?: repo.workingCopy.id
         return annotateInternal(file, revisionId, repo)

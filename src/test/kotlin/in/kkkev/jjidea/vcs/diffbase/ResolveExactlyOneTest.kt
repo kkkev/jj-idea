@@ -39,13 +39,13 @@ class ResolveExactlyOneTest {
     )
 
     @Test
-    fun `resolves to Single with the one matching entry's id`() {
+    fun `resolves to Single with the one matching entry's commit id`() {
         setup()
         every {
             logService.getLog(revset = Expression("trunk()"), limit = 2, quiet = true)
         } returns Result.success(listOf(entry("abc")))
 
-        resolveExactlyOne(repo, "trunk()") shouldBe ResolveResult.Single(ChangeId("abc", "abc", null))
+        resolveExactlyOne(repo, "trunk()") shouldBe ResolveResult.Single(CommitId("commit-abc"))
     }
 
     @Test

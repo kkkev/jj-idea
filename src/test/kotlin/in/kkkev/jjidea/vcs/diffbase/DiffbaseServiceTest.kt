@@ -134,7 +134,7 @@ class DiffbaseServiceTest {
             logService.getLog(revset = Expression(DiffbaseStrategy.IMMUTABLE_ANCESTOR_REVSET), limit = 2, quiet = true)
         } returns Result.success(listOf(entry("abc")))
 
-        service.resolve(repo) shouldBe ChangeId("abc", "abc", null)
+        service.resolve(repo) shouldBe CommitId("commit-abc")
     }
 
     @Test
@@ -259,7 +259,7 @@ class DiffbaseServiceTest {
     fun `isAbsentAtBase is true when file list is empty at the resolved base`() {
         val executor = mockk<CommandExecutor>()
         stubResolvesTo("abc", executor)
-        every { executor.fileList(listOf(filePath), ChangeId("abc", "abc", null)) } returns commandResult(0, "")
+        every { executor.fileList(listOf(filePath), CommitId("commit-abc")) } returns commandResult(0, "")
 
         service.isAbsentAtBase(repo, filePath) shouldBe true
     }
@@ -268,7 +268,7 @@ class DiffbaseServiceTest {
     fun `isAbsentAtBase is false when the file exists at the base`() {
         val executor = mockk<CommandExecutor>()
         stubResolvesTo("abc", executor)
-        every { executor.fileList(listOf(filePath), ChangeId("abc", "abc", null)) } returns commandResult(0, "foo.rs\n")
+        every { executor.fileList(listOf(filePath), CommitId("commit-abc")) } returns commandResult(0, "foo.rs\n")
 
         service.isAbsentAtBase(repo, filePath) shouldBe false
     }

@@ -11,8 +11,8 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
-import `in`.kkkev.jjidea.jj.tellUser
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
+import `in`.kkkev.jjidea.jj.tellUser
 import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.split.SplitDialog

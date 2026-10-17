@@ -1,16 +1,21 @@
 package `in`.kkkev.jjidea.contract
 
+import com.intellij.openapi.vcs.FilePath
+import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor.CommandResult
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
+import `in`.kkkev.jjidea.jj.cli.CliLogService
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
-import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -133,6 +138,42 @@ class CommitIdReadsContractCliTest {
             (r.exitCode != 0) shouldBe true
             r.stderr shouldContain expected
         }
+    }
+
+    private fun readers(): Triple<CliExecutor, CliLogService, FilePath> {
+        val root = mockk<VirtualFile> { every { path } returns tempDir.resolve("work").toString() }
+        val executor = CliExecutor(root)
+        val repo = mockk<JujutsuRepository> {
+            every { commandExecutor } returns executor
+            every { directory } returns root
+        }
+        return Triple(executor, CliLogService(repo), LocalFilePath(tempDir.resolve("work/f").toString(), false))
+    }
+
+    @Test
+    fun `hidden commit reads as itself through the log service and executor`() {
+        val (executor, logService, file) = readers()
+
+        val entry = logService.getLog(CommitId(a1)).getOrThrow().single()
+        entry.isHidden shouldBe true
+        entry.commitId.full shouldBe a1
+        entry.parentCommitIds.map { it.full } shouldBe listOf(log("root()", "commit_id"))
+
+        // The details pane reads the hidden commit by its commit id, never by the shared change id.
+        entry.contentLocator.full shouldBe a1
+
+        executor.show(file, CommitId(a1)).stdout shouldBe "v1\n"
+        executor.show(file, ChangeId(changeId)).stdout shouldBe "v2\n" // what the change id alone would have read
+        executor.diffSummary(CommitId(a1)).stdout shouldContain "A f"
+    }
+
+    @Test
+    fun `a commit id jj cannot find is reported as no longer available`() {
+        val (executor, _, file) = readers()
+
+        val result = executor.show(file, CommitId("0123456789abcdef0123456789abcdef01234567"))
+
+        result.shouldBeInstanceOf<CommandResult.Failure>().message shouldContain "no longer available"
     }
 
     @Test

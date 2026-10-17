@@ -92,13 +92,15 @@ class JujutsuFileAnnotation(
      */
     override fun getPreviousFileRevisionProvider() = object : PreviousFileRevisionProvider {
         override fun getPreviousRevision(lineNumber: Int): VcsFileRevision? {
-            val parentIds = getAnnotationLine(lineNumber)?.parentIds ?: return null
-            val parentId = parentIds.singleOrNull() ?: return null
-            return ParentFileRevision(parentId, file, repo).takeIf { fileExistsAt(parentId) }
+            val line = getAnnotationLine(lineNumber) ?: return null
+            val parentId = line.parentIds.singleOrNull() ?: return null
+            val parentCommitId = line.parentCommitIds.singleOrNull()
+            return ParentFileRevision(parentId, parentCommitId, file, repo)
+                .takeIf { fileExistsAt(parentCommitId ?: parentId) }
         }
 
         override fun getLastRevision(): VcsFileRevision? =
-            workingCopyChangeId?.let { ParentFileRevision(it, file, repo) } ?: getRevisions().firstOrNull()
+            workingCopyChangeId?.let { ParentFileRevision(it, null, file, repo) } ?: getRevisions().firstOrNull()
     }
 
     /**
@@ -225,7 +227,7 @@ private class AnnotationFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, line.id) }
+        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, line.commitId) }
         val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
         if (result !is CommandExecutor.CommandResult.Success) {
             throw VcsException(
@@ -246,6 +248,7 @@ private class AnnotationFileRevision(
  */
 private class ParentFileRevision(
     private val changeId: ChangeId,
+    private val commitId: CommitId?,
     private val virtualFile: VirtualFile,
     private val repo: JujutsuRepository
 ) : VcsFileRevisionEx() {
@@ -264,7 +267,7 @@ private class ParentFileRevision(
 
     @Throws(VcsException::class)
     override fun loadContent(): ByteArray {
-        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, changeId) }
+        val future = runInBackground { repo.commandExecutor.show(virtualFile.filePath, commitId ?: changeId) }
         val result = ProgressIndicatorUtils.awaitWithCheckCanceled(future)
         if (result !is CommandExecutor.CommandResult.Success) {
             throw VcsException(

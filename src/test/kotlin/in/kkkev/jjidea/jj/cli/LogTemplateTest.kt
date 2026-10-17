@@ -26,6 +26,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -59,6 +60,7 @@ class LogTemplateTest {
             "main;true;false;0;0,feature;true;false;0;0", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "true",
             "false",
             "false",
@@ -84,6 +86,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "plkvukqt~p~,rlvkpnrz~rl~34", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -109,6 +112,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -132,6 +136,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "true",
@@ -155,6 +160,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             parents,
+            "", // parent commit ids
             "false",
             "false",
             "false", // empty, as the template reports it
@@ -186,6 +192,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false", // Not empty
@@ -211,6 +218,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "true",
             "false",
@@ -234,6 +242,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -271,6 +280,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -305,6 +315,7 @@ class LogTemplateTest {
             "", // bookmarks
             "v1.0,v1.0-rc1", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -328,6 +339,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags (empty)
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -351,6 +363,7 @@ class LogTemplateTest {
             "main;true;false;0;0,feature@origin;true;true;3;1", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
@@ -443,6 +456,7 @@ class LogTemplateTest {
             "", // bookmarks
             "", // tags
             "", // parents
+            "", // parent commit ids
             "false",
             "false",
             "false",
