@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.jj
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.contents.DiffContent
 import com.intellij.diff.contents.EmptyContent
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vcs.FilePath
@@ -21,6 +22,7 @@ import `in`.kkkev.jjidea.vcs.*
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.CommitIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.MergeParentRevisionNumber
+import java.util.concurrent.CancellationException
 
 /**
  * A (possible) JJ repository. "Possible" because the directory could be uninitialised, as this class allows
@@ -280,4 +282,12 @@ fun JujutsuRepository.reconstructMergeParentContent(childRevision: Revision, fil
  * sharing its change id (jj-idea-wiz0).
  */
 fun JujutsuRepository.resolveCommitId(revision: Revision): CommitId? =
-    revision as? CommitId ?: runCatching { getLogEntry(revision).commitId }.getOrNull()
+    revision as? CommitId ?: try {
+        getLogEntry(revision).commitId
+    } catch (e: ProcessCanceledException) {
+        throw e // a cancelled caller (jj-idea-innq) must not read as "doesn't resolve"
+    } catch (e: CancellationException) {
+        throw e
+    } catch (_: Exception) {
+        null
+    }

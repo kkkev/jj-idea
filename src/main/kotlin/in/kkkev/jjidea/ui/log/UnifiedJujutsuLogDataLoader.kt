@@ -1,7 +1,9 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.concurrency.SensitiveProgressWrapper
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.util.concurrency.AppExecutorUtil
 import `in`.kkkev.jjidea.jj.*
@@ -171,19 +173,25 @@ class UnifiedJujutsuLogDataLoader(
                 repos.forEachIndexed { index, repo ->
                     runInBackground {
                         try {
-                            // checkCanceled (not ProgressManager.runProcess(indicator)) - the
-                            // indicator is already owned by this Task.Backgroundable's thread;
-                            // wrapping it again from these pooled threads made CoreProgressManager
-                            // report "already running under this indicator" as a data race. This
-                            // check only skips repos that haven't started yet on cancellation; an
-                            // in-flight jj call still runs to completion (killing it is jj-idea-1a4c's job).
-                            indicator.checkCanceled()
-                            indicator.text2 = "Loading from ${repo.displayName}..."
-                            indicator.fraction = index.toDouble() / repos.size
+                            // Each pooled thread runs under its own SensitiveProgressWrapper, not
+                            // the parent indicator itself: that is already owned by this
+                            // Task.Backgroundable's thread, and binding it again from these threads
+                            // made CoreProgressManager report "already running under this
+                            // indicator" as a data race. The wrapper is cancelled with the parent,
+                            // so cancelling the load also kills the in-flight `jj log`
+                            // (jj-idea-innq), not just the repos that haven't started yet.
+                            ProgressManager.getInstance().runProcess(
+                                {
+                                    indicator.checkCanceled()
+                                    indicator.text2 = "Loading from ${repo.displayName}..."
+                                    indicator.fraction = index.toDouble() / repos.size
 
-                            val loadedEntries = loadFirstPageOrFallback(repo, settings)
-                            entriesByRepo[repo] = loadedEntries
-                            log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
+                                    val loadedEntries = loadFirstPageOrFallback(repo, settings)
+                                    entriesByRepo[repo] = loadedEntries
+                                    log.info("Loaded ${loadedEntries.size} commits from ${repo.displayName}")
+                                },
+                                SensitiveProgressWrapper(indicator)
+                            )
                         } catch (e: ProcessCanceledException) {
                             log.info("Loading commits from $repo cancelled")
                         } catch (e: Exception) {
