@@ -195,6 +195,9 @@ Fixture: FX-SCALE-SET `r80k-git` (about 40% of rows are merges, most of them emp
 
 **Code:** `ui/components/IconAwareTooltip.kt`
 
+- [ ] jj-idea-6yiq (GH #144): hover a log row — the tooltip appears after about half a second,
+      like a toolbar button's tooltip, not instantly. Still true in Rider, or in IDEA with
+      registry `ide.tooltip.initialDelay` set to 0
 - [ ] In Settings → Version Control → Issue Navigation, add a pattern (as above) so a commit's
       row tooltip contains a clickable issue-tracker link; hover that row until the tooltip
       appears, then move the pointer up into the tooltip — it stays open (does not disappear)

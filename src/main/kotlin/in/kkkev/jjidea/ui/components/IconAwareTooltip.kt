@@ -4,6 +4,7 @@ import com.intellij.ide.IdeTooltip
 import com.intellij.ide.IdeTooltipManager
 import com.intellij.ide.TooltipEvent
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.ui.ScreenUtil
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.panels.Wrapper
@@ -113,6 +114,14 @@ private object PlatformTooltipHost : TooltipHost {
 }
 
 /**
+ * The delay before the hover tooltip shows: the same one the IDE's standard tooltips (toolbar
+ * buttons etc., `HelpTooltip`) use - `ide.tooltip.initialReshowDelay`. Deliberately not
+ * [IdeTooltip.getShowDelay] (`ide.tooltip.initialDelay`): Rider sets that to 0, which made the log
+ * tooltip appear instantly (jj-idea-6yiq, GitHub #144).
+ */
+internal fun standardTooltipShowDelayMs(): Int = Registry.intValue("ide.tooltip.initialReshowDelay", 500)
+
+/**
  * Whether [IdeTooltipManager] should be allowed to auto-hide the tooltip for [event]. Extracted
  * as a top-level function (rather than left inline in the `canAutohideOn` override) so tests can
  * exercise it directly - `canAutohideOn` itself is `protected` on [IdeTooltip], unreachable from
@@ -170,7 +179,8 @@ internal fun installIconAwareTooltip(
     project: Project,
     cellKeyAt: (Point) -> Any?,
     htmlAt: (Point) -> String?,
-    host: TooltipHost = PlatformTooltipHost
+    host: TooltipHost = PlatformTooltipHost,
+    showDelayMs: () -> Int = ::standardTooltipShowDelayMs
 ): IdeTooltip {
     var suppressedUntilMouseMove = false
 
@@ -202,8 +212,10 @@ internal fun installIconAwareTooltip(
 
     // Drives the show ourselves - see PlatformTooltipHost.showNow for why IdeTooltipManager's own
     // mouse-driven path can't. One-shot: restarted on each new cell, left alone while the pointer
-    // jitters within the same cell, and stopped on exit/scroll/window-deactivation below.
-    val hoverTimer = Timer(tooltip.showDelay) { host.showNow(tooltip) }.apply { isRepeats = false }
+    // jitters within the same cell, and stopped on exit/scroll/window-deactivation below. The delay
+    // is read on each new cell (see [standardTooltipShowDelayMs]), not at install, so registry edits
+    // apply live and install needs no platform Registry.
+    val hoverTimer = Timer(0) { host.showNow(tooltip) }.apply { isRepeats = false }
 
     var lastCellKey: Any? = null
     owner.addMouseMotionListener(
@@ -213,6 +225,7 @@ internal fun installIconAwareTooltip(
                 trackedMousePoint = e.point
                 val newCellKey = cellKeyAt(e.point)
                 if (newCellKey != lastCellKey) {
+                    hoverTimer.initialDelay = showDelayMs()
                     hoverTimer.restart()
                     if (host.hideOnMouseMove(e)) {
                         lastCellKey = newCellKey

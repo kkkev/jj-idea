@@ -8,6 +8,9 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Test
 import java.awt.Point
 import java.awt.event.MouseEvent
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import javax.swing.JComponent
 import javax.swing.JPanel
 import javax.swing.JViewport
@@ -44,7 +47,13 @@ class IconAwareTooltipBehaviourTest {
             hideNowCalls++
         }
 
-        override fun showNow(tooltip: IdeTooltip) {}
+        val shown = CountDownLatch(1)
+        val showNowCalls = AtomicInteger()
+
+        override fun showNow(tooltip: IdeTooltip) {
+            showNowCalls.incrementAndGet()
+            shown.countDown()
+        }
     }
 
     private val project = mockk<Project>()
@@ -52,10 +61,50 @@ class IconAwareTooltipBehaviourTest {
     private fun install(
         owner: JComponent,
         host: FakeHost,
-        cellKeyAt: (Point) -> Any? = { p -> p.x / 10 }
+        cellKeyAt: (Point) -> Any? = { p -> p.x / 10 },
+        showDelayMs: () -> Int = { 0 }
     ): IdeTooltip {
-        installIconAwareTooltip(owner, project, cellKeyAt, htmlAt = { "<html>tip</html>" }, host = host)
+        installIconAwareTooltip(
+            owner,
+            project,
+            cellKeyAt,
+            htmlAt = { "<html>tip</html>" },
+            host = host,
+            showDelayMs = showDelayMs
+        )
         return host.installed!!
+    }
+
+    @Test
+    fun `tooltip is not shown before the delay elapses`() {
+        val owner = JPanel()
+        val host = FakeHost()
+        install(owner, host, showDelayMs = { 400 })
+
+        owner.mouseMotionListeners.single().mouseMoved(moveEvent(owner, x = 1))
+        Thread.sleep(100)
+        host.showNowCalls.get() shouldBe 0
+
+        host.shown.await(5, TimeUnit.SECONDS) shouldBe true
+        host.showNowCalls.get() shouldBe 1
+    }
+
+    @Test
+    fun `the delay is read once per new cell, not per move`() {
+        val owner = JPanel()
+        val host = FakeHost()
+        var reads = 0
+        install(owner, host, showDelayMs = {
+            reads++
+            60_000
+        })
+
+        val listener = owner.mouseMotionListeners.single()
+        listener.mouseMoved(moveEvent(owner, x = 1))
+        listener.mouseMoved(moveEvent(owner, x = 2)) // same cell
+        listener.mouseMoved(moveEvent(owner, x = 15)) // new cell
+
+        reads shouldBe 2
     }
 
     private fun moveEvent(owner: JComponent, x: Int) =
