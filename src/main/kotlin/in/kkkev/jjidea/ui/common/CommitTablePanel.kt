@@ -83,10 +83,21 @@ abstract class CommitTablePanel<D>(
     // Every filter chip in the toolbar, kept so [resetAllFilters] can clear them (jj-idea-7rxm).
     private var allFilterComponents: List<JujutsuFilterComponent> = emptyList()
 
-    /** Clears the search text and every filter chip, so all loaded rows are visible again. */
-    fun resetAllFilters() {
+    // The tab's Scope chip, shown ahead of the search box; not in [allFilterComponents] so a plain
+    // reset keeps it (jj-idea-ehwm.4).
+    private var scopeComponent: JujutsuFilterComponent? = null
+
+    /** True when the search box or any narrowing chip (Root included) is active; the scope doesn't count. */
+    fun hasNarrowingFilters(): Boolean = searchField.text.isNotBlank() || allFilterComponents.any { it.isActive }
+
+    /**
+     * Clears the search text and every narrowing filter chip, so all in-scope loaded rows are
+     * visible again. The tab's scope survives unless [includeScope] is set.
+     */
+    fun resetAllFilters(includeScope: Boolean = false) {
         searchField.text = ""
         allFilterComponents.forEach { it.resetFilter() }
+        if (includeScope) scopeComponent?.resetFilter()
     }
 
     // Search field with regex/match-case/whole-words toggles, and history (jj-idea-lpbv).
@@ -215,6 +226,29 @@ abstract class CommitTablePanel<D>(
         // Create left-side panel with text filter
         val leftPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
+            // The scope leads: it is the base the search box and the chips narrow within, and it
+            // sits outside the overflow-collapsing filter strip so it can never be hidden.
+            createScopeComponent()?.let { scope ->
+                scopeComponent = scope
+                // BoxLayout stretches components up to their maximum size; pin it to the preferred
+                // size (which grows with the revset text) so the search box keeps the free width.
+                add(
+                    object : JPanel(BorderLayout()) {
+                        override fun getMaximumSize() = preferredSize
+                    }.apply {
+                        isOpaque = false
+                        alignmentY = CENTER_ALIGNMENT
+                        add(scope, BorderLayout.CENTER)
+                    }
+                )
+                add(Box.createHorizontalStrut(JBUI.scale(5)))
+                add(
+                    JSeparator(SwingConstants.VERTICAL).apply {
+                        maximumSize = Dimension(JBUI.scale(2), JBUI.scale(18))
+                    }
+                )
+                add(Box.createHorizontalStrut(JBUI.scale(5)))
+            }
             add(searchField)
             add(Box.createHorizontalStrut(5))
             add(createFilterComponents())
@@ -234,6 +268,9 @@ abstract class CommitTablePanel<D>(
         add(leftPanel, BorderLayout.CENTER)
         add(toolbar.component, BorderLayout.EAST)
     }
+
+    /** The tab's Scope chip, placed before the search box; null (the default) for panels without one. */
+    protected open fun createScopeComponent(): JujutsuFilterComponent? = null
 
     open fun createOtherFilterComponents(): List<JujutsuFilterComponent> = emptyList()
 

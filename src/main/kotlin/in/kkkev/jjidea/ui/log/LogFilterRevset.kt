@@ -59,9 +59,11 @@ internal data class LogFilterState(
  * - Paths -> `files(root:...)` per path, OR-ed (a directory path matches everything under it).
  * - Search -> [logSearchRevset] for text, or the user's own revset in [LogFilterState.revsetMode].
  *
+ * [matchIds] = false drops the search term's id-prefix lookup (see [logSearchRevset]).
+ *
  * [base] is ANDed in by [andRevsets], so no filter can surface a commit the repo-level revset excludes.
  */
-internal fun compileLogFilterRevset(base: Revset, state: LogFilterState): Revset? {
+internal fun compileLogFilterRevset(base: Revset, state: LogFilterState, matchIds: Boolean = true): Revset? {
     val terms = buildList {
         state.scope.trim().takeIf { it.isNotEmpty() }?.let { add(it) }
         state.reference?.let { add("::(${referenceTerm(it)})") }
@@ -72,7 +74,7 @@ internal fun compileLogFilterRevset(base: Revset, state: LogFilterState): Revset
         if (state.paths.isNotEmpty()) {
             add(state.paths.sorted().joinToString(" | ") { "files(root:${quoteRevsetString(it)})" })
         }
-        searchTerm(state)?.let { add(it) }
+        searchTerm(state, matchIds)?.let { add(it) }
     }
     return if (terms.isEmpty()) null else andRevsets(base, terms)
 }
@@ -92,8 +94,8 @@ private fun referenceTerm(reference: LogFilterReference): String = when (referen
     is LogFilterReference.Tag -> "tags(exact:${quoteRevsetString(reference.name)})"
 }
 
-private fun searchTerm(state: LogFilterState): String? = when {
+private fun searchTerm(state: LogFilterState, matchIds: Boolean): String? = when {
     state.searchText.isBlank() -> null
     state.revsetMode -> state.searchText.trim()
-    else -> logSearchRevset(state.searchText, state.useRegex, state.matchCase, state.wholeWords)?.value
+    else -> logSearchRevset(state.searchText, state.useRegex, state.matchCase, state.wholeWords, matchIds)?.value
 }

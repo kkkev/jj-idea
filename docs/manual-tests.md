@@ -714,7 +714,7 @@ toggles are pure `LogFilterMatcher` logic, testable without rendering)
 `ui/log/JujutsuLogTable.kt` (`revsetDriven`, `filterState`), `ui/common/CommitTablePanel.kt`
 (status bar), `ui/log/LogFilterMatcher.kt` (file history only)
 
-In the main log tab every filter except Root (search text, Reference, Author, Date and the Revset
+In the main log tab every filter except Root (search text, Reference, Author, Date and the Scope
 chip) is compiled into one revset per repo and resolved by jj, so it covers the whole history, not
 just the loaded window. Matches arrive a page at a time. File history keeps the old client-side
 filtering (nothing here applies to it).
@@ -848,22 +848,43 @@ alongside one other repo works.
 - [ ] Filtering to "@" (working copy) shows **every** repo's working copy, each with its own
       ancestry — not just the first repo's
 
-#### Custom revset filter (jj-idea-vqpn, GitHub #116)
+#### Tab scope (Scope chip; jj-idea-vqpn, jj-idea-ehwm.4)
 
 **Code:** `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`,
 `ui/log/JujutsuLogTable.kt` (`setScope`), `ui/log/UnifiedJujutsuLogPanel.kt`
-(`revsetFilterComponent`), `settings/LogWindowConfig.kt` (`revsetFilter`)
+(`createScopeComponent`, `onSelectionHiddenByFilter`), `ui/common/CommitTablePanel.kt` (`createScopeComponent`, `resetAllFilters`), `settings/LogWindowConfig.kt` (`revsetFilter`)
 
 The typed revset is validated against jj (one single-row `jj log` call per repo) and becomes the
-tab's scope; jj then resolves it together with every other filter (see "Whole-history filtering"),
+tab's scope — the base the search box and the other chips narrow within; jj then resolves it together with every other filter (see "Whole-history filtering"),
 ANDed with the repo-level revset from Settings. Matches anywhere in history show up, a page at a
 time. It never changes what jj loads for any other tab or dialog.
 
-- [ ] Click the **Revset** chip — a popup opens under it with a text field and a
+- [ ] The **Scope** chip (with a scope icon) is the first thing in the toolbar, left of the search
+      box and separated from it by a thin divider; it is not among the Root/Reference/Author/Date chips
+- [ ] Narrow the window until the other chips collapse into "»" — the Scope chip stays visible
+- [ ] Hover the chip — a tooltip explains it is the tab's scope. After a failing re-apply the tooltip
+      shows jj's error instead; once the error clears it returns to the explanation
+- [ ] Type a single letter such as `t` in the search box — matching commits show and there is no
+      "prefix is ambiguous" error (same in the New Change picker after pressing Enter)
+- [ ] Click the **Scope** chip — a popup opens under it with a text field and a
       "Enter to apply · Esc to close" hint
 - [ ] Type `ancestors(@, 5)` and press **Enter** — the popup closes, the graph narrows to that
       revset, and the chip shows the revset text
-- [ ] Also apply the **Author** filter — the visible rows are the intersection of both filters
+- [ ] Also apply the **Author** filter, and type search text — the visible rows are the intersection
+      of all of them (narrowing within the scope)
+- [ ] The unset chip reads `Scope: all()` in grey; a set scope is shown in the monospace editor font.
+      The popup is titled "Scope Revset" and its "Revset language" link opens jj's revset docs
+- [ ] With a scope set and an Author filter or search text active, navigate to a change those hide
+      (e.g. from the bookmarks panel) — the balloon says it is "hidden by the current log filters";
+      **Reset Filters** clears search and chips, **keeps the scope**, and selects the change if the
+      scope allows it
+- [ ] With a scope set and nothing else active, navigate to a change outside the scope — the balloon
+      says the change "is outside this tab's scope (…)"; **Clear Scope** clears the scope and selects it
+- [ ] Clicking **Clear Scope** or **Reset Filters** shows **at most one** follow-up balloon, and none when
+      the change becomes visible (the balloons never fire from the stale, pre-refilter rows)
+- [ ] With scope `ancestors(@, 10)`, scroll to the last row and click its parent link — exactly **one**
+      "outside this tab's scope" balloon appears (also with several log tabs open)
+- [ ] A tab saved before the Revset chip became Scope opens with its old revset shown as the Scope
 - [ ] Open the chip again, clear the field, and press Enter — the filter clears and the full log
       returns
 - [ ] Open the chip, type an invalid revset (e.g. `foo(`) and press Enter — the field gets a red

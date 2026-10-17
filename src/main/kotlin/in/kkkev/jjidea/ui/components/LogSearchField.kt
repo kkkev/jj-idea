@@ -112,7 +112,8 @@ class LogSearchField(
     fun matcher(): LogFilterMatcher? = LogFilterMatcher.create(text, useRegex, matchCase, matchWholeWords)
 
     /** Builds the whole-repo search revset (jj-idea-lpbv) from the current text and toggles. */
-    fun revset(): Expression? = logSearchRevset(text, useRegex, matchCase, matchWholeWords)
+    fun revset(matchIds: Boolean = true): Expression? =
+        logSearchRevset(text, useRegex, matchCase, matchWholeWords, matchIds)
 
     private inner class FilterToggleAction(
         messageKeySuffix: String,

@@ -205,6 +205,15 @@ object JujutsuNotifications {
             ).notify(project)
     }
 
+    // The "target is hidden" balloon currently showing, per project. A click can reach several log tabs, or
+    // the same one twice, and a Reset/Clear action can chain into a second kind of balloon: one at a time.
+    private val hiddenTargetBalloons = ConcurrentHashMap<Project, Notification>()
+
+    private fun showHiddenTargetBalloon(project: Project, notification: Notification) {
+        hiddenTargetBalloons.put(project, notification)?.expire()
+        notification.notify(project)
+    }
+
     /** The log target of a navigation is loaded but hidden by filters; [resetAndSelect] fixes that. */
     fun notifyNavigationTargetFiltered(project: Project, id: ChangeId, resetAndSelect: () -> Unit) {
         NotificationGroupManager.getInstance()
@@ -214,7 +223,24 @@ object JujutsuNotifications {
                 NotificationType.INFORMATION
             ).apply {
                 addExpiringAction("log.navigate.resetFilters", resetAndSelect)
-            }.notify(project)
+            }.let { showHiddenTargetBalloon(project, it) }
+    }
+
+    /** The log target of a navigation is outside the tab's scope [scope]; [clearScopeAndSelect] drops the scope. */
+    fun notifyNavigationTargetOutOfScope(
+        project: Project,
+        id: ChangeId,
+        scope: String,
+        clearScopeAndSelect: () -> Unit
+    ) {
+        NotificationGroupManager.getInstance()
+            .getNotificationGroup(GROUP_ID)
+            .createNotification(
+                JujutsuBundle.message("log.navigate.outsideScope", id.short, scope),
+                NotificationType.INFORMATION
+            ).apply {
+                addExpiringAction("log.navigate.clearScope", clearScopeAndSelect)
+            }.let { showHiddenTargetBalloon(project, it) }
     }
 
     /**

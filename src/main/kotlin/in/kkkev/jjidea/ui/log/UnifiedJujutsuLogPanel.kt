@@ -49,9 +49,10 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     // Root filter component (created lazily, only shown if multiple roots)
     private var rootFilterComponent: JujutsuRootFilterComponent? = null
 
-    // Custom revset filter component (jj-idea-vqpn, GitHub #116) - created in
-    // createOtherFilterComponents(), which the base class constructor calls before this
+    // The Scope chip (jj-idea-vqpn, GitHub #116; jj-idea-ehwm.4) - created in
+    // createScopeComponent(), which the base class constructor calls before this
     // subclass's own init{} block runs.
+
     private var revsetFilterComponent: JujutsuRevsetFilterComponent? = null
 
     /**
@@ -177,12 +178,25 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         }
 
         // jj-idea-7rxm (GitHub #140): a loaded target hidden by a filter used to fail silently.
+        // Reset Filters clears the search and chips but keeps the tab's scope, which is its definition.
+        // If the target is still hidden afterwards only the scope can be responsible, and the user
+        // gets a separate, explicit "Clear Scope" choice.
         logTable.onSelectionHiddenByFilter = { key ->
             val rev = key.revision
-            if (rev is ChangeId) {
-                JujutsuNotifications.notifyNavigationTargetFiltered(project, rev) {
-                    resetAllFilters()
-                    logTable.requestSelection(key)
+            if (filterApplyPending) {
+                deferredHiddenKey = key
+            } else if (rev is ChangeId) {
+                val scope = revsetFilterComponent?.getRevsetText().orEmpty()
+                if (hasNarrowingFilters() || scope.isEmpty()) {
+                    JujutsuNotifications.notifyNavigationTargetFiltered(project, rev) {
+                        resetAllFilters()
+                        logTable.requestSelection(key)
+                    }
+                } else {
+                    JujutsuNotifications.notifyNavigationTargetOutOfScope(project, rev, scope) {
+                        resetAllFilters(includeScope = true)
+                        logTable.requestSelection(key)
+                    }
                 }
             }
         }
@@ -208,8 +222,17 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     }
 
     /** Runs [applyFilterNow] - at once, or after a short pause for search text so typing doesn't spawn a jj call per key. */
+    // True from scheduling a filter apply until jj's answer has been published. The rows on screen are
+    // stale meanwhile, so "this change is hidden" can't be trusted: the pending selection is retried
+    // when the fresh rows land (jj-idea-ehwm.4).
+    private var filterApplyPending = false
+
+    // A hidden-selection report that arrived while [filterApplyPending]; re-requested once the answer is in.
+    private var deferredHiddenKey: ChangeKey? = null
+
     private fun scheduleFilterApply(immediate: Boolean) {
         if (!initialFilterApplied) return
+        filterApplyPending = true
         filterAlarm.cancelAllRequests()
         showStatusMessage(JujutsuBundle.message("log.status.filtering"))
         filterAlarm.addRequest(::applyFilterNow, if (immediate) 0 else FILTER_DEBOUNCE_MS)
@@ -219,6 +242,11 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
     private fun applyFilterNow() {
         if (Disposer.isDisposed(this) || project.isDisposed) return
         (dataLoader as UnifiedJujutsuLogDataLoader).applyFilter(logTable.logModel.filterState()) { errors ->
+            filterApplyPending = false
+            deferredHiddenKey?.let {
+                deferredHiddenKey = null
+                logTable.requestSelection(it)
+            }
             if (errors.isEmpty()) {
                 clearStatusMessage()
             } else {
@@ -390,11 +418,17 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             }
         }
 
-        // Custom revset filter (jj-idea-vqpn, GitHub #116). Log-only (not passed to file
-        // history's toolbar, which doesn't override this method), and reads the same per-repo
-        // resolved revset the data loader itself fetches with, so the filter can never surface a
-        // commit outside what's already loadable for this tab.
-        revsetFilterComponent = JujutsuRevsetFilterComponent(
+        return listOfNotNull(rootFilterComponent)
+    }
+
+    /**
+     * The tab's Scope chip (jj-idea-vqpn, GitHub #116; jj-idea-ehwm.4): a base revset the search box
+     * and the other chips narrow within. Log-only (file history doesn't override this), and reads
+     * the same per-repo resolved revset the data loader itself fetches with, so the scope can never
+     * surface a commit outside what's already loadable for this tab.
+     */
+    override fun createScopeComponent(): JujutsuFilterComponent {
+        val component = JujutsuRevsetFilterComponent(
             repos = { config.selectedRepos(project.initialisedJujutsuRepositories) },
             baseFor = { repo -> JujutsuSettings.getInstance(project).resolvedLogRevset(repo) },
             tableModel = logTable.logModel
@@ -402,8 +436,8 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
             initUi()
             initialize()
         }
-
-        return listOfNotNull(rootFilterComponent, revsetFilterComponent)
+        revsetFilterComponent = component
+        return component
     }
 
     override fun updateTableStuff() {

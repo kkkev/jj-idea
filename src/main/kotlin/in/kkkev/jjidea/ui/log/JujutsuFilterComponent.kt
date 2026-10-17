@@ -4,6 +4,8 @@ import com.intellij.icons.AllIcons
 import com.intellij.ide.DataManager
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.AnAction
+import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.editor.colors.EditorFontType
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.ui.popup.ListPopup
 import com.intellij.openapi.util.Condition
@@ -56,6 +58,15 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
      */
     private var errorText: String? = null
 
+    /** Optional icon shown before the filter name, for chips that need to stand apart from the rest. */
+    protected open val leadingIcon: Icon? = null
+
+    /** True for a chip whose value is code (a revset): shown in the editor font so it reads as an expression. */
+    protected open val codeStyledValue: Boolean = false
+
+    /** Tooltip shown while no error is set (see [setErrorText]); null for chips that don't need one. */
+    protected open val hintToolTipText: String? = null
+
     /**
      * Initialize the UI components after the subclass is fully constructed.
      * Must be called by subclass or factory method.
@@ -64,6 +75,11 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         // Create labels
         nameLabel = DynamicLabel { "$displayName: " }
         valueLabel = DynamicLabel { getCurrentText() }
+        if (codeStyledValue) {
+            valueLabel.font = EditorColorsManager.getInstance().globalScheme
+                .getFont(EditorFontType.PLAIN)
+                .deriveFont(nameLabel.font.size2D)
+        }
 
         // Create button
         filterButton = InlineIconButton(AllIcons.Actions.Close)
@@ -80,6 +96,10 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         filterButton.alignmentY = CENTER_ALIGNMENT
 
         // Add components
+        leadingIcon?.let { icon ->
+            add(JBLabel(icon).apply { alignmentY = CENTER_ALIGNMENT })
+            add(Box.createHorizontalStrut(JBUI.scale(4)))
+        }
         add(nameLabel)
         add(valueLabel)
         add(Box.createHorizontalStrut(gapBeforeArrow()))
@@ -110,8 +130,17 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         indicateHovering()
         indicateFocusing()
         cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        applyToolTip()
 
         return this
+    }
+
+    /** The error if one is set, else the chip's hint; on the panel and both labels, which swallow hover. */
+    private fun applyToolTip() {
+        val text = errorText ?: hintToolTipText
+        toolTipText = text
+        if (::nameLabel.isInitialized) nameLabel.toolTipText = text
+        if (::valueLabel.isInitialized) valueLabel.toolTipText = text
     }
 
     /**
@@ -134,10 +163,9 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
      */
     protected fun setErrorText(text: String?) {
         errorText = text
-        toolTipText = text
+        applyToolTip()
         if (::valueLabel.isInitialized) {
             setDefaultForeground()
-            valueLabel.toolTipText = text
             valueLabel.revalidate()
             valueLabel.repaint()
         }
@@ -245,7 +273,12 @@ abstract class JujutsuFilterComponent(private val displayName: String) : JBPanel
         } else {
             nameLabel.foreground =
                 if (isEnabled) UIUtil.getLabelInfoForeground() else UIUtil.getLabelDisabledForeground()
-            valueLabel.foreground = if (isEnabled) UIUtil.getLabelForeground() else UIUtil.getLabelDisabledForeground()
+            valueLabel.foreground = when {
+                !isEnabled -> UIUtil.getLabelDisabledForeground()
+                // An unset chip that still shows placeholder text (the Scope chip's `all()`) is greyed out.
+                !isValueSelected() -> UIUtil.getLabelInfoForeground()
+                else -> UIUtil.getLabelForeground()
+            }
         }
     }
 

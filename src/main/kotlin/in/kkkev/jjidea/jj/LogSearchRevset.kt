@@ -26,9 +26,19 @@ package `in`.kkkev.jjidea.jj
  * (e.g. `"foo"`, not `"foo@origin"`), so a query for just the remote part (e.g. `"origin"`)
  * matches client-side (against the full `"foo@origin"` string) but is not found by this revset.
  *
+ * [matchIds] = false leaves out that `present(<query>)` term. It is the fallback for a query that is
+ * an *ambiguous* id prefix (a single letter, say): `present()` only forgives a prefix that matches
+ * nothing, so an ambiguous one fails the whole revset ([isAmbiguousIdPrefix]).
+ *
  * Returns null for a blank query (nothing to search).
  */
-internal fun logSearchRevset(query: String, useRegex: Boolean, matchCase: Boolean, wholeWords: Boolean): Expression? {
+internal fun logSearchRevset(
+    query: String,
+    useRegex: Boolean,
+    matchCase: Boolean,
+    wholeWords: Boolean,
+    matchIds: Boolean = true
+): Expression? {
     if (query.isBlank()) return null
 
     val kind = if (matchCase) "regex" else "regex-i"
@@ -50,12 +60,18 @@ internal fun logSearchRevset(query: String, useRegex: Boolean, matchCase: Boolea
         "bookmarks($stringPattern)",
         "remote_bookmarks($stringPattern)"
     )
-    if (looksLikeRevisionName(query)) {
+    if (matchIds && looksLikeRevisionName(query)) {
         terms.add(0, "present(${quoteRevsetString(query)})")
     }
 
     return Expression(terms.joinToString(" | "))
 }
+
+private val AMBIGUOUS_PREFIX = Regex("prefix .* is ambiguous", RegexOption.IGNORE_CASE)
+
+/** True when [error] is jj's "Change ID prefix `t` is ambiguous" (or the commit id wording). */
+internal fun isAmbiguousIdPrefix(error: Throwable): Boolean =
+    error.message?.let { AMBIGUOUS_PREFIX.containsMatchIn(it) } == true
 
 /**
  * True when [text] contains nothing but characters that can appear in a change id, commit hash,

@@ -180,6 +180,47 @@ class UnifiedJujutsuLogDataLoaderTest {
         }
 
         @Test
+        fun `retries once without the id lookup when the prefix is ambiguous`() {
+            val withIds = Expression("present(\"t\") | description(substring-i:\"t\")")
+            val textOnly = Expression("description(substring-i:\"t\")")
+            val repo = mockk<JujutsuRepository>()
+            val logService = mockk<LogService>()
+            every {
+                logService.getLog(revset = withIds, filePaths = emptyList(), limit = 100, quiet = true)
+            } returns Result.failure(RuntimeException("Error: Change ID prefix `t` is ambiguous"))
+            every {
+                logService.getLog(revset = textOnly, filePaths = emptyList(), limit = 100, quiet = true)
+            } returns Result.success(listOf(entryFor(mockk())))
+            every { repo.logService } returns logService
+
+            val result = fetchSearchResults(listOf(repo), { matchIds -> if (matchIds) withIds else textOnly }) { 100 }
+
+            result.keys shouldBe setOf(repo)
+            verify(exactly = 1) {
+                logService.getLog(revset = withIds, filePaths = emptyList(), limit = 100, quiet = true)
+            }
+            verify(exactly = 1) {
+                logService.getLog(revset = textOnly, filePaths = emptyList(), limit = 100, quiet = true)
+            }
+        }
+
+        @Test
+        fun `does not retry for an unrelated failure`() {
+            val withIds = Expression("a")
+            val textOnly = Expression("b")
+            val (repo, logService) = repoWithService(Result.failure(RuntimeException("boom")), revset = withIds)
+
+            fetchSearchResults(listOf(repo), { matchIds -> if (matchIds) withIds else textOnly }) { 100 }
+
+            verify(exactly = 1) {
+                logService.getLog(revset = withIds, filePaths = emptyList(), limit = 100, quiet = true)
+            }
+            verify(exactly = 0) {
+                logService.getLog(revset = textOnly, filePaths = emptyList(), limit = 100, quiet = true)
+            }
+        }
+
+        @Test
         fun `omits repos with empty results`() {
             val (repo, _) = repoWithService(Result.success(emptyList()))
 

@@ -206,10 +206,16 @@ class CommitPickerPanel(
      * would defer the `runLater` callback until the dialog closes.
      */
     private fun searchWholeRepo() {
-        val revset = searchField.revset() ?: return
+        // Read on the EDT, before going to the background: the field's text and toggles aren't thread-safe.
+        val withIds = searchField.revset() ?: return
+        val textOnly = searchField.revset(matchIds = false)
         val settings = JujutsuSettings.getInstance(project)
         runInBackground(ModalityState.any()) {
-            val found = fetchSearchResults(listOf(repo), revset) { settings.logChangeLimit(it) }[repo] ?: emptyList()
+            val found =
+                fetchSearchResults(listOf(repo), { matchIds ->
+                    if (matchIds) withIds else textOnly
+                }) { settings.logChangeLimit(it) }[repo]
+                    ?: emptyList()
             if (found.isNotEmpty()) repo.logCache.store(found)
             runLater {
                 if (disposed) return@runLater

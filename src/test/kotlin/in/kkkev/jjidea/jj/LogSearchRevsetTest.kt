@@ -90,6 +90,21 @@ class LogSearchRevsetTest {
     }
 
     @Test
+    fun `matchIds false leaves out the present term for an id-shaped query`() {
+        val result = logSearchRevset("t", useRegex = false, matchCase = false, wholeWords = false, matchIds = false)!!
+        result.value shouldBe """description(substring-i:"t") | author(substring-i:"t") | """ +
+            """bookmarks(substring-i:"t") | remote_bookmarks(substring-i:"t")"""
+    }
+
+    @Test
+    fun `isAmbiguousIdPrefix recognises both jj wordings and nothing else`() {
+        isAmbiguousIdPrefix(RuntimeException("Error: Change ID prefix `t` is ambiguous")) shouldBe true
+        isAmbiguousIdPrefix(RuntimeException("Error: Commit ID prefix `a` is ambiguous")) shouldBe true
+        isAmbiguousIdPrefix(RuntimeException("Error: Revision `zzz` doesn't exist")) shouldBe false
+        isAmbiguousIdPrefix(RuntimeException()) shouldBe false
+    }
+
+    @Test
     fun `free text with spaces does not get a present term`() {
         val result = logSearchRevset("fix the bug", useRegex = false, matchCase = false, wholeWords = false)!!.value
         (result.contains("present(")) shouldBe false

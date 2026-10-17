@@ -42,8 +42,8 @@ data class LogWindowConfig(
     /** Name of the selected reference (bookmark, tag, or "@"), or "" for none. */
     var selectedReference: String = "",
     /**
-     * The custom revset log filter chip's text (jj-idea-vqpn, GitHub #116), or "" for none.
-     * The tab's scope revset: resolved by jj together with the other filters - see
+     * The Scope chip's text (jj-idea-vqpn, GitHub #116; named Revset before jj-idea-ehwm.4, the
+     * stored value is unchanged), or "" for none. The tab's scope revset: resolved by jj together with the other filters - see
      * [in.kkkev.jjidea.ui.log.JujutsuRevsetFilterComponent] and
      * [in.kkkev.jjidea.ui.log.UnifiedJujutsuLogDataLoader.applyFilter] - so it doesn't affect what's
      * loaded for any other tab or dialog.

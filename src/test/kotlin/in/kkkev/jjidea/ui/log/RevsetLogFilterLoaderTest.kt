@@ -71,6 +71,9 @@ class RevsetLogFilterLoaderTest {
 
         override fun getLogHeads(revset: Revset): Result<List<ChangeId>> {
             if ("bad(" in revset.toString()) return Result.failure(RuntimeException("Error from jj log: bad revset"))
+            if ("present(\"t\")" in revset.toString()) {
+                return Result.failure(RuntimeException("Error: Change ID prefix `t` is ambiguous"))
+            }
             headsCalls.incrementAndGet()
             return Result.success(evaluate(revset.toString()).take(1).map { chain[it].id })
         }
@@ -241,6 +244,22 @@ class RevsetLogFilterLoaderTest {
 
         service.pageCalls.count { "author_email(" in it.first } - filterPagesBefore shouldBe 2
         published.last().filterMatches shouldBe keysOf(0, 5, 10, 15, 20, 25)
+    }
+
+    @Test
+    fun `an ambiguous id prefix in the search falls back to a text-only search`() {
+        val loader = loader()
+        loader.loadCommits()
+        drainBackgroundLoads(500)
+        var errors: Map<JujutsuRepository, String>? = null
+
+        loader.applyFilter(LogFilterState(searchText = "t")) { errors = it }
+        drainBackgroundLoads(500)
+
+        errors.orEmpty().isEmpty() shouldBe true
+        published.last().filterMatches shouldBe keysOf(0, 1, 2)
+        service.pageCalls.last().first.contains("present(\"t\")") shouldBe false
+        service.pageCalls.last().first shouldContain "description(substring-i:\"t\")"
     }
 
     @Test

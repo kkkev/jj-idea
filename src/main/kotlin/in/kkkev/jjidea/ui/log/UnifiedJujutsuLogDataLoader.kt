@@ -381,18 +381,38 @@ class UnifiedJujutsuLogDataLoader(
         pages: Int,
         isCurrent: () -> Boolean
     ): String? {
-        val compiled = compileLogFilterRevset(settings.resolvedLogRevset(repo), state)
-        if (compiled == null) {
+        val firstCompiled = compileLogFilterRevset(settings.resolvedLogRevset(repo), state)
+        if (firstCompiled == null) {
             if (isCurrent()) {
                 filterCursorByRepo.remove(repo)
                 filterEntriesByRepo.remove(repo)
             }
             return null
         }
-        val cursor = FilterPageCursor(compiled, pageRows)
-        for (i in 0 until pages) {
+        var compiled: Revset = firstCompiled
+        var cursor = FilterPageCursor(compiled, pageRows)
+        var retriedWithoutIds = false
+        var i = 0
+        while (i < pages) {
             if (cursor.isExhausted) break
-            val failure = cursor.fetchNextPage(repo.logService).exceptionOrNull() ?: continue
+            val failure = cursor.fetchNextPage(repo.logService).exceptionOrNull()
+            if (failure == null) {
+                i++
+                continue
+            }
+            // A one-letter search is an ambiguous id prefix, which fails the whole revset even inside
+            // present(): search the text alone instead. Only for plain text, never a user's own revset.
+            if (!retriedWithoutIds &&
+                !state.revsetMode &&
+                state.searchText.isNotBlank() &&
+                isAmbiguousIdPrefix(failure)
+            ) {
+                retriedWithoutIds = true
+                compiled = compileLogFilterRevset(settings.resolvedLogRevset(repo), state, matchIds = false) ?: compiled
+                cursor = FilterPageCursor(compiled, pageRows)
+                i = 0
+                continue
+            }
             if (failure !is FrontierTooWide) {
                 log.info("Failed to page the log filter of ${repo.displayName}: ${failure.message}")
                 return failure.message ?: failure.toString()
@@ -986,9 +1006,24 @@ internal fun fetchSearchResults(
     repos: Collection<JujutsuRepository>,
     revset: Expression,
     limitFor: (JujutsuRepository) -> Int
+): Map<JujutsuRepository, List<LogEntry>> = fetchSearchResults(repos, { revset }, limitFor)
+
+/**
+ * [fetchSearchResults] for a query that may be an ambiguous id prefix: [build] is called with
+ * `matchIds = true` first and, if jj rejects that as ambiguous ([isAmbiguousIdPrefix]), once more with
+ * `false` (a text-only search). The retry only costs a call for repos where the first one failed.
+ */
+internal fun fetchSearchResults(
+    repos: Collection<JujutsuRepository>,
+    build: (matchIds: Boolean) -> Expression?,
+    limitFor: (JujutsuRepository) -> Int
 ): Map<JujutsuRepository, List<LogEntry>> = repos.mapNotNull { repo ->
-    repo.logService.getLog(revset = revset, limit = limitFor(repo), quiet = true)
-        .getOrNull()
+    val limit = limitFor(repo)
+    var result = repo.logService.getLog(revset = build(true) ?: return@mapNotNull null, limit = limit, quiet = true)
+    if (result.exceptionOrNull()?.let(::isAmbiguousIdPrefix) == true) {
+        result = repo.logService.getLog(revset = build(false) ?: return@mapNotNull null, limit = limit, quiet = true)
+    }
+    result.getOrNull()
         ?.takeUnless { it.isEmpty() }
         ?.let { repo to it }
 }.toMap()

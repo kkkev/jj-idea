@@ -5,8 +5,8 @@ import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revset
 
 /**
- * The custom revset log filter (jj-idea-vqpn, GitHub #116): a per-tab revset chip that narrows
- * the log to commits matching a user-typed revset, ANDed with the other filters
+ * The log tab's Scope chip (jj-idea-vqpn, GitHub #116; jj-idea-ehwm.4): a per-tab base revset
+ * that the search box and the other filters narrow within, ANDed with them
  * ([JujutsuLogTableModel.setScope], compiled by [compileLogFilterRevset]).
  *
  * The repo-level revset from [in.kkkev.jjidea.settings.JujutsuSettings.resolvedLogRevset] keeps

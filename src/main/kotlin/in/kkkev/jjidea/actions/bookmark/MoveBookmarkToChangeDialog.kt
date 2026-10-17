@@ -303,10 +303,16 @@ class MoveBookmarkToChangeDialog(
      * outside the loaded log window.
      */
     private fun searchWholeRepo() {
-        val revset = searchField.revset() ?: return
+        // Read on the EDT, before going to the background: the field's text and toggles aren't thread-safe.
+        val withIds = searchField.revset() ?: return
+        val textOnly = searchField.revset(matchIds = false)
         val settings = JujutsuSettings.getInstance(repo.project)
         repo.runRecoverableInBackground(retry = ::searchWholeRepo, modalityState = ModalityState.any()) {
-            val found = fetchSearchResults(listOf(repo), revset) { settings.logChangeLimit(it) }[repo] ?: emptyList()
+            val found =
+                fetchSearchResults(listOf(repo), { matchIds ->
+                    if (matchIds) withIds else textOnly
+                }) { settings.logChangeLimit(it) }[repo]
+                    ?: emptyList()
             // Only a *sole* target is pre-excluded from [classified] - a divergent bookmark's targets stay
             // findable so an off-window one still resolves to RESOLVE (jj-idea-t7cz).
             val alreadyKnown =

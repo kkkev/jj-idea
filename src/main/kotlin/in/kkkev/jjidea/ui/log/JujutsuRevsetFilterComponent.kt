@@ -1,9 +1,11 @@
 package `in`.kkkev.jjidea.ui.log
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.DocumentAdapter
+import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
@@ -19,11 +21,14 @@ import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
+import javax.swing.Icon
 import javax.swing.JPanel
 import javax.swing.event.DocumentEvent
 
 /**
- * Custom revset log filter chip (jj-idea-vqpn, GitHub #116).
+ * The log tab's Scope chip (jj-idea-vqpn, GitHub #116; jj-idea-ehwm.4): the tab's base revset,
+ * which the search box and the other filters narrow within. Shown ahead of the search box, outside
+ * the overflow-collapsing filter strip, and kept by "clear filters".
  *
  * Validates the typed revset against jj (one `--limit 1` call per repo, see [validateRevsetFilter])
  * and hands it to [tableModel] as the tab's scope. The table's owner then has jj resolve it together
@@ -43,11 +48,17 @@ class JujutsuRevsetFilterComponent(
 ) : JujutsuFilterComponent(JujutsuBundle.message("log.filter.revset")) {
     private var currentRevset: String = ""
 
+    override val codeStyledValue = true
+
+    override val leadingIcon: Icon = AllIcons.Ide.LocalScope
+
+    override val hintToolTipText: String = JujutsuBundle.message("log.filter.revset.tooltip")
+
     // Bumped on every validation (and reset) so a stale in-flight result (e.g. the popup was
     // reopened with a new value, or the filter was reset while an edit was in flight) can't clobber a newer one.
     private var generation = 0
 
-    override fun getCurrentText(): String = currentRevset
+    override fun getCurrentText(): String = currentRevset.ifEmpty { "all()" }
 
     override fun isValueSelected(): Boolean = currentRevset.isNotEmpty()
 
@@ -92,6 +103,7 @@ class JujutsuRevsetFilterComponent(
         val panel = EditPanel()
         val popup = JBPopupFactory.getInstance()
             .createComponentPopupBuilder(panel, panel.preferredFocus)
+            .setTitle(JujutsuBundle.message("log.filter.revset.title"))
             .setRequestFocus(true)
             .setFocusable(true)
             .setCancelOnClickOutside(true)
@@ -134,13 +146,22 @@ class JujutsuRevsetFilterComponent(
         private val statusLabel = JBLabel(JujutsuBundle.message("log.filter.revset.hint")).apply {
             foreground = UIUtil.getLabelInfoForeground()
         }
+        private val docsLink = HyperlinkLabel(JujutsuBundle.message("log.filter.revset.docs")).apply {
+            setHyperlinkTarget(REVSET_DOCS)
+        }
 
         val preferredFocus get() = searchField.textEditor
 
         init {
             border = JBUI.Borders.empty(6, 8)
             add(searchField, BorderLayout.NORTH)
-            add(statusLabel, BorderLayout.SOUTH)
+            add(
+                JPanel(BorderLayout()).apply {
+                    add(statusLabel, BorderLayout.CENTER)
+                    add(docsLink, BorderLayout.EAST)
+                },
+                BorderLayout.SOUTH
+            )
 
             searchField.textEditor.document.addDocumentListener(
                 object : DocumentAdapter() {
@@ -189,5 +210,9 @@ class JujutsuRevsetFilterComponent(
             searchField.textEditor.putClientProperty("JComponent.outline", if (message != null) "error" else null)
             searchField.textEditor.repaint()
         }
+    }
+
+    private companion object {
+        const val REVSET_DOCS = "https://docs.jj-vcs.dev/latest/revsets/"
     }
 }
