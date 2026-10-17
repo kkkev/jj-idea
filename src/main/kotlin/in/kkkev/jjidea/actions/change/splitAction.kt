@@ -11,6 +11,7 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.createCommand
 import `in`.kkkev.jjidea.jj.invalidate
+import `in`.kkkev.jjidea.jj.tellUser
 import `in`.kkkev.jjidea.jj.runRecoverableInBackground
 import `in`.kkkev.jjidea.ui.common.HunkSelection
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -110,7 +111,7 @@ private fun executeSplitFilePaths(project: Project, target: LogEntry, spec: Spli
 
         runLater {
             if (result !is CommandExecutor.CommandResult.Success) {
-                result.tellUser(project, "log.action.split.error")
+                result.tellUser(target.repo, "log.action.split.error")
                 return@runLater
             }
             onSplitSuccess(project, target, spec, result.stderr)
@@ -158,7 +159,7 @@ private fun executeSplitInteractive(
 
         runLater {
             if (result !is CommandExecutor.CommandResult.Success) {
-                result.tellUser(project, "log.action.split.error")
+                result.tellUser(target.repo, "log.action.split.error")
                 return@runLater
             }
             onSplitSuccess(project, target, spec, result.stderr)

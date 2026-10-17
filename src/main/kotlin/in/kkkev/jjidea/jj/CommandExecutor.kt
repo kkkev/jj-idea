@@ -9,6 +9,7 @@ import com.intellij.openapi.vcs.VcsException
 import com.intellij.openapi.vfs.VirtualFile
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.createCommand
+import `in`.kkkev.jjidea.jj.handleDivergentChange
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications.notifyWorkingCopyUnavailable
 import `in`.kkkev.jjidea.ui.services.withUndoBalloon
@@ -101,6 +102,17 @@ interface CommandExecutor {
             /** Ran to completion with a non-zero exit code. */
             data class Exited(override val stdout: String, override val stderr: String, override val exitCode: Int) :
                 Executed
+
+            /**
+             * A write addressed a change id that has since become divergent (jj-idea-wiz0): jj
+             * exits 1 with ``Change ID `<id>` is divergent``. Detected centrally by
+             * [in.kkkev.jjidea.jj.divergentChangeId]; handled by [in.kkkev.jjidea.jj.handleDivergentChange],
+             * never retried.
+             */
+            data class Divergent(override val stdout: String, override val stderr: String, val changeId: String) :
+                Executed {
+                override val exitCode get() = 1
+            }
 
             /**
              * Killed at the timeout: [stdout] is real partial output; there is no exit code
@@ -764,7 +776,9 @@ interface CommandExecutor {
             override val action: CommandExecutor.() -> CommandResult,
             override val onSuccess: ContextWithRepo<CommandResult.Success>.(String) -> Unit = {},
             override val onSuccessResult: CommandResult.Success.() -> Unit = {},
-            override val onFailure: CommandResult.Failure.() -> Unit = {}
+            override val onFailure: CommandResult.Failure.() -> Unit = {},
+            private val divergenceHandler: (JujutsuRepository, CommandResult.Failure.Divergent) -> Unit =
+                JujutsuRepository::handleDivergentChange
         ) : Command<WithRepo, ContextWithRepo<CommandResult.Success>> {
             override fun createContext(result: CommandResult.Success) = ContextWithRepo(this, result)
 
@@ -797,6 +811,7 @@ interface CommandExecutor {
                 val health = classifyRepositoryFailure(failure.message)
                 when {
                     health is RepositoryHealth.Stale -> notifyWorkingCopyUnavailable(repo.project, repo, health, retry)
+                    failure is CommandResult.Failure.Divergent -> divergenceHandler(repo, failure) // never retried
                     else -> super.fireFailure(failure, retry)
                 }
             }

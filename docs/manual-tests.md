@@ -950,6 +950,17 @@ time. It never changes what jj loads for any other tab or dialog.
       still loading → project closes promptly (no multi-minute stall); idea.log shows the load
       being cancelled rather than running to completion
 
+**Divergent-change write protection (jj-idea-wiz0, GitHub #130)**
+
+**Code:** `jj/DivergentChange.kt`, `jj/CommandExecutor.kt` (`Failure.Divergent`, `WithRepo.fireFailure`)
+
+- [ ] Make `@` divergent behind the IDE's back: `op=$(jj op log --no-graph --limit 1 -T 'id.short()')`, then
+      `jj describe -r @ -m left --at-op $op` and `jj describe -r @ -m right --at-op $op`. In the log, Describe
+      the (now stale) `@` row *before* it auto-refreshes → "Change Has Become Divergent" dialog, log refreshes
+      to show both versions, the description is **not** applied, and the action is not retried
+- [ ] Same for Edit, Abandon, and a hunk-level Split/Squash Into (raw write paths) → same dialog, no raw stderr
+- [ ] After the refresh, Describe one of the divergent rows (`/0`, `/1` offset) → succeeds
+
 **Manual refresh (jj-idea-bbn3, GitHub #115)**
 
 **Code:** `ui/common/CommitTablePanel.kt` (`manualRefresh`), `jj/JujutsuStateModel.kt`

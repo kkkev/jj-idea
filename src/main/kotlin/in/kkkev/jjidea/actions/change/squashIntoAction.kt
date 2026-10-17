@@ -143,7 +143,7 @@ private fun executeSquashIntoInteractive(
 
         runLater {
             if (result !is CommandExecutor.CommandResult.Success) {
-                result.tellUser(repo.project, "log.action.squash.into.error")
+                result.tellUser(repo, "log.action.squash.into.error")
                 return@runLater
             }
             val selectId: Revision = if (deleteAndMove) spec.destination else source.id

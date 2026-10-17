@@ -715,7 +715,9 @@ internal fun ProcessOutput.toCommandResult(
         }
         CommandExecutor.CommandResult.Success.Irreversible(stdout, stderr, reason)
     } else {
-        CommandExecutor.CommandResult.Failure.Exited(stdout, stderr, exitCode)
+        divergentChangeId(exitCode, stderr)
+            ?.let { CommandExecutor.CommandResult.Failure.Divergent(stdout, stderr, it) }
+            ?: CommandExecutor.CommandResult.Failure.Exited(stdout, stderr, exitCode)
     }
 
 /**

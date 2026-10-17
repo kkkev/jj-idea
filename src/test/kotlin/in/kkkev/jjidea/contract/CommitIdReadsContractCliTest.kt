@@ -1,6 +1,14 @@
 package `in`.kkkev.jjidea.contract
 
+import com.intellij.openapi.vfs.VirtualFile
+import `in`.kkkev.jjidea.jj.ChangeId
+import `in`.kkkev.jjidea.jj.CommandExecutor.CommandResult
+import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
+import io.mockk.every
+import io.mockk.mockk
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import org.junit.jupiter.api.BeforeEach
@@ -125,6 +133,20 @@ class CommitIdReadsContractCliTest {
             (r.exitCode != 0) shouldBe true
             r.stderr shouldContain expected
         }
+    }
+
+    @Test
+    fun `executor maps a divergent write to Divergent and an offset write succeeds`() {
+        makeDivergent()
+        val root = mockk<VirtualFile> { every { path } returns tempDir.resolve("work").toString() }
+        val executor = CliExecutor(root)
+
+        executor.describe(Description("x"), ChangeId(changeId))
+            .shouldBeInstanceOf<CommandResult.Failure.Divergent>().changeId shouldBe changeId
+        executor.edit(ChangeId(changeId))
+            .shouldBeInstanceOf<CommandResult.Failure.Divergent>().changeId shouldBe changeId
+        executor.describe(Description("x"), ChangeId(changeId, offset = 0))
+            .shouldBeInstanceOf<CommandResult.Success>()
     }
 
     @Test
