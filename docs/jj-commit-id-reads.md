@@ -135,3 +135,11 @@ plugin's existing "offset only when divergent" rule is why the hidden commit get
 > commit staying readable after it's amended away. On a plain Git-backed jj repo it does, even after
 > `jj op abandon` and `jj util gc --expire=now`. If Piper can drop them, the plugin needs a clear
 > "commit no longer available" message instead of an error.
+
+## Bookmark and tag targets (PR A)
+
+`jj bookmark list` / `jj tag list` now also emit each `added_targets` commit's `commit_id` and `hidden`, so
+`RefItem.commitIds` / `hiddens` ride along with `targets` in the same single call. A ref at a hidden commit
+(`cl/X@origin` above) is resolved by commit id: `LogService.loadHiddenTargets` fetches those entries in one batched
+`jj log` (none when nothing is hidden) and `RefItem.resolveEntry` refuses to fall back to the visible commit sharing the
+change id. Writes (move, create, track, drag-and-drop) keep using the change id.

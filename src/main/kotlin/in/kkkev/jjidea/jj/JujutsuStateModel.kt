@@ -176,10 +176,9 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         emptyMap()
     ) {
         initialisedRepositories.immediateValue.values.associateWith { repo ->
-            RepositoryReferences(
-                bookmarks = repo.logService.withDerivedDivergence(repo.logService.getBookmarks().getOrNull().orEmpty()),
-                tags = repo.logService.getTags().getOrNull().orEmpty()
-            )
+            val bookmarks = repo.logService.withDerivedDivergence(repo.logService.getBookmarks().getOrNull().orEmpty())
+            val tags = repo.logService.getTags().getOrNull().orEmpty()
+            RepositoryReferences(bookmarks, tags, repo.logService.loadHiddenTargets(bookmarks, tags))
         }
     }
 

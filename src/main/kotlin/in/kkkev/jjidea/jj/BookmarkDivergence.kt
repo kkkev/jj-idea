@@ -74,7 +74,9 @@ fun LogService.withDerivedDivergence(items: List<BookmarkItem>): List<BookmarkIt
         val remotes = remotesByLocalName[item.bookmark.localName] ?: continue
         conflictedBudget--
         for (remoteItem in remotes) {
-            val exact = exactDivergence(item.targets, remoteItem.targets.firstOrNull() ?: continue) ?: continue
+            val exact =
+                exactDivergence(item.targetRevsetArgs(), remoteItem.targetRevsetArgs().firstOrNull() ?: continue)
+                    ?: continue
             // Local's own perspective: ahead/behind of its own position. The matching remote row
             // gets the swap, mirroring withDivergenceFrom, so both leaves read consistently.
             exactByName.merge(
@@ -109,6 +111,14 @@ fun LogService.withDerivedDivergence(items: List<BookmarkItem>): List<BookmarkIt
 private fun maxCounts(a: Bookmark, b: Bookmark) =
     a.copy(aheadCount = maxOf(a.aheadCount, b.aheadCount), behindCount = maxOf(a.behindCount, b.behindCount))
 
+/**
+ * The revset arguments naming this ref's targets: full commit ids when jj reported them, else change ids. A remote
+ * target left at a hidden commit shares its change id with the visible commit, so a change id would measure the wrong
+ * commit (jj-idea-wiz0, GitHub #130).
+ */
+internal fun RefItem.targetRevsetArgs(): List<String> =
+    if (commitIds.size == targets.size) commitIds.map { it.full } else targets.map { it.toString() }
+
 private data class ExactDivergence(val ahead: Int, val behind: Int)
 
 /**
@@ -123,7 +133,7 @@ private data class ExactDivergence(val ahead: Int, val behind: Int)
  * Two bounded `jj log` calls (capped at [DIVERGENCE_COUNT_LIMIT]), not a per-commit or per-file
  * loop. Returns `null` if [localTargets] is empty or either query fails.
  */
-private fun LogService.exactDivergence(localTargets: List<ChangeId>, remoteTarget: ChangeId): ExactDivergence? {
+private fun LogService.exactDivergence(localTargets: List<String>, remoteTarget: String): ExactDivergence? {
     val others = localTargets.filterNot { it == remoteTarget }.ifEmpty { localTargets }
     if (others.isEmpty()) return null
     val local = others.joinToString("|") { "::$it" }

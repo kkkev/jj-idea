@@ -98,6 +98,13 @@ object JujutsuDataKeys {
      * a deleted bookmark, or one jj reports with no resolvable change) — carried alongside
      * [bookmark] because [Bookmark] itself has no change-id field; needed by
      * [NavigateToBookmarkAction][in.kkkev.jjidea.actions.bookmark.NavigateToBookmarkAction].
+     * [hidden] marks a target that is a hidden commit (jj-idea-wiz0): [id] then names the visible commit sharing
+     * its change id, so the log cannot show it.
      */
-    data class BookmarkTarget(val repo: JujutsuRepository, val bookmark: Bookmark, val id: ChangeId? = null)
+    data class BookmarkTarget(
+        val repo: JujutsuRepository,
+        val bookmark: Bookmark,
+        val id: ChangeId? = null,
+        val hidden: Boolean = false
+    )
 }

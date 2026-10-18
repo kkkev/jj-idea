@@ -96,12 +96,13 @@ class NavigateToBookmarkAction : DumbAwareAction(
     AllIcons.Actions.Find
 ) {
     override fun update(e: AnActionEvent) {
-        e.presentation.isEnabled = e.bookmarkTarget?.id != null
+        // A hidden target is not in the log; navigating by its change id would select the visible commit instead.
+        e.presentation.isEnabled = e.bookmarkTarget?.let { it.id != null && !it.hidden } == true
     }
 
     override fun actionPerformed(e: AnActionEvent) {
         val target = e.bookmarkTarget ?: return
-        val id = target.id ?: return
+        val id = target.id.takeUnless { target.hidden } ?: return
         performNavigateToBookmark(target.repo, id)
     }
 

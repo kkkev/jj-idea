@@ -2209,6 +2209,24 @@ with the commit tooltip) the target commit's change id/commit id/author/date/des
   [View options menu](#view-options-menu-jj-idea-lgo4-n22a)) — both the log row tooltip and every
   bookmarks-panel tooltip stop appearing; re-check — both come back, no restart needed
 
+**Remote bookmark at a hidden commit (jj-idea-wiz0, GitHub #130)**
+
+Setup: in a repo with a git remote, `jj bookmark create cl/X -r @`, add file `f` with `v1`, `jj git push --bookmark cl/X`
+(`--allow-new` on older jj), then edit `f` to `v2` so `@` is amended in place. `cl/X@origin` is now at a hidden commit
+that shares its change id with `@`.
+
+- [ ] Bookmarks panel, **Remote** `cl/X@origin` row: hover — tooltip commit info shows the **old** commit (its commit
+  id, the `v1` era description), not the working copy
+- [ ] Right-click the `cl/X@origin` row: no New Change / Edit / Rebase / Duplicate entries (they write by change id
+  and would hit `@`); the Track/Untrack, Filter and Navigate entries remain (Navigate disabled). The local `cl/X`
+  row still offers the change actions
+- [ ] **Navigate Log to Bookmark** is disabled on the `cl/X@origin` row (the hidden commit is not in the log) and
+  double-click does not move the log selection to `@`; the local `cl/X` row still navigates normally
+- [ ] Compare with Branch… listing: `cl/X@origin` shows a short **commit id** in parentheses (the local `cl/X`
+  shows its change id); picking it compares against `v1`
+- [ ] Refresh with `jj git fetch` / `jj new` — rows and tooltips stay correct; a repo with no hidden remote targets
+  behaves exactly as before
+
 ### MT-WORKINGCOPY
 
 **Working copy panel, status bar widget, and tool window behavior**

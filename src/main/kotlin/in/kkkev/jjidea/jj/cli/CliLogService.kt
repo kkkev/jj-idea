@@ -536,8 +536,24 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         }
 
         /**
+         * Each `added_targets` commit as `commit_id~shortest`, comma-joined. A remote ref left at a hidden commit shares
+         * its change id with the visible commit, so only the commit id says which one it targets (jj-idea-wiz0, #130).
+         */
+        private val addedTargetCommitIds =
+            singleField("""added_targets.map(|c| ${TemplateParts.commitId("c")}).join(",")""") {
+                it.splitByComma { id -> commitId.parse(id) }
+            }
+
+        /** Whether each `added_targets` commit is hidden, comma-joined, aligned with [addedTargetCommitIds]. */
+        private val addedTargetHiddens =
+            singleField("""added_targets.map(|c| if(c.hidden(), "true", "false")).join(",")""") {
+                it.splitByComma { b -> b.toBoolean() }
+            }
+
+        /**
          * Template for tag list parsing.
-         * Fields: present, name, change_ids (comma-joined, qualified), immutable flags (comma-joined)
+         * Fields: present, name, change_ids (comma-joined, qualified), immutable flags (comma-joined),
+         * commit_ids (comma-joined), hidden flags (comma-joined)
          * Note: jj tag list exposes `normal_target`/`added_targets` (same as bookmarks) since jj 0.37+.
          *
          * Uses `added_targets` rather than `normal_target`: on a conflicted/divergent ref,
@@ -558,14 +574,18 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             },
             singleField("""added_targets.map(|c| if(c.immutable(), "true", "false")).join(",")""") {
                 it.splitByComma { b -> b.toBoolean() }
-            }
+            },
+            addedTargetCommitIds,
+            addedTargetHiddens
         ) {
             override fun take(input: Iterator<String>): TagItem? = try {
                 val present = fields[0].take(input) as Boolean
                 val name = fields[1].take(input) as String
                 val ids = (fields[2].take(input) as List<*>).filterIsInstance<ChangeId>()
                 val immutables = (fields[3].take(input) as List<*>).filterIsInstance<Boolean>()
-                if (name.isNotEmpty()) TagItem(Tag(name), ids, immutables) else null
+                val commitIds = (fields[4].take(input) as List<*>).filterIsInstance<CommitId>()
+                val hiddens = (fields[5].take(input) as List<*>).filterIsInstance<Boolean>()
+                if (name.isNotEmpty()) TagItem(Tag(name), ids, immutables, commitIds, hiddens) else null
             } catch (_: Exception) {
                 null
             }
@@ -574,7 +594,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         /**
          * Template for bookmark list parsing.
          * Fields: present, name, conflict, tracked, ahead_count, behind_count, change_ids
-         * (comma-joined, qualified), immutable flags (comma-joined)
+         * (comma-joined, qualified), immutable flags (comma-joined), commit_ids (comma-joined),
+         * hidden flags (comma-joined)
          *
          * tracked/ahead_count/behind_count added for jj-idea-ita2 (GitHub #48) — without them every
          * [Bookmark] built here defaulted to tracked=true, ahead=behind=0 regardless of reality.
@@ -612,7 +633,9 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             },
             singleField("""added_targets.map(|c| if(c.immutable(), "true", "false")).join(",")""") {
                 it.splitByComma { b -> b.toBoolean() }
-            }
+            },
+            addedTargetCommitIds,
+            addedTargetHiddens
         ) {
             override fun take(input: Iterator<String>): BookmarkItem? = try {
                 val present = fields[0].take(input) as Boolean
@@ -623,6 +646,8 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                 val behindCount = fields[5].take(input) as Int
                 val ids = (fields[6].take(input) as List<*>).filterIsInstance<ChangeId>()
                 val immutables = (fields[7].take(input) as List<*>).filterIsInstance<Boolean>()
+                val commitIds = (fields[8].take(input) as List<*>).filterIsInstance<CommitId>()
+                val hiddens = (fields[9].take(input) as List<*>).filterIsInstance<Boolean>()
                 val bookmark = Bookmark(
                     name,
                     tracked = tracked,
@@ -631,7 +656,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
                     behindCount = behindCount
                 )
                 when {
-                    present && ids.isNotEmpty() -> BookmarkItem(bookmark, ids, immutables)
+                    present && ids.isNotEmpty() -> BookmarkItem(bookmark, ids, immutables, commitIds, hiddens)
                     !present -> BookmarkItem(bookmark.copy(deleted = true), emptyList())
                     else -> null
                 }

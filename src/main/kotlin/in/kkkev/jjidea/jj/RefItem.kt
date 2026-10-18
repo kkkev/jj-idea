@@ -19,6 +19,16 @@ sealed interface RefItem {
     val immutables: List<Boolean>
 
     /**
+     * Each target's commit id, positionally aligned with [targets], or empty when the source did not report them.
+     * A [ChangeId] resolves to the visible commit of its change, so a remote ref left behind at a hidden commit
+     * (jj-idea-wiz0, GitHub #130) can only be read through its commit id.
+     */
+    val commitIds: List<CommitId>
+
+    /** Per-target hidden flag, positionally aligned with [commitIds]. */
+    val hiddens: List<Boolean>
+
+    /**
      * The first target, or `null` if [targets] is empty. A derived compat shim for callers that
      * only ever cared about "the" target before a conflicted ref could carry more than one - most
      * of them (navigation, selection sync) still only need this. A caller that must treat every
@@ -28,6 +38,12 @@ sealed interface RefItem {
 
     /** Whether [id]'s target commit is immutable. `false` for an unresolved/deleted ref. */
     val immutable: Boolean get() = immutables.firstOrNull() ?: false
+
+    /** The first target's commit id, or `null` if [commitIds] is empty. */
+    val commitId: CommitId? get() = commitIds.firstOrNull()
+
+    /** Whether [commitId]'s commit is hidden, i.e. no longer the visible commit of its change. */
+    val hidden: Boolean get() = hiddens.firstOrNull() ?: false
 
     /** True when jj reports more than one target for this ref, i.e. it is conflicted/divergent. */
     val conflicted: Boolean get() = targets.size > 1

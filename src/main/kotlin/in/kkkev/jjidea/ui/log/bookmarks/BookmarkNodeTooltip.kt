@@ -3,11 +3,12 @@ package `in`.kkkev.jjidea.ui.log.bookmarks
 import com.intellij.icons.AllIcons
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.Bookmark
-import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
+import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.resolveEntry
 import `in`.kkkev.jjidea.message
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -50,7 +51,8 @@ import `in`.kkkev.jjidea.ui.components.icon
 internal fun bookmarkNodeTooltip(
     node: BookmarkNode,
     entryLookup: (ChangeKey) -> LogEntry?,
-    isMultiRepo: Boolean
+    isMultiRepo: Boolean,
+    hiddenTargets: (JujutsuRepository) -> Map<CommitId, LogEntry> = { emptyMap() }
 ): String? = when (node) {
     is BookmarkNode.Local -> htmlString {
         appendRepoLine(node.repo, isMultiRepo)
@@ -58,7 +60,7 @@ internal fun bookmarkNodeTooltip(
         append("\n")
         appendBookmarkChip(node.item.bookmark, node.item.bookmark.localName)
         appendRemoteBreakdown(node.remotes)
-        appendCommitInfo(node.repo, node.item.id, entryLookup)
+        appendCommitInfo(node.item.resolveEntry(node.repo, entryLookup, hiddenTargets(node.repo)))
     }
 
     is BookmarkNode.Remote -> htmlString {
@@ -70,7 +72,7 @@ internal fun bookmarkNodeTooltip(
             append("\n")
             appendBracket(listOf { append(message("bookmarks.panel.tooltip.remote.forcepush")) })
         }
-        appendCommitInfo(node.repo, node.item.id, entryLookup)
+        appendCommitInfo(node.item.resolveEntry(node.repo, entryLookup, hiddenTargets(node.repo)))
     }
 
     is BookmarkNode.Tag -> htmlString {
@@ -78,7 +80,7 @@ internal fun bookmarkNodeTooltip(
         appendGroupBracket(JujutsuBundle.message("bookmarks.panel.tags"))
         append("\n")
         appendTagChip(node.item.tag, node.item.tag.name)
-        appendCommitInfo(node.repo, node.item.id, entryLookup)
+        appendCommitInfo(node.item.resolveEntry(node.repo, entryLookup, hiddenTargets(node.repo)))
     }
 
     is BookmarkNode.Category -> htmlString {
@@ -106,7 +108,7 @@ internal fun bookmarkNodeTooltip(
         } else {
             appendClosestBracket(node.closest, isDanglingHead = false)
         }
-        appendCommitInfo(node.repo, node.id, entryLookup)
+        appendCommitInfo(node.id?.let { entryLookup(ChangeKey(node.repo, it)) })
     }
 
     is BookmarkNode.DanglingHead -> htmlString {
@@ -114,7 +116,7 @@ internal fun bookmarkNodeTooltip(
         appendGroupBracket(JujutsuBundle.message("bookmarks.panel.unbookmarked"))
         append("\n")
         appendClosestBracket(node.closest, isDanglingHead = true)
-        appendCommitInfo(node.repo, node.id, entryLookup)
+        appendCommitInfo(node.id?.let { entryLookup(ChangeKey(node.repo, it)) })
     }
 
     // Only shown at all in a multi-repo project (buildBookmarkTree's only caller of RepoGroup),
@@ -228,8 +230,8 @@ private fun TextCanvas.appendRemoteBreakdown(remotes: List<Bookmark>) {
  * shows on a commit-row tooltip (jj-idea-uyu9 follow-up) - the "@" row's own commit-info block
  * was missing it before, unlike every other place this codebase surfaces working-copy status.
  */
-private fun TextCanvas.appendCommitInfo(repo: JujutsuRepository, id: ChangeId?, entryLookup: (ChangeKey) -> LogEntry?) {
-    val entry = id?.let { entryLookup(ChangeKey(repo, it)) } ?: return
+private fun TextCanvas.appendCommitInfo(entry: LogEntry?) {
+    if (entry == null) return
     append("\n")
     appendChangeTooltip(entry)
     if (entry.isWorkingCopy) {

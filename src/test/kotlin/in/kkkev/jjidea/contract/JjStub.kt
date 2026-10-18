@@ -621,6 +621,8 @@ class JjStub(override val workDir: Path) : JjBackend {
                         field("0") // behindCount (no remotes in stub)
                         field(targets.joinToString(",") { qualifiedChangeId(it) }) // added_targets
                         field(targets.joinToString(",") { if (it.immutable) "true" else "false" })
+                        field(targets.joinToString(",") { "${it.commitId}~${shortCommitId(it.commitId)}" })
+                        field(targets.joinToString(",") { "false" }) // hidden (stub keeps no hidden commits)
                     }
 
                     isConflictOnlyBookmarkTemplate(template) -> {

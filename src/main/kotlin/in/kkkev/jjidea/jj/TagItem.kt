@@ -10,7 +10,9 @@ package `in`.kkkev.jjidea.jj
 data class TagItem(
     val tag: Tag,
     override val targets: List<ChangeId>,
-    override val immutables: List<Boolean> = List(targets.size) { false }
+    override val immutables: List<Boolean> = List(targets.size) { false },
+    override val commitIds: List<CommitId> = emptyList(),
+    override val hiddens: List<Boolean> = List(commitIds.size) { false }
 ) : RefItem {
     constructor(tag: Tag, id: ChangeId?, immutable: Boolean = false) :
         this(tag, listOfNotNull(id), if (id == null) emptyList() else listOf(immutable))

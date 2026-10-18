@@ -7,14 +7,17 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommandExecutor.CommandResult
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
+import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.jj.cli.CliLogService
+import `in`.kkkev.jjidea.jj.loadHiddenTargets
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import io.kotest.matchers.string.shouldNotContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
@@ -167,6 +170,35 @@ class CommitIdReadsContractCliTest {
         executor.show(file, CommitId(a1)).stdout shouldBe "v1\n"
         executor.show(file, ChangeId(changeId)).stdout shouldBe "v2\n" // what the change id alone would have read
         executor.diffSummary(CommitId(a1)).stdout shouldContain "A f"
+    }
+
+    @Test
+    fun `remote bookmark at a hidden commit reads diff show and history as that commit`() {
+        // jj-idea-wiz0 (GitHub #130) acceptance fixture: cl/X@origin is at hidden a1, cl/X (local) and @ at a2.
+        val (executor, logService, file) = readers()
+
+        val bookmarks = logService.getBookmarks().getOrThrow()
+        val local = bookmarks.single { it.bookmark.name.name == "cl/X" }
+        val remote = bookmarks.single { it.bookmark.name.name == "cl/X@origin" }
+        remote.commitId?.full shouldBe a1
+        remote.hidden shouldBe true
+        local.commitId?.full shouldBe a2
+        local.hidden shouldBe false
+        // Same change id, so a read through the change id could not tell the two apart (the bug).
+        remote.id shouldBe local.id
+
+        val target = remote.commitId!!
+        val entry = logService.loadHiddenTargets(bookmarks, emptyList())[target]!!
+        entry.isHidden shouldBe true
+        entry.commitId.full shouldBe a1
+
+        executor.show(file, target).stdout shouldBe "v1\n"
+        executor.diffGitFile(target, file).stdout.let {
+            it shouldContain "+v1"
+            it shouldNotContain "v2"
+        }
+        logService.getLogAndFileStatuses(Expression("::${target.full}"), file).getOrThrow()
+            .map { it.logEntry.commitId.full } shouldBe listOf(a1)
     }
 
     @Test

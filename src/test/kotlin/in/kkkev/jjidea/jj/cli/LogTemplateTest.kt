@@ -391,7 +391,7 @@ class LogTemplateTest {
 
     @Test
     fun `tagListTemplate parses present mutable tag`() {
-        val fields = listOf("true", "v1.0", "qpvuntsm~q~", "false")
+        val fields = listOf("true", "v1.0", "qpvuntsm~q~", "false", "qpqpqpqpqpqpqpqp0000~qp", "false")
         val item = tagListTemplate.take(fields.iterator())
 
         item!!.tag shouldBe Tag("v1.0")
@@ -401,7 +401,7 @@ class LogTemplateTest {
 
     @Test
     fun `tagListTemplate parses present immutable tag`() {
-        val fields = listOf("true", "v1.0", "qpvuntsm~q~", "true")
+        val fields = listOf("true", "v1.0", "qpvuntsm~q~", "true", "qpqpqpqpqpqpqpqp0000~qp", "false")
         val item = tagListTemplate.take(fields.iterator())
 
         item!!.tag shouldBe Tag("v1.0")
@@ -411,7 +411,7 @@ class LogTemplateTest {
 
     @Test
     fun `tagListTemplate returns null for empty name`() {
-        val fields = listOf("false", "", "", "")
+        val fields = listOf("false", "", "", "", "", "")
         val item = tagListTemplate.take(fields.iterator())
 
         item shouldBe null
@@ -419,7 +419,7 @@ class LogTemplateTest {
 
     @Test
     fun `tagListTemplate parses pending-delete tag`() {
-        val fields = listOf("false", "v1.0", "", "")
+        val fields = listOf("false", "v1.0", "", "", "", "")
         val item = tagListTemplate.take(fields.iterator())
 
         item!!.tag shouldBe Tag("v1.0")
@@ -432,7 +432,15 @@ class LogTemplateTest {
         // jj-idea-5r0g (GitHub #110): a conflicted tag's `normal_target` resolves to no commit,
         // so the template reads `added_targets` instead — one comma-joined qualified id per
         // target. Must not be dropped the way `normal_target` silently was.
-        val fields = listOf("true", "v1.0", "qpvuntsm~q~,mzvwutvl~m~", "false,true")
+        val fields =
+            listOf(
+                "true",
+                "v1.0",
+                "qpvuntsm~q~,mzvwutvl~m~",
+                "false,true",
+                "qpqpqpqpqpqpqpqp0000~qp,mzmzmzmzmzmzmzmz0000~mz",
+                "false,false"
+            )
         val item = tagListTemplate.take(fields.iterator())
 
         item shouldNotBe null
@@ -488,7 +496,19 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses present bookmark`() {
-        val fields = listOf("true", "main", "false", "true", "0", "0", "qpvuntsm~q~", "false")
+        val fields =
+            listOf(
+                "true",
+                "main",
+                "false",
+                "true",
+                "0",
+                "0",
+                "qpvuntsm~q~",
+                "false",
+                "qpqpqpqpqpqpqpqp0000~qp",
+                "false"
+            )
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark shouldBe Bookmark("main", conflict = false)
@@ -497,8 +517,32 @@ class LogTemplateTest {
     }
 
     @Test
+    fun `bookmarkListTemplate parses the commit id and hidden flag of a remote bookmark at a hidden commit`() {
+        // jj-idea-wiz0 (GitHub #130): cl/X@origin targets the hidden a1 while the visible a2 shares its change id.
+        val fields = listOf(
+            "true",
+            "cl/X@origin",
+            "false",
+            "true",
+            "0",
+            "0",
+            "qpvuntsm~q~",
+            "false",
+            "${"a1".repeat(20)}~a1",
+            "true"
+        )
+        val item = bookmarkListTemplate.take(fields.iterator())
+
+        item!!.id shouldBe ChangeId("qpvuntsm", "q", null)
+        item.commitId?.full shouldBe "a1".repeat(20)
+        item.commitId?.short shouldBe "a1"
+        item.hidden shouldBe true
+    }
+
+    @Test
     fun `bookmarkListTemplate parses present immutable bookmark`() {
-        val fields = listOf("true", "main", "false", "true", "0", "0", "qpvuntsm~q~", "true")
+        val fields =
+            listOf("true", "main", "false", "true", "0", "0", "qpvuntsm~q~", "true", "qpqpqpqpqpqpqpqp0000~qp", "false")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark shouldBe Bookmark("main", conflict = false)
@@ -508,7 +552,7 @@ class LogTemplateTest {
 
     @Test
     fun `bookmarkListTemplate parses pending-delete bookmark`() {
-        val fields = listOf("false", "feature", "false", "true", "0", "0", "", "")
+        val fields = listOf("false", "feature", "false", "true", "0", "0", "", "", "", "")
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.name shouldBe BookmarkName("feature")
@@ -525,7 +569,19 @@ class LogTemplateTest {
         // this bookmark vanished entirely (its `normal_target`-based id field parsed to a literal
         // `<Error: No Commit available>` string, throwing inside ChangeId's constructor, which the
         // template's catch-all turned into a dropped row).
-        val fields = listOf("true", "main", "true", "true", "0", "0", "qpvuntsm~q~,mzvwutvl~m~", "false,false")
+        val fields =
+            listOf(
+                "true",
+                "main",
+                "true",
+                "true",
+                "0",
+                "0",
+                "qpvuntsm~q~,mzvwutvl~m~",
+                "false,false",
+                "qpqpqpqpqpqpqpqp0000~qp,mzmzmzmzmzmzmzmz0000~mz",
+                "false,false"
+            )
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item shouldNotBe null
@@ -542,7 +598,19 @@ class LogTemplateTest {
         // name arrives pre-formatted as "name@remote" by nameWithRemote(), as jj's `--all-remotes`
         // output does for a bookmark with no local counterpart. Untracked, so ahead/behind are
         // reported as 0 rather than erroring (jj-idea-ita2).
-        val fields = listOf("true", "feature@origin", "false", "false", "0", "0", "qpvuntsm~q~", "false")
+        val fields =
+            listOf(
+                "true",
+                "feature@origin",
+                "false",
+                "false",
+                "0",
+                "0",
+                "qpvuntsm~q~",
+                "false",
+                "qpqpqpqpqpqpqpqp0000~qp",
+                "false"
+            )
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.name shouldBe BookmarkName("feature@origin")
@@ -556,7 +624,19 @@ class LogTemplateTest {
     fun `bookmarkListTemplate parses tracked diverged remote bookmark`() {
         // jj-idea-ita2 (GitHub #48): tracked/ahead/behind must reach the panel, not default to
         // tracked=true/0/0 regardless of the actual `jj bookmark list` output.
-        val fields = listOf("true", "feature@origin", "false", "true", "2", "3", "qpvuntsm~q~", "false")
+        val fields =
+            listOf(
+                "true",
+                "feature@origin",
+                "false",
+                "true",
+                "2",
+                "3",
+                "qpvuntsm~q~",
+                "false",
+                "qpqpqpqpqpqpqpqp0000~qp",
+                "false"
+            )
         val item = bookmarkListTemplate.take(fields.iterator())
 
         item!!.bookmark.tracked shouldBe true

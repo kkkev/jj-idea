@@ -32,8 +32,10 @@ import `in`.kkkev.jjidea.actions.tag.pushTagAction
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.RefItem
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.remoteEntriesFor
+import `in`.kkkev.jjidea.jj.resolveEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
@@ -437,7 +439,9 @@ class JujutsuBookmarksPanel(
         if (!JujutsuSettings.getInstance(project).state.showLogHoverTooltip) return null
         val node = nodeFor(tree.getPathForLocation(x, y)) ?: return null
         val isMultiRepo = project.stateModel.references.value.size > 1
-        return bookmarkNodeTooltip(node, entryLookup, isMultiRepo)
+        return bookmarkNodeTooltip(node, entryLookup, isMultiRepo) { repo ->
+            project.stateModel.references.value[repo]?.hiddenTargets.orEmpty()
+        }
     }
 
     /** The selected tree paths' [BookmarkNode] leaves — the only kinds a selection can meaningfully act on. */
@@ -450,11 +454,29 @@ class JujutsuBookmarksPanel(
     private fun selectedBookmarkTargets(): List<JujutsuDataKeys.BookmarkTarget> =
         selectedLeaves().mapNotNull { node ->
             when (node) {
-                is BookmarkNode.Local -> JujutsuDataKeys.BookmarkTarget(node.repo, node.item.bookmark, node.item.id)
-                is BookmarkNode.Remote -> JujutsuDataKeys.BookmarkTarget(node.repo, node.item.bookmark, node.item.id)
+                is BookmarkNode.Local -> JujutsuDataKeys.BookmarkTarget(
+                    node.repo,
+                    node.item.bookmark,
+                    node.item.id,
+                    node.item.hidden
+                )
+                is BookmarkNode.Remote -> JujutsuDataKeys.BookmarkTarget(
+                    node.repo,
+                    node.item.bookmark,
+                    node.item.id,
+                    node.item.hidden
+                )
                 else -> null
             }
         }
+
+    /**
+     * The entry behind [item]'s target: a hidden target (a remote bookmark left behind by a local amend,
+     * jj-idea-wiz0) from the references' hidden-target entries, anything else from [entryLookup] - see
+     * [resolveEntry].
+     */
+    private fun refEntry(repo: JujutsuRepository, item: RefItem): LogEntry? =
+        item.resolveEntry(repo, entryLookup, project.stateModel.references.value[repo]?.hiddenTargets.orEmpty())
 
     /**
      * The selection's bookmark/tag/dangling-head leaves resolved to real [LogEntry]s via
@@ -472,14 +494,15 @@ class JujutsuBookmarksPanel(
         }
         if (leaves.isEmpty()) return null
         val resolved = leaves.mapNotNull { node ->
-            val (repo, id) = when (node) {
-                is BookmarkNode.Local -> node.repo to node.item.id
-                is BookmarkNode.Remote -> node.repo to node.item.id
-                is BookmarkNode.Tag -> node.repo to node.item.id
-                is BookmarkNode.DanglingHead -> node.repo to node.id
-                else -> return@mapNotNull null
+            // The change actions write by change id, which would hit the visible commit sharing a hidden target's
+            // id (jj-idea-wiz0), so a hidden target offers none: it only resolves for the tooltip.
+            when (node) {
+                is BookmarkNode.Local -> node.item.takeUnless { it.hidden }?.let { refEntry(node.repo, it) }
+                is BookmarkNode.Remote -> node.item.takeUnless { it.hidden }?.let { refEntry(node.repo, it) }
+                is BookmarkNode.Tag -> node.item.takeUnless { it.hidden }?.let { refEntry(node.repo, it) }
+                is BookmarkNode.DanglingHead -> entryLookup(ChangeKey(node.repo, node.id))
+                else -> null
             }
-            id?.let { entryLookup(ChangeKey(repo, it)) }
         }
         return resolved.takeIf { it.size == leaves.size }
     }
@@ -509,7 +532,8 @@ class JujutsuBookmarksPanel(
      * *same instances* the log toolbar uses (so IntelliJ can resolve and show a keymap shortcut
      * hint, matching `JujutsuLogContextMenuActions`) and read the live
      * selection [uiDataSnapshot] just published - they self-disable when [entries] is empty, with
-     * no extra guard needed here. The fixed-target "…From These"/Duplicate factories have no such
+     * no extra guard needed here. A hidden target gets none of them (jj-idea-wiz0): they write by change id, and
+     * with no entry published here the data context falls through to the log table's own selection. The fixed-target "…From These"/Duplicate factories have no such
      * data-context enablement, so they're only added once [entries] actually resolved to
      * something to act on.
      */
@@ -543,7 +567,7 @@ class JujutsuBookmarksPanel(
                     add(Separator.create())
                     ManagedActions["Jujutsu.Bookmark.Filter"]?.let { add(it) }
                     ManagedActions["Jujutsu.Bookmark.Navigate"]?.let { add(it) }
-                    addChangeActions(node.repo, entries)
+                    if (!node.item.hidden) addChangeActions(node.repo, entries)
                 }.toTypedArray()
             )
         }
@@ -556,7 +580,7 @@ class JujutsuBookmarksPanel(
                     add(Separator.create())
                     ManagedActions["Jujutsu.Bookmark.Filter"]?.let { add(it) }
                     ManagedActions["Jujutsu.Bookmark.Navigate"]?.let { add(it) }
-                    addChangeActions(node.repo, entries)
+                    if (!node.item.hidden) addChangeActions(node.repo, entries)
                 }.toTypedArray()
             )
         }
@@ -568,11 +592,11 @@ class JujutsuBookmarksPanel(
                     add(pushTagAction(node.repo, node.item.tag))
                     add(deleteTagAction(node.repo, node.item.tag))
                     add(Separator.create())
-                    add(navigateLogToCommitAction(node.repo, node.item.id))
+                    add(navigateLogToCommitAction(node.repo, node.item.id.takeUnless { node.item.hidden }))
                     // Tags have no BOOKMARK_TARGET (they aren't bookmarks) so no Filter entry, but
                     // they're still real refs onto a change - the log's change actions apply just
                     // as well here as on a bookmark row (jj-idea-p35f follow-up).
-                    addChangeActions(node.repo, entries)
+                    if (!node.item.hidden) addChangeActions(node.repo, entries)
                 }.toTypedArray()
             )
         }

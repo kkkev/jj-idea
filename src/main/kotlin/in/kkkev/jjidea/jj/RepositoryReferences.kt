@@ -11,5 +11,10 @@ package `in`.kkkev.jjidea.jj
  */
 data class RepositoryReferences(
     val bookmarks: List<BookmarkItem> = emptyList(),
-    val tags: List<TagItem> = emptyList()
+    val tags: List<TagItem> = emptyList(),
+    /**
+     * The entries behind bookmark/tag targets that are hidden commits, by commit id - see [loadHiddenTargets].
+     * Empty unless some ref was left at a hidden commit (jj-idea-wiz0, GitHub #130).
+     */
+    val hiddenTargets: Map<CommitId, LogEntry> = emptyMap()
 )

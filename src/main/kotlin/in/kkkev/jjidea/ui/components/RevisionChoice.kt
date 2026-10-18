@@ -22,9 +22,14 @@ sealed class RevisionChoice(open val displayName: String, open val revision: Rev
         val description: Description get() = entry.description
     }
 
+    /**
+     * The ref is selected by name, which jj resolves to the ref's own target even when that is a hidden commit, so the
+     * display shows the commit id then (the change id would name the visible commit sharing it, jj-idea-wiz0).
+     */
     data class Ref(
         val item: RefItem,
-        override val displayName: String = "${item.ref}${item.id?.let { " (${it.short})" } ?: ""}",
+        override val displayName: String =
+            "${item.ref}${(if (item.hidden) item.commitId?.short else item.id?.short)?.let { " ($it)" } ?: ""}",
         override val revision: Revision = item.ref
     ) : RevisionChoice(displayName, revision)
 

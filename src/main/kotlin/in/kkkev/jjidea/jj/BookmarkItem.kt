@@ -12,7 +12,9 @@ package `in`.kkkev.jjidea.jj
 data class BookmarkItem(
     val bookmark: Bookmark,
     override val targets: List<ChangeId>,
-    override val immutables: List<Boolean> = List(targets.size) { false }
+    override val immutables: List<Boolean> = List(targets.size) { false },
+    override val commitIds: List<CommitId> = emptyList(),
+    override val hiddens: List<Boolean> = List(commitIds.size) { false }
 ) : RefItem {
     constructor(bookmark: Bookmark, id: ChangeId?, immutable: Boolean = false) :
         this(bookmark, listOfNotNull(id), if (id == null) emptyList() else listOf(immutable))
