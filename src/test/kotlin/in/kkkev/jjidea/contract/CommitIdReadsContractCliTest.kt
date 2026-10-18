@@ -8,6 +8,8 @@ import `in`.kkkev.jjidea.jj.CommandExecutor.CommandResult
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.JujutsuRepository
+import `in`.kkkev.jjidea.jj.WorkingCopy
+import `in`.kkkev.jjidea.jj.cli.AnnotationParser
 import `in`.kkkev.jjidea.jj.cli.CliExecutor
 import `in`.kkkev.jjidea.jj.cli.CliLogService
 import io.kotest.matchers.shouldBe
@@ -165,6 +167,21 @@ class CommitIdReadsContractCliTest {
         executor.show(file, CommitId(a1)).stdout shouldBe "v1\n"
         executor.show(file, ChangeId(changeId)).stdout shouldBe "v2\n" // what the change id alone would have read
         executor.diffSummary(CommitId(a1)).stdout shouldContain "A f"
+    }
+
+    @Test
+    fun `annotating the working copy parent by its commit id yields every line`() {
+        val (executor, logService, _) = readers()
+        jj.newChange("child")
+        jj.createFile("f", "v2\nmore\n") // working copy changed; the parent still has f
+        val wc = logService.getLog(WorkingCopy).getOrThrow().single()
+
+        val parent = wc.parentContentLocator as CommitId
+        val file = mockk<VirtualFile> { every { path } returns tempDir.resolve("work/f").toString() }
+        val result = executor.annotate(file, parent, AnnotationParser.TEMPLATE)
+
+        result.shouldBeInstanceOf<CommandResult.Success>()
+        AnnotationParser.parse(result.stdout).size shouldBe 1
     }
 
     @Test

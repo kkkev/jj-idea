@@ -370,7 +370,7 @@ fun TextCanvas.append(choice: RevisionChoice, entries: List<LogEntry> = emptyLis
             // sharing its change id (jj-idea-wiz0).
             grey {
                 space()
-                append(choice.entry.commitId.short)
+                append(choice.entry.commitId)
                 if (choice.entry.isHidden) append(" ${JujutsuBundle.message("dialog.revisionselector.hidden")}")
             }
             append(" ")

@@ -29,7 +29,6 @@ import `in`.kkkev.jjidea.jj.reconstructMergeParentContent
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.vcs.JujutsuVcsBase
-import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.changes.contentLocator
 import `in`.kkkev.jjidea.vcs.contentLocator
 import `in`.kkkev.jjidea.vcs.diffbase.DiffbaseService
@@ -310,7 +309,8 @@ class JujutsuAnnotationProvider(
     override fun annotate(file: VirtualFile, revision: VcsFileRevision?): FileAnnotation {
         val repo = project.jujutsuRepositoryFor(file)
         val revisionId = (revision as? JujutsuFileRevision)?.entry?.readRevision
-            ?: (revision?.revisionNumber as? ChangeIdRevisionNumber)?.changeId
+            // A change id or a commit id (e.g. the working copy's parent, or "previous revision" of a line)
+            ?: (revision?.revisionNumber?.contentLocator as? Revision)
             ?: repo.workingCopy.id
         return annotateInternal(file, revisionId, repo)
     }

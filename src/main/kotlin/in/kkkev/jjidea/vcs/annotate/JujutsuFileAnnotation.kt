@@ -22,6 +22,7 @@ import `in`.kkkev.jjidea.ui.components.DateTimeFormatter
 import `in`.kkkev.jjidea.ui.log.JujutsuCustomLogTabManager
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.vcs.changes.ChangeIdRevisionNumber
+import `in`.kkkev.jjidea.vcs.changes.CommitIdRevisionNumber
 import `in`.kkkev.jjidea.vcs.filePath
 import kotlinx.datetime.Instant
 import java.util.*
@@ -252,7 +253,8 @@ private class ParentFileRevision(
     private val virtualFile: VirtualFile,
     private val repo: JujutsuRepository
 ) : VcsFileRevisionEx() {
-    override fun getRevisionNumber(): VcsRevisionNumber = ChangeIdRevisionNumber(changeId)
+    override fun getRevisionNumber(): VcsRevisionNumber =
+        commitId?.let(::CommitIdRevisionNumber) ?: ChangeIdRevisionNumber(changeId)
     override fun getRevisionDate(): Date? = null
     override fun getAuthorDate(): Date? = null
     override fun getAuthor(): String? = null

@@ -2635,7 +2635,7 @@ Setup: in a scratch repo, `echo v1 > f; jj describe -m A; echo v2 > f` (the chan
 - [ ] File History of `f`: opening the revision's content shows that commit's content, and the row for the visible commit shows v2
 - [ ] Annotate `f`, then Annotate Previous Revision on a line → previous content is read from the parent *commit*, not whatever now carries the parent's change id
 - [ ] MT-DIFFBASE: set the diff base to a revset resolving to a commit, rewrite that commit in a terminal (`jj describe`), refocus the IDE → gutter base follows the refreshed resolution (cache cleared on log refresh), no stale content after refresh
-- [ ] Delete a commit's content from the store is not reproducible locally; instead, from a terminal run `jj op restore` to an op before a commit existed, then try opening a diff of that commit from an already-open details pane → "Commit … is no longer available. Refresh the log." (no stack trace)
+- [ ] "Commit … is no longer available" is not reproducible locally (hidden commits stay readable); it is covered by `CommitIdReadsContractCliTest`. Not a manual step.
 
 #### Diffs
 

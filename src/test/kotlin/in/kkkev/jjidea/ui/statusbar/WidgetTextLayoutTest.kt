@@ -56,7 +56,8 @@ class WidgetTextLayoutTest {
                 commitId = commitId,
                 underlyingDescription = "x ".repeat(200)
             )
-            val budget = 150.0
+            // Wide enough for the change id and the commit id (shown like everywhere else) plus some description.
+            val budget = 260.0
 
             val fragments = WidgetTextLayout.fit(entry, budget, font, frc)
 
