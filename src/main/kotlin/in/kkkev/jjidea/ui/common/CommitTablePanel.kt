@@ -52,6 +52,7 @@ abstract class CommitTablePanel<D>(
     private val toolbarPlace: String,
     dataLoaderFactory: (CommitTablePanel<D>) -> DataLoader,
     initialDetailsOnRight: Boolean = true,
+    revsetSearch: Boolean = false,
     configureColumnManager: (JujutsuColumnManager) -> Unit = {}
 ) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val log = Logger.getInstance(javaClass)
@@ -104,7 +105,9 @@ abstract class CommitTablePanel<D>(
     protected val searchField: LogSearchField = LogSearchField(
         placeholder = JujutsuBundle.message("log.filter.text.placeholder"),
         tooltip = JujutsuBundle.message("log.filter.text.tooltip"),
-        withHistory = true,
+        historyKey = "jujutsu.log.search.history",
+        revsetModeAvailable = revsetSearch,
+        collapsible = true,
         onFilterChanged = {
             applyFilter()
             onConfigChanged()
@@ -128,6 +131,11 @@ abstract class CommitTablePanel<D>(
         get() = searchField.matchWholeWords
         set(value) {
             searchField.matchWholeWords = value
+        }
+    var revsetMode: Boolean
+        get() = searchField.revsetMode
+        set(value) {
+            searchField.revsetMode = value
         }
 
     // Status bar for truncation indicator
@@ -690,8 +698,11 @@ abstract class CommitTablePanel<D>(
      */
     private fun applyFilter() {
         val filterText = searchField.text
-        log.info("Applying filter: '$filterText' (regex=$useRegex, matchCase=$matchCase, wholeWords=$matchWholeWords)")
-        logTable.logModel.setFilter(filterText, useRegex, matchCase, matchWholeWords)
+        log.info(
+            "Applying filter: '$filterText' " +
+                "(regex=$useRegex, matchCase=$matchCase, wholeWords=$matchWholeWords, revset=$revsetMode)"
+        )
+        logTable.logModel.setFilter(filterText, useRegex, matchCase, matchWholeWords, revsetMode)
     }
 
     /**

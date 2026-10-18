@@ -62,6 +62,15 @@ class JujutsuLogTableModelFilterTest {
         committer = null
     )
 
+    @Test
+    fun `revset-mode text hides nothing client-side`() {
+        model.setEntries(listOf(createEntry("abc123", "First"), createEntry("def456", "Second")))
+
+        model.setFilter("heads(::@)", revset = true)
+
+        model.rowCount shouldBe 2
+    }
+
     @Nested
     inner class `Text filter` {
         @Test
@@ -625,6 +634,20 @@ class JujutsuLogTableModelFilterTest {
                 matchCase = true,
                 wholeWords = true
             )
+        }
+
+        @Test
+        fun `revset mode is part of the filter state and a change to it asks for a debounced apply`() {
+            val requests = mutableListOf<Boolean>()
+            model.onFilterStateChanged = { requests.add(it) }
+            model.setFilter("heads(::@)")
+            requests.clear()
+
+            model.setFilter("heads(::@)", revset = true)
+            model.setFilter("heads(::@)", revset = true)
+
+            model.filterState().revsetMode shouldBe true
+            requests shouldContainExactly listOf(false)
         }
 
         @Test

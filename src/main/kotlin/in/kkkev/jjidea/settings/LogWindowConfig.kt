@@ -36,6 +36,8 @@ data class LogWindowConfig(
     var useRegex: Boolean = false,
     var matchCase: Boolean = false,
     var matchWholeWords: Boolean = false,
+    /** The search box text is a jj revset instead of text to match (jj-idea-ehwm.5). */
+    var searchRevsetMode: Boolean = false,
     var authorFilter: MutableList<String> = mutableListOf(),
     /** Name of a [in.kkkev.jjidea.ui.log.JujutsuDateFilterComponent.DatePeriod] enum constant, or "" for none. */
     var dateFilterPeriodName: String = "",

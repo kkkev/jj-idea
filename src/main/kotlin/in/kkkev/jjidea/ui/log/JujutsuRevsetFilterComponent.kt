@@ -15,6 +15,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revset
+import `in`.kkkev.jjidea.ui.components.persistentHistorySearchField
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -138,7 +139,7 @@ class JujutsuRevsetFilterComponent(
     private inner class EditPanel : JPanel(BorderLayout()) {
         var popup: JBPopup? = null
 
-        private val searchField = SearchTextField(true).apply {
+        private val searchField = persistentHistorySearchField("jujutsu.log.scope.history").apply {
             text = currentRevset
             textEditor.emptyText.text = JujutsuBundle.message("log.filter.revset.placeholder")
             preferredSize = Dimension(JBUI.scale(360), preferredSize.height)
@@ -154,14 +155,17 @@ class JujutsuRevsetFilterComponent(
 
         init {
             border = JBUI.Borders.empty(6, 8)
-            add(searchField, BorderLayout.NORTH)
+            // The hint/error line goes above the field so the field is the popup's bottom edge: its history
+            // drop-down then opens directly beneath it instead of overlapping (and hiding behind) this popup.
             add(
                 JPanel(BorderLayout()).apply {
+                    border = JBUI.Borders.emptyBottom(6)
                     add(statusLabel, BorderLayout.CENTER)
                     add(docsLink, BorderLayout.EAST)
                 },
-                BorderLayout.SOUTH
+                BorderLayout.NORTH
             )
+            add(searchField, BorderLayout.SOUTH)
 
             searchField.textEditor.document.addDocumentListener(
                 object : DocumentAdapter() {

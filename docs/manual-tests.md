@@ -691,6 +691,33 @@ not Swing's, so that's the path that must carry the chip text (a context menu ha
       bookmark/reference and date filters each restrict correctly
 - [ ] Clear filters (X button) resets all filters; multiple active filters combine correctly (AND logic)
 
+#### Search box revset mode (jj-idea-ehwm.5)
+
+**Code:** `ui/components/LogSearchField.kt` (`revsetMode`, `setError`, collapse chip), `ui/log/RevsetFilter.kt` (`conciseRevsetError`), `ui/log/UnifiedJujutsuLogPanel.kt`
+(`applyFilterNow`), `settings/LogWindowConfig.kt` (`searchRevsetMode`)
+
+Use FX-STRESS.
+
+- [ ] The log tab's search box has a 4th toggle (revset) after Regex / Match Case / Words; turning it
+      on greys out those three and changes the placeholder to a revset example
+- [ ] With it on, `heads(::@)` shows only the matching rows (after the "Filtering…" pause); Enter
+      applies at once
+- [ ] The revset ANDs with the Scope chip and chips: add an Author chip and only that author's
+      matches remain
+- [ ] Type `heads(` — the whole box gets a red outline and hovering shows a one-line message (e.g.
+      "Failed to parse revset: Syntax error: expected … (column 7)") with no `|` snippet and none of
+      the scope/chip terms; the status bar shows the same short text as "Search revset error", and
+      the previous rows stay (the log is not emptied). Fixing the text clears the outline and tooltip
+- [ ] With a bad *scope* and a valid search, the search box is not outlined (the status bar names the error)
+- [ ] Narrow the tool window until the search box would leave only a few characters to type: it
+      collapses to a compact chip (search icon + text, red text on an error). Clicking it pops out the
+      full box with the toggles; Enter applies and closes it, Esc closes it, and the text and toggles
+      are kept. Widening the window brings the inline box back
+
+- [ ] Turn the toggle off: the same text is searched as plain text again, with the red outline gone
+- [ ] Toggle state survives closing and reopening the IDE, per tab
+- [ ] The Rebase / Squash Into… / Move Bookmark to Change pickers and file history have no revset toggle
+
 #### Search by Git commit hash (jj-idea-odzo)
 
 → automate: jj-idea-4u7j (hash-prefix matching, filter AND-combination, and regex/case

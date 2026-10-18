@@ -14,6 +14,7 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.settings.LogWindowConfig
@@ -21,6 +22,8 @@ import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.ui.log.bookmarks.BookmarksStripeButton
 import `in`.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
+import `in`.kkkev.jjidea.util.runInBackground
+import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 
 /**
@@ -42,6 +45,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         "JujutsuLogToolbar",
         { UnifiedJujutsuLogDataLoader(project, { config.selectedRepos(project.initialisedJujutsuRepositories) }, it) },
         initialDetailsOnRight = config.detailsOnRight,
+        revsetSearch = true,
         configureColumnManager = { it.loadFrom(config) }
     ) {
     private val log = Logger.getInstance(javaClass)
@@ -124,6 +128,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         useRegex = config.useRegex
         matchCase = config.matchCase
         matchWholeWords = config.matchWholeWords
+        revsetMode = config.searchRevsetMode
         if (config.searchText.isNotEmpty()) searchField.text = config.searchText
 
         // Restore filter component state (reference is restored later in onDataLoaded via retryFilter)
@@ -248,11 +253,49 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
                 logTable.requestSelection(it)
             }
             if (errors.isEmpty()) {
+                searchField.setError(null)
                 clearStatusMessage()
+            } else if (revsetMode && searchField.text.isNotBlank()) {
+                attributeRevsetError(errors)
             } else {
-                showStatusMessage(
-                    JujutsuBundle.message("log.status.revset.error", errors.values.distinct().joinToString("; "))
-                )
+                searchField.setError(null)
+                showRevsetError(errors.values)
+            }
+        }
+    }
+
+    private fun showRevsetError(messages: Collection<String>) = showStatusMessage(
+        JujutsuBundle.message(
+            "log.status.revset.error",
+            messages.map(::conciseRevsetError).distinct().joinToString("; ")
+        )
+    )
+
+    // Bumped per attribution so a slow validation of old text can't overwrite a newer result.
+    private var searchErrorGeneration = 0
+
+    /**
+     * The filter failed while the search box holds a revset, but jj's message is about the compiled
+     * revset - scope, chips and search together - so it can't say which part is wrong. Checks the
+     * search text on its own: if that fails it is the culprit and the box shows jj's (shortened) message
+     * for just that text; if it passes, the fault is elsewhere (the scope) and the box stays clean.
+     */
+    private fun attributeRevsetError(errors: Map<JujutsuRepository, String>) {
+        val generation = ++searchErrorGeneration
+        val text = searchField.text.trim()
+        val repos = config.selectedRepos(project.initialisedJujutsuRepositories)
+        runInBackground {
+            val own = validateRevsetFilter(repos, text) { Revset.Default }
+            runLater {
+                if (generation != searchErrorGeneration || Disposer.isDisposed(this)) return@runLater
+                if (own.isEmpty()) {
+                    searchField.setError(null)
+                    showRevsetError(errors.values)
+                } else {
+                    val message = own.values.map(::conciseRevsetError).distinct().joinToString("; ")
+                    searchField.setError(message)
+                    showStatusMessage(JujutsuBundle.message("log.status.revset.search.error", message))
+                }
             }
         }
     }
@@ -374,6 +417,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         config.useRegex = useRegex
         config.matchCase = matchCase
         config.matchWholeWords = matchWholeWords
+        config.searchRevsetMode = revsetMode
         config.searchText = searchField.text
         persistConfig()
     }

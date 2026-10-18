@@ -56,3 +56,31 @@ internal fun validateRevsetFilter(
     }
     return errors
 }
+
+private val ERROR_COLUMN = Regex("""-->\s*\d+:(\d+)""")
+private val ERROR_DETAIL = Regex("""^\s*=\s*(.+)$""")
+private val ERROR_CAUSE = Regex("""^\s*\d+:\s*(.+)$""")
+
+/**
+ * Boils a jj revset error down to one line for a tooltip or the status bar. jj prints the failing
+ * revset back as a framed snippet (`1 | heads(` with `|` gutters and a caret line), which for a
+ * compiled log filter would expose the terms other filters contributed; this keeps only the
+ * headline, the `= ...` explanation (or the innermost numbered cause) and the column, and drops the
+ * snippet and the hints. A message with no such structure ("Revision `x` doesn't exist") is returned
+ * trimmed, minus any `Error: ` prefix.
+ */
+internal fun conciseRevsetError(message: String): String {
+    val lines = message.lines()
+    val headline = lines.firstOrNull { it.trimStart().startsWith("Error:") }
+        ?.trim()?.removePrefix("Error:")?.trim()
+        ?: lines.firstOrNull { it.isNotBlank() }?.trim()
+        ?: return message.trim()
+    val detail = lines.mapNotNull { ERROR_CAUSE.find(it)?.groupValues?.get(1) }.lastOrNull()
+        ?: lines.mapNotNull { ERROR_DETAIL.find(it)?.groupValues?.get(1) }.firstOrNull()
+    val column = lines.firstNotNullOfOrNull { ERROR_COLUMN.find(it)?.groupValues?.get(1) }
+    return buildString {
+        append(headline)
+        if (detail != null && detail != headline) append(": ").append(detail)
+        if (column != null) append(" (column ").append(column).append(')')
+    }
+}

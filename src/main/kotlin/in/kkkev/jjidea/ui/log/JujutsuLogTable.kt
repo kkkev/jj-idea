@@ -1201,6 +1201,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
     private var useRegex: Boolean = false
     private var matchCase: Boolean = false
     private var matchWholeWords: Boolean = false
+    private var revsetMode: Boolean = false // filterText is a jj revset (jj-idea-ehwm.5)
     private var authorFilter: Set<String> = emptySet() // Filter by author email
     private var bookmarkFilter: Set<ChangeKey> =
         emptySet() // Filter by repo-scoped bookmark change keys (includes ancestors)
@@ -1359,13 +1360,20 @@ class JujutsuLogTableModel : AbstractTableModel() {
     /**
      * Set the filter text and options, then update the filtered entries.
      */
-    fun setFilter(text: String, regex: Boolean = false, caseSensitive: Boolean = false, wholeWords: Boolean = false) {
+    fun setFilter(
+        text: String,
+        regex: Boolean = false,
+        caseSensitive: Boolean = false,
+        wholeWords: Boolean = false,
+        revset: Boolean = false
+    ) {
         // jj resolves a changed filter, so repeating the current one would only cost a pointless jj call.
         if (revsetDriven &&
             text == filterText &&
             regex == useRegex &&
             caseSensitive == matchCase &&
-            wholeWords == matchWholeWords
+            wholeWords == matchWholeWords &&
+            revset == revsetMode
         ) {
             return
         }
@@ -1373,6 +1381,7 @@ class JujutsuLogTableModel : AbstractTableModel() {
         useRegex = regex
         matchCase = caseSensitive
         matchWholeWords = wholeWords
+        revsetMode = revset
         filterChanged(immediate = false)
     }
 
@@ -1451,7 +1460,8 @@ class JujutsuLogTableModel : AbstractTableModel() {
         searchText = filterText,
         useRegex = useRegex,
         matchCase = matchCase,
-        wholeWords = matchWholeWords
+        wholeWords = matchWholeWords,
+        revsetMode = revsetMode
     )
 
     /**
@@ -1542,7 +1552,9 @@ class JujutsuLogTableModel : AbstractTableModel() {
 
     /** The client-side predicates, used when jj isn't resolving the filters (file history). */
     private fun addClientFilteredEntries() {
+        // A revset can't be evaluated client-side, so its text filters nothing here.
         val matcher = LogFilterMatcher.create(filterText, useRegex, matchCase, matchWholeWords)
+            .takeUnless { revsetMode }
         filteredEntries.addAll(
             entries.filter { entry ->
                 val matchesText = matcher?.matches(entry) ?: true

@@ -263,6 +263,36 @@ class RevsetLogFilterLoaderTest {
     }
 
     @Test
+    fun `a failing revset-mode search is reported, keeps the previous rows and is not retried as text`() {
+        val loader = loader()
+        loader.loadCommits()
+        drainBackgroundLoads(500)
+        loader.applyFilter(aliceFilter)
+        drainBackgroundLoads(500)
+        val before = published.last().filterMatches
+        var errors: Map<JujutsuRepository, String>? = null
+
+        loader.applyFilter(LogFilterState(searchText = "bad(", revsetMode = true)) { errors = it }
+        drainBackgroundLoads(500)
+
+        errors.orEmpty().values.single() shouldContain "bad revset"
+        published.last().filterMatches shouldBe before
+    }
+
+    @Test
+    fun `an ambiguous id prefix in revset mode is the user's error, not retried as text`() {
+        val loader = loader()
+        loader.loadCommits()
+        drainBackgroundLoads(500)
+        var errors: Map<JujutsuRepository, String>? = null
+
+        loader.applyFilter(LogFilterState(searchText = "present(\"t\")", revsetMode = true)) { errors = it }
+        drainBackgroundLoads(500)
+
+        errors.orEmpty().values.single() shouldContain "ambiguous"
+    }
+
+    @Test
     fun `clearing the filter drops its rows and matches`() {
         val loader = loader()
         loader.loadCommits()
