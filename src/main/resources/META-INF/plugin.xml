@@ -123,6 +123,9 @@
     <!-- Per-hunk gutter arrows for HunkPickerDialog (jj-idea-xuob). Global EP: gated to a
          strict no-op on every other diff viewer by HunkArrowDiffExtension.HUNK_PICKER_SESSION. -->
     <diff.DiffExtension implementation="in.kkkev.jjidea.diffedit.HunkArrowDiffExtension"/>
+    <!-- Inline per-hunk checkboxes in the Split / Squash Into preview (jj-idea-s5yx); strict no-op
+         unless the DiffRequest carries HunkCheckboxDiffExtension.HUNK_CHECKBOX_SESSION. -->
+    <diff.DiffExtension implementation="in.kkkev.jjidea.diffedit.HunkCheckboxDiffExtension"/>
 
     <!-- Reads a conflicted Change's three-way content from its own revision instead of the
          platform default (working copy on disk) - GitHub #119, jj-idea-ct7e. -->

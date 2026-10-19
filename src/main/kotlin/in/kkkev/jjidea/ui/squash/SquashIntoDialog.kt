@@ -143,8 +143,13 @@ class SquashIntoDialog(
         resolveContent = { fp, included, contents ->
             destinationOverrides[fp] ?: computePreviewAfterContent(included, null, contents.before, contents.after)
         },
-        previewPanes = { content, contents -> squashPreviewPanes(content, contents) },
-        isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } }
+        isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } },
+        movesToLabel = { JujutsuBundle.message("dialog.squash.into.destination") },
+        invertApplied = false,
+        onHunksChanged = { fp, content, contents ->
+            applyPickedContent(fp, content, contents.before, contents.after)
+            updateDeleteEmptyEnabled()
+        }
     )
     internal val preview get() = previewController.preview
 

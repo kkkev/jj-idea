@@ -40,6 +40,7 @@ Components whose blast radius exceeds their own package:
 | Shared hunk-pick preview cache/renderer (`ui/common/HunkPickPreviewController.kt`, `ui/common/HunkSelectionModel.kt`) and the diff-editor staging protocol (`diffedit/DiffEditTool.kt`, `diffedit/HunkApplyMain.kt`) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash) |
 | Multi-repo scoping (root-aware actions/filters generally) | [MT-CROSS](#mt-cross), plus every section with a repo-scoped action |
 | `actions/filechange/FileChangeActionGroup.kt` (file-change right-click menu, via `JujutsuChangesTree.installHandlers()`) | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-CTXMENU](#mt-ctxmenu) (`JujutsuCompareChangesPanel`) |
+| `diffedit/HunkCheckboxDiffExtension.kt` + `diffedit/ClickableDiffGutter.kt` (plugin-wide `diff.DiffExtension`, gated to a no-op unless the request carries the hunk-checkbox session; the clickable-gutter helper is shared with the arrow extension below) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
 | `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
 | `ui/editor/conflict/JujutsuConflictGutterInstaller.kt` (plugin-wide `editorFactoryListener` — fires on every editor the platform creates, gated to a no-op outside a main editor on a jj-tracked file) | [MT-CONFLICT](#mt-conflict), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview), [MT-DIFFBASE](#mt-diffbase) (shares the gutter), [MT-WORKINGCOPY](#mt-workingcopy) (its preview tabs open editors this listener sees), [MT-CROSS](#mt-cross) (multi-repo scoping of the repo-detection gate) |
 | `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
@@ -1461,11 +1462,22 @@ not the real destination's content — see the section's linked issue for why.
 - [ ] Right-click a mutable change with 2+ changed files → **Squash into Parent…** (or
       **Squash from Here into…**) → a preview pane appears to the right of the file list,
       wider dialog overall
-- [ ] Click a file → preview shows a syntax-highlighted, read-only diff titled roughly
-      "Before" / "Destination (all changes)", showing the file's full change (all files are
-      ticked by default, so everything moves)
-- [ ] Untick that file → titles flip to "Destination (unchanged)" and the diff goes empty;
-      re-tick → restored
+- [ ] Click a file → preview shows a syntax-highlighted, read-only diff of the file's full
+      change, titled "Before" / "After (tick hunks to move to Destination)", with a **checkbox in
+      the right gutter of every hunk** (all ticked by default, since all files are ticked) and a
+      summary line under the file name reading "All hunks move to Destination"
+- [ ] Untick that file in the list → every gutter checkbox clears, the summary reads "No hunks
+      move to Destination", and the diff itself **stays** (same hunks, no scroll jump);
+      re-tick → all boxes tick again
+- [ ] On a multi-hunk file, click one hunk's checkbox → it toggles in place (no flicker/scroll
+      reset), the summary reads "1 of N hunks move to Destination", and the file turns
+      **half-checked** in the list without opening Pick Hunks…
+- [ ] Tick/untick hunks until all are ticked → the file becomes fully ticked (no override);
+      until none are → fully unticked
+- [ ] After a line-level edit made in **Pick Hunks…** (not a whole-hunk subset) → the file shows
+      **no gutter checkboxes** and the summary reads "Custom pick moves to Destination (use Pick
+      Hunks… to edit)"; ticking the file in the list resets it
+- [ ] Open any ordinary diff (e.g. MT-DIFF) → **no** checkboxes appear
 - [ ] Click a second file → preview switches to it; click back to the first → switches back
       immediately (no visible reload)
 - [ ] **Squash Into Here from…** (multi-source picker): select a file, then change the
@@ -1492,8 +1504,8 @@ confirmation dialogs.
       change, with arrows at each hunk's divider
 - [ ] Move one hunk's arrow so only part of the file's change is squashed → **Apply** → dialog
       closes with **no confirmation dialog of any kind**
-- [ ] The file now shows **half-checked** in the file list; the diff preview title reads
-      "Destination (partial)"
+- [ ] The file now shows **half-checked** in the file list; the preview's gutter checkboxes
+      match the hunks you moved and the summary reads "K of N hunks move to Destination"
 - [ ] **The file's tick state is unchanged by a partial pick** — re-open the file list and
       confirm the checkbox itself wasn't force-ticked or unticked
 - [ ] Reopen **Pick Hunks…** on that file → the middle pane resumes the exact prior partial
@@ -1657,8 +1669,13 @@ confirmation dialogs anywhere in this picker.
 - [ ] Under "Source", a muted note states the mode's shape: default mode reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new child commit created on top of it."
 - [ ] The note **word-wraps across multiple lines** and does **not** widen the left column or push the diff preview panel narrower — the splitter stays at its usual ~40/60 proportion regardless of note length (jj-idea-8khi follow-up: a plain, non-wrapping label here previously forced the column wide enough to fit the whole sentence on one line)
 - [ ] The change id embedded in the note and in both description labels renders with the same bold-prefix/grey-remainder styling used everywhere else in the plugin (log table, commit details, other dialogs' "Source" line) — not plain, equal-weight text
-- [ ] Click a file in the list → right panel shows a native syntax-highlighted diff titled **"Existing commit (all changes)"** / **"New commit (no changes)"** — "Existing commit"/"New commit" are the same consistent noun pair used everywhere in this dialog: the summary line, the hunk picker, and (via "Description for existing commit …"/"Description for new commit …") the description labels below (jj-idea-8khi follow-up: previously the preview/summary/hunk-picker used the bare word "Here" while the description label separately said "(keeps change ID)" — two different, mismatched names for the same side) — with an **empty diff** (nothing ticked yet, so nothing moves)
-- [ ] Tick the file → titles switch to **"…(no changes)"** / **"…(all changes)"** (the "no changes"/"all changes" pair flips sides — never "(unchanged)", which would wrongly imply the stays-side is literally the file's unmodified parent), showing the **full diff** (the whole file's change moves to the new commit); untick → back to the first pair and empty diff
+- [ ] Click a file in the list → right panel shows a native syntax-highlighted diff of the file's **full change** (before → after), titled "Before" / "After (tick hunks to move to new commit)", with an **unticked checkbox in the gutter of every hunk** (nothing ticked yet, so nothing moves) and a summary under the file name reading "No hunks move to new commit" ("new commit" is the same noun used everywhere in this dialog: the summary line, the hunk picker, and the "Description for new commit …" label)
+- [ ] Tick the file in the list → every hunk checkbox ticks and the summary reads "All hunks move to new commit" (the diff itself does not change or scroll); untick → back to empty boxes
+- [ ] On a multi-hunk file, click one hunk's gutter checkbox → it ticks in place (no flicker, scroll position kept), the summary reads "1 of N hunks move to new commit", the file turns **half-checked** in the list (its directory nodes too) and the dialog summary counts it as partial — **without** opening Pick Hunks…
+- [ ] Tick every hunk one by one → the file becomes **fully ticked** (filled box, no partial); untick them all → fully unticked
+- [ ] Tick one hunk inline, then open **Pick Hunks…** → it opens already showing that exact partial; Apply a different whole-hunk selection → the gutter boxes match it. After a **line-level** edit in Pick Hunks… the file shows **no gutter boxes** and the summary reads "Custom pick moves to new commit (use Pick Hunks… to edit)"
+- [ ] Hover a checkbox → tooltip "Move this hunk to new commit"; verify in `-B` (new parent) and "Create parallel commits" modes that ticked hunks still end up in the **new** commit (`jj show` after Split)
+- [ ] Light and dark themes and at a larger UI zoom: checkboxes are crisp and aligned with the first line of each hunk (including a pure-deletion hunk, anchored at the line after the deletion)
 - [ ] Fully-ticked files show a filled checkbox; unticked show empty; partially-picked (see below) show a **half-checked** box
 - [ ] Directory nodes containing a partial file also show a half-checked box
 
@@ -1758,10 +1775,10 @@ state/routing logic, not rendering)
       **working-copy note** (if splitting @) all update immediately, with no separate event
       needed to trigger the refresh (jj-idea-o6sw's original bug: toggling only updated internal
       label state, not the already-rendered preview/summary)
-- [ ] In parallel mode, a fully-ticked file's preview still reads "Existing commit (no changes)" /
-      "New commit (all changes)" — unaffected by the mode, since the preview always uses the
-      same "Existing commit"/"New commit" pair, never "(unchanged)" (which would wrongly imply a
-      parent relationship that doesn't exist between siblings)
+- [ ] In parallel mode, a fully-ticked file's preview still shows every hunk ticked and the
+      summary "All hunks move to new commit" — unaffected by the mode, since the preview always
+      uses the same "new commit" wording (never "child"/"parent", which would wrongly imply a
+      relationship that doesn't exist between siblings)
 - [ ] Uncheck "Create parallel commits" again → description labels, note, preview and summary all revert live
       to the child wording
 - [ ] **With an existing child of the split target**: split it in parallel mode → via `jj log`,

@@ -8,7 +8,6 @@ import com.intellij.diff.tools.simple.SimpleThreesideDiffChange
 import com.intellij.diff.tools.simple.SimpleThreesideDiffViewer
 import com.intellij.diff.tools.util.base.DiffViewerListener
 import com.intellij.diff.util.DiffGutterOperation
-import com.intellij.diff.util.DiffGutterRenderer
 import com.intellij.diff.util.DiffUtil
 import com.intellij.diff.util.Side
 import com.intellij.diff.util.ThreeSide
@@ -75,11 +74,9 @@ private class ArrowInstaller(
     private val project: Project,
     private val labels: HunkPickerLabels
 ) {
-    private var installedOperations: List<DiffGutterOperation> = emptyList()
+    private val operationSet = DiffGutterOperationSet()
 
     fun install() {
-        installedOperations.forEach { it.dispose() }
-
         val operations = mutableListOf<DiffGutterOperation>()
         for (change in viewer.getChanges()) {
             if (change.isChange(Side.LEFT)) {
@@ -103,7 +100,7 @@ private class ArrowInstaller(
                 )
             }
         }
-        installedOperations = operations
+        operationSet.replaceWith(operations)
     }
 
     private fun installArrow(
@@ -113,16 +110,8 @@ private class ArrowInstaller(
         tooltip: String,
         sourceSide: ThreeSide,
         change: SimpleThreesideDiffChange
-    ): DiffGutterOperation {
-        val editorEx = viewer.getEditor(editor)
-        val offset = DiffGutterOperation.lineToOffset(editorEx, line)
-        return DiffGutterOperation.Simple(
-            editorEx,
-            offset,
-            DiffGutterOperation.RendererBuilder {
-                ArrowGutterRenderer(icon, tooltip) { onArrowClicked(change, sourceSide) }
-            }
-        )
+    ): DiffGutterOperation = clickableGutterOperation(viewer.getEditor(editor), line, { icon }, tooltip) {
+        onArrowClicked(change, sourceSide)
     }
 
     private fun onArrowClicked(change: SimpleThreesideDiffChange, sourceSide: ThreeSide) {
@@ -131,12 +120,4 @@ private class ArrowInstaller(
             viewer.replaceChange(change, sourceSide, ThreeSide.BASE)
         }
     }
-}
-
-private class ArrowGutterRenderer(
-    icon: javax.swing.Icon,
-    tooltip: String,
-    private val onClicked: () -> Unit
-) : DiffGutterRenderer(icon, tooltip) {
-    override fun handleMouseClick() = onClicked()
 }

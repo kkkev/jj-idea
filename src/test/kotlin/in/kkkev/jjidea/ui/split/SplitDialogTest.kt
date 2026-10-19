@@ -1,6 +1,5 @@
 package `in`.kkkev.jjidea.ui.split
 
-import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.vcs.LocalFilePath
 import com.intellij.openapi.vcs.changes.Change
@@ -14,7 +13,6 @@ import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
-import `in`.kkkev.jjidea.ui.common.FileContents
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.vcs.filePath
 import io.kotest.matchers.comparables.shouldBeLessThan
@@ -619,129 +617,6 @@ class SplitDialogTest {
         )
         content shouldBe "partial\n"
         disposeDialog(dialog)
-    }
-
-    @Test
-    fun `describeSplitState labels unticked state as parent all changes, child no changes`() {
-        val (parentTitle, childTitle) = describeSplitState(
-            content = "after\n",
-            baseContent = "before\n",
-            afterContent = "after\n",
-            lowerLabel = "Parent",
-            upperLabel = "Child"
-        )
-        parentTitle shouldContain "all changes"
-        childTitle shouldContain "no changes"
-    }
-
-    @Test
-    fun `describeSplitState labels fully-ticked state as stays no changes, new commit all changes`() {
-        val (parentTitle, childTitle) = describeSplitState(
-            content = "before\n",
-            baseContent = "before\n",
-            afterContent = "after\n",
-            lowerLabel = "Parent",
-            upperLabel = "Child"
-        )
-        parentTitle shouldContain "no changes"
-        parentTitle shouldNotContain "unchanged"
-        childTitle shouldContain "all changes"
-    }
-
-    @Test
-    fun `describeSplitState labels partial content as partial on both sides`() {
-        val (parentTitle, childTitle) = describeSplitState(
-            content = "partial\n",
-            baseContent = "before\n",
-            afterContent = "after\n",
-            lowerLabel = "Parent",
-            upperLabel = "Child"
-        )
-        parentTitle shouldContain "partial"
-        childTitle shouldContain "partial"
-    }
-
-    // Regression coverage for jj-idea-jb2q (GitHub #101): the preview's left/right panes must
-    // match their own titles — previously the right pane always showed the parent-remainder
-    // content (same as the left pane) even though its title claimed "Child".
-    @Test
-    fun `splitPreviewPanes fully ticked shows base on the left, after on the right (regression)`() {
-        val contents = FileContents(before = "before\n", after = "after\n", fileType = PlainTextFileType.INSTANCE)
-
-        val (left, right) = splitPreviewPanes(
-            content = "before\n",
-            contents = contents,
-            lowerLabel = "Parent",
-            upperLabel = "Child"
-        )
-
-        left.text shouldBe "before\n"
-        right.text shouldBe "after\n"
-        left.text shouldNotBe right.text
-        left.title shouldContain "no changes"
-        right.title shouldContain "all changes"
-    }
-
-    @Test
-    fun `splitPreviewPanes unticked shows after on both sides (nothing moves)`() {
-        val contents = FileContents(before = "before\n", after = "after\n", fileType = PlainTextFileType.INSTANCE)
-
-        val (left, right) = splitPreviewPanes(
-            content = "after\n",
-            contents = contents,
-            lowerLabel = "Parent",
-            upperLabel = "Child"
-        )
-
-        left.text shouldBe "after\n"
-        right.text shouldBe "after\n"
-        left.title shouldContain "all changes"
-        right.title shouldContain "no changes"
-    }
-
-    @Test
-    fun `splitPreviewPanes partial shows the remainder on the left, after on the right`() {
-        val contents = FileContents(before = "before\n", after = "after\n", fileType = PlainTextFileType.INSTANCE)
-
-        val (left, right) = splitPreviewPanes(
-            content = "partial\n",
-            contents = contents,
-            lowerLabel = "Parent",
-            upperLabel = "Child"
-        )
-
-        left.text shouldBe "partial\n"
-        right.text shouldBe "after\n"
-        left.title shouldContain "partial"
-        right.title shouldContain "partial"
-    }
-
-    // describeSplitState/splitPreviewPanes are mode-agnostic (jj-idea-8khi, GitHub #101 UX
-    // follow-up): with identity-first labels shared by every mode, "unchanged" (which implied a
-    // literal parent/child relationship - jj-idea-o6sw's fix for siblings) is gone in favour of
-    // "no changes" everywhere, regardless of what caller passes as parentLabel/childLabel.
-    @Test
-    fun `describeSplitState never renders 'unchanged' - only 'no changes', 'all changes', or 'partial'`() {
-        val (staysAllChanges, newNoChanges) = describeSplitState(
-            content = "after\n",
-            baseContent = "before\n",
-            afterContent = "after\n",
-            lowerLabel = "Second",
-            upperLabel = "First"
-        )
-        staysAllChanges shouldContain "all changes"
-        newNoChanges shouldContain "no changes"
-
-        val (staysNoChanges, newAllChanges) = describeSplitState(
-            content = "before\n",
-            baseContent = "before\n",
-            afterContent = "after\n",
-            lowerLabel = "Second",
-            upperLabel = "First"
-        )
-        staysNoChanges shouldContain "no changes"
-        staysNoChanges shouldNotContain "unchanged"
-        newAllChanges shouldContain "all changes"
     }
 
     @Test

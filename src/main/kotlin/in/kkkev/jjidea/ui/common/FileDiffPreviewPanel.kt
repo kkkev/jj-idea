@@ -38,6 +38,12 @@ class FileDiffPreviewPanel(project: Project, parentDisposable: Disposable) : JPa
         font = font.deriveFont(Font.BOLD)
     }
 
+    /** Per-file selection summary under the header (e.g. "2 of 5 hunks move to …"); blank when unset. */
+    private val stateLabel = JBLabel("", SwingConstants.CENTER).apply {
+        foreground = JBUI.CurrentTheme.Label.disabledForeground()
+        isVisible = false
+    }
+
     private val diffPanel: DiffRequestPanel =
         DiffManager.getInstance().createRequestPanel(project, parentDisposable, null)
     private var currentRequest: DiffRequest? = null
@@ -50,7 +56,13 @@ class FileDiffPreviewPanel(project: Project, parentDisposable: Disposable) : JPa
     }
 
     init {
-        add(header, BorderLayout.NORTH)
+        add(
+            JPanel(BorderLayout()).apply {
+                add(header, BorderLayout.NORTH)
+                add(stateLabel, BorderLayout.SOUTH)
+            },
+            BorderLayout.NORTH
+        )
         add(diffPanel.component, BorderLayout.CENTER)
         add(footer, BorderLayout.SOUTH)
     }
@@ -58,6 +70,12 @@ class FileDiffPreviewPanel(project: Project, parentDisposable: Disposable) : JPa
     /** Add a control to the footer bar, before the trailing glue. */
     fun addFooterComponent(component: JComponent) {
         footer.add(component, footer.componentCount - 1)
+    }
+
+    /** Set the selection summary shown under the header; null/blank hides it. */
+    fun setStateText(text: String?) {
+        stateLabel.text = text.orEmpty()
+        stateLabel.isVisible = !text.isNullOrBlank()
     }
 
     /** Clear the preview and restore the placeholder header — e.g. when nothing is selected. */
@@ -86,6 +104,9 @@ class FileDiffPreviewPanel(project: Project, parentDisposable: Disposable) : JPa
 
     @org.jetbrains.annotations.TestOnly
     internal fun headerTextForTest(): String = header.text
+
+    @org.jetbrains.annotations.TestOnly
+    internal fun stateTextForTest(): String = stateLabel.text
 
     @org.jetbrains.annotations.TestOnly
     internal fun hasRequestForTest(): Boolean = currentRequest != null

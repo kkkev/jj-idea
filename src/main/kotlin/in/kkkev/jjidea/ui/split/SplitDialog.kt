@@ -18,7 +18,6 @@ import `in`.kkkev.jjidea.jj.CommandExecutor
 import `in`.kkkev.jjidea.jj.Description
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.Revision
-import `in`.kkkev.jjidea.ui.common.DiffPane
 import `in`.kkkev.jjidea.ui.common.FileContents
 import `in`.kkkev.jjidea.ui.common.FileSelectionPanel
 import `in`.kkkev.jjidea.ui.common.HunkPickPreviewController
@@ -126,15 +125,15 @@ class SplitDialog(
         resolveContent = { fp, included, contents ->
             firstCommitOverrides[fp] ?: computePreviewLeftContent(included, null, contents.before, contents.after)
         },
-        previewPanes = { content, contents ->
-            // The left pane is the lower commit: "stays" by default, the new commit under -B.
-            if (newParent) {
-                splitPreviewPanes(content, contents, secondCommitLabel, firstCommitLabel)
-            } else {
-                splitPreviewPanes(content, contents, firstCommitLabel, secondCommitLabel)
-            }
-        },
-        isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } }
+        isIncluded = { fp -> fileSelection.includedChanges.any { it.filePath == fp } },
+        movesToLabel = { secondCommitLabel },
+        // Lower commit is the "stays" side by default (hunks move when NOT applied in it); under
+        // -B it is the new commit itself (hunks move when applied).
+        invertApplied = !newParent,
+        onHunksChanged = { fp, content, contents ->
+            applyPickedContent(fp, content, contents.before, contents.after)
+            updateSummary()
+        }
     )
     private val diffPreview get() = previewController.preview
 
@@ -274,10 +273,9 @@ class SplitDialog(
      * Load the split-off change's before/after content and file type for [change], off the EDT —
      * the [HunkPickPreviewController] loader.
      *
-     * The preview shows the **split-off change that moves to the new commit**: the right
-     * ("New commit") side is always its full content (it's the tip of the split, so it always
-     * holds the full original content — see [splitPreviewPanes]). The left ("Stays") side
-     * reflects what **remains on the original commit** — see [computePreviewLeftContent].
+     * The preview shows the file's own change, before → after, with a gutter checkbox per hunk
+     * ticking the hunks that move to the new commit; the ticks are derived from the content that
+     * **remains on the lower commit** — see [computePreviewLeftContent].
      */
     private fun loadFileContents(change: Change): FileContents? {
         val fp = change.filePath
@@ -736,62 +734,4 @@ private fun IconAwareHtmlPane.setStyledText(messageKey: String, id: ChangeId, bo
     val message = JujutsuBundle.message(messageKey, idFragment)
     val body = if (bold) "<b>$message</b>" else message
     text = "<html><body><div style='width:${JBUI.scale(LABEL_WIDTH_PX)}px'>$body</div></body></html>"
-}
-
-/**
- * Describe the split state of [content] (relative to [baseContent]/[afterContent]) as a pair
- * of (lower title, upper title) label fragments, for the main file preview's diff titles —
- * e.g. an untouched (unticked) file reads "Stays (all changes)" / "New commit (no changes)"; a
- * fully-moved (ticked) file reads "Stays (no changes)" / "New commit (all changes)"; anything
- * else is "partial". Mode-agnostic (jj-idea-8khi, GitHub #101 UX follow-up): the labels passed in
- * already carry whatever mode-specific wording is needed, so this function no longer needs to
- * know the mode itself - it previously distinguished "(unchanged)" (parent/child) from
- * "(no changes)" (siblings, jj-idea-o6sw), a distinction the identity-first relabelling made
- * moot everywhere.
- */
-internal fun describeSplitState(
-    content: String,
-    baseContent: String,
-    afterContent: String,
-    lowerLabel: String,
-    upperLabel: String
-): Pair<String, String> = when (content) {
-    afterContent -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.allChanges", lowerLabel),
-        JujutsuBundle.message("dialog.split.hunks.noChanges", upperLabel)
-    )
-
-    baseContent -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.noChanges", lowerLabel),
-        JujutsuBundle.message("dialog.split.hunks.allChanges", upperLabel)
-    )
-
-    else -> Pair(
-        JujutsuBundle.message("dialog.split.hunks.partial", lowerLabel),
-        JujutsuBundle.message("dialog.split.hunks.partial", upperLabel)
-    )
-}
-
-/**
- * The (left, right) [DiffPane]s for the main file preview: left is [content] itself (the
- * lower commit's content — see [SplitDialog.computePreviewLeftContent]), right is always
- * [FileContents.after] (the upper commit is the tip of the split, so it always holds the full
- * original content). The lower commit is "stays" by default and the new commit under `-B`. Titles come from [describeSplitState], evaluated on the same [content] that
- * decides the left pane's text, so a pane's text and its own title can never disagree
- * (jj-idea-jb2q, GitHub #101).
- */
-internal fun splitPreviewPanes(
-    content: String,
-    contents: FileContents,
-    lowerLabel: String,
-    upperLabel: String
-): Pair<DiffPane, DiffPane> {
-    val (lowerTitle, upperTitle) = describeSplitState(
-        content,
-        contents.before,
-        contents.after,
-        lowerLabel,
-        upperLabel
-    )
-    return Pair(DiffPane(content, lowerTitle), DiffPane(contents.after, upperTitle))
 }
