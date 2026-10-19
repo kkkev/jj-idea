@@ -8,7 +8,9 @@ import com.intellij.testFramework.junit5.TestApplication
 import com.intellij.testFramework.junit5.fixture.projectFixture
 import com.intellij.ui.tree.ui.DefaultTreeUI
 import com.intellij.util.ui.UIUtil
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
+import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -19,6 +21,8 @@ import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
+import io.kotest.matchers.collections.shouldContain
+import io.kotest.matchers.collections.shouldNotContain
 import io.kotest.matchers.ints.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import io.mockk.every
@@ -210,6 +214,56 @@ class JujutsuBookmarksPanelTest {
             JujutsuDataKeys.LOG_ENTRY.getData(dataContext) shouldBe null
         } finally {
             Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    // jj-idea-wiz0 (GitHub #130): the change actions write by change id, which for a ref left at a hidden commit
+    // names the visible commit sharing it - and with no entry published they would fall through to the log table's
+    // selection - so a hidden-target row must not offer them at all.
+
+    private fun changeActions(panel: JujutsuBookmarksPanel, node: BookmarkNode.Remote) =
+        panel.actionGroupFor(node)!!.getChildren(null).toList()
+
+    @Test
+    fun `a remote bookmark row offers the change actions only when its target is not hidden`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val id = ChangeId("aaaaaaaa", "a")
+        val a1 = CommitId("a1".repeat(20), "a1")
+        val a2 = CommitId("a2".repeat(20), "a2")
+        // The log table only has the visible commit a2, which shares the change id with the hidden a1.
+        val visibleEntry = LogEntry(repo, id, a2, "a2")
+        val bookmark = Bookmark("cl/X@origin")
+        fun remote(target: CommitId, hidden: Boolean) = BookmarkNode.Remote(
+            repo,
+            BookmarkItem(bookmark, listOf(id), listOf(false), listOf(target), listOf(hidden)),
+            "cl/X@origin"
+        )
+        val duplicate = JujutsuBundle.message("log.action.duplicate")
+        // The registered log actions, which read the data context and so would otherwise fall through to the log
+        // table's selection when the panel publishes no entry.
+        val edit = ManagedActions["Jujutsu.EditChange"]!!
+
+        val panel = JujutsuBookmarksPanel(project.get(), entryLookup = {
+            if (it.revision ==
+                id
+            ) {
+                visibleEntry
+            } else {
+                null
+            }
+        })
+        try {
+            val atVisible = remote(a2, hidden = false)
+            selectLeaves(panel, atVisible)
+            changeActions(panel, atVisible).mapNotNull { it.templateText } shouldContain duplicate
+            changeActions(panel, atVisible) shouldContain edit
+
+            val atHidden = remote(a1, hidden = true)
+            selectLeaves(panel, atHidden)
+            changeActions(panel, atHidden).mapNotNull { it.templateText } shouldNotContain duplicate
+            changeActions(panel, atHidden) shouldNotContain edit
+        } finally {
             Disposer.dispose(panel)
         }
     }

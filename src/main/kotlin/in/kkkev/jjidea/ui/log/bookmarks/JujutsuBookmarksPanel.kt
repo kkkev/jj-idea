@@ -546,7 +546,7 @@ class JujutsuBookmarksPanel(
         if (entries.isNotEmpty()) add(duplicateChangeAction(project, repo, entries))
     }
 
-    private fun actionGroupFor(node: BookmarkNode): ActionGroup? = when (node) {
+    internal fun actionGroupFor(node: BookmarkNode): ActionGroup? = when (node) {
         is BookmarkNode.Local -> {
             val allBookmarks = project.stateModel.references.value[node.repo]?.bookmarks.orEmpty().map { it.bookmark }
             val entries = selectedLogEntries().orEmpty()
