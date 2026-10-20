@@ -8,7 +8,13 @@ import `in`.kkkev.jjidea.ui.log.graph.ParentState
  * One graph connector: a real edge between two laid-out rows ([state] null), or an
  * unresolved-parent stub with no laid-out [parent] at all ([state] non-null - see [ParentState]).
  */
-data class GraphEdge(val child: ChangeKey, val parent: ChangeKey, val state: ParentState?)
+data class GraphEdge(
+    val child: ChangeKey,
+    val parent: ChangeKey,
+    val state: ParentState?,
+    /** A real edge bridging filter-hidden commits to the nearest visible ancestor (jj-idea-hlu3) - drawn wavy. */
+    val elided: Boolean = false
+)
 
 /** Which way navigation goes: [DOWN] towards history (older, further down the table, i.e. the
  * parent) or [UP] towards a child (newer, further up) - see [GraphEdgeIndex.hoveredEdgeAt] for how
@@ -33,8 +39,9 @@ data class CapArrow(val lane: Int, val edge: GraphEdge, val direction: EdgeDirec
  * the directional cursor: when one end is already visible, [pivotRow] sits at that visible end so
  * the *entire* span is emphasized, right up to its circle; when both ends are off-screen,
  * [pivotRow] is the viewport's middle row (the same row the direction choice pivots on).
- * [navigable] is false only for a [ParentState.HIDDEN] stub - its target can't be shown without
- * clearing the filter first (jj-idea-hlu3's job), so it gets a tooltip but no click action.
+ * [navigable] is false only for a [ParentState.HIDDEN] stub (a hidden parent with no visible
+ * ancestor to bridge to, jj-idea-hlu3) - its target can't be shown without clearing the filter first,
+ * so it gets a tooltip but no click action.
  */
 data class HoveredEdge(
     val edge: GraphEdge,
@@ -321,14 +328,21 @@ class GraphEdgeIndex private constructor(
                 // Real edges to loaded parents - same lane choice as
                 // JujutsuGraphAndDescriptionRenderer.drawLinesToParents.
                 val childHasMultipleParents = node.parentLanes.size > 1
-                for (parentKey in entry.parentKeys) {
+                // Elided parents (jj-idea-hlu3) aren't in entry.parentKeys - the entry's own parents are the
+                // hidden ones - so they're appended; a real parent is never also elided (direct wins).
+                for (parentKey in entry.parentKeys + node.elidedParents) {
                     val parentNode = nodes[parentKey] ?: continue // unresolved - handled by the stub below
                     val parentRow = rowOfKey[parentKey] ?: continue
                     operationCount++
                     val passThroughLane = node.passthroughLanes[parentKey]
                     val lane = passThroughLane
                         ?: if (childHasMultipleParents && parentNode.lane != node.lane) parentNode.lane else node.lane
-                    val edge = GraphEdge(child = key, parent = parentKey, state = null)
+                    val edge = GraphEdge(
+                        child = key,
+                        parent = parentKey,
+                        state = null,
+                        elided = parentKey in node.elidedParents
+                    )
                     // Recorded once per edge, not per row it spans - what a row's own paint
                     // (jj-idea-a0wp) needs is "which edges touch my row as an endpoint"; the
                     // passthrough extent is one interval on the lane (jj-idea-2570.6).

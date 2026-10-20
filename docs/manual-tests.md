@@ -423,9 +423,9 @@ handler — commit-onto-commit rebase — so gestures other than that one still 
       commit whose parent is beyond the log limit (not loaded at all) shows a **faded
       straight line** down from its circle instead of a real connector, while a commit
       whose parent is loaded but hidden by the active filter shows a **wiggly line**
-      instead (jj-idea-xi58 - the two are now visually distinct; a true nearest-visible-
-      ancestor connector for the filtered case is still tracked separately as
-      `jj-idea-hlu3`, not a bug here); a merge with one loaded parent and one
+      instead (jj-idea-xi58 - the two are now visually distinct) - but only when that
+      hidden parent has no visible ancestor at all; otherwise the commit is joined to its
+      nearest visible ancestor by a full-length wavy edge (jj-idea-hlu3, below); a merge with one loaded parent and one
       unresolved parent shows its real connector plus a stub in its own lane, not just
       the real connector (jj-idea-1pgy); clear the filter and confirm the graph restores
       immediately without a manual Refresh
@@ -439,6 +439,23 @@ handler — commit-onto-commit rebase — so gestures other than that one still 
       FX-STRESS), every sub-menu's actions are enabled/clickable as normal, not greyed out
       (jj-idea-lm3o); each sub-menu is labelled with the same colored bookmark
       (tracked/plain) or tag glyph its own chip would show
+
+#### Elided edges in a filtered log (jj-idea-hlu3, GitHub #131)
+
+Reuse FX-STRESS with `WITH_REMOTE=1`.
+
+- [ ] With the search box in revset mode, filter `main | @ | remote_bookmarks()`: `@` and `main`
+      are joined by a **wavy** edge in the lane colour (vertical stretches wave; the diagonals into and out of a commit are straight) (not left as unrelated rows); edges
+      between directly adjacent visible commits stay solid
+- [ ] Hovering a wavy edge shows the tooltip "Revisions hidden by the current filter" followed by
+      the target and row distance; clicking a long one navigates to the ancestor row
+- [ ] Apply an author filter that hides a commit in the middle of a branch: its child is joined to
+      the nearest remaining ancestor by a wavy edge; a merge with one hidden parent shows one
+      solid and one wavy edge
+- [ ] Hide every ancestor of a commit (filter to just that commit): it still shows the short
+      wiggly stub that ends at nothing, not a full-length wavy edge to another row
+- [ ] Click a faded stub to load more rows while the filter is active: wavy edges are recomputed
+      for the new rows (none stale, none missing); clear the filter and all wavy edges disappear
 
 #### Long-edge collapsing (jj-idea-66rr)
 

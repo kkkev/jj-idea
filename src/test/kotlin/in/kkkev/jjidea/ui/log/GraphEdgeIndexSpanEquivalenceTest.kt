@@ -5,6 +5,7 @@ import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.ui.log.graph.LONG_EDGE_PART_ROWS
 import io.kotest.matchers.shouldBe
 import org.junit.jupiter.api.Test
 import kotlin.random.Random
@@ -38,6 +39,7 @@ class GraphEdgeIndexSpanEquivalenceTest {
         val ownLaneByRow = HashMap<Int, Int>()
         val rightmostLaneByRow = HashMap<Int, Int>()
         val passthroughLanesByRow: Map<Int, Set<Int>>
+        private val capCells = HashSet<Pair<Int, Int>>()
 
         private fun place(row: Int, lane: Int, edge: GraphEdge, span: Int) {
             val existingSpan = spanByRowLane.getOrPut(row) { mutableMapOf() }[lane]
@@ -58,13 +60,39 @@ class GraphEdgeIndexSpanEquivalenceTest {
                 ownLaneByRow[row] = node.lane
                 markActive(row, node.lane)
                 val childHasMultipleParents = node.parentLanes.size > 1
-                for (parentKey in entry.parentKeys) {
+                for (parentKey in entry.parentKeys + node.elidedParents) {
                     val parentNode = nodes[parentKey] ?: continue
                     val parentRow = rowOfKey[parentKey] ?: continue
                     val lane = node.passthroughLanes[parentKey]
                         ?: if (childHasMultipleParents && parentNode.lane != node.lane) parentNode.lane else node.lane
-                    val edge = GraphEdge(child = key, parent = parentKey, state = null)
+                    val edge = GraphEdge(
+                        child = key,
+                        parent = parentKey,
+                        state = null,
+                        elided =
+                            parentKey in node.elidedParents
+                    )
                     val span = parentRow - row
+                    // A long edge collapses to two caps with no lane held between (jj-idea-66rr); filtered
+                    // views reach this now that elided edges (jj-idea-hlu3) can span many hidden rows.
+                    val capLane = if (node.passthroughLanes[parentKey] != null) {
+                        parentNode.longEdgeCapLanes[key]
+                    } else {
+                        null
+                    }
+                    if (capLane != null) {
+                        for (r in row..row + LONG_EDGE_PART_ROWS) {
+                            place(r, lane, edge, span)
+                            markActive(r, lane)
+                            capCells += r to lane
+                        }
+                        for (r in parentRow - LONG_EDGE_PART_ROWS..parentRow) {
+                            place(r, capLane, edge, span)
+                            markActive(r, capLane)
+                            capCells += r to capLane
+                        }
+                        continue
+                    }
                     for (r in row..parentRow) {
                         place(r, lane, edge, span)
                         markActive(r, lane)
@@ -77,8 +105,12 @@ class GraphEdgeIndexSpanEquivalenceTest {
                 }
             }
             passthroughLanesByRow = edgesByRow.mapValues { (row, lanes) ->
-                lanes.filterValues { edge ->
-                    edge.state == null && rowOfKey[edge.child] != row && rowOfKey[edge.parent] != row
+                // A cap's arrow row is painted by the cap, never as a plain vertical passthrough.
+                lanes.filter { (lane, edge) ->
+                    edge.state == null &&
+                        rowOfKey[edge.child] != row &&
+                        rowOfKey[edge.parent] != row &&
+                        (row to lane) !in capCells
                 }.keys
             }
         }
@@ -110,7 +142,7 @@ class GraphEdgeIndexSpanEquivalenceTest {
             maxOf(node.lane, node.stubLane ?: 0, node.passthroughLanes.values.maxOrNull() ?: 0)
         } ?: 0
 
-        fun d(e: GraphEdge?) = e?.let { "${it.child.revision}->${it.parent.revision}/${it.state}" }
+        fun d(e: GraphEdge?) = e?.let { "${it.child.revision}->${it.parent.revision}/${it.state}/${it.elided}" }
         val problems = mutableListOf<String>()
         for (row in entries.indices) {
             for (lane in 0..maxLane + 2) {

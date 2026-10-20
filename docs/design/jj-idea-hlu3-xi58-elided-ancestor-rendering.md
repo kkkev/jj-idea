@@ -121,6 +121,16 @@ with no passthrough beyond it, so no lane leaks to the rest of the graph (the ex
 Ships with `jj-idea-xi58` in one session — it's the same renderer function and the same per-parent
 state.
 
+### `jj-idea-hlu3` shipped shape
+
+`ElidedAncestors` (`ui/log/graph/`) re-points each visible entry's hidden parents at their nearest
+visible ancestors (memoised, explicit-stack DFS, O(n + e)); `CommitGraphBuilder.buildGraph(entries,
+allEntries)` feeds the remapped parents to the layout and records the bridged ones in
+`GraphNode.elidedParents`, so the layout engine itself is unchanged. `GraphEdge.elided` makes the renderer
+paint the edge wavy, like the HIDDEN stub (wavy = commits missing here; a stub = nothing visible found); it is a real edge, so hover/click navigation applies. A hidden parent with no
+visible ancestor keeps the `HIDDEN` stub. Recomputed from scratch on every filter change / row load.
+Not done: jj's transitive-edge reduction for merge-rich hidden regions.
+
 ### `jj-idea-hlu3` is now decoupled
 
 hlu3 draws a connector to the nearest still-visible ancestor. This plan makes *navigation*, not

@@ -180,6 +180,7 @@ class JujutsuGraphAndDescriptionRenderer(
                     }
                     null -> {
                         val target = model.entryFor(hovered.targetKey) ?: return@htmlString
+                        if (hovered.edge.elided) append("Revisions hidden by the current filter\n")
                         val targetRow = edgeIndex(model).rowOf(hovered.targetKey)
                         appendSummary(target.description)
                         val way = if (hovered.direction == EdgeDirection.DOWN) "down" else "up"
@@ -346,18 +347,71 @@ class JujutsuGraphAndDescriptionRenderer(
         private fun isEmphasizedEdge(edge: GraphEdge?) = isHoveredEdge(edge) && hoveredEdge?.emphasized(row) == true
 
         private fun strokeForEdge(edge: GraphEdge?): Stroke =
-            if (isEmphasizedEdge(edge)) BasicStroke(EDGE_HOVER_STROKE_WIDTH.getFloat()) else BasicStroke(1f)
+            BasicStroke(if (isEmphasizedEdge(edge)) EDGE_HOVER_STROKE_WIDTH.getFloat() else 1f)
 
         /** Draws one connector/passthrough segment with [strokeForEdge] applied and restored, so
          * callers don't each hand-roll the save/apply/restore dance. [edge] is the specific
          * [GraphEdge] this segment belongs to (see [isHoveredEdge] for why that matters, not just
-         * the lane it's drawn in). */
-        private fun drawLaneLine(g2d: Graphics2D, edge: GraphEdge?, color: Color, x1: Int, y1: Int, x2: Int, y2: Int) {
+         * the lane it's drawn in). An [GraphEdge.elided] edge - one bridging filter-hidden commits
+         * (jj-idea-hlu3) - is drawn wavy like the [ParentState.HIDDEN] stub, but only its vertical
+         * segments: the diagonals into and out of a commit stay straight (a wave there looks ragged and
+         * doesn't join up), and always meet a wavy vertical, so the edge still reads as elided. [wavy]
+         * false forces a straight line (the small cap chevrons). [straightenEnd] flattens the wave over the
+         * last that-many pixels before (x2,y2), so it doesn't obscure an arrow tip sitting there. */
+        private fun drawLaneLine(
+            g2d: Graphics2D,
+            edge: GraphEdge?,
+            color: Color,
+            x1: Int,
+            y1: Int,
+            x2: Int,
+            y2: Int,
+            wavy: Boolean = true,
+            straightenEnd: Int = 0
+        ) {
             val originalStroke = g2d.stroke
             g2d.color = color
             g2d.stroke = strokeForEdge(edge)
-            g2d.drawLine(x1, y1, x2, y2)
+            if (wavy &&
+                x1 == x2 &&
+                edge?.elided == true
+            ) {
+                g2d.draw(wavePath(x1, y1, x2, y2, straightenEnd))
+            } else {
+                g2d.drawLine(x1, y1, x2, y2)
+            }
             g2d.stroke = originalStroke
+        }
+
+        /**
+         * A sine wave along the segment (x1,y1)-(x2,y2). The period is stretched to fit a whole number
+         * of times, so the wave has zero offset at both ends: each row paints its own segments, and
+         * a line must meet its neighbour's - and the commit circle - exactly on the lane centre.
+         * Over the last [straightenEnd] pixels the amplitude ramps down to nothing.
+         */
+        private fun wavePath(x1: Int, y1: Int, x2: Int, y2: Int, straightenEnd: Int = 0): Path2D {
+            val dx = (x2 - x1).toDouble()
+            val dy = (y2 - y1).toDouble()
+            val length = kotlin.math.hypot(dx, dy)
+            val path = Path2D.Double()
+            path.moveTo(x1.toDouble(), y1.toDouble())
+            if (length < 1.0) return path
+            val periods = maxOf(1, Math.round(length / ELIDED_WAVE_LENGTH.get()).toInt())
+            val amplitude = ELIDED_WAVE_AMPLITUDE.get()
+            // Unit normal to the segment.
+            val nx = -dy / length
+            val ny = dx / length
+            var step = 1
+            while (step <= length.toInt()) {
+                val t = step / length
+                val fromEnd = length * (1 - t)
+                val envelope = if (straightenEnd > 0) minOf(1.0, fromEnd / straightenEnd) else 1.0
+                val offset = amplitude * envelope * kotlin.math.sin(2 * Math.PI * periods * t)
+                path.lineTo(x1 + dx * t + nx * offset, y1 + dy * t + ny * offset)
+                step++
+            }
+            path.lineTo(x2.toDouble(), y2.toDouble())
+            return path
         }
 
         /**
@@ -427,9 +481,9 @@ class JujutsuGraphAndDescriptionRenderer(
                 // sitting at) the row's middle - the other half of the lane is free for those.
                 val tipY = if (down) mid - size else mid + size
                 val backY = if (down) tipY - size else tipY + size
-                drawLaneLine(g2d, edge, color, x, if (down) 0 else height, x, tipY)
-                drawLaneLine(g2d, edge, color, x - size, backY, x, tipY)
-                drawLaneLine(g2d, edge, color, x + size, backY, x, tipY)
+                drawLaneLine(g2d, edge, color, x, if (down) 0 else height, x, tipY, straightenEnd = size * 3)
+                drawLaneLine(g2d, edge, color, x - size, backY, x, tipY, wavy = false)
+                drawLaneLine(g2d, edge, color, x + size, backY, x, tipY, wavy = false)
             }
         }
 

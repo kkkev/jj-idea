@@ -4,6 +4,7 @@ import com.intellij.openapi.diagnostic.Logger
 import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeIdentity
 import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.ui.log.graph.ElidedAncestors
 import `in`.kkkev.jjidea.ui.log.graph.GraphEntry
 import `in`.kkkev.jjidea.ui.log.graph.IncrementalLayout
 import `in`.kkkev.jjidea.ui.log.graph.LayoutCalculatorImpl
@@ -40,7 +41,12 @@ data class GraphNode(
     /** See [in.kkkev.jjidea.ui.log.graph.RowLayout.stubLane]. */
     val stubLane: Int? = null,
     /** See [in.kkkev.jjidea.ui.log.graph.RowLayout.longEdgeCapLanes]. */
-    val longEdgeCapLanes: Map<ChangeKey, Int> = emptyMap()
+    val longEdgeCapLanes: Map<ChangeKey, Int> = emptyMap(),
+    /**
+     * Parents whose edge from this node bridges one or more filter-hidden commits (jj-idea-hlu3) -
+     * drawn wavy. Always a subset of this node's laid-out parents.
+     */
+    val elidedParents: Set<ChangeKey> = emptySet()
 ) {
     /** Always [lane]'s color - there is no case where a node's line color differs from its own
      * lane's, so this is derived rather than a separate field callers could pass out of sync with
@@ -121,8 +127,9 @@ class CommitGraphBuilder {
     fun buildGraph(entries: List<GraphableEntry>, allEntries: List<GraphableEntry>): Map<ChangeKey, GraphNode> =
         log.measurePerf("graph-layout") { report ->
             report.count("rows", entries.size.toLong())
-            val graphEntries = entries.map { GraphEntry(it.key, it.parentKeys) }
+            var elided: Map<ChangeKey, Set<ChangeKey>> = emptyMap()
             val layout = if (entries === allEntries) {
+                val graphEntries = entries.map { GraphEntry(it.key, it.parentKeys) }
                 // jj-idea-jnqi bugfix: the unfiltered layout runs on the incremental engine so a later
                 // appendGraph() call has a correct base to extend, instead of silently treating its first
                 // delta as the whole log (losing every previously-loaded row's GraphNode). Only for the
@@ -134,12 +141,20 @@ class CommitGraphBuilder {
                 appended
             } else {
                 // Filtered (e.g. UnifiedJujutsuLogPanel's own instance): leaves incrementalEngine untouched.
+                // jj-idea-hlu3: re-point each visible entry at its nearest visible ancestors. Recomputed
+                // from scratch on every call (filter change or on-demand row load), never patched.
                 val allIds = allEntries.mapTo(HashSet()) { it.key }
+                val visibleIds = entries.mapTo(HashSet()) { it.key }
+                val parentsByKey = allEntries.associate { it.key to it.parentKeys }
+                val remap = ElidedAncestors(entries.map { it.key }, parentsByKey::get) { it in visibleIds }
+                report.count("elided-remap-operations", remap.operationCount)
+                elided = remap.elided
+                val graphEntries = entries.map { GraphEntry(it.key, remap.effectiveParents[it.key] ?: it.parentKeys) }
                 val calculated = layoutCalculator.calculate(graphEntries, allIds)
                 report.count("operations", layoutCalculator.operationCount)
                 calculated
             }
-            layout.rows.associate { it.id to it.toGraphNode() }
+            layout.rows.associate { it.id to it.toGraphNode(elided[it.id].orEmpty()) }
         }
 
     /**
@@ -184,13 +199,14 @@ class CommitGraphBuilder {
             layout.rows.associate { it.id to it.toGraphNode() }
         }
 
-    private fun RowLayout<ChangeKey>.toGraphNode() = GraphNode(
+    private fun RowLayout<ChangeKey>.toGraphNode(elidedParents: Set<ChangeKey> = emptySet()) = GraphNode(
         lane = lane,
         parentLanes = parentLanes,
         childLanes = childLanes,
         passthroughLanes = passthroughLanes,
         unresolvedParents = unresolvedParents,
         stubLane = stubLane,
-        longEdgeCapLanes = longEdgeCapLanes
+        longEdgeCapLanes = longEdgeCapLanes,
+        elidedParents = elidedParents
     )
 }

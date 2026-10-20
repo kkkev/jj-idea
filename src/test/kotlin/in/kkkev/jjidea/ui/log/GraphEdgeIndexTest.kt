@@ -144,6 +144,62 @@ class GraphEdgeIndexTest {
     }
 
     @Test
+    fun `a hidden middle commit is bridged by an elided edge to the nearest visible ancestor`() {
+        val a = entry("a", listOf("b"))
+        val b = entry("b", listOf("c"))
+        val c = entry("c")
+        val index = buildIndex(listOf(a, c), allEntries = listOf(a, b, c))
+
+        index.edgeAt(0, 0) shouldBe GraphEdge(key("a"), key("c"), null, elided = true)
+        index.stubEdgeAt(0) shouldBe null
+        index.hoveredEdgeAt(0, 0, 0..1)?.navigable shouldBe null // both ends on screen: not long
+    }
+
+    @Test
+    fun `an elided edge to a row outside the viewport is navigable to that row`() {
+        val a = entry("a", listOf("h"))
+        val h = entry("h", listOf("c"))
+        val c = entry("c")
+        val index = buildIndex(listOf(a, c), allEntries = listOf(a, h, c))
+
+        val hovered = index.hoveredEdgeAt(0, 0, 0..0)
+        hovered?.navigable shouldBe true
+        hovered?.targetKey shouldBe key("c")
+    }
+
+    @Test
+    fun `a hidden parent with no visible ancestor keeps the HIDDEN stub and no elided edge`() {
+        val a = entry("a", listOf("h"))
+        val h = entry("h", listOf("g"))
+        val g = entry("g")
+        val index = buildIndex(listOf(a), allEntries = listOf(a, h, g))
+
+        index.stubEdgeAt(0)?.edge?.state shouldBe ParentState.HIDDEN
+    }
+
+    @Test
+    fun `on-demand rows - each rebuild equals a fresh build over the same inputs`() {
+        val rows = listOf(
+            entry("a", listOf("b")),
+            entry("b", listOf("c")),
+            entry("c", listOf("d")),
+            entry("d", listOf("e")),
+            entry("e")
+        )
+        // Visible set grows as rows are loaded on demand: a+e, then +c (middle), then +d.
+        val steps = listOf(listOf("a", "e"), listOf("a", "c", "e"), listOf("a", "c", "d", "e"))
+        val builder = CommitGraphBuilder()
+        for (ids in steps) {
+            val visible = rows.filter { it.id.full in ids }
+            val reused = builder.buildGraph(visible, rows)
+            reused shouldBe CommitGraphBuilder().buildGraph(visible, rows)
+        }
+        val last = builder.buildGraph(rows.filter { it.id.full in steps.last() }, rows)
+        last[key("a")]!!.elidedParents shouldBe setOf(key("c"))
+        last[key("c")]!!.elidedParents shouldBe emptySet()
+    }
+
+    @Test
     fun `laneAt maps x to a lane, or null left of the graph`() {
         val a = entry("a")
         val index = buildIndex(listOf(a))
