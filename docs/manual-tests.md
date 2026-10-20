@@ -876,6 +876,28 @@ alongside one other repo works.
 - [ ] Filtering to "@" (working copy) shows **every** repo's working copy, each with its own
       ancestry — not just the first repo's
 
+#### Save a revset as an alias (jj-idea-ehwm.6)
+
+**Code:** `jj/cli/RevsetAliases.kt`, `ui/log/SaveRevsetAliasDialog.kt`, `ui/log/JujutsuRevsetFilterComponent.kt`
+(`saveAsAlias`), `ui/components/LogSearchField.kt` (`SaveRevsetAliasAction`), `ui/log/UnifiedJujutsuLogPanel.kt`
+(`onSaveRevsetAliasRequested`)
+
+Needs a throwaway user config (`JJ_CONFIG`) or remove `revset-aliases.mine` afterwards. Check results in a
+terminal with `jj config list revset-aliases` and `jj log -r mine`.
+
+- [ ] The Scope popup has a **Save as alias…** link beside "Revset language". With the field empty it does nothing
+- [ ] Type `author(exact:"you@example.com") & mutable()` in the Scope popup, click the link: the popup closes and a
+      "Save Revset as Alias" dialog shows the revset (read-only), a name field, and **User config** (selected) / **Repository config**
+- [ ] Name `1bad` or `a-b`: inline error, and OK does nothing. Name `mine`, User config, OK: the dialog closes, the Scope chip now
+      reads `mine`, the rows are unchanged, and `jj config list revset-aliases` shows the expression with its quotes intact
+- [ ] Restart the IDE: the tab's scope is still `mine`
+- [ ] Repeat with name `mine` again: an "already exists" confirmation appears; **No** keeps the dialog open, **Yes** overwrites
+- [ ] Choose **Repository config** in a multi-repo project: the alias is written to each repo's own config only
+- [ ] Edit the alias in the config file, then change another filter: the tab follows the new definition
+- [ ] In the search box turn revset mode on: a **Save as alias…** toolbar button appears, disabled while the box is empty and when
+      revset mode is off. With text it opens the same dialog, and after saving the box holds the alias name and is filtered by it
+- [ ] The Rebase / Squash Into… / Move Bookmark to Change pickers and file history have no such button
+
 #### Tab scope (Scope chip; jj-idea-vqpn, jj-idea-ehwm.4)
 
 **Code:** `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`,

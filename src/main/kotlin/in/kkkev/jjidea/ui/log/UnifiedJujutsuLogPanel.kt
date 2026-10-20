@@ -484,6 +484,18 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         return component
     }
 
+    override fun onSaveRevsetAliasRequested(text: String) {
+        val repos = config.selectedRepos(project.initialisedJujutsuRepositories)
+        if (repos.isEmpty()) return
+        // The box switches to the alias name, which re-filters and persists like any other edit.
+        SaveRevsetAliasDialog(
+            repos,
+            text,
+            baseFor = { repo -> JujutsuSettings.getInstance(project).resolvedLogRevset(repo) },
+            onSaved = { name -> searchField.text = name }
+        ).show()
+    }
+
     override fun updateTableStuff() {
         updateColumnVisibility()
         logTable.updateGraph(logTable.graphNodes) // Refresh rendering

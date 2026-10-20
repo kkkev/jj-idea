@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.FlowLayout
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import javax.swing.Icon
@@ -150,6 +151,10 @@ class JujutsuRevsetFilterComponent(
         private val docsLink = HyperlinkLabel(JujutsuBundle.message("log.filter.revset.docs")).apply {
             setHyperlinkTarget(REVSET_DOCS)
         }
+        private val aliasLink = HyperlinkLabel(JujutsuBundle.message("log.filter.revset.alias.action")).apply {
+            toolTipText = JujutsuBundle.message("log.filter.revset.alias.tooltip")
+            addHyperlinkListener { saveAsAlias() }
+        }
 
         val preferredFocus get() = searchField.textEditor
 
@@ -161,7 +166,14 @@ class JujutsuRevsetFilterComponent(
                 JPanel(BorderLayout()).apply {
                     border = JBUI.Borders.emptyBottom(6)
                     add(statusLabel, BorderLayout.CENTER)
-                    add(docsLink, BorderLayout.EAST)
+                    add(
+                        JPanel(FlowLayout(FlowLayout.RIGHT, JBUI.scale(10), 0)).apply {
+                            isOpaque = false
+                            add(aliasLink)
+                            add(docsLink)
+                        },
+                        BorderLayout.EAST
+                    )
                 },
                 BorderLayout.NORTH
             )
@@ -205,6 +217,21 @@ class JujutsuRevsetFilterComponent(
                     setError(formatErrors(errors))
                 }
             }
+        }
+
+        /** jj-idea-ehwm.6: names the typed revset as a jj alias, then makes the alias this tab's scope. */
+        private fun saveAsAlias() {
+            val text = searchField.text.trim()
+            val targetRepos = repos()
+            if (text.isEmpty() || targetRepos.isEmpty()) return
+            popup?.cancel()
+            SaveRevsetAliasDialog(targetRepos, text, baseFor) { name ->
+                generation++
+                currentRevset = name
+                tableModel.setScope(name)
+                setErrorText(null)
+                notifyFilterChanged()
+            }.show()
         }
 
         private fun setError(message: String?) {

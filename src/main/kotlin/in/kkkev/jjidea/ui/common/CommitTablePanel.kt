@@ -112,7 +112,8 @@ abstract class CommitTablePanel<D>(
             applyFilter()
             onConfigChanged()
         },
-        onSubmitted = { text -> onSearchSubmitted(text) }
+        onSubmitted = { text -> onSearchSubmitted(text) },
+        onSaveRevsetAlias = if (revsetSearch) { text -> onSaveRevsetAliasRequested(text) } else null
     )
 
     // Filter options state — delegate to [searchField] so persistence (LogWindowConfig) and
@@ -411,6 +412,9 @@ abstract class CommitTablePanel<D>(
      * already the complete history of the file, so there is no "outside the window" to search.
      */
     protected open fun onSearchSubmitted(text: String) {}
+
+    /** The search box's "Save as alias…" (jj-idea-ehwm.6) was clicked with the revset [text]. */
+    protected open fun onSaveRevsetAliasRequested(text: String) {}
 
     /**
      * The toolbar Refresh button's full behaviour: re-read the log rows *and* every state

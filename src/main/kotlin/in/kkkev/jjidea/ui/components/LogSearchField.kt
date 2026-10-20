@@ -3,6 +3,7 @@ package `in`.kkkev.jjidea.ui.components
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionUpdateThread
+import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.ui.popup.JBPopup
@@ -57,7 +58,8 @@ class LogSearchField(
     private val revsetModeAvailable: Boolean = false,
     private val collapsible: Boolean = false,
     private val onFilterChanged: () -> Unit = {},
-    private val onSubmitted: (String) -> Unit = {}
+    private val onSubmitted: (String) -> Unit = {},
+    private val onSaveRevsetAlias: ((String) -> Unit)? = null
 ) : JPanel(BorderLayout()) {
     private val searchTextField = (
         if (historyKey !=
@@ -152,7 +154,8 @@ class LogSearchField(
                     FilterToggleAction("revset.mode", AllIcons.Ide.LocalScope, LogSearchField::revsetMode, true)
                 } else {
                     null
-                }
+                },
+                if (revsetModeAvailable && onSaveRevsetAlias != null) SaveRevsetAliasAction() else null
             ).toTypedArray()
         ),
         true
@@ -294,6 +297,23 @@ class LogSearchField(
     fun revset(matchIds: Boolean = true): Expression? = when {
         revsetMode -> text.trim().takeIf { it.isNotEmpty() }?.let(::Expression)
         else -> logSearchRevset(text, useRegex, matchCase, matchWholeWords, matchIds)
+    }
+
+    /** jj-idea-ehwm.6: saves the revset in the box as a jj alias; only meaningful in revset mode with text. */
+    private inner class SaveRevsetAliasAction : AnAction(
+        JujutsuBundle.message("log.filter.revset.alias.action"),
+        JujutsuBundle.message("log.filter.revset.alias.tooltip"),
+        AllIcons.Actions.MenuSaveall
+    ) {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun update(e: AnActionEvent) {
+            e.presentation.isEnabled = revsetMode && text.isNotBlank()
+        }
+
+        override fun actionPerformed(e: AnActionEvent) {
+            onSaveRevsetAlias?.invoke(text.trim())
+        }
     }
 
     private inner class FilterToggleAction(
