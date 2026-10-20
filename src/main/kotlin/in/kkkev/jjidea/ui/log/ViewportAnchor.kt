@@ -3,10 +3,13 @@ package `in`.kkkev.jjidea.ui.log
 import `in`.kkkev.jjidea.jj.ChangeKey
 
 /**
- * The identity of the row sitting at (or just above) the top of the viewport, plus how far it is
- * scrolled off-screen - captured before a data refresh so [JujutsuLogTable.setEntries] can restore
+ * The identity of the row the viewport is pinned to - the selected row when it is visible, else
+ * the row at (or just above) the top - plus how far that row's top is from the viewport's top
+ * (negative when the row sits below it) - captured before a data refresh so [JujutsuLogTable.setEntries] can restore
  * the same pixel relationship after the model swap, even though the refreshed row's index may have
- * shifted (jj-idea-wrza: `refresh()`'s page-1 splice can insert/remove rows above it).
+ * shifted (jj-idea-wrza: `refresh()`'s page-1 splice can insert/remove rows above it). Preferring
+ * the visible selection keeps an explicitly navigated target in view while rows are filled in
+ * between it and the viewport top (jj-idea-8qso: a stub click's target, then the gap above it).
  */
 internal data class ViewportAnchor(val key: ChangeKey, val pixelsScrolledOff: Int)
 
@@ -14,17 +17,17 @@ internal data class ViewportAnchor(val key: ChangeKey, val pixelsScrolledOff: In
  * without a platform test - same split as [GraphEdgeIndex] from jj-idea-sc8m. */
 internal object ViewportAnchors {
     /**
-     * Captures the anchor for the row at [topRowY] (its cell's top y in table coordinates) given
+     * Captures the anchor for the row at [rowY] (its cell's top y in table coordinates) given
      * the viewport's current top-of-content y, [viewY], and that row's [key].
      *
-     * Returns `null` when [key] is `null` (no row at the viewport top - e.g. an empty table), or
+     * Returns `null` when [key] is `null` (no anchor row - e.g. an empty table), or
      * when [viewY] is `0`: the viewport is already pinned to the very top, and a commit newly
      * spliced in above row 0 should become visible, not scrolled past to preserve the old top
      * row's position.
      */
-    fun capture(key: ChangeKey?, viewY: Int, topRowY: Int): ViewportAnchor? {
+    fun capture(key: ChangeKey?, viewY: Int, rowY: Int): ViewportAnchor? {
         if (key == null || viewY <= 0) return null
-        return ViewportAnchor(key, viewY - topRowY)
+        return ViewportAnchor(key, viewY - rowY)
     }
 
     /**

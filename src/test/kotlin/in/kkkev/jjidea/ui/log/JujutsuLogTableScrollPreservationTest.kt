@@ -59,6 +59,8 @@ class JujutsuLogTableScrollPreservationTest {
         Disposer.register(project.get(), table)
         table.setEntries(entries)
         val scrollPane = JScrollPane(table)
+        // A showing table is resized by the queued revalidate; this unrealized pane never would be.
+        table.model.addTableModelListener { table.setSize(table.width, table.rowHeight * table.rowCount) }
         scrollPane.setSize(400, 100)
         scrollPane.viewport.setSize(400, 100)
         scrollPane.doLayout()
@@ -199,6 +201,45 @@ class JujutsuLogTableScrollPreservationTest {
         table.setEntries(listOf(entry("target")) + entries)
 
         scrollPane.viewport.viewPosition shouldBe java.awt.Point(0, table.getCellRect(0, 0, true).y)
+    }
+
+    /**
+     * jj-idea-8qso: a stub click loads the target (scrolled into view), then the trickle/loadMore
+     * fill the rows between the old window and the target. Those land above the target but below
+     * the viewport top, so anchoring on the top row used to push the target off-screen.
+     */
+    @Test
+    fun `stub-click target stays in view while the gap above it fills in`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+        scrollPane.viewport.viewPosition = java.awt.Point(0, table.getCellRect(45, 0, true).y)
+
+        val targetKey = ChangeKey(repo, ChangeId("zzz", "zzz", null))
+        table.requestSelection(targetKey)
+        table.setEntries(entries + entry("zzz"))
+        table.selectedRow shouldBe 50
+        scrollPane.viewport.viewRect.intersects(table.getCellRect(50, 0, true)) shouldBe true
+
+        // The gap between the old window and the target fills in (it sorts before the target).
+        val gap = (0 until 20).map { entry("g%03d".format(it)) }
+        table.setEntries(entries + gap + entry("zzz"))
+
+        table.selectedRow shouldBe 70
+        scrollPane.viewport.viewRect.intersects(table.getCellRect(70, 0, true)) shouldBe true
+    }
+
+    @Test
+    fun `visible carried selection stays put when rows are inserted above it`() {
+        val entries = manyEntries(50)
+        val (table, scrollPane) = tableInScrollPane(entries)
+        scrollPane.viewport.viewPosition = java.awt.Point(0, table.getCellRect(30, 0, true).y)
+        table.setRowSelectionInterval(32, 32)
+        val offset = table.getCellRect(32, 0, true).y - scrollPane.viewport.viewPosition.y
+
+        table.setEntries(entries.take(31) + (0 until 10).map { entry("x%03d".format(it)) } + entries.drop(31))
+
+        table.selectedRow shouldBe 42
+        table.getCellRect(42, 0, true).y - scrollPane.viewport.viewPosition.y shouldBe offset
     }
 
     /**

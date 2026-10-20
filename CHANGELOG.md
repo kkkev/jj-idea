@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Log filters now search the whole history.** Search text, the Reference, Author and Date filters and the Revset filter are resolved by jj, a page at a time, instead of only filtering the commits already loaded. A search or revset matching old commits shows them without pressing Enter (the table holds its previous rows and shows "Filtering…" while jj answers), and scrolling loads more matches. The Reference filter now shows the bookmark or tag's complete ancestry rather than just the part that was loaded, and the "matches outside the loaded window" notice is gone. ([#116](https://github.com/kkkev/jj-idea/issues/116))
 
 ### Fixed
+- In a large paged log, clicking the faded line below a change loads its parent and now keeps it in view. Previously the rows that filled in between could push the new selection off-screen.
 - Searching the log (or a picker) for a short text such as a single letter no longer fails with "Change ID prefix is ambiguous".
 - The log's hover tooltip no longer appears instantly in Rider. It now waits for the same delay as the IDE's standard tooltips (`ide.tooltip.initialReshowDelay`, 500 ms by default), which also means it shows after 500 ms rather than 1.2 s in IntelliJ IDEA. ([#144](https://github.com/kkkev/jj-idea/issues/144))
 - The Restore dialog's "N files will be restored" line no longer reads "0 files" until you toggle a checkbox when files are pre-selected.

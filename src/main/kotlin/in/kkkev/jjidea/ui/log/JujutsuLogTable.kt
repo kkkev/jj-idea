@@ -37,6 +37,7 @@ import java.awt.font.FontRenderContext
 import javax.swing.JTable
 import javax.swing.JViewport
 import javax.swing.ListSelectionModel
+import javax.swing.RepaintManager
 import javax.swing.event.*
 import javax.swing.table.AbstractTableModel
 
@@ -864,16 +865,22 @@ class JujutsuLogTable(
     }
 
     /**
-     * Captures the top-visible row's identity and scroll offset before a [setEntries] model swap,
-     * so [restoreViewportAnchor] can keep it in the same pixel position afterward even if a
-     * `refresh()` page-1 splice shifted its row index (jj-idea-wrza). `null` when there's no row
-     * at the viewport top or the viewport is already pinned to the top - see [ViewportAnchors.capture].
+     * Captures the anchor row's identity and scroll offset before a [setEntries] model swap - the
+     * visible selection if any, else the top-visible row - so [restoreViewportAnchor] can keep it
+     * in the same pixel position afterward even if a `refresh()` page-1 splice shifted its row
+     * index (jj-idea-wrza). `null` when there's no such row or the viewport is already pinned to
+     * the top - see [ViewportAnchors.capture].
      */
     private fun captureViewportAnchor(): ViewportAnchor? {
-        val viewY = visibleRect.y
-        val row = rowAtPoint(Point(0, viewY)).takeIf { it >= 0 } ?: return null
+        val visible = visibleRect
+        // Prefer the selected row when it is on screen (jj-idea-8qso): a stub click scrolls its
+        // target into view, then the rows between the old window and the target load in above it -
+        // anchoring on the top row would let them push the target off-screen.
+        val selected = selectionModel.leadSelectionIndex.takeIf { it in 0 until rowCount }
+            ?.takeIf { getCellRect(it, 0, true).intersects(visible) }
+        val row = selected ?: rowAtPoint(Point(0, visible.y)).takeIf { it >= 0 } ?: return null
         val key = logModel.getEntry(row)?.key
-        return ViewportAnchors.capture(key, viewY, getCellRect(row, 0, true).y)
+        return ViewportAnchors.capture(key, visible.y, getCellRect(row, 0, true).y)
     }
 
     /** Restores [anchor] after a [setEntries] model swap - a no-op if the anchor row is gone
@@ -883,7 +890,19 @@ class JujutsuLogTable(
         val row = logModel.rowOf(anchor.key) ?: return
         val newY = ViewportAnchors.restoredY(anchor, getCellRect(row, 0, true).y)
         val v = visibleRect
-        if (newY != v.y) scrollRectToVisible(Rectangle(v.x, newY, v.width, v.height))
+        if (newY != v.y) {
+            validateGrownLayout()
+            scrollRectToVisible(Rectangle(v.x, newY, v.width, v.height))
+        }
+    }
+
+    /**
+     * A model change only *queues* the table's resize (revalidate), so a scroll issued straight
+     * after [setEntries] grows the table is clamped to the old, shorter height - a target row
+     * appended below never gets scrolled to (jj-idea-8qso). Applies the queued layout first.
+     */
+    private fun validateGrownLayout() {
+        RepaintManager.currentManager(this).validateInvalidComponents()
     }
 
     /**
@@ -916,6 +935,7 @@ class JujutsuLogTable(
 
         setRowSelectionInterval(rowIndex, rowIndex)
         if (scrollIntoView) {
+            validateGrownLayout()
             scrollRectToVisible(rowRectPreservingHorizontalScroll(getCellRect(rowIndex, 0, true), visibleRect))
         }
         log.info("Selected entry at row $rowIndex ($repo:$revision)")

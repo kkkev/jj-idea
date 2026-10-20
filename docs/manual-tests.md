@@ -1032,8 +1032,9 @@ non-paged behavior is perceptible.
       (which would look like a true root) — distinct from the wiggle used for the filtering case
       above (jj-idea-xi58: a paged-window boundary isn't elision, it just hasn't loaded yet)
 - [ ] Clicking that faded straight line loads and reveals the missing parent, scrolling to it
-      once it arrives — see MT-LOG-GRAPH's "Long-edge navigation" (jj-idea-sc8m) subsection for
-      the full hover/click behavior
+      once it arrives — and it stays in view while the idle trickle keeps loading the rows
+      between it and the old window (jj-idea-8qso) — see MT-LOG-GRAPH's "Long-edge navigation"
+      (jj-idea-sc8m) subsection for the full hover/click behavior
 - [ ] jj-idea-2570.5 (idle trickle): on FX-STRESS (`SCALE=6 WITH_REMOTE=1`; pages are a fixed 500
       rows, so "Changes to show" is irrelevant), open the log and *leave it alone*: older history keeps loading in the
       background at a gentle pace (the scrollbar thumb slowly shrinks), faded stubs on screen

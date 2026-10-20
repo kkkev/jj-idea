@@ -18,18 +18,27 @@ class ViewportAnchorTest {
 
     @Test
     fun `capture returns null when the viewport is pinned to the top`() {
-        ViewportAnchors.capture(key, viewY = 0, topRowY = 0) shouldBe null
+        ViewportAnchors.capture(key, viewY = 0, rowY = 0) shouldBe null
     }
 
     @Test
     fun `capture returns null when there is no row at the viewport top`() {
-        ViewportAnchors.capture(null, viewY = 40, topRowY = 20) shouldBe null
+        ViewportAnchors.capture(null, viewY = 40, rowY = 20) shouldBe null
     }
 
     @Test
     fun `capture records how far the top row is scrolled off-screen`() {
         // Row 2 starts at y=40; the viewport's visible top is at y=55, i.e. 15px into that row.
-        ViewportAnchors.capture(key, viewY = 55, topRowY = 40) shouldBe ViewportAnchor(key, 15)
+        ViewportAnchors.capture(key, viewY = 55, rowY = 40) shouldBe ViewportAnchor(key, 15)
+    }
+
+    @Test
+    fun `a row below the viewport top keeps its viewport-relative y`() {
+        // Selected row at y=300; viewport top at y=100, so it sits 200px down (offset -200).
+        val anchor = ViewportAnchors.capture(key, viewY = 100, rowY = 300)!!
+        anchor shouldBe ViewportAnchor(key, -200)
+        // Rows filled in above push it to y=700: the viewport follows to keep it 200px down.
+        ViewportAnchors.restoredY(anchor, newRowY = 700) shouldBe 500
     }
 
     @Test
