@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log.bookmarks
 
 import com.intellij.icons.AllIcons
+import com.intellij.ide.ActivityTracker
 import com.intellij.ide.BrowserUtil
 import com.intellij.ide.DefaultTreeExpander
 import com.intellij.openapi.Disposable
@@ -13,6 +14,7 @@ import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.UiDataProvider
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.*
@@ -29,10 +31,15 @@ import `in`.kkkev.jjidea.actions.change.newChangeFromAction
 import `in`.kkkev.jjidea.actions.invokeEnterBoundAction
 import `in`.kkkev.jjidea.actions.tag.deleteTagAction
 import `in`.kkkev.jjidea.actions.tag.pushTagAction
+import `in`.kkkev.jjidea.jj.ChangeId
 import `in`.kkkev.jjidea.jj.ChangeKey
+import `in`.kkkev.jjidea.jj.CommitId
+import `in`.kkkev.jjidea.jj.Expression
+import `in`.kkkev.jjidea.jj.HIDDEN_TARGET_LIMIT
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
 import `in`.kkkev.jjidea.jj.RefItem
+import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.jj.WorkingCopy
 import `in`.kkkev.jjidea.jj.remoteEntriesFor
 import `in`.kkkev.jjidea.jj.resolveEntry
@@ -42,12 +49,15 @@ import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.ui.common.RepositoryIcons
 import `in`.kkkev.jjidea.ui.components.*
+import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Cursor
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.net.URI
+import java.util.Collections
+import java.util.concurrent.Future
 import javax.swing.JPanel
 import javax.swing.JTree
 import javax.swing.event.TreeExpansionEvent
@@ -84,7 +94,8 @@ class JujutsuBookmarksPanel(
      * jj-idea-p35f) on a bookmark row without a second `jj log` invocation. Defaults to always
      * missing (no change actions) for callers — tests included — that have no log table to ask.
      * `null` (a bookmark whose change fell outside the loaded window) is a real, expected outcome,
-     * not an error: see [uiDataSnapshot].
+     * not an error: the panel then hydrates just the selected such leaves on demand through
+     * [loadEntries] (jj-idea-6haf), see [hydrateSelection].
      */
     private val entryLookup: (ChangeKey) -> LogEntry? = { null },
     /**
@@ -94,6 +105,13 @@ class JujutsuBookmarksPanel(
      * Defaults to empty for callers with no log table to ask, matching [entryLookup]'s default.
      */
     internal val allEntries: () -> List<LogEntry> = { emptyList() },
+    /**
+     * Loads the entries matching a revset in one `jj log`, for selected leaves outside the log's loaded
+     * window (jj-idea-6haf). Runs on a pooled thread; a failure yields no entries.
+     */
+    private val loadEntries: (JujutsuRepository, Revset) -> List<LogEntry> = { repo, revset ->
+        repo.logService.getLogBasic(revset).getOrNull().orEmpty()
+    },
     private val onExpansionChanged: () -> Unit = {}
 ) : JPanel(BorderLayout()), Disposable, UiDataProvider {
     private val root = DefaultMutableTreeNode()
@@ -131,6 +149,29 @@ class JujutsuBookmarksPanel(
      */
     private var applyingExpansionState = false
 
+    /** A selected leaf's target, as [selectedLogEntries] needs it resolved. */
+    private data class Want(val repo: JujutsuRepository, val id: ChangeId, val commitId: CommitId?)
+
+    /**
+     * Entries hydrated by [hydrateSelection] for leaves outside the log's loaded window (jj-idea-6haf), a small
+     * LRU. Read from the background thread that builds [uiDataSnapshot], hence synchronized. Cleared whenever the
+     * references or log change, so it never outlives the state it was loaded against.
+     */
+    private val hydrated: MutableMap<Want, LogEntry> = Collections.synchronizedMap(
+        object : LinkedHashMap<Want, LogEntry>(16, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Want, LogEntry>) =
+                size > HYDRATED_CACHE_SIZE
+        }
+    )
+
+    // The remaining hydration state is only touched on the EDT.
+    @Volatile
+    private var hydrationGeneration = 0
+    private val inFlight = mutableSetOf<Want>()
+    private val waiters = mutableListOf<Pair<MutableSet<Want>, () -> Unit>>()
+    private var lastFetch: Future<*>? = null
+    private var disposed = false
+
     init {
         add(createToolbar().component, BorderLayout.NORTH)
         add(ScrollPaneFactory.createScrollPane(tree), BorderLayout.CENTER)
@@ -138,6 +179,9 @@ class JujutsuBookmarksPanel(
             ((path.lastPathComponent as? DefaultMutableTreeNode)?.userObject as? BookmarkNode)?.displayName.orEmpty()
         }
         installPopupHandler()
+        // Hydrate out-of-window targets as soon as they're selected, so keyboard shortcuts and toolbar actions
+        // (which have no popup to wait on) see them after one re-evaluation - see hydrateSelection.
+        tree.addTreeSelectionListener { hydrateSelection {} }
         installLinkHandler()
         installDoubleClickHandler()
         installTooltip()
@@ -149,12 +193,18 @@ class JujutsuBookmarksPanel(
         )
         // jj-idea-qr78: the View Options "Bookmark Ahead/Behind Counts" toggle broadcasts logRefresh;
         // cached row widths must be dropped so the chips re-measure without a full rebuild.
-        project.stateModel.logRefresh.connect(this) { tree.treeDidChange() }
+        project.stateModel.logRefresh.connect(this) {
+            invalidateHydrated()
+            tree.treeDidChange()
+        }
         // Registered against this panel (not project.stateModel) so closing a log tab
         // unregisters these listeners along with everything else Disposer tears down for it,
         // rather than leaking them for the state model's project-wide lifetime.
         with(project.stateModel) {
-            references.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
+            references.connect(this@JujutsuBookmarksPanel) {
+                invalidateHydrated()
+                queueRebuild()
+            }
             workingCopies.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
             closestBookmarks.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
             danglingHeads.connect(this@JujutsuBookmarksPanel) { queueRebuild() }
@@ -305,10 +355,16 @@ class JujutsuBookmarksPanel(
                         tree.selectionPath = path
                     }
                     val node = nodeFor(path) ?: return
-                    val group = actionGroupFor(node) ?: return
-                    val popupMenu = ActionManager.getInstance().createActionPopupMenu("Jujutsu.BookmarksPanel", group)
-                    popupMenu.setTargetComponent(tree)
-                    popupMenu.component.show(comp, x, y)
+                    // Show once any out-of-window targets are hydrated (jj-idea-6haf), so the menu is built with
+                    // their change actions; immediate when everything is already resolved.
+                    hydrateSelection {
+                        if (!comp.isShowing) return@hydrateSelection
+                        val group = actionGroupFor(node) ?: return@hydrateSelection
+                        val popupMenu =
+                            ActionManager.getInstance().createActionPopupMenu("Jujutsu.BookmarksPanel", group)
+                        popupMenu.setTargetComponent(tree)
+                        popupMenu.component.show(comp, x, y)
+                    }
                 }
             }
         )
@@ -478,33 +534,107 @@ class JujutsuBookmarksPanel(
     private fun refEntry(repo: JujutsuRepository, item: RefItem): LogEntry? =
         item.resolveEntry(repo, entryLookup, project.stateModel.references.value[repo]?.hiddenTargets.orEmpty())
 
-    /**
-     * The selection's bookmark/tag/dangling-head leaves resolved to real [LogEntry]s via
-     * [entryLookup], or `null` if the selection has no such leaves, or resolution failed for any
-     * one of them — a partial resolution (some bookmarks outside the loaded log window) must
-     * never let a change action silently act on a subset of what's selected. See
-     * [uiDataSnapshot].
-     */
-    private fun selectedLogEntries(): List<LogEntry>? {
+    /** The target [node] needs resolved, or `null` when it offers no change actions (hidden, or no target). */
+    private fun wantOf(node: BookmarkNode): Want? {
+        fun ofRef(repo: JujutsuRepository, item: RefItem): Want? =
+            item.takeUnless { it.hidden }?.id?.let { Want(repo, it, item.commitId) }
+        return when (node) {
+            is BookmarkNode.Local -> ofRef(node.repo, node.item)
+            is BookmarkNode.Remote -> ofRef(node.repo, node.item)
+            is BookmarkNode.Tag -> ofRef(node.repo, node.item)
+            is BookmarkNode.DanglingHead -> Want(node.repo, node.id, null)
+            else -> null
+        }
+    }
+
+    /** The entry for [want]: the log's loaded one, else one [hydrateSelection] fetched. */
+    private fun resolve(want: Want): LogEntry? =
+        entryLookup(ChangeKey(want.repo, want.id))
+            ?.takeIf { want.commitId == null || it.commitId == want.commitId }
+            ?: hydrated[want]
+
+    private fun selectedWants(): List<Want?>? {
         val leaves = selectedLeaves().filter {
             it is BookmarkNode.Local ||
                 it is BookmarkNode.Remote ||
                 it is BookmarkNode.Tag ||
                 it is BookmarkNode.DanglingHead
         }
-        if (leaves.isEmpty()) return null
-        val resolved = leaves.mapNotNull { node ->
-            // The change actions write by change id, which would hit the visible commit sharing a hidden target's
-            // id (jj-idea-wiz0), so a hidden target offers none: it only resolves for the tooltip.
-            when (node) {
-                is BookmarkNode.Local -> node.item.takeUnless { it.hidden }?.let { refEntry(node.repo, it) }
-                is BookmarkNode.Remote -> node.item.takeUnless { it.hidden }?.let { refEntry(node.repo, it) }
-                is BookmarkNode.Tag -> node.item.takeUnless { it.hidden }?.let { refEntry(node.repo, it) }
-                is BookmarkNode.DanglingHead -> entryLookup(ChangeKey(node.repo, node.id))
-                else -> null
+        return leaves.takeIf { it.isNotEmpty() }?.map(::wantOf)
+    }
+
+    /**
+     * The selection's bookmark/tag/dangling-head leaves resolved to real [LogEntry]s - from [entryLookup], or
+     * from what [hydrateSelection] fetched for leaves outside the loaded window - or `null` if the selection has
+     * no such leaves, or resolution failed for any one of them: a partial resolution must never let a change
+     * action silently act on a subset of what's selected. Never blocks on jj, so it is safe from [uiDataSnapshot].
+     * The change actions write by change id, which would hit the visible commit sharing a hidden target's id
+     * (jj-idea-wiz0), so a hidden target offers none.
+     */
+    private fun selectedLogEntries(): List<LogEntry>? {
+        val wants = selectedWants() ?: return null
+        val resolved = wants.mapNotNull { want -> want?.let(::resolve) }
+        return resolved.takeIf { it.size == wants.size }
+    }
+
+    private fun invalidateHydrated() {
+        hydrationGeneration++
+        hydrated.clear()
+    }
+
+    /**
+     * Fetches the selected leaves that [entryLookup] cannot resolve (their change is outside the log's loaded
+     * window, jj-idea-6haf) in ONE `jj log` per repo, then calls [onDone] on the EDT - immediately when there is
+     * nothing to fetch. Scoped to the selection and run only on selection change / popup, never on the references
+     * refresh, so it costs O(k) for k selected out-of-window leaves (capped at [HIDDEN_TARGET_LIMIT]), not
+     * O(bookmarks). Results are cached ([hydrated]); the fetch bumps the [ActivityTracker] so toolbar and keymap
+     * actions re-evaluate against them. A failed fetch leaves the leaves unresolved, so their change actions stay
+     * disabled as before. Call on the EDT.
+     */
+    private fun hydrateSelection(onDone: () -> Unit) {
+        val missing = selectedWants().orEmpty().filterNotNull().filter { resolve(it) == null }.distinct()
+        if (missing.isEmpty() || missing.size > HIDDEN_TARGET_LIMIT) return onDone()
+        val fresh = missing.filter { inFlight.add(it) }
+        waiters.add(missing.toMutableSet() to onDone)
+        if (fresh.isEmpty()) return
+        val generation = hydrationGeneration
+        lastFetch = ApplicationManager.getApplication().executeOnPooledThread {
+            val loaded = fresh.groupBy { it.repo }.mapValues { (repo, wants) ->
+                val revset = Expression(wants.joinToString(" | ") { (it.commitId?.full ?: it.id.full) })
+                runCatching { loadEntries(repo, revset) }.getOrDefault(emptyList())
+            }
+            runLater { finishHydration(fresh, loaded, generation) }
+        }
+    }
+
+    private fun finishHydration(
+        fetched: List<Want>,
+        loaded: Map<JujutsuRepository, List<LogEntry>>,
+        generation: Int
+    ) {
+        inFlight.removeAll(fetched.toSet())
+        if (!disposed && generation == hydrationGeneration) {
+            for (want in fetched) {
+                val entry = loaded[want.repo].orEmpty().firstOrNull {
+                    if (want.commitId != null) it.commitId == want.commitId else it.id == want.id
+                } ?: continue
+                hydrated[want] = entry
             }
         }
-        return resolved.takeIf { it.size == leaves.size }
+        val done = waiters.filter { (remaining, _) ->
+            remaining.removeAll(fetched.toSet())
+            remaining.isEmpty()
+        }
+        waiters.removeAll(done)
+        if (disposed) return
+        ActivityTracker.getInstance().inc()
+        done.forEach { (_, callback) -> callback() }
+    }
+
+    /** Test seam: waits for the last [hydrateSelection] fetch and runs the EDT work it queued. */
+    internal fun awaitHydration() {
+        lastFetch?.get()
+        com.intellij.util.ui.UIUtil.dispatchAllInvocationEvents()
     }
 
     /**
@@ -628,7 +758,9 @@ class JujutsuBookmarksPanel(
         is BookmarkNode.RepoGroup, is BookmarkNode.Category, is BookmarkNode.Prefix -> null
     }
 
-    override fun dispose() = Unit
+    override fun dispose() {
+        disposed = true
+    }
 
     private class BookmarkNodeRenderer(private val project: Project) : ColoredTreeCellRenderer() {
         override fun customizeCellRenderer(
@@ -768,3 +900,6 @@ class JujutsuBookmarksPanel(
         }
     }
 }
+
+/** Upper bound on [JujutsuBookmarksPanel]'s hydrated-entry cache (jj-idea-6haf). */
+private const val HYDRATED_CACHE_SIZE = 64

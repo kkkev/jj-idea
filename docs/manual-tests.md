@@ -2213,9 +2213,11 @@ selection does nothing; right-click for actions.
   (shortcut hints included)
 - [ ] jj-idea-p35f: Ctrl+Click two bookmark rows whose changes are both loaded in the log, then
   "New Change From These" — creates a merge change with both as parents
-- [ ] jj-idea-p35f: select a bookmark whose change is **not** in the currently loaded log window
-  (e.g. a far-back bookmark in a filtered/paginated log) — New Change/Edit/Rebase/Duplicate show
-  disabled rather than acting on the wrong change
+- [ ] jj-idea-6haf: select a bookmark or tag whose change is **not** in the currently loaded log
+  window (e.g. a far-back bookmark in a filtered/paginated log) and right-click — New
+  Change/Edit/Rebase/Duplicate are present and act on that bookmark's change (the menu may open a
+  moment late while it is fetched); an immutable target still has Edit/Rebase disabled. A hidden
+  (amended-away) remote target still offers none of them
 - [ ] jj-idea-lig7 (GitHub #107): `jj new` off a bookmarked change, twice, without moving the
   bookmark (leaving two unbookmarked heads) — an "Unbookmarked heads" group appears right after
   the "@" node and before "Local", listing both, each as "\<closest bookmark\> +n \<change id\>"

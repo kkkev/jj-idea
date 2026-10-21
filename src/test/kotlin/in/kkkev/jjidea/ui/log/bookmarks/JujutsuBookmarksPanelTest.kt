@@ -192,19 +192,19 @@ class JujutsuBookmarksPanelTest {
     }
 
     @Test
-    fun `uiDataSnapshot omits log entries when a selected bookmark's change is outside the loaded window`() {
-        // The default entryLookup (always null) stands in for "this bookmark's change isn't in
-        // the log table's currently-loaded window" - change actions must disable, not act on
-        // whatever happened to resolve.
+    fun `uiDataSnapshot omits log entries when a selected bookmark's change is outside the window and unloadable`() {
+        // Default entryLookup (always null) = outside the loaded window; the loader finds nothing (failed fetch):
+        // change actions must stay disabled, not act on whatever happened to resolve.
         val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
         val id = ChangeId("aaaaaaaa", "a")
         val bookmark = Bookmark("main")
 
         val fallbackDisposable = Disposer.newDisposable()
-        val panel = JujutsuBookmarksPanel(project.get())
+        val panel = JujutsuBookmarksPanel(project.get(), loadEntries = { _, _ -> emptyList() })
         try {
             HeadlessDataManager.fallbackToProductionDataManager(fallbackDisposable)
             selectLeaves(panel, BookmarkNode.Local(repo, BookmarkItem(bookmark, id), "main", onWorkingCopy = false))
+            panel.awaitHydration()
 
             val dataContext = DataManager.getInstance().getDataContext(panel.tree)
 
@@ -214,6 +214,138 @@ class JujutsuBookmarksPanelTest {
             JujutsuDataKeys.LOG_ENTRY.getData(dataContext) shouldBe null
         } finally {
             Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    // jj-idea-6haf: a bookmark outside the loaded log window is hydrated on selection, in one jj log per selection.
+
+    private fun outOfWindowFixture(): Triple<JujutsuRepository, List<ChangeId>, List<LogEntry>> {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val ids = listOf("aaaaaaaa", "bbbbbbbb", "cccccccc").map { ChangeId(it, it.take(1)) }
+        val entries = ids.mapIndexed { i, id -> LogEntry(repo, id, CommitId("${i + 1}".repeat(34)), "d$i") }
+        return Triple(repo, ids, entries)
+    }
+
+    private fun locals(repo: JujutsuRepository, ids: List<ChangeId>) = ids.mapIndexed { i, id ->
+        BookmarkNode.Local(repo, BookmarkItem(Bookmark("b$i"), id), "b$i", onWorkingCopy = false)
+    }
+
+    @Test
+    fun `selecting out-of-window bookmarks hydrates them with a single jj log`() {
+        val (repo, ids, entries) = outOfWindowFixture()
+        val revsets = mutableListOf<String>()
+        val fallbackDisposable = Disposer.newDisposable()
+        val panel = JujutsuBookmarksPanel(project.get(), loadEntries = { _, revset ->
+            revsets += revset.toString()
+            entries
+        })
+        try {
+            HeadlessDataManager.fallbackToProductionDataManager(fallbackDisposable)
+            val nodes = locals(repo, ids)
+            selectLeaves(panel, *nodes.toTypedArray())
+            panel.awaitHydration()
+
+            revsets.size shouldBe 1
+            ids.forEach { revsets[0].contains(it.full) shouldBe true }
+            val dataContext = DataManager.getInstance().getDataContext(panel.tree)
+            JujutsuDataKeys.LOG_ENTRIES.getData(dataContext) shouldBe entries
+            panel.actionGroupFor(nodes[0])!!.getChildren(null).mapNotNull { it.templateText }.shouldContain(
+                JujutsuBundle.message("log.action.duplicate")
+            )
+
+            // Re-selecting is served from the cache, and refresh bursts never fetch.
+            selectLeaves(panel, *nodes.toTypedArray())
+            panel.awaitHydration()
+            repeat(20) {
+                panel.scheduleRebuild()
+                panel.flushRebuildQueue()
+            }
+            panel.awaitHydration()
+            revsets.size shouldBe 1
+        } finally {
+            Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `a reference invalidation drops hydrated entries so the next selection fetches again`() {
+        val (repo, ids, entries) = outOfWindowFixture()
+        var calls = 0
+        val panel = JujutsuBookmarksPanel(project.get(), loadEntries = { _, _ ->
+            calls++
+            entries.take(1)
+        })
+        try {
+            val node = locals(repo, ids.take(1))
+            selectLeaves(panel, *node.toTypedArray())
+            panel.awaitHydration()
+            calls shouldBe 1
+
+            project.get().stateModel.logRefresh.notify(Unit)
+            drainBackgroundLoads(200)
+            selectLeaves(panel, *node.toTypedArray())
+            panel.awaitHydration()
+            calls shouldBe 2
+        } finally {
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `a hydrated entry for a different commit than the bookmark targets is not used`() {
+        val (repo, ids, entries) = outOfWindowFixture()
+        val staleCommit = CommitId("9".repeat(34))
+        val node = BookmarkNode.Local(
+            repo,
+            BookmarkItem(Bookmark("b0"), listOf(ids[0]), listOf(false), listOf(staleCommit), listOf(false)),
+            "b0",
+            onWorkingCopy = false
+        )
+        val fallbackDisposable = Disposer.newDisposable()
+        val panel = JujutsuBookmarksPanel(project.get(), loadEntries = { _, _ -> entries.take(1) })
+        try {
+            HeadlessDataManager.fallbackToProductionDataManager(fallbackDisposable)
+            selectLeaves(panel, node)
+            panel.awaitHydration()
+            JujutsuDataKeys.LOG_ENTRIES.getData(DataManager.getInstance().getDataContext(panel.tree)) shouldBe null
+        } finally {
+            Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `a hidden target and an in-window bookmark trigger no fetch`() {
+        val (repo, ids, entries) = outOfWindowFixture()
+        var calls = 0
+        val panel = JujutsuBookmarksPanel(
+            project.get(),
+            entryLookup = { key -> entries.firstOrNull { it.id == key.revision } },
+            loadEntries = { _, _ ->
+                calls++
+                emptyList()
+            }
+        )
+        try {
+            selectLeaves(panel, *locals(repo, ids.take(1)).toTypedArray())
+            panel.awaitHydration()
+            val hidden = BookmarkNode.Remote(
+                repo,
+                BookmarkItem(
+                    Bookmark("x@origin"),
+                    listOf(ChangeId("dddddddd", "d")),
+                    listOf(false),
+                    listOf(CommitId("8".repeat(34))),
+                    listOf(true)
+                ),
+                "x@origin"
+            )
+            selectLeaves(panel, hidden)
+            panel.awaitHydration()
+            calls shouldBe 0
+        } finally {
             Disposer.dispose(panel)
         }
     }

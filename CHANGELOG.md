@@ -36,11 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Advance Bookmark** now respects your `revsets.bookmark-advance-to` jj setting instead of always moving the bookmark to the working copy. ([#146](https://github.com/kkkev/jj-idea/issues/146))
 - Jujutsu menu actions (history, restore, compare, squash, split, diff) are now disabled for files that are ignored and not tracked, since jj has nothing to offer for them; **Annotate** is hidden. Tick **Tracked** to bring such a file under jj, and tracked-but-ignored files are unaffected.
 - Editing an immutable working copy (`jj edit --ignore-immutable`) no longer leaves you confused when your edits end up in a new change on top. That is jj's own protection, applied by any command that snapshots, including the plugin's background refreshes. The plugin now says so in a notification, and **Squash into Immutable Commit...** (also on the child's right-click menu) folds the edits back into the immutable commit after confirmation. ([#143](https://github.com/kkkev/jj-idea/issues/143))
+- **Change actions on far-back bookmarks and tags**: New Change, Edit, Rebase and Duplicate are now offered on a bookmarks-panel row whose change is outside the log's loaded window. They used to be missing from the menu. The row's change is fetched when you select it, so the menu may open a moment late.
+- Opening a file no longer shows a "nothing to annotate" balloon when annotations are preloaded in the background for a file that did not exist at the configured diff base.
 
 ## [0.9.1] - 2026-10-10
 
 ### Fixed
-- Opening a file no longer shows a "nothing to annotate" balloon when annotations are preloaded in the background for a file that did not exist at the configured diff base.
 
 ## [0.9.0] - 2026-10-10
 
