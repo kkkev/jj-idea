@@ -225,7 +225,7 @@ abstract class CommitTablePanel<D>(
                 Point(0, viewport.viewPosition.y + viewport.extentSize.height - 1)
             )
             if (lastVisibleRow < 0) return@addChangeListener
-            if (lastVisibleRow >= logTable.rowCount - PagedLogWindow.PAGE_ROWS) {
+            if (lastVisibleRow >= logTable.rowCount - dataLoader.loadMoreDistance) {
                 dataLoader.loadMore()
             }
         }

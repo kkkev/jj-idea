@@ -130,6 +130,7 @@ class PagedLogRevsetChangeTest {
             .also {
                 it.trickleEnabled = false
                 it.pageRows = 10 // short fake chains must span several pages
+                it.maxPageRows = 10 // fixed-size pages (instant fake fetches would otherwise double them)
             }
     }
 

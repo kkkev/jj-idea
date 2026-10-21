@@ -8,6 +8,8 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.ui.OnePixelSplitter
 import com.intellij.util.Alarm
+import com.intellij.util.ui.update.MergingUpdateQueue
+import com.intellij.util.ui.update.Update
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.ManagedActions
 import `in`.kkkev.jjidea.jj.ChangeId
@@ -22,6 +24,7 @@ import `in`.kkkev.jjidea.ui.common.CommitTablePanel
 import `in`.kkkev.jjidea.ui.log.bookmarks.BookmarksStripeButton
 import `in`.kkkev.jjidea.ui.log.bookmarks.JujutsuBookmarksPanel
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
+import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
@@ -337,9 +340,45 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         }
     }
 
+    // jj-idea-2570.9: every paged landing is a full snapshot whose apply costs O(loaded rows), so landings
+    // that arrive within one window (demand + trickle, or a backlog behind a busy EDT) apply once - the
+    // latest. Same pattern as UnifiedWorkingCopyPanel.reloadQueue (jj-idea-f21f).
+    //
+    // Nullable because the base constructor can call onDataLoaded (no repositories: the loader notifies
+    // synchronously) before this subclass's initializers run; that landing is re-posted until construction is done.
+    private var applyQueue: MergingUpdateQueue? = MergingUpdateQueue("logApply", 100, true, null, this)
+
+    @Volatile
+    private var latestData: UnifiedJujutsuLogDataLoader.Data? = null
+
+    /** Test seam for the apply scale guard: how many times [applyData] actually ran. */
+    var applyCount = 0
+        private set
+
+    /** Forces the apply queue to process pending updates synchronously (test seam). */
+    fun flushApplyQueue() = applyQueue?.flush()
+
     override fun onDataLoaded(newData: UnifiedJujutsuLogDataLoader.Data) {
         // A background load can land after the project/panel started closing (jj-idea-mrcv).
         if (Disposer.isDisposed(this) || project.isDisposed) return
+        val queue = applyQueue ?: return runLater { onDataLoaded(newData) }
+        val firstLoad = applyCount == 0
+        latestData = newData
+        queue.queue(Update.create("apply") { latestData?.let(::applyData) })
+        // The first paint must not wait out the window.
+        if (firstLoad) queue.flush()
+    }
+
+    private fun applyData(newData: UnifiedJujutsuLogDataLoader.Data) {
+        if (Disposer.isDisposed(this) || project.isDisposed) return
+        applyCount++
+        log.measurePerf("log-apply") { report ->
+            report.count("rows", newData.entries.size.toLong())
+            applyDataNow(newData)
+        }
+    }
+
+    private fun applyDataNow(newData: UnifiedJujutsuLogDataLoader.Data) {
         watchMergeEmptiness(newData.entries)
         // Store the full-set graph before setEntries() so refreshDisplayedGraph() can reuse it
         // immediately when no filter is active.

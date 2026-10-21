@@ -141,6 +141,7 @@ class RevsetLogFilterLoaderTest {
         return UnifiedJujutsuLogDataLoader(projectFx.get(), { listOf(repo) }, panel).also {
             it.trickleEnabled = false
             it.pageRows = 3
+            it.maxPageRows = 3
             repoRef = repo
         }
     }

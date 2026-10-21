@@ -1,5 +1,7 @@
 package `in`.kkkev.jjidea.ui.common
 
+import `in`.kkkev.jjidea.ui.log.PagedLogWindow
+
 /**
  * A data loader for a panel containing a commit table.
  */
@@ -24,6 +26,13 @@ interface DataLoader {
      * of the visible viewport. No-op for loaders that don't page.
      */
     fun loadMore() {}
+
+    /**
+     * How many rows from the bottom of the loaded table scrolling should trigger [loadMore]: about
+     * one page, so the next page is fetched before the user reaches the end. Grows with a loader
+     * whose pages grow (jj-idea-2570.9).
+     */
+    val loadMoreDistance: Int get() = PagedLogWindow.PAGE_ROWS
 
     /** Release any background work the loader started (e.g. the paged log's idle trickle). */
     fun close() {}

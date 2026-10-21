@@ -1080,7 +1080,8 @@ non-paged behavior is perceptible.
       between it and the old window (jj-idea-8qso) — see MT-LOG-GRAPH's "Long-edge navigation"
       (jj-idea-sc8m) subsection for the full hover/click behavior
 - [ ] jj-idea-2570.5 (idle trickle): on FX-STRESS (`SCALE=6 WITH_REMOTE=1`; pages are a fixed 500
-      rows, so "Changes to show" is irrelevant), open the log and *leave it alone*: older history keeps loading in the
+      rows for the first page, then sized so each fetch takes about 0.7 s, up to 8,000 — jj-idea-2570.9;
+      "Changes to show" is irrelevant), open the log and *leave it alone*: older history keeps loading in the
       background at a gentle pace (the scrollbar thumb slowly shrinks), faded stubs on screen
       connect to their parents without any scrolling or clicking, no old row ever appears ahead
       of the rows between, and the IDE stays responsive. It stops when the whole log is loaded or
@@ -1092,6 +1093,12 @@ non-paged behavior is perceptible.
       further pages at a consistent, flat pace — not slowing down page over page; the viewport
       stays where you scrolled to (does not jump back up to the selected/`@` row) each time a new
       page loads
+- [ ] jj-idea-2570.9 (landing granularity): on FX-SCALE-SET `r80k-git` (or `r36k-keycloak`), scroll
+      steadily to ~40k rows: the `perf: log-page` lines in idea.log
+      show `limit` growing from 500 (at most doubling per page, ceiling 8,000) while `took` stays near
+      700 ms (sweep with `-Djj.log.pageTargetMs=` / `-Djj.log.pageMaxRows=`), `perf: log-apply` lines appear far less often than once per 500
+      rows (landings arriving within ~100 ms apply once, as the latest), the first paint is not
+      delayed, and scrolling stays smooth with no new freezes at depth
 - [ ] Right-click → **New Change** (or **Describe**, **Squash**, **Abandon**): appears/updates
       at the top effectively immediately, regardless of how many pages you've scrolled through
 - [ ] jj-idea-wrza: scroll several pages deep, then run a write that adds a commit at the top

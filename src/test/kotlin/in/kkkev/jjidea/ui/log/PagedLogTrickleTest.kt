@@ -23,6 +23,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * jj-idea-2570.5 operation-count tests for the paged log's idle trickle: each
@@ -45,7 +46,9 @@ class PagedLogTrickleTest {
     private class FakeLogService(
         private val chain: List<LogEntry>,
         val getLogCalls: AtomicInteger,
-        val limits: MutableList<Int?> = CopyOnWriteArrayList()
+        val limits: MutableList<Int?> = CopyOnWriteArrayList(),
+        val clock: AtomicLong = AtomicLong(),
+        val nanosPerRow: Long = 0
     ) :
         LogService by mockk(relaxed = true) {
         override fun getLogHeads(revset: Revset): Result<List<ChangeId>> = Result.success(listOf(chain.first().id))
@@ -58,6 +61,7 @@ class PagedLogTrickleTest {
         ): Result<List<LogEntry>> {
             getLogCalls.incrementAndGet()
             limits += limit
+            clock.addAndGet((limit ?: chain.size) * nanosPerRow) // a fake fetch takes this long
             val ids = Regex("""present\(([^)]+)\)""").findAll(revset.toString()).map { it.groupValues[1] }.toSet()
             val start = ids.mapNotNull { id -> chain.indexOfFirst { it.id.full == id }.takeIf { it >= 0 } }
                 .minOrNull() ?: return Result.success(emptyList())
@@ -65,9 +69,14 @@ class PagedLogTrickleTest {
         }
     }
 
-    private class Fake(val repo: JujutsuRepository, val calls: AtomicInteger, val limits: List<Int?>)
+    private class Fake(
+        val repo: JujutsuRepository,
+        val calls: AtomicInteger,
+        val limits: List<Int?>,
+        val clock: AtomicLong
+    )
 
-    private fun fakeRepo(length: Int): Fake {
+    private fun fakeRepo(length: Int, msPerRow: Long = 0): Fake {
         val repo = mockk<JujutsuRepository>(relaxed = true)
         every { repo.displayName } returns "a"
         every { repo.directory } returns mockk<VirtualFile>(relaxed = true) { every { path } returns "/fake/a" }
@@ -82,21 +91,25 @@ class PagedLogTrickleTest {
         }
         val calls = AtomicInteger(0)
         val limits = CopyOnWriteArrayList<Int?>()
-        every { repo.logService } returns FakeLogService(chain, calls, limits)
+        val clock = AtomicLong()
+        every { repo.logService } returns FakeLogService(chain, calls, limits, clock, msPerRow * 1_000_000)
         every { repo.logCache } returns mockk<LogCache>(relaxed = true)
-        return Fake(repo, calls, limits)
+        return Fake(repo, calls, limits, clock)
     }
 
     private fun loaded(
         fake: Fake,
         rowCap: Int = TricklePolicy.ROW_CAP,
-        rows: Int = pageSize
+        rows: Int = pageSize,
+        maxRows: Int = PageSizePolicy.MAX_PAGE_ROWS
     ): UnifiedJujutsuLogDataLoader {
         val panel = mockk<CommitTablePanel<UnifiedJujutsuLogDataLoader.Data>>(relaxed = true)
         val loader = UnifiedJujutsuLogDataLoader(projectFx.get(), { listOf(fake.repo) }, panel)
         loader.trickleEnabled = false
         loader.trickleRowCap = rowCap
         loader.pageRows = rows
+        loader.maxPageRows = maxRows
+        loader.clockNanos = fake.clock::get
         loader.loadCommits()
         drainBackgroundLoads(1_000)
         return loader
@@ -105,7 +118,7 @@ class PagedLogTrickleTest {
     @Test
     fun `each tick loads one page until the log is exhausted, then stops and costs nothing`() {
         val fake = fakeRepo(length = 35) // pages of 10: 10 on load, then 10, 10, 5
-        val log = loaded(fake)
+        val log = loaded(fake, maxRows = pageSize) // fixed-size pages
         val afterLoad = fake.calls.get()
 
         repeat(3) { (log.trickleTick() != null) shouldBe true }
@@ -118,7 +131,7 @@ class PagedLogTrickleTest {
     @Test
     fun `stops at the row cap even though more history exists`() {
         val fake = fakeRepo(length = 400)
-        val log = loaded(fake, rowCap = 25) // 10 loaded; ticks bring it to 20, then 30
+        val log = loaded(fake, rowCap = 25, maxRows = pageSize) // 10 loaded; ticks bring it to 20, then 30
         val afterLoad = fake.calls.get()
 
         (log.trickleTick() != null) shouldBe true // 20 rows
@@ -140,15 +153,35 @@ class PagedLogTrickleTest {
         val settings = JujutsuSettings.getInstance(projectFx.get())
         settings.state.logChangeLimit = 10_000
         try {
-            val fake = fakeRepo(length = 1_700)
+            val fake = fakeRepo(length = 1_700, msPerRow = 1) // 500 rows take 500 ms, under the 700 ms budget
             val log = loaded(fake, rows = PagedLogWindow.PAGE_ROWS) // the production default
             log.trickleTick()
             log.trickleTick()
 
-            // Every fetch - the first paint included - is 500 rows, not the 10,000 setting.
-            fake.limits shouldBe List(3) { PagedLogWindow.PAGE_ROWS }
+            // The first paint is 500 rows, not the 10,000 setting; later pages are sized to the time budget
+            // (jj-idea-2570.9): 500 rows in 500 ms scales to 700 rows, which again take 700 ms.
+            fake.limits shouldBe listOf(PagedLogWindow.PAGE_ROWS, 700, 700)
         } finally {
             settings.state.logChangeLimit = 500
         }
+    }
+
+    @Test
+    fun `fast fetches grow pages by at most double per page, up to the ceiling`() {
+        val fake = fakeRepo(length = 200) // instant fetches
+        val log = loaded(fake, maxRows = 40)
+        repeat(4) { log.trickleTick() }
+
+        fake.limits shouldBe listOf(10, 20, 40, 40, 40)
+        fake.calls.get() shouldBe 5 // 150 rows in 5 fetches; fixed 10-row pages would need 15
+    }
+
+    @Test
+    fun `slow fetches keep pages at the first-page size`() {
+        val fake = fakeRepo(length = 200, msPerRow = 100) // 10 rows take 1 s, over the budget
+        val log = loaded(fake, maxRows = 40)
+        repeat(3) { log.trickleTick() }
+
+        fake.limits shouldBe List(4) { 10 }
     }
 }

@@ -10,7 +10,6 @@ import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
-import `in`.kkkev.jjidea.util.measurePerf
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import kotlinx.datetime.Instant
@@ -88,6 +87,10 @@ class UnifiedJujutsuLogDataLoader(
     // fallback already happened - see loadPagedOrFallback/tryPagedForceRefresh).
     private val pagedWindowByRepo = ConcurrentHashMap<JujutsuRepository, PagedLogWindow>()
 
+    // jj-idea-2570.9: the row limit [PageSizePolicy] chose for each repo's next page, from its last fetch.
+    // Only read for pages after the first, so a stale value after a window reset is never used for page 1.
+    private val nextLimitByRepo = ConcurrentHashMap<JujutsuRepository, Int>()
+
     // jj-idea-2c8k: PagedLogWindow is not thread-safe, and refresh()/forceRefresh()/loadMore()
     // can each be triggered from a different thread with no ordering guarantee between them
     // (a write's post-write refresh(), the toolbar's forceRefresh(), and the scroll listener's
@@ -129,10 +132,7 @@ class UnifiedJujutsuLogDataLoader(
             val waitedMs = (System.nanoTime() - readyAtNanos) / 1_000_000
             log.info("perf: log-edt-wait took ${waitedMs}ms [rows=%,d]".format(data.entries.size))
         }
-        log.measurePerf("log-apply") { report ->
-            report.count("rows", data.entries.size.toLong())
-            panel.onDataLoaded(data)
-        }
+        panel.onDataLoaded(data)
         ensureTrickle()
         log.info("Table updated with ${data.entries.size} commits and graph layout")
     }
@@ -315,11 +315,23 @@ class UnifiedJujutsuLogDataLoader(
             )
             return null
         }
-        val page = repo.logService.getLog(revset = window.pageRevset(), limit = window.pageSize).getOrElse {
+        // jj-idea-2570.9: page 1 is always the fixed first-page size; later pages are sized from how long
+        // the previous fetch took (PageSizePolicy), so the budget holds on slow hardware and wide graphs.
+        val limit = if (window.pageCount == 0) pageRows else nextLimitByRepo[repo] ?: pageRows
+        val startNanos = clockNanos()
+        val page = repo.logService.getLog(revset = window.pageRevset(), limit = limit).getOrElse {
             log.warn("Failed to fetch log page for ${repo.displayName}: ${it.message}")
             return null
         }
+        val fetchMs = (clockNanos() - startNanos) / 1_000_000
         window.recordPage(page)
+        // A short page is the end of history, not a measurement of how fast `limit` rows fetch.
+        if (page.size >= limit) {
+            val next = PageSizePolicy.next(limit, fetchMs, pageRows, maxPageRows)
+            nextLimitByRepo[repo] = next
+            loadMoreDistance = next
+            log.info("perf: log-page took ${fetchMs}ms [limit=%,d, next=%,d] (${repo.displayName})".format(limit, next))
+        }
         return window.entries
     }
 
@@ -783,12 +795,13 @@ class UnifiedJujutsuLogDataLoader(
         for (repo in repos) {
             val revset = settings.resolvedLogRevset(repo)
             if (revset == Revset.Default) return null
-            val targetPageCount = lockFor(repo).withLock {
-                (pagedWindowByRepo[repo]?.pageCount ?: 0).coerceAtLeast(1)
+            // Re-walk to at least the depth already loaded (pages grow, so count rows, not pages).
+            val targetRows = lockFor(repo).withLock {
+                (pagedWindowByRepo[repo]?.loadedCount ?: 0).coerceAtLeast(1)
             }
             val window = PagedLogWindow(revset, pageRows)
-            repeat(targetPageCount) {
-                if (!window.isExhausted && fetchOnePage(repo, window) == null) return null
+            while (!window.isExhausted && (window.pageCount == 0 || window.loadedCount < targetRows)) {
+                if (fetchOnePage(repo, window) == null) return null
             }
             freshWindows[repo] = window
         }
@@ -890,6 +903,12 @@ class UnifiedJujutsuLogDataLoader(
     @Volatile
     private var closed = false
 
+    // Kept as a cached value (not derived from a window) because the scroll listener reads it on the EDT
+    // without the repo lock, and a window is not thread-safe.
+    @Volatile
+    override var loadMoreDistance: Int = PagedLogWindow.PAGE_ROWS
+        private set
+
     /** Off switch for tests that count fetches and don't want background paging interleaved. */
     @Volatile
     internal var trickleEnabled = true
@@ -897,6 +916,14 @@ class UnifiedJujutsuLogDataLoader(
     /** [PagedLogWindow.PAGE_ROWS]; a var only so tests can page a short fake chain. */
     @Volatile
     internal var pageRows = PagedLogWindow.PAGE_ROWS
+
+    /** [PageSizePolicy.MAX_PAGE_ROWS]; a var only so tests can reach the ceiling on a short fake chain. */
+    @Volatile
+    internal var maxPageRows = PageSizePolicy.MAX_PAGE_ROWS
+
+    /** Time source for fetch timing; a var only so tests can fake slow and fast fetches. */
+    @Volatile
+    internal var clockNanos: () -> Long = System::nanoTime
 
     /** [TricklePolicy.ROW_CAP]; a var only so tests can reach it without a 10,000-row fake. */
     @Volatile
