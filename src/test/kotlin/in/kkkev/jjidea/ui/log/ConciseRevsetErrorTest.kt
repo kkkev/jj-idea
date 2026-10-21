@@ -51,4 +51,51 @@ class ConciseRevsetErrorTest {
         conciseRevsetError("Error: Revision `nosuchbookmark` doesn't exist") shouldBe
             "Revision `nosuchbookmark` doesn't exist"
     }
+
+    @Test
+    fun `an error inside an alias reports the failure within its definition`() {
+        val message =
+            """
+            Error from jj log: Error: Failed to parse revset: In alias `pref1`
+            Caused by:
+            1:  --> 1:1
+              |
+            1 | pref1
+              | ^---^
+              |
+              = In alias `pref1`
+            2:  --> 1:49
+              |
+            1 | @ | ancestors(trunk()..visible_heads() & mine()), 2) | trunk()
+              |                                                 ^---
+              |
+              = expected <EOI>, `-`, `+`, `::`, `..`, `|`, `&`, or `~`
+            Hint: See https://docs.jj-vcs.dev/latest/revsets/
+            """.trimIndent()
+
+        val concise = conciseRevsetError(message)
+
+        concise shouldBe
+            "Failed to parse revset: In alias `pref1`: expected <EOI>, `-`, `+`, `::`, `..`, `|`, `&`, or `~` (column 49)"
+        concise shouldNotContain "Error from"
+        concise shouldNotContain "-->"
+    }
+
+    @Test
+    fun `the jj log prefix is dropped from a syntax error`() {
+        val message =
+            """
+            Error from jj log: Error: Failed to parse revset: Syntax error
+            Caused by:  --> 1:5
+              |
+            1 | foo(
+              |     ^---
+              |
+              = expected <strict_identifier> or <expression>
+            Hint: See docs
+            """.trimIndent()
+
+        conciseRevsetError(message) shouldBe
+            "Failed to parse revset: Syntax error: expected <strict_identifier> or <expression> (column 5)"
+    }
 }

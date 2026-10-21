@@ -59,25 +59,55 @@ internal fun validateRevsetFilter(
 
 private val ERROR_COLUMN = Regex("""-->\s*\d+:(\d+)""")
 private val ERROR_DETAIL = Regex("""^\s*=\s*(.+)$""")
-private val ERROR_CAUSE = Regex("""^\s*\d+:\s*(.+)$""")
+private val ERROR_CAUSE_START = Regex("""^(\d+):\s*(.*)$""")
+private const val CAUSED_BY = "Caused by:"
+
+/** One link of jj's "Caused by:" chain: its first line plus the frame lines that follow it. */
+private class ErrorCause(val first: String, val body: MutableList<String> = mutableListOf()) {
+    private val isFrame get() = first.startsWith("-->")
+    val column get() = if (isFrame) ERROR_COLUMN.find(first)?.groupValues?.get(1) else null
+    val detail get() = if (isFrame) {
+        body.firstNotNullOfOrNull { ERROR_DETAIL.find(it)?.groupValues?.get(1) }
+    } else {
+        first.ifEmpty { null }
+    }
+}
+
+private fun errorCauses(lines: List<String>): List<ErrorCause> {
+    val start = lines.indexOfFirst { it.contains(CAUSED_BY) }
+    if (start < 0) return emptyList()
+    val causes = mutableListOf<ErrorCause>()
+    val firstRest = lines[start].substringAfter(CAUSED_BY).trim()
+    // A lone cause starts on the "Caused by:" line itself; a chain numbers each cause on the lines below.
+    val numbered = lines.drop(start + 1).any { ERROR_CAUSE_START.matches(it) }
+    if (!numbered) causes += ErrorCause(firstRest)
+    for (line in lines.drop(start + 1)) {
+        if (line.startsWith("Hint:")) break
+        val m = ERROR_CAUSE_START.find(line)
+        if (m != null) causes += ErrorCause(m.groupValues[2].trim()) else causes.lastOrNull()?.body?.add(line)
+    }
+    return causes
+}
 
 /**
  * Boils a jj revset error down to one line for a tooltip or the status bar. jj prints the failing
  * revset back as a framed snippet (`1 | heads(` with `|` gutters and a caret line), which for a
  * compiled log filter would expose the terms other filters contributed; this keeps only the
- * headline, the `= ...` explanation (or the innermost numbered cause) and the column, and drops the
- * snippet and the hints. A message with no such structure ("Revision `x` doesn't exist") is returned
- * trimmed, minus any `Error: ` prefix.
+ * headline (after any `Error from jj log: ` prefix), the innermost cause's explanation (its text, or
+ * the `= ...` line of its frame) and the column of the innermost frame, and drops the snippet and the
+ * hints. An error raised inside a revset alias has a chain of causes (the alias reference, then the
+ * failure within its definition), so the last one is the one that matters. A message with no such
+ * structure ("Revision `x` doesn't exist") is returned trimmed, minus any `Error: ` prefix.
  */
 internal fun conciseRevsetError(message: String): String {
     val lines = message.lines()
-    val headline = lines.firstOrNull { it.trimStart().startsWith("Error:") }
-        ?.trim()?.removePrefix("Error:")?.trim()
+    val headline = lines.firstOrNull { it.contains("Error:") }
+        ?.substringAfter("Error:")?.trim()
         ?: lines.firstOrNull { it.isNotBlank() }?.trim()
         ?: return message.trim()
-    val detail = lines.mapNotNull { ERROR_CAUSE.find(it)?.groupValues?.get(1) }.lastOrNull()
-        ?: lines.mapNotNull { ERROR_DETAIL.find(it)?.groupValues?.get(1) }.firstOrNull()
-    val column = lines.firstNotNullOfOrNull { ERROR_COLUMN.find(it)?.groupValues?.get(1) }
+    val causes = errorCauses(lines)
+    val detail = causes.lastOrNull()?.detail
+    val column = causes.lastOrNull { it.column != null }?.column
     return buildString {
         append(headline)
         if (detail != null && detail != headline) append(": ").append(detail)

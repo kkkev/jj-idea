@@ -22,9 +22,10 @@ import `in`.kkkev.jjidea.util.runLater
  * "Save as revset alias…" (jj-idea-ehwm.6, GitHub #116/#150): writes [expression] to jj config as
  * `revset-aliases.<name>`, in the user config or - for every repo in [repos] - the repo config.
  *
- * Asks before overwriting an existing alias, and checks that the saved name resolves against every
- * repo ([validateRevsetFilter]) before calling [onSaved], so the caller never switches its input to a
- * name jj can't resolve. Work is O(#repos) `jj config` processes plus one `--limit 1` log per repo.
+ * Refuses an expression jj can't parse (nothing is written), asks before overwriting an existing alias,
+ * and checks that the saved name resolves against every repo ([validateRevsetFilter]) before calling
+ * [onSaved], so the caller never switches its input to a name jj can't resolve. Work is O(#repos)
+ * `jj config` processes plus two `--limit 1` logs per repo.
  */
 class SaveRevsetAliasDialog(
     private val repos: Collection<JujutsuRepository>,
@@ -34,9 +35,11 @@ class SaveRevsetAliasDialog(
 ) : DialogWrapper(repos.first().project) {
     private val project = repos.first().project
     private val nameField = JBTextField()
+    private val expressionField = JBTextField(expression)
     private var scope = CommandExecutor.ConfigScope.USER
 
     private val name get() = nameField.text.trim()
+    private val currentExpression get() = expressionField.text.trim()
 
     init {
         title = JujutsuBundle.message("log.filter.revset.alias.title")
@@ -45,8 +48,8 @@ class SaveRevsetAliasDialog(
 
     override fun createCenterPanel() = panel {
         row(JujutsuBundle.message("log.filter.revset.alias.expression")) {
-            // Selectable so it can be copied, not editable: the alias is exactly what the input held.
-            cell(JBTextField(expression).apply { isEditable = false }).columns(COLUMNS_MEDIUM)
+            // Editable so an expression jj rejects can be fixed without leaving the dialog.
+            cell(expressionField).columns(COLUMNS_MEDIUM)
         }
         row(JujutsuBundle.message("log.filter.revset.alias.name")) {
             cell(nameField).focused().columns(COLUMNS_MEDIUM)
@@ -76,22 +79,38 @@ class SaveRevsetAliasDialog(
     }
 
     override fun doOKAction() {
+        if (currentExpression.isEmpty()) {
+            setErrorText(JujutsuBundle.message("log.filter.revset.alias.error.empty"), expressionField)
+            return
+        }
         if (name.isEmpty() || !isValidRevsetAliasName(name)) {
             setErrorText(JujutsuBundle.message("log.filter.revset.alias.error.name"), nameField)
             return
         }
         val aliasName = name
         val aliasScope = scope
+        val revset = currentExpression
         // The user config is shared by every repo, so one write is enough; repo scope writes each repo's own.
         val targets = if (aliasScope == CommandExecutor.ConfigScope.USER) listOf(repos.first()) else repos.toList()
 
         isOKActionEnabled = false
         setErrorText(null)
         runInBackground {
-            val existing = targets.filter { revsetAliasExists(it.commandExecutor, aliasScope, aliasName) }
+            val invalid = validateRevsetFilter(repos, revset, baseFor).values.firstOrNull()
+            val existing = if (invalid == null) {
+                targets.filter { revsetAliasExists(it.commandExecutor, aliasScope, aliasName) }
+            } else {
+                emptyList()
+            }
             runLater {
-                if (existing.isEmpty() || confirmOverwrite(aliasName)) {
-                    save(aliasName, aliasScope, targets)
+                if (invalid != null) {
+                    isOKActionEnabled = true
+                    setErrorText(
+                        JujutsuBundle.message("log.filter.revset.alias.error.invalid", conciseRevsetError(invalid)),
+                        expressionField
+                    )
+                } else if (existing.isEmpty() || confirmOverwrite(aliasName)) {
+                    save(aliasName, aliasScope, targets, revset)
                 } else {
                     isOKActionEnabled = true
                 }
@@ -106,10 +125,15 @@ class SaveRevsetAliasDialog(
         Messages.getWarningIcon()
     ) == Messages.YES
 
-    private fun save(aliasName: String, aliasScope: CommandExecutor.ConfigScope, targets: List<JujutsuRepository>) {
+    private fun save(
+        aliasName: String,
+        aliasScope: CommandExecutor.ConfigScope,
+        targets: List<JujutsuRepository>,
+        revset: String
+    ) {
         runInBackground {
             val failure = targets
-                .map { saveRevsetAlias(it.commandExecutor, aliasScope, aliasName, expression) }
+                .map { saveRevsetAlias(it.commandExecutor, aliasScope, aliasName, revset) }
                 .firstOrNull { it is CommandResult.Failure }
             val error = when {
                 failure != null -> JujutsuBundle.message("log.filter.revset.alias.error.save", failure.stderr.trim())

@@ -910,6 +910,10 @@ terminal with `jj config list revset-aliases` and `jj log -r mine`.
       reads `mine`, the rows are unchanged, and `jj config list revset-aliases` shows the expression with its quotes intact
 - [ ] Restart the IDE: the tab's scope is still `mine`
 - [ ] Repeat with name `mine` again: an "already exists" confirmation appears; **No** keeps the dialog open, **Yes** overwrites
+- [ ] In the dialog the Revset field is editable: after an invalid-revset refusal, fix the expression there and OK saves it
+- [ ] Type an invalid revset (e.g. `ancestors(trunk(), 2) )` with a stray `)`) and press Enter in the Scope popup: the field turns red with a
+      wrapped error balloon (not a truncated label). Via **Save as alias…** + OK the dialog refuses with "Not a valid revset, alias not
+      saved: …" and `jj config list revset-aliases` has no new entry
 - [ ] Choose **Repository config** in a multi-repo project: the alias is written to each repo's own config only
 - [ ] Edit the alias in the config file, then change another filter: the tab follows the new definition
 - [ ] In the search box turn revset mode on: a **Save as alias…** toolbar button appears, disabled while the box is empty and when

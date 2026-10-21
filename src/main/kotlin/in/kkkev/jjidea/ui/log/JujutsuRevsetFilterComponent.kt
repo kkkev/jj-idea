@@ -2,6 +2,8 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.ui.ComponentValidator
+import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.ui.DocumentAdapter
@@ -9,7 +11,6 @@ import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.NamedColorUtil
 import com.intellij.util.ui.UIUtil
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
@@ -112,6 +113,7 @@ class JujutsuRevsetFilterComponent(
             .setCancelKeyEnabled(true)
             .createPopup()
         panel.popup = popup
+        panel.installValidator(popup)
         popup.showUnderneathOf(this)
     }
 
@@ -129,10 +131,10 @@ class JujutsuRevsetFilterComponent(
 
     private fun formatErrors(errors: Map<JujutsuRepository, String>): String =
         if (errors.size == 1) {
-            JujutsuBundle.message("log.filter.revset.error", errors.values.first())
+            JujutsuBundle.message("log.filter.revset.error", conciseRevsetError(errors.values.first()))
         } else {
-            errors.entries.joinToString("; ") { (repo, message) ->
-                JujutsuBundle.message("log.filter.revset.error.multiple", repo.displayName, message)
+            errors.entries.joinToString("\n") { (repo, message) ->
+                JujutsuBundle.message("log.filter.revset.error.multiple", repo.displayName, conciseRevsetError(message))
             }
         }
 
@@ -154,6 +156,13 @@ class JujutsuRevsetFilterComponent(
         private val aliasLink = HyperlinkLabel(JujutsuBundle.message("log.filter.revset.alias.action")).apply {
             toolTipText = JujutsuBundle.message("log.filter.revset.alias.tooltip")
             addHyperlinkListener { saveAsAlias() }
+        }
+
+        private var validator: ComponentValidator? = null
+
+        /** Errors show as the platform's validation balloon (as in the alias dialog), so long ones wrap rather than truncate. */
+        fun installValidator(parent: JBPopup) {
+            validator = ComponentValidator(parent).installOn(searchField.textEditor)
         }
 
         val preferredFocus get() = searchField.textEditor
@@ -235,11 +244,7 @@ class JujutsuRevsetFilterComponent(
         }
 
         private fun setError(message: String?) {
-            statusLabel.text = message ?: JujutsuBundle.message("log.filter.revset.hint")
-            statusLabel.foreground =
-                if (message != null) NamedColorUtil.getErrorForeground() else UIUtil.getLabelInfoForeground()
-            searchField.textEditor.putClientProperty("JComponent.outline", if (message != null) "error" else null)
-            searchField.textEditor.repaint()
+            validator?.updateInfo(message?.let { ValidationInfo(it, searchField.textEditor) })
         }
     }
 
