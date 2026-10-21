@@ -57,7 +57,7 @@ internal fun validateRevsetFilter(
     return errors
 }
 
-private val ERROR_COLUMN = Regex("""-->\s*\d+:(\d+)""")
+private val ERROR_COLUMN = Regex("""-->\s*(\d+):(\d+)""")
 private val ERROR_DETAIL = Regex("""^\s*=\s*(.+)$""")
 private val ERROR_CAUSE_START = Regex("""^(\d+):\s*(.*)$""")
 private const val CAUSED_BY = "Caused by:"
@@ -65,7 +65,7 @@ private const val CAUSED_BY = "Caused by:"
 /** One link of jj's "Caused by:" chain: its first line plus the frame lines that follow it. */
 private class ErrorCause(val first: String, val body: MutableList<String> = mutableListOf()) {
     private val isFrame get() = first.startsWith("-->")
-    val column get() = if (isFrame) ERROR_COLUMN.find(first)?.groupValues?.get(1) else null
+    val column get() = if (isFrame) ERROR_COLUMN.find(first)?.groupValues?.get(2) else null
     val detail get() = if (isFrame) {
         body.firstNotNullOfOrNull { ERROR_DETAIL.find(it)?.groupValues?.get(1) }
     } else {
@@ -88,6 +88,15 @@ private fun errorCauses(lines: List<String>): List<ErrorCause> {
     }
     return causes
 }
+
+/**
+ * The 1-based (line, column) jj reports for a revset parse error (`--> 1:7`), or null when the message
+ * has none. The position refers to the text jj parsed, so it only maps onto a field's own text when
+ * jj validated that text alone.
+ */
+internal fun revsetErrorPosition(message: String): Pair<Int, Int>? = message.lineSequence()
+    .firstNotNullOfOrNull { ERROR_COLUMN.find(it) }
+    ?.let { it.groupValues[1].toInt() to it.groupValues[2].toInt() }
 
 /**
  * Boils a jj revset error down to one line for a tooltip or the status bar. jj prints the failing

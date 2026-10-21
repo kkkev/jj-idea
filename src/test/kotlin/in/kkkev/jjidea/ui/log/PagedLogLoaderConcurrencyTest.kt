@@ -109,7 +109,9 @@ class PagedLogLoaderConcurrencyTest {
         @Volatile
         var releaseLatch: CountDownLatch? = null
 
-        override fun getLogHeads(revset: Revset): Result<List<ChangeId>> = Result.success(listOf(chain.first().id))
+        override fun getLogHeads(revset: Revset, quiet: Boolean): Result<List<ChangeId>> = Result.success(
+            listOf(chain.first().id)
+        )
 
         override fun getLog(
             revset: Revset,

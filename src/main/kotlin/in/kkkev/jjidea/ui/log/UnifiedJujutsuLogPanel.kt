@@ -296,7 +296,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
                     showRevsetError(errors.values)
                 } else {
                     val message = own.values.map(::conciseRevsetError).distinct().joinToString("; ")
-                    searchField.setError(message)
+                    searchField.setError(message, own.values.firstNotNullOfOrNull(::revsetErrorPosition))
                     showStatusMessage(JujutsuBundle.message("log.status.revset.search.error", message))
                 }
             }
@@ -512,6 +512,7 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
      */
     override fun createScopeComponent(): JujutsuFilterComponent {
         val component = JujutsuRevsetFilterComponent(
+            project = project,
             repos = { config.selectedRepos(project.initialisedJujutsuRepositories) },
             baseFor = { repo -> JujutsuSettings.getInstance(project).resolvedLogRevset(repo) },
             tableModel = logTable.logModel
@@ -522,6 +523,8 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         revsetFilterComponent = component
         return component
     }
+
+    override fun searchRepos() = config.selectedRepos(project.initialisedJujutsuRepositories)
 
     override fun onSaveRevsetAliasRequested(text: String) {
         val repos = config.selectedRepos(project.initialisedJujutsuRepositories)

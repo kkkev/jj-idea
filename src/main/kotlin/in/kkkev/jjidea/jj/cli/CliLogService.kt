@@ -119,7 +119,7 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
             )
         }
 
-    override fun getLogHeads(revset: Revset): Result<List<ChangeId>> {
+    override fun getLogHeads(revset: Revset, quiet: Boolean): Result<List<ChangeId>> {
         // Revset.Default means "omit -r, let jj's own revsets.log config decide" - there's no
         // revset syntax to wrap an *implicit* default in heads(...), only an explicit one.
         // Callers needing the frontier-cursor's heads seed must resolve to a concrete revset
@@ -127,12 +127,13 @@ class CliLogService(private val repo: JujutsuRepository) : LogService {
         if (revset == Revset.Default) {
             return Result.failure(VcsException("getLogHeads requires an explicit revset, not the default"))
         }
-        return getChangeIds(Expression("heads($revset)"))
+        return getChangeIds(Expression("heads($revset)"), quiet)
     }
 
-    override fun getChangeIds(revset: Revset): Result<List<ChangeId>> = getLog(
+    override fun getChangeIds(revset: Revset, quiet: Boolean): Result<List<ChangeId>> = getLog(
         logTemplates.changeIdOnlyTemplate,
-        revset
+        revset,
+        quiet = quiet
     )
 
     override fun getEmptiness(commitIds: Collection<CommitId>): Result<Map<CommitId, Boolean>> {

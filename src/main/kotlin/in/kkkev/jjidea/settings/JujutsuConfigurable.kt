@@ -32,6 +32,9 @@ import `in`.kkkev.jjidea.preview.AccessCode
 import `in`.kkkev.jjidea.preview.PreviewCodeStatus
 import `in`.kkkev.jjidea.preview.PreviewFeature
 import `in`.kkkev.jjidea.preview.PreviewFeatureSpec
+import `in`.kkkev.jjidea.ui.components.RevsetTextField
+import `in`.kkkev.jjidea.ui.log.conciseRevsetError
+import `in`.kkkev.jjidea.ui.log.revsetErrorPosition
 import `in`.kkkev.jjidea.ui.newchange.isValidMergeTemplate
 import `in`.kkkev.jjidea.ui.services.SPONSORS_URL
 import `in`.kkkev.jjidea.util.runInBackground
@@ -84,7 +87,7 @@ class JujutsuConfigurable(
     private val validationLabel = JBLabel()
 
     // Revset validation
-    private lateinit var revsetField: Cell<JBTextArea>
+    private lateinit var revsetField: Cell<RevsetTextField>
     private val revsetValidationPanel = JPanel().apply {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         isOpaque = false
@@ -93,7 +96,7 @@ class JujutsuConfigurable(
 
     // jj-idea-fwea: diff-base validation
     private lateinit var diffbaseCustomOption: Cell<JBRadioButton>
-    private lateinit var diffbaseRevsetField: Cell<JBTextField>
+    private lateinit var diffbaseRevsetField: Cell<RevsetTextField>
     private val diffbaseValidationLabel = JBLabel()
     private var diffbaseError: String? = null
 
@@ -123,7 +126,7 @@ class JujutsuConfigurable(
         val limitCb: JBCheckBox,
         val limitField: JBTextField,
         val revsetCb: JBCheckBox,
-        val revsetField: JBTextField,
+        val revsetField: RevsetTextField,
         // jj-idea-ixju: split into an override toggle + value checkbox, since the global default
         // can now itself be true - "unchecked value" must be distinguishable from "no override".
         val disableScanOverrideCb: JBCheckBox,
@@ -134,7 +137,7 @@ class JujutsuConfigurable(
         // jj-idea-fwea: per-repo diff-base override.
         val diffbaseOverrideCb: JBCheckBox,
         val diffbaseCombo: ComboBox<DiffbaseStrategy>,
-        val diffbaseRevsetField: JBTextField,
+        val diffbaseRevsetField: RevsetTextField,
         val revsetValidationLabel: JBLabel = JBLabel(),
         var revsetError: String? = null,
         // jj-idea-i0e6: filled in after the collapsibleGroup below builds them - a test seam
@@ -309,24 +312,27 @@ class JujutsuConfigurable(
                 // A multi-line field (jj-idea-bwdk) so its left edge lines up with the fields
                 // above instead of being indented under its own label, and so long expressions
                 // have room to be read without horizontal scrolling.
-                revsetField = textArea()
-                    .bindText(settings.state::logRevset)
-                    .rows(REVSET_FIELD_ROWS)
-                    .columns(COLUMNS_MEDIUM)
+                // An editor-based field (jj-idea-ehwm.7) with revset highlighting and completion.
+                // Enter inserts a literal newline, which jj's revset parser tolerates as
+                // insignificant whitespace, but nothing here encourages typing one.
+                revsetField = cell(newRevsetField(multiline = true))
+                    .bind(
+                        { it.text },
+                        { field, value -> field.text = value },
+                        settings.state::logRevset.toMutableProperty()
+                    )
+                    .applyToComponent { sizeToColumns(COLUMNS_MEDIUM, REVSET_FIELD_ROWS) }
                     .align(AlignX.FILL)
                     .resizableColumn()
-                    // Word-wrap only — the field holds one logical expression; Enter still
-                    // inserts a literal newline, which jj's revset parser tolerates as
-                    // insignificant whitespace, but nothing here encourages typing one.
-                    .applyToComponent {
-                        lineWrap = true
-                        wrapStyleWord = true
-                    }
+                    .revsetValidationRequestor()
                     .validationOnApply {
                         revsetError?.let { error(it) }
                     }
                     .also {
-                        it.component.document.addDocumentListener(clearErrorListener { revsetError = null })
+                        it.component.onTextChanged {
+                            revsetError = null
+                            it.component.setError(null)
+                        }
                     }
                     .comment(
                         JujutsuBundle.message("settings.log.revset.comment"),
@@ -387,14 +393,22 @@ class JujutsuConfigurable(
                 }
                 indent {
                     row {
-                        diffbaseRevsetField = textField()
-                            .bindText(settings.state::customDiffbaseRevset)
-                            .columns(COLUMNS_MEDIUM)
+                        diffbaseRevsetField = cell(newRevsetField())
+                            .bind(
+                                { it.text },
+                                { field, value -> field.text = value },
+                                settings.state::customDiffbaseRevset.toMutableProperty()
+                            )
+                            .applyToComponent { sizeToColumns(COLUMNS_MEDIUM) }
                             .align(AlignX.FILL)
                             .resizableColumn()
                             .enabledIf(diffbaseCustomOption.selected)
+                            .revsetValidationRequestor()
                             .also {
-                                it.component.document.addDocumentListener(clearErrorListener { diffbaseError = null })
+                                it.component.onTextChanged {
+                                    diffbaseError = null
+                                    it.component.setError(null)
+                                }
                             }
                             .validationOnApply {
                                 if (diffbaseCustomOption.component.isSelected && it.text.isBlank()) {
@@ -443,7 +457,7 @@ class JujutsuConfigurable(
                     val limitCb = JBCheckBox(JujutsuBundle.message("settings.repo.loglimit.override"))
                     val limitField = JBTextField()
                     val revsetCb = JBCheckBox(JujutsuBundle.message("settings.repo.logrevset.override"))
-                    val revsetField = JBTextField()
+                    val revsetField = newRevsetField()
                     val disableScanOverrideCb =
                         JBCheckBox(JujutsuBundle.message("settings.repo.disableignorescan.override"))
                     val disableScanCb = JBCheckBox(JujutsuBundle.message("settings.repo.disableignorescan"))
@@ -454,7 +468,7 @@ class JujutsuConfigurable(
                         @Suppress("removal")
                         renderer = SimpleListCellRenderer.create("") { diffbaseStrategyLabel(it) }
                     }
-                    val diffbaseRevsetField = JBTextField()
+                    val diffbaseRevsetField = newRevsetField()
 
                     // jj-idea-i0e6: read-only "In effect: ..." row, populated once the background
                     // load below resolves something to show - see effectiveIdentityHtml.
@@ -521,9 +535,9 @@ class JujutsuConfigurable(
                     nameField.document.addDocumentListener(dirtyListener)
                     emailField.document.addDocumentListener(dirtyListener)
                     limitField.document.addDocumentListener(dirtyListener)
-                    revsetField.document.addDocumentListener(dirtyListener)
+                    revsetField.onTextChanged { repoSettingsDirty = true }
                     contextField.document.addDocumentListener(dirtyListener)
-                    diffbaseRevsetField.document.addDocumentListener(dirtyListener)
+                    diffbaseRevsetField.onTextChanged { repoSettingsDirty = true }
 
                     // Load limit, revset, ignore-scan, context-window, and diff-base overrides (synchronous)
                     val repoPath = repo.directory.path
@@ -590,7 +604,10 @@ class JujutsuConfigurable(
                         diffbaseCombo,
                         diffbaseRevsetField
                     )
-                    revsetField.document.addDocumentListener(clearErrorListener { repoPanel.revsetError = null })
+                    revsetField.onTextChanged {
+                        repoPanel.revsetError = null
+                        revsetField.setError(null)
+                    }
                     repoSettingsPanels.add(repoPanel)
 
                     collapsibleGroup(repo.displayName) {
@@ -644,9 +661,10 @@ class JujutsuConfigurable(
                         }
                         indent {
                             row {
-                                cell(revsetField).columns(COLUMNS_MEDIUM)
+                                cell(revsetField).applyToComponent { sizeToColumns(COLUMNS_MEDIUM) }
                                     .align(AlignX.FILL)
                                     .resizableColumn()
+                                    .revsetValidationRequestor()
                                     .validationOnApply {
                                         if (revsetCb.isSelected) {
                                             repoPanel.revsetError?.let { error(it) }
@@ -691,9 +709,10 @@ class JujutsuConfigurable(
                             // Diff Base group above, which already keeps its custom-revset field
                             // on its own row (`:296-352`).
                             row {
-                                cell(diffbaseRevsetField).columns(COLUMNS_MEDIUM)
+                                cell(diffbaseRevsetField).applyToComponent { sizeToColumns(COLUMNS_MEDIUM) }
                                     .align(AlignX.FILL)
                                     .resizableColumn()
+                                    .revsetValidationRequestor()
                                     .validationOnApply {
                                         if (diffbaseOverrideCb.isSelected &&
                                             diffbaseCombo.selectedItem == DiffbaseStrategy.CUSTOM_REVSET &&
@@ -1140,12 +1159,18 @@ class JujutsuConfigurable(
                 revsetValidationPanel.removeAll()
                 revsetError = null
                 results.forEach { (repo, result, hasOverride) ->
+                    val target = if (hasOverride) {
+                        repoSettingsPanels.find { it.repo == repo }?.revsetField
+                    } else {
+                        revsetField.component
+                    }
+                    target?.markResult(result)
                     val (icon, msg) = if (result !is CommandExecutor.CommandResult.Success) {
-                        revsetError = result.stderr.trim()
+                        revsetError = conciseRevsetError(result.stderr)
                         AllIcons.General.Error to JujutsuBundle.message(
                             "settings.log.revset.test.error",
                             repo.displayName,
-                            result.stderr.trim()
+                            conciseRevsetError(result.stderr)
                         )
                     } else {
                         val count = result.stdout.length
@@ -1172,6 +1197,7 @@ class JujutsuConfigurable(
         runInBackground {
             val result = runRevsetTest(panel.repo, expression)
             runLater {
+                panel.revsetField.markResult(result)
                 if (result is CommandExecutor.CommandResult.Success) {
                     val count = result.stdout.length
                     showRevsetResult(
@@ -1181,7 +1207,7 @@ class JujutsuConfigurable(
                     )
                     panel.revsetError = null
                 } else {
-                    val errorMsg = result.stderr.trim()
+                    val errorMsg = conciseRevsetError(result.stderr)
                     showRevsetResult(
                         panel.revsetValidationLabel,
                         false,
@@ -1230,7 +1256,13 @@ class JujutsuConfigurable(
                 }
                 when {
                     failure != null -> {
-                        val errorMsg = failure.second.stderr.trim()
+                        val errorMsg = conciseRevsetError(failure.second.stderr)
+                        val failedPanel = repoSettingsPanels.find { it.repo == failure.first }
+                        val overridden = failedPanel?.diffbaseOverrideCb?.isSelected == true &&
+                            failedPanel.diffbaseCombo.selectedItem == DiffbaseStrategy.CUSTOM_REVSET
+                        val failedField =
+                            if (overridden) failedPanel.diffbaseRevsetField else diffbaseRevsetField.component
+                        failedField.markResult(failure.second)
                         diffbaseError = errorMsg
                         showRevsetResult(
                             diffbaseValidationLabel,
@@ -1252,6 +1284,7 @@ class JujutsuConfigurable(
 
                     else -> {
                         diffbaseError = null
+                        diffbaseRevsetField.component.setError(null)
                         showRevsetResult(
                             diffbaseValidationLabel,
                             true,
@@ -1497,6 +1530,23 @@ class JujutsuConfigurable(
             }
         }
     }
+
+    /**
+     * Re-validates when the text changes. The DSL can't guess a requestor for a custom component (it logs
+     * "Please, install Cell.validationRequestor"), so say which event it is.
+     */
+    private fun Cell<RevsetTextField>.revsetValidationRequestor() =
+        validationRequestor { _, validate -> component.onTextChanged(validate) }
+
+    /** Outlines [this] and underlines the token jj reports when [result] failed; clears both when it passed. */
+    private fun RevsetTextField.markResult(result: CommandExecutor.CommandResult) = when (result) {
+        is CommandExecutor.CommandResult.Success -> setError(null)
+        else -> setError(conciseRevsetError(result.stderr), revsetErrorPosition(result.stderr))
+    }
+
+    /** A revset input with highlighting and completion (jj-idea-ehwm.7), completing against this project's repos. */
+    private fun newRevsetField(multiline: Boolean = false) =
+        RevsetTextField(project, { repos.toList() }, multiline = multiline)
 
     private fun clearErrorListener(clear: () -> Unit) = object : javax.swing.event.DocumentListener {
         override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = clear()

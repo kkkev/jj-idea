@@ -48,7 +48,7 @@ class LogLoaderStaleWorkspaceTest {
         @Volatile
         var failure: String? = null
 
-        override fun getLogHeads(revset: Revset): Result<List<ChangeId>> =
+        override fun getLogHeads(revset: Revset, quiet: Boolean): Result<List<ChangeId>> =
             failure?.let { Result.failure(VcsException(it)) } ?: Result.success(listOf(entry().id))
 
         override fun getLog(

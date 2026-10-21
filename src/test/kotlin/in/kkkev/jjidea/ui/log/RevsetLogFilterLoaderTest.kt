@@ -69,7 +69,7 @@ class RevsetLogFilterLoaderTest {
             return chain.indices.filter { it >= start && it !in excluded }.filter(predicate(revset))
         }
 
-        override fun getLogHeads(revset: Revset): Result<List<ChangeId>> {
+        override fun getLogHeads(revset: Revset, quiet: Boolean): Result<List<ChangeId>> {
             if ("bad(" in revset.toString()) return Result.failure(RuntimeException("Error from jj log: bad revset"))
             if ("present(\"t\")" in revset.toString()) {
                 return Result.failure(RuntimeException("Error: Change ID prefix `t` is ambiguous"))

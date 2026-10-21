@@ -2,11 +2,11 @@ package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.icons.AllIcons
 import com.intellij.openapi.actionSystem.ActionGroup
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComponentValidator
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
-import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.HyperlinkLabel
 import com.intellij.ui.SearchTextField
 import com.intellij.ui.components.JBLabel
@@ -16,17 +16,13 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revset
-import `in`.kkkev.jjidea.ui.components.persistentHistorySearchField
+import `in`.kkkev.jjidea.ui.components.RevsetTextField
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
-import java.awt.Dimension
 import java.awt.FlowLayout
-import java.awt.event.KeyAdapter
-import java.awt.event.KeyEvent
 import javax.swing.Icon
 import javax.swing.JPanel
-import javax.swing.event.DocumentEvent
 
 /**
  * The log tab's Scope chip (jj-idea-vqpn, GitHub #116; jj-idea-ehwm.4): the tab's base revset,
@@ -45,6 +41,7 @@ import javax.swing.event.DocumentEvent
  * and returns an empty group.
  */
 class JujutsuRevsetFilterComponent(
+    private val project: Project,
     private val repos: () -> Collection<JujutsuRepository>,
     private val baseFor: (JujutsuRepository) -> Revset,
     private val tableModel: JujutsuLogTableModel
@@ -142,10 +139,15 @@ class JujutsuRevsetFilterComponent(
     private inner class EditPanel : JPanel(BorderLayout()) {
         var popup: JBPopup? = null
 
-        private val searchField = persistentHistorySearchField("jujutsu.log.scope.history").apply {
-            text = currentRevset
-            textEditor.emptyText.text = JujutsuBundle.message("log.filter.revset.placeholder")
-            preferredSize = Dimension(JBUI.scale(360), preferredSize.height)
+        private val searchField = RevsetTextField(
+            project,
+            { repos().toList() },
+            "jujutsu.log.scope.history",
+            placeholder = JujutsuBundle.message("log.filter.revset.placeholder"),
+            initialText = currentRevset,
+            popupAnchor = { this }
+        ).apply {
+            sizeToColumns(SCOPE_FIELD_COLUMNS)
         }
         private val statusLabel = JBLabel(JujutsuBundle.message("log.filter.revset.hint")).apply {
             foreground = UIUtil.getLabelInfoForeground()
@@ -162,10 +164,10 @@ class JujutsuRevsetFilterComponent(
 
         /** Errors show as the platform's validation balloon (as in the alias dialog), so long ones wrap rather than truncate. */
         fun installValidator(parent: JBPopup) {
-            validator = ComponentValidator(parent).installOn(searchField.textEditor)
+            validator = ComponentValidator(parent).installOn(searchField.editorField)
         }
 
-        val preferredFocus get() = searchField.textEditor
+        val preferredFocus get() = searchField.focusTarget
 
         init {
             border = JBUI.Borders.empty(6, 8)
@@ -188,19 +190,9 @@ class JujutsuRevsetFilterComponent(
             )
             add(searchField, BorderLayout.SOUTH)
 
-            searchField.textEditor.document.addDocumentListener(
-                object : DocumentAdapter() {
-                    override fun textChanged(e: DocumentEvent) = setError(null)
-                }
-            )
-            searchField.textEditor.addActionListener { apply() }
-            searchField.textEditor.addKeyListener(
-                object : KeyAdapter() {
-                    override fun keyPressed(e: KeyEvent) {
-                        if (e.keyCode == KeyEvent.VK_ESCAPE) popup?.cancel()
-                    }
-                }
-            )
+            searchField.onTextChanged { setError(null) }
+            searchField.onEnter = { apply() }
+            searchField.onEscape = { popup?.cancel() }
         }
 
         private fun apply() {
@@ -224,6 +216,26 @@ class JujutsuRevsetFilterComponent(
                     popup?.cancel()
                 } else {
                     setError(formatErrors(errors))
+                    locateError(text, errors)
+                }
+            }
+        }
+
+        /**
+         * [validate] checks the scope ANDed with the repo revset, so jj's column is about that compiled text.
+         * Re-checks the scope alone (one more `jj log` per repo, only on failure) to get a column that maps
+         * onto the field; if the scope passes alone the fault is the repo revset and nothing is underlined.
+         */
+        private fun locateError(text: String, errors: Map<JujutsuRepository, String>) {
+            val gen = generation
+            val repoSnapshot = repos()
+            runInBackground {
+                val own = validateRevsetFilter(repoSnapshot, text) { Revset.Default }
+                runLater {
+                    val position = own.values.firstNotNullOfOrNull(::revsetErrorPosition)
+                    if (gen == generation && position != null && searchField.text.trim() == text) {
+                        setError(formatErrors(errors), position)
+                    }
                 }
             }
         }
@@ -243,12 +255,17 @@ class JujutsuRevsetFilterComponent(
             }.show()
         }
 
-        private fun setError(message: String?) {
-            validator?.updateInfo(message?.let { ValidationInfo(it, searchField.textEditor) })
+        private fun setError(message: String?, position: Pair<Int, Int>? = null) {
+            statusLabel.text = JujutsuBundle.message("log.filter.revset.hint")
+            statusLabel.foreground = UIUtil.getLabelInfoForeground()
+            // The validator draws the outline and the balloon; the field adds the squiggle at jj's column.
+            validator?.updateInfo(message?.let { ValidationInfo(it, searchField.editorField) })
+            searchField.setError(message, position, showOutline = false)
         }
     }
 
     private companion object {
+        const val SCOPE_FIELD_COLUMNS = 70
         const val REVSET_DOCS = "https://docs.jj-vcs.dev/latest/revsets/"
     }
 }

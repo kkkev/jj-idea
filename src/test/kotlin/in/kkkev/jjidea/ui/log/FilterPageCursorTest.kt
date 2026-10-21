@@ -5,9 +5,12 @@ import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.Expression
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.LogService
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
+import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import org.junit.jupiter.api.Test
 
 /** The state machine behind jj-idea-ehwm.3's paged filter results; the jj queries themselves are in the loader. */
@@ -85,5 +88,17 @@ class FilterPageCursorTest {
 
         cursor.frontierTooWide(4) shouldBe true
         cursor.frontierTooWide(5) shouldBe false
+    }
+
+    @Test
+    fun `the head queries behind a filter run quietly`() {
+        val logService = mockk<LogService>()
+        val revset = Expression("(all()) & (mine())")
+        every { logService.getLogHeads(revset, any()) } returns Result.success(emptyList())
+
+        cursor().fetchNextPage(logService)
+
+        verify { logService.getLogHeads(revset, true) }
+        verify(exactly = 0) { logService.getLogHeads(revset, false) }
     }
 }

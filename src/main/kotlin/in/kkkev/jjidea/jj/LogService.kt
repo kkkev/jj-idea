@@ -77,17 +77,20 @@ interface LogService {
      * — every branch has a guaranteed entry point — holds from the first page. See
      * docs/design/jj-idea-2c8k-paged-log-loading.md for the full mechanism.
      * @param revset Revset to compute heads of (default: "all()")
+     * @param quiet If true, log a failure at INFO rather than WARN, as for [getLog]: set for a revset the user typed,
+     *   where a half-typed one failing is expected
      * @return List of change IDs at the heads of [revset], in jj's own returned order
      */
-    fun getLogHeads(revset: Revset = Expression.ALL): Result<List<ChangeId>>
+    fun getLogHeads(revset: Revset = Expression.ALL, quiet: Boolean = false): Result<List<ChangeId>>
 
     /**
      * Get just the change ids matching [revset] — no other metadata. Used by [getLogHeads].
      * A failure carries jj's own error message (e.g. an invalid revset).
      * @param revset Revset to query (default: "all()")
+     * @param quiet As for [getLogHeads]
      * @return List of change ids matching [revset], in jj's own returned order
      */
-    fun getChangeIds(revset: Revset = Expression.ALL): Result<List<ChangeId>>
+    fun getChangeIds(revset: Revset = Expression.ALL, quiet: Boolean = false): Result<List<ChangeId>>
 
     /**
      * Exact `empty` for each of [commitIds] in one `jj log` call - the expensive keyword the log template skips for

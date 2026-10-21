@@ -61,7 +61,7 @@ class PagedLogRevsetChangeTest {
         val headsRevsets = CopyOnWriteArrayList<String>()
         val pageFetches = AtomicInteger()
 
-        override fun getLogHeads(revset: Revset): Result<List<ChangeId>> {
+        override fun getLogHeads(revset: Revset, quiet: Boolean): Result<List<ChangeId>> {
             headsRevsets.add(revset.toString())
             if (headCount > 1) return Result.success((0 until headCount).map { ChangeId("h$it", "h$it") })
             return Result.success(listOf(chain.first().id))

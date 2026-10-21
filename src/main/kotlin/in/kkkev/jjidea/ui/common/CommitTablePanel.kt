@@ -20,6 +20,7 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.LazyActionById
+import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.RebaseSourceMode
 import `in`.kkkev.jjidea.jj.parseRebaseSourceMode
 import `in`.kkkev.jjidea.jj.stateModel
@@ -28,6 +29,7 @@ import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.LogSearchField
 import `in`.kkkev.jjidea.ui.log.*
 import `in`.kkkev.jjidea.util.runLater
+import `in`.kkkev.jjidea.vcs.initialisedJujutsuRepositories
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Point
@@ -113,7 +115,9 @@ abstract class CommitTablePanel<D>(
             onConfigChanged()
         },
         onSubmitted = { text -> onSearchSubmitted(text) },
-        onSaveRevsetAlias = if (revsetSearch) { text -> onSaveRevsetAliasRequested(text) } else null
+        onSaveRevsetAlias = if (revsetSearch) { text -> onSaveRevsetAliasRequested(text) } else null,
+        project = project,
+        repos = { searchRepos() }
     )
 
     // Filter options state — delegate to [searchField] so persistence (LogWindowConfig) and
@@ -415,6 +419,9 @@ abstract class CommitTablePanel<D>(
 
     /** The search box's "Save as alias…" (jj-idea-ehwm.6) was clicked with the revset [text]. */
     protected open fun onSaveRevsetAliasRequested(text: String) {}
+
+    /** The repositories the search box completes bookmarks, tags and aliases for. */
+    protected open fun searchRepos(): List<JujutsuRepository> = project.initialisedJujutsuRepositories.toList()
 
     /**
      * The toolbar Refresh button's full behaviour: re-read the log rows *and* every state

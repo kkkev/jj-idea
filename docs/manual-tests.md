@@ -32,6 +32,7 @@ Components whose blast radius exceeds their own package:
 | `ui/components/TextCanvas.kt`, `LogEntryText.kt`, `HtmlTextCanvas.kt`, `UnbreakableContent.kt`, `AtomicHtmlView.kt`, `HtmlIcons.kt`, `Linkifier.kt` | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-BOOKMARK](#mt-bookmark) |
 | Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details), [MT-DND](#mt-dnd) (the `@` marker's hit target, jj-idea-pk2c) |
 | `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff), [MT-DIFFBASE](#mt-diffbase) (quick action's "Choose revision...") |
+| Shared revset input (`ui/components/RevsetTextField.kt`, `RevsetCompletionProvider.kt`, `RevsetInputDialog.kt`, `jj/revset/`; used by the Scope popup, the log search box in revset mode, the Settings revset fields and the Set Diff Base → Custom revset dialog; jj-idea-ehwm.7) | [MT-LOG-FILTER](#mt-log-filter), [MT-SETTINGS](#mt-settings), [MT-DIFFBASE](#mt-diffbase) |
 | Shared commit picker (`ui/components/CommitPickerPanel.kt`, `ui/components/LogSearchField.kt`, used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split), [MT-BOOKMARK](#mt-bookmark), [MT-LOG-FILTER](#mt-log-filter) |
 | `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
@@ -919,6 +920,45 @@ terminal with `jj config list revset-aliases` and `jj log -r mine`.
 - [ ] In the search box turn revset mode on: a **Save as alias…** toolbar button appears, disabled while the box is empty and when
       revset mode is off. With text it opens the same dialog, and after saving the box holds the alias name and is filtered by it
 - [ ] The Rebase / Squash Into… / Move Bookmark to Change pickers and file history have no such button
+
+#### Revset highlighting, completion and history (jj-idea-ehwm.7)
+
+**Code:** `ui/components/RevsetTextField.kt`, `ui/components/RevsetCompletionProvider.kt`, `jj/revset/` (`RevsetLexer`, `RevsetSyntaxHighlighter`,
+`RevsetFunctions`, `RevsetCompletion`), `jj/cli/RevsetAliases.kt` (`listRevsetAliases`), `ui/components/LogSearchField.kt`,
+`ui/log/JujutsuRevsetFilterComponent.kt`
+
+The Scope popup and the search box (in revset mode) are editor-based fields: they colour the revset, complete it, and underline the
+column where jj reports a syntax error. jj remains the only validator.
+
+- [ ] Open the Scope popup and type `anc`: a completion list offers `ancestors` (with its `(x, [depth])` signature as tail text).
+      Accept it with Enter or Tab: the text becomes `ancestors()` with the caret **between** the parentheses and the list reopens
+- [ ] Accept a no-argument function such as `mine` — the caret ends **after** `mine()`
+- [ ] Type the first letters of a bookmark and of a tag in the repo: both are offered, labelled `bookmark` / `tag`
+- [ ] With a revset alias configured (e.g. the one from "Save as alias…"), type its first letters: it is offered, labelled `alias`.
+      Add an alias in a terminal, click out of the field and back in, and it is offered too
+- [ ] While the list is showing, **Enter** accepts the item and does **not** apply the scope; with no list showing, **Enter** applies it.
+      **Esc** closes the list first, and a second **Esc** closes the popup
+- [ ] Functions, strings (`"…"`), pattern kinds (`exact:`), operators (`&`, `|`, `::`) and parentheses are coloured differently; the colours
+      follow the IDE theme (try Light and Dark)
+- [ ] Type `heads(` and press Enter: the popup stays open, jj's message shows in a validation balloon by the field, the field has a red
+      outline and the character at the reported column is underlined. Editing the text removes the underline
+- [ ] Type a bad revset that only fails because of the Settings log revset (valid on its own): the message shows, there is no underline
+- [ ] Click the history icon at the left of the field: the last applied scopes (up to 5, most recent first) are listed; choosing one fills the
+      field. History written before this change (the same entries) is still there after upgrading
+- [ ] The × at the right of the field clears the text
+- [ ] Search box: with revset mode **off**, typing `foo(` shows plain text — no colours, no completion list. Turn revset mode on: the same
+      text is coloured and completion appears. Turn it off again: plain
+- [ ] Search box in revset mode: an invalid revset gets the red outline and the underline at jj's column (the column refers to the
+      search text alone, not to the scope); the border is red exactly once (no second outline inside it).
+      While you type half-formed revsets, `idea.log` gets no `CliExecutor … failed` WARN lines for them
+- [ ] Search box in revset mode: accepting a completion changes the text, so the log re-filters a moment later; that live filtering is expected
+- [ ] Search box, window wide enough that the box is inline: click into it (or Tab to it) — in **text** mode and in **revset** mode alike — and it
+      pops out into the wide popup under a chip showing the same text, with the caret in the field; typing (and, in revset mode, completion and
+      history) work there. Toggle revset mode on or off inside the popup: the box stays popped out. Click away or press Esc: the popup closes
+      and the box is inline again with the text intact. After Esc, focus returning to the box does **not** pop it out again; clicking the box does
+- [ ] Squeeze the log until the search box collapses to its chip; click the chip: the full field pops out with the toggles, completion and
+      history work inside the popup (the history list opens below the popup, not behind it), and Esc closes the popup
+- [ ] The Rebase / Squash Into… / Move Bookmark to Change pickers and file history keep their plain search box (no colours, no completion)
 
 #### Tab scope (Scope chip; jj-idea-vqpn, jj-idea-ehwm.4)
 
@@ -2983,7 +3023,8 @@ confirm that's no longer possible (below).
       checkbox that stays open), open editors' gutter markers widen to the full diff vs trunk
       right away, and reopening the popup shows the checkmark moved to "Latest immutable
       ancestor", not stuck on the old entry
-- [ ] "Custom revset..." with no override yet active opens an input dialog with an empty field;
+- [ ] "Custom revset..." with no override yet active opens an input dialog (a coloured, completing revset field; Enter accepts, unless a
+      completion list is showing) with an empty field;
       type `trunk()`, OK — gutters/Annotate rebase onto trunk; reopening the popup shows a
       trailing "Custom: `trunk()`" row, checked, and Settings → Version Control → Jujutsu shows
       the repo's "Override diff base" row checked with "Custom revset" and `trunk()` **verbatim**
@@ -3727,6 +3768,12 @@ Jujutsu → Preview features and tick **Manage Git remotes** (or start the IDE w
       limit), open the project — the value carries over; change any setting, wait for save —
       `.idea/jujutsu.xml` is deleted, `.idea/workspace.xml` contains `JujutsuSettings`, and
       `jj st` no longer lists `jujutsu.xml`; value persists across restart
+- [ ] (jj-idea-ehwm.7) The **Log revset**, the custom **Diff Base** revset, and each repository's override fields for them are coloured and
+      complete functions / bookmarks / tags / aliases as you type. In the multi-line Log revset field Enter inserts a newline. Type an invalid
+      revset, click **Test**: the result line shows a short one-line error (e.g. "Failed to parse revset: Syntax error: expected … (column 17)"),
+      not jj's raw framed snippet and hint; the field gets a red outline (also for an error with no column, such as an
+      unknown revision), and the character at jj's column, if any, is underlined; editing the text clears both. A completion list that is
+      open when you click **Test** closes. The IDE log shows no `Please, install Cell.validationRequestor` warning when Settings opens. Apply/Reset still round-trip the values, and a per-repo field is only editable while its checkbox is on
 - [ ] JJ executable path can be configured, including via the file picker
 - [ ] Auto-refresh toggle, change ID format preference (short/long), and log change limit
       each take effect as expected, and all settings persist across IDE restarts

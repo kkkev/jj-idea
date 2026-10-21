@@ -23,6 +23,7 @@ import `in`.kkkev.jjidea.settings.DiffbaseStrategy
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.components.Filter
 import `in`.kkkev.jjidea.ui.components.RevisionSelectorPopup
+import `in`.kkkev.jjidea.ui.components.RevsetInputDialog
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import `in`.kkkev.jjidea.vcs.diffbase.DiffbaseService
@@ -215,14 +216,13 @@ class SetDiffbaseAction : DumbAwareAction(
         } else {
             ""
         }
-        val revset = Messages.showInputDialog(
+        val revset = RevsetInputDialog.prompt(
             repo.project,
-            JujutsuBundle.message("action.diffbase.customRevset.message"),
+            listOf(repo),
             JujutsuBundle.message("action.diffbase.customRevset.title"),
-            null,
-            initial,
-            null
-        )?.trim()
+            JujutsuBundle.message("action.diffbase.customRevset.message"),
+            initial
+        )
         if (!revset.isNullOrEmpty()) {
             validateAndApplyCustomRevset(repo, revset)
         }

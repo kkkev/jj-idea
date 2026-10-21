@@ -70,7 +70,9 @@ class BookmarkCorrectionsReapplyTest {
         )
         // Paged loading is the only path (jj-idea-2570.4): serve the single row as page 1.
         every { repo.logService } returns object : LogService by mockk(relaxed = true) {
-            override fun getLogHeads(revset: Revset): Result<List<ChangeId>> = Result.success(listOf(entry.id))
+            override fun getLogHeads(revset: Revset, quiet: Boolean): Result<List<ChangeId>> = Result.success(
+                listOf(entry.id)
+            )
 
             override fun getLog(
                 revset: Revset,

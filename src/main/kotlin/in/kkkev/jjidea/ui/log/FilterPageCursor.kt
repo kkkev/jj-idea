@@ -94,7 +94,7 @@ internal class FrontierTooWide : Exception("log frontier too wide to page")
  */
 internal fun FilterPageCursor.fetchNextPage(logService: LogService): Result<List<LogEntry>> {
     if (pageCount == 0 && !isExhausted) {
-        seed(logService.getLogHeads(revset).getOrElse { return Result.failure(it) })
+        seed(logService.getLogHeads(revset, quiet = true).getOrElse { return Result.failure(it) })
     }
     if (isExhausted) return Result.success(entries)
     if (frontierTooWide(PagedLogWindow.FRONTIER_CAP)) return Result.failure(FrontierTooWide())
@@ -102,7 +102,12 @@ internal fun FilterPageCursor.fetchNextPage(logService: LogService): Result<List
     if (page.size < pageSize) {
         recordLastPage(page)
     } else {
-        recordPage(page, logService.getLogHeads(remainderRevset(page)).getOrElse { return Result.failure(it) })
+        recordPage(
+            page,
+            logService.getLogHeads(remainderRevset(page), quiet = true).getOrElse {
+                return Result.failure(it)
+            }
+        )
     }
     return Result.success(entries)
 }
