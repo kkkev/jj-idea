@@ -1004,6 +1004,11 @@ time. It never changes what jj loads for any other tab or dialog.
       save a tracked file, then refocus the IDE → the `@` row still updates (the `Operation heads of … changed`
       fallback in `idea.log`)
 - [ ] Log refreshes after VCS operations (describe, new, edit)
+- [ ] jj-idea-dndo / jj-idea-vwxu: stale workspace — add a second workspace (`jj workspace add ../ws2`), run
+      `jj describe -m x` in `ws2`, then open the original in the IDE (also try with the project already open and the
+      log tab visible) → no "Uncaught exception in background task" error dialog; exactly one "stale workspace"
+      balloon (not one per refresh); `idea.log` shows INFO "working copy is stale", not WARN or "jj may not be
+      installed"; click **Update stale workspace** → the log loads without pressing Refresh
 - [ ] Log refreshes after an **external** jj operation run in a terminal (e.g. `jj new`,
       `jj bookmark create`) within ~300 ms, without saving a file (op-heads watch) — this is the
       canonical auto-refresh check; other sections (bookmark widget, reference filter) reference

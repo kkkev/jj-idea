@@ -5,11 +5,13 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vcs.VcsException
 import com.intellij.util.concurrency.AppExecutorUtil
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.ui.common.BackgroundDataLoader
 import `in`.kkkev.jjidea.ui.common.CommitTablePanel
+import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import kotlinx.datetime.Instant
@@ -121,6 +123,26 @@ class UnifiedJujutsuLogDataLoader(
 
     override fun load() = loadCommits()
 
+    /** Seam for tests; production shows the per-root-deduped stale-workspace balloon (jj-idea-vwxu). */
+    @Volatile
+    internal var notifyStale: (Project, JujutsuRepository, RepositoryHealth) -> Unit =
+        JujutsuNotifications::notifyUnreadableRoot
+
+    /**
+     * A stale working copy is an expected user condition (jj-idea-dndo, jj-idea-vwxu): log at INFO and offer the
+     * "Update stale workspace" remedy via the balloon [notifyStale] shows, which is deduped per root and re-armed by
+     * the next successful working-copy read. Any other failure keeps its WARN.
+     */
+    private fun reportRepoFailure(repo: JujutsuRepository, what: String, error: Throwable) {
+        val health = classifyRepositoryFailure(error.message.orEmpty())
+        if (health is RepositoryHealth.Stale) {
+            log.info("$what for ${repo.displayName}: working copy is stale")
+            runLater { notifyStale(project, repo, health) }
+        } else {
+            log.warn("$what for ${repo.displayName}: ${error.message}")
+        }
+    }
+
     /**
      * Hands [data] to the panel on the EDT. [readyAtNanos] is when the background work finished
      * (from [System.nanoTime]); logging the gap to this call separates "the EDT was busy" (project
@@ -196,7 +218,7 @@ class UnifiedJujutsuLogDataLoader(
                             log.info("Loading commits from $repo cancelled")
                         } catch (e: Exception) {
                             errors[repo] = e
-                            log.warn("Exception loading commits from $repo: ${e.message}")
+                            reportRepoFailure(repo, "Exception loading commits", e)
                         } finally {
                             latch.countDown()
                         }
@@ -209,7 +231,11 @@ class UnifiedJujutsuLogDataLoader(
                 }
 
                 if (entriesByRepo.isEmpty() && errors.isNotEmpty()) {
-                    log.warn("All repositories failed to load - jj may not be installed")
+                    val allStale = errors.values.all {
+                        classifyRepositoryFailure(it.message.orEmpty()) is RepositoryHealth.Stale
+                    }
+                    val summary = "All repositories failed to load: ${errors.values.first().message}"
+                    if (allStale) log.info(summary) else log.warn(summary)
                     return@executeInBackground
                 }
 
@@ -301,7 +327,7 @@ class UnifiedJujutsuLogDataLoader(
     private fun fetchOnePage(repo: JujutsuRepository, window: PagedLogWindow): List<LogEntry>? {
         if (window.pageCount == 0) {
             val heads = repo.logService.getLogHeads(window.baseRevset).getOrElse {
-                log.warn("Failed to compute log heads for ${repo.displayName}: ${it.message}")
+                reportRepoFailure(repo, "Failed to compute log heads", it)
                 return null
             }
             window.seed(heads)
@@ -320,7 +346,7 @@ class UnifiedJujutsuLogDataLoader(
         val limit = if (window.pageCount == 0) pageRows else nextLimitByRepo[repo] ?: pageRows
         val startNanos = clockNanos()
         val page = repo.logService.getLog(revset = window.pageRevset(), limit = limit).getOrElse {
-            log.warn("Failed to fetch log page for ${repo.displayName}: ${it.message}")
+            reportRepoFailure(repo, "Failed to fetch log page", it)
             return null
         }
         val fetchMs = (clockNanos() - startNanos) / 1_000_000
@@ -349,7 +375,12 @@ class UnifiedJujutsuLogDataLoader(
     fun loadExpanding(repo: JujutsuRepository, changeId: ChangeId, onMissing: () -> Unit = {}) {
         val window = JujutsuSettings.getInstance(project).logContextWindow(repo)
         runInBackground {
-            val expansion = repo.logCache.loadContext(changeId, window)
+            val expansion = try {
+                repo.logCache.loadContext(changeId, window)
+            } catch (e: VcsException) {
+                reportRepoFailure(repo, "Failed to load log context", e)
+                return@runInBackground
+            }
             if (expansion.isEmpty()) {
                 runLater { onMissing() }
             } else {
@@ -571,7 +602,13 @@ class UnifiedJujutsuLogDataLoader(
      */
     private fun fullMergeAndNotify(correctionsByRepo: Map<JujutsuRepository, BookmarkCorrections>): Data? {
         val allEntries = repositories().flatMap { r ->
-            val regular = r.logCache.all
+            val regular = try {
+                r.logCache.all
+            } catch (e: VcsException) {
+                // Keep the last published rows rather than a partial merge (jj-idea-dndo).
+                reportRepoFailure(r, "Failed to read log", e)
+                return null
+            }
             val expanded = expansionEntriesByRepo[r] ?: emptyList()
             val filtered = filterEntriesByRepo[r] ?: emptyList()
             (regular + expanded + filtered).map { entry ->
