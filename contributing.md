@@ -360,10 +360,32 @@ parsing.
   surface. That checklist is the canonical pre-release regression list; it only stays
   useful if every PR that touches a manual surface updates it.
 
+### Keeping `docs/manual-tests.md` small
+
+The checklist is a description of how the plugin should behave *now*, not a changelog.
+When a change touches a manual surface, **edit the existing item or section in place**:
+
+- **Group by feature, not by bead.** Don't add a subsection named after the bead. Find the
+  feature's subsection and extend it; a new subsection is only for a new feature.
+- **Fix an existing item before adding one.** A bug fix usually changes an expectation in an
+  existing item (add a clause, or tighten it). Add a new item only for a behaviour no item
+  covers. Don't repeat a check that another section already makes — cross-reference it.
+- **State the expected behaviour only.** No "previously…", "regression:", "no longer…", "as
+  before" or a story of the bug. A bead id is fine as a trailing tag when it points to a
+  design or repro; it is not a substitute for saying what should happen.
+- **No one-off checks.** Migration steps ("a tab saved before this change…"), checks that the
+  fix itself is wired, and "graduated from preview" availability checks can't be re-run after
+  the release; leave them in the PR description.
+- **Delete what's automated.** When a test now covers a manual item, remove the item (and any
+  `→ automate:` marker) in the same PR.
+- **Keep the Release smoke list short.** `docs/manual-tests.md` opens with a one-line-per-check
+  smoke list run before every release. Add to it only for a surface a user would notice broken
+  within a minute, and tag the line with the section holding the deep checks.
+
 ### Manual regression scope as a deliverable
 
-`docs/manual-tests.md` has grown too large to run end-to-end for every change (~500
-checkboxes across 17 sections as of this writing). Any change touching a manual-testable
+`docs/manual-tests.md` has grown too large to run end-to-end for every change (~1,400
+checkboxes across 21 sections as of 2026-10; compression is tracked in jj-idea-pt25). Any change touching a manual-testable
 surface must:
 
 **(a)** identify which existing `docs/manual-tests.md` sections its blast radius reaches,

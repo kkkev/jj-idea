@@ -24,7 +24,9 @@ rules that supplement it.
 - **After any UI-affecting change**: report the exact manual smoke steps, update
   [docs/manual-tests.md](docs/manual-tests.md) if it adds or changes a manual-testable
   surface, and report a **Manual regression scope** — the `MT-*` section IDs to re-run,
-  derived per contributing.md § Manual regression scope as a deliverable.
+  derived per contributing.md § Manual regression scope as a deliverable. Edit existing
+  checklist items in place rather than appending a new subsection per bead — see
+  contributing.md § Keeping `docs/manual-tests.md` small.
 - Follow contributing.md's End of Task Checklist before declaring work done.
 - **When the user says "finish"**, run in order: `./gradlew check` → update `CHANGELOG.md`
   (add a user-facing entry under `[Unreleased]`) → if this finish is cutting a GitHub

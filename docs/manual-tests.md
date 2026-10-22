@@ -4,7 +4,7 @@ This document provides a comprehensive manual test checklist for the Jujutsu IDE
 tests require GUI interaction and should be verified manually using `./gradlew runIde`.
 
 Use this checklist:
-- Before releases, as a full regression pass
+- Before releases: the [Release smoke](#release-smoke) pass, then the sections it points to for anything that fails (a full pass only when the smoke pass shows broad breakage)
 - When verifying feature parity with standard VCS logs
 - When onboarding new contributors to understand expected behavior
 - **After a change, to re-run only the affected sections** — see [How to scope a run](#how-to-scope-a-run)
@@ -13,8 +13,9 @@ Use this checklist:
 
 1. Start the IDE with the plugin: `./gradlew runIde`
 2. Open a project with a Jujutsu repository (or create one with `jj git init`)
-3. For a full pass, work through every section below. For a change, scope to the affected
-   sections first (see below) — the full list is too large to run for every PR.
+3. Before a release, run [Release smoke](#release-smoke). For a change, scope to the affected
+   sections (see below) — the full list is too large to run for every PR; a full pass is for
+   when smoke shows broad breakage.
 
 ## How to scope a run
 
@@ -23,6 +24,44 @@ change touched → `grep -n 'Code:' docs/manual-tests.md` for each → check
 [Shared Surfaces](#shared-surfaces) and each match's **Also re-run:** line → run the union.
 See contributing.md § "Manual regression scope as a deliverable" for how this feeds a PR report.
 
+## Release smoke
+
+The short pass to run before every release, before deciding whether the full sections need a run. Each line is something a user would notice broken within a minute; the tag names the section with the deep checks. Use FX-STACK for squash/split, FX-CONFLICT for conflicts and FX-STRESS (`SCALE=6 WITH_REMOTE=1`) for the log. A failure here means run that whole section.
+
+**Log**
+- [ ] Open the Jujutsu log: the first page loads fast, the graph draws (linear, merge, branch), `@` is marked, and selecting a row fills the details panel (MT-LOG-TABLE, MT-LOG-GRAPH, MT-LOG-DETAILS)
+- [ ] Filter by text, Author, Reference and Scope in turn, then clear them all: rows narrow correctly, nothing flickers, the full log returns (MT-LOG-FILTER)
+- [ ] Run `jj new` and `jj bookmark create x` in a terminal: the log and the bookmark widget update within ~1 s without Refresh (MT-LOG-REFRESH)
+- [ ] On `r80k-git` (or FX-STRESS `SCALE=6`), scroll to the end: pages keep loading with no freezes and the viewport stays put (MT-LOG-REFRESH "Paged log loading")
+- [ ] Hover a row, a bookmark chip and an author name: tooltips and hover cues behave; right-click a chip and an author name for their menus (MT-LOG-TABLE)
+
+**Changing history**
+- [ ] Right-click a row: New Change, Edit, Describe, Abandon each work, and the Abandon balloon's Undo brings the change back (MT-CTXMENU)
+- [ ] Rebase dialog with its preview, Duplicate Onto, and Move Up/Move Down on a small stack (MT-CTXMENU)
+- [ ] Squash Into: pick a destination, see the result preview, tick/untick a file, squash (MT-SQUASH)
+- [ ] Split a change with a file ticked, and open Pick Hunks… on a two-hunk file and apply a partial pick (MT-SPLIT)
+- [ ] Drag a commit onto another to rebase, drag a bookmark chip onto a commit to move it, and drag the `@` marker to edit a commit (MT-DND)
+- [ ] The Operations tab (if enabled): revert an operation and check the log updates (MT-OPLOG)
+
+**Bookmarks and remotes**
+- [ ] Bookmark widget: Create Bookmark Here…, Advance, Rename…, Delete; the Bookmarks panel tree shows Local/remote/Tags and "Filter Log to Bookmark" narrows the log (MT-BOOKMARK)
+- [ ] Push a bookmark (dialog, confirmation for a new remote bookmark) and Fetch; a tag push if jj ≥ 0.44 (MT-GIT)
+
+**Working copy, diff and files**
+- [ ] Working Copy panel: describe `@`, New Change, change a file and see it listed with the right colour, open Restore… and restore one file (MT-WORKINGCOPY)
+- [ ] Show Diff from the log and from the Working Copy panel opens a single preview tab that swaps on click; Annotate a file and click an annotation to select its change (MT-DIFF, MT-DIFF-PREVIEW)
+- [ ] Set Diff Base to "Latest immutable ancestor" and back: gutter markers follow (MT-DIFFBASE)
+- [ ] Ignored files are grey and appear under Ignored Files; the Tracked toggle on an ignored file works (MT-IGNORE)
+
+**Conflicts**
+- [ ] With FX-CONFLICT: the file shows red, the editor banner offers Accept links and Open Merge Tool, an accept resolves it with a "Resolve conflict completed" balloon, and cancelling the merge tool leaves the markers intact (MT-CONFLICT)
+
+**Settings, environment and projects**
+- [ ] Settings → Version Control → Jujutsu opens with no horizontal scrollbar; **Test** on the jj path works, and Installation Help shows (MT-SETTINGS)
+- [ ] A project with no `.jj` offers Initialize and then populates the Working copy window; a stale workspace and a broken store each show their notification instead of an error (MT-WORKINGCOPY)
+- [ ] In a two-repo project: the Root filter, the per-repo bookmark widget menu and the Working Copy "Other Repositories" node all behave (MT-CROSS, MT-BOOKMARK, MT-WORKINGCOPY)
+- [ ] Switch between a light and a dark theme: chips, markers and the graph are readable in both (MT-LOG-TABLE, MT-CROSS)
+
 ## Shared Surfaces
 
 Components whose blast radius exceeds their own package:
@@ -30,9 +69,9 @@ Components whose blast radius exceeds their own package:
 | Component | Feeds |
 |---|---|
 | `ui/components/TextCanvas.kt`, `LogEntryText.kt`, `HtmlTextCanvas.kt`, `UnbreakableContent.kt`, `AtomicHtmlView.kt`, `HtmlIcons.kt`, `Linkifier.kt` | [MT-LOG-DETAILS](#mt-log-details), [MT-WORKINGCOPY](#mt-workingcopy), [MT-BOOKMARK](#mt-bookmark) |
-| Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details), [MT-DND](#mt-dnd) (the `@` marker's hit target, jj-idea-pk2c) |
+| Renderer trio: `ui/log/JujutsuLogTableRenderers.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/LaidOutCell.kt`, `ui/log/LogClickTarget.kt`, `LogEntryText.kt.appendSummaryAndStatuses` | [MT-LOG-TABLE](#mt-log-table), [MT-LOG-GRAPH](#mt-log-graph), [MT-LOG-DETAILS](#mt-log-details), [MT-DND](#mt-dnd) (the `@` marker's hit target) |
 | `ui/components/RevisionSelectorPopup.kt` | [MT-CTXMENU](#mt-ctxmenu), [MT-DIFF](#mt-diff), [MT-DIFFBASE](#mt-diffbase) (quick action's "Choose revision...") |
-| Shared revset input (`ui/components/RevsetTextField.kt`, `RevsetCompletionProvider.kt`, `RevsetInputDialog.kt`, `jj/revset/`; used by the Scope popup, the log search box in revset mode, the Settings revset fields and the Set Diff Base → Custom revset dialog; jj-idea-ehwm.7) | [MT-LOG-FILTER](#mt-log-filter), [MT-SETTINGS](#mt-settings), [MT-DIFFBASE](#mt-diffbase) |
+| Shared revset input (`ui/components/RevsetTextField.kt`, `RevsetCompletionProvider.kt`, `RevsetInputDialog.kt`, `jj/revset/`; used by the Scope popup, the log search box in revset mode, the Settings revset fields and the Set Diff Base → Custom revset dialog) | [MT-LOG-FILTER](#mt-log-filter), [MT-SETTINGS](#mt-settings), [MT-DIFFBASE](#mt-diffbase) |
 | Shared commit picker (`ui/components/CommitPickerPanel.kt`, `ui/components/LogSearchField.kt`, used by Rebase, Squash Into…, Duplicate Onto…, Move Bookmark to Change) | [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash), [MT-SPLIT](#mt-split), [MT-BOOKMARK](#mt-bookmark), [MT-LOG-FILTER](#mt-log-filter) |
 | `ui/components/IconAwareTooltip.kt` (icon-aware tooltip installer, incl. `installIconAwareTableTooltip`) and `ui/log/LogPreviewTable.kt` (shared picker/preview table setup) | [MT-LOG-TABLE](#mt-log-table), [MT-CTXMENU](#mt-ctxmenu), [MT-SQUASH](#mt-squash) |
 | Diff preview-tab helper (`ui/common/JujutsuEditorTabDiffPreview.kt`) | [MT-DIFF-PREVIEW](#mt-diff-preview), and its three referrers |
@@ -45,7 +84,7 @@ Components whose blast radius exceeds their own package:
 | `diffedit/HunkArrowDiffExtension.kt` (plugin-wide `diff.DiffExtension` — fires on every diff viewer the platform creates, gated to a no-op elsewhere) | [MT-SPLIT](#mt-split), [MT-SQUASH](#mt-squash), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview) |
 | `ui/editor/conflict/JujutsuConflictGutterInstaller.kt` (plugin-wide `editorFactoryListener` — fires on every editor the platform creates, gated to a no-op outside a main editor on a jj-tracked file) | [MT-CONFLICT](#mt-conflict), [MT-DIFF](#mt-diff), [MT-DIFF-PREVIEW](#mt-diff-preview), [MT-DIFFBASE](#mt-diffbase) (shares the gutter), [MT-WORKINGCOPY](#mt-workingcopy) (its preview tabs open editors this listener sees), [MT-CROSS](#mt-cross) (multi-repo scoping of the repo-detection gate) |
 | `vcs/diffbase/DiffbaseService.kt` (shared base-revision resolver) | [MT-DIFFBASE](#mt-diffbase), [MT-DIFF](#mt-diff) (Annotate), [MT-WORKINGCOPY](#mt-workingcopy) (gutter markers) |
-| `actions/diffbase/SetDiffbaseAction.kt` (quick action, jj-idea-g1io) | [MT-DIFFBASE](#mt-diffbase), [MT-CTXMENU](#mt-ctxmenu) (shares `RevisionSelectorPopup`), [MT-CROSS](#mt-cross) (multi-repo submenu) |
+| `actions/diffbase/SetDiffbaseAction.kt` (quick action) | [MT-DIFFBASE](#mt-diffbase), [MT-CTXMENU](#mt-ctxmenu) (shares `RevisionSelectorPopup`), [MT-CROSS](#mt-cross) (multi-repo submenu) |
 | `actions/JujutsuMainMenuGroup.kt` ("Jujutsu" submenu in `Vcs.MainMenu`) | [MT-DIFFBASE](#mt-diffbase) |
 | `jj/cli/CliExecutor.kt` `execute`/`executeBytes` (process launch, timeout and cancellation for every jj call) | [MT-DIFF](#mt-diff) (Annotate cancel), [MT-LOG-REFRESH](#mt-log-refresh) (cancelled load), plus a smoke pass of any section that runs jj |
 
@@ -60,8 +99,8 @@ directory as a project in the plugin IDE (`./gradlew runIde`).
 | FX-STACK | `scripts/fixtures/fx-stack.sh [target-dir]` | Linear stack base → A → B → C (@ = C), for squash testing |
 | FX-CONFLICT | `scripts/fixtures/fx-conflict.sh [target-dir] [marker-style] [wc-position]` | A content conflict on `file.txt` (change A rebased onto change B); `marker-style` is `git` (default), `snapshot`, or `diff` — rerun with a different style against the same repo to test all three. `wc-position` is `conflicted` (default, working copy on the conflict) or `sibling` (working copy on change B, a clean commit unrelated to the conflict — GitHub #119 / jj-idea-ct7e's repro position) |
 | FX-MD-CONFLICT | `scripts/fixtures/fx-md-conflict.sh [target-dir]` | A modify/delete conflict on `a.txt` — one side deletes the file entirely, so "accept" on that side must remove it from disk, not leave an empty file; a different case from FX-CONFLICT's content conflict |
-| FX-STRESS | `scripts/fixtures/fx-stress.sh [target-dir]` | A ~1084-commit repo with ~26 concurrent heads (main trunk, 20 short feature branches, 5 long branches, a 200-commit deep-branch, an octopus-merge, a hotfix/* cluster), for log-graph/filter stress testing. Reused as `jj-stress-test` by MT-LOG-GRAPH's stress bullet and its "Graph layout under filtering" subsection, and by MT-LOG-FILTER's Reference filter fixture — don't build a separate throwaway multi-branch repo for those, this one already has far more lanes than any of them need. Two env knobs for larger-scale work (jj-idea-2c8k): `SCALE=<n>` multiplies the main trunk / deep-branch / long-branch lengths (e.g. `SCALE=6` for ~7,000 commits, matching GitHub #69's repo size), and `WITH_REMOTE=1` pushes `main` and a few branch bookmarks to a bare repo created alongside the target, so `remote_bookmarks()` is non-empty — a plain `jj git init` leaves it empty, which makes the log template's `hasPushedAncestor` predicate (`descendants(::remote_bookmarks())`) trivially cheap and would understate its real cost |
-| FX-SCALE-SET | `scripts/fixtures/fx-scale-set.sh [target-dir]` (default `~/workspace/jj-scale`; `ONLY="name ..."` builds a subset) | A ladder of repo sizes for tuning large-repo log behaviour (paged loading, the idle trickle, first-page size, prefetch distance — jj-idea-2570.x, GitHub #69): `s1k-synthetic` (~1.1k commits) and `s6k-synthetic` (~6k, `WITH_REMOTE`, #69's reporter's shape) via FX-STRESS, plus real code cloned with `jj git clone --colocate`: `r2k-openNDS` (~2k, C), `r6k-longhorn` (~6.3k, Go — #69-sized with real code), `r36k-keycloak` (~35k, Java/Maven — the IDE does Maven import and indexing on open, so first-page latency is measured against real project-opening load) and `r80k-git` (~86k, C — well past the 10,000-row idle-trickle cap). Local checkouts under `~/workspace` are cloned from when present (read-only), else GitHub. `s6k-synthetic` reproduces #69's reporter (paged loading is always on; the old *Changes to show* limit is now only the fallback). Each load logs `perf: log-load`, `perf: log-edt-wait` and `perf: log-apply` lines to idea.log (grep `perf:`) for timing |
+| FX-STRESS | `scripts/fixtures/fx-stress.sh [target-dir]` | A ~1084-commit repo with ~26 concurrent heads (main trunk, 20 short feature branches, 5 long branches, a 200-commit deep branch, an octopus merge, a hotfix/* cluster) for log-graph and filter stress testing. Reused as `jj-stress-test` wherever a section says FX-STRESS; don't build a separate throwaway multi-branch repo. Env knobs: `SCALE=<n>` multiplies the trunk / deep-branch / long-branch lengths (`SCALE=6` is ~7,000 commits, GitHub #69's repo size), and `WITH_REMOTE=1` pushes `main` and a few branch bookmarks to a bare repo beside the target so `remote_bookmarks()` is non-empty (a plain `jj git init` leaves it empty, which makes the log template's `hasPushedAncestor` trivially cheap and understates its real cost) |
+| FX-SCALE-SET | `scripts/fixtures/fx-scale-set.sh [target-dir]` (default `~/workspace/jj-scale`; `ONLY="name ..."` builds a subset) | A ladder of repo sizes for tuning large-repo log behaviour (paged loading, idle trickle, first-page size, prefetch distance; GitHub #69): `s1k-synthetic` (~1.1k commits) and `s6k-synthetic` (~6k, `WITH_REMOTE`, the #69 reporter's shape) via FX-STRESS, plus real code cloned with `jj git clone --colocate`: `r2k-openNDS` (~2k, C), `r6k-longhorn` (~6.3k, Go), `r36k-keycloak` (~35k, Java/Maven; the IDE does Maven import and indexing on open) and `r80k-git` (~86k, C; well past the 10,000-row idle-trickle cap). Local checkouts under `~/workspace` are cloned from when present (read-only), else GitHub. Each load logs `perf: log-load`, `perf: log-edt-wait` and `perf: log-apply` lines to idea.log (grep `perf:`) |
 
 Each script fails loudly (non-zero exit, explanatory message) if the jj version installed
 produces a different topology than expected, rather than silently leaving a broken fixture —
@@ -99,305 +138,101 @@ Not checkboxes — just a reminder of what's known-missing so you don't file a d
 
 **Log table selection, navigation, and row interaction**
 
-**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/components/LogEntryText.kt` (`appendBookmarks`, `bookmarkRefChips`, jj-idea-e4ln's `@git` filter), `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch), `ui/log/JujutsuCustomLogTabManager.kt`, `actions/top/OpenJujutsuLogTabAction.kt`
+**Code:** `ui/log/JujutsuLogTable.kt`, `ui/log/UnifiedJujutsuLogPanel.kt`, `ui/log/JujutsuColumnManager.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `ui/components/TextCanvas.kt`, `ui/components/LogEntryText.kt` (`appendBookmarks`, `bookmarkRefChips`, the `@git` filter), `ui/log/JujutsuLogTableDnD.kt`, `ui/dnd/` (payload/target model, zone geometry, guards, dispatch), `ui/log/JujutsuCustomLogTabManager.kt`, `actions/top/OpenJujutsuLogTabAction.kt`
 **Also re-run:** MT-LOG-DETAILS (issue-tracker link rendering is shared with the details panel)
 
-#### Change-id alignment (jj-idea-t04a, GitHub #91)
+#### Opening the log
 
-- [ ] With the View Options toggle **Align Status and Change ID Columns** off (the default),
-      the log lays out exactly as before (description follows the id directly)
-- [ ] Turn it **on** in a repo whose change ids have different unique-prefix lengths (and ideally a
-      divergent `/N` id, the bold `@` row, and immutable/conflicted commits): every row's
-      description starts at the same x position, and the immutable/conflict icons share one status
-      column sized to the widest icon run on screen (rows without icons keep the id and description
-      x unchanged); open logs update immediately, hiding Status or Change ID removes that padding,
-      and issue links in descriptions still hover/click correctly
-- [ ] Turn it back off: the padding disappears at once
+- [ ] With the Version Control tool window closed or hidden, **VCS → Jujutsu → Open Jujutsu Log** opens it on the Jujutsu log tab. With the tab already open but the tool window hidden, re-invoking it (menu, VCS Operations popup, or its shortcut) brings the tool window forward and selects the existing tab, with no second tab (GitHub #118)
+- [ ] The VCS Operations popup (Ctrl/Cmd+`) lists "Open Jujutsu Log" near the top of the Jujutsu section. In a plain Git project there is no "Jujutsu" submenu and no "Open Jujutsu Log" entry
 
-#### Immutable merges: emptiness is fetched in the background (jj-idea-2570.8)
+#### Row order and selection
 
-Fixture: FX-SCALE-SET `r80k-git` (about 40% of rows are merges, most of them empty).
+- [ ] Single-repo log rows follow `jj log` order (compare the top ~50 rows with `jj log -r 'all()'`), and paging never reshuffles rows already shown
+- [ ] Single-click, Shift+click range, Ctrl/Cmd+click non-contiguous, Up/Down, Page Up/Down and Home/End all select as expected
+- [ ] Changing or clearing each filter (reference, author, date, text, root) while the selected commit stays visible keeps it selected and keeps the details panel populated, with no flicker to empty. A filter that hides the selected commit clears the selection and shows the details panel's empty state
+- [ ] With the window narrow and scrolled right, selecting a commit (click, arrows, ref-chip click, details-panel parent link, or a log refresh) does not reset the horizontal scroll
+- [ ] Clicking a parent or change-id link in the details or working copy panel selects that commit in the log and it stays selected (no flicker); if it is beyond the log limit, the log expands to include it
+- [ ] Select a change outside the loaded window, then `jj abandon` it (or squash it into its parent) in a terminal and refresh twice: no "Uncaught exception" dialog, the selection is simply dropped, and selecting another off-window change still expands normally (GitHub #76)
+- [ ] Scroll partway down, **Accept side** on a conflicted file, then **Undo**: the log selects and shows `@`, and loading more history afterwards does not snap back to it
+- [ ] Ctrl/Cmd+C copies the change ID (or the file path when a file is selected); Delete abandons the selected change after a confirmation; F2 opens the describe dialog
 
-- [ ] On first load the page appears quickly (well under a second after the project is ready), and
-      immutable merge rows show a greyed "(…)" in the description instead of "(empty)"
-- [ ] Within about a second the "(…)" markers on the visible rows turn into "(empty)" (most merges)
-      or disappear (a merge that changed something, an "evil" merge) - no row is left on "(…)"
-- [ ] Scroll quickly to a deep page: the rows on screen resolve first, rows further down later
-- [ ] Select an immutable merge that still shows "(…)": the details panel status line shows
-      "Checking whether empty…", then changes to "Empty" (or the item goes away if the merge is not empty)
-- [ ] A mutable merge (`jj new a b` on two of your own changes) shows "(empty)" immediately, never "(…)"
-- [ ] Non-merge rows and mutable rows never show "(…)"
+#### Show Diff: Enter and double-click
 
-#### Row order (jj-idea-2570.7)
+- [ ] Enter on a selected commit, and double-clicking a commit row (outside a chip or the root gutter), open that commit's diff
+- [ ] Double-clicking a bookmark or tag chip does nothing (chips have no left-click action, only a right-click menu). Double-clicking the "+N more" chip shows the hidden-refs popup without opening a diff
+- [ ] Double-clicking the root gutter column (multi-repo) toggles expansion, with no diff
+- [ ] Rebinding "Show Diff" in Settings → Keymap (to another jj action, or cleared) changes what both Enter and double-click do
 
-- [ ] In a single-repo project, log rows follow `jj log` order (compare the top ~50 rows with
-      `jj log -r 'all()'` in a terminal), and paging/scrolling to load more never reshuffles rows
-      already shown
-
-#### Selection after refresh (jj-idea-vd5j)
-
-- [ ] Scroll part way down the log, do **Accept side** on a conflicted file, then click **Undo**:
-      the log selects and shows `@` (it does not land on an unrelated row), and scrolling to load
-      more history afterwards does not snap back to it
-
-#### Entry points (jj-idea-biqp, GitHub #118)
-
-- [ ] With the Version Control tool window closed/hidden, **VCS → Jujutsu → Open Jujutsu Log**
-      opens it, focused on the Jujutsu log tab
-- [ ] With the log tab already open but the tool window hidden (e.g. another tool window has
-      focus, or it was collapsed), re-invoking **Open Jujutsu Log** (from the menu, the VCS
-      Operations popup, or its keymap shortcut if bound) brings the tool window to the front and
-      selects the tab — it does not create a second/duplicate log tab
-- [ ] The VCS Operations popup (Ctrl/Cmd+`) shows "Open Jujutsu Log" near the top of the Jujutsu
-      section
-- [ ] In a plain Git (non-jj) project, the "Jujutsu" VCS submenu is absent and the VCS Operations
-      popup shows only Git's entries — no "Open Jujutsu Log" leaks in
-
-#### Selection & navigation
-
-- [ ] Basic selection and navigation all work: single-click select, Shift+click range,
-      Ctrl/Cmd+click non-contiguous, Up/Down arrows, Page Up/Down, Home/End
-- [ ] Selection persists after filtering (if entry still visible): select a commit, then clear or
-      change each of the reference/bookmark, author, date, text, and root filters in turn while the
-      commit stays visible throughout — the selection (and the details panel content) never
-      flickers to empty and stays on the same commit each time (jj-idea-yje9)
-- [ ] Selection clears when filtered entry is hidden: select a commit, then apply a filter that
-      excludes it — the selection clears and the details panel shows its empty state (jj-idea-yje9)
-- [ ] On a narrow window with horizontal scroll active (scrolled right so later columns are
-      visible), selecting a commit (click, arrow keys, ref-chip click, a details-panel parent
-      link click, or a log refresh) does not reset horizontal scroll position (jj-idea-f27g)
-- [ ] Clicking a parent/change-id link in the commit details panel (or working copy panel)
-      selects that commit in the log and it stays selected (no flicker/deselect); if the
-      linked commit is beyond the log limit, the log expands to include it (jj-idea-f27g)
-- [ ] Select a change that's outside the log window (so expansion is needed), then in a terminal
-      `jj abandon` it (or squash it into its parent) before the log refreshes — refresh the log
-      (and refresh again): no "Uncaught exception" error dialog appears, the selection is simply
-      dropped, and selecting another off-window change still expands normally afterwards
-      (GitHub #76)
-- [ ] Ctrl/Cmd+C on a selected row copies the change ID (or file path, when a file is selected)
-- [ ] Delete on a selected change abandons it, with a confirmation dialog first
-- [ ] F2 on a selected change renames/describes it (opens the describe dialog)
-
-#### Double-click / Enter on a log row (jj-idea-th9h)
-
-- [ ] Select a commit row and press Enter → that commit's diff opens (Show Diff)
-- [ ] Double-click a commit row (not on a bookmark/tag chip or the root gutter) → the same
-      diff opens
-- [ ] Double-click a bookmark or tag chip → does nothing (no diff opens, no filter change,
-      jj-idea-wkcz — bookmark/tag chips have no left-click action, only a right-click menu)
-- [ ] Double-click the "+N more" overflow chip → shows the hidden-refs popup (no diff opens)
-- [ ] jj-idea-e4ln (GitHub #120): in a **colocated** repo, a bookmark shows only its local chip
-      and any real-remote chip(s) in the log row — no separate `@git` chip, matching the
-      bookmarks panel (which already hides the `git` group, see MT-BOOKMARK); the "+N more"
-      overflow count and its hidden-refs popup also never include `@git`
-- [ ] Double-click the root gutter column (multi-repo view) → toggles expansion (no diff opens)
-- [ ] In Settings → Keymap, rebind "Show Diff" off Enter onto a different jj action (or clear
-      it) → both Enter and double-click on a log row now follow the new binding
-
-#### Hover tooltip behaviour (jj-idea-wp12)
+#### Hover tooltips
 
 **Code:** `ui/components/IconAwareTooltip.kt`
 
-- [ ] jj-idea-6yiq (GH #144): hover a log row — the tooltip appears after about half a second,
-      like a toolbar button's tooltip, not instantly. Still true in Rider, or in IDEA with
-      registry `ide.tooltip.initialDelay` set to 0
-- [ ] In Settings → Version Control → Issue Navigation, add a pattern (as above) so a commit's
-      row tooltip contains a clickable issue-tracker link; hover that row until the tooltip
-      appears, then move the pointer up into the tooltip — it stays open (does not disappear)
-- [ ] With the tooltip open, click the issue-tracker link inside it → opens in your browser;
-      click the author's name (a `mailto:` link) → opens your mail client
-- [ ] With the tooltip open, select some of its text with the mouse (click-drag) — the text
-      highlights instead of the tooltip disappearing on the first move
-- [ ] With the tooltip open, move the pointer sideways or away from it (not towards it) → it
-      dismisses normally
-- [ ] Hover a row so the tooltip appears, then scroll the log (mouse wheel, scrollbar drag, or
-      Page Up/Down) without moving the pointer — the tooltip disappears immediately and does
-      **not** reappear while the pointer stays still; move the pointer afterwards — the tooltip
-      reappears with the *new* row under the pointer (not stale content from before the scroll)
-- [ ] Move the pointer between adjacent rows without ever entering the tooltip — content still
-      updates to match each row as before
-- [ ] Move the pointer off the log table onto another tool window or editor — the tooltip
-      dismisses
-- [ ] jj-idea-lgo4: off-switch for this tooltip — see "View options menu" below
+- [ ] Hovering a row shows the tooltip after about half a second (like a toolbar button), not instantly; also in Rider, and in IDEA with registry `ide.tooltip.initialDelay` set to 0 (GitHub #144)
+- [ ] With an Issue Navigation pattern configured so a row's tooltip holds a link, hover until it appears and move the pointer into it: it stays open. The issue link opens the browser, the author's `mailto:` link opens the mail client, and click-drag selects text instead of dismissing it
+- [ ] Moving the pointer sideways or away (not towards it), or onto another tool window or editor, dismisses it. Moving between adjacent rows without entering the tooltip updates its content to each row
+- [ ] Scrolling the log (wheel, scrollbar drag, Page Up/Down) with the pointer still hides the tooltip at once and it does not reappear until the pointer moves, then it shows the *new* row under the pointer
 
-#### Column management
+#### Columns and View Options
 
-- [ ] jj-idea-rozx: no blank header row above the log table (GitHub #78) - the table starts
-      directly under the toolbar
-- [ ] Column visibility toggle (View Options menu) still works
-- [ ] Resize a column by dragging its border directly in the rows (matches Git's log - no visible
-      header row to grab). Reorder a column by dragging it horizontally; a mostly-vertical drag
-      doesn't start a reorder. Double-clicking a border no longer auto-fits it
-- [ ] The root gutter (leftmost) column can't be resized or dragged to reorder
-- [ ] Date (rightmost) can be resized by dragging its right edge, same as any other column, and
-      isn't noticeably narrower than the other fixed columns with "Fit columns to window width" on
-- [ ] Column widths and visibility both persist across IDE restarts
-- [ ] A mostly-vertical drag on a commit row
-      still starts a commit drag/drop (e.g. rebase), not a column reorder
+- [ ] No blank header row above the table (GitHub #78); it starts directly under the toolbar
+- [ ] Resize a column by dragging its border in the rows; reorder it by dragging horizontally. A mostly-vertical drag does not start a reorder, and on a commit row starts a commit drag/drop instead. Double-clicking a border does not auto-fit
+- [ ] The root gutter column (leftmost) can't be resized or reordered. The Date column (rightmost) resizes by its right edge like the others and is not noticeably narrower than the other fixed columns with Fit Columns to Window Width on
+- [ ] Column widths and visibility persist across IDE restarts
+- [ ] The eye-icon **View Options** button is the only view button (no separate Columns or Details Position buttons). Its popup has a "Columns" header (per-column toggles, a separator, then Fit Columns to Window Width) and a "Details" header (Right/Bottom), followed by Alternating Row Colors, Hover Tooltips and Bookmark Ahead/Behind Counts, all checked by default. Each toggle takes effect without a restart, and Details Right/Bottom moves the details pane
+- [ ] Unchecking **Hover Tooltips** stops row tooltips immediately and re-checking restores them. The one global setting also applies to file-history tabs, the Working copy tool window and the bookmarks panel's tooltips
+- [ ] Unchecking **Bookmark Ahead/Behind Counts** removes the ↑n↓m arrows at once from the log's bookmark chips and the bookmarks panel leaves (a collapsed remote folder with unsynced bookmarks still shows just a `•`; the hover tooltip still shows the counts). Re-checking restores them. The setting survives a restart and applies to every project (GitHub #128)
+- [ ] Unchecking **Alternating Row Colors** makes log rows uniform, and the Duplicate, Squash-into and Rebase pickers too when next opened. Re-checking restores striping everywhere, including tables opened while it was off
+- [ ] **Align Status and Change ID Columns** (off by default): off, a description follows the id directly. On, in a repo with varying unique-prefix lengths (ideally with a divergent `/N` id, the bold `@` row and immutable/conflicted commits), every description starts at the same x and the immutable/conflict icons share one status column sized to the widest icon run on screen (rows without icons keep the id and description x unchanged). Open logs update at once, hiding Status or Change ID removes that padding, turning it off removes the padding at once, and issue links still hover and click correctly (GitHub #91)
+- [ ] **Fit Columns to Window Width** is checked on a fresh tab. Narrowing the window shrinks the description column and narrows and ellipsizes author and date before any horizontal scrollbar appears; docking the details pane to the right re-fits the table; widening restores the columns.
+- [ ] Toggling Fit off and on switches between responsive and manual immediately and persists across closing and reopening the tab. With Fit on, a manually widened author column keeps its width through narrowing and widening, and persists across reopening the tab
 
-#### View options menu (jj-idea-lgo4, n22a)
+#### Issue-tracker links
 
-The toolbar's eye-icon button opens a single flat "View Options" popup (replacing the old,
-separate "Columns" and "Details Position" submenus) with labeled section headers: **Columns**
-(the per-column toggles, then a plain separator, then "Fit Columns to Window Width" - a layout
-behavior rather than a column), **Details** (Right/Bottom), and an unlabeled trailing group with
-**Alternating Row Colors** and **Hover Tooltips** (renamed from "Commit Tooltips", jj-idea-uyu9,
-since the same setting now also gates the bookmarks panel's own row tooltip - see
-[Bookmark-state tooltips](#bookmark-state-tooltips-jj-idea-uyu9-github-110)).
+Setup: Settings → Version Control → Issue Navigation, add a pattern (e.g. `[A-Z]+-\d+` → `https://example.com/browse/$0`). This is the one full check; MT-LOG-DETAILS and MT-BOOKMARK only cover what differs on their surface.
 
-- [ ] Toolbar shows one eye-icon **View Options** button (no separate Columns / Details Position
-      buttons). Opening it shows "Columns" and "Details" section headers with the expected items
-      grouped underneath, and "Alternating Row Colors" / "Hover Tooltips" at the bottom, both
-      checked by default
-- [ ] Uncheck **Hover Tooltips**, then hover a log row — no tooltip appears; re-check it —
-      hovering again shows the tooltip, no restart needed. Repeat in a file-history tab and in
-      the **Working copy** tool window (same table, same global setting) — toggling it in one
-      table's menu updates all of them immediately
-- [ ] Uncheck **Bookmark Ahead/Behind Counts** (jj-idea-qr78, GitHub #128; checked by default)
-      with a bookmark that's ahead/behind its tracked remote — the ↑n↓m arrows vanish at once
-      from the log's bookmark chips and from the bookmarks panel's leaves; a *collapsed* remote
-      folder with unsynced bookmarks still shows just a `•` (no number); the hover tooltip still
-      shows the counts. Re-check it — the arrows return immediately. The setting survives an IDE
-      restart and applies to every open project
-- [ ] Uncheck **Alternating Row Colors** — log window rows become uniform, no restart needed;
-      open the Duplicate, Squash-into, and Rebase dialogs — their destination/source picker
-      tables are also unstriped (they read the same global setting when opened). Re-check and
-      confirm striping returns everywhere, including in tables/tabs opened while it was off
-- [ ] Column visibility, Fit Columns to Window Width, and Details Right/Bottom toggles all still
-      work exactly as before from this flattened menu
+- [ ] A description containing a match (`Fixes JIRA-123`) shows it link-coloured, not underlined at rest. Hovering just the reference shows a hand cursor and underlines only that word; elsewhere in the description the cursor is the default. Left-click opens the URL in the browser, and right-click shows a single "Open <url>" action. The row tooltip renders it as a link too
+- [ ] With the description column narrowed so text truncates, a reference before the truncation point is still a link, and one after it is dropped with the rest of the truncated text, not left half-rendered
+- [ ] With no patterns configured the description renders as plain text, with no link and no hover cue
+- [ ] A bookmark or tag name containing a match (`jira-123-fix-thing`) renders the reference link-coloured inside the chip, with the rest of the chip plain. Hovering just the reference shows a hand cursor and underlines only it; hovering the rest of the chip shows no hand cursor. Left-click on the reference opens the browser and elsewhere on the chip does nothing. Right-click on the reference shows the single "Open <url>" action, and right-click elsewhere on the chip shows the usual bookmark/tag menu. Same for a tag; a name with no match is unaffected
 
-#### Responsive column sizing (jj-idea-lzq7)
+#### Description word spacing and copying
 
-- [ ] Open a fresh log tab (or one where you've never dragged a column). The View Options menu's
-      "Fit Columns to Window Width" is checked by default. Drag the tool window narrow: the
-      description column shrinks and no horizontal scrollbar appears until the window is very
-      narrow; author/date visibly narrow (and ellipsize) before any scrollbar appears
-- [ ] With that tab still narrow, dock the commit-details pane to the right (Details position):
-      the table re-fits to the remaining width with no scrollbar; widen the window back out and
-      the columns grow back
-- [ ] In a tab with a column you dragged before this change shipped (or drag one now, then
-      reopen the tab), "Fit Columns to Window Width" defaults to unchecked and the layout/
-      scrollbar behavior is exactly as before
-- [ ] Toggle "Fit Columns to Window Width" off and on in the View Options menu; behavior switches
-      between responsive and manual immediately, and the choice persists across closing and
-      reopening the tab
-- [ ] With fit-to-width on, manually widen the author column via drag, then narrow the window:
-      the chosen author width is remembered (the column returns to it on widen) and persists
-      across reopening the tab
+- [ ] A long multi-word description wraps at word boundaries in the description column, the details panel and the tooltip, not only at the column edge (GitHub #77)
+- [ ] Text selected with the mouse in any of those, copied and pasted into a plain text editor, has ordinary spaces (not non-breaking spaces). Copy Description copies the description exactly as typed
 
-#### Issue-tracker links in the description column (jj-idea-91qf)
+#### Author, committer and chip click targets
 
-- [ ] In Settings → Version Control → Issue Navigation, add a pattern (e.g. issue regexp
-      `[A-Z]+-\d+`, link `https://example.com/browse/$0`); Apply
-- [ ] A commit whose description contains a matching reference (e.g. `Fixes JIRA-123`) shows it
-      link-colored (not underlined at rest) in the log table's description column
-- [ ] Hovering just the reference shows a hand cursor and underlines only that word, not the rest
-      of the description; hovering elsewhere in the description shows the default cursor
-- [ ] Left-clicking the reference opens the URL in your default browser
-- [ ] Right-clicking the reference shows a popup with a single "Open <url>" action that does the same
-- [ ] The row tooltip's description also renders the reference as a link
-- [ ] With no Issue Navigation patterns configured, the description column renders exactly as
-      before (no link, no hover cue)
-- [ ] Narrowing the column so the description truncates still linkifies a reference that appears
-      before the truncation point; one that would appear after it is dropped along with the rest
-      of the truncated text, not left half-rendered
+Author and committer names are left-click hyperlinks; right-click opens a menu with the default action highlighted. Bookmark and tag chips have **no** left-click action (right-click only) and show a grey hover background with no hand cursor, so an issue reference inside a chip name can be its own link.
 
-#### Description word spacing and copy fidelity (jj-idea-myje / GitHub #77)
+- [ ] Author and committer names are link-coloured with no underline at rest; hovering the name adds the underline and a hand cursor, and moving off removes the underline. Blank cell space to the right of a short name neither underlines, shows a hand cursor nor launches anything
+- [ ] Left-clicking an author or committer name opens the OS mail client addressed to them. Right-clicking an author shows **Send Email to …** highlighted, a separator, then **Filter Log by …**; right-clicking a committer shows only **Send Email to …**
+- [ ] **Filter Log by …** narrows the log to that author (the Author chip updates) and closes the menu; choosing it again clears the filter. It shows a checkmark exactly when that author is the active filter
+- [ ] Hovering a bookmark or tag chip shows a grey background across the chip's whole width (left edge, middle, right edge) and no hand cursor; the bookmark/tag accent colour stays visible on top. The highlight covers only that chip, not the gaps or a neighbouring chip. Left-click does nothing
+- [ ] Right-clicking a chip opens a menu with **Filter Log to '…'** highlighted, then a separator and rename/delete/forget/move/advance/track actions (Advance: MT-BOOKMARK; a tag also gets **Push Tag**: MT-GIT). Choosing Filter applies it and closes the menu; choosing it again clears it. It shows a checkmark exactly when that reference is the active filter
+- [ ] The "+N more" chip shows a hand cursor and the same grey highlight on hover; left-click opens its popup of hidden refs, each openable via its own submenu
+- [ ] In a colocated repo a bookmark shows only its local chip and any real-remote chips, never an `@git` chip, and the "+N more" count and popup exclude `@git` too, matching the bookmarks panel (GitHub #120)
+- [ ] `jj new` off a bookmarked change without moving the bookmark: the new unbookmarked head's row shows a small slashed-bookmark marker after its (absent) chips; `jj bookmark set <name> -r <that change>` removes it after auto-refresh; a bookmarked change, or an ancestor of one, never shows it (bookmarks panel side: MT-BOOKMARK "Unbookmarked heads"). Narrowing the column until chips collapse into "+N more" leaves the marker uncollapsed after the overflow chip, like the `@` marker (GitHub #107)
 
-- [ ] Describe a change with a long, multi-word description (long enough to wrap in the
-      description column and in the commit details panel/tooltip) — it wraps at word
-      boundaries like ordinary text, not only at the column edge
-- [ ] Select some of that description's text with the mouse (in the description column, the
-      details panel, or the row tooltip), copy it, and paste into a plain text editor — the
-      pasted text has ordinary spaces between words, matching what you typed (not literal
-      non-breaking spaces, which look identical on screen but paste/diff/search differently)
-- [ ] Right-click the row → Copy Description (or the equivalent toolbar/keyboard action) still
-      copies the description exactly as typed
+#### Immutable merges: emptiness resolves in the background
 
-#### Issue-tracker links inside bookmark/tag chip names (jj-idea-vrmv)
+Fixture: FX-SCALE-SET `r80k-git` (about 40% of rows are merges, most of them empty).
 
-- [ ] With an Issue Navigation pattern configured (as above), create/rename a bookmark to include a
-      matching reference (e.g. `jira-123-fix-thing`, regexp `[A-Za-z]+-\d+`) — the reference renders
-      link-colored within the chip; the rest of the chip (icon, remaining text) stays plain
-- [ ] Hovering just the reference substring shows a hand cursor and underlines only it; hovering the
-      rest of the same chip (icon or non-matching text) shows no hand cursor, matching plain
-      bookmark/tag chip hover (jj-idea-wkcz)
-- [ ] Left-clicking the reference substring opens the URL in your default browser; left-clicking
-      elsewhere in the chip does nothing (still no whole-chip left-click action)
-- [ ] Right-clicking the reference substring shows a popup with a single "Open <url>" action;
-      right-clicking elsewhere in the same chip still shows the usual bookmark/tag actions menu
-      (Rename…, Delete, Forget, etc.) — the two right-click behaviors are position-sensitive
-- [ ] Repeat for a tag name containing a matching reference
-- [ ] A bookmark/tag name with no matching reference renders unaffected
-- [ ] With no Issue Navigation patterns configured, chip names render exactly as before
+- [ ] First load shows the page in well under a second, with immutable merge rows showing a greyed "(…)" in place of "(empty)". Within about a second the visible rows' "(…)" turn into "(empty)" (most merges) or disappear (a merge that changed something, an "evil" merge); none stays on "(…)". Scrolling quickly to a deep page resolves the on-screen rows first
+- [ ] Selecting an immutable merge that still shows "(…)" shows "Checking whether empty…" in the details status line, then "Empty" (or the item goes away if the merge is not empty)
+- [ ] A mutable merge (`jj new a b` on two of your own changes) shows "(empty)" immediately. Non-merge and mutable rows never show "(…)"
 
-#### Row click actions: author/committer links and bookmark/tag chips (jj-idea-iesq, jj-idea-wkcz, jj-idea-a52h)
+#### Drag and drop: core
 
-Log rows render bookmark/tag chips and author/committer names with link styling. Author/committer
-names are real left-click hyperlinks (left-click performs the default action; right-click opens a
-menu with that default action pre-highlighted). Bookmark/tag chips are **not** — they have no
-left-click action; only the right-click menu reaches their actions (jj-idea-wkcz, a prerequisite
-for letting issue-tracker references *inside* a bookmark/tag name become their own links, without
-a link-inside-a-link). Hovering one instead shows a subtle grey background highlight
-(jj-idea-a52h) — the same "hover" tint used for a hovered row elsewhere — signaling "right-click
-here" without a hand cursor implying a left-click action that doesn't exist.
+Operation-specific drops are under MT-DND.
 
-- [ ] Author/committer names are link-colored at rest, with **no underline**; hovering the name adds an underline, and moving off it removes the underline again (jj-idea-iesq: was permanently underlined before)
-- [ ] Hovering blank cell space to the right of a short author/committer name does **not** add an underline (matches the existing "no click target" boundary)
-- [ ] Hovering an author name (not blank space in the cell) shows a hand cursor
-- [ ] **Left-clicking** an author name opens the OS mail client addressed to that author's email
-- [ ] **Right-clicking** an author name opens a menu with **Send Email to ...** highlighted, a separator, then **Filter Log by ...**
-- [ ] Choosing **Filter Log by ...** narrows the log to that author (the Author filter chip updates) and closes the menu; choosing it again while already active clears the filter and closes the menu
-- [ ] **Filter Log by ...** shows a checkmark when that author is the currently active author filter, and no checkmark otherwise
-- [ ] **Left-clicking** a committer name opens the OS mail client (same as author)
-- [ ] **Right-clicking** a committer name shows only **Send Email to ...** — no filter option
-- [ ] Clicking blank cell space to the right of a short author/committer name does **not** launch the mail client
-- [ ] Hovering a bookmark or tag chip does **not** show a hand cursor, but does show a subtle grey background highlight (jj-idea-a52h) — its accent color (bookmark/tag color) stays visible on top of the highlight. Check across the whole width of the chip (left edge, middle, right edge), not just one spot
-- [ ] The highlight covers only the hovered chip's own icon+label(+suffix) — not the space before/after it, and not a neighboring chip
-- [ ] **Left-clicking** a bookmark/tag chip does nothing — no filter change, no navigation
-- [ ] **Right-clicking** a bookmark/tag chip opens a menu with **Filter Log to '...'** highlighted at the top, followed by a separator and the existing rename/delete/forget/move/advance/track actions (see MT-BOOKMARK for Advance; a tag chip also gets **Push Tag** — see MT-GIT)
-- [ ] Choosing **Filter Log to '...'** from the right-click menu applies the filter and closes the menu; choosing it again while already active clears the filter and closes the menu
-- [ ] **Filter Log to '...'** shows a checkmark when that reference is the currently active filter, and no checkmark otherwise — reopen the menu after toggling to confirm the checkmark follows the filter state
-- [ ] The "+N more" overflow chip shows both a hand cursor and the same grey background highlight on hover (jj-idea-ttmp), and **left-clicking** it still opens its popup of hidden refs, each still openable via their own submenu
-- [ ] jj-idea-lig7 (GitHub #107): `jj new` off a bookmarked change without moving the bookmark —
-      the resulting unbookmarked head's log row shows a small slashed-bookmark marker after its
-      (absent) bookmark chips; `jj bookmark set <name> -r <that change>` removes the marker after
-      the auto-refresh; a change with a bookmark, or one that's merely an ancestor of one, never
-      shows it (see MT-BOOKMARK's "Unbookmarked heads" for the bookmarks-panel side)
-- [ ] jj-idea-lig7: the marker survives column-width capping (`cappedDecorations`) — narrow the
-      graph+description column so bookmark/tag chips collapse into "+N more"; the dangling-head
-      marker still renders after the overflow chip, uncollapsed, same as the `@` marker
+- [ ] Dragging from a commit row starts a drag (drag/reject/drop cursor as appropriate); releasing over an unsupported target (a copy-modifier drag, or dropping on a bookmark chip) changes nothing in the log or repository
+- [ ] Dragging near the bottom edge of a long log auto-scrolls the table as the pointer approaches the edge
+- [ ] The selection highlight stays exactly as it was when the drag started for the whole gesture; it does not follow the row under the pointer, which would fight the drop-zone indicator. Click, Shift+click, Ctrl/Cmd+click, double-click, right-click (row and chip) and author/committer hover links all still work with drag and drop installed
 
-#### Drag and drop - core infrastructure (jj-idea-6jvh)
+#### Palette readability
 
-This bead shipped the drag-and-drop *infrastructure* (payload/target model, y-aware zone hit-test,
-guards, indicator painting). jj-idea-8fxs (see the next subsection) wired the first real drop
-handler — commit-onto-commit rebase — so gestures other than that one still uniformly reject.
-
-- [ ] Pressing and dragging from a commit row starts a drag gesture (the cursor changes to a
-      drag/reject or drop cursor as appropriate); releasing over an unwired operation (e.g. a
-      copy-modifier drag, or dropping a commit on a bookmark chip) does **not** change the log or
-      repository state
-- [ ] Dragging near the bottom edge of a long log (more rows than fit the viewport) auto-scrolls
-      the table as the pointer approaches the edge (`SmoothAutoScroller`)
-- [ ] Regression: with drag-and-drop installed, single-click select, Shift+click range,
-      Ctrl/Cmd+click multi-select, double-click (Show Diff), right-click context menu (row and ref
-      chip), and author/committer hover-link behavior are all unaffected
-- [ ] Pressing on a row and dragging over *other* rows does not change the table's selection
-      highlight to whatever row the pointer is currently over - the selection stays exactly what
-      it was when the drag started, for the whole gesture (regression: a plain `JTable` without
-      `dragEnabled` extends its selection to the row under the pointer on every drag tick, which
-      visually fought the drop-zone indicator until this was suppressed)
-
-#### Palette readability (jj-idea-mn1a)
-
-- [ ] Switch the IDE to a **light** theme (e.g. IntelliJ Light). Bookmark chips, tag chips, the
-      `@` working-copy marker, a conflicted change's marker, and a divergent change's marker are
-      all comfortably readable against the row background — none reads as washed-out or
-      near-invisible (was reported for bookmark gold, GitHub #51)
-- [ ] Repeat with a row **selected** (chips keep their accent color per the hover-highlight item
-      above; confirm it's still readable against the selection background too)
-- [ ] Switch back to a **dark** theme (e.g. Darcula) and confirm nothing regressed there
+- [ ] In a light theme (IntelliJ Light), bookmark chips (including the gold, GitHub #51), tag chips and the `@`, conflicted and divergent markers are readable against the row, and also against a selected row. Switching back to a dark theme (Darcula) shows nothing washed out
 
 ### MT-LOG-GRAPH
 
@@ -405,140 +240,65 @@ handler — commit-onto-commit rebase — so gestures other than that one still 
 
 **Code:** `ui/log/JujutsuCommitGraph.kt`, `ui/log/JujutsuGraphAndDescriptionRenderer.kt`, `ui/log/graph/DataStructures.kt`, `ui/log/graph/LayoutCalculator.kt`
 
-- [ ] Graph lines render correctly for linear history, merges, and branches; the working
-      copy (@) indicator is visible; colors differentiate branches; the graph column
-      auto-sizes to content
-- [ ] On a commit with ~30 bookmarks (e.g. `for i in $(seq 1 30); do jj bookmark create
-      bm-$i; done`), the log row still shows description text (not blank), and the
-      bookmarks collapse behind a "+N more" chip rather than overflowing the cell
-      (jj-idea-w61m); the chip still shows a colored bookmark icon (not plain grey text),
-      so the row still reads as a branch head even fully collapsed (jj-idea-lm3o); the icon
-      is the tracked-bookmark glyph as long as every hidden bookmark is tracked (all local
-      bookmarks count as tracked), and falls back to the plain glyph if any hidden bookmark
-      is an untracked remote; on a commit whose overflow is tags only (no bookmarks
-      hidden), the chip's icon is the green tag glyph instead
-- [ ] Stress-test repo, many concurrent branches (`jj-idea-1ojh`, `jj-idea-5i6i`): run
-      FX-STRESS; set Settings → Version Control → Jujutsu → Log Limit to 200 so several
-      branches fall out of view; apply an author or date filter to shrink the visible set
-      further; confirm tree lines never cross over unrelated commits or share a lane; a
-      commit whose parent is beyond the log limit (not loaded at all) shows a **faded
-      straight line** down from its circle instead of a real connector, while a commit
-      whose parent is loaded but hidden by the active filter shows a **wiggly line**
-      instead (jj-idea-xi58 - the two are now visually distinct) - but only when that
-      hidden parent has no visible ancestor at all; otherwise the commit is joined to its
-      nearest visible ancestor by a full-length wavy edge (jj-idea-hlu3, below); a merge with one loaded parent and one
-      unresolved parent shows its real connector plus a stub in its own lane, not just
-      the real connector (jj-idea-1pgy); clear the filter and confirm the graph restores
-      immediately without a manual Refresh
-- [ ] Hovering that row's tooltip lists every bookmark, including the ones collapsed
-      behind "+N more" (jj-idea-w61m), wrapping the bookmark list across multiple lines
-      and showing the full description without being clipped by the screen edge; if the
-      content is taller than the screen it scrolls instead of clipping (jj-idea-szn8)
-- [ ] Left-clicking the "+N more" chip opens a popup listing the hidden bookmarks, each
-      as a sub-menu with the usual bookmark actions (Rename…, Delete, Forget, etc.); right-
-      clicking it does the same (jj-idea-w61m); with a large hidden count (~50+, e.g. via
-      FX-STRESS), every sub-menu's actions are enabled/clickable as normal, not greyed out
-      (jj-idea-lm3o); each sub-menu is labelled with the same colored bookmark
-      (tracked/plain) or tag glyph its own chip would show
+- [ ] Graph lines render correctly for linear history, merges and branches; the working copy (`@`) indicator is visible; colours differentiate branches; the graph column auto-sizes to content
+- [ ] On a commit with ~30 bookmarks (`for i in $(seq 1 30); do jj bookmark create bm-$i; done`), the row still shows description text (not blank) and the bookmarks collapse behind a "+N more" chip rather than overflowing the cell. The chip keeps a coloured bookmark icon so the row still reads as a branch head: the tracked-bookmark glyph if every hidden bookmark is tracked (all local bookmarks count as tracked), the plain glyph if any hidden bookmark is an untracked remote, and the green tag glyph when the overflow is tags only
+- [ ] That row's tooltip lists every bookmark, including those behind "+N more", wrapping across lines and showing the full description without clipping at the screen edge; content taller than the screen scrolls instead of clipping
+- [ ] Left- or right-clicking the "+N more" chip opens a popup listing the hidden bookmarks, each as a sub-menu with the usual bookmark actions (Rename…, Delete, Forget, …). With a large hidden count (~50+, e.g. via FX-STRESS) every sub-menu's actions are enabled and clickable, and each sub-menu is labelled with the same coloured bookmark (tracked/plain) or tag glyph its own chip would show
 
-#### Elided edges in a filtered log (jj-idea-hlu3, GitHub #131)
+#### Concurrent branches and unresolved parents
+
+Use FX-STRESS with Settings → Version Control → Jujutsu → Log Limit set to 200 so several branches fall out of view, then apply an author or date filter to shrink the visible set further.
+
+- [ ] Tree lines never cross over unrelated commits or share a lane
+- [ ] A commit whose parent is beyond the log limit (not loaded at all) shows a **faded straight line** down from its circle instead of a connector. A commit whose parent is loaded but hidden by the active filter shows a **wiggly line** instead, but only when that hidden parent has no visible ancestor at all; otherwise it is joined to its nearest visible ancestor by a full-length wavy edge (see below)
+- [ ] A merge with one loaded parent and one unresolved parent shows its real connector plus a stub in its own lane. Clearing the filter restores the graph immediately, without a manual Refresh
+
+#### Elided edges in a filtered log (GitHub #131)
 
 Reuse FX-STRESS with `WITH_REMOTE=1`.
 
-- [ ] With the search box in revset mode, filter `main | @ | remote_bookmarks()`: `@` and `main`
-      are joined by a **wavy** edge in the lane colour (vertical stretches wave; the diagonals into and out of a commit are straight) (not left as unrelated rows); edges
-      between directly adjacent visible commits stay solid
-- [ ] Hovering a wavy edge shows the tooltip "Revisions hidden by the current filter" followed by
-      the target and row distance; clicking a long one navigates to the ancestor row
-- [ ] Apply an author filter that hides a commit in the middle of a branch: its child is joined to
-      the nearest remaining ancestor by a wavy edge; a merge with one hidden parent shows one
-      solid and one wavy edge
-- [ ] Hide every ancestor of a commit (filter to just that commit): it still shows the short
-      wiggly stub that ends at nothing, not a full-length wavy edge to another row
-- [ ] Click a faded stub to load more rows while the filter is active: wavy edges are recomputed
-      for the new rows (none stale, none missing); clear the filter and all wavy edges disappear
+- [ ] With the search box in revset mode, filter `main | @ | remote_bookmarks()`: `@` and `main` are joined by a **wavy** edge in the lane colour (vertical stretches wave; the diagonals into and out of a commit are straight), not left as unrelated rows. Edges between directly adjacent visible commits stay solid
+- [ ] Hovering a wavy edge shows "Revisions hidden by the current filter" followed by the target and row distance; clicking a long one navigates to the ancestor row
+- [ ] An author filter that hides a commit in the middle of a branch joins its child to the nearest remaining ancestor by a wavy edge; a merge with one hidden parent shows one solid and one wavy edge
+- [ ] Hiding every ancestor of a commit (filter to just that commit) leaves the short wiggly stub that ends at nothing, not a full-length wavy edge to another row
+- [ ] Clicking a faded stub to load more rows while the filter is active recomputes wavy edges for the new rows (none stale, none missing); clearing the filter removes all wavy edges
 
-#### Long-edge collapsing (jj-idea-66rr)
+#### Long-edge collapsing
 
 Reuse FX-STRESS (its 200-commit deep branch and long branches have edges well over 50 rows).
 
-- [ ] An edge spanning 50+ rows shows as a short line from its child with a **down arrow**
-      one row below, and a short line into its parent with an **up arrow** one row above;
-      nothing is drawn between the two
-- [ ] An octopus merge whose parents are all far away fans out compactly: its first line drops
-      straight down from the circle, and the rest use the nearest free columns (including one
-      whose arrow from the commit above ends on the merge's row), not a gap of empty columns
-- [ ] Long-edge arrow tips stop short of the row's centre (down arrows above it, up arrows below
-      it) and never touch a circle or a connector leaving the middle of the row
-- [ ] The column the long edge used is reused by other branches in the rows between the
-      caps, and the graph is visibly narrower there than before (compare against the
-      previous release, or against rows just outside the long edge)
-- [ ] Hovering either cap thickens **both** caps and shows the directional cursor even
-      when both ends are on screen; the tooltip names the target and the row distance
-- [ ] Clicking either cap jumps to the other end (down arrow → parent, up arrow → child),
-      loading it first if needed
-- [ ] Scroll through a long edge's middle with the paged log: no stray vertical line, no
-      shifting of other lanes as the arrows scroll in and out of view
+- [ ] An edge spanning 50+ rows shows as a short line from its child with a **down arrow** one row below, and a short line into its parent with an **up arrow** one row above; nothing is drawn between the two
+- [ ] An octopus merge whose parents are all far away fans out compactly: its first line drops straight down from the circle, and the rest use the nearest free columns (including one whose arrow from the commit above ends on the merge's row), with no gap of empty columns
+- [ ] Arrow tips stop short of the row's centre (down arrows above it, up arrows below it) and never touch a circle or a connector leaving the middle of the row
+- [ ] The column a long edge used is reused by other branches in the rows between the caps, so the graph is visibly narrower there than just outside the long edge
+- [ ] Hovering either cap thickens **both** caps and shows the directional cursor even when both ends are on screen; the tooltip names the target and the row distance. Clicking either cap jumps to the other end (down arrow → parent, up arrow → child), loading it first if needed
+- [ ] Scrolling through a long edge's middle with the paged log shows no stray vertical line and no shifting of other lanes as the arrows scroll in and out of view
 
-#### Long-edge navigation (jj-idea-sc8m)
+#### Long-edge navigation
 
-Reuse FX-STRESS with `SCALE=6 WITH_REMOTE=1`, per MT-LOG-REFRESH's
-"Paged log loading" fixture below.
+Reuse FX-STRESS with `SCALE=6 WITH_REMOTE=1`, per MT-LOG-REFRESH's "Paged log loading" fixture.
 
-- [ ] Hovering a long line whose child (upper) end is visible always points **down**, toward
-      the invisible parent; hovering one whose parent (lower) end is visible always points
-      **up**, toward the invisible child — direction never depends on where within the row
-      you point, only on which end is actually off-screen
-- [ ] When *both* ends are off-screen (e.g. scrolled to the middle of a very long branch),
-      direction instead depends on which half of the **viewport** the row falls in: rows in
-      the top half point up, rows in the bottom half point down. Moving the mouse gradually
-      from one visible row to the next changes direction **at most once**, at a single
-      stable transition row near the viewport's middle — not back and forth per row, and
-      not depending on where within a row you point
-- [ ] Whichever direction is active thickens the side of the line that *is* the navigation
-      target and shows a directional resize cursor (↑/↓); the side that isn't the target
-      stays plain/normal weight (not a dimmed or translucent overlay) — the tooltip names
-      the target commit and how many rows up/down it is
-- [ ] When one end is visible, the thickened treatment runs the **entire** way to that end's
-      own commit circle, with no gap or thin segment beforehand - including where the
-      connector is a diagonal (e.g. into/out of a merge commit), not just a plain vertical
-- [ ] Scroll the log (mouse wheel, scrollbar, keyboard) while hovering a long edge without
-      moving the mouse: the thickened span/direction updates to match the new viewport
-      immediately, instead of staying stuck at the position from before you scrolled
-- [ ] No stray extra vertical segments appear anywhere else in the graph while hovering - a
-      merge with 3+ parents is the sharpest test: hover each of its connector lines
-      individually and confirm nothing appears in an unrelated lane, and that the thickened
-      treatment stops exactly at a visible end's circle rather than bleeding into whatever
-      unrelated edge happens to reuse that lane immediately below/above it
-- [ ] Hovering a **faded straight stub** (a `NOT_LOADED` unresolved parent) shows a
-      directional-down cursor and a "Parent not loaded yet — click to load" tooltip
-      (a stub has no child-ward direction to offer, so it's always "down"); clicking it
-      loads and scrolls to reveal that parent, exactly as if you had scrolled to trigger
-      the load
-- [ ] Apply a filter that hides an ancestor so its row shows the **wiggly line**
-      (`HIDDEN`, jj-idea-xi58) — hovering it shows a tooltip naming what's hidden but the
-      cursor stays the plain arrow (not a directional cursor), and clicking it does nothing
-      (clearing the filter is the only way to reveal it, per jj-idea-hlu3)
-- [ ] A short edge whose both ends are already on screen gets no hover treatment at all —
-      the graph looks exactly as it did before this feature
-- [ ] Double-clicking a long edge navigates the same way a single click does, instead of
-      also triggering the row's Enter-bound action (e.g. Show Diff)
-- [ ] Confirm the graph column's text indent (where the description starts) looks
-      unchanged from before this change, on both a linear history and a wide multi-branch
-      view
+- [ ] Hovering a long line whose child (upper) end is visible always points **down**, toward the invisible parent; one whose parent (lower) end is visible always points **up**. Direction depends only on which end is off-screen, never on where within the row you point
+- [ ] When *both* ends are off-screen (scrolled to the middle of a very long branch), direction depends on which half of the **viewport** the row is in: top half points up, bottom half points down. Moving the mouse gradually from one visible row to the next changes direction **at most once**, at a single stable transition row near the viewport's middle
+- [ ] The active direction thickens the side of the line that *is* the navigation target and shows a directional resize cursor (↑/↓); the other side stays plain weight (not dimmed or translucent). The tooltip names the target commit and how many rows up or down it is
+- [ ] When one end is visible, the thickened treatment runs the **entire** way to that end's circle with no gap or thin segment, including where the connector is a diagonal (into or out of a merge commit)
+- [ ] Scrolling (wheel, scrollbar, keyboard) while hovering a long edge without moving the mouse updates the thickened span and direction to the new viewport immediately
+- [ ] No stray vertical segments appear elsewhere while hovering. A merge with 3+ parents is the sharpest test: hover each connector individually and confirm nothing appears in an unrelated lane and the thickening stops exactly at a visible end's circle instead of bleeding into whatever edge reuses that lane below or above it
+- [ ] Hovering a **faded straight stub** (an unresolved parent not yet loaded) shows a directional-down cursor and a "Parent not loaded yet — click to load" tooltip; clicking it loads and scrolls to reveal that parent, as if you had scrolled to trigger the load
+- [ ] With a filter that hides an ancestor so its row shows the **wiggly line**, hovering shows a tooltip naming what's hidden but the cursor stays the plain arrow, and clicking does nothing (clearing the filter is the only way to reveal it)
+- [ ] A short edge whose ends are both on screen gets no hover treatment. Double-clicking a long edge navigates like a single click, without also triggering the row's Enter-bound action (e.g. Show Diff)
+- [ ] The graph column's text indent (where the description starts) looks unchanged on both a linear history and a wide multi-branch view
 
-#### Graph layout under filtering (jj-idea-7jkr)
+#### Graph layout under filtering
 
 → automate: jj-idea-2k2b (layout re-alignment under filtering is a deterministic
 `LayoutCalculator` computation, testable without rendering)
 
-Reuse FX-STRESS rather than building another throwaway multi-branch repo — it already has far
-more lanes than the 3-4 needed here.
+Reuse FX-STRESS rather than building another throwaway multi-branch repo.
 
-- [ ] Type a text filter that hides some rows — the graph re-draws to match the **visible** rows only: lines do not extend to hidden commits, no misaligned passthrough lines across the remaining rows
-- [ ] Clear the text filter — the graph returns to the full layout immediately (no stale passthrough lines from the filtered view)
-- [ ] Apply author, date, or root filter on a multi-branch repo — same check: graph lines align with visible rows only
-- [ ] Rapid typing (several characters quickly) converges to a single correct layout within ~250 ms (no flickering per keystroke)
+- [ ] Typing a text filter that hides some rows redraws the graph for the **visible** rows only: lines do not extend to hidden commits, and there are no misaligned passthrough lines across the remaining rows. Clearing it returns the full layout immediately, with no stale passthrough lines
+- [ ] An author, date or root filter on a multi-branch repo gives the same result
+- [ ] Rapid typing (several characters quickly) converges to a single correct layout within ~250 ms, without flickering per keystroke
 
 ### MT-LOG-DETAILS
 
@@ -547,155 +307,47 @@ more lanes than the 3-4 needed here.
 **Code:** `ui/log/JujutsuCommitDetailsPanel.kt`, `ui/components/HtmlTextCanvas.kt`, `ui/components/TextCanvas.kt`, `ui/log/JujutsuLogContextMenuActions.kt`, `ui/log/LogClickTarget.kt`, `actions/filechange/FileChangeActionGroup.kt`
 **Also re-run:** MT-DIFF-PREVIEW (details changes panel shares the preview-tab behavior); MT-LOG-TABLE (change-id link click handling and the file-change context menu are shared with the log table / working copy panel)
 
-- [ ] Details panel shows on row selection
-- [ ] Metadata displays correctly (author, date, change ID)
-- [ ] Author line shows `Name <email>` as a single clickable mailto link; when the committer
-      differs from the author, a "committed by Name <email>" line also appears with its own mailto link
-- [ ] Narrow the details panel (or use a commit with a long name/email, e.g. a bot commit) so the
-      author/committer line must wrap: `Name <email>` and `· date, time` each wrap as a whole (never
-      splitting mid-email or mid-date), with a visible gap between them, never touching
-- [ ] Description renders HTML formatting
-- [ ] Splitter position persists
-- [ ] Toggle details panel position (right/bottom) works
-- [ ] On a commit with several long/hyphenated bookmarks (e.g. `hotfix/issue-123`,
-      `feature/long-name-here`), narrow the panel until the bookmark line wraps — each
-      bookmark (icon + name) stays intact on one line; wrapping only occurs between
-      bookmarks, never inside a name or between its icon and text (jj-idea-kds1)
-- [ ] The `Name <email>` link is link-colored, with **no underline** at rest; hovering it adds
-      an underline, moving off removes it (jj-idea-iesq)
-- [ ] Hovering a bookmark or tag chip in the details panel shows a subtle grey background
-      highlight but no hand cursor (jj-idea-a52h) — check across the whole chip width including
-      near its right edge, a hit-testing bug meant this used to only hold over roughly the left half
-- [ ] **Left-clicking** a bookmark/tag chip does nothing here either; **right-clicking** opens the
-      same menu as the log table (Filter Log to '...' plus rename/delete/forget/move/track), with
-      the checkmark reflecting active filter state
-- [ ] **Right-clicking** an author or committer email in the details panel opens the same menu as
-      the log table (Send Email to ..., plus Filter Log by ... for the author) — this previously
-      did nothing at all (jj-idea-a52h)
-- [ ] **Right-clicking** a parent/change-id link (e.g. a parent reference in a merge commit's
-      details) opens that commit's full log-row context menu (Show Diff, New/Edit, Describe,
-      Abandon, Rebase, etc.) — this previously showed an empty "Nothing Here" placeholder
-      (jj-idea-in2h). Left-click still navigates/selects that commit as before
-- [ ] Right-clicking a bookmark/tag chip, author/committer email or change-id link in the details pane
-      now opens a highlighted-default popup list (same as in the log table) instead of a plain
-      context menu; items work as before (jj-idea-eir1)
-- [ ] Right-click a change-id link whose target has since become invalid (e.g. abandon that
-      commit via the CLI in another terminal, then right-click the now-stale link without
-      refreshing) — shows an empty menu rather than throwing or crashing
-- [ ] jj-idea-g2p8 (GitHub #84): right-click one or more files in the changed-files list of a
-      **historical** commit's details panel → **Restore to This…** opens the Restore dialog
-      (see MT-WORKINGCOPY's "Restore dialog" for the full checklist) listing the files that
-      differ between that commit and `@`, with the right-clicked file(s) pre-checked;
-      confirming restores exactly the checked files via `jj restore -f <that revision>`
-- [ ] jj-idea-gl5e (GitHub #148): in a **mutable** historical commit that changed 3 files,
-      multi-select 2 of them → **Drop Changes from This…** opens the "Drop Changes" dialog with
-      those 2 pre-ticked (summary "Changes to 2 files will be dropped"); confirm → `jj diff -r <it>
-      --name-only` lists only the third, descendants are rebased, and the "Drop Changes" balloon's
-      **Undo** restores both files in one step. The item is hidden for an **immutable** commit and
-      for the working copy, and visible but **disabled** (tooltip "Select a single commit…") when
-      several commits are selected in the log
+- [ ] Selecting a row shows the panel with author, date and change ID. The splitter position persists, and the panel toggles between right and bottom
+- [ ] The author line is a single `Name <email>` mailto link, link-coloured with no underline at rest and an underline on hover. When the committer differs, a "committed by Name <email>" line also appears with its own mailto link. Narrowing the panel (or a long bot name/email) wraps `Name <email>` and `· date, time` each as a whole, never mid-email or mid-date, with a visible gap between them
+- [ ] The description renders HTML formatting
+- [ ] On a commit with several long or hyphenated bookmarks (`hotfix/issue-123`, `feature/long-name-here`), narrowing the panel wraps the bookmark line only between bookmarks, never inside a name or between its icon and text
+- [ ] Hovering a bookmark or tag chip shows a grey background and no hand cursor, across the whole chip width including near its right edge. Left-click does nothing. Right-click opens the same menu as the log table (Filter Log to '…' with its checkmark, plus rename/delete/forget/move/track)
+- [ ] Right-clicking an author or committer email opens the same menu as the log table (Send Email to …, plus Filter Log by … for the author)
+- [ ] Right-clicking a parent or change-id link (e.g. a merge's parent) opens that commit's full log-row menu (Show Diff, New/Edit, Describe, Abandon, Rebase, …) as a highlighted-default popup list; left-click navigates and selects that commit. If the target has become invalid (abandoned in a terminal, link not refreshed) the menu is empty rather than throwing
+- [ ] Right-clicking one or more files in the changed-files list of a **historical** commit → **Restore to This…** opens the Restore dialog (MT-WORKINGCOPY "Restore dialog" has the full checklist) listing the files that differ between that commit and `@`, with the right-clicked files pre-checked. Confirming restores exactly the checked files via `jj restore -f <that revision>` (GitHub #84)
+- [ ] In a **mutable** historical commit that changed 3 files, multi-select 2 → **Drop Changes from This…** opens the "Drop Changes" dialog with those 2 pre-ticked (summary "Changes to 2 files will be dropped"). Confirming leaves only the third in `jj diff -r <it> --name-only`, rebases descendants, and the "Drop Changes" balloon's **Undo** restores both files in one step. The item is hidden for an immutable commit and for the working copy, and visible but disabled (tooltip "Select a single commit…") when several commits are selected in the log (GitHub #148)
 
-#### Issue-tracker links in descriptions (jj-idea-10fo)
+#### Issue-tracker links
 
-- [ ] In Settings → Version Control → Issue Navigation, add a pattern (e.g. issue regexp
-      `[A-Z]+-\d+`, link `https://example.com/browse/$0`); Apply
-- [ ] Select a commit whose description contains a matching reference (e.g. `Fixes JIRA-123`) —
-      the reference renders underlined/link-styled in the details panel
-- [ ] Clicking the reference opens the URL in your default browser
-- [ ] A bare `https://…` URL in a description is also clickable and opens correctly
-- [ ] A commit description with no matching reference renders unchanged (plain text, no link)
+Setup and the full link checks are in MT-LOG-TABLE → Issue-tracker links; this covers what differs here.
 
-#### Issue-tracker links inside bookmark/tag chip names (jj-idea-vrmv)
+- [ ] A selected commit's description reference renders link-styled (underlined) and opens the browser on click. A bare `https://…` URL is clickable too. A description with no match, or no patterns configured, is plain text
+- [ ] A bookmark or tag name containing a match renders the reference link-coloured within the chip. Hovering just the reference shows a hand cursor and underline with no background highlight (the two hover cues don't overlap); left-click opens the browser; right-click on the reference shows the single "Open <url>" action, and elsewhere on the chip shows the usual bookmark/tag menu. A name with no match shows the grey chip highlight on hover and the usual menu, with no link
 
-- [ ] With an Issue Navigation pattern configured (as above), select a commit with a bookmark/tag
-      whose name contains a matching reference (e.g. `jira-123-fix-thing`) — the reference renders
-      link-colored within the chip in the details panel's bookmark/tag line; the rest of the chip
-      (icon, remaining text) stays plain
-- [ ] Hovering just the reference substring shows a hand cursor and underlines only it; hovering the
-      rest of the same chip (icon or non-matching text) shows no hand cursor and no background
-      highlight — the two hover cues don't overlap
-- [ ] Left-clicking the reference substring opens the URL in your default browser; left-clicking
-      elsewhere in the chip still does nothing
-- [ ] Right-clicking the reference substring shows a popup with a single "Open <url>" action;
-      right-clicking elsewhere in the same chip still shows the usual bookmark/tag actions menu
-- [ ] A bookmark/tag name with no matching reference in the details panel renders and right-clicks
-      exactly as before (ref-only hover highlight, no link)
-- [ ] With no Issue Navigation patterns configured, descriptions render exactly as before
+#### Icons and chips at non-default zoom
 
-#### Icons and chips at non-default zoom (jj-idea-3as8)
+Repeat at **View → Appearance → Zoom IDE** 85%, 150% and 200%, then reset to 100%. Use a commit with a local and a remote bookmark (one divergent, e.g. ↑1), a tag, an immutable parent and an author/committer email. Compare each surface with the same commit's row in the log table.
 
-Repeat at **View → Appearance → Zoom IDE** 85%, 150% and 200%, then reset to 100%. Use a commit
-with a local and a remote bookmark (one divergent, e.g. ↑1), a tag, an immutable parent and an
-author/committer email. Compare each surface with the same commit's row in the log table.
+- [ ] In the details panel the repo line's icon, the chips' icons and the immutable/conflict icons are the same size as in the log table, centred on their text line, with no overlap and no extra gap before the following text. Chip names and the ↑/↓ divergence scale with the zoom like the surrounding text (slightly smaller, as in the log table)
+- [ ] The "+N" overflow chip, the `@` marker and the dangling-head marker line up the same way; the row tooltip and the bookmarks panel (tree and its tooltips) show the same alignment
+- [ ] Hovering a chip highlights exactly the chip; hovering the author's `Name <email>` underlines exactly it; an issue-link substring inside a chip name underlines only itself
 
-- [ ] Details panel: the repo line's icon, the bookmark/tag chips' icons and the immutable/conflict
-      icons are the same size as in the log table, centred on their text line, with no overlap
-      and no extra gap before the text that follows
-- [ ] Bookmark/tag chip names and the ↑/↓ divergence scale with the zoom, the same as the
-      surrounding text (slightly smaller, as in the log table)
-- [ ] The "+N" overflow chip, the `@` marker and the dangling-head marker line up the same way
-- [ ] Row tooltip and the bookmarks panel (tree and its tooltips) show the same alignment
-- [ ] Hovering a bookmark/tag chip highlights exactly the chip; hovering the author's
-      `Name <email>` underlines exactly it; the issue-link substring inside a chip name still
-      underlines only itself
+#### Copying text
 
-#### Copying chip text (jj-idea-5zio)
+Use the **keyboard** shortcut (Cmd/Ctrl+C) throughout: the IDE routes it through its own Copy action, not Swing's, so that is the path that must carry the chip text (a context menu has no Copy here).
 
-Use the **keyboard** shortcut (Cmd/Ctrl+C) throughout: the IDE routes it through its own Copy action,
-not Swing's, so that's the path that must carry the chip text (a context menu has no Copy here).
+- [ ] Drag-select from plain text before the author line to past the date (start on plain text, not on a chip), copy, and paste into a plain text editor: the text includes `Name <email>` and the date
+- [ ] Select All (Ctrl/Cmd+A), copy and paste: bookmark and tag chip names (with any ↑/↓ divergence) appear, and icons contribute nothing. (The on-screen highlight skips chips and the author line, whose selection highlight has zero width — a known limitation — but the clipboard has them)
+- [ ] A commit with an issue reference in its description and bookmark name (`Fixes JIRA-123`, `jira-123-fix-thing`) copies as plain text, with no URL or markup. The description pastes with ordinary spaces; the only non-breaking spaces are the deliberate gaps between chips and around the `·` before the date
+- [ ] Row tooltip: select text with the mouse (not from a corner of the tooltip, which dismisses it), then copy: the text includes its chips' text. The tooltip closes on the key press (it dismisses on any key, so Cmd/Ctrl+A in it just closes it); the copy still happens
 
-- [ ] In the details panel, drag-select from plain text before the author line to past the date
-      (start the drag on plain text, not on a chip), Cmd/Ctrl+C, and paste into a plain text
-      editor — the pasted text includes `Name <email>` and the date
-- [ ] Select All (Ctrl/Cmd+A) in the details panel, Cmd/Ctrl+C and paste — bookmark/tag chip names
-      (with any ↑/↓ divergence) appear in the pasted text; icons contribute nothing. (The on-screen
-      highlight skips chips and the author line — their selection highlight has zero width, a known
-      limitation — but the clipboard has them)
-- [ ] A commit with an issue-tracker reference in its description and bookmark name (e.g.
-      `Fixes JIRA-123`, `jira-123-fix-thing`) copies as plain text — no URL or markup
-- [ ] Row tooltip: select text with the mouse (not from a corner of the tooltip, which dismisses
-      it), then Cmd/Ctrl+C and paste — includes its chips' text. The tooltip closes on the key
-      press (it dismisses on any key, so Cmd/Ctrl+A in it just closes it); the copy still happens
-- [ ] The description line pastes with ordinary spaces; the only non-breaking spaces are the
-      deliberate gaps between chips and around the `·` before the date (out of scope)
+#### Changes tree
 
-#### Details Changes Panel
-
-- [ ] File change tree shows correct files
-- [ ] Preview-tab behavior (double-click, Enter, tab-swap, Escape, Cmd/Ctrl+D, F4): see MT-DIFF-PREVIEW
-- [ ] Open file for historical version opens correct version
-- [ ] Open file for working copy opens editable editor
-- [ ] jj-idea-lo7u: right-clicking a file for a historical commit shows "Compare Before with
-      Another Commit..."; hidden for the working-copy entry and for a root commit
-- [ ] Right-click a file in the details panel's change tree → **Show History** appears in the
-      menu (jj-idea-cb3r, fixed for real in jj-idea-v9g4 — the initial jj-idea-cb3r fix added it to
-      the menu-building code but the action stayed invisible there since it only read
-      `CommonDataKeys.VIRTUAL_FILE`, which this tree only supplies for a working-copy selection —
-      see `JujutsuChangesTree.showsLocalFiles`) and opens that file's custom history tab, same as
-      from the editor's Jujutsu submenu
-- [ ] Repeat from the **Working Copy** tool window's file tree and from a compare-changes panel
-      (e.g. "Compare with Another Commit…") — **Show History** works from all of them, not just
-      the commit details panel
-- [ ] Right-click a **deleted** file (e.g. in a historical commit's file list) → **Show History**
-      is still available (uses the file's last-known path, not just files with current content)
-- [ ] Multi-select several files in the details panel's change tree for a **historical** commit
-      (not `@`) → **Show History** is disabled/hidden rather than silently acting on just one of
-      the selected files
-
-#### Platform file actions on the changes tree (`JujutsuChangesTree.showsLocalFiles`)
-
-- [ ] Select `@` (the working copy) in the log → in the details panel's change tree, select one
-      or more files → the IDE's **Reformat Code** (Ctrl/Cmd+Alt+L) and **Optimize Imports**
-      (Ctrl/Cmd+Alt+O) both act on the selected file(s) on disk
-- [ ] Right-click a file in that same `@`-selection tree → Jujutsu submenu → **Annotate** opens
-      the gutter annotations for that file
-- [ ] F4 on that same `@`-selection still opens the file via **Jujutsu.OpenChangeFile** (unchanged
-      — this tree owns the F4 shortcut, not the platform's generic Jump to Source)
-- [ ] Select a **historical** (non-`@`) commit in the log → in the details panel's change tree,
-      Reformat Code/Optimize Imports/Annotate either do nothing or act on the *editor's* current
-      file (not silently acting on the historical revision or the working-copy file instead)
-- [ ] "Open File" on a historical commit's change still opens that **revision's** content, not
-      the current working-copy file, both before and after selecting files in the tree
+- [ ] The tree shows the commit's changed files. Preview-tab behaviour (double-click, Enter, tab-swap, Escape, Cmd/Ctrl+D, F4) is MT-DIFF-PREVIEW
+- [ ] Open File on a historical commit opens that **revision's** content (before and after selecting files in the tree); on the working copy it opens the editable file
+- [ ] Right-clicking a file of a historical commit shows "Compare Before with Another Commit…", hidden for the working-copy entry and for a root commit
+- [ ] **Show History** appears in a file's right-click menu and opens that file's history tab. It works from the details panel, the Working Copy tool window's tree and a compare-changes panel (e.g. "Compare with Another Commit…"), and for a **deleted** file (it uses the last-known path). Selecting several files of a historical (non-`@`) commit disables or hides it rather than acting on just one
+- [ ] With `@` selected in the log, selecting files in the details tree makes the IDE's Reformat Code (Ctrl/Cmd+Alt+L) and Optimize Imports (Ctrl/Cmd+Alt+O) act on them on disk, Jujutsu → **Annotate** opens the gutter annotations, and F4 opens the file via **Jujutsu.OpenChangeFile**. With a historical commit selected, Reformat Code, Optimize Imports and Annotate do nothing, or act on the editor's current file, never silently on the historical revision or the working-copy file
 
 ### MT-LOG-FILTER
 
@@ -705,55 +357,50 @@ not Swing's, so that's the path that must carry the chip text (a context menu ha
 
 #### Toolbar & filters
 
-- [ ] Refresh button reloads data; text search filters in real-time; regex and
-      case-sensitivity toggles both work
-- [ ] Author dropdown shows all authors and restricts visible entries when applied;
-      bookmark/reference and date filters each restrict correctly
-- [ ] Clear filters (X button) resets all filters; multiple active filters combine correctly (AND logic)
+- [ ] Refresh reloads data; text search filters in real time; the regex and case-sensitivity toggles both work
+- [ ] The Author dropdown lists all authors and restricts visible entries when applied; the bookmark/reference and date filters each restrict correctly
+- [ ] Clear filters (X) resets all filters; multiple active filters combine with AND
 
-#### Search box revset mode (jj-idea-ehwm.5)
+#### Toolbar buttons and shortcuts
+
+- [ ] **New**, **Edit**, **Rebase** and **Describe** icon buttons sit at the left of the main log toolbar, in that order and before Refresh, each with a tooltip. **Edit** (Ctrl/Cmd+Shift+E), **Rebase** and **Describe** have default shortcuts (Settings → Keymap: "Jujutsu.EditChange", "Jujutsu.RebaseChangeToolbar", "Jujutsu.DescribeChangeToolbar"); with a log row selected and the table focused, pressing them does what clicking does. (Ctrl/Cmd+Shift+E soft-conflicts with the IDE's "Recent Locations" outside the log table; a keymap conflict warning is expected there, not a bug)
+- [ ] **Edit** on a selected mutable non-working-copy change moves the working copy to it (it becomes `@`) and the log reselects it; it is disabled for the working-copy change and for immutable commits
+- [ ] **New** on a selected change creates a new empty change on top of it and it becomes `@`; with no selection it stacks on the working copy. Clearing the selection (Ctrl/Cmd-click the selected row) greys **New** out rather than removing it from the toolbar
+- [ ] **Describe** on a selected mutable change opens the same dialog as the right-click Describe entry; it is disabled for an immutable change or no selection (greyed out, still in place)
+- [ ] **Rebase** on one or more mutable changes in the same repo opens the same dialog as the right-click Rebase entry, pre-populated with the selection as source. It is disabled for only-immutable selections and for a multi-selection across two repos (no arbitrary repo is picked)
+- [ ] Right-clicking a log row shows the keyboard shortcut hint next to **Rebase** and **Describe** (e.g. "Ctrl+Shift+R"), matching the toolbar. Multi-selecting several mutable rows (same repo) enables **Rebase** with all of them as source (disabled across two repos) and disables **Describe**
+- [ ] Right-clicking a change-id link (e.g. a parent reference in the details panel) gives a menu that acts on the link's target, not the log selection (select a *different* row first to confirm): **New Change**, **Edit**, **Describe** and **Rebase** show their shortcut hints, and **Move Up**/**Move Down** are shown disabled
+- [ ] A file's history tab (right-click a file → Show History) shows only Refresh and search in its toolbar: no New, Edit, Rebase or Describe buttons
+
+#### Narrow-width toolbar
+
+- [ ] Shrinking the log tool window narrower and narrower keeps New, Edit, Refresh, Fetch, **Push**, Columns and Details-position buttons visible and clickable at every width, never pushed off-screen. The search field shrinks to a minimum width and stops (it doesn't shrink to zero or overlap the buttons)
+- [ ] Narrowing further hides filter chips (Reference, Author, Date, Root) one at a time and shows a "»" overflow chevron; clicking it lists all filters, including the hidden ones, and they are fully usable from there (clicking one opens its dropdown). With no filters applied, filters hide in trailing (rightmost) order first
+- [ ] A filter with a value applied (e.g. a bookmark selected in Reference) stays visible while unapplied filters hide ahead of it, even if it isn't leftmost; whatever remains keeps its original left-to-right order. Widening brings hidden filters back and removes the chevron once everything fits
+
+#### Search box revset mode
 
 **Code:** `ui/components/LogSearchField.kt` (`revsetMode`, `setError`, collapse chip), `ui/log/RevsetFilter.kt` (`conciseRevsetError`), `ui/log/UnifiedJujutsuLogPanel.kt`
 (`applyFilterNow`), `settings/LogWindowConfig.kt` (`searchRevsetMode`)
 
 Use FX-STRESS.
 
-- [ ] The log tab's search box has a 4th toggle (revset) after Regex / Match Case / Words; turning it
-      on greys out those three and changes the placeholder to a revset example
-- [ ] With it on, `heads(::@)` shows only the matching rows (after the "Filtering…" pause); Enter
-      applies at once
-- [ ] The revset ANDs with the Scope chip and chips: add an Author chip and only that author's
-      matches remain
-- [ ] Type `heads(` — the whole box gets a red outline and hovering shows a one-line message (e.g.
-      "Failed to parse revset: Syntax error: expected … (column 7)") with no `|` snippet and none of
-      the scope/chip terms; the status bar shows the same short text as "Search revset error", and
-      the previous rows stay (the log is not emptied). Fixing the text clears the outline and tooltip
+- [ ] The log tab's search box has a 4th toggle (revset) after Regex / Match Case / Words; turning it on greys out those three and changes the placeholder to a revset example. Turning it off searches the same text as plain text again, with any red outline gone. The toggle state survives an IDE restart, per tab
+- [ ] With it on, `heads(::@)` shows only the matching rows (after the "Filtering…" pause); Enter applies at once. The revset ANDs with the Scope chip and the other chips (add an Author chip and only that author's matches remain)
+- [ ] Typing `heads(` gives the whole box a red outline and a one-line hover message (e.g. "Failed to parse revset: Syntax error: expected … (column 7)") with no `|` snippet and none of the scope/chip terms. The status bar shows the same short text as "Search revset error", and the previous rows stay (the log is not emptied). Fixing the text clears the outline and tooltip
 - [ ] With a bad *scope* and a valid search, the search box is not outlined (the status bar names the error)
-- [ ] Narrow the tool window until the search box would leave only a few characters to type: it
-      collapses to a compact chip (search icon + text, red text on an error). Clicking it pops out the
-      full box with the toggles; Enter applies and closes it, Esc closes it, and the text and toggles
-      are kept. Widening the window brings the inline box back
+- [ ] Narrowing the tool window until the box would leave only a few characters to type collapses it to a compact chip (search icon + text, red text on an error). Clicking the chip pops out the full box with the toggles; Enter applies and closes it, Esc closes it, and the text and toggles are kept. Widening brings the inline box back
+- [ ] The Rebase, Squash Into… and Move Bookmark to Change pickers and file history have no revset toggle
 
-- [ ] Turn the toggle off: the same text is searched as plain text again, with the red outline gone
-- [ ] Toggle state survives closing and reopening the IDE, per tab
-- [ ] The Rebase / Squash Into… / Move Bookmark to Change pickers and file history have no revset toggle
-
-#### Search by Git commit hash (jj-idea-odzo)
+#### Search by Git commit hash
 
 → automate: jj-idea-4u7j (hash-prefix matching, filter AND-combination, and regex/case
 toggles are pure `LogFilterMatcher` logic, testable without rendering)
 
-- [ ] Copy a full 40-character Git commit hash of a commit currently visible in the log
-      (e.g. `jj log -T commit_id`) and paste it into the search field — the row filters
-      in and is the only result
-- [ ] Paste just an abbreviated prefix of that hash — it still matches
-- [ ] Paste the hash in a different case (e.g. uppercase) — it still matches (case-insensitive
-      by default)
-- [ ] Paste a hash for a commit that isn't currently loaded in the log window — after a brief
-      "Filtering…" it appears as the only row, no Enter needed — see "Whole-history filtering
-      (jj-idea-ehwm.3)" below
+- [ ] Pasting the full 40-character Git commit hash of a visible commit (e.g. from `jj log -T commit_id`) into the search field leaves that row as the only result. An abbreviated prefix still matches, and so does a different case (case-insensitive by default)
+- [ ] A hash for a commit not currently loaded appears as the only row after a brief "Filtering…", with no Enter needed (see Whole-history filtering below)
 
-#### Whole-history filtering (jj-idea-lpbv, jj-idea-ehwm.3)
+#### Whole-history filtering
 
 **Code:** `jj/LogSearchRevset.kt`, `ui/log/LogFilterRevset.kt` (`compileLogFilterRevset`),
 `ui/log/FilterPageCursor.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt` (`applyFilter`,
@@ -761,286 +408,107 @@ toggles are pure `LogFilterMatcher` logic, testable without rendering)
 `ui/log/JujutsuLogTable.kt` (`revsetDriven`, `filterState`), `ui/common/CommitTablePanel.kt`
 (status bar), `ui/log/LogFilterMatcher.kt` (file history only)
 
-In the main log tab every filter except Root (search text, Reference, Author, Date and the Scope
-chip) is compiled into one revset per repo and resolved by jj, so it covers the whole history, not
-just the loaded window. Matches arrive a page at a time. File history keeps the old client-side
-filtering (nothing here applies to it).
+In the main log tab every filter except Root (search text, Reference, Author, Date and the Scope chip) is compiled into one revset per repo and resolved by jj, so it covers the whole history, not just the loaded window. Matches arrive a page at a time. File history keeps client-side filtering of the loaded rows (nothing here applies to it).
 
 → automate: `LogFilterRevsetTest`, `RevsetLogFilterLoaderTest`, `FilterPageCursorTest` and the
 real-jj `FilterPageCursorContractTest` cover compilation, paging and the table model; this section is
 for the end-to-end wiring that only shows up when jj actually runs.
 
-Setup: `scripts/fixtures/fx-stress.sh`'s ~1084-commit repo (`jj-stress-test`, shared with
-MT-LOG-GRAPH/MT-LOG-FILTER's other stress fixtures); the first page is only 500 rows, so most
-commits are off-window.
+Setup: `scripts/fixtures/fx-stress.sh`'s ~1084-commit repo (`jj-stress-test`); the first page is only 500 rows, so most commits are off-window.
 
-- [ ] Find a commit hash/change-id well past the first page (e.g. `jj log -r 'all()' -T commit_id
-      --no-graph --limit 2000`), paste it into the search field — after a brief "Filtering…"
-      (no Enter needed) it shows as the only visible row
-- [ ] Type a word that appears only in an old commit's description **body** (not its first line) —
-      the old commit shows (full-body matching, not just the summary line)
-- [ ] Type gibberish that matches nothing — the table goes empty, the "Filtering…" hint goes away
-- [ ] While typing a longer word, the table holds its previous rows until you pause (about 300 ms);
-      pressing **Enter** applies immediately
-- [ ] Type free text containing punctuation (e.g. `fix: the . thing`) — must not error (check
-      `idea.log`); it just searches description/author as usual
-- [ ] A search matching more than one page of commits (e.g. a single letter): scroll to the bottom
-      — more matches load, with no repeated rows and none skipped (compare the count with
-      `jj log -r 'description(substring-i:"x")' --no-graph -T commit_id | wc -l` once fully scrolled)
-- [ ] Combine search + Author + Date — the visible rows are exactly the commits matching all three
-- [ ] Click **Refresh**, or make a change in a terminal — the filtered view re-fetches and keeps its
-      scroll depth; clear the search and the log returns to the configured revset/limit
-- [ ] In a multi-repo project, repeat with a hash from a second repo — results from both roots
-      merge and the root gutter stays correct; the **Root** filter still hides/shows roots instantly
-- [ ] A match whose parent is not itself a match (sparse results) shows a faded "not loaded" stub
-      edge rather than a wrong connection; clicking the stub loads its target
-- [ ] Open a file's history (right-click a file → Show History) — its search field filters the
-      already-loaded rows instantly, exactly as before (no "Filtering…" hint)
-
-#### New/Edit toolbar buttons (jj-idea-e53e)
-
-- [ ] **New** and **Edit** icon buttons appear at the left of the main log toolbar, before Refresh, each with a tooltip
-- [ ] Selecting a mutable non-working-copy change and clicking **Edit** moves the working copy to it (it becomes `@`) and the log reselects it
-- [ ] Selecting the working-copy change or an immutable commit disables **Edit**
-- [ ] **Edit** has a default keyboard shortcut (Ctrl/Cmd+Shift+E, jj-idea-crt0) — check Settings → Keymap for "Jujutsu.EditChange"; with a log row selected, pressing it edits that row. (This shortcut soft-conflicts with IntelliJ's built-in "Recent Locations" outside the log table — Recent Locations still wins there since Edit is disabled without a log selection; a keymap conflict warning in Settings → Keymap is expected, not a bug)
-- [ ] Clicking **New** with a change selected creates a new empty change on top of the selection and it becomes `@`; with no selection it stacks on the working copy
-- [ ] Clearing the log selection entirely (e.g. Ctrl/Cmd-click the selected row to deselect) disables **New** (greyed out) rather than removing it from the toolbar — it stays in place, matching **Edit**'s behavior
-- [ ] Open a file's history (right-click a file > Show History) — confirm its toolbar shows only Refresh/search, with no New/Edit buttons
-
-#### Rebase/Describe toolbar buttons (jj-idea-ck64, GitHub #78)
-
-- [ ] **Rebase** and **Describe** icon buttons appear on the main log toolbar, after **Edit** and before Refresh, each with a tooltip and a default keyboard shortcut (check Settings → Keymap for "Jujutsu.RebaseChangeToolbar" / "Jujutsu.DescribeChangeToolbar")
-- [ ] Selecting a mutable change and clicking **Describe** opens the same description dialog as the right-click menu's Describe entry; editing and confirming updates the change
-- [ ] Selecting an immutable change disables **Describe**; selecting nothing also disables it (stays in place, greyed out)
-- [ ] Selecting one or more mutable changes (same repo) and clicking **Rebase** opens the same rebase dialog as the right-click menu's Rebase entry, pre-populated with the selection as source
-- [ ] Multi-selecting changes across two repos in a multi-root project disables **Rebase** (no arbitrary repo is picked), matching **New Change From These**'s cross-repo behavior
-- [ ] Selecting only immutable changes disables **Rebase**
-- [ ] Pressing the toolbar buttons' keyboard shortcuts while the log table has focus triggers the same actions as clicking them
-
-#### Context-menu shortcut hints (jj-idea-crt0)
-
-- [ ] Right-click a log row → the **Rebase** and **Describe** entries show their keyboard shortcut hint next to the label (e.g. "Ctrl+Shift+R"), matching the toolbar buttons — this previously showed no hint even though the toolbar shortcut existed
-- [ ] Right-click a change-id link (e.g. a parent reference in the commit details panel) → its menu acts on the link's target, not the log table's selection (jj-idea-eir1): **New Change**, **Edit**, **Describe** and **Rebase** show their keyboard shortcut hints like a log-row right-click, and use the linked change (select a *different* row first to confirm); **Move Up**/**Move Down** are shown disabled
-- [ ] Multi-select several mutable rows (same repo), right-click → **Rebase** is enabled and opens with all of them as source; multi-select spanning two repos → **Rebase** is disabled
-- [ ] Multi-select several rows, right-click → **Describe** is disabled (only meaningful for a single selection)
-- [ ] Open a file's history (right-click a file > Show History) — confirm its toolbar still shows only Refresh/search, with no Rebase/Describe buttons
-
-#### Narrow-width toolbar (jj-idea-kxx4)
-
-- [ ] Shrink the log tool window / splitter narrower and narrower — New, Edit, Refresh,
-  Fetch, **Push**, Columns, and Details-position buttons all stay visible and clickable at
-  every width; they are never pushed off-screen
-- [ ] As the window narrows, the search field shrinks down to a minimum width and stops
-  (it does not keep shrinking to zero or overlap the buttons)
-- [ ] As the window narrows further, filter chips (Reference, Author, Date, Root) start
-  disappearing from the toolbar one at a time and a "»" overflow chevron appears in their
-  place; clicking the chevron opens a popup listing all filters, including the ones that
-  no longer fit — from there they're fully usable (clicking one opens its dropdown)
-- [ ] With no filters applied, narrowing hides filters in trailing (rightmost) order first
-- [ ] Apply a value to a filter that would otherwise be hidden first (e.g. select a bookmark
-  in the Reference filter, then narrow) — the applied filter stays visible and unapplied
-  filters are hidden ahead of it, even though the applied filter isn't the leftmost one;
-  whatever remains visible keeps its original left-to-right order (nothing reorders/jumps)
-- [ ] Widen the window back out — hidden filters reappear and the chevron disappears once
-  everything fits again
+- [ ] Pasting a hash or change-id well past the first page (e.g. from `jj log -r 'all()' -T commit_id --no-graph --limit 2000`) shows it as the only visible row after a brief "Filtering…", with no Enter needed
+- [ ] A word that appears only in an old commit's description **body** (not its first line) finds that commit (full-body matching). Gibberish that matches nothing empties the table and the "Filtering…" hint goes away
+- [ ] While typing a longer word the table holds its previous rows until you pause (~300 ms); **Enter** applies immediately
+- [ ] Free text with punctuation (`fix: the . thing`) does not error (check `idea.log`); it searches description/author as usual
+- [ ] A search matching more than one page of commits (e.g. a single letter): scrolling to the bottom loads more matches with no repeated rows and none skipped (compare the count with `jj log -r 'description(substring-i:"x")' --no-graph -T commit_id | wc -l` once fully scrolled)
+- [ ] Search + Author + Date together show exactly the commits matching all three
+- [ ] Refresh, or a change made in a terminal, re-fetches the filtered view and keeps its scroll depth; clearing the search returns to the configured revset/limit
+- [ ] In a multi-repo project, a hash from a second repo merges results from both roots with the root gutter correct, and the **Root** filter still hides and shows roots instantly
+- [ ] A match whose parent is not itself a match (sparse results) shows a faded "not loaded" stub edge rather than a wrong connection; clicking the stub loads its target
+- [ ] A file's history tab filters the already-loaded rows instantly, with no "Filtering…" hint
 
 #### Reference filter (bookmark/tag dropdown)
 
-Use a repo where the log limit is **smaller** than total history, with at least one bookmark and
-one tag pointing at commits **beyond** the limit. FX-STRESS at Log Limit 100 works: `main`,
-`release-1.0`/`release-2.0`, and the `v1.0` tag all sit deep in history, and `main`'s ancestry
-is immutable.
+Use a repo where the log limit is **smaller** than total history, with at least one bookmark and one tag **beyond** the limit. FX-STRESS at Log Limit 100 works: `main`, `release-1.0`/`release-2.0` and the `v1.0` tag all sit deep in history, and `main`'s ancestry is immutable.
 
-- [ ] Dropdown lists **all** local bookmarks (with the gold bookmark icon, narrower than the tag icon), not only those on loaded log rows, including bookmarks beyond the log limit
-- [ ] Dropdown lists **all** tags (with the green tag icon), including tags beyond the log limit
-- [ ] Bookmark and tag icons are visibly distinct from each other and from the "@" working-copy icon, and colored to match the bookmark/tag colors used in the log table
+- [ ] The dropdown lists **all** local bookmarks (gold bookmark icon, narrower than the tag icon) and **all** tags (green tag icon), including those beyond the log limit. The bookmark, tag and "@" icons are visibly distinct and coloured like the log table's
+- [ ] Opening the dropdown very early after opening the project shows a single disabled "Loading bookmarks and tags…" entry instead of looking empty; reopening after loading shows the real list. For a repo with no bookmarks or tags it ends up empty rather than stuck on the placeholder
+- [ ] With a remote bookmark left **untracked** (clone, push a bookmark from another clone, don't `jj bookmark track`; `jj bookmark list --all-remotes` shows it untracked), the dropdown lists it as `name@remote` with an icon distinct from local bookmarks. A local bookmark whose remote is synced appears only once, as the plain name
+- [ ] The currently-selected reference shows a checkmark next to its icon and no other row does; hovering or moving the keyboard selection does not move it
+- [ ] Creating or deleting a bookmark or tag in a terminal updates the dropdown after the auto-refresh (see MT-LOG-REFRESH), without Refresh or saving a file
+- [ ] Selecting a reference on a loaded row filters the log to that commit and its ancestors and closes the dropdown. Selecting one whose target is **outside** the first page (including a remote-only bookmark) shows that commit and its **complete** ancestry after a brief "Filtering…" (the true `::ref`, resolved by jj, nothing expanded first); scrolling loads more of it. Never a silent empty result. Selecting "@" filters to the working copy and its ancestors
+- [ ] Reopening the dropdown while a filter is active scrolls to and highlights the selected reference. Arrow up/down moves the highlight; Enter applies it and closes the dropdown. Clearing the filter restores the full (limited) log
 
-#### Loading placeholder (jj-idea-a52h)
+#### Multi-repo scoping
 
-- [ ] Open the dropdown as early as possible after opening the project/log tab (before bookmarks/tags have had time to load) — it shows a single disabled "Loading bookmarks and tags…" entry instead of looking empty
-- [ ] Reopen the dropdown once bookmarks/tags have loaded — the placeholder is gone, replaced by the real list
-- [ ] For a repo that genuinely has no bookmarks or tags, the dropdown eventually shows as empty (no bookmark/tag rows, no "@" if there's no working copy either) once loading finishes — it does **not** get stuck on the loading placeholder forever
+Open a multi-root project with at least two independent (non-colocated) jj repos; FX-STRESS alongside one other repo works.
 
-#### Remote-only bookmarks (jj-idea-iadu)
+- [ ] Filtering to a bookmark that exists in only one repo shows **only** that repo's ancestry, with no other repo's root commit ("zzzzzzzz", "no description", empty). The graph draws **no** connector between rows from different repos, even though every repo's root shares the same change id
+- [ ] Filtering to "@" shows **every** repo's working copy, each with its own ancestry
 
-Clone a repo and leave at least one remote bookmark **untracked** (e.g. `jj git clone`, then
-push a bookmark from another clone without running `jj bookmark track` in this one —
-`jj bookmark list --all-remotes` in the terminal should show it as untracked).
-
-- [ ] Dropdown lists the untracked remote bookmark as `name@remote`, with an icon visibly
-      distinct from local bookmarks (plain vs. filled bookmark icon)
-- [ ] A local bookmark whose remote is synced (tracked, same target) appears only **once**, as
-      the plain local name — no duplicate `name@remote` row
-- [ ] Selecting the remote-only bookmark filters the log to that commit and its ancestors,
-      even if the target is outside the first page (jj resolves it - nothing is expanded first)
-- [ ] The currently-selected reference shows a checkmark next to its icon; no other row does
-- [ ] Hovering over rows or moving the keyboard selection up/down does **not** move the checkmark — it stays on the actually-selected reference
-- [ ] Creating/deleting a bookmark or tag in the terminal updates the dropdown after the auto-refresh (see MT-LOG-REFRESH) — without clicking Refresh or saving a file
-- [ ] Selecting a reference that **is** on a loaded row filters the log to that commit and its ancestors, and the dropdown closes
-- [ ] Selecting a reference whose target is **outside** the first page shows that commit and its **complete** ancestry after a brief "Filtering…" (the true `::ref`, not just the ancestors that happened to be loaded); scrolling loads more of it. Never a silent empty result
-- [ ] Selecting "@" (working copy) filters to the working copy and its ancestors
-- [ ] Reopening the dropdown while a filter is active scrolls to and highlights the currently-selected reference
-- [ ] Arrow up/down moves the highlight; Enter applies the highlighted reference and closes the dropdown
-- [ ] Clearing the filter restores the full (limited) log
-
-#### Multi-repo scoping (jj-idea-1ra9, jj-idea-2xf3)
-
-Open a multi-root project with at least two independent (non-colocated) jj repos — FX-STRESS
-alongside one other repo works.
-
-- [ ] Filtering to a bookmark that exists in only one repo shows **only** that repo's ancestry —
-      no other repo's root commit ("zzzzzzzz", "no description", empty) appears
-- [ ] The graph draws **no** connector line between rows from different repos, even though every
-      repo's root shares the same underlying change id
-- [ ] Filtering to "@" (working copy) shows **every** repo's working copy, each with its own
-      ancestry — not just the first repo's
-
-#### Save a revset as an alias (jj-idea-ehwm.6)
+#### Save a revset as an alias
 
 **Code:** `jj/cli/RevsetAliases.kt`, `ui/log/SaveRevsetAliasDialog.kt`, `ui/log/JujutsuRevsetFilterComponent.kt`
 (`saveAsAlias`), `ui/components/LogSearchField.kt` (`SaveRevsetAliasAction`), `ui/log/UnifiedJujutsuLogPanel.kt`
 (`onSaveRevsetAliasRequested`)
 
-Needs a throwaway user config (`JJ_CONFIG`) or remove `revset-aliases.mine` afterwards. Check results in a
-terminal with `jj config list revset-aliases` and `jj log -r mine`.
+Needs a throwaway user config (`JJ_CONFIG`) or remove `revset-aliases.mine` afterwards. Check results in a terminal with `jj config list revset-aliases` and `jj log -r mine`.
 
-- [ ] The Scope popup has a **Save as alias…** link beside "Revset language". With the field empty it does nothing
-- [ ] Type `author(exact:"you@example.com") & mutable()` in the Scope popup, click the link: the popup closes and a
-      "Save Revset as Alias" dialog shows the revset (read-only), a name field, and **User config** (selected) / **Repository config**
-- [ ] Name `1bad` or `a-b`: inline error, and OK does nothing. Name `mine`, User config, OK: the dialog closes, the Scope chip now
-      reads `mine`, the rows are unchanged, and `jj config list revset-aliases` shows the expression with its quotes intact
-- [ ] Restart the IDE: the tab's scope is still `mine`
-- [ ] Repeat with name `mine` again: an "already exists" confirmation appears; **No** keeps the dialog open, **Yes** overwrites
-- [ ] In the dialog the Revset field is editable: after an invalid-revset refusal, fix the expression there and OK saves it
-- [ ] Type an invalid revset (e.g. `ancestors(trunk(), 2) )` with a stray `)`) and press Enter in the Scope popup: the field turns red with a
-      wrapped error balloon (not a truncated label). Via **Save as alias…** + OK the dialog refuses with "Not a valid revset, alias not
-      saved: …" and `jj config list revset-aliases` has no new entry
-- [ ] Choose **Repository config** in a multi-repo project: the alias is written to each repo's own config only
-- [ ] Edit the alias in the config file, then change another filter: the tab follows the new definition
-- [ ] In the search box turn revset mode on: a **Save as alias…** toolbar button appears, disabled while the box is empty and when
-      revset mode is off. With text it opens the same dialog, and after saving the box holds the alias name and is filtered by it
-- [ ] The Rebase / Squash Into… / Move Bookmark to Change pickers and file history have no such button
+- [ ] The Scope popup has a **Save as alias…** link beside "Revset language"; with the field empty it does nothing
+- [ ] Typing `author(exact:"you@example.com") & mutable()` in the Scope popup and clicking the link closes the popup and opens a "Save Revset as Alias" dialog with the revset (read-only), a name field, and **User config** (selected) / **Repository config**
+- [ ] Name `1bad` or `a-b`: inline error, and OK does nothing. Name `mine`, User config, OK: the dialog closes, the Scope chip reads `mine`, the rows are unchanged, and `jj config list revset-aliases` shows the expression with its quotes intact. After an IDE restart the tab's scope is still `mine`
+- [ ] Saving `mine` again shows an "already exists" confirmation: **No** keeps the dialog open, **Yes** overwrites
+- [ ] An invalid revset (`ancestors(trunk(), 2) )` with a stray `)`) entered in the Scope popup with Enter turns the field red with a wrapped error balloon (not a truncated label). Via **Save as alias…** + OK the dialog refuses with "Not a valid revset, alias not saved: …" and no new entry appears in `jj config list revset-aliases`. The dialog's Revset field is editable: fix the expression there and OK saves it
+- [ ] **Repository config** in a multi-repo project writes the alias to each repo's own config only
+- [ ] Editing the alias in the config file, then changing another filter, makes the tab follow the new definition
+- [ ] In the search box with revset mode on, a **Save as alias…** toolbar button appears, disabled while the box is empty and when revset mode is off. With text it opens the same dialog, and after saving the box holds the alias name and is filtered by it. The Rebase, Squash Into…, Move Bookmark to Change pickers and file history have no such button
 
-#### Revset highlighting, completion and history (jj-idea-ehwm.7)
+#### Revset highlighting, completion and history
 
 **Code:** `ui/components/RevsetTextField.kt`, `ui/components/RevsetCompletionProvider.kt`, `jj/revset/` (`RevsetLexer`, `RevsetSyntaxHighlighter`,
 `RevsetFunctions`, `RevsetCompletion`), `jj/cli/RevsetAliases.kt` (`listRevsetAliases`), `ui/components/LogSearchField.kt`,
 `ui/log/JujutsuRevsetFilterComponent.kt`
 
-The Scope popup and the search box (in revset mode) are editor-based fields: they colour the revset, complete it, and underline the
-column where jj reports a syntax error. jj remains the only validator.
+The Scope popup and the search box (in revset mode) are editor-based fields: they colour the revset, complete it, and underline the column where jj reports a syntax error. jj remains the only validator.
 
-- [ ] Open the Scope popup and type `anc`: a completion list offers `ancestors` (with its `(x, [depth])` signature as tail text).
-      Accept it with Enter or Tab: the text becomes `ancestors()` with the caret **between** the parentheses and the list reopens
-- [ ] Accept a no-argument function such as `mine` — the caret ends **after** `mine()`
-- [ ] Type the first letters of a bookmark and of a tag in the repo: both are offered, labelled `bookmark` / `tag`
-- [ ] With a revset alias configured (e.g. the one from "Save as alias…"), type its first letters: it is offered, labelled `alias`.
-      Add an alias in a terminal, click out of the field and back in, and it is offered too
-- [ ] While the list is showing, **Enter** accepts the item and does **not** apply the scope; with no list showing, **Enter** applies it.
-      **Esc** closes the list first, and a second **Esc** closes the popup
-- [ ] Functions, strings (`"…"`), pattern kinds (`exact:`), operators (`&`, `|`, `::`) and parentheses are coloured differently; the colours
-      follow the IDE theme (try Light and Dark)
-- [ ] Type `heads(` and press Enter: the popup stays open, jj's message shows in a validation balloon by the field, the field has a red
-      outline and the character at the reported column is underlined. Editing the text removes the underline
-- [ ] Type a bad revset that only fails because of the Settings log revset (valid on its own): the message shows, there is no underline
-- [ ] Click the history icon at the left of the field: the last applied scopes (up to 5, most recent first) are listed; choosing one fills the
-      field. History written before this change (the same entries) is still there after upgrading
-- [ ] Apply two different valid scopes, reopen the Scope popup, click the history icon: both are listed, most recent first. An invalid
-      scope (Enter with an error) is **not** added. Re-applying an older one moves it to the top; after 6 distinct scopes only 5 remain
-- [ ] The history is shared: open a second log tab and its Scope popup lists the same scopes; restart the IDE and they are still there
-- [ ] Save a revset as an alias (**Save as alias…**): the alias name is added to the scope history
-- [ ] With revset aliases configured (one in user config, one in the repo's `.jj/repo/config.toml`, one function alias `f(x)`), the history
-      drop-down shows the recent revsets, then a **Saved aliases** header and the symbol aliases sorted by name; the repo one is labelled
-      `(repo)`, the function alias is absent. Choosing an alias puts just its name in the field. The same drop-down appears in the search box
-      in revset mode (and its recent revsets are that box's own history). Add an alias in a terminal, click out and back into the field:
-      it appears. With no aliases configured there is no header
-- [ ] Search box history keeps switches: search `fo+` with **Regex** and **Words** on (Enter), then `mine()` with **Revset** on (Enter).
-      Turn every switch off, open the history: the rows read `mine()   [Revset]` and `fo+   [Regex, Words]`. Choosing the second turns Regex
-      and Words on and Revset off; choosing the first turns Revset on. A plain search with no switches restores them all to off. Entries
-      from before this change show no `[...]` and leave the switches as they are
-- [ ] The Settings revset fields, the Set Diff Base → Custom revset dialog and the pickers have no history icon (unchanged)
-- [ ] The × at the right of the field clears the text
-- [ ] Search box: with revset mode **off**, typing `foo(` shows plain text — no colours, no completion list. Turn revset mode on: the same
-      text is coloured and completion appears. Turn it off again: plain
-- [ ] Search box in revset mode: an invalid revset gets the red outline and the underline at jj's column (the column refers to the
-      search text alone, not to the scope); the border is red exactly once (no second outline inside it).
-      While you type half-formed revsets, `idea.log` gets no `CliExecutor … failed` WARN lines for them
-- [ ] Search box in revset mode: accepting a completion changes the text, so the log re-filters a moment later; that live filtering is expected
-- [ ] Search box, window wide enough that the box is inline: click into it (or Tab to it) — in **text** mode and in **revset** mode alike — and it
-      pops out into the wide popup under a chip showing the same text, with the caret in the field; typing (and, in revset mode, completion and
-      history) work there. Toggle revset mode on or off inside the popup: the box stays popped out. Click away or press Esc: the popup closes
-      and the box is inline again with the text intact. After Esc, focus returning to the box does **not** pop it out again; clicking the box does
-- [ ] Squeeze the log until the search box collapses to its chip; click the chip: the full field pops out with the toggles, completion and
-      history work inside the popup (the history list opens below the popup, not behind it), and Esc closes the popup
-- [ ] The Rebase / Squash Into… / Move Bookmark to Change pickers and file history keep their plain search box (no colours, no completion)
+- [ ] In the Scope popup, typing `anc` offers `ancestors` (with its `(x, [depth])` signature as tail text). Accepting with Enter or Tab gives `ancestors()` with the caret **between** the parentheses and the list reopens; a no-argument function such as `mine` ends with the caret **after** `mine()`
+- [ ] The first letters of a bookmark and of a tag are both offered, labelled `bookmark` / `tag`. A configured revset alias (e.g. from "Save as alias…") is offered, labelled `alias`; one added in a terminal is offered after clicking out of the field and back in
+- [ ] While the list is showing, **Enter** accepts the item and does **not** apply the scope; with no list showing, Enter applies it. **Esc** closes the list first, and a second Esc closes the popup
+- [ ] Functions, strings (`"…"`), pattern kinds (`exact:`), operators (`&`, `|`, `::`) and parentheses are coloured differently, following the IDE theme (try Light and Dark)
+- [ ] `heads(` + Enter keeps the popup open, shows jj's message in a validation balloon by the field, gives it a red outline and underlines the character at the reported column; editing the text removes the underline. A revset that is valid on its own but fails only because of the Settings log revset shows the message with no underline
+- [ ] The × at the right of the field clears the text. The Settings revset fields, the Set Diff Base → Custom revset dialog and the pickers have no history icon
+- [ ] Scope history: after applying two different valid scopes, reopening the Scope popup and clicking the history icon at the left of the field lists both, most recent first, and choosing one fills the field. An invalid scope (Enter with an error) is **not** added, re-applying an older one moves it to the top, and after 6 distinct scopes only 5 remain. The history is shared: a second log tab's Scope popup lists the same scopes, and they survive an IDE restart. Saving a revset as an alias (**Save as alias…**) adds the alias name to the history
+- [ ] Saved aliases in the drop-down: with revset aliases configured (one in user config, one in the repo's `.jj/repo/config.toml`, one function alias `f(x)`), the history drop-down shows the recent revsets, then a **Saved aliases** header and the symbol aliases sorted by name; the repo one is labelled `(repo)` and the function alias is absent. Choosing an alias puts just its name in the field. The same drop-down appears in the search box in revset mode, where the recent revsets are that box's own history. An alias added in a terminal appears after clicking out of the field and back in, and with no aliases configured there is no header
+- [ ] Search box history keeps switches: searching `fo+` with **Regex** and **Words** on (Enter), then `mine()` with **Revset** on (Enter), then turning every switch off and opening the history shows the rows `mine()   [Revset]` and `fo+   [Regex, Words]`. Choosing the second turns Regex and Words on and Revset off; choosing the first turns Revset on. A plain search with no switches restores them all to off
+- [ ] Search box with revset mode **off**: `foo(` is plain text, with no colours and no completion list. Turning revset mode on colours it and offers completion; turning it off makes it plain again
+- [ ] Search box in revset mode: an invalid revset gets the red outline and the underline at jj's column (relative to the search text alone, not the scope), the border is red exactly once (no second outline inside it), and half-formed revsets while typing log no `CliExecutor … failed` WARN lines. Accepting a completion changes the text, so the log re-filters a moment later, which is expected
+- [ ] Search box wide enough to be inline: clicking into it (or Tab), in text mode and revset mode alike, pops it out into the wide popup under a chip showing the same text, with the caret in the field; typing (and in revset mode, completion and history) work there. Toggling revset mode inside the popup keeps it popped out. Clicking away or pressing Esc closes the popup and returns to the inline box with the text intact; after Esc, focus returning to the box does **not** pop it out again, while clicking the box does
+- [ ] Squeezing the log until the box collapses to its chip, then clicking the chip pops out the full field with the toggles; completion and history work inside the popup (the history list opens below the popup, not behind it) and Esc closes it
+- [ ] The Rebase, Squash Into… and Move Bookmark to Change pickers and file history keep their plain search box (no colours, no completion)
 
-#### Tab scope (Scope chip; jj-idea-vqpn, jj-idea-ehwm.4)
+#### Tab scope (Scope chip)
 
 **Code:** `ui/log/JujutsuRevsetFilterComponent.kt`, `ui/log/RevsetFilter.kt`,
 `ui/log/JujutsuLogTable.kt` (`setScope`), `ui/log/UnifiedJujutsuLogPanel.kt`
 (`createScopeComponent`, `onSelectionHiddenByFilter`), `ui/common/CommitTablePanel.kt` (`createScopeComponent`, `resetAllFilters`), `settings/LogWindowConfig.kt` (`revsetFilter`)
 
-The typed revset is validated against jj (one single-row `jj log` call per repo) and becomes the
-tab's scope — the base the search box and the other chips narrow within; jj then resolves it together with every other filter (see "Whole-history filtering"),
-ANDed with the repo-level revset from Settings. Matches anywhere in history show up, a page at a
-time. It never changes what jj loads for any other tab or dialog.
+The typed revset is validated against jj (one single-row `jj log` call per repo) and becomes the tab's scope: the base the search box and the other chips narrow within. jj resolves it together with every other filter (see Whole-history filtering), ANDed with the repo-level revset from Settings. Matches anywhere in history show up, a page at a time. It never changes what jj loads for any other tab or dialog.
 
-- [ ] The **Scope** chip (with a scope icon) is the first thing in the toolbar, left of the search
-      box and separated from it by a thin divider; it is not among the Root/Reference/Author/Date chips
-- [ ] Narrow the window until the other chips collapse into "»" — the Scope chip stays visible
-- [ ] Hover the chip — a tooltip explains it is the tab's scope. After a failing re-apply the tooltip
-      shows jj's error instead; once the error clears it returns to the explanation
-- [ ] Type a single letter such as `t` in the search box — matching commits show and there is no
-      "prefix is ambiguous" error (same in the New Change picker after pressing Enter)
-- [ ] Click the **Scope** chip — a popup opens under it with a text field and a
-      "Enter to apply · Esc to close" hint
-- [ ] Type `ancestors(@, 5)` and press **Enter** — the popup closes, the graph narrows to that
-      revset, and the chip shows the revset text
-- [ ] Also apply the **Author** filter, and type search text — the visible rows are the intersection
-      of all of them (narrowing within the scope)
-- [ ] The unset chip reads `Scope: all()` in grey; a set scope is shown in the monospace editor font.
-      The popup is titled "Scope Revset" and its "Revset language" link opens jj's revset docs
-- [ ] With a scope set and an Author filter or search text active, navigate to a change those hide
-      (e.g. from the bookmarks panel) — the balloon says it is "hidden by the current log filters";
-      **Reset Filters** clears search and chips, **keeps the scope**, and selects the change if the
-      scope allows it
-- [ ] With a scope set and nothing else active, navigate to a change outside the scope — the balloon
-      says the change "is outside this tab's scope (…)"; **Clear Scope** clears the scope and selects it
-- [ ] Clicking **Clear Scope** or **Reset Filters** shows **at most one** follow-up balloon, and none when
-      the change becomes visible (the balloons never fire from the stale, pre-refilter rows)
-- [ ] With scope `ancestors(@, 10)`, scroll to the last row and click its parent link — exactly **one**
-      "outside this tab's scope" balloon appears (also with several log tabs open)
-- [ ] A tab saved before the Revset chip became Scope opens with its old revset shown as the Scope
-- [ ] Open the chip again, clear the field, and press Enter — the filter clears and the full log
-      returns
-- [ ] Open the chip, type an invalid revset (e.g. `foo(`) and press Enter — the field gets a red
-      outline and jj's own parse error shows under it; the popup stays open, letting you fix it
-- [ ] Press **Esc** instead of fixing it — the popup closes and the previous filter state (if any)
-      is unchanged
-- [ ] With a revset applied, make jj fail when the filter is re-applied (e.g. make the workspace
-      stale from another workspace, then change the Author filter) — the strip below the log shows
-      one truncated line, hovering shows the full jj error, and the log tool window can still be
-      dragged narrow (jj-idea-v17o, GitHub #142)
-- [ ] In Settings → Version Control → Jujutsu, set a repo-level Log Revset (e.g. `::@`), then set
-      the chip to `all()` — the result stays within `::@` (the repo-level setting always wins)
-- [ ] Change the repo-level Log Revset (or Log Limit) override and click OK/Apply — the log window
-      updates immediately, with **no need to click the toolbar Refresh button first** (jj-idea-vqpn
-      regression: the config change wasn't reaching the log window at all until Refresh was hit
-      explicitly; also covers the paged path, which had a second, separate staleness bug of its own — see `UnifiedJujutsuLogDataLoader.refreshOneRepoLocked`)
-- [ ] Set the chip to a revset that references a bookmark (e.g. `my-bookmark::`), then delete that
-      bookmark and change another filter (e.g. Author) — the status bar shows jj's error and the
-      graph keeps showing the last successfully-resolved set rather than going blank
-- [ ] Restart the IDE — the chip's revset persists per log tab
-- [ ] With a filter active, scroll to the bottom — the next page of matches loads (one page and one
-      remainder query per scroll, check `idea.log`), and once every match is loaded further
-      scrolling makes no `jj log` calls
-- [ ] A revset matching commits only deep in history (outside the first 500 rows) shows them, with
-      no "outside the loaded window" notice (that notice no longer exists)
-- [ ] Open a second log tab with no revset filter — it still shows the full log; opening the "New
-      Change" picker or another dialog that reads the log cache is unaffected by the first tab's
-      filter
-- [ ] Create a new change that falls inside the active revset filter — after a refresh, it appears
-      in the filtered graph
+- [ ] The **Scope** chip (with a scope icon) is the first thing in the toolbar, left of the search box and separated from it by a thin divider; it is not among the Root/Reference/Author/Date chips and stays visible when the other chips collapse into "»"
+- [ ] The unset chip reads `Scope: all()` in grey; a set scope is shown in the monospace editor font. Hovering explains it is the tab's scope; after a failing re-apply the tooltip shows jj's error instead, and returns to the explanation once the error clears
+- [ ] Clicking the chip opens a popup under it titled "Scope Revset" with a text field, an "Enter to apply · Esc to close" hint, and a "Revset language" link that opens jj's revset docs
+- [ ] Typing `ancestors(@, 5)` + **Enter** closes the popup, narrows the graph to that revset and shows the revset text on the chip. Adding the **Author** filter and search text shows the intersection of all of them. Clearing the field and pressing Enter returns the full log
+- [ ] An invalid revset (`foo(`) + Enter gives the field a red outline and jj's own parse error under it, and the popup stays open to fix it. **Esc** closes the popup and leaves the previous filter state unchanged
+- [ ] A single letter such as `t` in the search box matches commits with no "prefix is ambiguous" error (same in the New Change picker after pressing Enter)
+- [ ] With a scope set and an Author filter or search text active, navigating to a change those hide (e.g. from the bookmarks panel) shows a balloon saying it is "hidden by the current log filters"; **Reset Filters** clears search and chips, **keeps the scope**, and selects the change if the scope allows it
+- [ ] With a scope set and nothing else active, navigating to a change outside the scope shows a balloon saying it "is outside this tab's scope (…)"; **Clear Scope** clears the scope and selects it
+- [ ] **Clear Scope** or **Reset Filters** shows **at most one** follow-up balloon, and none when the change becomes visible (never fired from stale, pre-refilter rows). With scope `ancestors(@, 10)`, scrolling to the last row and clicking its parent link shows exactly **one** "outside this tab's scope" balloon, also with several log tabs open
+- [ ] When jj fails on a re-apply (e.g. make the workspace stale from another workspace, then change the Author filter), the strip below the log shows one truncated line, hovering shows the full jj error, and the log tool window can still be dragged narrow (GitHub #142)
+- [ ] Setting a repo-level Log Revset in Settings → Version Control → Jujutsu (e.g. `::@`) and the chip to `all()` stays within `::@` (the repo-level setting always wins). Changing the repo-level Log Revset or Log Limit and clicking OK/Apply updates the log window immediately, with no need to click Refresh first
+- [ ] A scope that references a bookmark (`my-bookmark::`), after deleting that bookmark and changing another filter, shows jj's error in the status bar while the graph keeps the last successfully resolved set rather than going blank
+- [ ] The chip's revset persists per log tab across an IDE restart
+- [ ] With a filter active, scrolling to the bottom loads the next page of matches (one page and one remainder query per scroll; check `idea.log`), and once every match is loaded further scrolling makes no `jj log` calls. A revset matching commits only deep in history (outside the first 500 rows) shows them
+- [ ] A second log tab with no scope still shows the full log, and the New Change picker or any dialog that reads the log cache is unaffected by the first tab's scope. A new change that falls inside the active scope appears in the filtered graph after a refresh
 
 ### MT-LOG-REFRESH
 
@@ -1048,155 +516,53 @@ time. It never changes what jj loads for any other tab or dialog.
 
 **Code:** `ui/log/UnifiedJujutsuLogDataLoader.kt`, `ui/common/BackgroundDataLoader.kt`
 
-- [ ] Log refreshes when a **tracked** file changes in the working copy (edit and save it): the `@` row
-      updates (no longer empty) within ~1 s, and `idea.log` shows a single `Refreshing log entries`
-      (via the snapshot `jj status` records, not the file event itself)
-- [ ] jj-idea-2570.12: saving an **ignored** file causes no log refresh — `touch .idea/workspace.xml`
-      (repo with `/workspace.xml` in `.idea/.gitignore`) twice: `idea.log` shows no
-      `Refreshing log entries` and no `perf: graph-layout`
-- [ ] jj-idea-2570.12: with `JAVA_TOOL_OPTIONS=-Didea.filewatcher.disabled=true ./gradlew runIde`, edit and
-      save a tracked file, then refocus the IDE → the `@` row still updates (the `Operation heads of … changed`
-      fallback in `idea.log`)
-- [ ] Log refreshes after VCS operations (describe, new, edit)
-- [ ] jj-idea-dndo / jj-idea-vwxu: stale workspace — add a second workspace (`jj workspace add ../ws2`), run
-      `jj describe -m x` in `ws2`, then open the original in the IDE (also try with the project already open and the
-      log tab visible) → no "Uncaught exception in background task" error dialog; exactly one "stale workspace"
-      balloon (not one per refresh); `idea.log` shows INFO "working copy is stale", not WARN or "jj may not be
-      installed"; click **Update stale workspace** → the log loads without pressing Refresh
-- [ ] Log refreshes after an **external** jj operation run in a terminal (e.g. `jj new`,
-      `jj bookmark create`) within ~300 ms, without saving a file (op-heads watch) — this is the
-      canonical auto-refresh check; other sections (bookmark widget, reference filter) reference
-      it rather than repeating it
-- [ ] jj-idea-2570.14: on a large repo scrolled well past the first page, run `jj new` (then `jj new` on an
-      empty `@`, then `jj abandon @`) → the graph at the top and far below stays correct (no shifted or
-      missing lanes, long-edge arrows intact), further scrolling still loads cleanly, and `idea.log` shows
-      `perf: graph-layout-replace` with an `operations` count in the thousands, not tens of thousands
-      (one-off, not per loaded row)
-- [ ] jj-idea-xhnw: in a **secondary workspace** (`jj workspace add ../ws2` from the sandbox
-      repo, open `ws2` as the project), run `jj new` in a terminal in `ws2`, then `jj new` in the
-      primary workspace → the log refreshes within ~300 ms both times, without saving a file
-- [ ] Working copy (@) selection maintained after refresh
-- [ ] No flickering during refresh
-- [ ] jj-idea-c4tp: open a large repo's log, click Refresh, then close the project while it is
-      still loading → project closes promptly (no multi-minute stall); idea.log shows the load
-      being cancelled rather than running to completion
+- [ ] Editing and saving a **tracked** file in the working copy updates the `@` row (no longer empty) within ~1 s, with a single `Refreshing log entries` in `idea.log` (via the snapshot `jj status` records, not the file event itself)
+- [ ] Saving an **ignored** file causes no log refresh: `touch .idea/workspace.xml` twice (repo with `/workspace.xml` in `.idea/.gitignore`) leaves no `Refreshing log entries` and no `perf: graph-layout` in `idea.log`
+- [ ] With `JAVA_TOOL_OPTIONS=-Didea.filewatcher.disabled=true ./gradlew runIde`, editing and saving a tracked file and then refocusing the IDE still updates the `@` row (the `Operation heads of … changed` fallback in `idea.log`)
+- [ ] The log refreshes after VCS operations (describe, new, edit), keeping the working copy (`@`) selected, with no flicker
+- [ ] The log refreshes after an **external** jj operation run in a terminal (e.g. `jj new`, `jj bookmark create`) within ~300 ms, without saving a file (op-heads watch). This is the canonical auto-refresh check; other sections (bookmark widget, reference filter) reference it rather than repeating it
+- [ ] In a **secondary workspace** (`jj workspace add ../ws2` from the sandbox repo, open `ws2` as the project), `jj new` in a terminal in `ws2`, then `jj new` in the primary workspace, refreshes the log within ~300 ms both times, without saving a file
+- [ ] Stale workspace: add a second workspace (`jj workspace add ../ws2`), run `jj describe -m x` in `ws2`, then open the original in the IDE (also try with the project already open and the log tab visible). No "Uncaught exception in background task" dialog appears; exactly one "stale workspace" balloon appears (not one per refresh); `idea.log` shows INFO "working copy is stale", not WARN or "jj may not be installed"; **Update stale workspace** loads the log without pressing Refresh
+- [ ] On a large repo scrolled well past the first page, `jj new` (then `jj new` on an empty `@`, then `jj abandon @`) leaves the graph at the top and far below correct (no shifted or missing lanes, long-edge arrows intact), further scrolling still loads cleanly, and `idea.log` shows `perf: graph-layout-replace` with an `operations` count in the thousands, not tens of thousands (one-off, not per loaded row)
+- [ ] Opening a large repo's log, clicking Refresh and closing the project while it is still loading closes the project promptly (no multi-minute stall); `idea.log` shows the load cancelled rather than run to completion
 
-**Divergent-change write protection (jj-idea-wiz0, GitHub #130)**
+#### Divergent-change write protection (GitHub #130)
 
 **Code:** `jj/DivergentChange.kt`, `jj/CommandExecutor.kt` (`Failure.Divergent`, `WithRepo.fireFailure`)
 
-- [ ] Make `@` divergent behind the IDE's back: `op=$(jj op log --no-graph --limit 1 -T 'id.short()')`, then
-      `jj describe -r @ -m left --at-op $op` and `jj describe -r @ -m right --at-op $op`. In the log, Describe
-      the (now stale) `@` row *before* it auto-refreshes → "Change Has Become Divergent" dialog, log refreshes
-      to show both versions, the description is **not** applied, and the action is not retried
-- [ ] Same for Edit, Abandon, and a hunk-level Split/Squash Into (raw write paths) → same dialog, no raw stderr
-- [ ] After the refresh, Describe one of the divergent rows (`/0`, `/1` offset) → succeeds
+- [ ] Make `@` divergent behind the IDE's back: `op=$(jj op log --no-graph --limit 1 -T 'id.short()')`, then `jj describe -r @ -m left --at-op $op` and `jj describe -r @ -m right --at-op $op`. Describing the (now stale) `@` row *before* it auto-refreshes shows a "Change Has Become Divergent" dialog, the log refreshes to show both versions, the description is **not** applied, and the action is not retried
+- [ ] Edit, Abandon and a hunk-level Split/Squash Into (raw write paths) give the same dialog, with no raw stderr
+- [ ] After the refresh, Describe on one of the divergent rows (`/0`, `/1` offset) succeeds
 
-**Manual refresh (jj-idea-bbn3, GitHub #115)**
+#### Manual refresh (GitHub #115)
 
 **Code:** `ui/common/CommitTablePanel.kt` (`manualRefresh`), `jj/JujutsuStateModel.kt`
 (`invalidateRepositoryState`)
 
-Under normal conditions this bug is invisible: the op_heads VFS watch (previous section)
-fires on essentially every jj operation and refreshes bookmarks/working-copy state before
-you'd ever click Refresh, masking the difference between `manualRefresh()` and the old
-`forceRefresh()`-only behavior. To exercise the fix, first kill the watch the reporter's
-network-drive repo effectively has dead: launch the sandbox IDE with
-`JAVA_TOOL_OPTIONS=-Didea.filewatcher.disabled=true ./gradlew runIde` (disables IntelliJ's
-native file watcher process — same failure mode, no `.jj/repo/op_heads` events ever
-delivered).
+The op_heads watch normally refreshes bookmarks and working-copy state before you'd ever click Refresh, so first kill it: launch with `JAVA_TOOL_OPTIONS=-Didea.filewatcher.disabled=true ./gradlew runIde` (no `.jj/repo/op_heads` events are delivered).
 
-- [ ] With the watcher disabled, run `jj bookmark create refresh-check` (or delete/move an
-      existing bookmark) in a terminal, and **don't refocus the IDE window** (frame-activation
-      refresh is a separate fallback path that would mask this too) — confirm the bookmark
-      chip, reference filter dropdown, and status-bar widget stay stale
-- [ ] Click toolbar **Refresh** — confirm all three now update
-- [ ] To confirm this bullet actually exercises the fix (rather than passing vacuously),
-      temporarily revert `manualRefresh()` to call only `dataLoader.forceRefresh()`, rebuild,
-      and re-run the same steps — Refresh should now reload log rows but leave the bookmark
-      stale; then restore the fix
+- [ ] With the watcher disabled, `jj bookmark create refresh-check` (or delete/move one) in a terminal, **without** refocusing the IDE window (frame activation is a separate fallback), leaves the bookmark chip, reference filter dropdown and status-bar widget stale; clicking toolbar **Refresh** updates all three
+- [ ] On FX-STRESS with `SCALE=6`, clicking toolbar **Refresh** and immediately cancelling the "Loading commits" progress (✕) leaves no process in `ps aux | grep 'jj log'`, produces no error report, and the next Refresh loads normally
 
-- [ ] jj-idea-innq: on FX-STRESS with `SCALE=6`, click toolbar **Refresh** and then immediately cancel the
-      "Loading commits" progress (✕). `ps aux | grep 'jj log'` shows no leftover process, there is no error
-      report, and the next Refresh loads normally
-
-#### Paged log loading (jj-idea-2c8k, GitHub #69; graduated from preview, jj-idea-2570.4)
+#### Paged log loading (GitHub #69)
 
 **Code:** `ui/log/PagedLogWindow.kt`, `ui/log/UnifiedJujutsuLogDataLoader.kt`,
 `ui/common/CommitTablePanel.kt`, `ui/log/graph/LayoutCalculator.kt`
 
-See docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated (and
-not-yet-validated) boundaries. Paged loading is always on, with no access code or setting
-needed. Use FX-STRESS's `SCALE=6 WITH_REMOTE=1` fixture
-(`jj-stress-test`, ~5,952 commits) for a repo large enough that the difference from the
-non-paged behavior is perceptible.
+See docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its validated (and not-yet-validated) boundaries. Paged loading is always on, with no setting needed. Use FX-STRESS's `SCALE=6 WITH_REMOTE=1` fixture (`jj-stress-test`, ~5,952 commits) for a repo large enough that paging is perceptible.
 
-- [ ] Open the log: loads fast, showing the first page (500 rows,
-      independent of the "Changes to show" setting); the status strip below the table stays hidden the whole time
-      (no "Showing N changes" message in this mode — the scrollbar already says there's more)
-- [ ] On a wide multi-branch repo (e.g. FX-STRESS), rows whose parent didn't make it into any
-      loaded page show a **faded straight line** down from the commit circle instead of nothing
-      (which would look like a true root) — distinct from the wiggle used for the filtering case
-      above (jj-idea-xi58: a paged-window boundary isn't elision, it just hasn't loaded yet)
-- [ ] Clicking that faded straight line loads and reveals the missing parent, scrolling to it
-      once it arrives — and it stays in view while the idle trickle keeps loading the rows
-      between it and the old window (jj-idea-8qso) — see MT-LOG-GRAPH's "Long-edge navigation"
-      (jj-idea-sc8m) subsection for the full hover/click behavior
-- [ ] jj-idea-2570.5 (idle trickle): on FX-STRESS (`SCALE=6 WITH_REMOTE=1`; pages are a fixed 500
-      rows for the first page, then sized so each fetch takes about 0.7 s, up to 8,000 — jj-idea-2570.9;
-      "Changes to show" is irrelevant), open the log and *leave it alone*: older history keeps loading in the
-      background at a gentle pace (the scrollbar thumb slowly shrinks), faded stubs on screen
-      connect to their parents without any scrolling or clicking, no old row ever appears ahead
-      of the rows between, and the IDE stays responsive. It stops when the whole log is loaded or
-      ~10,000 rows are in memory, after which stubs remain clickable (sc8m) and scrolling to the
-      bottom still loads more, uncapped. Check Activity Monitor: the IDE/jj stay well under a core
-      while it trickles. Closing the log window stops it
-- [ ] Scroll to the bottom of the loaded rows: more history loads in automatically before you
-      reach the literal end (eager one-page-ahead prefetch); scrolling repeatedly keeps loading
-      further pages at a consistent, flat pace — not slowing down page over page; the viewport
-      stays where you scrolled to (does not jump back up to the selected/`@` row) each time a new
-      page loads
-- [ ] jj-idea-2570.9 (landing granularity): on FX-SCALE-SET `r80k-git` (or `r36k-keycloak`), scroll
-      steadily to ~40k rows: the `perf: log-page` lines in idea.log
-      show `limit` growing from 500 (at most doubling per page, ceiling 8,000) while `took` stays near
-      700 ms (sweep with `-Djj.log.pageTargetMs=` / `-Djj.log.pageMaxRows=`), `perf: log-apply` lines appear far less often than once per 500
-      rows (landings arriving within ~100 ms apply once, as the latest), the first paint is not
-      delayed, and scrolling stays smooth with no new freezes at depth
-- [ ] Right-click → **New Change** (or **Describe**, **Squash**, **Abandon**): appears/updates
-      at the top effectively immediately, regardless of how many pages you've scrolled through
-- [ ] jj-idea-wrza: scroll several pages deep, then run a write that adds a commit at the top
-      (`jj new` in a terminal, or the right-click actions above) — the rows under the viewport
-      stay put (no slide by a row) even though a commit was spliced in far above them. Repeat
-      scrolled to the very top: the new commit appears at row 0 and is visible, rather than the
-      viewport holding its old pixel position and hiding it
-- [ ] After scrolling several pages deep, perform a write near `@`: still fast, and the
-      previously-scrolled-to deeper pages remain visible/unaffected
-- [ ] jj-idea-3mjy (GitHub #145): Ctrl/Cmd+click three rows (and Shift+click a range), then let the idle trickle
-      run for ~10 s, and separately run a write such as `jj describe` on an unselected commit from a
-      terminal: all selected rows stay selected, the lead row (focus ring) is unchanged, the viewport
-      doesn't move, and a diff opened for the selection doesn't blank. Abandon one selected row: the
-      others stay selected. Apply an author filter that hides one selected row: the rest stay selected
-- [ ] Perform a write whose effect lands on a commit deep in history you haven't scrolled to
-      (e.g. move a bookmark via a picker to an off-screen commit): it's still found/selected
-      correctly (falls back to the existing loadContext/GitHub #76 mechanism), even though
-      slower than the common case
-- [ ] After scrolling several pages deep, click toolbar **Refresh**: confirm the scroll depth /
-      total loaded row count is preserved (not collapsed back to one page), and total time is
-      proportional to pages loaded, not instant (deliberate — Explicit Refresh re-verifies
-      everything currently loaded, it doesn't just reload page 1)
-- [ ] Fallback (rare, automated-test covered): in a repository with more than 8,000 branch heads the
-      log loads the **Fallback change limit** worth of changes in one go instead of paging, logs
-      a warning (`idea.log`: "Log frontier ... exceeded 8000 ids"), and shows no error. Only
-      worth a manual check if you have such a repository to hand
-- [ ] Click a bookmark/reference filter entry that's currently off-screen (explicit navigation,
-      not a data refresh): the viewport still scrolls to make it visible, unlike the loadMore
-      case above — confirms the scroll-suppression fix didn't break real navigation
-- [ ] Settings → Version Control → Jujutsu → Log: the limit field reads **Fallback change limit** and
-      its comment says it only applies when paging is unavailable. Raise it to a large value
-      (e.g. 10,000): nothing changes — the first paint and every page are still 500 rows, and a
-      write near `@` stays fast
-- [ ] With no access code entered and no `jjidea.preview.*` system property, none of the above
-      needs any setup (paged loading is the default for everyone)
+- [ ] Opening the log loads fast, showing the first page (500 rows, independent of the "Changes to show" setting); the status strip below the table stays hidden throughout (no "Showing N changes" message in this mode; the scrollbar already says there's more)
+- [ ] On a wide multi-branch repo (e.g. FX-STRESS), rows whose parent didn't make it into any loaded page show a **faded straight line** down from the commit circle instead of nothing (which would look like a true root), distinct from the wiggle used for filtering. Clicking it loads and reveals the missing parent, scrolling to it once it arrives, and it stays in view while the idle trickle keeps loading rows between it and the old window (see MT-LOG-GRAPH "Long-edge navigation" for the full hover/click behaviour)
+- [ ] Idle trickle: on FX-STRESS (`SCALE=6 WITH_REMOTE=1`), open the log and *leave it alone*. Older history keeps loading at a gentle pace (the scrollbar thumb slowly shrinks), faded stubs on screen connect to their parents without any scrolling or clicking, no old row ever appears ahead of the rows between, and the IDE stays responsive. It stops when the whole log is loaded or ~10,000 rows are in memory, after which stubs remain clickable and scrolling to the bottom still loads more, uncapped. In Activity Monitor the IDE and jj stay well under a core while it trickles. Closing the log window stops it. (Page size: a fixed 500 rows for the first page, then sized so each fetch takes about 0.7 s, up to 8,000)
+- [ ] Scrolling to the bottom of the loaded rows loads more history in automatically before you reach the literal end (eager one-page-ahead prefetch); scrolling repeatedly keeps loading further pages at a consistent, flat pace, and the viewport stays where you scrolled to (does not jump back to the selected/`@` row) each time a page loads
+- [ ] Landing granularity: on FX-SCALE-SET `r80k-git` (or `r36k-keycloak`), scroll steadily to the end (~86k rows). In `idea.log`, `perf: log-page` lines show `limit` growing from 500 (at most doubling per page) up to the 8,000 ceiling, about 13 pages at the ceiling for a full load, with `took` well under ~700 ms (on a fast machine the target never binds; to exercise the adaptive path run with `-Djj.log.pageTargetMs=150`, where `limit` stays at the 500-row floor and grows only after a page that took under 150 ms; also `-Djj.log.pageMaxRows=`). `perf: log-apply` lines stay at one per page (25-80 ms at depth), `log-edt-wait` stays under ~15 ms after the first page, `graph-layout-append` does not grow with depth, the first paint is not delayed, and scrolling stays smooth with no new freezes. Landings arriving within ~100 ms apply once, as the latest; that needs pages that close together, which normal paging on a fast machine does not produce (2026-10-23 run: 19 pages, 19 applies, so coalescing was not observed)
+- [ ] Right-click → **New Change** (or **Describe**, **Squash**, **Abandon**) appears and updates at the top effectively immediately, regardless of how many pages you've scrolled through; the previously scrolled-to deeper pages stay visible and unaffected
+- [ ] After scrolling several pages deep, a write that adds a commit at the top (`jj new` in a terminal, or the right-click actions) leaves the rows under the viewport in place (no slide by a row). Scrolled to the very top, the new commit appears at row 0 and is visible, instead of the viewport holding its old pixel position and hiding it
+- [ ] Ctrl/Cmd+click three rows (and Shift+click a range), then let the idle trickle run ~10 s, and separately run a write such as `jj describe` on an unselected commit from a terminal: all selected rows stay selected, the lead row (focus ring) is unchanged, the viewport doesn't move, and a diff opened for the selection doesn't blank. Abandoning one selected row leaves the others selected. An author filter that hides one selected row leaves the rest selected (GitHub #145)
+- [ ] A write whose effect lands on a commit deep in history you haven't scrolled to (e.g. moving a bookmark via a picker to an off-screen commit) still finds and selects it correctly (via the existing loadContext mechanism, GitHub #76), slower than the common case
+- [ ] After scrolling several pages deep, toolbar **Refresh** preserves the scroll depth and total loaded row count (not collapsed back to one page), and total time is proportional to pages loaded, not instant (deliberate: an explicit Refresh re-verifies everything currently loaded)
+- [ ] Clicking a bookmark/reference filter entry that is currently off-screen (explicit navigation, not a data refresh) still scrolls the viewport to make it visible, unlike the loadMore case above
+- [ ] Settings → Version Control → Jujutsu → Log: the limit field reads **Fallback change limit** and its comment says it only applies when paging is unavailable. Raising it to a large value (e.g. 10,000) changes nothing: the first paint and every page are still 500 rows, and a write near `@` stays fast
 
 ### MT-CTXMENU
 
@@ -1205,121 +571,62 @@ non-paged behavior is perceptible.
 **Code:** `actions/change/`, `ui/duplicate/DuplicateDialog.kt`, `ui/duplicate/DuplicateImmutabilityGuard.kt`, `ui/newchange/NewChangeDialog.kt`, `ui/rebase/RebasePreviewPanel.kt`, `ui/rebase/RebaseSimulator.kt`, `ui/common/JujutsuCompareChangesPanel.kt`, `ui/components/RevisionSelectorPopup.kt`, `actions/change/compareWithRevisionAction.kt`
 **Also re-run:** MT-SQUASH, MT-SPLIT (share the commit picker); MT-DIFF (Compare with Working Copy / Show Diff in New Tab reuse the RevisionSelectorPopup and Changes-pane view); MT-WORKINGCOPY (its "New Change" button shares `CommandExecutor.new`)
 
-- [ ] Right-click opens context menu
-- [ ] **Copy Change ID** works and copies to clipboard
-- [ ] **Copy Commit ID** copies the full 40-char hex commit id (jj-idea-mavt, GitHub #137)
-- [ ] **Copy Change ID** / **Copy Commit ID** appear under Settings → Keymap (search "Copy Change ID"), unbound by default; assign a shortcut to each, select a log row, and the shortcut copies the right id (and does nothing outside the log). The menu items show the assigned shortcut hint
-- [ ] **Copy Description** works and copies to clipboard
-- [ ] **New Change From This** (primary, no dialog) creates new change directly and refreshes
-- [ ] **New Change...** (secondary) opens the New Change dialog and creates the change
-- [ ] **Edit** action changes working copy
-- [ ] **Describe** action opens dialog and updates description
-- [ ] jj-idea-n3w1 (GitHub #46): the Describe dialog opens with the description field already
-      focused; it's a real commit-message editor (spellcheck, subject-length inspection, Ctrl+E
-      history popup), not a plain text box; Enter inserts a newline, Ctrl+Enter accepts
-- [ ] jj-idea-is97 (GitHub #76 regression): the Describe dialog's prompt reads "Enter description
-      for change \<short-id\>:" using the same short id shown in the log row, not the full
-      64-character change id
-- [ ] **Abandon** action removes change after confirmation
-- [ ] jj-idea-940s (GitHub #129): abandoning an empty, undescribed change that carries a local
-      bookmark asks for confirmation naming the bookmark and warning it will be deleted;
-      cancelling keeps both the change and the bookmark. A change with only a remote-tracking
-      bookmark (`name@remote`) abandons without prompting
-- [ ] jj-idea-thk: multi-select 3 mutable changes (Ctrl/Cmd-click) → right-click → **Abandon Changes**
-      asks once, listing counts ("2 with file modifications", ...) and the union of local bookmarks;
-      confirming removes all three and selects a surviving parent (the working copy if `@` was among
-      them); a single **Undo** restores all three. Two empty, undescribed, unbookmarked changes abandon
-      without a prompt; selecting 10 or more always prompts. A selection that includes an immutable change,
-      or spans two repos, shows **Abandon** disabled
-- [ ] **Duplicate Change** action creates an identical copy in place, with a new change ID and the same description; `@` does not move
-- [ ] **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
-- [ ] jj-idea-1uz0 (GitHub #125): with ~20 rows selected, **Rebase…** and **Duplicate Onto…** show the source list scrolling within about 5 rows, with the destination picker still visible (the source list helper is shared with Squash Into…)
-- [ ] jj-idea-2md7: hovering a commit row in the Duplicate Onto... destination picker, and in the
-      Rebase destination picker / preview, shows real bookmark/tag chips and status icons in the
-      tooltip - not a broken-image glyph
-- [ ] jj-idea-rskx: **Set Tag Here...** shows a distinct tag-plus badge icon (not the platform's
-      generic + icon); entering a name creates the tag at that commit and the log updates
+#### Basic actions
 
-#### Undo (jj-idea-v9zp)
+- [ ] Right-clicking a row opens the context menu. **Copy Change ID**, **Copy Commit ID** (the full 40-char hex id, GitHub #137) and **Copy Description** copy to the clipboard
+- [ ] **Copy Change ID** and **Copy Commit ID** appear in Settings → Keymap (search "Copy Change ID"), unbound by default. With a shortcut assigned and a log row selected, the shortcut copies the right id (and does nothing outside the log), and the menu items show the shortcut hint
+- [ ] **New Change From This** (primary, no dialog) creates the new change directly and refreshes. **New Change...** (secondary) opens the New Change dialog and creates the change. **Edit** changes the working copy
+- [ ] **Describe** opens a dialog and updates the description. The description field is focused on open and is a real commit-message editor (spellcheck, subject-length inspection, Ctrl+E history popup): Enter inserts a newline, Ctrl+Enter accepts (GitHub #46). The prompt reads "Enter description for change \<short-id\>:" using the short id shown in the log row, not the full 64-character id
+- [ ] **Abandon** removes the change after confirmation. Abandoning an empty, undescribed change that carries a local bookmark asks for confirmation naming the bookmark and warning it will be deleted; cancelling keeps both the change and the bookmark. A change with only a remote-tracking bookmark (`name@remote`) abandons without prompting (GitHub #129)
+- [ ] Multi-selecting 3 mutable changes (Ctrl/Cmd-click) → **Abandon Changes** asks once, listing counts ("2 with file modifications", …) and the union of local bookmarks. Confirming removes all three and selects a surviving parent (the working copy if `@` was among them), and a single **Undo** restores all three. Two empty, undescribed, unbookmarked changes abandon without a prompt; selecting 10 or more always prompts. A selection that includes an immutable change, or spans two repos, shows **Abandon** disabled
+- [ ] **Duplicate Change** creates an identical copy in place, with a new change ID and the same description; `@` does not move. **Duplicate Onto...** opens a dialog to pick a destination and placement (onto/after/before), then creates the copy there
+- [ ] With ~20 rows selected, **Rebase…** and **Duplicate Onto…** show the source list scrolling within about 5 rows with the destination picker still visible (the source list helper is shared with Squash Into…, GitHub #125)
+- [ ] Hovering a commit row in the Duplicate Onto... destination picker, and in the Rebase destination picker / preview, shows real bookmark/tag chips and status icons in the tooltip, not a broken-image glyph
+- [ ] **Set Tag Here...** shows a distinct tag-plus badge icon (not the platform's generic + icon); entering a name creates the tag at that commit and the log updates
+
+#### Undo
 
 **Code:** `ui/services/UndoBalloon.kt`, `ui/services/JujutsuUndoService.kt`,
 `vcs/JujutsuRollbackEnvironment.kt` (via `offerUndo`), `actions/undo/UndoLastOperationAction.kt`, `actions/change/abandonChangeAction.kt`,
-`ui/restore/RestoreDialog.kt` (jj-idea-g2p8)
+`ui/restore/RestoreDialog.kt`
 
-Stage 1 of the undo roadmap (docs/design/undo-support-roadmap.md). Wired to **Abandon**,
-**Duplicate Onto**, **Move Bookmark**, **Rebase** (drag-and-drop), **Set Tag**, and now
-**Restore**/**Restore to This** (jj-idea-g2p8) - the rest of jj-idea-t0iy's rollout is still
-pending, see the last bullet below.
+Stage 1 of the undo roadmap (docs/design/undo-support-roadmap.md). Wired to **Abandon**, **Duplicate Onto**, **Move Bookmark**, **Rebase** (drag-and-drop), **Set Tag** and **Restore** / **Restore to This**; the rest of jj-idea-t0iy's rollout is still pending.
 
-- [ ] Create a change, `jj new`, then **edit a file so the working copy is dirty** before
-      abandoning (exercises the snapshot-op exclusion) → right-click → **Abandon** → confirm
-- [ ] The change disappears **and** a Jujutsu balloon appears with an inline **Undo** link
-- [ ] Click **Undo** → the change reappears, working-copy files refresh, the balloon expires
-- [ ] Repeat with a **clean** working copy (no snapshot op written) — identical behavior
-- [ ] Abandon again, **dismiss the balloon without clicking Undo**, then open the **VCS**
-      main-menu → an entry reads **"Undo Abandon"**; invoking it brings the change back
-- [ ] Invoke **"Undo Abandon"** a second time (nothing left to undo) → the entry is now
-      disabled, reading "Undo Last Jujutsu Operation" (visible, not hidden - hover shows why)
-- [ ] While a balloon is still showing, run `jj new` in a terminal in the same repo, *then*
-      click the balloon's Undo link → it undoes the abandon specifically, not the terminal
-      command
-- [ ] In a terminal, `jj op log` shows a **new** "revert" operation was added (the log grew),
-      not that an earlier operation was removed
-- [ ] Settings → Version Control → Jujutsu → JJ executable path → point at a pinned older jj
-      (`scripts/jj-install-version.sh 0.37.0`, then `~/.local/bin/jj-0.37`) → repeat the first
-      three checks above — confirms the mechanism works at `JjVersion.MINIMUM`
-- [ ] Push, fetch, squash, split, describe, resolve, file track/untrack, and config actions
-      all behave exactly as before this change, and **none** of them show an undo balloon
-      yet (jj-idea-t0iy extends this to the rest)
-- [ ] Settings → Keymap → search "Jujutsu" → **Undo Last Jujutsu Operation** shows that name,
-      not the raw action id `Jujutsu.UndoLastOperation`
-- [ ] jj-idea-g2p8: modify a file, right-click → **Restore…**, tick it in the dialog, confirm
-      → a balloon appears reading "Restore" with an inline **Undo** link; clicking it brings
-      the discarded content back and refreshes the working-copy tree
-- [ ] jj-idea-g2p8: same check for **Restore to This…** from a historical commit's changed
-      files (see MT-LOG-DETAILS) → the balloon reads "Restore to This"
-- [ ] jj-idea-gl5e (GitHub #148): the Restore / Drop dialogs' summary line ("N files will be
-      restored" / "Changes to N files will be dropped") counts the pre-ticked files immediately on
-      open, not only after toggling a checkbox
+- [ ] Create a change, `jj new`, then **edit a file so the working copy is dirty** (exercises the snapshot-op exclusion) → right-click → **Abandon** → confirm. The change disappears **and** a Jujutsu balloon appears with an inline **Undo** link. Clicking **Undo** brings the change back, refreshes the working-copy files and expires the balloon. Repeat with a **clean** working copy (no snapshot op written): identical behaviour
+- [ ] Abandon again and **dismiss the balloon without clicking Undo**: the **VCS** main menu has an entry reading **"Undo Abandon"** that brings the change back. Invoking it a second time (nothing left to undo) shows it disabled, reading "Undo Last Jujutsu Operation" (visible, not hidden; hover shows why)
+- [ ] While a balloon is showing, run `jj new` in a terminal in the same repo, *then* click the balloon's Undo: it undoes the abandon specifically, not the terminal command. `jj op log` shows a **new** "revert" operation added, not an earlier one removed
+- [ ] With Settings → Version Control → Jujutsu → JJ executable path pointing at a pinned older jj (`scripts/jj-install-version.sh 0.37.0`, then `~/.local/bin/jj-0.37`), the first three checks above still work (the mechanism holds at `JjVersion.MINIMUM`)
+- [ ] Settings → Keymap → search "Jujutsu" → **Undo Last Jujutsu Operation** shows that name, not the raw action id `Jujutsu.UndoLastOperation`
+- [ ] Modify a file, right-click → **Restore…**, tick it in the dialog, confirm: a balloon reading "Restore" with an inline **Undo** appears, and clicking it brings the discarded content back and refreshes the working-copy tree. **Restore to This…** from a historical commit's changed files (see MT-LOG-DETAILS) shows a balloon reading "Restore to This"
+- [ ] The Restore and Drop dialogs' summary lines ("N files will be restored" / "Changes to N files will be dropped") count the pre-ticked files immediately on open, not only after toggling a checkbox (GitHub #148)
 
-#### Duplicate Change (jj-idea-vu35)
+#### Duplicate Change
 
-- [ ] Right-clicking an **immutable** change still offers both Duplicate actions (unlike Abandon/Describe/Edit)
-- [ ] Multi-selecting several changes (same repo) and choosing **Duplicate Change** creates an identical copy of each, in place
-- [ ] Multi-selecting commits across two repos in a multi-root project: both Duplicate actions are disabled/hidden
-- [ ] **Duplicate Onto...**: choosing "Onto (-d)" places the copy as a child of the destination
-- [ ] **Duplicate Onto...**: choosing "Insert after (-A)" / "Insert before (-B)" places the copy relative to the destination accordingly
-- [ ] **Duplicate Onto...** with no destination selected shows a validation error and does not close the dialog
+- [ ] Right-clicking an **immutable** change still offers both Duplicate actions (unlike Abandon/Describe/Edit). Multi-selecting several changes (same repo) and choosing **Duplicate Change** copies each in place; across two repos in a multi-root project both Duplicate actions are disabled or hidden
+- [ ] **Duplicate Onto...**: "Onto (-d)" places the copy as a child of the destination; "Insert after (-A)" / "Insert before (-B)" place it relative to the destination accordingly. With no destination selected a validation error shows and the dialog stays open
 
-#### Duplicate Onto... immutability guard (jj-idea-70e6)
+#### Duplicate Onto... immutability guard
 
 In a repo with an immutable trunk (e.g. `main` tracked as immutable, with mutable commits on top):
 
-- [ ] Selecting an immutable **head** (no children) as destination: "Insert after" stays enabled; "Insert before" greys out
-- [ ] Selecting an immutable **non-head** commit (has a child) as destination: both "Insert after" and "Insert before" grey out; only "Onto" is selectable
-- [ ] With "Insert before" already selected, immutable commits don't appear in the destination picker at all
-- [ ] With "Insert after" already selected, only immutable commits that have an immutable child are hidden from the picker; an immutable head remains selectable
-- [ ] Switching placement back to "Onto" makes every commit (including immutable ones) reappear in the picker
-- [ ] A permitted "Insert after" on an immutable head actually succeeds when you click Duplicate
-- [ ] Normal "Onto" duplicates and the quick in-place **Duplicate Change** action are unaffected by the guard
+- [ ] An immutable **head** (no children) as destination: "Insert after" stays enabled and "Insert before" greys out. An immutable **non-head** commit (has a child): both grey out and only "Onto" is selectable
+- [ ] With "Insert before" selected, immutable commits don't appear in the destination picker at all. With "Insert after" selected, only immutable commits that have an immutable child are hidden; an immutable head remains selectable. Switching back to "Onto" makes every commit reappear
+- [ ] A permitted "Insert after" on an immutable head succeeds when you click Duplicate. Normal "Onto" duplicates and the quick in-place **Duplicate Change** are unaffected by the guard
 
-#### Dialog commit-picker ordering (jj-idea-6fxz, jj-idea-45id)
+#### Dialog commit-picker ordering
 
 → automate: jj-idea-pa05 (cold-cache ordering is a `logCache`/`RepoLogCache` invariant,
 testable without rendering)
 
-Restart the IDE (or open a repo the log tool window hasn't loaded yet) so `logCache` starts cold for it, then — **without** opening the main log tab for that repo first — open a dialog with a commit picker (Rebase, Squash Into..., Duplicate Onto..., Move Bookmark to Change):
+Restart the IDE (or open a repo the log tool window hasn't loaded yet) so `logCache` starts cold for it, then, **without** opening the main log tab for that repo first, open a dialog with a commit picker (Rebase, Squash Into..., Duplicate Onto..., Move Bookmark to Change):
 
-- [ ] The picker's commit order matches what the main log window shows (newest first, root/oldest last) — not reversed or arbitrary
-- [ ] The graph connector lines in the picker render correctly (no crossed/backwards lines), consistent with a cold-cache fetch
-- [ ] Opening the main log tab afterwards shows the same order as the dialog did
+- [ ] The picker's order matches what the main log shows (newest first, root/oldest last), not reversed or arbitrary; the graph connector lines render correctly (no crossed or backwards lines); and opening the main log tab afterwards shows the same order as the dialog did
 
 In a **multi-repo** project (multiple `.jj` roots open together):
 
-- [ ] Open the main log tab (loads and merges all repos), then open a commit picker for each repo in turn — every repo shows its own commits newest-first, root last; none show the root (or any commit) out of place
-- [ ] Repeat across a few IDE restarts — the correct ordering should hold consistently for every repo, not just some of them
+- [ ] After opening the main log tab (which loads and merges all repos), a commit picker for each repo in turn shows that repo's own commits newest-first with the root last, none out of place. The ordering holds consistently across a few IDE restarts, for every repo
 
-#### Dialog commit-picker search (jj-idea-tq4b)
+#### Dialog commit-picker search
 
 **Code:** `ui/components/LogSearchField.kt`, `ui/components/CommitPickerPanel.kt`,
 `jj/LogSearchRevset.kt`, `ui/log/LogFilterMatcher.kt`, `ui/rebase/RebaseDialog.kt`,
@@ -1331,177 +638,71 @@ preservation, and the one-`jj log`-call-per-Enter contract without rendering a d
 section is for the toggles' visible behavior and the end-to-end off-window search in each
 dialog.
 
-- [ ] Open **Rebase**, **Squash Into…**, and **Duplicate Onto…** on a mutable commit — each
-      destination picker's search field now shows regex/match-case/whole-words toggle icons,
-      matching the main log window's search field
-- [ ] In each, toggling **regex** and typing a pattern (e.g. `fix.*bug`) filters the picker by
-      regex instead of literal text; toggling **match case** makes the filter case-sensitive;
-      toggling **whole words** restricts matches to whole-word boundaries
-- [ ] In each, typing part of a bookmark name filters to commits carrying that bookmark (this is
-      new — previously only Rebase/Squash Into…/Duplicate Onto… matched bookmark names by plain
-      substring, and Move Bookmark to Change didn't match them at all)
-- [ ] **Squash Into…**'s **parent mode** (right-click → Squash Into Parent) still shows its small
-      fixed candidate list with **no** search field — unaffected by this change
+- [ ] **Rebase**, **Squash Into…** and **Duplicate Onto…** destination pickers show regex / match-case / whole-words toggle icons on the search field, as the main log's does. Toggling regex and typing `fix.*bug` filters by regex; match case makes the filter case-sensitive; whole words restricts matches to whole-word boundaries
+- [ ] In each picker (and Move Bookmark to Change), typing part of a bookmark name filters to commits carrying that bookmark
+- [ ] **Squash Into…**'s **parent mode** (right-click → Squash Into Parent) still shows its small fixed candidate list with **no** search field
 
-Setup for the off-window checks below: lower "Number of changes to show" (Settings → Version
-Control → Jujutsu) to something small (e.g. 100) against a repo with several hundred commits
-(e.g. `scripts/fixtures/fx-stress.sh`'s `jj-stress-test` fixture, shared with MT-LOG-FILTER's
-whole-repo-search section) so most commits are off-window. Find a change ID well past the
-window (e.g. `jj log -r 'all()' -T change_id --no-graph --limit 2000`).
+Setup for the off-window checks: lower "Number of changes to show" (Settings → Version Control → Jujutsu) to something small (e.g. 100) against a repo with several hundred commits (e.g. `scripts/fixtures/fx-stress.sh`'s `jj-stress-test`) so most commits are off-window. Find a change ID well past the window (e.g. `jj log -r 'all()' -T change_id --no-graph --limit 2000`).
 
-- [ ] **Rebase**: paste the off-window change ID into the destination search — typing alone
-      shows no rows; pressing **Enter** fetches and shows it as a selectable destination, and a
-      status line below the table reports it was found; selecting it and clicking Rebase succeeds
-- [ ] **Squash Into…** (both picking a destination and picking sources) and **Duplicate Onto…**:
-      repeat the same paste-then-Enter check; the found commit is selectable and the operation
-      completes
-- [ ] **Move Bookmark to Change**: paste the off-window change ID, press Enter — it appears under
-      the correct Forward/Backward section (matches the classification the initially-loaded rows
-      use) and moving the bookmark to it succeeds
-- [ ] In **Rebase**/**Duplicate Onto…**, search for a change ID that both matches nothing loaded
-      *and* would be invalid as a destination for the current source (e.g. a descendant) — Enter
-      still finds it via the whole-repo query, but selecting it and confirming shows jj's own
-      rejection rather than silently succeeding (this is the documented ancestry-completeness
-      limitation, not a crash)
-- [ ] Typing gibberish that matches nothing and pressing Enter leaves the picker unchanged and the
-      status line reports no results, in every dialog above
-- [ ] Closing a dialog mid-search (e.g. click Cancel immediately after pressing Enter, before the
-      result would normally appear) does not throw in `idea.log` and does not reopen/flash the
-      dialog
+- [ ] **Rebase**: pasting the off-window change ID into the destination search shows no rows while typing; pressing **Enter** fetches and shows it as a selectable destination, a status line below the table reports it was found, and selecting it and clicking Rebase succeeds
+- [ ] **Squash Into…** (picking a destination and picking sources) and **Duplicate Onto…**: the same paste-then-Enter check; the found commit is selectable and the operation completes
+- [ ] **Move Bookmark to Change**: pasting the off-window change ID and pressing Enter shows it under the correct Forward/Backward section (the same classification the initially-loaded rows use), and moving the bookmark to it succeeds
+- [ ] In **Rebase**/**Duplicate Onto…**, searching for a change ID that matches nothing loaded *and* would be invalid as a destination (e.g. a descendant): Enter still finds it via the whole-repo query, and selecting it and confirming shows jj's own rejection rather than silently succeeding (the documented ancestry-completeness limitation, not a crash)
+- [ ] Gibberish plus Enter leaves the picker unchanged and the status line reports no results, in every dialog above. Cancelling a dialog immediately after pressing Enter (before the result appears) throws nothing in `idea.log` and does not reopen or flash the dialog
 
-#### New Change quick action (jj-idea-byfa)
+#### New Change quick action
 
-- [ ] With the log focused and a commit selected, pressing Cmd/Ctrl+Shift+N creates a new change on top of it, with no dialog, and the log reselects the new change
-- [ ] With the log focused and nothing selected but the default working-copy (@) selection, Cmd/Ctrl+Shift+N creates a new change on top of @
-- [ ] With the **editor** focused (not the log), Cmd/Ctrl+Shift+N still triggers the IDE's normal Go to File / New Scratch File action - it is not intercepted
-- [ ] Multi-selecting two commits (same repo) and choosing **New Change From These** (or the shortcut) creates a merge change with both as parents
-- [ ] Multi-selecting commits across two repos in a multi-root project: **New Change From This/These** is disabled/hidden (no arbitrary repo is picked)
+- [ ] With the log focused and a commit selected (or nothing but the default `@` selection), Cmd/Ctrl+Shift+N creates a new change on top of it with no dialog, and the log reselects the new change
+- [ ] With the **editor** focused (not the log), Cmd/Ctrl+Shift+N still triggers the IDE's normal Go to File / New Scratch File action; it is not intercepted
+- [ ] Multi-selecting two commits (same repo) and choosing **New Change From These** (or the shortcut) creates a merge change with both as parents; across two repos in a multi-root project it is disabled or hidden (no arbitrary repo is picked)
 
-#### New Change... dialog (jj-idea-grc8, GitHub #83)
+#### New Change... dialog (GitHub #83)
 
 Build a small stack `A → B → C` (three plain changes) for this section.
 
-- [ ] Right-click B → **New Change...** opens a dialog showing B as the target, an empty
-      description field, placement radios (Onto/Insert after/Insert before, Onto selected by
-      default), a "Switch working copy to the new change" checkbox (checked), and a live preview
-      graph
-- [ ] **Onto** + typing a description + Ctrl+Enter (Cmd+Enter): creates a plain child of B with
-      that description, `@` moves to it — matching the old "New Change with Description..."
-      flow's effect. (jj-idea-n3w1, GitHub #46: the description field became a real
-      commit-message editor, so plain Enter now inserts a newline instead of submitting — verify
-      this is in fact the current behavior, since it's a change from the plain text area this
-      dialog used before)
-- [ ] **Insert after**: preview shows the new change between B and C; clicking Create makes it
-      so — C is rebased onto the new change, `@` moves to it, log reselects it
-- [ ] **Insert before**: preview shows the new change between A and B; clicking Create makes it
-      so — B (and C) are rebased onto the new change, `@` moves to it
-- [ ] Unchecking "Switch working copy to the new change" before clicking Create: the change is
-      inserted but `@` stays on its prior commit (`jj new --no-edit`)
-- [ ] Preview fidelity: for each placement mode, the graph shown before clicking Create matches
-      what the log shows immediately after
-- [ ] Multi-selecting B and another head, then **Insert after**: creates a merge change with both
-      as parents and relocates both targets' children onto it
-- [ ] Right-clicking an **immutable** change and choosing New Change...: **Insert before** is
-      disabled (would rewrite the immutable target); **Insert after** stays enabled unless the
-      target has an immutable child, matching the Duplicate Onto... immutability guard above
-- [ ] Cross-repo multi-select in a multi-root project: the action is disabled/hidden (no arbitrary
-      repo is picked), same as **New Change From This/These**
-- [ ] Right-clicking a `jjc://` change-navigation link (e.g. a parent reference in the commit
-      details panel) still offers **New Change...** and it acts on the link's target
+- [ ] Right-click B → **New Change...** opens a dialog showing B as the target, an empty description field, placement radios (Onto/Insert after/Insert before, Onto selected by default), a "Switch working copy to the new change" checkbox (checked), and a live preview graph
+- [ ] **Onto** + a description + Ctrl+Enter (Cmd+Enter) creates a plain child of B with that description and `@` moves to it. Plain Enter inserts a newline (the field is a commit-message editor, GitHub #46)
+- [ ] **Insert after**: the preview shows the new change between B and C; Create does so, C is rebased onto it, `@` moves to it and the log reselects it. **Insert before**: the preview shows it between A and B; Create does so, B (and C) are rebased onto it and `@` moves to it. For each placement mode the preview graph matches what the log shows immediately after
+- [ ] Unchecking "Switch working copy to the new change" before Create inserts the change but leaves `@` on its prior commit (`jj new --no-edit`)
+- [ ] Multi-selecting B and another head, then **Insert after**, creates a merge change with both as parents and relocates both targets' children onto it
+- [ ] On an **immutable** change, **Insert before** is disabled (it would rewrite the immutable target) and **Insert after** stays enabled unless the target has an immutable child, matching the Duplicate Onto... guard above
+- [ ] Cross-repo multi-select in a multi-root project disables or hides the action, as for **New Change From This/These**. Right-clicking a `jjc://` change-navigation link (e.g. a parent reference in the details panel) still offers **New Change...** and it acts on the link's target
 
-**Merge description prefill (jj-idea-b0p2, GitHub #103)** — needs two sibling changes with bookmarks `feat` (newer) and `main` (older):
+**Merge description prefill (GitHub #103)**: needs two sibling changes with bookmarks `feat` (newer) and `main` (older).
 
-- [ ] Select both → **New Change...** (the dialog, not the quick **New Change From These**): description is prefilled `Merge branch 'feat' into main` (older tip = destination), with an **Other phrasings** link below the editor
-- [ ] **Other phrasings** lists the primary, the flipped form, and `Merge branches 'feat' and 'main'`; picking one replaces the text
-- [ ] Type extra text, then pick a phrasing: a confirmation asks before replacing; No keeps your text
-- [ ] One change, three changes, or a change with no bookmark (or two different bookmarks): description empty, no link
-- [ ] Two bookmarks only as remotes (`main@origin`): prefilled using the local names
-- [ ] Same flow from the bookmarks panel (multi-select two bookmarks)
+- [ ] Selecting both → **New Change...** (the dialog, not the quick **New Change From These**) prefills the description `Merge branch 'feat' into main` (older tip = destination), with an **Other phrasings** link below the editor listing the primary, the flipped form, and `Merge branches 'feat' and 'main'`; picking one replaces the text. After typing extra text, picking a phrasing asks for confirmation before replacing, and No keeps your text
+- [ ] One change, three changes, or a change with no bookmark (or two different bookmarks): description empty, no link. Two bookmarks that exist only as remotes (`main@origin`) prefill using the local names. The same flow works from the bookmarks panel (multi-select two bookmarks)
 
-#### Move Up / Move Down (jj-idea-owje, GitHub #93)
+#### Move Up / Move Down (GitHub #93)
 
-Move Up/Down swap the selected commit with its single child/single parent **in the commit
-graph** — not whatever row happens to be adjacent on screen. Build a small stack
-`A → B → C → D` (four plain changes, `A` immutable - e.g. `jj config set --repo user.email a;
-jj new; jj new; jj new` then `jj bookmark create -r A base` and set the diff base / advance
-`main`/trunk over `A` so it becomes immutable) for the linear checks below, plus a small merge
-(`A → B`, `A → C`, `B,C → D`) for the branch/merge checks.
+Move Up/Down swap the selected commit with its single child / single parent **in the commit graph**, not whatever row is adjacent on screen. Build a small stack `A → B → C → D` (four plain changes, `A` immutable, e.g. `jj config set --repo user.email a; jj new; jj new; jj new` then `jj bookmark create -r A base` and advance `main`/trunk over `A`) for the linear checks, plus a small merge (`A → B`, `A → C`, `B,C → D`) for the branch/merge checks.
 
-- [ ] On the linear stack, select `B` or `C` and press Ctrl+Shift+Up (same on macOS - Cmd+Shift+Up
-      is deliberately **not** bound, see the plugin.xml comment on `Jujutsu.MoveChangeUp`) — it
-      swaps with its single child, the log reselects it in its new position, and `jj log` in a
-      terminal confirms the parent/child order now matches the table
-- [ ] Press it again — the commit keeps climbing one position per press
-- [ ] Ctrl+Shift+Down: moves the same commit back down
+- [ ] On the linear stack, selecting `B` or `C` and pressing Ctrl+Shift+Up (same on macOS; Cmd+Shift+Up is deliberately **not** bound, see the plugin.xml comment on `Jujutsu.MoveChangeUp`) swaps it with its single child, the log reselects it in its new position, and `jj log` confirms the order. Pressing again keeps climbing one position per press; Ctrl+Shift+Down moves it back down
 - [ ] The undo balloon after a move reads "Move" (not "Rebase"); **Undo** restores the previous order
-- [ ] Select `D` (no child) — Move Up is disabled; select `A` (no parent) — Move Down is disabled
-- [ ] Select `B` (single parent immutable `A`) — Move Down (which would `jj rebase -r B -B A`,
-      rewriting the immutable commit) is disabled; Move Up remains enabled
-- [ ] Multi-select two rows — both Move Up and Move Down are disabled
-- [ ] Right-click a row: **Move Up**/**Move Down** appear near **Rebase...** in the context menu,
-      each showing its keyboard-shortcut hint
-- [ ] Focus the **editor** (not the log) and press Ctrl+Shift+Up/Down — the editor's own "Move
-      Statement Up/Down" still fires; it is not intercepted
-- [ ] On **macOS**, in the Commit/Local Changes file list, press Cmd+Shift+Up/Down — it still
-      extends the selection to include every change above/below (the platform's own
-      `EditorTextStartWithSelection`/`EditorTextEndWithSelection`, unaffected since Move Up/Down
-      is deliberately not bound to Cmd+Shift+Up/Down on macOS)
-- [ ] On the merge shape, select `A` (two children `B`/`C`) — Move Up is disabled (ambiguous
-      which child to swap with); select `D` (two parents) — Move Down is disabled
-- [ ] Select `B` (single child `D`, single parent `A`) — both directions enabled and each swap
-      lands where the graph predicts, confirmed via `jj log`
-- [ ] In a multi-root project, arrange two repos' commits so one repo's row displays directly
-      above/below a commit from the *other* repo (any timestamps that interleave will do) —
-      moving the first repo's commit must act on its own repo's child/parent (or disable if it
-      has none), never touch the adjacent row from the other repo
-- [ ] Apply a log filter that hides the selected commit's actual single child while leaving an
-      unrelated commit visually adjacent — Move Up still targets the real (hidden) child, not
-      the visible neighbour
+- [ ] `D` (no child): Move Up is disabled; `A` (no parent): Move Down is disabled. `B` (single immutable parent `A`): Move Down, which would rewrite the immutable commit, is disabled and Move Up stays enabled. Multi-selecting two rows disables both
+- [ ] Right-clicking a row shows **Move Up**/**Move Down** near **Rebase...**, each with its keyboard-shortcut hint
+- [ ] With the **editor** focused, Ctrl+Shift+Up/Down still fires the editor's own "Move Statement Up/Down". On **macOS**, Cmd+Shift+Up/Down in the Commit/Local Changes file list still extends the selection to every change above/below (the platform's `EditorTextStartWithSelection`/`EditorTextEndWithSelection`)
+- [ ] On the merge shape, `A` (two children) disables Move Up (ambiguous) and `D` (two parents) disables Move Down. `B` (single child `D`, single parent `A`) enables both, and each swap lands where the graph predicts, confirmed via `jj log`
+- [ ] In a multi-root project with two repos' commits interleaved so one repo's row sits directly above/below the other's, moving a commit acts on its own repo's child/parent (or is disabled if it has none) and never touches the adjacent row from the other repo. With a log filter that hides the selected commit's real single child while leaving an unrelated commit visually adjacent, Move Up still targets the real (hidden) child
 
-#### Compare with Working Copy (jj-idea-a6cz, jj-idea-vtdl)
+#### Compare with Working Copy
 
-- [ ] Right-clicking a non-working-copy commit shows **Compare with Working Copy**
-- [ ] Right-clicking the working-copy entry: **Compare with Working Copy** is **not visible**
-- [ ] Invoking it on a commit with differences from `@` opens the **VcsChanges** tool window with a Changes tree listing every changed file (added/modified/deleted/renamed all included), and the first file's diff open in the editor
-- [ ] Selecting other files in the tree updates the diff in the same reusable editor tab
-- [ ] The right (working-copy) side of the diff is editable, and edits are written through to the real file on disk
-- [ ] The left (commit) side is read-only
-- [ ] Right-clicking a file in the Changes tree shows the jj file-change context menu (Show Diff, Restore, etc.)
-- [ ] Invoking it on a commit identical to `@` shows a "No Differences" notification instead of an empty pane
+- [ ] **Compare with Working Copy** is shown on a non-working-copy commit and **not visible** on the working-copy entry
+- [ ] Invoking it on a commit that differs from `@` opens the **VcsChanges** tool window with a Changes tree listing every changed file (added, modified, deleted and renamed), and the first file's diff open in the editor. Selecting other files updates the diff in the same reusable editor tab
+- [ ] The right (working-copy) side of the diff is editable and edits write through to the real file on disk; the left (commit) side is read-only
+- [ ] Right-clicking a file in the Changes tree shows the jj file-change context menu (Show Diff, Restore, etc.). On a commit identical to `@` a "No Differences" notification appears instead of an empty pane
 
-#### Compare with Another Commit / Compare Before with Another Commit (jj-idea-jp33)
+#### Compare with Another Commit / Compare Before with Another Commit
 
-- [ ] Right-clicking any historical commit shows **Compare with Working Copy**, **Compare with
-      Another Commit...**, and **Compare Before with Another Commit...** together, in that order
-- [ ] Right-clicking the **working-copy** entry: **Compare with Working Copy** is not visible, but
-      **Compare with Another Commit...** is still shown and enabled
-- [ ] Right-clicking a **root commit** (no parents): **Compare Before with Another Commit...** is disabled
-- [ ] Invoking **Compare with Another Commit...** opens the same revision-picker popup as
-      **Compare with Branch...** (bookmark/change ID/revision search); picking one opens a
-      Changes-pane tab titled `<selected> vs <picked>`, with the **selected commit's content on
-      the left** and the **picked revision's content on the right**, both read-only
-- [ ] Invoking **Compare Before with Another Commit...** on a commit compares its **parent** (not
-      itself) against the picked revision, same left/right convention; on a **merge commit** the
-      left side reflects the auto-merged parent content (matching Compare with Working Copy's
-      merge-parent handling)
-- [ ] Picking a revision identical in content to the base shows a "No Differences" notification, no tab opens
-- [ ] Typing an unresolvable revision in the picker shows a "Compare Failed" error dialog
-- [ ] Both actions also appear, and work identically, from a `jjc://` change-navigation link's menu
-- [ ] jj-idea-wiz0 (GitHub #130): in a repo, note `jj log -r @ -T commit_id`, edit a tracked file so `@`
-      is amended (the noted commit is now hidden), then **Compare with Another Commit...** on any
-      other commit and type the **old full commit id** in the picker: the right side shows the
-      file content **as of the old commit**, not the current working-copy content
-      Rows in the picker show the short commit id after the change id; the hidden commit's row is
-      marked `(hidden)`
-- [ ] Same hidden-commit check for the per-file actions: from a file's history (or a commit's changed
-      files) choose **Compare with Another Commit...** and **Compare Before with Another Commit...**,
-      type the old full commit id: the picked side shows the file as of the old commit, not the current
-      content
+- [ ] Right-clicking any historical commit shows **Compare with Working Copy**, **Compare with Another Commit...** and **Compare Before with Another Commit...** together, in that order. On the **working-copy** entry, Compare with Working Copy is not visible but **Compare with Another Commit...** is still shown and enabled. On a **root commit** (no parents), **Compare Before with Another Commit...** is disabled
+- [ ] **Compare with Another Commit...** opens the same revision-picker popup as **Compare with Branch...** (bookmark/change ID/revision search); picking one opens a Changes-pane tab titled `<selected> vs <picked>`, the **selected commit's content on the left** and the **picked revision's on the right**, both read-only
+- [ ] **Compare Before with Another Commit...** compares the commit's **parent** (not itself) against the picked revision, same left/right convention; on a **merge commit** the left side is the auto-merged parent content (matching Compare with Working Copy's merge-parent handling)
+- [ ] Picking a revision identical in content to the base shows a "No Differences" notification and opens no tab. Typing an unresolvable revision shows a "Compare Failed" error dialog. Both actions appear and work identically from a `jjc://` change-navigation link's menu
+- [ ] Hidden commits (GitHub #130): note `jj log -r @ -T commit_id`, edit a tracked file so `@` is amended (the noted commit is now hidden), then **Compare with Another Commit...** on any other commit and type the **old full commit id**: the right side shows the file content **as of the old commit**, not the current working-copy content. Picker rows show the short commit id after the change id, and the hidden commit's row is marked `(hidden)`. The same holds for the per-file actions: from a file's history (or a commit's changed files), **Compare with Another Commit...** and **Compare Before with Another Commit...** with the old full commit id show the file as of the old commit
 
-#### Show Diff in New Tab, multi-file (jj-idea-vtdl)
+#### Show Diff in New Tab, multi-file
 
-- [ ] Multi-selecting files (in the log's file list or a commit's changes) and choosing **Show Diff in New Tab** opens the same VcsChanges Changes-pane view as Compare with Working Copy, with the first file's diff open
-- [ ] Selecting a single file still shows a title with just that file's name; multiple files show "N files"
+- [ ] Multi-selecting files (in the log's file list or a commit's changes) and choosing **Show Diff in New Tab** opens the same VcsChanges Changes-pane view as Compare with Working Copy, with the first file's diff open. A single file shows a title with just that file's name; several show "N files"
 
 ### MT-SQUASH
 
@@ -1511,248 +712,89 @@ jj new; jj new; jj new` then `jj bookmark create -r A base` and set the diff bas
 **Fixture:** FX-STACK
 **Also re-run:** MT-CTXMENU (shares the commit picker); MT-SPLIT (shares `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, the hunk picker, and the staging protocol); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer)
 
-#### Availability / enablement
+#### Availability and destination picker
 
-- [ ] "Squash Into..." is present in context menu for a single mutable change
-- [ ] jj-idea-1uz0 (GitHub #125): select ~20 mutable changes → **Squash Into…** → the source list at the top **scrolls within about 5 rows** and the destination picker below it stays visible and usable (previously it was squeezed off the bottom). With 2–3 selected, the list shows in full with no scrollbar, as before
-- [ ] "Squash Into..." is present when 2+ mutable changes are selected
-- [ ] "Squash Into..." is **disabled** when any selected change is immutable
-- [ ] "Squash Into..." is **disabled** when selections span multiple repos (multi-root project)
-- [ ] "Squash into Parent..." still works for single-parent mutable changes (regression)
+- [ ] "Squash Into..." is present in the context menu for a single mutable change and for 2+ mutable changes, and **disabled** when any selected change is immutable or when the selection spans multiple repos. "Squash into Parent..." still works for single-parent mutable changes
+- [ ] Selecting ~20 mutable changes → **Squash Into…** makes the source list at the top **scroll within about 5 rows** with the destination picker below it still visible and usable; with 2–3 selected the list shows in full with no scrollbar (GitHub #125)
+- [ ] The dialog opens with the source change(s) listed at the top. The source itself is **not** selectable as destination, immutable changes are **not** shown, and **descendants of the source ARE** shown as valid destinations
+- [ ] Typing in the search field filters by change ID, description and bookmark name; clearing it restores the full filtered list. Selecting a destination populates the description field if you haven't typed. Hovering a commit row with bookmarks/tags shows real chip icons in the tooltip, not a broken-image glyph
 
-#### Destination picker
+#### Description editor
 
-- [ ] Dialog opens with source change(s) listed at the top
-- [ ] Source change itself is **not** selectable as destination
-- [ ] Immutable changes are **not** shown in the destination table
-- [ ] **Descendants of the source ARE shown** as valid destinations (e.g. selecting "change A", "change B" and "change C" should both appear)
-- [ ] Typing in the search field filters by change ID, description, and bookmark name
-- [ ] Clearing the search restores the full filtered list
-- [ ] Selecting a destination populates the description field (if user hasn't typed)
-- [ ] jj-idea-2md7: hovering a commit row with bookmarks/tags in the picker table shows real chip
-      icons in the tooltip - not a broken-image glyph
+The description field is a real commit-message editor (`ui/components/DescriptionEditor.kt`, wrapping the platform's `CommitMessage`), not a plain text area (GitHub #46).
+
+- [ ] A long first line shows the subject-length inspection highlight, and a misspelled word shows a spellcheck squiggle
+- [ ] The toolbar's history button (Ctrl+E / Cmd+E) opens a popup of recently-used descriptions from other dialogs/changes; picking one previews it, Escape reverts, and it doesn't close the dialog
+- [ ] Enter inserts a newline (does not submit); Ctrl+Enter (Cmd+Enter) submits
+
+#### Graph preview
+
+The top of the right-hand side shows the log graph as it will look after the squash (source green, destination blue), with a one-line summary underneath.
+
+- [ ] Right-click a mutable change → **Squash Into…** shows a "Result preview" graph above the file diff; before a destination is picked it shows the unchanged graph. Picking a destination highlights it blue and the summary reads "<source> → squash into <dest> (source kept)" (checkbox unticked by default)
+- [ ] Ticking **Delete empty source change…** removes the source row, hangs its children off its parent, and the summary says "source abandoned"; unticking returns the row. With it ticked, unticking one file (or hunk-picking a file) greys the checkbox out and brings the source row back (a partial squash can't empty it). Squashing the working copy with it ticked moves the `@` marker to the destination
+- [ ] **Squash Into Here from…** (multi-select sources): selecting and deselecting sources updates the preview, and the summary says "N changes". **Squash into Parent…** shows the source and its parent
+- [ ] Clicking OK leaves the real log matching the preview. The dialog still fits at its default size (graph, file diff and Pick Hunks… button all visible)
+
+#### Per-file diff preview
+
+The preview always shows **Before** (the source's own pre-change content, fixed) next to **Destination** (that same content plus this file's change if it's ticked, i.e. what the destination ends up with). This is deliberately anchored to the source's own before/after, not the real destination's content.
+
+- [ ] Right-click a mutable change with 2+ changed files → **Squash into Parent…** (or **Squash from Here into…**) shows a preview pane to the right of the file list, with a wider dialog overall
+- [ ] Clicking a file shows a syntax-highlighted, read-only diff of the file's full change, titled "Before" / "After (tick hunks to move to Destination)", with a **checkbox in the right gutter of every hunk** (all ticked by default, since all files are ticked) and a summary line under the file name reading "All hunks move to Destination"
+- [ ] Unticking that file in the list clears every gutter checkbox, the summary reads "No hunks move to Destination", and the diff **stays** (same hunks, no scroll jump); re-ticking ticks all boxes again
+- [ ] On a multi-hunk file, clicking one hunk's checkbox toggles it in place (no flicker or scroll reset), the summary reads "1 of N hunks move to Destination", and the file turns **half-checked** in the list without opening Pick Hunks…. Ticking or unticking hunks until all/none are ticked makes the file fully ticked/unticked (no override)
+- [ ] After a line-level edit in **Pick Hunks…** (not a whole-hunk subset) the file shows **no gutter checkboxes** and the summary reads "Custom pick moves to Destination (use Pick Hunks… to edit)"; ticking the file in the list resets it
+- [ ] Clicking a second file switches the preview to it, and clicking back to the first switches back immediately (no visible reload). In **Squash Into Here from…**, changing the source selection in the picker table resets the preview to the placeholder and repopulates the file tree. Multi-selecting two changes → **Squash Into…** previews the combined file list. A binary or deleted file degrades gracefully (no exception)
+- [ ] An ordinary diff elsewhere (e.g. MT-DIFF) shows **no** checkboxes
+
+#### Hunk picking
+
+Single-source only: jj's diff editor is one before/after pair, so hunk-level squashing across multiple sources isn't well-defined. It reuses Split's 3-pane arrow picker (`diffedit/HunkPickerDialog.kt`) with squash wording: Before (fixed) | destination (live) | full source change (fixed). A right-hand arrow squashes a hunk into the destination, a left-hand arrow reverts it to unsquashed. There is no "resolved" concept, so no merge-conflict confirmation dialogs.
+
+- [ ] Right-click a mutable change with 2+ changed files → **Squash into Parent…** → selecting a changed file enables **Pick Hunks…** below the preview. With **two or more sources** selected in **Squash Into…**/**Squash Into Here from…** it is **not offered** (hidden), and selecting down to exactly one source shows it
+- [ ] **Pick Hunks…** opens a 3-pane diff: Before | destination (live) | full source change, with arrows at each hunk's divider. Moving one hunk's arrow so only part of the file is squashed and clicking **Apply** closes the dialog with **no confirmation dialog of any kind**
+- [ ] The file then shows **half-checked** in the file list, the preview's gutter checkboxes match the hunks you moved, and the summary reads "K of N hunks move to Destination". The file's own tick state is **unchanged** by a partial pick (not force-ticked or unticked). Reopening **Pick Hunks…** on that file resumes the exact prior partial selection
+- [ ] **Apply** with every hunk moved to the destination side fully ticks the file; with every hunk left unsquashed it fully unticks; either way the override clears (reopening starts fresh from the tick-derived default, not a stale partial)
+- [ ] With a partial pick present, the **"Delete empty source and move working copy"** checkbox is disabled (a partial squash can never empty the source) and the description field shows only the destination's own description (no merge)
+- [ ] Clicking **Squash** leaves `jj diff` on the destination showing only the picked hunk, and the source still has the rest of that file's change. With a change that **deletes a file**, ticking the deletion (or hunk-picking to fully squash it) alongside a partial pick elsewhere lands the deletion in the destination too, not left behind as an empty file
+- [ ] Any ordinary diff elsewhere in the IDE shows no gutter arrows (the `DiffExtension` stays a no-op outside the picker)
+- [ ] **Split regression pass** (the preview cache and hunk picker are shared with Split): run MT-SPLIT's "Basic hunk selection" and "Hunk picking with the 3-pane arrow picker" checks; the wording there must read "Parent"/"Child", not the squash wording above
+
+#### Description auto-population and validation
 
 → automate: jj-idea-ikr6 (description auto-population + validation logic below is pure
 string/state logic, no rendering dependency)
 
-#### Description editor (jj-idea-n3w1, GitHub #46)
-
-The description field is now a real commit-message editor (`ui/components/DescriptionEditor.kt`,
-wrapping the platform's `CommitMessage`) instead of a plain text area:
-
-- [ ] Typing a long first line shows the subject-length inspection highlight; misspelling a word
-      shows a spellcheck squiggle
-- [ ] The toolbar's history button (Ctrl+E / Cmd+E) opens a popup of recently-used descriptions
-      from other dialogs/changes; picking one previews it, Escape reverts, and it doesn't close
-      the dialog
-- [ ] Enter inserts a newline (does not submit/click OK); Ctrl+Enter (Cmd+Enter) submits
-
-#### Graph preview (jj-idea-uuy9)
-
-The top of the right-hand side shows the log graph as it will look after the squash
-(source green, destination blue), with a one-line summary underneath.
-
-- [ ] Right-click a mutable change → **Squash Into…** → a "Result preview" graph appears above
-      the file diff; before a destination is picked it shows the unchanged graph
-- [ ] Pick a destination → it is highlighted blue and the summary reads
-      "<source> → squash into <dest> (source kept)" (checkbox unticked by default)
-- [ ] Tick **Delete empty source change…** → the source row disappears, its children hang off its
-      parent, and the summary says "source abandoned"; untick → the source row returns
-- [ ] With the checkbox ticked, untick one file (or hunk-pick a file) → the checkbox greys out and
-      the source row comes back (a partial squash can't empty it)
-- [ ] Squash the working copy with the checkbox ticked → the `@` marker moves to the destination
-- [ ] **Squash Into Here from…** (multi-select sources) → selecting/deselecting sources updates the
-      preview; the summary says "N changes"
-- [ ] **Squash into Parent…** → preview shows the source and its parent
-- [ ] Click OK → the real log matches what the preview showed
-- [ ] The dialog still fits at its default size (graph, file diff and Pick Hunks… button all visible)
-
-#### Per-file diff preview (jj-idea-8a8z)
-
-The preview always shows **Before** (the source's own pre-change content, fixed) next to
-**Destination** (that same content, plus this file's change if it's ticked — i.e. what the
-destination ends up with). This is deliberately anchored to the source's own before/after,
-not the real destination's content — see the section's linked issue for why.
-
-- [ ] Right-click a mutable change with 2+ changed files → **Squash into Parent…** (or
-      **Squash from Here into…**) → a preview pane appears to the right of the file list,
-      wider dialog overall
-- [ ] Click a file → preview shows a syntax-highlighted, read-only diff of the file's full
-      change, titled "Before" / "After (tick hunks to move to Destination)", with a **checkbox in
-      the right gutter of every hunk** (all ticked by default, since all files are ticked) and a
-      summary line under the file name reading "All hunks move to Destination"
-- [ ] Untick that file in the list → every gutter checkbox clears, the summary reads "No hunks
-      move to Destination", and the diff itself **stays** (same hunks, no scroll jump);
-      re-tick → all boxes tick again
-- [ ] On a multi-hunk file, click one hunk's checkbox → it toggles in place (no flicker/scroll
-      reset), the summary reads "1 of N hunks move to Destination", and the file turns
-      **half-checked** in the list without opening Pick Hunks…
-- [ ] Tick/untick hunks until all are ticked → the file becomes fully ticked (no override);
-      until none are → fully unticked
-- [ ] After a line-level edit made in **Pick Hunks…** (not a whole-hunk subset) → the file shows
-      **no gutter checkboxes** and the summary reads "Custom pick moves to Destination (use Pick
-      Hunks… to edit)"; ticking the file in the list resets it
-- [ ] Open any ordinary diff (e.g. MT-DIFF) → **no** checkboxes appear
-- [ ] Click a second file → preview switches to it; click back to the first → switches back
-      immediately (no visible reload)
-- [ ] **Squash Into Here from…** (multi-source picker): select a file, then change the
-      source selection in the picker table → preview resets to the placeholder and the file
-      tree repopulates
-- [ ] Multi-select two changes → **Squash Into…** → preview works on the combined file list
-- [ ] Select a binary or deleted file → preview degrades gracefully (no exception)
-
-#### Hunk picking (jj-idea-4q7m)
-
-Single-source only — jj's diff editor is one before/after pair, so hunk-level squashing across
-multiple sources isn't well-defined. Reuses Split's 3-pane arrow picker
-(`diffedit/HunkPickerDialog.kt`) with squash-specific wording: Before (fixed) | destination
-(live) | full source change (fixed) — a right-hand arrow squashes a hunk into the destination, a
-left-hand arrow reverts it back to unsquashed. No "resolved" concept, so no merge-conflict
-confirmation dialogs.
-
-- [ ] Right-click a mutable change with 2+ changed files → **Squash into Parent…** → select a
-      changed file → **Pick Hunks…** button is enabled below the preview
-- [ ] **Squash Into…**/**Squash Into Here from…** with **two or more sources selected** →
-      **Pick Hunks…** is **not offered** (hidden); selecting down to exactly one source makes it
-      appear
-- [ ] Click **Pick Hunks…** → a 3-pane diff opens: Before | destination (live) | full source
-      change, with arrows at each hunk's divider
-- [ ] Move one hunk's arrow so only part of the file's change is squashed → **Apply** → dialog
-      closes with **no confirmation dialog of any kind**
-- [ ] The file now shows **half-checked** in the file list; the preview's gutter checkboxes
-      match the hunks you moved and the summary reads "K of N hunks move to Destination"
-- [ ] **The file's tick state is unchanged by a partial pick** — re-open the file list and
-      confirm the checkbox itself wasn't force-ticked or unticked
-- [ ] Reopen **Pick Hunks…** on that file → the middle pane resumes the exact prior partial
-      selection
-- [ ] Click **Apply** with every hunk moved to the destination side → file **fully ticks**;
-      with every hunk left unsquashed → file **fully unticks**; either way the override clears
-      (reopening the picker starts fresh from the tick-derived default, not a stale partial)
-- [ ] With a partial pick present, the **"Delete empty source and move working copy"** checkbox
-      is disabled (a partial squash can never empty the source) and the description field shows
-      only the destination's own description (no merge)
-- [ ] Click **Squash** → `jj diff` on the destination shows only the picked hunk; the source
-      still has the rest of that file's change
-- [ ] Repeat with a change that **deletes a file**: tick the deletion (or pick-hunks to fully
-      squash it) alongside a partial pick elsewhere → the deletion lands in the destination too
-      (not left behind as an empty file)
-- [ ] Open any ordinary diff elsewhere in the IDE → no gutter arrows appear (the `DiffExtension`
-      stays a no-op outside the picker)
-- [ ] **Split regression pass** (the preview cache and hunk picker are now shared with Split):
-      run MT-SPLIT's "Basic hunk selection" and "Hunk picking with the 3-pane arrow picker"
-      checks — wording must read "Parent"/"Child", not the squash wording above
-
-#### Description auto-population (full squash — all files selected)
-
-- [ ] Field pre-fills correctly for each source/dest description combination: both non-empty
-      (`<dest desc>\n\n<source desc>`), dest empty (source only), source empty (dest only),
-      both empty (empty); multi-source appends all non-empty source descriptions after dest
-- [ ] Editing the description field prevents further auto-updates on destination change
-
-#### Description auto-population (partial squash — some files unchecked)
-
-- [ ] Field shows **only the destination description**, regardless of what the source description is
-- [ ] Switching back to all-files-selected restores the combined pre-fill (if user hasn't edited)
-
-#### Validation
-
-- [ ] "Squash" button is active initially (if destination pre-selected after load)
-- [ ] Clicking "Squash" with no destination selected shows inline error "Select a destination"
-- [ ] Unchecking all files in the tree shows inline error "Select at least one file"
+- [ ] Full squash (all files selected): the field pre-fills `<dest desc>\n\n<source desc>` when both are non-empty, the source only when dest is empty, the dest only when source is empty, and stays empty when both are; multi-source appends all non-empty source descriptions after dest. Editing the field prevents further auto-updates on destination change
+- [ ] Partial squash (some files unchecked): the field shows **only the destination description**, whatever the source description is. Switching back to all files selected restores the combined pre-fill (if you haven't edited)
+- [ ] The "Squash" button is active initially (if the destination is pre-selected after load). Clicking it with no destination shows the inline error "Select a destination"; unchecking all files shows "Select at least one file"
 
 #### "Delete empty source and move working copy" checkbox
 
-- [ ] Checkbox is **enabled** when all files are selected (full squash)
-- [ ] Checkbox is **disabled** (grayed out) when any file is unchecked (partial squash — source won't be empty)
-- [ ] Checkbox defaults to unchecked
-- [ ] Last-used state is remembered across dialog opens
+- [ ] The checkbox is **enabled** when all files are selected (full squash), **disabled** (greyed out) when any file is unchecked (the source won't be empty), unchecked by default, and its last-used state is remembered across dialog opens
+- [ ] Full squash, checkbox unchecked: select "change A" → "Squash Into..." → pick "change B", leave all files, click "Squash". "change A" is kept (now empty), `@` does not move to B, and the log selection stays on "change A"
+- [ ] Full squash, checkbox checked: same, but check the box. "change A" disappears (abandoned), "change B" now contains `a.txt`, and if "change A" was the working copy (`@`), the working copy moves to "change B"
+- [ ] Partial squash: add two files (`jj new -m "multi" && echo "x" > x.txt && echo "y" > y.txt`), select that change → "Squash Into..." → pick any destination, uncheck `y.txt`: the checkbox is greyed out and can't be checked. Clicking "Squash" moves only `x.txt` to the destination, the source still exists containing only `y.txt`, and neither description changes (no `--message` sent)
 
-**Full squash, checkbox unchecked (default):**
-1. Select "change A" → "Squash Into..." → pick "change B", leave all files
-2. Leave checkbox unchecked → click "Squash"
-- [ ] "change A" is kept (now empty) — it was NOT abandoned
-- [ ] Working copy stays where it was (@ does not move to B)
-- [ ] Log selection stays on "change A"
+#### Other source and target shapes
 
-**Full squash, checkbox checked:**
-1. Select "change A" → "Squash Into..." → pick "change B", leave all files
-2. **Check** the checkbox → click "Squash"
-- [ ] "change A" disappears (abandoned)
-- [ ] "change B" now contains `a.txt`
-- [ ] If "change A" was the working copy (@), working copy moves to "change B"
+- [ ] Squashing a parent into a child: "change A" → "Squash Into..." → pick "change C", which appears in the destination picker; with all files selected and the checkbox unchecked the squash completes without error and "change A"'s content is now in "change C"
+- [ ] Multi-source: Ctrl/Cmd+click "change A" and "change B" → "Squash Into..." shows the files from both combined; picking "change C" and clicking "Squash" puts both A's and B's files in "change C", and A and B disappear (or are kept if the checkbox is unchecked; check either way)
+- [ ] Working copy as source: with `@` on "change C" holding some content, select `@` → "Squash Into..." → pick "change B". Unchecked: `@` stays on "change C" (now empty or partial) and "change B" has the squashed content. Checked: "change C" (old `@`) is abandoned, the working copy moves to "change B" (now `@`), and no stranded empty change is left behind
+- [ ] Merge commit target: after `jj new -m "merge" change_a change_b`, selecting the merge commit → "Squash Into..." lists the merge commit as a valid destination and squashing into it succeeds
 
-**Partial squash, checkbox disabled:**
-1. Add two files: `jj new -m "multi" && echo "x" > x.txt && echo "y" > y.txt`
-2. Select that change → "Squash Into..." → pick any destination
-3. Uncheck `y.txt` in the file tree
-- [ ] Checkbox is grayed out and cannot be checked
-4. Click "Squash"
-- [ ] Only `x.txt` moves to the destination
-- [ ] Source change still exists (now containing only `y.txt`)
-- [ ] Source description is unchanged (no `--message` sent)
-- [ ] Destination description is unchanged
-
-#### Squashing a parent into a child (descendant target)
-
-1. Select "change A" → "Squash Into..." → pick "change C" as destination
-- [ ] "change C" appears in the destination picker
-2. Leave all files selected → click "Squash" (checkbox unchecked)
-- [ ] Squash completes without error
-- [ ] "change A"'s content is now in "change C"
-
-#### Multi-source squash
-
-1. Ctrl/Cmd+click to select "change A" and "change B" → "Squash Into..."
-2. File tree shows files from both A and B combined
-3. Pick "change C" as destination → click "Squash"
-- [ ] Both A and B disappear from log (or are kept if checkbox unchecked — check either way)
-- [ ] "change C" now contains files from both A and B
-
-#### Working copy as source
-
-1. Make sure `@` is on "change C" with some content
-2. Select `@` → "Squash Into..." → pick "change B" as destination
-
-**Without checkbox:**
-3. Leave checkbox unchecked → click "Squash"
-- [ ] Working copy stays on "change C" (now empty or partial)
-- [ ] "change B" has the squashed content
-
-**With checkbox:**
-3. Check the checkbox → click "Squash"
-- [ ] "change C" (old @) is abandoned
-- [ ] Working copy moves to "change B" (now @)
-- [ ] No stranded empty change left behind
-
-#### Merge commit target
-
-1. Create a merge: `jj new -m "merge" change_a change_b`
-2. Select the merge commit → "Squash Into..."
-- [ ] Merge commit appears as a valid destination in the picker
-- [ ] Squashing into the merge commit succeeds
-
-#### Edited immutable working copy (jj-idea-bzkf, GitHub #143)
+#### Edited immutable working copy (GitHub #143)
 
 jj never edits an immutable `@` in place: the first snapshot with edits moves them into a new child. The plugin lets jj do that, says so, and offers to squash the child back.
 
 **Setup:** FX-STACK with an immutable base, e.g. `jj config set --repo 'revset-aliases."immutable_heads()"' 'bookmarks()'`, then in a terminal `jj edit --ignore-immutable <bookmarked change>`.
-1. Edit and save a tracked file in the IDE
-- [ ] A sticky **Immutable Commit Left Unchanged** notification appears once, naming the immutable commit and the repo, with a **Squash into Immutable Commit...** action
-- [ ] The log shows `@` as a new change on top of the immutable commit; the immutable commit itself is unchanged
-2. Keep editing, or run `jj status` in a terminal
-- [ ] No second notification for the same child
-3. Click **Squash into Immutable Commit...**
-- [ ] A confirmation names the immutable commit and warns it may be shared; **No** changes nothing
-- [ ] **Yes** squashes the edits into the immutable commit (`jj diff -r <it>` shows them); `@` is an empty change on top; the notification disappears; the log refreshes
-- [ ] Undo (Operations tab / `jj op undo`) reverts the squash
-4. Repeat steps 1–2, then dismiss the notification and right-click the new child in the log
-- [ ] **Squash into Immutable Parent...** is present, and only on that child (not on `@` after the squash, nor on ordinary changes above trunk)
-5. Repeat step 1, then in a terminal `jj abandon @` (or `jj undo`)
-- [ ] The notification expires once the child is gone
-6. **Terminal-triggered:** with the IDE idle, edit a file on disk, then run `jj status` in a terminal
-- [ ] Once the IDE refreshes, the notification still appears (detected from repo state)
-7. **No false positives:** from an immutable `@`, use the status-bar switcher's **New on Top**; push `@` so a fetch/push makes it immutable
-- [ ] Neither shows the notification
+
+- [ ] Editing and saving a tracked file in the IDE shows a sticky **Immutable Commit Left Unchanged** notification once, naming the immutable commit and the repo, with a **Squash into Immutable Commit...** action. The log shows `@` as a new change on top of the immutable commit, which itself is unchanged. Continuing to edit, or running `jj status` in a terminal, shows no second notification for the same child
+- [ ] Clicking **Squash into Immutable Commit...** shows a confirmation naming the immutable commit and warning it may be shared; **No** changes nothing. **Yes** squashes the edits into the immutable commit (`jj diff -r <it>` shows them), leaves `@` as an empty change on top, removes the notification and refreshes the log. Undo (Operations tab / `jj op undo`) reverts the squash
+- [ ] After repeating the first edit and dismissing the notification, right-clicking the new child in the log shows **Squash into Immutable Parent...**, and only on that child (not on `@` after the squash, nor on ordinary changes above trunk)
+- [ ] After the edit, `jj abandon @` (or `jj undo`) in a terminal expires the notification once the child is gone. With the IDE idle, editing a file on disk and running `jj status` in a terminal still produces the notification once the IDE refreshes (detected from repo state)
+- [ ] No false positives: from an immutable `@`, using the status-bar switcher's **New on Top**, or pushing `@` so a fetch/push makes it immutable, does not show the notification
 
 ### MT-SPLIT
 
@@ -1761,161 +803,71 @@ jj never edits an immutable `@` in place: the first snapshot with edits moves th
 **Code:** `ui/split/SplitDialog.kt`, `ui/common/HunkSelectionModel.kt`, `ui/common/HunkPickPreviewController.kt`, `ui/common/FileDiffPreviewPanel.kt`, `diffedit/HunkPickerDialog.kt`, `diffedit/HunkArrowDiffExtension.kt`, `diffedit/DiffEditTool.kt`, `actions/change/splitAction.kt`, `actions/filechange/SplitFilesAction.kt` (also `SplitIntoNewParentFilesAction`)
 **Also re-run:** MT-CTXMENU (shares the commit picker in some flows); MT-DIFF, MT-DIFF-PREVIEW (the hunk picker registers a plugin-wide `diff.DiffExtension` — confirm it stays a no-op on every other diff viewer); MT-SQUASH (shares `ui/common/FileDiffPreviewPanel.kt`, `ui/common/HunkPickPreviewController.kt`, the hunk picker, and the staging protocol)
 
-Setup: create a scratch jj repo with a file that has at least **two separate** hunks of changes
-(so partial selection is meaningful).
+Setup: a scratch jj repo with a file that has at least **two separate** hunks of changes (so partial selection is meaningful).
 
-Model (jj-idea-8khi, GitHub #101 UX follow-up — identity-first wording, shared by every mode):
-**ticking a file moves it to a brand-new commit**; unticked files **stay on the source's own
-change ID and position**. Nothing is ticked by default. Only the new commit's *position* varies
-with mode: a child (default), a sibling (`--parallel`), or a parent (`-B`/"Split into New
-Parent"). "Pick Hunks…" opens a native **3-pane** diff — Before (fixed) | Stays (live) | New
-commit (fixed) — with a directional arrow at each hunk's divider instead of a checkbox: a right
-arrow at a Before|Stays divider moves that hunk to the new commit; a left arrow at a
-Stays|New-commit divider moves it back. The Stays pane genuinely updates in place as you click,
-so you always see the actual resulting content, not just an inferred state — this replaced an
-earlier 2-pane checkbox picker (itself replacing the original 3-way *merge* widget) specifically
-so gnarlier, many-hunk splits have somewhere to see the live result while picking. The Stays pane
-is view-only (arrow clicks only, no direct typing) — deliberately, so the result is always a
-well-formed composition of Before/New-commit hunks. No "resolved" concept, so no merge-conflict
-confirmation dialogs anywhere in this picker.
+Model (GitHub #101, identity-first wording shared by every mode): **ticking a file moves it to a brand-new commit**; unticked files **stay on the source's own change ID and position**. Nothing is ticked by default. Only the new commit's *position* varies with mode: a child (default), a sibling (`--parallel`), or a parent (`-B` / "Split into New Parent"). "Pick Hunks…" opens a native **3-pane** diff, Before (fixed) | Stays (live) | New commit (fixed), with a directional arrow at each hunk's divider instead of a checkbox: a right arrow at a Before|Stays divider moves that hunk to the new commit, and a left arrow at a Stays|New-commit divider moves it back. The Stays pane updates in place as you click, so you always see the actual resulting content, and it is view-only (arrow clicks only), so the result is always a well-formed composition of Before/New-commit hunks. There is no "resolved" concept, so no merge-conflict confirmation dialogs anywhere in this picker.
 
 #### Basic hunk selection (main dialog preview)
-- [ ] Right-click a mutable change → **Split into New Child…** → dialog shows changed-files list on the left (nothing ticked) and a native read-only diff preview on the right
-- [ ] Under "Source", a muted note states the mode's shape: default mode reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new child commit created on top of it."
-- [ ] The note **word-wraps across multiple lines** and does **not** widen the left column or push the diff preview panel narrower — the splitter stays at its usual ~40/60 proportion regardless of note length (jj-idea-8khi follow-up: a plain, non-wrapping label here previously forced the column wide enough to fit the whole sentence on one line)
-- [ ] The change id embedded in the note and in both description labels renders with the same bold-prefix/grey-remainder styling used everywhere else in the plugin (log table, commit details, other dialogs' "Source" line) — not plain, equal-weight text
-- [ ] Click a file in the list → right panel shows a native syntax-highlighted diff of the file's **full change** (before → after), titled "Before" / "After (tick hunks to move to new commit)", with an **unticked checkbox in the gutter of every hunk** (nothing ticked yet, so nothing moves) and a summary under the file name reading "No hunks move to new commit" ("new commit" is the same noun used everywhere in this dialog: the summary line, the hunk picker, and the "Description for new commit …" label)
-- [ ] Tick the file in the list → every hunk checkbox ticks and the summary reads "All hunks move to new commit" (the diff itself does not change or scroll); untick → back to empty boxes
-- [ ] On a multi-hunk file, click one hunk's gutter checkbox → it ticks in place (no flicker, scroll position kept), the summary reads "1 of N hunks move to new commit", the file turns **half-checked** in the list (its directory nodes too) and the dialog summary counts it as partial — **without** opening Pick Hunks…
-- [ ] Tick every hunk one by one → the file becomes **fully ticked** (filled box, no partial); untick them all → fully unticked
-- [ ] Tick one hunk inline, then open **Pick Hunks…** → it opens already showing that exact partial; Apply a different whole-hunk selection → the gutter boxes match it. After a **line-level** edit in Pick Hunks… the file shows **no gutter boxes** and the summary reads "Custom pick moves to new commit (use Pick Hunks… to edit)"
-- [ ] Hover a checkbox → tooltip "Move this hunk to new commit"; verify in `-B` (new parent) and "Create parallel commits" modes that ticked hunks still end up in the **new** commit (`jj show` after Split)
-- [ ] Light and dark themes and at a larger UI zoom: checkboxes are crisp and aligned with the first line of each hunk (including a pure-deletion hunk, anchored at the line after the deletion)
-- [ ] Fully-ticked files show a filled checkbox; unticked show empty; partially-picked (see below) show a **half-checked** box
-- [ ] Directory nodes containing a partial file also show a half-checked box
 
-#### Right-click file(s) → "Split into New Child"
-- [ ] Select one or more files in the working-copy / commit-details file list, right-click → **Split into New Child** → dialog opens with exactly those files **ticked** (moving to the child)
-- [ ] Split → the new child commit contains only the selected files; the parent keeps the rest
+- [ ] Right-click a mutable change → **Split into New Child…** shows the changed-files list on the left (nothing ticked) and a native read-only diff preview on the right. Under "Source", a muted note states the mode's shape; in the default mode: "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new child commit created on top of it."
+- [ ] The note **word-wraps across multiple lines** and does **not** widen the left column or push the diff preview narrower; the splitter stays at its usual ~40/60 proportion regardless of note length. The change id in the note and in both description labels uses the same bold-prefix/grey-remainder styling as everywhere else in the plugin, not plain equal-weight text
+- [ ] Clicking a file shows a native syntax-highlighted diff of the file's **full change**, titled "Before" / "After (tick hunks to move to new commit)", with an **unticked checkbox in the gutter of every hunk** and a summary under the file name reading "No hunks move to new commit" ("new commit" is the same noun used in the summary line, the hunk picker and the "Description for new commit …" label)
+- [ ] Ticking the file in the list ticks every hunk checkbox and the summary reads "All hunks move to new commit" (the diff does not change or scroll); unticking returns to empty boxes
+- [ ] On a multi-hunk file, clicking one hunk's gutter checkbox ticks it in place (no flicker, scroll position kept), the summary reads "1 of N hunks move to new commit", and the file (and its directory nodes) turn **half-checked** in the list and count as partial in the dialog summary, **without** opening Pick Hunks…. Ticking every hunk one by one makes the file **fully ticked** (filled box, no partial); unticking them all makes it fully unticked
+- [ ] Ticking one hunk inline and then opening **Pick Hunks…** opens it already showing that exact partial; applying a different whole-hunk selection makes the gutter boxes match it. After a **line-level** edit in Pick Hunks…, the file shows **no gutter boxes** and the summary reads "Custom pick moves to new commit (use Pick Hunks… to edit)"
+- [ ] Hovering a checkbox shows the tooltip "Move this hunk to new commit"; in `-B` (new parent) and "Create parallel commits" modes, ticked hunks still end up in the **new** commit (`jj show` after Split)
+- [ ] In light and dark themes and at a larger UI zoom, checkboxes are crisp and aligned with the first line of each hunk (a pure-deletion hunk is anchored at the line after the deletion)
 
-#### Log row → "Split into New Parent…" (jj-idea-xvgl, GitHub #132)
-- [ ] Right-click a **mutable** log row → **Split into New Parent…** appears directly below **Split into New Child…**
-- [ ] Invoking it opens the "Split into New Parent" dialog (same as the file-list entry below) with **nothing ticked**; no "Create parallel commits" checkbox, but "Pick Hunks…" is shown
-- [ ] Tick a file and Split → `jj log` shows a new commit inserted as the parent holding that file; the original row keeps its own change ID
-- [ ] The entry is disabled on an **immutable** row and when **multiple** rows are selected (same gating as "Split into New Child…")
-- [ ] The Working Copy toolbar's Split button is unchanged (still child mode)
+#### Entry points
 
-#### Right-click file(s) → "Split into New Parent" (jj-idea-qswq / jj-idea-tkog, GitHub #74)
+- [ ] Selecting one or more files in the working-copy / commit-details file list and right-clicking → **Split into New Child** opens the dialog with exactly those files **ticked**; Split leaves the new child commit with only the selected files and the parent with the rest
+- [ ] Right-clicking a **mutable** log row shows **Split into New Parent…** directly below **Split into New Child…**. It opens the "Split into New Parent" dialog with **nothing ticked**, no "Create parallel commits" checkbox but with "Pick Hunks…" shown. Ticking a file and splitting shows in `jj log` a new commit inserted as the parent holding that file, while the original row keeps its own change ID. The entry is disabled on an **immutable** row and when **multiple** rows are selected (the same gating as "Split into New Child…"). The Working Copy toolbar's Split button is unchanged (still child mode) (GitHub #132)
+- [ ] Selecting one or more files and right-clicking shows **Split into New Parent…** alongside **Split into New Child…** (GitHub #74). It opens the dialog with exactly the selected files **ticked**, the same starting tick state as "Split into New Child", not inverted. This uses `jj split -B`: the ticked fileset becomes a **new** commit inserted before the source, and everything else stays on the source's own change ID and location
 
-Uses `jj split -B` (verified against jj 0.44: the ticked fileset becomes a **new** commit inserted
-before the source; everything else **stays on the source's own change ID and location** — the
-opposite polarity from "Split into New Child"'s plain `jj split`, where the ticked fileset becomes
-a new **child** and the unticked fileset keeps the original ID). Unlike the original jj-idea-qswq
-implementation (which just inverted the tick pre-selection through the same no-flag `jj split`),
-the right-clicked files now tick **directly**, same as "Split into New Child".
+#### Split into New Parent
 
-- [ ] Select one or more files, right-click → **Split into New Parent…** appears alongside **Split into New Child…**
-- [ ] Invoking it opens the dialog with exactly the selected files **ticked** — the same starting tick state as "Split into New Child", not inverted
-- [ ] Dialog title reads "Split into New Parent"; the note under "Source" reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new commit inserted below it."; above the ticked description editor, the label reads **"Description for new commit (parent of &lt;shortid&gt;)"**, and above the unticked one, **"Description for existing commit (&lt;shortid&gt;)"** — the same identity-first wording as the other two modes, with only the parenthetical spelling out that this mode makes the new commit the *parent* (jj-idea-8khi: one combined label per editor, not a separate header plus sub-label)
-- [ ] The **"Description for existing commit …"** block is on top, **"Description for new commit …"** below — the reverse of "Split into New Child"'s order (new-commit block on top, existing-commit block below) — matching each side's actual position in the log: the existing commit keeps the more-recent position, the new commit becomes the older parent one row further down
-- [ ] The "Create parallel commits" checkbox is **not shown** (mutually exclusive with `-B`)
-- [ ] "Pick Hunks…" **is shown** (jj-idea-p6bo, GitHub #139/#132). On a file with two separate hunks: click it → a 3-pane dialog opens as **New commit (live) in the middle**, with "Stays in <existing>" on the right; move one hunk into the middle pane (right-gutter arrow, tooltip "Move this hunk to New commit") → Apply → the file shows half-checked → Split → the **new parent** holds only that hunk and the original change ID keeps the other (`jj show`/`jj diff -r`)
-- [ ] Hunks-only `-B` split: with **nothing ticked** but one file partially picked → OK is enabled; result is as above
-- [ ] Picking *all* hunks into the middle pane ticks the file; moving them all back out unticks it (the mirror image of the New Child mode)
-- [ ] Split a revision where a **ticked file is a deletion** and another file is partially picked → the new parent shows the deletion (`D`), not an empty file
-- [ ] Working-copy variant: repeat on `@` → `@` stays on the original change ID with the remaining hunk
-- [ ] Split → via `jj log`/`jj show`: the ticked files land in a **new commit inserted as the parent** of the original; the original commit (unticked files) keeps its **own original change ID**, now with the new commit as its parent
-- [ ] Editing the new-commit description field and splitting → the new commit gets that description (passed as `-m`); the existing-commit field, if left unedited, leaves the original commit's description untouched
-- [ ] Editing the existing-commit description field and splitting → after the split completes, the original commit's description updates to match (chained via a follow-up `jj describe` on the same, unchanged change ID)
-- [ ] **Splitting the working copy itself**: an info line under the source commit reads "The working copy (@) stays on the existing commit (<shortid>); the new commit becomes its parent" — after splitting, confirm `@` is still genuinely on the original change ID (not the new parent)
-- [ ] Compare: repeat "Split into New Child" on the working copy — its info line instead reads "The working copy (@) moves to the new commit", and after splitting `@` has genuinely moved
-- [ ] Selecting **every** changed file → dialog opens with every file ticked, which trips the "at least one file must stay here" validation (nothing would be left at the original change ID) — expected, not a bug
-- [ ] Selecting **no** files → ticking nothing trips "move at least one file to the new commit" — expected
+- [ ] The dialog title reads "Split into New Parent" and the note under "Source" reads "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new commit inserted below it." The ticked description editor is labelled **"Description for new commit (parent of &lt;shortid&gt;)"** and the unticked one **"Description for existing commit (&lt;shortid&gt;)"**
+- [ ] The **"Description for existing commit …"** block is on top and **"Description for new commit …"** below, the reverse of "Split into New Child" (new-commit block on top), matching each side's position in the log: the existing commit keeps the more recent position, the new commit becomes the older parent one row further down. The "Create parallel commits" checkbox is **not shown** (mutually exclusive with `-B`)
+- [ ] "Pick Hunks…" **is shown** (GitHub #139, #132). On a file with two separate hunks, clicking it opens a 3-pane dialog with **New commit (live) in the middle** and "Stays in &lt;existing&gt;" on the right; moving one hunk into the middle pane (right-gutter arrow, tooltip "Move this hunk to New commit") and Apply shows the file half-checked, and Split leaves the **new parent** holding only that hunk and the original change ID keeping the other (`jj show`/`jj diff -r`). Picking *all* hunks into the middle pane ticks the file and moving them all back out unticks it
+- [ ] A hunks-only `-B` split with **nothing ticked** but one file partially picked enables OK. Splitting a revision where a **ticked file is a deletion** and another file is partially picked leaves the new parent showing the deletion (`D`), not an empty file
+- [ ] Splitting via `jj log`/`jj show`: the ticked files land in a **new commit inserted as the parent** of the original, and the original commit (unticked files) keeps its **own change ID** with the new commit as its parent. Repeating on the working copy `@` leaves `@` on the original change ID with the remaining hunk
+- [ ] Editing the new-commit description field and splitting gives the new commit that description (passed as `-m`); an unedited existing-commit field leaves the original commit's description untouched. Editing the existing-commit field updates the original commit's description after the split (chained via a follow-up `jj describe` on the same, unchanged change ID)
+- [ ] **Splitting the working copy itself**: an info line under the source commit reads "The working copy (@) stays on the existing commit (&lt;shortid&gt;); the new commit becomes its parent", and after splitting `@` is still on the original change ID (not the new parent). For comparison, "Split into New Child" on the working copy reads "The working copy (@) moves to the new commit" and `@` has genuinely moved after splitting
+- [ ] Selecting **every** changed file opens the dialog with every file ticked, which trips the "at least one file must stay here" validation (nothing would be left at the original change ID); selecting **no** files trips "move at least one file to the new commit". Both are expected, not bugs
 
 #### Hunk picking with the 3-pane arrow picker
-- [ ] Click **Pick Hunks…** → a dialog opens titled "Pick Hunks — <filename>" with **three** panes: Before | Existing commit (live) | Moves to New commit — "Existing commit"/"New commit" are the same identity-first labels as the main dialog (jj-idea-8khi), not literally "Parent"/"Child"
-- [ ] On a freshly-opened **unticked** file: Existing commit's text equals the New-commit pane's; every hunk shows as a Before|Existing-commit divider bar with a **right arrow**
-- [ ] Click a right arrow → that hunk's Existing-commit content flips to Before's text (matching); the Before|Existing-commit bar for that hunk disappears, and a **new** Existing-commit|New-commit bar with a **left arrow** appears in its place
-- [ ] Click that left arrow → reverses back to a Before|Existing-commit bar with a right arrow — confirm this is reversible any number of times, either direction, independently per hunk
-- [ ] **Try typing directly into the Existing-commit pane** → rejected; it's view-only, arrow clicks are the only way to change it (a deliberate choice, so the result is always a clean composition of Before/New-commit hunks, never a hand-edited hybrid)
-- [ ] Click **Apply** with a mix of moved/unmoved hunks → dialog closes immediately with **no confirmation dialog of any kind** (the regression the original merge-widget picker had — a "Save changes and mark the conflict resolved anyway?" prompt used to fire here)
-- [ ] After Apply → file shows **half-checked** in the file list; summary shows "(N partial)"
-- [ ] **The file's tick state is unchanged by a partial pick** — if it was unticked before opening the picker, it's still unticked after a partial Apply
-- [ ] Moving every hunk to the new commit → Apply results in a **fully ticked** file (no half-check), same as ticking it directly
-- [ ] Moving no hunks (or reversing back to none) → Apply results in the file being **fully ticked or unticked** to match its starting state, with no partial override left over
-- [ ] Click **Cancel** → closes immediately with **no confirmation dialog**; file state (tick + any prior override) unchanged
-- [ ] **Reopen "Pick Hunks…" on a file with an existing partial selection** → the Existing-commit pane opens already showing the exact prior split (the content itself resumes; no per-hunk state to reconstruct)
-- [ ] Split (linear) → new commit contains only the hunks left pointing at it; the existing commit has the rest
-- [ ] jj-idea-5g8h: change a file partially and **delete a second file** in the same change, pick hunks for the first file only, leave the deletion **unticked** → the first commit deletes the file (log details show it as deleted, not as an empty file); tick the deleted file instead → the deletion appears in the new commit and not the first
-- [ ] Log refreshes selecting the newly created change
-- [ ] **Global extension no-op check**: open any ordinary diff elsewhere (log → Show Diff, a working-copy file diff) — confirm **no arrows appear** and behavior is identical to before (the arrow overlay is registered as a plugin-wide `diff.DiffExtension`, gated to fire only inside this picker)
+
+- [ ] **Pick Hunks…** opens a dialog titled "Pick Hunks — &lt;filename&gt;" with **three** panes: Before | Existing commit (live) | Moves to New commit (the same identity-first labels as the main dialog, not "Parent"/"Child"). On a freshly-opened **unticked** file the Existing-commit text equals the New-commit pane's and every hunk shows a Before|Existing-commit divider bar with a **right arrow**
+- [ ] Clicking a right arrow flips that hunk's Existing-commit content to Before's text, the Before|Existing-commit bar for that hunk disappears, and a **new** Existing-commit|New-commit bar with a **left arrow** appears in its place. Clicking the left arrow reverses it; this is reversible any number of times, in either direction, independently per hunk
+- [ ] Typing directly into the Existing-commit pane is rejected (view-only; arrow clicks are the only way to change it, so the result is never a hand-edited hybrid)
+- [ ] **Apply** with a mix of moved and unmoved hunks closes the dialog immediately with **no confirmation dialog of any kind** (no "Save changes and mark the conflict resolved anyway?" prompt). The file then shows **half-checked** in the file list and the summary shows "(N partial)", and its tick state is **unchanged** by a partial pick (unticked before means unticked after)
+- [ ] Moving every hunk to the new commit and Apply fully ticks the file (no half-check), same as ticking it directly. Moving none (or reversing back to none) and Apply leaves the file fully ticked or unticked to match its starting state, with no partial override left over
+- [ ] **Cancel** closes immediately with **no confirmation dialog**, and file state (tick plus any prior override) is unchanged. Reopening "Pick Hunks…" on a file with an existing partial selection opens already showing the exact prior split
+- [ ] Split (linear) leaves the new commit with only the hunks left pointing at it and the existing commit with the rest; the log refreshes selecting the newly created change
+- [ ] With a file changed partially and a **second file deleted** in the same change, picking hunks for the first file only and leaving the deletion **unticked** makes the first commit delete the file (log details show it as deleted, not as an empty file); ticking the deleted file instead puts the deletion in the new commit and not the first
+- [ ] Opening any ordinary diff elsewhere (log → Show Diff, a working-copy file diff) shows **no arrows** and behaves as usual (the arrow overlay is a plugin-wide `diff.DiffExtension` gated to fire only inside this picker)
+
+#### Descriptions
+
+- [ ] Both description fields are pre-populated with the source commit's description. Each editor has exactly **one** label above it ("Description for new commit (child of &lt;shortid&gt;)" / "Description for existing commit (&lt;shortid&gt;)" in the default mode), not two stacked lines. "Existing commit" is the same name used for that side everywhere in the dialog (preview pane title, summary line, hunk picker)
+- [ ] The new-commit description field appears **above** the existing-commit field (matching the new commit's position above the source in the log in the default, child mode). Editing the new-commit field updates the new commit; editing the existing-commit field updates the source commit
+- [ ] Both fields are real commit-message editors, not plain text areas: a long subject line is highlighted, misspellings get a spellcheck squiggle, and Enter inserts a newline (GitHub #46)
+
+#### Parallel split
+
+- [ ] Checking "Create parallel commits" switches the ticked-side description label from "Description for new commit (child of &lt;shortid&gt;)" to "Description for new commit (sibling of &lt;shortid&gt;)" and the mode note under "Source" to "The existing commit (&lt;shortid&gt;) keeps its change ID and position; ticked files move to a new commit created beside it. Any existing children become merges of both.", and (when splitting `@`) updates the working-copy note, all **immediately** on toggling, with no separate event needed. The unticked-side label stays "Description for existing commit (&lt;shortid&gt;)". Unchecking reverts the labels and note live to the child wording
+- [ ] In parallel mode a fully-ticked file's preview still shows every hunk ticked and the summary "All hunks move to new commit", unaffected by the mode (the preview always says "new commit", never "child"/"parent")
+- [ ] Splitting in parallel mode a target that has an existing child leaves that child with **two parents** (both new siblings) per `jj log`, i.e. it has become a merge (contract test: `MutatingCommandsContractCliTest` "split --parallel makes an existing child a merge of both new siblings"). Two sibling commits are created, not parent/child
+- [ ] Splitting the working copy itself in parallel mode: the working-copy note ("The working copy (@) moves to the new commit") is accurate, and after splitting `@` is on the new **sibling**, not on the side that kept the original change ID (contract test: "split --parallel on the working copy…")
 
 → automate: jj-idea-ygtw (validation, whole-file fast path, and binary gating below are
 state/routing logic, not rendering)
 
-#### Descriptions
-- [ ] Both description fields are pre-populated with the source commit's description
-- [ ] Each editor has exactly **one** label above it — "Description for new commit (child of
-      &lt;shortid&gt;)" / "Description for existing commit (&lt;shortid&gt;)" in the default mode
-      — not two stacked lines (jj-idea-8khi follow-up: a separate bold identity header plus a
-      near-duplicate plain sub-label like "New commit description" was noisy and repeated the
-      same fact twice)
-- [ ] "Existing commit" is the same name used for this side everywhere else in the dialog —
-      preview pane title, summary line, hunk picker — not a different phrase like the earlier
-      "(keeps change ID)", which read as a mismatched part of speech next to "New commit"
-      (jj-idea-8khi follow-up)
-- [ ] The label does **not** say anything like "(unchanged unless edited)" — considered and
-      dropped: it's implementation detail (whether a follow-up `jj describe` runs) that doesn't
-      change what to do, and the field's own pre-filled text already shows nothing will change
-      unless you touch it
-- [ ] New-commit description field appears **above** the existing-commit field (matching the new commit's position above the source in the log in the default, child mode)
-- [ ] Editing the new-commit description field updates the new commit; editing the existing-commit field updates the source commit
-- [ ] (jj-idea-n3w1, GitHub #46) Both fields are real commit-message editors, not plain text
-      areas: typing a long subject line highlights it, misspellings get a spellcheck squiggle,
-      and Enter inserts a newline rather than doing anything else
+#### Validation, whole-file fast path and binary files
 
-#### Parallel split (jj-idea-8khi, GitHub #101 UX follow-up)
-- [ ] Check "Create parallel commits" → the ticked-side description label switches from
-      "Description for new commit (child of &lt;shortid&gt;)" to "Description for new commit
-      (sibling of &lt;shortid&gt;)"; the unticked-side label stays "Description for existing
-      commit (&lt;shortid&gt;)" — unchanged, since that side's meaning never varies by mode
-- [ ] The mode note under "Source" switches to "The existing commit (&lt;shortid&gt;) keeps its
-      change ID and position; ticked files move to a new commit created beside it. Any existing
-      children become merges of both." — confirm this happens **immediately** on toggling, not
-      just after some other event
-- [ ] With a file already selected in the preview, check "Create parallel commits" → the diff
-      preview's pane titles ("Existing commit"/"New commit") and the summary line below the file
-      tree relabel live too — wait, these two are already mode-invariant text, so nothing changes
-      there; confirm instead that the **description labels**, the **mode note**, and the
-      **working-copy note** (if splitting @) all update immediately, with no separate event
-      needed to trigger the refresh (jj-idea-o6sw's original bug: toggling only updated internal
-      label state, not the already-rendered preview/summary)
-- [ ] In parallel mode, a fully-ticked file's preview still shows every hunk ticked and the
-      summary "All hunks move to new commit" — unaffected by the mode, since the preview always
-      uses the same "new commit" wording (never "child"/"parent", which would wrongly imply a
-      relationship that doesn't exist between siblings)
-- [ ] Uncheck "Create parallel commits" again → description labels, note, preview and summary all revert live
-      to the child wording
-- [ ] **With an existing child of the split target**: split it in parallel mode → via `jj log`,
-      confirm the previously-existing child now has **two parents** (both new siblings) — it's
-      become a merge (verified against real jj 0.44 in
-      `MutatingCommandsContractCliTest`'s "split --parallel makes an existing child a merge of
-      both new siblings" contract test)
-- [ ] **Splitting the working copy itself in parallel mode**: the working-copy note (same text as
-      the default mode's — "The working copy (@) moves to the new commit") is accurate here too;
-      after splitting, confirm `@` is on the new **sibling**, not the side that kept the original
-      change ID (verified in the same contract test file, "split --parallel on the working copy…")
-- [ ] Split → two sibling commits created (not parent/child)
-
-#### Validation
-- [ ] With nothing ticked → OK is disabled with a message to move at least one file to the new commit — same message in every mode (default, parallel, and "Split into New Parent")
-- [ ] With everything ticked (no overrides) → OK is disabled with a message that at least one file must stay here — same message in every mode
-- [ ] With nothing ticked but one file partially picked via "Pick Hunks…" → OK is **enabled**; splitting produces a new commit with just those hunks (GitHub #117)
-
-#### Whole-file fast path
-- [ ] With no partial hunk selection (all files fully ticked or unticked) → split completes via file-level `jj split` (no diff-editor overhead); verify via log that both commits have the expected files
-
-#### Binary / conflicted files
+- [ ] With nothing ticked, OK is disabled with a message to move at least one file to the new commit; with everything ticked (no overrides), OK is disabled with a message that at least one file must stay here. Both messages are the same in every mode (default, parallel, "Split into New Parent")
+- [ ] With nothing ticked but one file partially picked via "Pick Hunks…", OK is **enabled** and splitting produces a new commit with just those hunks (GitHub #117)
+- [ ] With no partial hunk selection (all files fully ticked or unticked), the split completes via file-level `jj split` (no diff-editor overhead); both commits have the expected files in the log
 - [ ] A binary file in the changed list shows no "Pick Hunks…" button (whole-file only)
 
 ### MT-BOOKMARK
@@ -1923,676 +875,197 @@ state/routing logic, not rendering)
 **Bookmark widget**
 
 **Code:** `ui/toolbar/JujutsuBookmarkToolbarWidget.kt`, `ui/statusbar/JujutsuBookmarkStatusBarWidget.kt` + `JujutsuBookmarkStatusBarWidgetFactory.kt`, `actions/bookmark/BookmarkMenu.kt`, `actions/bookmark/`, `actions/bookmark/pushBookmarkAction.kt`, `jj/ClosestBookmarks.kt`, `jj/JjFeature.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt` (Advance Bookmark toolbar button)
-**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button); MT-GIT (push confirmation dialogs triggered from this action); MT-LOG-FILTER (the bookmarks panel's "Filter Log to Bookmark" action); MT-LOG-TABLE (log tab layout — the bookmarks panel adds a splitter); MT-SETTINGS (new persisted per-window panel-visibility state)
+**Also re-run:** MT-LOG-REFRESH (label reactivity relies on the same auto-refresh path); MT-CROSS (multi-repo dropdown structure); MT-WORKINGCOPY (Advance Bookmark toolbar button); MT-GIT (push confirmation dialogs triggered from this action); MT-LOG-FILTER (the bookmarks panel's "Filter Log to Bookmark" action); MT-LOG-TABLE (log tab layout — the bookmarks panel adds a splitter); MT-SETTINGS (persisted per-window panel-visibility state)
 
-As of jj-idea-cpno, the bookmark widget lives in the main IDE toolbar (next to where Git's
-branch widget would sit), not the log window's filter row — this is the location fix for
-GitHub #62. A status-bar fallback (MT-BOOKMARK-STATUSBAR below) takes over when the main
-toolbar itself is hidden or unavailable.
+The bookmark widget lives in the main IDE toolbar (next to where Git's branch widget would sit), not the log window's filter row (GitHub #62). A status-bar fallback takes over when the main toolbar is hidden or unavailable.
 
 #### Single-repo project
 
-- [ ] "\<name\>" label appears in the **main IDE toolbar** (not the log toolbar) when @ has a local bookmark
-- [ ] Settings → Keymap → search "Jujutsu" → **Jujutsu Bookmark** shows that name, not the raw
-      action id `Jujutsu.MainToolbarBookmarks`
-- [ ] `jj new` off a bookmarked change with nothing left ahead of it — label shows "\<name\> +1" (jj-idea-l7wd, GitHub #62), where `<name>` is the nearest ancestor bookmark and `+1` the number of changes since it; label is blank only when @ has no bookmark anywhere in its ancestry
-- [ ] Two bookmarks equally close to @ (e.g. either side of a merge) — label lists both names, comma-separated, before the shared `+N`
-- [ ] Label updates reactively: run `jj bookmark create foo` in the terminal — label changes to "foo" within ~300 ms, without saving a file or restarting (see MT-LOG-REFRESH); `jj new` afterwards updates it to "foo +1" the same way
-- [ ] Click the widget — dropdown opens with "Create Bookmark Here…", then "Advance Bookmark" at the top
-- [ ] Dropdown lists all local bookmarks in the repo (not just those on @, and including bookmarks beyond the log limit), each as a sub-menu
-- [ ] For a bookmark **on @**: sub-menu contains Advance, Rename…, Delete, Forget (no Move Here)
-- [ ] For a bookmark **not on @**: sub-menu contains Move…, Advance, Rename…, Delete, Forget
-- [ ] Remote bookmarks (e.g. `master@origin`) are folded into the corresponding local bookmark's sub-menu as Track/Untrack, not shown as separate top-level items
-- [ ] "Create Bookmark Here…" (enter name → confirm) creates the bookmark at @, label and log
-      decorations update; Rename… renames it in log and label; Delete removes it (label
-      reverts to blank if it was on @); Forget (remote entry) removes remote tracking
-- [ ] jj-idea-rskx: Create/Delete/Forget context-menu items show distinct bookmark-pennant
-      icons (plus/cross/minus overlay), not the platform's generic +/trash/- icons
-- [ ] jj-idea-rskx: a bookmark deleted locally but not yet pushed (`jj bookmark delete X`)
-      shows a dashed/hollow pennant in the log chip (in addition to strikethrough text); a
-      conflicted bookmark (e.g. after a divergent fetch) shows a red forked-tail pennant
-      instead of the generic red warning triangle. Both remain legible at 125%/150% IDE
-      text size and in both Light and Dark themes
-- [ ] The log window's filter row (Root/Reference/Author/Date) no longer shows a Bookmark chip
+- [ ] A "\<name\>" label appears in the **main IDE toolbar** (not the log toolbar) when `@` has a local bookmark. Settings → Keymap → search "Jujutsu" shows **Jujutsu Bookmark** by that name, not the raw action id `Jujutsu.MainToolbarBookmarks`. The log window's filter row (Root/Reference/Author/Date) has no Bookmark chip
+- [ ] After `jj new` off a bookmarked change with nothing left ahead of it, the label shows "\<name\> +1", where `<name>` is the nearest ancestor bookmark and `+1` the number of changes since it (GitHub #62). Two bookmarks equally close to `@` (e.g. either side of a merge) are listed comma-separated before the shared `+N`. The label is blank only when `@` has no bookmark anywhere in its ancestry
+- [ ] The label updates reactively: `jj bookmark create foo` in the terminal changes it to "foo" within ~300 ms, with no file save or restart (see MT-LOG-REFRESH), and a following `jj new` updates it to "foo +1" the same way
+- [ ] Clicking the widget opens a dropdown with "Create Bookmark Here…", then "Advance Bookmark" at the top, then **all** local bookmarks in the repo (not just those on `@`, and including bookmarks beyond the log limit), each as a sub-menu. A bookmark **on `@`** has Advance, Rename…, Delete, Forget (no Move Here); one **not on `@`** has Move…, Advance, Rename…, Delete, Forget. Remote bookmarks (e.g. `master@origin`) are folded into the matching local bookmark's sub-menu as Track/Untrack, not shown as separate top-level items
+- [ ] "Create Bookmark Here…" (enter a name, confirm) creates the bookmark at `@` and the label and log decorations update; Rename… renames it in the log and label; Delete removes it (the label reverts to blank if it was on `@`); Forget (remote entry) removes remote tracking
+- [ ] Create/Delete/Forget menu items show distinct bookmark-pennant icons (plus/cross/minus overlay), not the platform's generic +/trash/- icons. A bookmark deleted locally but not yet pushed (`jj bookmark delete X`) shows a dashed/hollow pennant in the log chip in addition to the strikethrough text, and a conflicted bookmark (e.g. after a divergent fetch) shows a red forked-tail pennant instead of the generic red warning triangle. Both stay legible at 125%/150% IDE text size and in Light and Dark themes
 
 #### Multi-repo project
 
-- [ ] Bookmark widget is present in the main toolbar (not hidden)
-- [ ] Label is blank regardless of which bookmarks exist (the "name +N" fallback only applies to a single-repo project — see jj-idea-1ra9 for the wrong-repo-ancestry bug this must not repeat)
-- [ ] Click the widget — dropdown shows one sub-menu **per repo**, named by repo display name
-- [ ] Each repo sub-menu contains the same structure as the single-repo dropdown: "Create Bookmark Here…", then "Advance Bookmark", then the repo's bookmark sub-menus
-- [ ] "Create Bookmark Here…" inside repo-a's sub-menu creates a bookmark at **repo-a's** working copy, not repo-b's (check via `jj bookmark list` in each repo)
-- [ ] `jj new` past every bookmark in repo-a only (repo-b still has one on @) — repo-a's "Advance Bookmark" is enabled and targets repo-a's nearest bookmark; repo-b's advances repo-b's bookmark, unaffected by repo-a
-- [ ] Rename/Delete/Forget in repo-b's sub-menu affects only repo-b
-- [ ] (jj-idea-kxaa, #146) `jj config set --repo revsets.bookmark-advance-to '@-'`, then Advance a bookmark — it lands on `@-` (not `@`), and the notification reads "Advanced 'name'" with no destination. Unset the config and Advance again — it lands on `@`
+- [ ] The widget is present in the main toolbar, and its label is blank regardless of which bookmarks exist (the "name +N" fallback applies to a single-repo project only; another repo's ancestry must never leak in). Clicking it shows one sub-menu **per repo**, named by repo display name, each with the single-repo structure: "Create Bookmark Here…", "Advance Bookmark", then that repo's bookmark sub-menus
+- [ ] "Create Bookmark Here…" inside repo-a's sub-menu creates the bookmark at **repo-a's** working copy, not repo-b's (check `jj bookmark list` in each). Rename/Delete/Forget in repo-b's sub-menu affects only repo-b
+- [ ] After `jj new` past every bookmark in repo-a only (repo-b still has one on `@`), repo-a's "Advance Bookmark" is enabled and targets repo-a's nearest bookmark, while repo-b's advances repo-b's bookmark, unaffected by repo-a
+- [ ] After `jj config set --repo revsets.bookmark-advance-to '@-'`, advancing a bookmark lands it on `@-` (not `@`) and the notification reads "Advanced 'name'" with no destination; after unsetting the config it lands on `@` (GitHub #146)
 
-#### Status-bar fallback (jj-idea-cpno)
+#### Status-bar fallback
 
 **Code:** `ui/statusbar/JujutsuBookmarkStatusBarWidget.kt`, `JujutsuBookmarkStatusBarWidgetFactory.kt`
 
-- [ ] New UI, Settings → Appearance & Behavior → uncheck "Show main toolbar" → the main-toolbar
-      bookmark widget disappears and an equivalent bookmark widget appears in the status bar
-      (bottom of the IDE window), live, without restarting; re-check the setting → reverses
-- [ ] Switch to Classic UI (no main toolbar exists at all) → the bookmark status-bar widget is
-      present
-- [ ] The status-bar widget shows the same text as the main-toolbar widget would (bookmark on @,
-      or nearest-ancestor "name +N"), and clicking it opens the identical dropdown (Create,
-      Advance, per-bookmark Move/Rename/Delete/Forget/Track)
-- [ ] With the main toolbar visible (New UI default), the bookmark status-bar widget is **not**
-      shown — only the main-toolbar widget is
-- [ ] Non-jj project: neither the main-toolbar widget nor the status-bar fallback appears
-- [ ] jj-idea-0hw4 (GitHub #100): in that non-jj project, run **Jujutsu → Init** — the
-      main-toolbar widget (or its status-bar fallback, per the current toolbar-visibility
-      setting) appears immediately, without restarting the IDE
-- [ ] jj-idea-z5uu (GitHub #95): the status-bar fallback's padding, text colour, hover fill, and
-      pressed fill all match a stock status-bar widget (e.g. the encoding widget) at rest, on
-      hover, and while the mouse button is held down — check in both a light and a dark theme;
-      dark theme hover must go **lighter**, not darker
+- [ ] In the New UI, unchecking Settings → Appearance & Behavior → "Show main toolbar" removes the main-toolbar bookmark widget and shows an equivalent widget in the status bar (bottom of the IDE window), live, without restarting; re-checking reverses it. In the Classic UI (no main toolbar at all) the status-bar widget is present. With the main toolbar visible (New UI default) the status-bar widget is **not** shown
+- [ ] The status-bar widget shows the same text as the main-toolbar widget would (bookmark on `@`, or nearest-ancestor "name +N") and opens the identical dropdown (Create, Advance, per-bookmark Move/Rename/Delete/Forget/Track)
+- [ ] In a non-jj project neither widget appears; running **Jujutsu → Init** there makes the main-toolbar widget (or its status-bar fallback, per the toolbar-visibility setting) appear immediately, without restarting the IDE (GitHub #100)
+- [ ] The status-bar fallback's padding, text colour, hover fill and pressed fill match a stock status-bar widget (e.g. the encoding widget) at rest, on hover and while the mouse button is held down, in both a light and a dark theme; dark-theme hover goes **lighter**, not darker (GitHub #95)
 
-#### Advance Bookmark (jj-idea-l7wd, GitHub #61)
+#### Advance Bookmark (GitHub #61)
 
-- [ ] With exactly one bookmark closest to @: clicking "Advance Bookmark" moves it directly to @, no dialog — confirm via `jj bookmark list` or the updated log decoration
-- [ ] With two+ equidistant closest bookmarks (e.g. `jj new` off a merge of two bookmarked branches): clicking "Advance Bookmark" opens a picker dialog listing all of them, pre-checked; unchecking one and confirming advances only the checked ones
-- [ ] The per-bookmark "Advance …" action (in a bookmark's own sub-menu, or via right-click on its chip in the log) moves that specific bookmark to @ regardless of distance, without opening a picker
-- [ ] Advancing a bookmark that's already at @ is a no-op (no error)
-- [ ] With no bookmark anywhere in @'s ancestry: "Advance Bookmark" is visible but disabled, with a tooltip explaining there's nothing to advance
-- [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one, and Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method (see also MT-WORKINGCOPY's "Version-Gated Feature Upgrade Nudge", jj-idea-sov0, for the startup balloon this same gating also surfaces)
-- [ ] The disabled reason is also appended to the menu item's own text, not just its tooltip (menus don't reliably show tooltips) — e.g. "Advance Bookmark (needs jj 0.39+)" or "Advance 'main' (needs jj 0.39+)"; with no bookmark anywhere in @'s ancestry, "Advance Bookmark (nothing to advance)"
-- [ ] jj-idea-xsa8 (GitHub #61): the same "Advance Bookmark" action is also available as an
-      icon button in the Working Copy tool window's toolbar, alongside New Change/Split/Squash/
-      Abandon/Create Bookmark/Set Tag (see MT-WORKINGCOPY) — clicking it there behaves identically
-      to the bookmark widget's menu item, including the picker for equidistant bookmarks and
-      version gating; switching the bound repository via the panel's dropdown in a multi-root
-      project re-evaluates the button against the newly selected repo
-- [ ] jj-idea-xsa8 follow-up: the tooltip names the actual bookmark(s) it would move rather than
-      generic wording — "Move 'main' forward to the working copy (jj bookmark advance)" for one
-      candidate, "Move 'main', 'feature' forward…" (each name individually quoted) for two+
-      equidistant ones — both from the bookmark widget's menu item and the Working Copy toolbar
-      button
-- [ ] jj-idea-xsa8 follow-up: after a successful advance — **both** the direct single-bookmark
-      path and after confirming the equidistant-candidates picker — a balloon notification
-      appears: "Bookmark Advanced" / "Advanced '\<name\>' to \<shortid\>", where \<shortid\>
-      matches `jj log -r @`'s change id. This is deliberately the *only* one of the Working Copy
-      toolbar's actions with this treatment (see MT-WORKINGCOPY) — advancing is the only one with
-      no dialog on its common path and no other visible effect in that panel
-- [ ] jj-idea-xsa8 follow-up: clicking the Working Copy toolbar's Advance button with exactly one
-      nearest bookmark shows a "Advance Bookmark" Yes/No confirmation naming the bookmark before
-      moving it — Yes advances (and still shows the completion notification above), No/Escape
-      leaves the bookmark untouched. This confirmation is specific to the toolbar's icon button —
-      clicking the same "Advance Bookmark" entry from the bookmark widget's dropdown menu or
-      the log's right-click menu still advances immediately with **no** confirmation, since those
-      are more deliberate two-step clicks than an icon-only toolbar button. The equidistant-
-      candidates picker dialog (multiple close bookmarks) is unaffected either way — it already
-      served as its own confirmation before this change
+- [ ] With exactly one bookmark closest to `@`, "Advance Bookmark" moves it directly to `@` with no dialog (confirm via `jj bookmark list` or the log decoration). With two or more equidistant closest bookmarks (e.g. `jj new` off a merge of two bookmarked branches) it opens a picker listing all of them, pre-checked, and unchecking one advances only the checked ones
+- [ ] The per-bookmark "Advance …" action (in a bookmark's own sub-menu, or via right-click on its chip in the log) moves that specific bookmark to `@` regardless of distance, without a picker. Advancing a bookmark already at `@` is a no-op with no error
+- [ ] With no bookmark anywhere in `@`'s ancestry, "Advance Bookmark" is visible but disabled, with a tooltip explaining there is nothing to advance, and "(nothing to advance)" appended to the item's own text
+- [ ] **Version gating**: with a jj executable below 0.39 configured (Settings → Version Control → Jujutsu → jj executable path), both "Advance Bookmark" and the per-bookmark Advance action are visible but disabled, with a tooltip naming the required version and your current one. The reason is also appended to the item's text, since menus don't reliably show tooltips (e.g. "Advance Bookmark (needs jj 0.39+)", "Advance 'main' (needs jj 0.39+)"). Settings → Version Control → Jujutsu → Install/Upgrade shows the correct upgrade command for your detected install method (see also MT-WORKINGCOPY "Version-Gated Feature Upgrade Nudge" for the startup balloon this gating also surfaces)
+- [ ] The Working Copy tool window's toolbar has an **Advance Bookmark** icon button alongside New Change/Split/Squash/Abandon/Create Bookmark/Set Tag (see MT-WORKINGCOPY) that behaves like the widget's menu item, including the picker for equidistant bookmarks and version gating; switching the bound repository via the panel's dropdown in a multi-root project re-evaluates the button against the newly selected repo (GitHub #61)
+- [ ] The tooltip names the actual bookmark(s) it would move: "Move 'main' forward to the working copy (jj bookmark advance)" for one candidate, "Move 'main', 'feature' forward…" (each name individually quoted) for two or more, from both the widget's menu item and the Working Copy toolbar button
+- [ ] After a successful advance (the direct single-bookmark path **and** after confirming the picker), a balloon reads "Bookmark Advanced" / "Advanced '\<name\>' to \<shortid\>", where \<shortid\> matches `jj log -r @`'s change id. This is deliberately the *only* Working Copy toolbar action with this treatment, since it has no dialog on its common path and no other visible effect in that panel
+- [ ] The Working Copy toolbar's Advance button with exactly one nearest bookmark first shows an "Advance Bookmark" Yes/No confirmation naming the bookmark: Yes advances (and shows the balloon above), No/Escape leaves the bookmark untouched. The same entry from the widget's dropdown or the log's right-click menu advances immediately with **no** confirmation (more deliberate two-step clicks than an icon-only button). The equidistant-candidates picker is its own confirmation
 
 #### Move direction (forward / backward-sideways / resolve)
 
-Covers `actions/bookmark/MoveBookmarkDialog.kt`, `MoveBookmarkToChangeDialog.kt`,
-`BookmarkClassifier.kt`. jj-idea-tvch: in a repo with any divergent change, every move used to
-be misclassified as backward/sideways.
+Covers `actions/bookmark/MoveBookmarkDialog.kt`, `MoveBookmarkToChangeDialog.kt`, `BookmarkClassifier.kt`.
 
-- [ ] Right-click a commit that is a **descendant** of an existing bookmark → "Move Bookmark
-      Here…" → the bookmark row shows the forward (move-up) icon at full opacity, is selectable,
-      and OK enables **without** ticking "Allow backward or sideways move"
-- [ ] Right-click an **ancestor** of the bookmark instead → the bookmark row is greyed out with
-      the warning icon and is only selectable after ticking the checkbox; confirming without the
-      checkbox is impossible (OK stays disabled)
-- [ ] Right-click a bookmark → "Move '\<bookmark\>' to Change…" → descendants of the bookmark's
-      current position show as forward/selectable; ancestors are greyed with the warning icon
-      until the checkbox is ticked
-- [ ] In a repo containing a divergent change (`jj log` shows `(divergent)` on some commit): the
-      forward/backward classification above still works for bookmarks unrelated to the divergent
-      change — it doesn't blank out to "everything backward" the way it did before jj-idea-tvch
-- [ ] Confirming a forward move without ticking the checkbox actually runs `jj bookmark set`
-      without `-B` (check via `jj op log` or that the bookmark moved) — no unexpected
-      "backwards or sideways" retry prompt
-- [ ] jj-idea-499t: confirming a move from **both** dialogs shows an undo balloon reading "Move
-      bookmark"; clicking Undo puts the bookmark back where it was. "Move Bookmark Here…" already
-      had this; "Move '\<bookmark\>' to Change…" did not — it moved the bookmark with no balloon
-      and no undo support at all
+**Divergent-bookmark recipe** (also used by the Bookmarks panel below): create the bookmark on a **third** revision, a common ancestor of the two you are about to diverge it to. If it already targets `<rev-a>` when you capture `$OP`, the first `set` is a no-op ("Nothing changed."), jj records no operation, and nothing diverges.
 
-**jj-idea-t7cz (GitHub #121): resolving a divergent bookmark back onto one of its own targets.**
-Build a divergent bookmark with the `conflicted-bm` recipe in the "Bookmarks panel" subsection's
-jj-idea-5r0g item, below.
+```sh
+jj bookmark create conflicted-bm -r <common-ancestor-rev>
+OP=$(jj op log --no-graph --limit 1 -T 'id.short()')
+jj bookmark set conflicted-bm -r <rev-a> --allow-backwards --at-op "$OP"
+jj bookmark set conflicted-bm -r <rev-b> --allow-backwards --at-op "$OP"
+```
 
-- [ ] Right-click `<rev-a>` (one of `conflicted-bm`'s two targets) → "Move Bookmark Here…" →
-      `conflicted-bm` now appears (it used to be silently excluded when `<rev-a>` happened to be
-      jj's *first* `added_targets` entry), under a **"Resolve conflict"** section header, with the
-      red conflict glyph instead of the forward/backward icon, at full opacity, and OK enables
-      **without** ticking "Allow backward or sideways move". Confirm → `jj bookmark list` shows a
-      single target
-- [ ] Repeat right-clicking `<rev-b>` (the other target, after re-diverging) → same behaviour —
-      this row was already reachable before this change, but was labelled/greyed as an ordinary
-      backward move; it must now read as a resolve too
-- [ ] Right-click `conflicted-bm` itself → "Move 'conflicted-bm' to Change…" → both `<rev-a>` and
-      `<rev-b>` appear together under **"Resolve conflict (bookmark is divergent)"**; every other
-      commit sits under Backward/Sideways behind the checkbox, none under Forward (a conflicted
-      bookmark never classifies FORWARD)
-- [ ] Regression: a **non-divergent** bookmark's own current change is still absent from both
-      dialogs (plain no-op exclusion unaffected), and forward/backward sectioning for ordinary
-      moves is unchanged
+`jj bookmark list` should print `conflicted-bm (conflicted):` with two `+` targets (`<rev-a>` and `<rev-b>`) before you check anything.
 
-#### Per-bookmark push (jj-idea-t29z, GitHub #81)
+- [ ] Right-clicking a commit that is a **descendant** of an existing bookmark → "Move Bookmark Here…" shows the bookmark row with the forward (move-up) icon at full opacity, selectable, and OK enables **without** ticking "Allow backward or sideways move". Right-clicking an **ancestor** instead greys the row out with the warning icon, selectable only after ticking the checkbox (OK stays disabled otherwise)
+- [ ] Right-clicking a bookmark → "Move '\<bookmark\>' to Change…" shows descendants of the bookmark's current position as forward/selectable and ancestors greyed with the warning icon until the checkbox is ticked
+- [ ] In a repo containing a divergent change (`jj log` shows `(divergent)` on some commit), the forward/backward classification above still works for bookmarks unrelated to the divergent change, and does not blank out to "everything backward". Confirming a forward move without the checkbox runs `jj bookmark set` without `-B` (check `jj op log`), with no "backwards or sideways" retry prompt
+- [ ] Confirming a move from **both** dialogs shows an undo balloon reading "Move bookmark", and Undo puts the bookmark back where it was
+- [ ] Resolving a divergent bookmark onto one of its own targets (GitHub #121; use the recipe): right-clicking `<rev-a>` → "Move Bookmark Here…" lists `conflicted-bm` under a **"Resolve conflict"** section header, with the red conflict glyph instead of the forward/backward icon, at full opacity, and OK enables **without** ticking "Allow backward or sideways move"; confirming leaves a single target in `jj bookmark list`. Right-clicking `<rev-b>` (after re-diverging) behaves the same, reading as a resolve rather than an ordinary backward move
+- [ ] Right-clicking `conflicted-bm` itself → "Move 'conflicted-bm' to Change…" lists both `<rev-a>` and `<rev-b>` together under **"Resolve conflict (bookmark is divergent)"**; every other commit sits under Backward/Sideways behind the checkbox and none under Forward (a conflicted bookmark never classifies FORWARD). A **non-divergent** bookmark's own current change is still absent from both dialogs, and ordinary forward/backward sectioning is unchanged
 
-`pushBookmarkAction` opens the same Push dialog as MT-GIT, pre-selected to "Specific bookmark"
-scope with this bookmark (and the chosen remote) already selected — skipping the repo/remote/
-bookmark selection clicks a fresh dialog needs, while still requiring an OK click before
-anything is pushed (pushing mutates a shared remote, so this is deliberately not a one-click
-fire-and-forget action). Reachable from every surface that shows a bookmark's other actions
-(Rename…, Delete, Forget): the bookmark's own sub-menu in this widget, the log row's Bookmark
-submenu, and a right-click on the bookmark's chip in the log.
+#### Pushing a bookmark (GitHub #81)
 
-Whether there's anything to push is evaluated **per remote**, using that remote's own
-`name@remote` tracking entry — deliberately not the local bookmark's own aggregate ahead/behind
-count, which in a **colocated** repo (this plugin always colocates) is always `0` because jj
-auto-tracks a same-commit `@git` remote alongside any real ones. Getting this wrong makes every
-bookmark look permanently up to date; the checks below exist specifically to catch that.
+`pushBookmarkAction` opens the same Push dialog as MT-GIT, pre-selected to "Specific bookmark" scope with this bookmark (and the chosen remote) already selected, but still requires an OK click before anything is pushed (pushing mutates a shared remote). It is reachable wherever a bookmark's other actions (Rename…, Delete, Forget) are: its sub-menu in this widget, the log row's Bookmark submenu, and a right-click on its chip in the log.
 
-Setup: a repository with a local bookmark tracked against exactly one Git remote, and — for the
-multi-remote cases — a second Git remote configured (`jj git remote add <name> <url>`). The
-`/tmp/jj-idea-push-test` scratch repo (see jj-idea-ehki's fix) already has all three states set
-up: `main` (tracked, in sync on both remotes), `feature` (pending deletion, still present on
-both remotes), `new-thing` (never tracked anywhere).
+Whether there is anything to push is evaluated **per remote**, using that remote's own `name@remote` tracking entry, deliberately not the local bookmark's aggregate ahead/behind count, which in a **colocated** repo (this plugin always colocates) is always `0` because jj auto-tracks a same-commit `@git` remote alongside any real ones. Getting this wrong makes every bookmark look permanently up to date; the checks below exist to catch that.
 
-- [ ] Right-click a bookmark's chip in the log (or open its sub-menu from this widget) → a Push
-  entry appears alongside Rename…/Delete/Forget, with the same push icon as the toolbar Push
-  action
-- [ ] With exactly one Git remote: a single "Push '\<name\>' to \<remote\>..." entry, not a
-  submenu; clicking it opens the Push dialog with "Specific bookmark" scope, this bookmark, and
-  this remote already selected — confirming with OK is enough
-- [ ] With two or more Git remotes: the entry becomes a "Push '\<name\>' to ▸" submenu, one item
-  per remote, each independently labelled/enabled (see below) — clicking one opens the dialog
-  pre-selected to that specific remote
-- [ ] A bookmark that's up to date on `origin` (`main@origin` at the same commit as local `main`)
-  shows that remote's entry **disabled**, with "(up to date)" appended to the text (a disabled
-  item's tooltip alone is easy to miss in a menu) — **even though** the same bookmark is also
-  tracked by the automatic colocated `@git` remote at the same commit as local (this is the
-  actual regression case: confirm it stays disabled, not "always enabled because @git matches")
-- [ ] The same bookmark, if ahead on a second remote (`main@github` behind local `main`), shows
-  **that** remote's entry enabled while `origin`'s stays disabled — the two are evaluated
-  independently
-- [ ] A bookmark that has never been tracked/pushed to a given remote still shows an **enabled**
-  entry for it despite having nothing to compare against yet — opening it and confirming creates
-  it on that remote (with the usual "will create a new remote bookmark" confirmation from MT-GIT)
-- [ ] Cancelling the pre-populated dialog performs no push
-- [ ] (jj-idea-ehki) On a pending-deletion bookmark (`jj bookmark delete <name>`, still shown
-  strikethrough in the log) that's still present on a remote: that remote's entry is **enabled**
-  (deletions don't show up in `aheadCount`) and opens the dialog with `<name> (deleted)`
-  pre-selected; confirming runs the same "will be deleted from the remote" warning as MT-GIT,
-  then removes the bookmark from that remote. A remote the deletion has already been pushed to
-  (or that never had the bookmark) shows its entry **disabled**
+Setup: a repository with a local bookmark tracked against exactly one Git remote and, for the multi-remote cases, a second remote (`jj git remote add <name> <url>`). The `/tmp/jj-idea-push-test` scratch repo has all three states: `main` (tracked, in sync on both remotes), `feature` (pending deletion, still present on both remotes), `new-thing` (never tracked anywhere).
 
-#### Push to all tracking remotes (jj-idea-ndzp)
+- [ ] Right-clicking a bookmark's chip (or opening its sub-menu from this widget) shows a Push entry alongside Rename…/Delete/Forget, with the same push icon as the toolbar Push action. With exactly one Git remote it is a single "Push '\<name\>' to \<remote\>..." entry (not a submenu); clicking it opens the Push dialog with "Specific bookmark" scope, this bookmark and this remote already selected, so OK is enough. Cancelling the pre-populated dialog pushes nothing
+- [ ] With two or more remotes the entry becomes a "Push '\<name\>' to ▸" submenu with one item per remote, each independently labelled and enabled, and a leading "Push '\<name\>' to all remotes" entry plus a separator. The "all remotes" entry skips the Push dialog and goes straight to a dry-run push per remote that has something to push, so the usual force-push / deletion / untracked-bookmark confirmations still fire, one per affected remote. With one remote there is no "all remotes" entry
+- [ ] A bookmark up to date on `origin` (`main@origin` at the same commit as local `main`) shows that remote's entry **disabled** with "(up to date)" appended, **even though** the same bookmark is also tracked by the colocated `@git` remote at the same commit (the regression case: it must not become "always enabled because `@git` matches"). If it is ahead on a second remote (`main@github` behind local `main`), **that** remote's entry is enabled while `origin`'s stays disabled
+- [ ] A bookmark never tracked or pushed to a given remote still shows an **enabled** entry for it despite having nothing to compare against; confirming creates it there with the usual "will create a new remote bookmark" confirmation from MT-GIT
+- [ ] "All remotes": a bookmark up to date everywhere shows the entry **disabled** with "(up to date)"; one ahead on only one of several remotes shows it **enabled** and pushes only that remote (verify via `jj git remote list`/the remote's log), silently skipping the up-to-date one; one moved backwards/sideways on a remote it would push to shows the same force-push confirmation as a per-remote push, scoped to that remote
+- [ ] A pending-deletion bookmark (`jj bookmark delete <name>`, still shown strikethrough in the log) that is still present on a remote shows that remote's entry **enabled** (deletions don't show up in `aheadCount`) and opens the dialog with `<name> (deleted)` pre-selected; confirming shows the same "will be deleted from the remote" warning as MT-GIT, then removes the bookmark from that remote. A remote the deletion was already pushed to (or that never had the bookmark) shows its entry **disabled**
 
-With two or more Git remotes, the submenu above gains a leading "Push '\<name\>' to all remotes"
-entry plus a separator, ahead of the per-remote entries. Unlike the per-remote entries, this one
-skips the Push dialog entirely — it goes straight to a dry-run push per remote that has
-something to push, so the usual force-push/deletion/untracked-bookmark confirmations still fire,
-one per affected remote.
+#### Bookmarks panel (GitHub #48)
 
-- [ ] With exactly one Git remote, no "all remotes" entry appears — just the single per-remote
-  entry as before
-- [ ] With two or more remotes, "Push '\<name\>' to all remotes" appears first, followed by a
-  separator, then the per-remote entries unchanged
-- [ ] A bookmark up to date on every remote shows the "all remotes" entry **disabled**, with
-  "(up to date)" appended
-- [ ] A bookmark ahead on only one of several remotes shows the entry **enabled**; clicking it
-  pushes only that remote (verify via `jj git remote list`/the remote's log) — the up-to-date
-  remote is silently skipped, not redundantly pushed
-- [ ] A bookmark moved backwards/sideways on a remote it would push to: clicking "all remotes"
-  still shows the same force-push confirmation as a per-remote push, scoped to that one remote
+**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarkNodeTooltip.kt`, `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`, `localBookmarkTemplate`, `remoteBookmarkTemplate`), `jj/BookmarkDivergence.kt` (`withDerivedDivergence`), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`), `ui/log/UnifiedJujutsuLogDataLoader.kt` (`enrichBookmarks`), `jj/ClosestBookmarks.kt` (`danglingHeads`)
+**Also re-run:** MT-LOG-TABLE, MT-LOG-DETAILS (the commit-row tooltip and details panel also show a dangling-head's "N commits ahead of..." status, via `ui/log/JujutsuGraphAndDescriptionRenderer.kt`/`ui/log/JujutsuCommitDetailsPanel.kt` reading `JujutsuStateModel.danglingHeads`)
 
-#### Bookmarks panel (jj-idea-b2ae, GitHub #48)
+A tree of bookmarks/tags to the left of the log table in the Jujutsu log tab, modelled on git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A narrow always-visible strip with a bookmark icon sits at the far left, outside the panel's own splitter; clicking it toggles the panel even while collapsed, so something is always on screen to bring it back. Plain selection does nothing; right-click for actions.
 
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanel.kt`, `ui/log/bookmarks/BookmarkTreeModel.kt`, `ui/log/bookmarks/BookmarkNodeTooltip.kt` (jj-idea-uyu9), `ui/log/bookmarks/BookmarksStripeButton.kt`, `actions/bookmark/bookmarkLogActions.kt`, `actions/bookmark/deleteBookmarkAction.kt`, `actions/bookmark/forgetBookmarkAction.kt`, `actions/bookmark/renameBookmarkAction.kt`, `actions/bookmark/advanceBookmarkAction.kt`, `actions/bookmark/toggleTrackBookmarkAction.kt`, `actions/bookmark/pushBookmarkAction.kt` (registered, keymap-assignable counterparts, jj-idea-ib1i), `actions/EnterBoundAction.kt`, `actions/JujutsuDataKeys.kt` (`BOOKMARK_TARGET`/`BOOKMARK_TARGETS`), `ui/common/CommitTablePanel.kt` (`installLeftComponent`), `settings/LogWindowConfig.kt` (`bookmarkNodeExpanded`), `jj/cli/CliLogService.kt` (`bookmarkListTemplate`, `localBookmarkTemplate`, `remoteBookmarkTemplate`), `jj/BookmarkDivergence.kt` (`withDerivedDivergence`, jj-idea-ks5k/j58e), `jj/Revset.kt` (`Bookmark.withDivergenceFrom`), `ui/log/UnifiedJujutsuLogDataLoader.kt` (`enrichBookmarks`), `jj/ClosestBookmarks.kt` (`danglingHeads`, jj-idea-lig7)
-**Also re-run:** MT-LOG-TABLE, MT-LOG-DETAILS (jj-idea-uyu9 follow-up: the commit-row tooltip and
-details panel now also show a dangling-head's "N commits ahead of..." status, via
-`ui/log/JujutsuGraphAndDescriptionRenderer.kt`/`ui/log/JujutsuCommitDetailsPanel.kt` reading
-`JujutsuStateModel.danglingHeads`)
+- [ ] The panel starts expanded on a fresh log tab. Clicking the bookmark-icon strip collapses it while the strip stays visible (tooltip switches to "Expand Bookmarks Panel"), and clicking again re-expands. "Show Bookmarks Panel" in the toolbar's View Options popup (below the Details Position toggles) reflects and controls the same state, and the expanded/collapsed state is restored per log window after an IDE restart
+- [ ] With bookmarks `feature/A`, `feature/B`, `fix/C`, a "Local" group contains a `feature` group (with `A`, `B`) and `fix` (with `C`), not three flat entries. A tracked `main@origin` appears under an `origin` group, `/`-grouped the same way, and tags appear under their own "Tags" group, also `/`-grouped
+- [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main" or "main +3"); creating or deleting a bookmark updates both together. Its label is bookmark-coloured followed by a bold "@" glyph in the log's own working-copy colour (compare side by side with the "@" the log table appends after a working-copy row's chips)
+- [ ] Local/remote bookmark leaves and their "Local"/remote-name folder groups render in the same brownish colour as bookmark chips in the log table, and tag leaves and the "Tags" group in the same greenish colour as tag chips. A bookmark sitting on `@` renders **bold** (still bookmark-coloured)
+- [ ] In a **colocated** repo no `git` group appears among the remote groups (only real remotes such as `origin`/`github`), and a bookmark tracked by both `@git` and a real remote still appears correctly under the real remote
+- [ ] An **untracked** remote bookmark shows the untracked icon (not the tracked one), and right-clicking it offers **Track**, not Untrack. A bookmark ahead/behind its remote shows `↑n`/`↓m` on its leaf, including a **local** bookmark ahead of its tracked remote on its own leaf under Local (advance the local bookmark past its remote with `jj bookmark set <name> -r <newer-rev>` without pushing, and confirm the Local leaf picks up `↑1`; GitHub #110)
+- [ ] A conflicted/divergent local bookmark (use the recipe in "Move direction") still appears under Local with the same red conflict icon the log table shows for it, as a **single** Local node (not two). Its right-click actions are unaffected, except Move Bookmark Here…/Move '\<bookmark\>' to Change…, whose own divergent-resolve behaviour is covered under "Move direction"; every target is reachable by drag. Side by side with the log table, its `↑n`/`↓m` on the Local leaf are **identical** in both and read as the counts a non-divergent bookmark sitting at `<rev-a>` would show relative to `<rev-b>` (real bidirectional divergence, not jj's one-directional `tracking_ahead_count`/`tracking_behind_count` hint)
+- [ ] With `[remotes.origin] auto-track-created-bookmarks = "*"` set (`jj config edit --repo`), a brand-new local bookmark that is not pushed shows no arrow or number on its Local leaf or its `@origin` leaf, collapsed or expanded, in either the panel or the log (the "↑1000+" bug repro), while a normal ahead/behind bookmark elsewhere in the repo is unaffected
+- [ ] With a tracked bookmark whose remote moves outside the IDE (e.g. `git fetch` in a colocated repo, or a push from another clone then `jj git fetch` in a terminal), clicking the log toolbar's Refresh **once** updates its `↑n`/`↓m` in the bookmarks panel **and** on the log table's chip, without a second Refresh (GitHub #128)
+- [ ] Renaming/creating/deleting a bookmark in the terminal updates the tree reactively, without a manual refresh (the auto-refresh path from MT-LOG-REFRESH). In a multi-repo project there is one top-level group per repository (with its icon), each with its own Local/remote/Tags structure; a single-repo project has no such wrapper level. Typing while the tree has focus speed-searches (jumps to or filters matching names)
+- [ ] With 2+ real remotes each remote group starts **collapsed** while "Local" and "Tags" start expanded. Manually collapsing "Local" and expanding a remote group persists across an IDE restart (or closing and reopening the log tab), per log window. The panel's toolbar **Expand All** / **Collapse All** buttons expand or collapse every group at once (including remote groups) and persist the same way
+- [ ] A collapsed remote group containing an ahead/behind or untracked bookmark shows a roll-up `↑n`/`↓m` (or a plain dot if only untracked) on its own row, in the same divergence colour as the leaf chips; expanding the group hides the roll-up and shows the per-bookmark indicators instead
 
-A tree of bookmarks/tags to the left of the log table, in the Jujutsu log tab — modelled on
-git4idea's Branches dashboard. Expanded by default (matching the root gutter's default). A
-narrow always-visible strip with a bookmark icon sits at the far left, outside the panel's own
-splitter — clicking it toggles the panel even while collapsed, so there's always something on
-screen to bring it back; the same toggle also lives in the toolbar's View Options popup. Plain
-selection does nothing; right-click for actions.
+Actions:
 
-- [ ] Panel starts expanded on a fresh log tab
-- [ ] Clicking the bookmark-icon strip at the far left collapses the panel; the strip itself
-  stays visible (tooltip switches to "Expand Bookmarks Panel") and clicking it again re-expands
-- [ ] "Show Bookmarks Panel" in the toolbar's View Options popup (below the Details Position
-  toggles) reflects and controls the same state as the strip
-- [ ] With bookmarks `feature/A`, `feature/B`, `fix/C`: a "Local" group contains a `feature`
-  group (with `A`, `B` underneath) and `fix` (with `C` underneath) — not three flat top-level
-  entries
-- [ ] A tracked `main@origin` appears under an `origin` group, itself `/`-grouped the same way
-- [ ] jj-idea-j0zv: in a **colocated** repo, no `git` group appears among the remote groups (only
-  real remotes like `origin`/`github`) — a bookmark tracked by both `@git` and a real remote still
-  appears correctly under the real remote
-- [ ] jj-idea-ita2: an **untracked** remote bookmark shows the untracked icon (not the tracked
-  one), and right-clicking it offers **Track**, not Untrack; a bookmark ahead/behind its remote
-  shows `↑n`/`↓m` on its leaf
-- [ ] jj-idea-we1n (GitHub #110): a **local** bookmark ahead of its tracked remote also shows
-  `↑n`/`↓m` on its own leaf under Local (not just on the `@origin` leaf) — advance the local
-  bookmark past its remote (e.g. `jj bookmark set <name> -r <newer-rev>` without pushing) and
-  confirm the Local leaf picks up `↑1`
-- [ ] jj-idea-5r0g (GitHub #110): a conflicted/divergent local bookmark still appears under Local
-  with the same red conflict icon the log table shows for it, instead of disappearing from the
-  panel. To force a conflict in a sandbox repo, create the bookmark on a **third** revision — a
-  common ancestor of the two you're about to diverge it to, not either one of them itself (if the
-  bookmark already targets `<rev-a>` when you capture `$OP`, the first `set` below is a no-op —
-  "Nothing changed." — and jj never records it as a real operation, so there's nothing for the
-  second `set` to diverge from and no conflict results):
-  ```sh
-  jj bookmark create conflicted-bm -r <common-ancestor-rev>
-  OP=$(jj op log --no-graph --limit 1 -T 'id.short()')
-  jj bookmark set conflicted-bm -r <rev-a> --allow-backwards --at-op "$OP"
-  jj bookmark set conflicted-bm -r <rev-b> --allow-backwards --at-op "$OP"
-  ```
-  `jj bookmark list` should print `conflicted-bm (conflicted):` with two `+` targets (`<rev-a>`
-  and `<rev-b>`) before you check the panel.
-- [ ] jj-idea-bico: `conflicted-bm` still renders as a **single** Local node (not two), and the
-  panel's right-click context-menu actions on it are unaffected by this change *except* Move
-  Bookmark Here…/Move '\<bookmark\>' to Change… - jj-idea-bico only made every target reachable
-  *by drag*, it doesn't split the node; the two move dialogs' own divergent-resolve behavior is
-  covered separately by MT-BOOKMARK's "Move direction" jj-idea-t7cz item, above
-- [ ] jj-idea-ks5k (GitHub #110): with `conflicted-bm` from the recipe above still in place, open
-  the bookmarks panel **and** the log table side by side — `conflicted-bm`'s `↑n`/`↓m` on its
-  Local leaf must be **identical** in both, and must read as the counts a non-divergent bookmark
-  sitting at `<rev-a>` would show relative to `<rev-b>` (i.e. real bidirectional divergence, not
-  jj's own one-directional `tracking_ahead_count`/`tracking_behind_count` hint — panel and log
-  used to disagree here, and the log showed nothing at all for a local bookmark's own divergence)
-- [ ] jj-idea-j58e (GitHub #110): with `[remotes.origin] auto-track-created-bookmarks = "*"` set
-  in `jj config edit --repo` (or equivalent), create a brand-new local bookmark and don't push it
-  — neither the new bookmark's Local leaf nor its `@origin` leaf shows an arrow or a number,
-  collapsed or expanded, in either the panel or the log (this is the reporter's own repro of the
-  "↑1000+" bug); a normal ahead/behind bookmark elsewhere in the same repo is unaffected
-- [ ] jj-idea-dii4 (GitHub #128): with a tracked bookmark whose remote moves outside the IDE
-  (e.g. `git fetch` in a colocated repo, or push from another clone then `jj git fetch` in a
-  terminal), click the log toolbar's Refresh **once** — the bookmark's `↑n`/`↓m` updates in the
-  bookmarks panel **and** on the log table's chip, without a second Refresh
-- [ ] Tags appear under their own "Tags" group, also `/`-grouped
-- [ ] An "@" node at the top shows the same text as the main-toolbar bookmark widget (e.g. "main"
-  or "main +3") — create/delete a bookmark and confirm both update together
-- [ ] The "@" node's label is bookmark-coloured, followed by a bold "@" glyph in the log's own
-  working-copy colour (same colour as the "@" the log table appends after a working-copy row's
-  bookmarks/tags — compare side by side)
-- [ ] Local/remote bookmark leaves, and their "Local"/remote-name folder groups, render in the
-  same brownish colour as bookmark chips in the log table
-- [ ] Tag leaves, and the "Tags" folder group, render in the same greenish colour as tag chips in
-  the log table
-- [ ] A bookmark sitting on `@` renders **bold** (still bookmark-coloured) in the tree
-- [ ] Right-click a local bookmark → same actions as its dropdown sub-menu (Move…/Advance/
-  Rename…/Delete/Forget, minus Move… when it's on @), plus "Filter Log to Bookmark" and
-  "Navigate Log to Bookmark" at the bottom
-- [ ] "Filter Log to Bookmark" narrows the log the same way the reference filter does
-- [ ] "Navigate Log to Bookmark" scrolls/selects that bookmark's change, including one outside
-  the currently loaded log window (triggers an expanding load, same as clicking a bookmark chip)
-- [ ] Right-click a remote bookmark → Track/Untrack, plus Filter/Navigate
-- [ ] Right-click a tag → Delete, plus Navigate (no Filter — tags aren't a log filter reference
-  here), plus New Change/Edit/Rebase/Duplicate the same as a bookmark row (jj-idea-p35f follow-up)
-- [ ] Right-click the "@" node → Create Bookmark Here…, Advance Bookmark
-- [ ] With an issue-tracker pattern configured (Settings → Version Control → Issue Navigation) and
-  a bookmark named e.g. `JIRA-123-fix-thing`: the `JIRA-123` portion of its label renders as a
-  link (same styling as the log table/description) while the rest of the name doesn't; hovering it
-  shows a hand cursor and clicking opens the configured issue URL in a browser. Same for a tag
-  named the same way, and for the "@" node when the bookmark on `@` has such a name
-- [ ] Clicking elsewhere on a linked bookmark's row (its icon, or non-linked text) does not open a
-  browser — only the linked portion is clickable
-- [ ] Renaming/creating/deleting a bookmark in the terminal updates the tree reactively, without
-  a manual refresh (same auto-refresh path as MT-LOG-REFRESH)
-- [ ] Multi-repo project: one top-level group per repository (with its icon), each containing its
-  own Local/remote/Tags structure; single-repo project has no such wrapper level
-- [ ] Type while the tree has focus — speed search jumps to/filters matching bookmark names
-- [ ] Restart the IDE — the panel's expanded/collapsed state is restored per log window
-- [ ] jj-idea-a7a7: with 2+ real remotes, each remote group starts **collapsed**; "Local" and
-  "Tags" start expanded, as before
-- [ ] jj-idea-a7a7: manually collapse "Local" and expand a remote group — restart the IDE (or
-  close/reopen the log tab) — both the manual collapse and the manual expand persist, per log
-  window (a second log window with a different layout is unaffected)
-- [ ] jj-idea-a7a7: with a remote group collapsed and one of its bookmarks ahead/behind or
-  untracked, the group's own row shows a roll-up `↑n`/`↓m` (or a plain dot if only untracked)
-  in the same divergence colour as the leaf chips; expanding the group hides the roll-up and
-  shows the normal per-bookmark indicators instead
-- [ ] jj-idea-a7a7: the panel's toolbar has **Expand All** / **Collapse All** buttons that expand
-  or collapse every group at once (including remote groups), and both toggles persist the same
-  way manual clicks do
-- [ ] jj-idea-ib1i (GitHub #48 split 1/3): Settings → Keymap → search "Jujutsu" — Navigate to
-  Bookmark's Change, Filter Log to Bookmark, Delete/Forget/Rename/Advance/Push Bookmark to All
-  Remotes, and Track/Untrack Bookmark all appear and can be rebound
-- [ ] jj-idea-ib1i: right-clicking a bookmark row's actions (Delete/Forget/Rename/Advance/Push to
-  all remotes/Track-Untrack) show a keymap shortcut hint next to any that have been bound, the
-  same way New Change/Edit/Rebase do in the log
-- [ ] jj-idea-ib1i: double-clicking a bookmark row navigates the log to that bookmark's change
-  (same as "Navigate Log to Bookmark"); rebind Enter in Keymap settings to a different bound
-  action and confirm double-click follows the new binding
-- [ ] jj-idea-ib1i: double-clicking the linked portion of a bookmark name (issue-tracker pattern
-  configured) still opens the browser, not the Enter-bound action
-- [ ] jj-idea-ib1i: Ctrl+Click to select two bookmark rows, then right-click **inside** that
-  selection — the multi-selection is preserved (not collapsed to the row under the cursor)
-- [ ] jj-idea-p35f (GitHub #48 split 2/3): right-click a local or remote bookmark row — New
-  Change, New Change..., Edit Change, Rebase, and Duplicate all appear alongside the existing
-  bookmark actions, reusing the same New Change/Edit/Rebase instances as the log toolbar
-  (shortcut hints included)
-- [ ] jj-idea-p35f: Ctrl+Click two bookmark rows whose changes are both loaded in the log, then
-  "New Change From These" — creates a merge change with both as parents
-- [ ] jj-idea-6haf: select a bookmark or tag whose change is **not** in the currently loaded log
-  window (e.g. a far-back bookmark in a filtered/paginated log) and right-click — New
-  Change/Edit/Rebase/Duplicate are present and act on that bookmark's change (the menu may open a
-  moment late while it is fetched); an immutable target still has Edit/Rebase disabled. A hidden
-  (amended-away) remote target still offers none of them
-- [ ] jj-idea-lig7 (GitHub #107): `jj new` off a bookmarked change, twice, without moving the
-  bookmark (leaving two unbookmarked heads) — an "Unbookmarked heads" group appears right after
-  the "@" node and before "Local", listing both, each as "\<closest bookmark\> +n \<change id\>"
-  (bookmark-coloured label, change id in the log's own bold-prefix/grey-remainder style)
-- [ ] jj-idea-lig7: a dangling head with no ancestor bookmark at all (e.g. a root-adjacent
-  disconnected change) shows "(no bookmark) \<change id\>" instead of a `+n` count
-- [ ] jj-idea-lig7: `jj bookmark set \<name\> -r \<that head\>` in the terminal — the row
-  disappears from "Unbookmarked heads" after the auto-refresh, without a manual refresh
-- [ ] jj-idea-lig7: double-clicking an unbookmarked-head row scrolls/selects that change in the
-  log, including one outside the currently loaded window (same expanding-load behavior as
-  "Navigate Log to Bookmark") — this works even though the row has no bookmark to publish as
-  `BOOKMARK_TARGET`
-- [ ] jj-idea-lig7: right-clicking an unbookmarked-head row offers "Navigate Log to Bookmark",
-  "Create Bookmark Here…" (bookmarking it removes it from the group), and the same New
-  Change/Edit/Rebase/Duplicate change actions as a bookmark row
-- [ ] jj-idea-lig7: the "Unbookmarked heads" group is collapsible via the same toolbar Expand
-  All/Collapse All buttons and persists its collapsed state across an IDE restart, same as
-  Local/Tags/a remote group
-- [ ] jj-idea-lig7: with more than 10 unbookmarked heads in the repo, the group caps at 10 rows
-  rather than growing unbounded (use `scripts/fixtures/fx-stress.sh`'s stress fixture, which has
-  many concurrent unbookmarked branch tips)
-- [ ] jj-idea-9ck7 (GitHub #107): `jj bookmark create` a ~50-char bookmark name, then `jj new`
-  twice off it without moving the bookmark — the main-toolbar bookmark widget truncates the name
-  with `…` but still shows the trailing `+n`; the bookmarks panel's "@" row and the
-  "Unbookmarked heads" row both show the **full, untruncated** name plus `+n` (the panel lays
-  out by available width like the rest of the tree, not by the toolbar's fixed char cap)
+- [ ] Right-clicking a local bookmark shows the same actions as its dropdown sub-menu (Move…/Advance/Rename…/Delete/Forget, minus Move… when it is on `@`), plus "Filter Log to Bookmark" and "Navigate Log to Bookmark" at the bottom, plus New Change, New Change..., Edit Change, Rebase and Duplicate (reusing the log toolbar's action instances, shortcut hints included). "Filter Log to Bookmark" narrows the log the same way the reference filter does; "Navigate Log to Bookmark" scrolls and selects that bookmark's change, including one outside the loaded window (an expanding load, as clicking a bookmark chip does)
+- [ ] Right-clicking a remote bookmark shows Track/Untrack plus Filter/Navigate (and the change actions); a tag shows Delete plus Navigate (no Filter, since tags aren't a log filter reference here) plus the change actions; the "@" node shows Create Bookmark Here…, Advance Bookmark
+- [ ] Selecting a bookmark or tag whose change is **not** in the currently loaded log window (e.g. a far-back bookmark in a filtered or paginated log) and right-clicking still shows New Change/Edit/Rebase/Duplicate acting on that change (the menu may open a moment late while it is fetched); an immutable target still has Edit/Rebase disabled, and a hidden (amended-away) remote target offers none of them
+- [ ] Ctrl+Click on two bookmark rows whose changes are both loaded, then "New Change From These", creates a merge change with both as parents. Ctrl+Click two bookmark rows and right-clicking **inside** that selection preserves the multi-selection (not collapsed to the row under the cursor)
+- [ ] Settings → Keymap → "Jujutsu" lists Navigate to Bookmark's Change, Filter Log to Bookmark, Delete/Forget/Rename/Advance/Push Bookmark to All Remotes and Track/Untrack Bookmark, all rebindable, and right-click menus show the keymap shortcut hint next to any that are bound, as New Change/Edit/Rebase do in the log (GitHub #48). Double-clicking a bookmark row navigates the log to its change (same as "Navigate Log to Bookmark"); rebinding Enter in Keymap settings to a different bound action makes double-click follow the new binding
+- [ ] With an Issue Navigation pattern configured and a bookmark named `JIRA-123-fix-thing`, the `JIRA-123` portion of its label renders as a link (same styling as the log table/description) and the rest does not; hovering it shows a hand cursor and clicking opens the issue URL in the browser (full checks: MT-LOG-TABLE "Issue-tracker links"). Same for a tag named that way and for the "@" node when the bookmark on `@` has such a name. Clicking elsewhere on the row (icon or non-linked text) opens nothing, and double-clicking the linked portion opens the browser, not the Enter-bound action
 
-##### Bookmark-state tooltips (jj-idea-uyu9, GitHub #110)
+#### Unbookmarked heads (GitHub #107)
 
-Hovering any row shows a compact tooltip, rendered via the same icon-aware pane the log table's
-own row tooltip uses (see [Hover tooltip behaviour](#hover-tooltip-behaviour-jj-idea-wp12)'s
-dismissal/scroll behavior, which applies here too). v2 redesign after user feedback on the first
-cut: no beginner prose, nothing that only restates the row's own icon/arrows - a
-`[GroupLabel, ...]` bracket line (with an icon), the bookmark's full `/`-qualified path, and (DRY
-with the commit tooltip) the target commit's change id/commit id/author/date/description.
+- [ ] After `jj new` off a bookmarked change twice without moving the bookmark (two unbookmarked heads), an "Unbookmarked heads" group appears right after the "@" node and before "Local", listing both, each as "\<closest bookmark\> +n \<change id\>" (bookmark-coloured label, change id in the log's bold-prefix/grey-remainder style). A dangling head with no ancestor bookmark at all (e.g. a root-adjacent disconnected change) shows "(no bookmark) \<change id\>" instead of a `+n` count. `jj bookmark set \<name\> -r \<that head\>` in a terminal removes its row after the auto-refresh
+- [ ] Double-clicking an unbookmarked-head row scrolls and selects that change in the log, including one outside the loaded window (the same expanding load as "Navigate Log to Bookmark"). Right-clicking it offers "Navigate Log to Bookmark", "Create Bookmark Here…" (bookmarking it removes it from the group) and the same New Change/Edit/Rebase/Duplicate actions as a bookmark row
+- [ ] The group is collapsible via the toolbar's Expand All/Collapse All and persists its collapsed state across an IDE restart, like Local/Tags/a remote group. With more than 10 unbookmarked heads in the repo (`scripts/fixtures/fx-stress.sh` has many concurrent unbookmarked branch tips) it caps at 10 rows instead of growing unbounded
+- [ ] After `jj bookmark create` with a ~50-char name and `jj new` twice off it without moving the bookmark, the main-toolbar widget truncates the name with `…` but still shows the trailing `+n`, while the panel's "@" row and "Unbookmarked heads" row show the **full, untruncated** name plus `+n` (the panel lays out by available width, not the toolbar's fixed char cap)
 
-- [ ] Create a nested bookmark (e.g. `branches/foo/bar`) — hover its Local leaf — tooltip shows
-  `[Local]`, then the full `branches/foo/bar` path (not just `bar`) with the same chip
-  icon/arrows the row shows, then change id/commit id/author/date/description matching what the
-  log row's own tooltip shows for that same change
-- [ ] Hover the "foo" prefix node above it — bracket reads `[Local]` (not `[foo]`/`[branches]`),
-  then `branches/foo`, then its own leaf count (e.g. "1 bookmark"); no commit info (a folder
-  isn't a single change)
-- [ ] Hover the matching `@origin` leaf — bracket reads `[origin]`
-- [ ] Collapse "Local"/a remote/"Tags" — hover the folder — bracket names the group alone when
-  nothing's notable; with a divergent or untracked bookmark inside, the bracket adds `↑n↓m`/
-  `N unsynced`, matching the in-row collapsed badge exactly; below it, a leaf-count line ("N
-  bookmarks"/"N tags", singular for exactly one) counts every leaf transitively, including
-  inside collapsed/nested sub-groups
-- [ ] Track a local bookmark to two remotes with different states (e.g. `origin` in sync,
-  `github` behind by moving the bookmark backwards there with `--allow-backwards`) — hover the
-  Local leaf — below the chip, one bracket line per remote: `[origin, in sync]`,
-  `[github, ↓1, force-push required]`; a remote with no ahead/behind shows "in sync", any remote
-  the local is behind (whether or not also ahead) adds "force-push required"; a local bookmark
-  tracked by no remote shows no such lines. Hover the `github` leaf itself under its remote
-  category — its own tooltip also flags "force-push required" when behind
-- [ ] Hover a tag — bracket reads `[Tags]`, full `/`-qualified tag path, no "Tag" text, plus its
-  target commit's info (change id/commit id/author/date/description, same as a bookmark's)
-- [ ] Hover the "@" row on a bookmark directly — shows the bookmark name(s), no distance bracket;
-  after `jj new`ing past it — compact `[N commit(s) ahead of <bookmark>]` bracket instead
-  (singular "1 commit" for exactly one, "commits" otherwise; no comma before a single name,
-  comma-separated for several); both cases include `@`'s own commit info, including a
-  `[@ Working Copy]` tag matching the log
-  row tooltip's own status tag for the working-copy commit; right-click → **Navigate Log to
-  Commit** (not "...to Bookmark") works, and double-clicking the row navigates there too
-  (previously a silent no-op)
-- [ ] Build the "Unbookmarked heads" recipe above — the category's own tooltip reads "N heads
-  without bookmarks" (singular "1 head without a bookmark" for exactly one), not a bracket; each
-  row in the tree, and the category header itself, shows the same slashed-bookmark icon the log
-  table uses for a dangling head; a child row's tooltip uses the same compact
-  `[N commits ahead of ...]` form as the "@" row (with that same slashed-bookmark icon leading
-  the bracket - the "@" row's own bracket does not have it, since the working copy isn't counted
-  as a dangling head), plus commit info, and **Navigate Log to Commit** (not "...to Bookmark") on
-  right-click
-- [ ] With that same unbookmarked head still visible in the log table itself, hover its row —
-  the row's own tooltip now also shows a `[N commits ahead of <bookmark>]` status tag (with the
-  slashed-bookmark icon) alongside any other status tags (Conflict/Immutable/etc); open the
-  commit details panel for the same row and confirm it shows the identical tag. Hover the
-  *working-copy* row even when it itself has no bookmark on it — no such tag appears there (it's
-  covered by its own `@ Working Copy` tag instead, not double-counted as a dangling head)
-- [ ] Single-repo project — no tooltip shows a repo line; multi-repo project — every tooltip
-  gains a leading repo icon+name line, above the group bracket
-- [ ] Hover a row, then move the pointer *into* the tooltip balloon — it stays open; scroll the
-  panel without moving the pointer — it hides and does not reappear until the pointer moves
-  (jj-idea-wp12 regression on this surface)
-- [ ] Uncheck the log toolbar's **Hover Tooltips** (renamed from "Commit Tooltips" - see
-  [View options menu](#view-options-menu-jj-idea-lgo4-n22a)) — both the log row tooltip and every
-  bookmarks-panel tooltip stop appearing; re-check — both come back, no restart needed
+#### Bookmark-state tooltips (GitHub #110)
 
-**Remote bookmark at a hidden commit (jj-idea-wiz0, GitHub #130)**
+Hovering any row shows a compact tooltip, rendered by the same icon-aware pane the log table's row tooltip uses (see [Hover tooltips](#hover-tooltips) for its dismissal and scroll behaviour, which applies here too): a `[GroupLabel, ...]` bracket line (with an icon), the bookmark's full `/`-qualified path, and (as in the commit tooltip) the target commit's change id/commit id/author/date/description.
 
-Setup: in a repo with a git remote, `jj bookmark create cl/X -r @`, add file `f` with `v1`, `jj git push --bookmark cl/X`
-(`--allow-new` on older jj), then edit `f` to `v2` so `@` is amended in place. `cl/X@origin` is now at a hidden commit
-that shares its change id with `@`.
+- [ ] Hovering the Local leaf of a nested bookmark (e.g. `branches/foo/bar`) shows `[Local]`, then the full `branches/foo/bar` path (not just `bar`) with the same chip icon/arrows the row shows, then change id/commit id/author/date/description matching the log row's own tooltip for that change. Hovering the "foo" prefix node above it shows `[Local]` (not `[foo]`/`[branches]`), then `branches/foo`, then its own leaf count (e.g. "1 bookmark"), with no commit info (a folder isn't a single change). Hovering the matching `@origin` leaf shows `[origin]`; hovering a tag shows `[Tags]`, the full `/`-qualified tag path, no "Tag" text, plus its target commit's info
+- [ ] Collapsing "Local"/a remote/"Tags" and hovering the folder shows a bracket naming the group alone when nothing is notable; with a divergent or untracked bookmark inside, the bracket adds `↑n↓m`/`N unsynced`, matching the in-row collapsed badge exactly. Below it a leaf-count line ("N bookmarks"/"N tags", singular for exactly one) counts every leaf transitively, including inside collapsed or nested sub-groups
+- [ ] Tracking a local bookmark to two remotes in different states (e.g. `origin` in sync, `github` behind after moving the bookmark backwards there with `--allow-backwards`) and hovering the Local leaf shows below the chip one bracket line per remote: `[origin, in sync]`, `[github, ↓1, force-push required]`. A remote with no ahead/behind shows "in sync", a remote the local is behind (whether or not also ahead) adds "force-push required", and a bookmark tracked by no remote shows no such lines. Hovering the `github` leaf itself under its remote category also flags "force-push required" when behind
+- [ ] Hovering the "@" row on a bookmark directly shows the bookmark name(s) with no distance bracket; after `jj new` past it, it shows a compact `[N commit(s) ahead of <bookmark>]` bracket instead (singular "1 commit", otherwise "commits"; no comma before a single name, comma-separated for several). Both cases include `@`'s own commit info with a `[@ Working Copy]` tag matching the log row tooltip's own status tag. Right-click shows **Navigate Log to Commit** (not "...to Bookmark") and double-clicking the row navigates there too
+- [ ] With the "Unbookmarked heads" setup above, the category's own tooltip reads "N heads without bookmarks" (singular "1 head without a bookmark"), not a bracket. Each row in the tree, and the category header, shows the same slashed-bookmark icon the log table uses for a dangling head. A child row's tooltip uses the compact `[N commits ahead of ...]` form with that slashed-bookmark icon leading the bracket (the "@" row's own bracket does not have it, since the working copy isn't counted as a dangling head), plus commit info, and right-click shows **Navigate Log to Commit**
+- [ ] With that unbookmarked head still visible in the log table, hovering its row shows a `[N commits ahead of <bookmark>]` status tag (with the slashed-bookmark icon) alongside any other status tags (Conflict/Immutable/etc.), and the commit details panel shows the identical tag. Hovering the *working-copy* row, even when it has no bookmark, shows no such tag (it has its own `@ Working Copy` tag and isn't double-counted as a dangling head)
+- [ ] A single-repo project shows no repo line in any tooltip; a multi-repo project adds a leading repo icon+name line above the group bracket to every tooltip. Moving the pointer into the tooltip balloon keeps it open, and scrolling the panel without moving the pointer hides it until the pointer moves. Unchecking the log toolbar's **Hover Tooltips** (see [Columns and View Options](#columns-and-view-options)) stops both the log row tooltip and every bookmarks-panel tooltip; re-checking brings both back with no restart
 
-- [ ] Bookmarks panel, **Remote** `cl/X@origin` row: hover — tooltip commit info shows the **old** commit (its commit
-  id, the `v1` era description), not the working copy
-- [ ] Right-click the `cl/X@origin` row: no New Change / Edit / Rebase / Duplicate entries (they write by change id
-  and would hit `@`); the Track/Untrack, Filter and Navigate entries remain (Navigate disabled). The local `cl/X`
-  row still offers the change actions
-- [ ] **Navigate Log to Bookmark** is disabled on the `cl/X@origin` row (the hidden commit is not in the log) and
-  double-click does not move the log selection to `@`; the local `cl/X` row still navigates normally
-- [ ] Compare with Branch… listing: `cl/X@origin` shows a short **commit id** in parentheses (the local `cl/X`
-  shows its change id); picking it compares against `v1`
-- [ ] Refresh with `jj git fetch` / `jj new` — rows and tooltips stay correct; a repo with no hidden remote targets
-  behaves exactly as before
+#### Remote bookmark at a hidden commit (GitHub #130)
+
+Setup: in a repo with a git remote, `jj bookmark create cl/X -r @`, add file `f` with `v1`, `jj git push --bookmark cl/X` (`--allow-new` on older jj), then edit `f` to `v2` so `@` is amended in place. `cl/X@origin` is now at a hidden commit that shares its change id with `@`.
+
+- [ ] Hovering the `cl/X@origin` row in the panel shows tooltip commit info for the **old** commit (its commit id, the `v1`-era description), not the working copy
+- [ ] Right-clicking the `cl/X@origin` row shows no New Change / Edit / Rebase / Duplicate entries (they write by change id and would hit `@`), while Track/Untrack, Filter and Navigate remain (Navigate disabled); the local `cl/X` row still offers the change actions. **Navigate Log to Bookmark** is disabled on the `cl/X@origin` row (the hidden commit is not in the log) and double-click does not move the log selection to `@`; the local `cl/X` row still navigates normally
+- [ ] In the "Compare with Branch…" listing, `cl/X@origin` shows a short **commit id** in parentheses (the local `cl/X` shows its change id), and picking it compares against `v1`. Refreshing with `jj git fetch` / `jj new` keeps rows and tooltips correct
 
 ### MT-WORKINGCOPY
 
 **Working copy panel, status bar widget, and tool window behavior**
 
-**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `vcs/JujutsuRollbackEnvironment.kt` (jj-idea-ad5d), `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring, jj-idea-xsa8 follow-up), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (jj-idea-g2p8, GitHub #84), `actions/filechange/DropChangesAction.kt` (jj-idea-gl5e, GitHub #148)
+**Code:** `ui/workingcopy/UnifiedWorkingCopyPanel.kt`, `ui/workingcopy/WorkingCopyControlsPanel.kt`, `ui/workingcopy/WorkingCopyToolWindowFactory.kt`, `ui/statusbar/JujutsuStatusBarWidget.kt`, `ui/statusbar/JujutsuWorkingCopySwitcher.kt`, `ui/services/JujutsuUiEnabler.kt`, `ui/services/WorkingCopySignpost.kt`, `ui/services/SponsorAsk.kt`, `ui/services/FeatureUpgradeNudge.kt`, `ui/services/JujutsuNotifications.kt`, `ui/services/JujutsuStartupActivity.kt`, `vcs/JujutsuHiddenCommitMode.kt` (Standard Commit Tool Window Suppression), `vcs/JujutsuVcsBase.kt`, `vcs/JujutsuRollbackEnvironment.kt`, `actions/top/InitAction.kt`, `ui/common/JujutsuChangesTree.kt`, `ui/common/JujutsuOtherRepositoriesNode.kt`, `ui/common/JujutsuNoChangesNode.kt` (repo-anchoring), `ui/common/JujutsuFilePathIconProvider.kt` (repo-root icon in changes trees), `jj/WorkingCopyRecovery.kt`, `jj/JujutsuRepositoryHealth.kt`, `ui/restore/RestoreDialog.kt`, `actions/file/RestoreSelectionAction.kt`, `actions/filechange/RestoreToChangeAction.kt` (GitHub #84), `actions/filechange/DropChangesAction.kt` (GitHub #148)
 **Also re-run:** MT-DIFF-PREVIEW (changed-files tree shares the preview-tab behavior); MT-CROSS (colocated Git / multi-VCS project scoping); MT-CTXMENU, MT-SQUASH, MT-SPLIT (Split/Squash/Abandon/Create Bookmark/Advance Bookmark/Set Tag are shared with the log context menu); MT-BOOKMARK (Advance Bookmark)
 
 #### Working Copy Panel
 
-- [ ] jj-idea-4d7p: on a **freshly started IDE**, before touching anything, the description box is
-  already populated with `@`'s description (not just the grey placeholder), and every toolbar
-  button (New Change, Split, Squash, Abandon, Create Bookmark) is enabled rather than all greyed
-  out
-- [ ] Description text area shows current description
-- [ ] jj-idea-qa8i: clicking into the description text area, typing, and pressing Enter inserts
-  a newline (does not do nothing or trigger another action)
-- [ ] jj-idea-n3w1 (GitHub #46): the description field is a real commit-message editor, not a
-  plain text area - typing a long first line highlights the subject-length inspection, a
-  misspelled word gets a spellcheck squiggle, and the toolbar's history button (Ctrl+E / Cmd+E)
-  opens a popup of recently-used descriptions (shared with Git's own commit UI and every other
-  description editor in this plugin)
-- [ ] With IdeaVim installed: describe the working copy, enter Insert mode in the description
-  field, then press Escape - it should leave Insert mode, not close/cancel anything (this was the
-  requester's headline ask on GitHub #46; if Escape does something else, note what and whether
-  `:set ideavimsupport=dialog` changes it)
-- [ ] jj-idea-n553 (GitHub #15): with an Issue Navigation pattern configured (Settings → Version
-  Control → Issue Navigation, e.g. issue `[A-Z]+-\d+` → link `https://example.com/browse/$0`),
-  an issue reference like `JIRA-123` inside a bookmark name shown in the current-change summary
-  (above the description area) renders as a clickable link, opening the configured URL on click
-- [ ] "Describe" button updates description via `jj describe`
-- [ ] "New Change" button creates new change via `jj new`
-- [ ] jj-idea-xsa8 (GitHub #61): the toolbar row also offers Split, Squash, Abandon, a separator,
-  then Create Bookmark, Advance Bookmark, and Set Tag — all acting on `@`, all icon-only
-  (tooltip-only labels) — **verify every one of them is actually visible in the row, not
-  collapsed behind an overflow `>>` chevron or silently missing**; each behaves identically to
-  its log context-menu counterpart (see MT-CTXMENU, MT-SQUASH, MT-SPLIT, MT-BOOKMARK) and greys
-  out (never disappears) when not applicable to the current `@` — e.g. Squash with no mutable
-  parent, Advance with no ancestor bookmark
-- [ ] Multi-root: switching the bound repository via the panel's dropdown re-evaluates every one
-  of these buttons against the newly selected repo
-- [ ] jj-idea-xsa8 follow-up: in a multi-root project, the repo selector dropdown sits in the same
-  row as this toolbar (top of the tool window), not ~60% down inside the description area where
-  it used to be — the two are visually adjacent, and choosing a different repo there immediately
-  updates both the toolbar buttons and the description/current-change area below
-- [ ] Changed files tree shows correct status colors and file type icons
-- [ ] Preview-tab behavior (double-click, Enter, tab-swap, single-click-no-op-when-closed,
-      single-click-swap-when-open, Escape, Cmd/Ctrl+D, F4): see MT-DIFF-PREVIEW
-- [ ] Right-click shows context menu with file actions
-- [ ] jj-idea-lo7u: "Compare Before with Another Commit..." is **not** in that menu (working
-      copy context — same as "Compare Before with Local")
+- [ ] On a **freshly started IDE**, before touching anything, the description box already shows `@`'s description (not just the grey placeholder) and every toolbar button (New Change, Split, Squash, Abandon, Create Bookmark) is enabled rather than greyed out
+- [ ] The description area shows the current description. It is a real commit-message editor, not a plain text area: Enter inserts a newline, a long first line highlights the subject-length inspection, a misspelled word gets a spellcheck squiggle, and the toolbar's history button (Ctrl+E / Cmd+E) opens a popup of recently-used descriptions (shared with Git's commit UI and every other description editor in the plugin) (GitHub #46)
+- [ ] With IdeaVim installed: describing the working copy, entering Insert mode in the description field and pressing Escape leaves Insert mode and does not close or cancel anything (the requester's headline ask on GitHub #46; if Escape does something else, note what and whether `:set ideavimsupport=dialog` changes it)
+- [ ] With an Issue Navigation pattern configured (Settings → Version Control → Issue Navigation, e.g. `[A-Z]+-\d+` → `https://example.com/browse/$0`), an issue reference like `JIRA-123` inside a bookmark name in the current-change summary (above the description area) renders as a clickable link that opens the URL (GitHub #15)
+- [ ] "Describe" updates the description via `jj describe`; "New Change" creates a new change via `jj new`
+- [ ] The toolbar row also offers Split, Squash, Abandon, a separator, then Create Bookmark, Advance Bookmark and Set Tag, all acting on `@` and icon-only (tooltip-only labels). **Verify every one is actually visible in the row**, not collapsed behind an overflow `>>` chevron or silently missing. Each behaves like its log context-menu counterpart (see MT-CTXMENU, MT-SQUASH, MT-SPLIT, MT-BOOKMARK) and greys out (never disappears) when not applicable to the current `@`, e.g. Squash with no mutable parent, Advance with no ancestor bookmark (GitHub #61)
+- [ ] In a multi-root project the repo selector dropdown sits in the same row as this toolbar (top of the tool window), visually adjacent to it. Choosing a different repo there immediately updates the toolbar buttons (each re-evaluated against the newly selected repo) and the description/current-change area below
+- [ ] The changed-files tree shows correct status colours and file type icons, and right-click shows the file actions menu, which does **not** contain "Compare Before with Another Commit..." (working-copy context, same as "Compare Before with Local"). Preview-tab behaviour (double-click, Enter, tab-swap, single-click-no-op-when-closed, single-click-swap-when-open, Escape, Cmd/Ctrl+D, F4) is MT-DIFF-PREVIEW
+- [ ] Open shows the working copy as editable, and Open for multiple files opens multiple editors. The menu has Open in → remote (see MT-DIFF for "Open in → remote for single parent" and the hidden-when-no-pushed-ancestor case)
+- [ ] Selecting files in the tree makes the IDE's **Reformat Code** (Ctrl/Cmd+Alt+L) and **Optimize Imports** (Ctrl/Cmd+Alt+O) act on them, as in the built-in Git/Commit changes view (`JujutsuChangesTree.showsLocalFiles`). Right-clicking a file → Jujutsu submenu → **Annotate** opens the gutter annotations for that file
+- [ ] In a repository colocated with Git (mapped to both Jujutsu and Git4Idea), the changed-files tree shows only jj's changes, with no Git-only changes, and "Resolve Conflicts…" (toolbar/menu action and per-file context action) offers only jj-tracked conflicted files
+- [ ] In a repository mapped to a non-jj VCS (e.g. Git4Idea), selecting a change belonging to that other VCS in the Changes view and pressing F4 or opening the context menu produces no `VcsException: Not a Jujutsu revision` in the IDE log, and jj's file-change actions (Open, Compare, Restore, etc.) simply don't offer that change
 
-##### Restore dialog (jj-idea-g2p8, GitHub #84)
+##### Restore dialog (GitHub #84)
 
-- [ ] Modify 3+ files; right-click one in the changed-files tree → **Restore…** opens a dialog
-      (not a plain Yes/No confirm) listing every changed file, with only the right-clicked
-      file checked; the right-click menu and editor Jujutsu submenu both show "Restore…" with
-      the ellipsis (it opens a dialog, not an immediate action)
-- [ ] jj-idea-lisi (GitHub #84): a **Restore** toolbar button sits on the changes tree toolbar
-      (after Resolve all conflicts) — select one or more files in the tree, click it → the
-      dialog opens with exactly those files pre-checked, same as right-click Restore
-- [ ] jj-idea-lisi: with **nothing** selected in the tree, the toolbar Restore button stays
-      enabled (not greyed out) → clicking it opens the dialog for the panel's current repo with
-      **no** files pre-checked, so it can still be widened to restore anything
-- [ ] Tick an additional file before confirming → exactly the checked files revert to `@-`;
-      unchecked files are untouched
-- [ ] Untick every file → the OK button is disabled with a "check at least one file" message
-- [ ] Invoke Restore with nothing selected in the tree (or from the editor's Jujutsu →
-      Restore, single file) → dialog still opens, pre-checked, and can be widened to restore
-      other changed files too — no more single-file Yes/No shortcut
-- [ ] With a renamed file among the changes, checking it and confirming restores **both** the
-      old and new path (no orphaned file left at either location)
-- [ ] jj-idea-c2m8 (GitHub #122): delete a tracked file (`rm`) → right-click **only** that
-      deleted file in the changed-files tree → **Restore** is offered (not hidden) → confirm →
-      the file comes back
-- [ ] jj-idea-c2m8: delete one file and edit another, select **both** in the changed-files tree
-      → Restore → the dialog opens with **both** files pre-checked → confirm → both are
-      restored (the deleted file used to be silently dropped from a mixed selection)
-- [ ] jj-idea-c2m8: same deleted-only selection → **Show File History** still opens history for
-      it (see MT-DIFF's File History section); **Squash Selected Files** / **Split** offer it
-      pre-ticked in their dialogs; **Open File** stays disabled (there's no file to open)
-- [ ] jj-idea-ad5d (GitHub #56/#84): modify one file, add one, delete one and rename one; select
-      them in the changed-files tree → platform **Rollback** (Ctrl+Alt+Z / right-click →
-      Rollback) → the "Rollback Changes" dialog lists them pre-checked → confirm → modified/deleted
-      files return to their @- content, the added file is gone, the rename is undone at **both**
-      paths, open editors reload, and the tree empties. Cancelling the dialog changes nothing.
-      A "Restore" balloon with an inline **Undo** link appears (one per repo); clicking it brings
-      the changes back. Also recoverable via Operations Log → Undo. In a colocated Git project, Rollback of a file under the
-      Git root still routes to Git (MT-CROSS)
-- [ ] (jj-idea-tov5) On a merge working copy (two parents) with a conflicted file, resolve it in the
-      editor (status becomes modified) → Rollback / Restore that file → succeeds with no "Failed to
-      restore selection" error, and the file returns to its conflicted state
-- [ ] With a clean working copy (no pending changes), Restore shows a "Nothing to restore"
-      notification instead of opening an empty dialog
-- [ ] After confirming a restore, an undo balloon reading "Restore" appears with an inline
-      Undo link (see MT-WORKINGCOPY's Undo section, jj-idea-v9zp/jj-idea-g2p8) - clicking it
-      brings the discarded content back
-- [ ] See MT-LOG-DETAILS for the historical "Restore to This" variant of this same dialog
-- [ ] Select one or more files in the changed-files tree → the IDE's **Reformat Code**
-      (Ctrl/Cmd+Alt+L) and **Optimize Imports** (Ctrl/Cmd+Alt+O) both act on the selected file(s),
-      same as the built-in Git/Commit changes view (`JujutsuChangesTree.showsLocalFiles`)
-- [ ] Right-click a file → Jujutsu submenu → **Annotate** opens the gutter annotations for that
-      file (jj-idea-0t5o)
-- [ ] Open shows working copy as editable
-- [ ] Open for multiple files opens multiple editors
-- [ ] Menu has Open in -> remote; see MT-DIFF for "Open in -> remote for single parent" and the hidden-when-no-pushed-ancestor case
-- [ ] jj-idea-t0zo: in a repository that is colocated with Git (mapped to both Jujutsu and
-  Git4Idea), the Working Copy panel's changed-files tree shows only jj's changes — no
-  Git-only changes appear. Also verify "Resolve Conflicts…" (both the toolbar/menu action
-  and the per-file context menu action) only offers jj-tracked conflicted files
-- [ ] jj-idea-mdi4: in a repository mapped to a non-jj VCS (e.g. Git4Idea, colocated or
-  otherwise), select a change belonging to that other VCS in the Changes view and press F4
-  / open the context menu — no `VcsException: Not a Jujutsu revision` appears in the IDE
-  log, and jj's file-change actions (Open, Compare, Restore, etc.) simply don't offer that
-  change
+- [ ] With 3+ modified files, right-clicking one in the changed-files tree → **Restore…** opens a dialog (not a plain Yes/No confirm) listing every changed file with only the right-clicked file checked. The right-click menu and the editor's Jujutsu submenu both show "Restore…" with the ellipsis. Ticking an additional file before confirming reverts exactly the checked files to `@-` and leaves unchecked files untouched; unticking every file disables OK with a "check at least one file" message
+- [ ] A **Restore** toolbar button sits on the changes tree toolbar (after Resolve all conflicts). With one or more files selected, clicking it opens the dialog with exactly those files pre-checked, like right-click Restore. With **nothing** selected it stays enabled and opens the dialog for the panel's current repo with **no** files pre-checked, so it can still be widened to restore anything; Restore from the editor's Jujutsu menu (single file) also opens the dialog pre-checked and can be widened
+- [ ] A renamed file that is checked and confirmed restores **both** the old and new path, leaving no orphaned file at either location. Deleting a tracked file (`rm`) and right-clicking **only** that file still offers **Restore** (not hidden), and confirming brings it back. With one file deleted and another edited, selecting **both** → Restore opens the dialog with **both** pre-checked and restores both (GitHub #122)
+- [ ] For that same deleted-only selection, **Show File History** still opens history for it (see MT-DIFF's File History section), **Squash Selected Files** / **Split** offer it pre-ticked in their dialogs, and **Open File** stays disabled (there is no file to open)
+- [ ] With a modified, an added, a deleted and a renamed file selected in the changed-files tree, the platform **Rollback** (Ctrl+Alt+Z / right-click → Rollback) lists them pre-checked in the "Rollback Changes" dialog. Confirming returns modified/deleted files to their `@-` content, removes the added file, undoes the rename at **both** paths, reloads open editors and empties the tree. Cancelling changes nothing. A "Restore" balloon with an inline **Undo** link appears (one per repo) and clicking it brings the changes back; Operations Log → Undo also recovers them. In a colocated Git project, Rollback of a file under the Git root still routes to Git (MT-CROSS) (GitHub #56, #84)
+- [ ] On a merge working copy (two parents) with a conflicted file, resolving it in the editor (status becomes modified) and then Rollback / Restore on that file succeeds with no "Failed to restore selection" error, and the file returns to its conflicted state
+- [ ] With a clean working copy, Restore shows a "Nothing to restore" notification instead of opening an empty dialog. After confirming a restore, an undo balloon reading "Restore" appears (see MT-CTXMENU "Undo"), and its Undo link brings the discarded content back. The historical "Restore to This" variant of this dialog is under MT-LOG-DETAILS
 
-#### Changes tree repo-anchoring (jj-idea-xsa8 follow-up, multi-repo only)
+#### Changes tree repo-anchoring (multi-repo only)
 
-Covers `ui/common/JujutsuChangesTree.kt`'s `currentRepo`, `JujutsuOtherRepositoriesNode`,
-`JujutsuOtherRepositoryNode`, and `JujutsuNoChangesNode`: the changes tree spans every repo,
-unlike the toolbar/description above it (which only ever act on the bound repo), so changes
-belonging to any *other* repo are demoted into one collapsed node rather than getting an
-equally-weighted group of their own.
+The changes tree spans every repo, unlike the toolbar and description above it (which only act on the bound repo), so changes belonging to any *other* repo are demoted into one collapsed node (`ui/common/JujutsuChangesTree.kt`'s `currentRepo`, `JujutsuOtherRepositoriesNode`, `JujutsuOtherRepositoryNode`, `JujutsuNoChangesNode`).
 
-- [ ] With a repo bound (via the relocated selector) that **has** changes: that repo's changed
-  files show directly at the top level of the tree (still grouped by directory as normal) — **not**
-  wrapped in their own repo-named node the way they were before this feature
-- [ ] With a repo bound that has **no** changes (e.g. a fresh/clean `@`): the tree still shows a
-  line for it — the repo's name followed by a grey "(no changes)" qualifier — rather than showing
-  nothing at all for the bound repo (easy to misread as broken, especially when "Other
-  Repositories" below it is populated)
-- [ ] Every *other* repo's changed files are collapsed under a single "Other Repositories" node,
-  sorted below the bound repo's own files/no-changes line, collapsed by default (not expanded) the
-  first time it appears
-- [ ] Expand "Other Repositories" with changes from **two or more** other repos present: each
-  other repo appears as its **own named sub-node**, with the same per-repo colored icon used
-  elsewhere (bookmark widget's multi-repo dropdown, the "(no changes)" line), directly followed
-  by its changed files — **no** extra node in between for a shared parent directory (e.g. the
-  folder containing several sibling repos on disk) or for the repo itself appearing twice nested
-- [ ] A file inside a subdirectory of an other-repo (e.g. `src/Main.kt`) shows as just its
-  filename ("Main.kt") directly under that repo's node, **not** nested under its own directory
-  sub-tree the way the bound repo's own files are, and **not** showing any path (relative or
-  absolute) as part of its label — this is a deliberate trade-off (see jj-idea-xsa8) for a
-  demoted, secondary area of the tree; only the bound repo's own top-level content gets full
-  directory grouping
-- [ ] Switch the bound repo via the selector — the split re-partitions immediately (files move
-  between the plain top level / "Other Repositories", the no-changes line appears or disappears as
-  appropriate), no need to touch Refresh
-- [ ] Single-repo project: no "Other Repositories" node ever appears, regardless of how many
-  changed files exist — behavior is unchanged from before this feature; the no-changes line is
-  also unaffected (single-repo behavior is untouched by `currentRepo`, since it was already the
-  only repo shown)
-- [ ] With conflicts present (`groupConflicts`): the Merge Conflicts node (top, bold) and the
-  Other Repositories node (bottom, sorted after the bound repo's own content) coexist correctly —
-  a conflicted file in another repo appears under Merge Conflicts, not duplicated under Other
-  Repositories
+- [ ] With a bound repo that **has** changes, its changed files show directly at the top level of the tree (still grouped by directory), not wrapped in a repo-named node. With a bound repo that has **no** changes, the tree still shows a line for it: the repo's name followed by a grey "(no changes)" qualifier, rather than nothing
+- [ ] Every *other* repo's changed files are collapsed under a single "Other Repositories" node, sorted below the bound repo's own content and collapsed by default the first time it appears. Expanding it with changes from **two or more** other repos shows each as its **own named sub-node** with the per-repo coloured icon used elsewhere (bookmark widget's multi-repo dropdown, the "(no changes)" line), directly followed by its changed files, with **no** extra node for a shared parent directory or for the repo appearing twice nested
+- [ ] A file in a subdirectory of an other-repo (e.g. `src/Main.kt`) shows as just its filename ("Main.kt") directly under that repo's node, not nested under its own directory sub-tree and showing no path in its label (a deliberate trade-off for the demoted area; only the bound repo gets full directory grouping)
+- [ ] Switching the bound repo via the selector re-partitions the tree immediately (files move between the top level and "Other Repositories", the no-changes line appears or disappears), with no Refresh. A single-repo project never shows an "Other Repositories" node and is otherwise unaffected
+- [ ] With conflicts present (`groupConflicts`), the Merge Conflicts node (top, bold) and the Other Repositories node (bottom) coexist correctly: a conflicted file in another repo appears under Merge Conflicts, not duplicated under Other Repositories
 
-#### Repository Initialization (jj-idea-uw11)
+#### Repository Initialization
 
-- [ ] With a directory that is VCS-mapped to Jujutsu but has no `.jj` (shows the
-  "uninitialized root" notification), click **Initialize** on the notification, pick the
-  directory, confirm → the Working copy tool window populates with the repo's changes
-  immediately, without needing any further unrelated action (e.g. no `jj split` first)
-- [ ] Same check using **VCS → Jujutsu → Initialize** (top-level menu action) directly on an
-  already-mapped-but-uninitialized directory, instead of the notification's button
-- [ ] The Log tool window also shows the initial commit(s) immediately after Initialize
-- [ ] After Initialize, add/edit a file in the new repo — the editor gutter and Project view
-  show the correct added/modified colour immediately, without needing to touch Settings,
-  restart, or trigger an unrelated VCS refresh first
+- [ ] For a directory that is VCS-mapped to Jujutsu but has no `.jj` (the "uninitialized root" notification), clicking **Initialize** on the notification, picking the directory and confirming populates the Working copy tool window with the repo's changes immediately, with no further unrelated action (e.g. no `jj split` first). The same works via **VCS → Jujutsu → Initialize** on an already-mapped-but-uninitialized directory
+- [ ] The Log tool window also shows the initial commit(s) immediately after Initialize, and adding or editing a file in the new repo shows the correct added/modified colour in the editor gutter and Project view immediately, without touching Settings, restarting, or triggering an unrelated VCS refresh
 
-#### Unreadable Repository (jj-idea-9ife)
+#### Unreadable Repository
 
-- [ ] With a working jj repo open (tool window populated), break its store on disk
-  while the IDE is running — e.g. `rm -rf .jj/repo/store` (leaves `.jj` present, so it still
-  passes the "is this a jj repo" check, but `jj log` fails) — then trigger a VCS re-scan
-  (e.g. touch a file, or reopen the project)
-- [ ] **Expected:** no red "IDE Internal Error" balloon; instead, a single WARNING
-  notification "Jujutsu Repository Could Not Be Read" appears, including jj's error detail,
-  and **Retry** and **Configure VCS Mappings…** actions
-- [ ] The Working copy tool window's empty state shows **"Jujutsu could not read the
-  repository '\<name\>'..."**, not the generic "No Jujutsu repositories configured", with its
-  own **Retry** link
-- [ ] Settings → Version Control → Directory Mappings shows the broken repo's row in red
-  (same treatment as an otherwise-invalid mapping)
-- [ ] Trigger another refresh (e.g. edit a file) — the toast notification does not repeat,
-  but the tool window's empty state and the red mapping row persist (they're not one-shot)
-- [ ] Click **Retry** on the notification, or on the tool window's empty-state link — it
-  re-checks immediately; while still broken, the same messages reappear (a fresh notification
-  can fire again since Retry re-arms it)
-- [ ] Restore the store (e.g. `jj git init --colocate .` again) **without** touching any
-  other file — within ~1s the tool window, Log, and the Directory Mappings row all recover on
-  their own, with no manual Retry/re-scan needed (the plugin watches the repo's `.jj/repo/`
-  directory for exactly this)
-- [ ] In a multi-repo project, break only one repo's store — the other repo's Working
-  copy/Log data is unaffected, and the tool window's empty-state message only mentions the
-  broken repo when *all* repos are unreadable (with more than one repo readable, the broken
-  one is just silently absent from the dropdown, matching existing uninitialized-repo
-  behavior)
-- [ ] Break two repos' stores in the same project — the notification message pluralizes
-  ("N Jujutsu repositories could not be read")
+- [ ] With a working jj repo open, break its store while the IDE runs (`rm -rf .jj/repo/store` leaves `.jj` present, so it still passes the "is this a jj repo" check, but `jj log` fails) and trigger a VCS re-scan (touch a file, or reopen the project). Expected: no red "IDE Internal Error" balloon; a single WARNING notification "Jujutsu Repository Could Not Be Read" appears with jj's error detail and **Retry** and **Configure VCS Mappings…** actions
+- [ ] The Working copy tool window's empty state shows **"Jujutsu could not read the repository '\<name\>'..."** (not the generic "No Jujutsu repositories configured") with its own **Retry** link, and Settings → Version Control → Directory Mappings shows the broken repo's row in red, like an otherwise-invalid mapping
+- [ ] Triggering another refresh does not repeat the toast, but the tool window's empty state and the red mapping row persist. **Retry** (on the notification or the empty-state link) re-checks immediately, and while still broken the same messages reappear (a fresh notification can fire again since Retry re-arms it)
+- [ ] Restoring the store (e.g. `jj git init --colocate .`) **without** touching any other file makes the tool window, Log and Directory Mappings row recover on their own within ~1 s, with no manual Retry/re-scan (the plugin watches `.jj/repo/` for exactly this)
+- [ ] In a multi-repo project, breaking only one repo's store leaves the other repo's Working copy/Log data unaffected, and the empty-state message mentions the broken repo only when *all* repos are unreadable (with more than one readable, the broken one is just absent from the dropdown, as for uninitialized repos). Breaking two repos' stores pluralizes the notification ("N Jujutsu repositories could not be read")
 
-#### Stale Workspace (jj-idea-b65g, jj-idea-27b4)
+#### Stale Workspace
 
-Genuinely staling a workspace requires more than advancing the op head from another workspace —
-jj's own working-copy auto-recovery silently absorbs that case. Force it instead by corrupting the
-workspace's local operation pointer:
+Genuinely staling a workspace takes more than advancing the op head from another workspace, since jj's own working-copy auto-recovery silently absorbs that case. Force it by corrupting the workspace's local operation pointer:
 
 ```bash
 jj workspace add ../ws2   # from the sandbox repo
@@ -2607,47 +1080,20 @@ with open(path, "wb") as f:
 '
 jj status   # confirm: "Error: Could not read working copy's operation." + the update-stale hint
 ```
-Re-run the same command (safe to repeat) any time you need to re-stale it, including after
-**Update Stale Workspace** has just repaired it. Open `../ws2` as its own IDE project.
+Re-run the same command (safe to repeat) any time you need to re-stale it, including after **Update Stale Workspace** has just repaired it. Open `../ws2` as its own IDE project.
 
-**Known gap:** Annotate still reports a stale workspace as a raw error in the platform's own
-"Annotate" Messages-tool-window tab, not the notification below — a fix attempt didn't pan out
-and was reverted rather than shipped half-working.
+**Known gap:** Annotate still reports a stale workspace as a raw error in the platform's own "Annotate" Messages-tool-window tab, not the notification below; a fix attempt was reverted rather than shipped half-working.
 
-- [ ] **Expected:** no red "IDE Internal Error" balloon and no "Uncaught exception" background
-  warning; instead, a WARNING notification **"Jujutsu Workspace Is Stale"** appears, with
-  **Update Stale Workspace** and **Retry** actions
-- [ ] The Working copy tool window's empty state shows the stale-specific message (not the
-  generic "could not be read" text) with its own **Update Stale Workspace** link
-- [ ] While stale: open the Working copy tool window's toolbar and context menus, and the
-  changes tree — every action is simply disabled/hidden, with no uncaught exception
-- [ ] Click **Update Stale Workspace** (on the notification or the empty-state link) — it runs
-  `jj workspace update-stale` and the tool window/Log repopulate on their own within ~1s, with
-  no manual Retry/re-scan needed
-- [ ] Trigger **Advance Bookmark**, **Rename Bookmark**, **Create Bookmark**, **Move Bookmark**,
-  **Set Tag**, or **Git → Push** while the workspace is stale — each shows the
-  **Update Stale Workspace**/**Retry** notification (not a crash, and not a wrong message like
-  "bookmark already exists"), and clicking **Update Stale Workspace** both repairs the workspace
-  *and* completes the action that was interrupted (the bookmark actually advances/renames/moves,
-  the push dialog actually opens)
-- [ ] Open the **Squash**, **Squash Into**, **Rebase**, **Duplicate**, or **New Change** dialog
-  while stale — the commit picker shows the stale notification instead of silently staying empty
-  or freezing; **Update Stale Workspace** repairs it and the picker populates
-- [ ] Open the **Move Bookmark** dialog while stale — it does not silently mislabel every
-  candidate as "backward/sideways"; it shows the stale notification instead
-- [ ] Open **Show History** on a file while stale — shows the notification, not a silently empty
-  history table
-- [ ] In a multi-repo project, stale only one repo's workspace — the other repo's Working
-  copy/Log data is unaffected, and repo-root icons in the changes tree still render correctly
-  for both (no freeze scrolling a large changes tree while one repo is stale)
-- [ ] With the workspace healthy again, deliberately create a **real** bookmark name conflict
-  (create a bookmark with a name that already exists) — confirm it still shows the correct
-  "already exists" message (the exit-code fix must not regress the true-positive case)
+- [ ] Expected: no red "IDE Internal Error" balloon and no "Uncaught exception" background warning; a WARNING notification **"Jujutsu Workspace Is Stale"** appears with **Update Stale Workspace** and **Retry** actions. The Working copy tool window's empty state shows the stale-specific message (not the generic "could not be read" text) with its own **Update Stale Workspace** link
+- [ ] While stale, the Working copy tool window's toolbar and context menus and the changes tree show every action simply disabled or hidden, with no uncaught exception. Clicking **Update Stale Workspace** (notification or empty-state link) runs `jj workspace update-stale` and the tool window/Log repopulate on their own within ~1 s, with no manual Retry/re-scan
+- [ ] Triggering **Advance Bookmark**, **Rename Bookmark**, **Create Bookmark**, **Move Bookmark**, **Set Tag** or **Git → Push** while stale shows the **Update Stale Workspace**/**Retry** notification (not a crash, and not a wrong message like "bookmark already exists"), and clicking **Update Stale Workspace** both repairs the workspace *and* completes the interrupted action (the bookmark actually advances/renames/moves, the push dialog actually opens)
+- [ ] Opening the **Squash**, **Squash Into**, **Rebase**, **Duplicate** or **New Change** dialog while stale shows the stale notification in the commit picker instead of staying silently empty or freezing, and **Update Stale Workspace** repairs it and populates the picker. The **Move Bookmark** dialog shows the stale notification instead of silently mislabelling every candidate "backward/sideways". **Show History** on a file shows the notification, not a silently empty history table
+- [ ] In a multi-repo project with only one repo's workspace stale, the other repo's Working copy/Log data is unaffected and repo-root icons in the changes tree still render for both (no freeze scrolling a large changes tree while one repo is stale)
+- [ ] With the workspace healthy again, deliberately creating a **real** bookmark name conflict (a bookmark whose name already exists) still shows the correct "already exists" message
 
-#### jj Not Responding (jj-idea-1bio)
+#### jj Not Responding
 
-A jj timeout (30s) is a busy system, not a broken repo. Simulate it with a wrapper script as the
-jj path (Settings → Version Control → Jujutsu):
+A jj timeout (30 s) is a busy system, not a broken repo. Simulate it with a wrapper script as the jj path (Settings → Version Control → Jujutsu):
 
 ```bash
 #!/bin/sh
@@ -2655,258 +1101,103 @@ case "$*" in *"-r @"*) sleep 35;; esac
 exec jj "$@"
 ```
 
-- [ ] Open a project with the wrapper active, from a cold start: after ~30s a WARNING
-  **"Jujutsu Is Not Responding"** balloon appears with only a **Retry** action (no
-  "Configure VCS Mappings"), and does **not** say "broken, moved, or incompatible"
-- [ ] While that first load is still waiting (the first ~30s), the Working copy tool window
-  says **"Loading Jujutsu repositories, please wait..."** with no link — not "No Jujutsu
-  repositories configured"
-- [ ] Close the project window and reopen the same project **without restarting the IDE**: the
-  balloon appears again (it must not be suppressed by the earlier one)
-- [ ] The Working copy tool window's empty state then says jj did not respond within 30 seconds /
-  the system may be busy, with a **Retry** link; Settings → Directory Mappings does **not**
-  show the root in red
-- [ ] Restore the real jj path and click **Retry** — the tool window and Log populate
-- [ ] With data already loaded, re-activate the wrapper and trigger a refresh (e.g. edit a
-  file): the Working copy and Log data stay visible; only the balloon appears
-- [ ] A genuinely broken store still shows the original "could not be read" balloon (see
-  the unreadable-repo section above)
+- [ ] Opening a project with the wrapper active from a cold start shows, after ~30 s, a WARNING **"Jujutsu Is Not Responding"** balloon with only a **Retry** action (no "Configure VCS Mappings") that does **not** say "broken, moved, or incompatible". During the first ~30 s the Working copy tool window says **"Loading Jujutsu repositories, please wait..."** with no link, not "No Jujutsu repositories configured"
+- [ ] Closing the project window and reopening the same project **without restarting the IDE** shows the balloon again (it must not be suppressed by the earlier one)
+- [ ] The tool window's empty state then says jj did not respond within 30 seconds / the system may be busy, with a **Retry** link, and Settings → Directory Mappings does **not** show the root in red. Restoring the real jj path and clicking **Retry** populates the tool window and Log
+- [ ] With data already loaded, re-activating the wrapper and triggering a refresh (e.g. editing a file) keeps the Working copy and Log data visible and shows only the balloon. A genuinely broken store still shows the original "could not be read" balloon (see Unreadable Repository above)
 
-#### Standard Commit Tool Window Suppression (jj-idea-wb5l)
+#### Standard Commit Tool Window Suppression
 
-- [ ] In a **jj-only** project (default setting), the standard **Commit** tool window and
-  the **Local Changes** tab are not shown; the **Working copy** tool window is the only
-  changes UI. Ctrl/Cmd+K still opens Describe (unchanged)
-- [ ] Settings → Version Control → Jujutsu → uncheck "Hide the standard Commit tool window"
-  → the Commit tool window / Local Changes tab reappears immediately, without reopening the
-  project. Re-check it → it disappears again
-- [ ] With the setting on: editor-tab and Project-view file colors for added/modified files
-  still render; editor gutter change markers still show; Annotate still works; the Working
-  copy panel's changed-files list still updates live as files change
-- [ ] In a **mixed jj + Git** project (both VCSes mapped), the standard Commit tool window
-  is still shown regardless of the setting (jj is not the single active VCS, so the setting
-  has no effect) — Git's own commit workflow is unaffected
+- [ ] In a **jj-only** project (default setting), the standard **Commit** tool window and the **Local Changes** tab are not shown; the **Working copy** tool window is the only changes UI, and Ctrl/Cmd+K still opens Describe. Unchecking Settings → Version Control → Jujutsu → "Hide the standard Commit tool window" brings the Commit tool window / Local Changes tab back immediately, without reopening the project, and re-checking hides it again
+- [ ] With the setting on, editor-tab and Project-view file colours for added/modified files still render, editor gutter change markers still show, Annotate still works, and the Working copy panel's changed-files list still updates live
+- [ ] In a **mixed jj + Git** project (both VCSes mapped), the standard Commit tool window is shown regardless of the setting (jj is not the single active VCS), and Git's own commit workflow is unaffected
 
-#### Working Copy Tool Window Signpost (jj-idea-jqpe)
+#### Working Copy Tool Window Signpost
 
-- [ ] With a fresh sandbox config (no prior `jujutsu.xml` app or project settings), open a
-  jj project → the **Working copy** tool window opens on the left automatically, but keyboard
-  focus stays wherever it was (e.g. the editor) — it doesn't steal focus
-- [ ] A sticky balloon notification appears explaining the Working copy panel and its
-  "Open Working Copy" action; clicking it activates and focuses the tool window
-- [ ] Close and reopen the same project → the tool window is not force-reopened again and no
-  balloon appears (both are one-shot per project/install)
-- [ ] Open a **second, different** jj project in the same sandbox → the tool window opens
-  automatically again (per-project), but no balloon appears (per-install, already shown)
-- [ ] Open a non-jj project → neither the tool window nor the balloon appear
+- [ ] With a fresh sandbox config (no prior `jujutsu.xml` app or project settings), opening a jj project opens the **Working copy** tool window on the left automatically while keyboard focus stays where it was (e.g. the editor). A sticky balloon explains the Working copy panel and its "Open Working Copy" action; clicking it activates and focuses the tool window
+- [ ] Closing and reopening the same project neither force-reopens the tool window nor shows the balloon (both are one-shot per project/install). A **second, different** jj project in the same sandbox opens the tool window automatically again (per-project) but shows no balloon (per-install, already shown). A non-jj project shows neither
 
-#### Sponsor Ask (jj-idea-z1ld)
+#### Sponsor Ask
 
-- [ ] Fresh sandbox config, open a jj project → no sponsor balloon on first run
-- [ ] Quit, backdate `firstRunEpochMillis` in the sandbox `jujutsu.xml` (under
-  `JujutsuApplicationSettings`) to more than 14 days ago, restart → a sticky balloon fires
-  once; clicking **Sponsor** opens `https://github.com/sponsors/kkkev` in the default browser
-- [ ] Restart again → the balloon does not reappear
-- [ ] Repeat the backdate in a fresh sandbox, click **Don't show again** instead → restart →
-  the balloon never reappears
-- [ ] The Working Copy signpost above still fires independently and is unaffected by the
-  sponsor ask (both read/write disjoint fields in `JujutsuApplicationSettingsState`)
+- [ ] With a fresh sandbox config, opening a jj project shows no sponsor balloon on first run. After quitting, backdating `firstRunEpochMillis` in the sandbox `jujutsu.xml` (under `JujutsuApplicationSettings`) to more than 14 days ago and restarting, a sticky balloon fires once, and clicking **Sponsor** opens `https://github.com/sponsors/kkkev` in the default browser. Restarting again does not show it again
+- [ ] Repeating the backdate in a fresh sandbox and clicking **Don't show again** instead means the balloon never reappears after a restart. The Working Copy signpost above still fires independently, unaffected by the sponsor ask (they use disjoint fields in `JujutsuApplicationSettingsState`)
 
-#### Version-Gated Feature Upgrade Nudge (jj-idea-sov0)
+#### Version-Gated Feature Upgrade Nudge
 
-Requires the multi-version harness — see [Test Tooling](#test-tooling) — to have a jj
-executable older than 0.39 available to point the plugin at.
+Requires the multi-version harness (see [Test Tooling](#test-tooling)) to have a jj executable older than 0.39 to point the plugin at.
 
-- [ ] Fresh sandbox config, jj executable path (Settings → Version Control → Jujutsu) pointed
-  at a pinned jj **below 0.39** (e.g. `~/.local/bin/jj-0.38`) → open a jj project → a balloon
-  fires once naming "Advance Bookmark (needs jj 0.39)" and your current version
-- [ ] Clicking **Update jj...** opens Settings → Version Control → Jujutsu
-- [ ] Restart the same sandbox → the balloon does not reappear
-- [ ] Repeat in a fresh sandbox, click **Don't show again** instead → restart → the balloon
-  never reappears
-- [ ] Change the configured jj path to a **different** old version (e.g. 0.37 instead of 0.38)
-  → the balloon fires again (re-nudges per jj version)
-- [ ] Point the executable path at a jj **0.39 or newer**, or clear it back to default
-  resolution → no balloon at all, regardless of prior dismissal state
-- [ ] Point the executable path at a jj **below the plugin's hard minimum** (0.37) → only the
-  existing "jj version too old" warning appears (MT-CROSS's Error Handling) — this nudge never
-  fires for that case
-- [ ] Open a **non-jj** project with an old jj configured → no balloon
+- [ ] With a fresh sandbox config and the jj executable path (Settings → Version Control → Jujutsu) pointed at a pinned jj **below 0.39** (e.g. `~/.local/bin/jj-0.38`), opening a jj project fires a balloon once naming "Advance Bookmark (needs jj 0.39)" and your current version. Clicking **Update jj...** opens Settings → Version Control → Jujutsu. Restarting the same sandbox does not show it again, and clicking **Don't show again** (in a fresh sandbox) means it never reappears after a restart
+- [ ] Changing the configured path to a **different** old version (e.g. 0.37 instead of 0.38) fires the balloon again (it re-nudges per jj version)
+- [ ] Pointing the path at a jj **0.39 or newer**, or clearing it back to default resolution, shows no balloon regardless of prior dismissal state. Pointing it **below the plugin's hard minimum** (0.37) shows only the existing "jj version too old" warning (MT-CROSS's Error Handling), never this nudge. Opening a **non-jj** project with an old jj configured shows no balloon
 
-#### Feature-gated upgrade prompt in Installation Help (jj-idea-vcqn, jj-idea-vwni, jj-idea-258c)
+#### Feature-gated upgrade prompt in Installation Help
 
-Surface 1 of jj-idea-xuah — the passive counterpart to the nudge balloon above. Requires the
-same multi-version harness (see [Test Tooling](#test-tooling)). `JjVersion.MINIMUM` is currently
-0.37.0 — a pinned jj exactly at or above that but below 0.39.0 (e.g. 0.37.x/0.38.x) is Scenario B
-(gated on a feature); anything below 0.37.0 is Scenario A (below the plugin's hard minimum).
+The passive counterpart to the nudge balloon above, in Settings; it needs the same multi-version harness. `JjVersion.MINIMUM` is currently 0.37.0: a pinned jj at or above that but below 0.39.0 (e.g. 0.37.x/0.38.x) is Scenario B (gated on a feature), and anything below 0.37.0 is Scenario A (below the plugin's hard minimum).
 
-This started as its own standalone "Feature Availability" group (jj-idea-vcqn), then a linked
-pair with Installation Help (jj-idea-vwni); jj-idea-258c folded the gated-feature list directly
-into Installation Help's own description, since the standalone group and its "see Installation
-Help above" pointer amounted to filler for what's fundamentally one message: "here's what's
-wrong and here's how to fix it."
-
-- [ ] With a current jj configured, open Settings → Version Control → Jujutsu → expand
-  "Installation Help" — reads "If jj is not installed, use one of these commands:" (no feature
-  list) — this is the "everything's fine" case, so there's nothing else to say here
-- [ ] Point the jj executable path at a pinned jj **below 0.39 but ≥ 0.37.0** (e.g.
-  `~/.local/bin/jj-0.38`), click Apply, **without closing Settings** — "Installation Help"
-  auto-expands live, from the same Apply that reran availability detection. Content is a
-  one-shot snapshot at panel-open time though (see below), so close and reopen Settings with
-  the same path still configured to see it read: "Your current jj version is too old. Upgrade
-  now to unlock these features:" followed by an **indented bullet line** "• Advance Bookmark
-  *(needs jj 0.39.0)*" — the "*(needs jj 0.39.0)*" part in grey secondary text, not the same
-  weight as the feature name — then "Upgrade using:" and the **upgrade** commands
-  (`brew upgrade jj`, not `brew install jj`). No separate group, no "now expanded" or similar
-  filler phrasing anywhere on the page.
-- [ ] Point the executable path at a jj **below the plugin's hard minimum** (e.g. 0.36), Apply,
-  reopen Settings — Installation Help reads "Your current jj version is too old. Upgrade using:"
-  with upgrade commands, but **no feature list** — Scenario A already has its own balloon and
-  JjNotInstalledPanel (MT-CROSS's Error Handling), so this must not double-report feature gating
-  on top of those
-- [ ] Clear the path back to default resolution (a current jj) — Installation Help **stays
-  expanded** (deliberate — the plugin never auto-collapses a group once opened, in case you
-  opened it yourself) but its content still needs a Settings reopen to drop back to the
-  "if jj is not installed" wording, per the one-shot-snapshot limitation above
+- [ ] With a current jj configured, Settings → Version Control → Jujutsu → "Installation Help" reads "If jj is not installed, use one of these commands:" with no feature list
+- [ ] Pointing the executable path at a pinned jj **below 0.39 but ≥ 0.37.0** (e.g. `~/.local/bin/jj-0.38`) and clicking Apply **without closing Settings** auto-expands "Installation Help" live (the same Apply reruns availability detection). Its content is a one-shot snapshot at panel-open time, so closing and reopening Settings with the same path shows: "Your current jj version is too old. Upgrade now to unlock these features:" followed by an **indented bullet line** "• Advance Bookmark *(needs jj 0.39.0)*" (the parenthetical in grey secondary text, not the same weight as the feature name), then "Upgrade using:" and the **upgrade** commands (`brew upgrade jj`, not `brew install jj`). There is no separate group and no "now expanded" or similar filler phrasing
+- [ ] Pointing the path **below the plugin's hard minimum** (e.g. 0.36), Apply and reopening Settings reads "Your current jj version is too old. Upgrade using:" with upgrade commands but **no feature list** (Scenario A already has its own balloon and JjNotInstalledPanel, see MT-CROSS's Error Handling, so feature gating is not double-reported). Clearing the path back to default (a current jj) leaves Installation Help **expanded** (the plugin never auto-collapses a group once opened), though its content needs a Settings reopen to drop back to the "if jj is not installed" wording
 
 #### Status Bar Widget (Switch Working Copy)
 
-- [ ] jj-idea-0hw4 (GitHub #100): open a plain Git or no-VCS project (no `.jj` root) — the
-  Jujutsu working-copy status-bar widget does not appear; running **Jujutsu → Init** in that
-  project makes it appear immediately, without restarting the IDE
-- [ ] jj-idea-fmrj: click the Jujutsu widget in the IDE status bar to open the "Switch Working
-  Copy" popup, in a repo with at least one local bookmark and one tag
-- [ ] Hover a bookmark or tag row — tooltip shows the bookmark/tag chip (icon + name, correct
-  accent color) followed by `(changeid)`, with **no broken-image glyph**
-- [ ] Hover a change row — tooltip shows change id, commit id, author (as a mailto link),
-  timestamp and description, each on its own line
-- [ ] Move the pointer between rows without leaving the list — tooltip content updates to the
-  newly hovered row
-- [ ] jj-idea-wp12: hover a row with enough entries that the list scrolls, then scroll it
-  (mouse wheel or scrollbar) without moving the pointer — the tooltip disappears and does not
-  reappear until the pointer moves
-- [ ] Regression: hover a commit row in the Jujutsu log — its tooltip still renders bookmark/tag
-  chips correctly and still reflows/scrolls for a commit with many bookmarks (jj-idea-szn8)
-- [ ] jj-idea-6nas: `jj describe` @ with a very long single-line description — the widget's
-  label ellipsizes and other status bar widgets (line/column, encoding, memory, notifications)
-  stay visible, both at full window width and after shrinking the IDE window to ~900px; hovering
-  the widget's tooltip still shows the full, untruncated description
-- [ ] jj-idea-z5uu (GitHub #95): the widget's padding, text colour, hover fill, and pressed fill
-  all match a stock status-bar widget (e.g. the encoding widget) at rest, on hover, and while
-  the mouse button is held down — check in both a light and a dark theme; dark theme hover must
-  go **lighter**, not darker
+- [ ] In a plain Git or no-VCS project (no `.jj` root) the Jujutsu working-copy status-bar widget does not appear, and running **Jujutsu → Init** there makes it appear immediately, without restarting the IDE (GitHub #100)
+- [ ] Clicking the widget in a repo with at least one local bookmark and one tag opens the "Switch Working Copy" popup. Hovering a bookmark or tag row shows a tooltip with the chip (icon + name, correct accent colour) followed by `(changeid)` and **no broken-image glyph**; hovering a change row shows change id, commit id, author (as a mailto link), timestamp and description, each on its own line. Moving the pointer between rows without leaving the list updates the tooltip to the newly hovered row
+- [ ] Hovering a row in a list long enough to scroll, then scrolling (wheel or scrollbar) without moving the pointer, hides the tooltip and it does not reappear until the pointer moves
+- [ ] `jj describe` on `@` with a very long single-line description makes the widget's label ellipsize while other status bar widgets (line/column, encoding, memory, notifications) stay visible, both at full window width and after shrinking the IDE window to ~900px; the widget's tooltip still shows the full, untruncated description
+- [ ] The widget's padding, text colour, hover fill and pressed fill match a stock status-bar widget (e.g. the encoding widget) at rest, on hover and while the mouse button is held down, in both a light and a dark theme; dark-theme hover goes **lighter**, not darker (GitHub #95)
 
 ### MT-DIFF
 
 **Diff viewing across file surfaces**
 
 **Code:** `vcs/diff/JujutsuDiffProvider.kt`, `actions/filechange/`, `vcs/annotate/`, `vcs/history/JujutsuHistoryProvider.kt`, `actions/file/OpenInRemoteFromEditorGroup.kt`, `actions/filechange/OpenFileInRemoteGroup.kt`
-**Also re-run:** MT-DIFF-PREVIEW; MT-DIFFBASE (a configured diff base changes what `Annotate`
-below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, which recur across every surface in this section
+**Also re-run:** MT-DIFF-PREVIEW; MT-DIFFBASE (a configured diff base changes what `Annotate` below annotates against); see [Known gaps](#known-gaps) for jj-idea-7d9p/zvzk, which recur across every surface in this section
 
-**Hidden-commit reads (jj-idea-wiz0, GitHub #130)**
+#### Hidden-commit reads (GitHub #130)
 
 **Code:** `jj/LogEntry.kt` (`contentLocator`/`readRevision`/`parentContentLocator`), `jj/cli/CliLogService.kt` (`getFileChanges`), `vcs/history/JujutsuFileRevision.kt`, `vcs/annotate/`, `vcs/diffbase/DiffbaseService.kt`
 
 Setup: in a scratch repo, `echo v1 > f; jj describe -m A; echo v2 > f` (the change is amended, so the v1 commit is hidden but still referenced, e.g. by a remote bookmark or by copying its commit id from `jj log -r 'all()' --hidden` / the op log).
 
-- [ ] Select the amended change in the log: the details pane and Show Diff show the *current* content; Compare with Another Commit... with the old (hidden) commit id shows v1 → v2 (not identical)
+- [ ] Selecting the amended change in the log, the details pane and Show Diff show the *current* content, and Compare with Another Commit... with the old (hidden) commit id shows v1 → v2 (not identical)
 - [ ] File History of `f`: opening the revision's content shows that commit's content, and the row for the visible commit shows v2
-- [ ] Annotate `f`, then Annotate Previous Revision on a line → previous content is read from the parent *commit*, not whatever now carries the parent's change id
-- [ ] MT-DIFFBASE: set the diff base to a revset resolving to a commit, rewrite that commit in a terminal (`jj describe`), refocus the IDE → gutter base follows the refreshed resolution (cache cleared on log refresh), no stale content after refresh
-- [ ] "Commit … is no longer available" is not reproducible locally (hidden commits stay readable); it is covered by `CommitIdReadsContractCliTest`. Not a manual step.
+- [ ] Annotate `f`, then Annotate Previous Revision on a line: previous content is read from the parent *commit*, not whatever now carries the parent's change id
+- [ ] Setting the diff base (MT-DIFFBASE) to a revset resolving to a commit, rewriting that commit in a terminal (`jj describe`) and refocusing the IDE makes the gutter base follow the refreshed resolution (cache cleared on log refresh), with no stale content
 
 #### Diffs
 
-- [ ] Show diff for a directory with changed files shows diffs for each file in the directory
-- [ ] Show diff for a directory with no changed files does nothing (no crash)
-- [ ] Diff for unchanged file shows no changes (before view has same content, shows content as identical)
-- [ ] Diff for a single-parent file shows the correct before/current pairing for each change
-      type — verify in Project Tool Window, Editors for Current Files, and Editors for
-      Historical Versions too, the assertion is identical across all four: modified
-      (before=parent, current=selected), deleted (before=parent, current=empty), added
-      (before=empty, current=@), renamed (before=@- with previous filepath, current=@)
-- [ ] Diff from working copy shows before = parent, current from working copy
-- [ ] jj-idea-zmse: right-clicking inside a diff viewer's editor pane shows "Annotate" exactly
-      once (not once at top level and again under "Jujutsu")
-- [ ] Right-hand diff pane is editable when it contains the working copy, read-only when
-      it contains a historical version
-- [ ] Binary/image diffs: commit a change that modifies a `.png`, select that commit in the
-      log and open the file's diff (and again with a later commit selected, so both sides are
-      historical) — IntelliJ's image diff viewer shows both versions as images, not garbled
-      text/bytes; an ordinary text file in the same commit still shows a syntax-highlighted
-      text diff
-- [ ] "Open in -> remote": for a single parent, opens that parent (resolves to pushed
-      ancestor); hidden when no pushed ancestor exists; for an unpushed historical version,
-      resolves to the nearest pushed ancestor — verify in Working Copy Panel, Project Tool
-      Window, Editors for Current Files, and Editors for Historical Versions
-- [ ] jj-idea-c4tp: right-click a file (editor or Working Copy panel) to open "Open in Remote"
-      immediately after opening the project (first menu open, cold cache) — submenu still lists
-      remotes correctly, with no `Synchronous execution under ReadAction` warning in Help → Show
-      Log
+- [ ] Show diff for a directory with changed files shows diffs for each file in it; for a directory with no changed files it does nothing (no crash). A diff for an unchanged file shows no changes (both sides identical)
+- [ ] A diff for a single-parent file shows the correct before/current pairing for each change type, identically in the Project Tool Window, Editors for Current Files and Editors for Historical Versions: modified (before=parent, current=selected), deleted (before=parent, current=empty), added (before=empty, current=`@`), renamed (before=`@-` with the previous filepath, current=`@`). A diff from the working copy shows before = parent, current from the working copy
+- [ ] Right-clicking inside a diff viewer's editor pane shows "Annotate" exactly once (not at top level and again under "Jujutsu"). The right-hand diff pane is editable when it holds the working copy and read-only when it holds a historical version
+- [ ] Binary/image diffs: committing a change to a `.png`, selecting that commit in the log and opening the file's diff (and again with a later commit selected, so both sides are historical) shows IntelliJ's image diff viewer with both versions as images, not garbled text; an ordinary text file in the same commit still shows a syntax-highlighted text diff
+- [ ] "Open in → remote": for a single parent it opens that parent (resolving to the pushed ancestor); it is hidden when no pushed ancestor exists; for an unpushed historical version it resolves to the nearest pushed ancestor. Verify in the Working Copy Panel, Project Tool Window, Editors for Current Files and Editors for Historical Versions
+- [ ] Right-clicking a file (editor or Working Copy panel) to open "Open in Remote" immediately after opening the project (first menu open, cold cache) still lists the remotes correctly, with no `Synchronous execution under ReadAction` warning in Help → Show Log
 
 #### Project Tool Window
 
-- [ ] File in tool window has a Jujutsu menu with "Show Diff" and "Compare with Another Commit..."
-- [ ] jj-idea-lo7u: menu also has "Compare Before with Another Commit..." for a historical
-      selection; hidden for the working-copy entry and for a root commit
-- [ ] Show diff for multiple files opens multiple editors
-- [ ] Menu has Open in -> remote (see Diffs above for the single-parent/no-ancestor cases)
+- [ ] A file in the tool window has a Jujutsu menu with "Show Diff" and "Compare with Another Commit...", plus "Compare Before with Another Commit..." for a historical selection (hidden for the working-copy entry and a root commit). Show diff for multiple files opens multiple editors. The menu has Open in → remote (see Diffs above)
 
 #### Editors for Current Files
 
-- [ ] Jujutsu menu has "Show Diff", "Compare with Another Commit", and "Annotate"
-- [ ] Annotate fetches annotations for the correct revision
-- [ ] jj-idea-7rxm (GitHub #140): clicking an annotation's change id / author selects that change in the Jujutsu log, including a change older than the log's change limit (use FX-STRESS with `SCALE=6`)
-- [ ] jj-idea-7rxm: with the log's date (or author) filter excluding that change, the same click shows a "hidden by the current log filters" balloon; **Reset Filters** clears every filter chip and the search text and selects the change
-- [ ] jj-idea-7rxm: close the Jujutsu log tab, then click an annotation: the tab reopens and the change is selected (not a silent no-op)
-- [ ] "Annotate Previous Revision" on a line owned by a single-parent commit re-annotates at that commit's parent
-- [ ] "Annotate Previous Revision" on a line owned by a merge commit is unavailable/no-op (no incorrect ancestor shown)
-- [ ] jj-idea-xssw: "Annotate Previous Revision" on a line whose own change added the file (no
-      earlier version exists) declines gracefully — no raw error, no logged ReadAction-violation
-      warning (`idea.log`/Help → Show Log)
-- [ ] Annotate on a file whose working copy is a merge commit succeeds (no "resolved to more than one revision" error)
-- [ ] Annotate on a merge commit with a resolved conflict shows no "line count" warning, and correctly attributes lines inherited from each parent plus the conflict-resolution line(s) to the merge commit itself
-- [ ] Annotate on a merge commit where the file exists in only some parents (e.g. a criss-cross merge) succeeds (no "No such path" error), attributing blame from whichever parents have the file
-- [ ] jj-idea-innq: on a repo where annotate is slow (FX-STRESS with `SCALE=6`, or GitHub #64's repo), start
-      Annotate and click the ✕ on the "Retrieving annotations" progress. Within about a second,
-      `ps aux | grep 'jj file annotate'` shows no process, and `idea.log` shows `Cancelled in … jj file annotate`
-      at INFO level with no error report. A fresh Annotate afterwards still works.
-      → automate: `CliExecutorCancellationPlatformTest` covers the executor; this checks the platform task really cancels
-- [ ] jj-idea-mn1a: with the IDE on a **light** theme, the change-id column in the annotation
-      gutter is readable, not washed-out
-- [ ] Has open in -> remote (see Diffs above)
+- [ ] The Jujutsu menu has "Show Diff", "Compare with Another Commit" and "Annotate", plus Open in → remote (see Diffs above). Annotate fetches annotations for the correct revision
+- [ ] Clicking an annotation's change id / author selects that change in the Jujutsu log, including a change older than the log's change limit (FX-STRESS with `SCALE=6`). With the log's date (or author) filter excluding that change, the same click shows a "hidden by the current log filters" balloon, and **Reset Filters** clears every filter chip and the search text and selects the change. With the Jujutsu log tab closed, clicking an annotation reopens the tab and selects the change (not a silent no-op) (GitHub #140)
+- [ ] "Annotate Previous Revision" on a line owned by a single-parent commit re-annotates at that commit's parent; on a line owned by a merge commit it is unavailable or a no-op (no incorrect ancestor shown); on a line whose own change added the file (no earlier version exists) it declines gracefully, with no raw error and no logged ReadAction-violation warning
+- [ ] Annotate on a file whose working copy is a merge commit succeeds (no "resolved to more than one revision" error). On a merge commit with a resolved conflict it shows no "line count" warning and attributes lines inherited from each parent, plus the conflict-resolution line(s), to the merge commit itself. On a merge commit where the file exists in only some parents (e.g. a criss-cross merge) it succeeds with no "No such path" error, attributing blame from whichever parents have the file
+- [ ] On a repo where annotate is slow (FX-STRESS with `SCALE=6`, or GitHub #64's repo), starting Annotate and clicking the ✕ on the "Retrieving annotations" progress leaves, within about a second, no process in `ps aux | grep 'jj file annotate'`, and `idea.log` shows `Cancelled in … jj file annotate` at INFO level with no error report. A fresh Annotate afterwards still works. → automate: `CliExecutorCancellationPlatformTest` covers the executor; this checks the platform task really cancels
+- [ ] On a **light** theme the change-id column in the annotation gutter is readable, not washed out
 
 #### Editors for Historical Versions
 
-- [ ] Has title including change id, and a Jujutsu menu with diff and "compare with another commit"
-- [ ] Compare with another commit opens that commit on LHS, editor's version on RHS
-- [ ] jj-idea-lo7u: Jujutsu menu also has "Compare Before with Another Commit..."; it opens the
-      parent of the editor's revision on LHS and the chosen commit on RHS; hidden for the
-      working-copy entry and for a root commit
-- [ ] jj-idea-hq4d: "Annotate" is enabled (both via right-click and the Jujutsu menu) for a file
-      opened from a historical commit — it used to be greyed out
-- [ ] Annotate fetches annotations for the correct revision
-- [ ] Has open in -> remote (see Diffs above, including the unpushed-historical-version case)
+- [ ] The editor has a title including the change id and a Jujutsu menu with diff and "compare with another commit" (and Open in → remote, including the unpushed-historical-version case in Diffs above). Compare with another commit opens that commit on the left and the editor's version on the right
+- [ ] The Jujutsu menu also has "Compare Before with Another Commit...", which opens the parent of the editor's revision on the left and the chosen commit on the right; it is hidden for the working-copy entry and for a root commit
+- [ ] "Annotate" is enabled (via right-click and the Jujutsu menu) for a file opened from a historical commit, and fetches annotations for the correct revision
 
 #### File History
 
-- [ ] jj-idea-hq4d: opening a file from the File History panel (right-click a file → "Show File
-      History", pick an older revision, open the file) enables "Annotate"; it produces a blame
-      gutter for that revision's content
-- [ ] Binary/image history: open the platform history tab for a `.png` changed across a few
-      commits, and show the diff between two revisions — it renders as an image diff, not
-      text
-- [ ] jj-idea-qrne: open a file's platform history tab (editor's Jujutsu submenu → "Show
-      History") — Date, Author, and Committer columns are populated for every revision, not
-      blank
-- [ ] jj-idea-a1fh: in that same tab, click the "Commit Time" column header twice — rows
-      order chronologically (oldest→newest, then newest→oldest), not alphabetically by
-      committer name
-- [ ] jj-idea-c2m8 (GitHub #122): delete a tracked file (`rm`) → right-click it alone in the
-      Working Copy panel's changed-files tree → **Show File History** is offered and opens
-      history for it (it used to be hidden, the same root cause as MT-WORKINGCOPY's Restore
-      dialog checks)
+- [ ] Opening a file from the File History panel (right-click a file → "Show File History", pick an older revision, open the file) enables "Annotate", which produces a blame gutter for that revision's content
+- [ ] Opening a `.png`'s platform history tab across a few commits and showing the diff between two revisions renders an image diff, not text
+- [ ] In a file's platform history tab (editor's Jujutsu submenu → "Show History"), the Date, Author and Committer columns are populated for every revision, and clicking the "Commit Time" column header twice orders rows chronologically (oldest→newest, then newest→oldest), not alphabetically by committer name
+- [ ] Deleting a tracked file (`rm`) and right-clicking it alone in the Working Copy panel's changed-files tree offers **Show File History** and opens history for it (GitHub #122; see MT-WORKINGCOPY "Restore dialog")
 
 ### MT-DIFF-PREVIEW
 
@@ -2916,149 +1207,45 @@ Setup: in a scratch repo, `echo v1 > f; jj describe -m A; echo v2 > f` (the chan
 **Referenced by:** MT-LOG-DETAILS (Details Changes Panel), MT-WORKINGCOPY (Working Copy Panel),
 MT-DIFF
 
-This is the canonical diff preview-tab check, deduplicated from the three surfaces above —
-verify it once per surface it's referenced from, not three times independently:
+This is the canonical diff preview-tab check, deduplicated from the three surfaces above: verify it once per surface it's referenced from, not three times independently.
 
-- [ ] Double-click file opens diff in a single editor tab (preview tab)
-- [ ] Enter on selected file opens the same diff tab
-- [ ] Clicking a different file while the diff tab is open swaps its content; tab count stays at 1
-- [ ] Single click does nothing if diff tab is not open
-- [ ] Single click swaps diff content if diff tab is already open
-- [ ] Escape inside the diff tab closes it
-- [ ] Cmd/Ctrl+D opens the same diff preview tab (routes through preview when available)
-- [ ] F4 still opens the file in a regular editor tab (no "Synchronous execution on EDT" error in IDE log)
-- [ ] With the diff tab open and a different (regular) editor tab focused, edit and save that file — the editor stays on it; it does not switch to the diff tab (GitHub #67)
-- [ ] jj-idea-q6vn: with the diff tab open on a long file, scrolled away from the top, edit and save a *different* tracked file from outside the IDE (e.g. a terminal) — once the background refresh lands, the diff stays scrolled where it was, it does not jump to the top
-- [ ] jj-idea-q6vn / jj-idea-ouul (GitHub #67): with `@` selected and its diff tab open on the working-copy side, the right-hand pane title reads "Current" (not the change id) and is editable; on a long file, scroll well away from the top, then edit and save *that same file* (the one shown in the diff, not a different one) — content updates in place and scroll position is unchanged
+- [ ] Double-clicking a file, or pressing Enter on a selected file, opens its diff in a single editor tab (preview tab). Clicking a different file while the diff tab is open swaps its content and the tab count stays at 1; a single click does nothing if no diff tab is open
+- [ ] Escape inside the diff tab closes it. Cmd/Ctrl+D opens the same diff preview tab (routing through the preview when available), and F4 still opens the file in a regular editor tab (no "Synchronous execution on EDT" error in the IDE log)
+- [ ] With the diff tab open and a different (regular) editor tab focused, editing and saving that file leaves the editor on it; it does not switch to the diff tab (GitHub #67)
+- [ ] With the diff tab open on a long file scrolled away from the top, editing and saving a *different* tracked file from outside the IDE (e.g. a terminal) leaves the diff scrolled where it was once the background refresh lands. With `@` selected and its diff tab open on the working-copy side, the right-hand pane title reads "Current" (not the change id) and is editable; on a long file scrolled well away from the top, editing and saving *that same file* updates the content in place with the scroll position unchanged (GitHub #67)
 
 ### MT-DIFFBASE
 
-**Custom diff base for gutter markers and Annotate (jj-idea-fwea, GitHub #43)**
+**Custom diff base for gutter markers and Annotate (GitHub #43)**
 
-**Code:** `vcs/diffbase/`, `settings/DiffbaseStrategy.kt`, `settings/JujutsuConfigurable.kt` (Diff Base group + per-repo override), `actions/diffbase/SetDiffbaseAction.kt` (quick action, jj-idea-g1io), `actions/JujutsuMainMenuGroup.kt` (VCS-menu submenu)
+**Code:** `vcs/diffbase/`, `settings/DiffbaseStrategy.kt`, `settings/JujutsuConfigurable.kt` (Diff Base group + per-repo override), `actions/diffbase/SetDiffbaseAction.kt` (quick action), `actions/JujutsuMainMenuGroup.kt` (VCS-menu submenu)
 **Also re-run:** MT-DIFF (Annotate is the other consumer of the diff base); MT-SETTINGS (the settings group itself); MT-CTXMENU (the quick action's "Pin to Revision..." shares `RevisionSelectorPopup`); MT-WORKINGCOPY (gutter markers); MT-CROSS (multi-repo submenu)
 
-Requires a repo with at least one immutable ancestor and a few mutable commits above it (e.g.
-`jj new trunk()` a couple of times) so "latest immutable ancestor" differs visibly from `@-`.
+Requires a repo with at least one immutable ancestor and a few mutable commits above it (e.g. `jj new trunk()` a couple of times) so "latest immutable ancestor" differs visibly from `@-`.
 
-- [ ] Settings → Version Control → Jujutsu → **Diff Base** defaults to "Working copy parent
-      (default)" on a fresh install; gutter markers and Annotate behave exactly as before this
-      feature existed
-- [ ] jj-idea-fwea: the "Working copy parent", "Latest immutable ancestor" and "Previous commit"
-      radio buttons show a "(?)" icon after the label — hovering (or focusing) it shows the
-      underlying revset (`@-` / `latest(ancestors(@-) & immutable())` /
-      `latest(@-- | latest(ancestors(@-) & immutable()))`); the labels themselves stay short, no
-      raw revset text visible without hovering
-- [ ] jj-idea-zf1j (GitHub #133): add a file in a mutable ancestor (`echo foo>foo.rs; jj commit`),
-      then `echo bar>>foo.rs` — with base "Latest immutable ancestor" or "Previous commit", every
-      line of `foo.rs` shows an *added* marker (the file doesn't exist at the base); with
-      "Working copy parent" only the new line is marked
-- [ ] jj-idea-bia2: with the same setup, Jujutsu → Annotate on `foo.rs` (base "Latest immutable
-      ancestor" or "Previous commit"), the editor right-click **Jujutsu** submenu has no Annotate
-      entry (it is present for files that exist at the base, and with "Working copy parent");
-      the platform's other Annotate entry points (main menu, gutter) still work and show a
-      "Nothing to annotate" balloon with no strip and the item unticked
-- [ ] jj-idea-bia2: show Annotate on a file with base "Working copy parent", then change the base
-      to "Latest immutable ancestor" and Apply — the open annotation is removed and the Annotate
-      menu item unticks (no stale blame left on a line of a now fully-added file); Annotate again
-      to get blame against the new base
-- [ ] Select "Latest immutable ancestor (trunk)", click Apply — without touching the editor,
-      every open file's gutter markers expand to the full diff vs trunk (not just vs `@-`)
-- [ ] jj-idea-g1io: select "Previous commit (grandparent)", click Apply — gutter markers narrow
-      to the last two commits' worth of change. `jj edit` onto a change directly on trunk (no
-      mutable grandparent) and re-check — it falls back to trunk, not past it, into immutable
-      history
-- [ ] Annotate the same file (Jujutsu → Annotate). **Alignment check:** every blame line lines
-      up with the correct source line; lines changed anywhere in the stack read as
-      unattributed, not shifted onto the wrong line — this is the bug this feature exists to
-      prevent (gutter base and Annotate base must never disagree)
-- [ ] Select "Custom revset", type `trunk()`, click **Test** — reports success per repo; gutter
-      and Annotate match the "Latest immutable ancestor" case above
-- [ ] Type an invalid revset (e.g. `zz(`) and click **Test** — the raw jj error wraps instead
-      of widening the panel (same pattern as the Log revset's Test button)
-- [ ] Type a revset that matches more than one revision (e.g. `heads(mutable())` in a repo with
-      concurrent branches) and click **Test** — reports it resolves to N revisions, not one,
-      as an error rather than success; Apply is blocked the same way an unresolvable revset is
-- [ ] Leaving "Custom revset" selected with an empty field shows a validation error on Apply
-- [ ] **Live update with an editor already open** (changed by jj-idea-bia2): with a file's
-      Annotate gutter already showing, switch the base (any strategy) and click Apply — *without*
-      closing the editor, the annotation columns are removed and the Annotate menu item unticks.
-      No stale blame stays on any line, no balloon appears and no "Number of lines annotated by
-      Jujutsu is not equal to number of lines in the file" banner appears at the top of the
-      editor; Annotate again to get blame against the new base. Repeat across all four strategies
-- [ ] Multi-repo project: set a per-repo override (Repository Settings → the repo's group →
-      "Override diff base") on one repo only — confirm only that repo's files use the
-      override, in both the gutter and Annotate; the other repo keeps using the project default
-- [ ] jj-idea-fwea: with at least one repo (so the "Repository Settings" group renders — the
-      automated `JujutsuConfigurablePanelTest` fixture has none and can't cover this), the
-      per-repo "Override diff base" combo box shows short strategy names, not the raw revset
-      text; a grey comment line below it explains what `@-` and "Latest immutable ancestor"
-      resolve to. Opening Settings → Version Control → Jujutsu at its default size shows no
-      horizontal scrollbar with this group expanded (see jj-idea-bwdk's width checklist above)
-- [ ] Edge cases: a repo with no immutable ancestor falls back to `@-` (no error dialog, no
-      crash); an ignored or unversioned file gets no gutter markers and no error; a file opened
-      from the log or File History (a historical version) is unaffected; the **Local Changes** /
-      **Working copy** panel keeps showing changes vs `@-` regardless of this setting
+- [ ] Settings → Version Control → Jujutsu → **Diff Base** defaults to "Working copy parent (default)" on a fresh install, with gutter markers and Annotate comparing against `@-`. The "Working copy parent", "Latest immutable ancestor" and "Previous commit" radio buttons show a "(?)" icon after the label whose hover/focus text is the underlying revset (`@-` / `latest(ancestors(@-) & immutable())` / `latest(@-- | latest(ancestors(@-) & immutable()))`); the labels stay short, with no raw revset text visible without hovering
+- [ ] Selecting "Latest immutable ancestor (trunk)" and clicking Apply, without touching the editor, expands every open file's gutter markers to the full diff vs trunk (not just vs `@-`). Selecting "Previous commit (grandparent)" narrows them to the last two commits' worth of change; after `jj edit` onto a change directly on trunk (no mutable grandparent) it falls back to trunk, not past it into immutable history
+- [ ] After adding a file in a mutable ancestor (`echo foo>foo.rs; jj commit`) and then `echo bar>>foo.rs`, with base "Latest immutable ancestor" or "Previous commit" every line of `foo.rs` shows an *added* marker (the file doesn't exist at the base), while with "Working copy parent" only the new line is marked (GitHub #133)
+- [ ] With that same setup and base "Latest immutable ancestor" or "Previous commit", the editor's right-click **Jujutsu** submenu has no Annotate entry (it is present for files that exist at the base and with "Working copy parent"), while the platform's other Annotate entry points (main menu, gutter) still work and show a "Nothing to annotate" balloon with no strip and the item unticked
+- [ ] **Live update with an editor already open**: with a file's Annotate gutter showing, switching the base (any of the four strategies) and clicking Apply, *without* closing the editor, removes the annotation columns and unticks the Annotate menu item. No stale blame stays on any line, no balloon appears, and no "Number of lines annotated by Jujutsu is not equal to number of lines in the file" banner appears at the top of the editor; Annotating again gives blame against the new base
+- [ ] Annotating the same file (Jujutsu → Annotate) after each switch lines up every blame line with the correct source line; lines changed anywhere in the stack read as unattributed, not shifted onto the wrong line (the gutter base and the Annotate base must never disagree)
+- [ ] Selecting "Custom revset", typing `trunk()` and clicking **Test** reports success per repo, and the gutter and Annotate match the "Latest immutable ancestor" case. An invalid revset (e.g. `zz(`) makes **Test** show the raw jj error wrapped instead of widening the panel. A revset resolving to more than one revision (e.g. `heads(mutable())` with concurrent branches) is reported as an error ("resolves to N revisions"), and Apply is blocked as for an unresolvable revset. "Custom revset" selected with an empty field shows a validation error on Apply
+- [ ] In a multi-repo project, a per-repo override (Repository Settings → the repo's group → "Override diff base") on one repo affects only that repo's files, in both the gutter and Annotate; the other repo keeps the project default. The per-repo "Override diff base" combo box shows short strategy names, not raw revset text, with a grey comment line explaining what `@-` and "Latest immutable ancestor" resolve to (the automated `JujutsuConfigurablePanelTest` fixture has no repo, so it can't cover this). Settings at its default size shows no horizontal scrollbar with this group expanded (see MT-SETTINGS "Settings panel width")
+- [ ] Edge cases: a repo with no immutable ancestor falls back to `@-` (no error dialog, no crash); an ignored or unversioned file gets no gutter markers and no error; a file opened from the log or File History (a historical version) is unaffected; the **Local Changes** / **Working copy** panel keeps showing changes vs `@-` whatever this setting is
 
-**Quick action (jj-idea-g1io, GitHub #43)**
+#### Quick action (GitHub #43)
 
-The reporter asked for a fast, task-driven way to switch the diff base, in addition to the
-settings row above. It writes the same per-repo setting, always as an explicit per-repo override
-(even in a single-repo project) — so it and the settings row can never disagree, but also so the
-project-level radios in Settings can read "Working copy parent" while a repo's real base is
-something else; only the repo's own "Repository Settings" group shows the truth (jj-idea-4tcf
-would add a live indicator here).
+The quick action is a fast, task-driven way to switch the diff base in addition to the settings row. It writes the same per-repo setting, always as an explicit per-repo override (even in a single-repo project), so it and the settings row can never disagree; the project-level radios in Settings can read "Working copy parent" while a repo's real base is something else, and only the repo's own "Repository Settings" group shows the truth (jj-idea-4tcf would add a live indicator).
 
-The popup deliberately splits "pick a revision" into two entries rather than one: **"Custom
-revset..."** saves a typed expression (e.g. `trunk()`) verbatim, re-resolved on every future diff
-base change, while **"Pin to Revision..."** freezes to whatever concrete commit the picked
-bookmark/tag/change resolves to right now. Reusing a single picker for both used to silently
-convert a typed expression into a frozen commit id once its own background resolution caught up —
-confirm that's no longer possible (below).
+The popup splits "pick a revision" into two entries: **"Custom revset..."** saves a typed expression (e.g. `trunk()`) verbatim, re-resolved on every future diff base change, while **"Pin to Revision..."** freezes to whatever concrete commit the picked bookmark/tag/change resolves to right now.
 
-- [ ] **VCS main menu** — "Initialise Jujutsu Repository" is a loose top-level entry (via the
-      platform's `Vcs.Import` group), same as Git/Mercurial/Subversion's own "init" actions —
-      confirm it appears exactly once, not duplicated
-- [ ] **VCS main menu → "Jujutsu"** — a submenu (pin icon) containing "Undo `<last action>`" and
-      "Set Diff Base", sitting in the **same section as the "Git" submenu** (both are `VcsGlobalGroup`
-      entries anchored after the `Vcs.Specific` marker) — with a Git-colocated or separate Git
-      project open, confirm "Jujutsu" and "Git" appear adjacent to each other, not in different
-      parts of the menu. "Initialise Jujutsu Repository" is deliberately **not** inside this
-      submenu, matching Git.Init not being inside Git.Menu either
-- [ ] In a project with **no jj repo yet**, the "Jujutsu" submenu is entirely absent (nothing left
-      in it needs to be reachable before a repo exists — only "Initialise Jujutsu Repository"
-      does, and it has its own placement above); "Initialise Jujutsu Repository" itself stays
-      reachable via the VCS menu, the VCS Operations popup, and the tool window's "Create
-      Repository" button, same as always
-- [ ] "Set Diff Base" opens a popup listing "Working copy parent", "Latest immutable ancestor",
-      "Previous commit", "Custom revset...", "Pin to Revision...", and "Configure in Settings..."
-      — a checkmark marks the repo's current strategy
-- [ ] Pick "Latest immutable ancestor" from the popup — the popup **closes immediately** (not a
-      checkbox that stays open), open editors' gutter markers widen to the full diff vs trunk
-      right away, and reopening the popup shows the checkmark moved to "Latest immutable
-      ancestor", not stuck on the old entry
-- [ ] "Custom revset..." with no override yet active opens an input dialog (a coloured, completing revset field; Enter accepts, unless a
-      completion list is showing) with an empty field;
-      type `trunk()`, OK — gutters/Annotate rebase onto trunk; reopening the popup shows a
-      trailing "Custom: `trunk()`" row, checked, and Settings → Version Control → Jujutsu shows
-      the repo's "Override diff base" row checked with "Custom revset" and `trunk()` **verbatim**
-      (not a resolved change id) — re-run this after letting the field sit idle for a couple of
-      seconds before confirming, to specifically catch the frozen-commit-id regression this fix
-      targets
-- [ ] Reopen "Custom revset..." — the dialog is now pre-filled with the active revset (`trunk()`)
-- [ ] Type an invalid revset (e.g. `zz(`) into "Custom revset..." — an error dialog appears and
-      the diff base is unchanged; type one that resolves to more than one revision (e.g.
-      `heads(mutable())`) — a distinct "resolves to N revisions" error, also unchanged
-- [ ] "Pin to Revision..." opens the familiar revision picker (search, bookmarks/tags, free-form
-      revset) — picking a bookmark rebases the gutters onto its **current** resolved commit; the
-      popup then shows "Custom: `<bookmark>`" checked
-- [ ] Annotate the file (Jujutsu → Annotate) after each switch — blame lines stay aligned with
-      source lines (same alignment check as MT-DIFFBASE's main flow)
-- [ ] **Editor context menu** → Jujutsu → "Set Diff Base" reaches the same popup
-- [ ] **Multi-repo project**, VCS menu → Jujutsu → "Set Diff Base" with no file/editor in context
-      — one submenu per repository (named by repo); setting one repo's base leaves the other
-      repo's untouched
-- [ ] "Configure in Settings..." opens Settings → Version Control → Jujutsu
+- [ ] The **VCS main menu** has "Initialise Jujutsu Repository" as a loose top-level entry (via the platform's `Vcs.Import` group, like Git/Mercurial/Subversion's init actions), appearing exactly once. It also has a **"Jujutsu"** submenu (pin icon) containing "Undo `<last action>`" and "Set Diff Base", sitting in the **same section as the "Git" submenu** (both are `VcsGlobalGroup` entries anchored after the `Vcs.Specific` marker): with a Git-colocated or separate Git project open, "Jujutsu" and "Git" appear adjacent. "Initialise Jujutsu Repository" is deliberately **not** inside this submenu, as Git.Init is not inside Git.Menu
+- [ ] In a project with **no jj repo yet**, the "Jujutsu" submenu is entirely absent, while "Initialise Jujutsu Repository" stays reachable via the VCS menu, the VCS Operations popup and the tool window's "Create Repository" button
+- [ ] "Set Diff Base" opens a popup listing "Working copy parent", "Latest immutable ancestor", "Previous commit", "Custom revset...", "Pin to Revision..." and "Configure in Settings...", with a checkmark on the repo's current strategy. Picking "Latest immutable ancestor" **closes the popup immediately** (not a checkbox that stays open), widens open editors' gutter markers to the full diff vs trunk right away, and reopening the popup shows the checkmark moved to it. "Configure in Settings..." opens Settings → Version Control → Jujutsu
+- [ ] "Custom revset..." with no override active opens an input dialog (a coloured, completing revset field; Enter accepts unless a completion list is showing) with an empty field. Typing `trunk()` and OK rebases gutters/Annotate onto trunk; reopening the popup shows a trailing "Custom: `trunk()`" row, checked, and Settings → Version Control → Jujutsu shows the repo's "Override diff base" row checked with "Custom revset" and `trunk()` **verbatim** (not a resolved change id). Repeat after letting the field sit idle for a couple of seconds before confirming, to catch the old frozen-commit-id behaviour. Reopening "Custom revset..." pre-fills the active revset (`trunk()`)
+- [ ] An invalid revset (e.g. `zz(`) in "Custom revset..." shows an error dialog and leaves the diff base unchanged; one resolving to more than one revision (e.g. `heads(mutable())`) shows a distinct "resolves to N revisions" error, also unchanged
+- [ ] "Pin to Revision..." opens the familiar revision picker (search, bookmarks/tags, free-form revset); picking a bookmark rebases the gutters onto its **current** resolved commit, and the popup then shows "Custom: `<bookmark>`" checked. Annotate after each switch keeps blame lines aligned with source lines
+- [ ] The editor context menu → Jujutsu → "Set Diff Base" reaches the same popup. In a **multi-repo project**, VCS menu → Jujutsu → "Set Diff Base" with no file/editor in context shows one submenu per repository (named by repo), and setting one repo's base leaves the other's untouched
 
 ### MT-CONFLICT
 
@@ -3070,410 +1257,130 @@ confirm that's no longer possible (below).
 
 #### Detection
 
-- [ ] `file.txt` appears in the Working Copy panel with red (MERGED_WITH_CONFLICTS) status
-- [ ] All three marker styles (git, snapshot, diff) correctly mark the file as conflicted
-- [ ] Under each marker style, "Resolve Conflicts…" shows correctly-oriented, commit-labelled
-      panes (see "Rebase conflict pane orientation and titles" below) — not just that the file is
-      detected as conflicted
-- [ ] (GitHub #138) Give one conflicting commit a description containing angle brackets, e.g.
-      `fix <foo@bar> & co` — in "Resolve Conflicts…" and in the conflict diff tab, the pane title
-      shows `<foo@bar> & co` literally (nothing dropped); the editor banner's "Accept …" link
-      and tooltip show the same text, also unescaped
+- [ ] `file.txt` appears in the Working Copy panel with red (MERGED_WITH_CONFLICTS) status under all three marker styles (git, snapshot, diff), and under each style "Resolve Conflicts…" shows correctly oriented, commit-labelled panes (see the next section)
+- [ ] A conflicting commit whose description contains angle brackets (`fix <foo@bar> & co`) shows `<foo@bar> & co` literally (nothing dropped) in the pane title of "Resolve Conflicts…" and the conflict diff tab, and in the editor banner's "Accept …" link and tooltip, also unescaped (GitHub #138)
 
-#### Rebase conflict pane orientation and titles (GitHub #112, jj-idea-l192)
+#### Rebase conflict pane orientation and titles (GitHub #112)
 
-A rebase conflict's two sides are asymmetric — one is the commit you rebased onto (jj calls this
-the "destination"), the other is your own moved commit — and which one jj renders as full content
-vs. a diff from base varies per conflict, not per operation. "Resolve Conflicts…" now reads jj's
-own per-side label out of the conflict markers to decide which side is "Yours", instead of
-guessing from marker layout.
+A rebase conflict's two sides are asymmetric: one is the commit you rebased onto (jj's "destination"), the other is your own moved commit, and which one jj renders as full content vs. a diff from base varies per conflict, not per operation. "Resolve Conflicts…" reads jj's own per-side label out of the conflict markers to decide which side is "Yours", instead of guessing from marker layout.
 
-Set up: `base` → `my change`; separately, `base` → `modified externally`; then rebase `my change`
-onto `modified externally` so it conflicts.
+Set up: `base` → `my change`; separately, `base` → `modified externally`; then rebase `my change` onto `modified externally` so it conflicts.
 
-- [ ] Opening "Resolve Conflicts…" on the conflicted file shows **your own change on the left**
-      pane and **the commit you rebased onto on the right**, titled with jj's own commit +
-      description text (e.g. `ulmlywnv "my change" (rebased revision)`), not "Yours"/"Theirs"
-- [ ] Repeat with a **descendant** of the rebased commit also conflicted (rebase a small stack,
-      not just one commit) — the orientation is the same as above for every conflicted commit in
-      the stack, not just the one directly targeted by the rebase
-- [ ] Try all three of `ui.conflict-marker-style` (`diff`, `git`, `snapshot`) — orientation and
-      titles are correct under `diff` and `git`; under `snapshot` (no commit info in the markers)
-      the panes fall back to plain **"Side #1"** / **"Side #2"** titles, content unaffected
-- [ ] A **merge** conflict (two arbitrary commits combined, not a rebase) and a **squash**
-      conflict still show today's unswapped ordering — confirm neither reads backwards now that
-      rebase conflicts do reorient
-- [ ] In the platform's native multi-file merge dialog (Commit tool window, if enabled; only on
-      an IDE where the iterative flow is off — otherwise it refuses, see below) for the
-      same rebase conflict, bulk **"Accept Yours"** and the interactive dialog's left pane resolve
-      to the **same content** — confirm with `jj status`/file content after each — and likewise
-      for **"Accept Theirs"** and the right pane
+- [ ] "Resolve Conflicts…" on the conflicted file shows **your own change on the left** pane and **the commit you rebased onto on the right**, titled with jj's own commit + description text (e.g. `ulmlywnv "my change" (rebased revision)`), not "Yours"/"Theirs". Rebasing a small stack, so that a **descendant** of the rebased commit is also conflicted, gives the same orientation for every conflicted commit in the stack
+- [ ] Under `ui.conflict-marker-style` `diff` and `git`, orientation and titles are correct; under `snapshot` (no commit info in the markers) the panes fall back to plain **"Side #1"** / **"Side #2"** titles with content unaffected
+- [ ] A **merge** conflict (two arbitrary commits combined, not a rebase) and a **squash** conflict show the unswapped ordering, neither reading backwards
+- [ ] In the platform's native multi-file merge dialog (Commit tool window; only on an IDE where the iterative flow is off, otherwise it refuses, see below), bulk **"Accept Yours"** and the interactive dialog's left pane resolve the rebase conflict to the **same content** (confirm with `jj status`/file content after each), and likewise **"Accept Theirs"** and the right pane
 
-#### Modify/delete conflicts (jj-idea-x283)
+#### Modify/delete conflicts
 
-Uses FX-MD-CONFLICT. Content conflicts (above) resolve to a merged text file either way; a
-modify/delete conflict is different — one side deleted the file entirely, so "accept" on that
-side must actually remove the file from disk, not leave an empty file behind.
+Uses FX-MD-CONFLICT. A modify/delete conflict differs from a content conflict: one side deleted the file entirely, so "accept" on that side must actually remove the file from disk, not leave an empty file behind.
 
-- [ ] `a.txt` appears in the Working Copy panel as MERGED_WITH_CONFLICTS
-- [ ] Opening the merge tool (via "Resolve Conflicts…") shows one pane empty (the deleted side)
-- [ ] In the platform's native multi-file merge dialog, using its bulk **"Accept Yours"** (or
-      **"Accept Theirs"**) button when the chosen side is the deletion **removes `a.txt` from
-      disk** — confirm with `jj status` (shows `D a.txt`, no conflict), not an empty `a.txt`
-- [ ] Using the jj-idea "Resolve Conflicts…" action's interactive merge tool, saving with an
-      empty result pane (i.e. choosing the deleted side) also **deletes `a.txt`** rather than
-      writing an empty file — confirm with `jj status`
-- [ ] Saving a genuinely edited (non-empty) result through either path still writes that content
-      normally
-- [ ] Make the repo temporarily unwritable (e.g. `chmod -w .jj/working_copy` on the resolve
-      target) and retry accept-yours/theirs from the native dialog: an **error notification**
-      appears (no silent no-op)
+- [ ] `a.txt` appears in the Working Copy panel as MERGED_WITH_CONFLICTS, and opening the merge tool via "Resolve Conflicts…" shows one pane empty (the deleted side)
+- [ ] In the platform's native multi-file merge dialog, bulk **"Accept Yours"** (or **"Accept Theirs"**) with the deletion side chosen **removes `a.txt` from disk** (`jj status` shows `D a.txt`, no conflict), not an empty `a.txt`. In the plugin's "Resolve Conflicts…" interactive merge tool, saving with an empty result pane (choosing the deleted side) also **deletes `a.txt`**, while saving a genuinely edited (non-empty) result through either path still writes that content normally
+- [ ] Making the repo temporarily unwritable (`chmod -w .jj/working_copy` on the resolve target) and retrying accept-yours/theirs from the native dialog shows an **error notification** (no silent no-op)
 
-#### Conflicts grouping node and "Resolve All Conflicts" toolbar button (GitHub #56, jj-idea-uoeg)
+#### Merge Conflicts node and toolbar buttons (GitHub #56)
 
-A reporter on GitHub #56 declined to use the Working Copy panel because, unlike the standard
-Commit tool window's single "Merge Conflicts / Resolve" grouping, it required hunting for red
-files one at a time. This adds an equivalent affordance directly to the Working Copy panel.
+- [ ] With `file.txt` conflicted, a bold **"Merge Conflicts"** node appears at the **top** of the Working Copy changes tree, above the directory/repository grouping, with a file count and a clickable **"Resolve"** link. Toggling **Group By → Directory / Repository / None** keeps the node pinned at the top in all three modes with the chosen grouping nested *inside* it. With no conflicts at all, neither the node nor the toolbar buttons appear
+- [ ] Clicking "Resolve" opens the **first** conflicted file (path order) **in the editor**, caret on its first `<<<<<<<` block, with the conflict banner showing, in one tab only, never one per file. The secondary **"Merge Tool"** link opens the three-way merge tool for every file under the node, one after another, and cancelling out of it still **leaves conflict markers intact** (the GitHub #63 invariant; confirm with `jj status`)
+- [ ] After resolving the only conflicted file, the node **disappears** on the next automatic refresh, without pressing Refresh. Collapsing the node and restarting the IDE keeps it collapsed, and it stays **collapsed** when a conflict is later created or resolved so the file count changes (the persisted collapse-state key must not embed the count)
+- [ ] Right-clicking the node itself → "Resolve Conflicts…" / "Open Merge Tool…" does the same as the inline "Resolve" / "Merge Tool" links. In a multi-repo project with conflicts in two jj roots, a single node contains both roots' conflicted files (grouped by repository underneath if that grouping is active). In a mixed jj + Git project it contains only jj conflicts, never Git-tracked ones from a co-located Git root
+- [ ] The changes-tree toolbar has a **"Resolve Conflicts in Editor"** button followed by an **"Open Merge Tool…"** button, both visible only when the working copy has at least one conflict. With a **non-conflicted** file selected and `file.txt` still conflicted elsewhere, both stay **visible and work** (they must not depend on tree selection). "Resolve Conflicts in Editor" opens the first conflicted file in the editor and "Open Merge Tool…" opens the merge tool for every conflicted file, like the node's two links
 
-- [ ] With `file.txt` conflicted, a bold **"Merge Conflicts"** node appears at the **top** of the Working Copy changes tree, above the normal directory/repository grouping, showing a file count and a clickable **"Resolve"** link
-- [ ] Clicking the node's "Resolve" link opens the **first** conflicted file (path order) **in the editor**, caret on its first `<<<<<<<` block, with the conflict banner showing — one tab only, never one per file (jj-idea-z9tp)
-- [ ] Clicking the node's secondary **"Merge Tool"** link opens the three-way merge tool for every file under that node, one after another
-- [ ] Cancelling out of the merge tool (via the "Merge Tool" link) from this entry point still **leaves conflict markers intact** (the GitHub #63 invariant — confirm with `jj status` after cancelling)
-- [ ] After resolving the only conflicted file, the "Merge Conflicts" node **disappears** on the next automatic refresh, without pressing Refresh (exercises the same jj-idea-3cvb fix as the file-level action)
-- [ ] Toggle **Group By → Directory / Repository / None** in the changes-tree toolbar: the "Merge Conflicts" node stays pinned at the top in all three modes, with the chosen grouping nested *inside* it
-- [ ] Multi-repo project with conflicts in two jj roots: a single "Merge Conflicts" node contains both roots' conflicted files (grouped by repository underneath, if that grouping is active)
-- [ ] Collapse the "Merge Conflicts" node, restart the IDE: it's still collapsed. Then create/resolve a conflict so the file count changes: it's **still collapsed** (the node's persisted collapse-state key must not embed the count)
-- [ ] Right-click the "Merge Conflicts" node itself → "Resolve Conflicts…" / "Open Merge Tool…": same as the inline "Resolve" / "Merge Tool" links respectively
-- [ ] The changes-tree toolbar has a **"Resolve Conflicts in Editor"** button and, right after it, an **"Open Merge Tool…"** button, both visible only when the working copy has at least one conflict
-- [ ] Select a **non-conflicted** file in the tree, with `file.txt` still conflicted elsewhere: both toolbar buttons **stay visible and work** (it must not depend on tree selection — this is the specific regression the button's separate action implementation exists to prevent)
-- [ ] Clicking "Resolve Conflicts in Editor" opens the first conflicted file in the editor; clicking "Open Merge Tool…" opens the merge tool for every conflicted file — same as the node's two links
-- [ ] With no conflicts at all: neither the "Merge Conflicts" node nor the toolbar button appear
-- [ ] Mixed jj + Git project: the node contains only jj conflicts, never Git-tracked conflicts from a co-located Git root
+#### Per-file resolve gestures in the Merge Conflicts node (GitHub #66)
 
-#### Per-file resolve gestures in the Merge Conflicts node (GitHub #66, jj-idea-wk7p)
+These let a user pick exactly which file(s) to act on, instead of multi-selecting several conflicted files and getting an unspecified queue order.
 
-GitHub #66: multi-selecting several conflicted files and choosing "Resolve Conflicts…" puts them
-in an unspecified queue order with no way to pick where to start or skip ahead. These gestures let
-a user pick exactly which file(s) to act on instead.
-
-- [ ] Create at least 3 conflicted files, including one **modify/delete** conflict (see the
-      "Modify/delete conflicts" section above for how to set one up). Each row in the "Merge
-      Conflicts" node shows jj's own shape text after the file name (e.g. "2-sided conflict" /
-      "2-sided conflict including 1 deletion"), matching `jj resolve --list` verbatim
-- [ ] **Double-click** one conflicted row (not multi-selected): only that file opens **in the editor** at its first conflict block (jj-idea-z9tp; the merge tool is the "Open Merge Tool…" context-menu action),
-      not a queue over the whole node
-- [ ] Double-click a **non-conflicted** row elsewhere in the tree: unaffected, still opens the
-      normal diff preview
-- [ ] Select a **single** conflicted row, right-click: the two accept actions read **"Accept
-      &lt;jj's own commit label&gt;"** for each side (matching the label the editor banner's
-      "Accept …" links show for the same file, GitHub #112) — not "Accept Yours"/"Accept Theirs"
-- [ ] Select **two or more** conflicted files from the **same rebase/merge operation**
-      (ctrl/cmd-click), right-click: the two actions read the **shared full commit label**
-      verbatim (same text as the single-file case, since every selected file names the same
-      commit), not the generic "Side #1"/"Side #2"
-- [ ] With those two-or-more files still selected, click one of the accept actions
-      (jj-idea-n6fz.2): all files resolve, **one** "Resolve conflict completed." balloon with an
-      **Undo** link appears, and `jj op log` shows **one** new `resolve` op. Click Undo **once**:
-      **every** file's markers return (not just the last one)
-- [ ] Select conflicted files from **unrelated** conflicts (different commits, even if they'd
-      share the same role word, e.g. two unconnected rebases both saying "(rebased revision)"),
-      right-click: falls back to the generic **"Accept Side #1"** / **"Accept Side #2"** rather
-      than coercing them under one label — never "Yours"/"Theirs" at any tier
-- [ ] Reproduce a conflict shaped like `ConflictMarkerFixtures.diffFromNamesADistinctSide`
-      (a diff-style side whose own label collides with the `+++++++` side's, e.g. via a divergent
-      commit) on a **single** file: the editor banner's two "Accept …" links show **different**
-      text — the diff side falls back to jj's `"from:"` identity, and the `+++++++` side still
-      shows **its own true jj label** (not a generic fallback: its label was never actually
-      unreliable, only the diff side's was) — same for the two context-menu accept actions on
-      that one file
-- [ ] Reproduce the **same** `diffFromNamesADistinctSide` shape in **two different files** and
-      select both: the two context-menu accept actions resolve exactly as in the single-file case
-      above (one shows the `"from:"` identity, the other its own true label) — not the generic
-      "Side #1"/"Side #2" just because more than one file is selected
-- [ ] Select one `diffFromNamesADistinctSide`-shaped file **together with** a
-      `ConflictMarkerFixtures.cleanRebaseConflictNamingSameCommits`-shaped file (a *clean* rebase
-      conflict naming the same two commits, but with no collision of its own, and in *swapped*
-      current/last order relative to the first file): the two accept actions show **specific
-      labels** (`change B` / `change A`, in the first selected file's order), not the generic
-      "Side #1"/"Side #2" (jj-idea-0k7k). Click **"Accept change B"**: **both** files end up with
-      change B's content (the swapped file is resolved via its opposite side), in one balloon per
-      resolve op. Undo restores both
-- [ ] Select two files that share only **one** of their two commits (e.g. A/B and B/C): both accept
-      actions fall back to the generic **"Accept Side #1"** / **"Accept Side #2"** together
-- [ ] Invoke either accept action on a multi-selection: all selected files resolve to that side in
-      one step, no merge tool opens, no queue order to contend with
-- [ ] Run either accept action on a selection that includes the **modify/delete** file: if the
-      deleted side is the one accepted, the file is actually **deleted** (`jj status`), not left
-      behind empty
-- [ ] After either bulk accept, the "Merge Conflicts" node's count drops and resolved rows
-      disappear without pressing Refresh
-- [ ] Select a mix of conflicted and non-conflicted files: the accept actions act only on the
-      conflicted ones
-- [ ] With nothing selected, or only non-conflicted files selected: the accept actions don't
-      appear in the context menu
-- [ ] In the log's commit details pane for a **non-`@`** conflicted commit: no shape text is
-      required to work correctly, but double-clicking a conflicted row there still opens the
-      (read-only) diff preview, not the merge tool — resolving off `@` is out of scope here (see
-      jj-idea-cmc3)
+- [ ] With at least 3 conflicted files, including one **modify/delete** conflict, each row in the node shows jj's own shape text after the file name (e.g. "2-sided conflict" / "2-sided conflict including 1 deletion"), matching `jj resolve --list` verbatim
+- [ ] **Double-clicking** one conflicted row (not multi-selected) opens only that file **in the editor** at its first conflict block (the merge tool is the "Open Merge Tool…" context-menu action), not a queue over the whole node. Double-clicking a **non-conflicted** row elsewhere in the tree still opens the normal diff preview
+- [ ] Right-clicking a **single** conflicted row shows two accept actions reading **"Accept \<jj's own commit label\>"** for each side (matching the label the editor banner's "Accept …" links show for the same file), not "Accept Yours"/"Accept Theirs". Selecting **two or more** conflicted files from the **same rebase/merge operation** (ctrl/cmd-click) shows the **shared full commit label** verbatim. Selecting files from **unrelated** conflicts (different commits, even if both say "(rebased revision)") falls back to the generic **"Accept Side #1"** / **"Accept Side #2"**, never "Yours"/"Theirs" at any tier. Two files sharing only **one** of their two commits (A/B and B/C) also fall back to the generic labels
+- [ ] Clicking an accept action with 2+ files selected resolves all of them in one step with no merge tool and no queue order: **one** "Resolve conflict completed." balloon with an **Undo** link appears, `jj op log` shows **one** new `resolve` op, and a single Undo restores **every** file's markers, not just the last. Afterwards the node's count drops and resolved rows disappear without Refresh (jj-idea-n6fz.2)
+- [ ] For a conflict shaped like `ConflictMarkerFixtures.diffFromNamesADistinctSide` (a diff-style side whose own label collides with the `+++++++` side's, e.g. via a divergent commit) in a **single** file, the editor banner's two "Accept …" links and the two context-menu accept actions show **different** text: the diff side falls back to jj's `"from:"` identity and the `+++++++` side still shows **its own true jj label**. The same shape in **two different files**, both selected, resolves exactly the same way (not generic "Side #1"/"Side #2" just because more than one file is selected)
+- [ ] Selecting one `diffFromNamesADistinctSide`-shaped file **together with** a `ConflictMarkerFixtures.cleanRebaseConflictNamingSameCommits`-shaped file (a clean rebase conflict naming the same two commits, in *swapped* current/last order relative to the first file) shows **specific labels** (`change B` / `change A`, in the first selected file's order), not the generic labels (jj-idea-0k7k). Clicking **"Accept change B"** leaves **both** files with change B's content (the swapped file is resolved via its opposite side), one balloon per resolve op, and Undo restores both
+- [ ] An accept action on a selection that includes the **modify/delete** file actually **deletes** the file (`jj status`) when the deleted side is accepted, not leaving it empty. With a mix of conflicted and non-conflicted files selected, the actions act only on the conflicted ones; with nothing, or only non-conflicted files, selected, the accept actions don't appear in the context menu
+- [ ] In the log's commit details pane for a **non-`@`** conflicted commit, double-clicking a conflicted row opens the (read-only) diff preview, not the merge tool (resolving off `@` is out of scope, see jj-idea-cmc3)
 
 #### "Resolve Conflicts" context menu action (selection-scoped)
 
-`Jujutsu.ResolveSelectedConflicts` ("Resolve Conflicts…", opens the first conflicted file in the editor) and its sibling `Jujutsu.OpenMergeToolSelected` ("Open Merge Tool…", the modal) share one scoping rule;
-it's wired into both the Working Copy panel / commit details pane's file context menu and
-the Project view / editor "Jujutsu" submenu. It always resolves an explicit selection when
-there is one, and otherwise falls back to the single focused file (editor/project view) or
-every conflicted file inherited from the working copy's ancestors (see "Inherited conflicts"
-below) — there is no separate "resolve every conflicted file regardless of context" action at
-the file level (for that, see "Log row context menu" further down, which resolves every
-conflicted file reachable from the working copy).
+`Jujutsu.ResolveSelectedConflicts` ("Resolve Conflicts…", opens the first conflicted file in the editor) and its sibling `Jujutsu.OpenMergeToolSelected` ("Open Merge Tool…", the modal) share one scoping rule, wired into the Working Copy panel / commit details pane's file context menu and the Project view / editor "Jujutsu" submenu. They always resolve an explicit selection when there is one, and otherwise fall back to the single focused file (editor/project view) or every conflicted file inherited from the working copy's ancestors (see "Conflicts off the working copy" below). There is no separate file-level "resolve every conflicted file" action (for that, see "Conflicts off the working copy" below).
 
-- [ ] Right-clicking a **non-conflicted** file in the Working Copy panel: "Resolve Conflicts…" is **not visible**, even when other, unrelated files elsewhere in the repo are conflicted
-- [ ] Right-clicking `file.txt` (conflicted): "Resolve Conflicts…" **is visible**
-- [ ] Invoking it opens the merge tool for **only** `file.txt`, not unrelated files
-- [ ] Multi-select: selecting one conflicted + one non-conflicted file → only the conflicted file's merge tool opens
-- [ ] Multi-select: selecting two conflicted files → both open in turn (second opens after the first is resolved)
-- [ ] Multi-select: selecting two **non-conflicted** files (with some other file elsewhere in the repo conflicted): "Resolve Conflicts…" is **not visible**
-- [ ] Right-clicking a **directory**, or the project root, in the Project view → Jujutsu submenu: "Resolve Conflicts…" is **not present** (no single file in scope to act on — there is no "resolve every conflicted file in the project" entry point at the file/project-view level; use the log row context menu for that, see below)
-- [ ] Right-clicking `file.txt` itself in the Project view → Jujutsu → Resolve Conflicts…: opens `file.txt` in the editor at its first conflict (and Jujutsu → Open Merge Tool… opens the merge tool for it)
-- [ ] Opening `file.txt` in the editor, right-clicking → Jujutsu → Resolve Conflicts…: opens **only** `file.txt` in the editor; Open Merge Tool… opens the merge tool for **only** `file.txt` (scoped to the focused editor file, not every conflicted file)
-- [ ] **On IntelliJ/RustRover 2026.2 (build 262) specifically**: triggering "Open Merge Tool…" opens the merge tool at all (jj-idea-qfgl / GitHub #55 — this used to silently do nothing)
+- [ ] In the Working Copy panel, right-clicking a **non-conflicted** file shows no "Resolve Conflicts…", even when unrelated files elsewhere are conflicted; right-clicking conflicted `file.txt` shows it, and invoking it opens the merge tool for **only** `file.txt`
+- [ ] Multi-select: one conflicted + one non-conflicted file opens only the conflicted file's merge tool; two conflicted files open both in turn (the second after the first is resolved); two **non-conflicted** files (with another file elsewhere conflicted) show no "Resolve Conflicts…"
+- [ ] In the Project view → Jujutsu submenu, a **directory** or the project root has no "Resolve Conflicts…"; right-clicking `file.txt` itself shows Resolve Conflicts… (opens it in the editor at its first conflict) and Open Merge Tool… (opens the merge tool for it)
+- [ ] With `file.txt` open in the editor, right-click → Jujutsu → Resolve Conflicts… opens **only** `file.txt` in the editor and Open Merge Tool… opens the merge tool for **only** `file.txt` (scoped to the focused editor file, not every conflicted file)
+- [ ] On IntelliJ/RustRover 2026.2 (build 262), "Open Merge Tool…" opens the merge tool at all (GitHub #55)
 
-#### Three-way merge tool — content correctness
+#### Three-way merge tool
 
-- [ ] Left pane ("Yours") shows "ours" content (`changed by A`, the rebased change)
-- [ ] Right pane ("Theirs") shows "theirs" content (`changed by B`, the destination)
-- [ ] Center pane is editable; initially shows a proposed merge result (not identical to left or right)
-- [ ] Left and right panes are **not** identical — conflict regions are highlighted
-- [ ] Works correctly for all three marker styles (git, snapshot, diff)
+- [ ] The left pane ("Yours") shows "ours" content (`changed by A`, the rebased change) and the right pane ("Theirs") shows "theirs" content (`changed by B`, the destination); they are **not** identical and conflict regions are highlighted. The center pane is editable and initially shows a proposed merge result (not identical to left or right). Works correctly for all three marker styles
+- [ ] Editing the center pane to the desired resolution and clicking Apply Changes leaves `file.txt` on disk with that resolution (no conflict markers). It disappears from the Working Copy panel's conflict list **automatically**, without pressing Refresh, and right-clicking it again shows no "Resolve Conflicts…" (and triggering it anyway does not throw)
+- [ ] **Accept Left** (yours) writes "ours" content and **Accept Right** (theirs) writes "theirs" content, with no conflict markers, and `file.txt` leaves conflicted state automatically, without Refresh
 
-#### Resolving via the merge tool
+#### Cancelling must never discard a side (GitHub #63, critical)
 
-- [ ] Edit the center pane to a desired resolution and click Apply Changes
-- [ ] After closing the tool, `file.txt` content on disk reflects the resolution (no conflict markers)
-- [ ] `file.txt` disappears from the Working Copy panel's conflict list **automatically**, without pressing Refresh (jj-idea-3cvb: a stale conflict decoration used to survive even a manual Refresh)
-- [ ] Right-clicking `file.txt` again (now resolved): "Resolve Conflicts…" is **not visible**, and if triggered anyway does not throw
+- [ ] Opening the merge tool for `file.txt` and closing it via the window's `x`, or the **Cancel** button, **without** touching anything leaves `file.txt` **conflicted**: its content on disk still has the original conflict markers and it still shows red (MERGED_WITH_CONFLICTS) in the Working Copy panel. Resolving only *some* hunks in the center pane and then closing via `x` (not Apply) also leaves it fully conflicted on disk (no partial write, markers intact). Repeat for each marker style (git, snapshot, diff)
+- [ ] With two conflicted files, cancelling the merge tool for the first means the second file's merge tool **never opens** and it remains conflicted untouched
 
-#### Editor notification banner (jj-idea-aunm, GitHub #56; live count + accept actions, jj-idea-lkrt)
+Native Commit tool window (mixed jj + Git project, or jj-only with "Hide the standard Commit tool window" unchecked; **IntelliJ 2026.2+ only**: on 2025.3 and older the dialog is the one-shot flow whose Accept Yours/Theirs buttons work via `jj resolve` and whose cancel restores the file, so there is nothing to refuse):
 
-Since jj-idea-lkrt, the static "This file has merge conflicts [Resolve]" banner is a
-model-accurate one: a live block count parsed from the editor document (not just
-`ChangeListManager`'s status), an **"Accept &lt;side label&gt;"** link per side using jj's own
-commit+role labels (GitHub #112), and a secondary **"Open Merge Tool"** link for the existing
-three-way merge tool. Both the heading and the side labels are kept deliberately short (a
-narrow editor split can't fit jj's full marker-header text plus three links on one line) - the
-full, untruncated side label and the "edit the markers directly" hint are both available as
-tooltips.
-
-- [ ] Open `file.txt` (2 conflict blocks) in the editor: a warning-colored banner appears at the
-      top with text "2 conflicts remaining:", an **"Accept &lt;side-1 label&gt;"** link, an
-      **"Accept &lt;side-2 label&gt;"** link, and an **"Open Merge Tool"** link
-- [ ] Hovering the banner's text shows a tooltip explaining that hand-editing the markers and
-      saving also works
-- [ ] Under `ui.conflict-marker-style = "git"` or `"diff"` with a rebase conflict, the accept
-      links read jj's own commit+description labels (e.g. `Accept ulmlywnv "my change" (re…`),
-      matching "Resolve Conflicts…"'s pane titles for the same file (see "Rebase conflict pane
-      orientation and titles" above)
-- [ ] With a long jj label (long description text, or the role-annotated rebase-conflict case
-      above), the accept link's text is **truncated with an ellipsis** rather than overflowing
-      the editor width - narrow the editor split to confirm the banner never wraps or gets
-      clipped by the platform itself; hovering the truncated link's tooltip shows the **full**
-      untruncated label
-- [ ] Under `ui.conflict-marker-style = "snapshot"` (no commit info in the markers), the accept
-      links fall back to **"Accept Side #1"** / **"Accept Side #2"** (short enough to never need
-      truncating)
-- [ ] Hand-edit one block's markers away (leaving one block remaining) and save: within ~1s
-      (no need to switch tabs or press Refresh) the banner text updates to "1 conflict
-      remaining:" — singular, count decremented
-- [ ] Hand-edit the last block's markers away: the banner **disappears** on its own, before any
-      jj snapshot happens (i.e. even before saving triggers a `jj status` refresh)
-- [ ] Undo the hand-edits so the file is back to 2 conflict blocks; click **"Accept &lt;side-1
-      label&gt;"**: `file.txt` on disk gets side #1's content with no markers, `jj status` shows
-      it resolved, and the banner disappears **without a manual Refresh**
-- [ ] Repeat, clicking **"Accept &lt;side-2 label&gt;"** on a freshly-conflicted file: resolves
-      to side #2's content instead
-- [ ] FX-MD-CONFLICT: clicking **Accept** on the side that is a deletion **removes the file**
-      from disk (`jj status` shows `D`), not an empty file — same invariant as the bulk
-      accept-yours/theirs path below
-- [ ] Clicking **"Open Merge Tool"** opens the same three-way merge tool as the other entry
-      points
-- [ ] Cancelling out of the merge tool from this entry point still **leaves conflict markers
-      intact** (the GitHub #63 invariant)
-- [ ] After resolving `file.txt` via any accept link, the merge tool, or any other entry point
-      while the file is open in the editor, the banner **disappears automatically**, without
-      switching tabs or reopening the file
-- [ ] Click the banner's **"Accept …"** link (jj-idea-5k16): the file resolves and a **"Resolve conflict completed."** balloon with an **Undo** link appears. Click Undo: the markers return in the file, the banner reappears with the original count, and `jj op log` shows an `op revert`
-- [ ] After dismissing that balloon (before any other jj action), the VCS/Jujutsu **"Undo Resolve conflict"** action does the same; on a modify/delete conflict (FX-MD-CONFLICT) accepting the deletion side then undoing restores the file
-- [ ] Open a **non-conflicted** jj-tracked file: no banner appears
-- [ ] Mixed jj + Git project: opening a file with a **Git** conflict shows no jj banner (and vice versa)
-- [ ] Open a conflicted file that is **outside** any jj repo (e.g. an unrelated Git-only root in a multi-root project): no jj banner appears
-
-#### In-editor conflict gutter: per-side colors and accept icons (jj-idea-82fo)
-
-Alongside the whole-file banner above, each conflict block gets its own in-editor affordance:
-a background color per side (`side1`/`base`/`side2`) covering exactly that side's own lines,
-and one gutter icon per side for accepting it directly. Reuses the platform's own
-`DiffColors.DIFF_DELETED`/`DIFF_INSERTED`/`DIFF_MODIFIED` keys, so colors match what the
-built-in 3-way merge viewer already uses. Regions/icons are driven by an incremental,
-debounced (~300ms) rescan of the document text, independent of the banner's own
-`ChangeListManager`-based status - the two surfaces can legitimately disagree briefly (e.g.
-right after a manual marker edit, before the next jj snapshot).
-
-- [ ] Open `file.txt` (git marker style): each side's lines are tinted a distinct background
-      color; the marker lines themselves (`<<<<<<<`/`|||||||`/`=======`/`>>>>>>>`) stay
-      uncolored, reading as separators between the colored regions
-- [ ] One gutter icon (right-aligned, so it doesn't collide with the diffbase gutter's own
-      line-status markers if a custom diff base is configured - see MT-DIFFBASE) appears on
-      each side's own first line - side1's icon on side1's first line, base's on base's first
-      line, side2's on side2's first line - not one icon on the block's opening `<<<<<<<` line
-- [ ] Hovering an icon shows a tooltip naming that side specifically (e.g. `Accept <label> —
-      right-click for more options`), not the whole block
-- [ ] **Left-click** an icon: a small one-item popup appears (`Accept <label>`) - the document is
-      **not** edited yet
-- [ ] Clicking that popup's one entry applies it: the block's markers are replaced with that
-      side's content, no jj process runs (`jj op log` unchanged until the file is saved)
-- [ ] Dismissing the popup instead (click elsewhere, Escape) leaves the document **untouched**
-- [ ] Ctrl/Cmd+Z once after an accept: content and gutter icon/highlighting are restored; Undo
-      reads "Accept `<label>`" - each accept is its own undo unit, not coalesced with others
-- [ ] **Right-click** any of a block's icons: the full menu (Accept side #1 / side #2 / Both /
-      Base) appears, not the one-item popup - Base is present only for git/snapshot style
-- [ ] Diff marker style (`ui.conflict-marker-style = "diff"`): side1/side2 still get colors and
-      icons; the derived base gets **neither** an icon nor a color (its "base" text is
-      synthesized from scattered diff lines, not read from one literal place)
-- [ ] Snapshot marker style: same behavior as git style, base included
-- [ ] Save the file after accepting one block in a multi-block file: the *other* block's own
-      color/icons are unaffected (offsets shift correctly, no stale highlighting)
-- [ ] Hand-delete a block's closing `>>>>>>>` marker to merge two adjacent blocks: colors/icons
-      update within ~300ms to match the merged shape, no stale icons left over
-- [ ] Type a stray `<<<<<<<` with no closer anywhere below it: no icon/color appears for it, and
-      the IDE stays responsive (not a full-document rescan every keystroke)
-- [ ] Split the editor on the conflicted file: colors/icons appear independently in **both**
-      panes (each pane gets its own copy - this feature does not share highlighters across a
-      split view, unlike some other gutter markers - see the code's own KDoc for why)
-- [ ] Open the same file in a diff viewer or a preview tab: **no** jj gutter icons/colors there
-      (the plugin-wide `editorFactoryListener` this depends on must be a no-op outside a real
-      main editor - see MT-DIFF, MT-DIFF-PREVIEW)
-- [ ] Mixed jj + Git project, a file with a **Git** conflict (not jj): no jj gutter icons/colors
-- [ ] A conflicted file **outside** any jj repo: no jj gutter icons/colors
-- [ ] FX-MD-CONFLICT: accepting a side on a block does **not** delete the file even if that side
-      is the deletion - per-block accept only ever edits text; the whole-file deletion behavior
-      stays on the banner's own Accept link and the merge tool, not this per-block affordance
-
-**Mouseover hover feedback on a side's own tint (jj-idea-sr42)**
-
-- [ ] Hover the mouse over a side's own colored text: that side's background brightens/strengthens
-      (visibly stronger than its resting tint), the other two sides stay at their resting tint
-- [ ] Hover a side's own gutter icon (not just its text): the same side's background strengthens,
-      exactly as hovering the text itself does, **and** a separate rounded highlight (the same
-      hover color as an ordinary IDE toolbar button, not the side's own tint color) appears
-      directly behind the icon - the icon now reads as the clickable element, distinct from the
-      side's own color
-- [ ] Hover a marker line (`<<<<<<<`/`|||||||`/`=======`/`>>>>>>>`) or plain text outside any
-      block: no hover strengthening appears anywhere, on the text **or** in the gutter
-- [ ] Move the mouse off the editor entirely (`mouseExited`): any active hover strengthening
-      clears immediately
-- [ ] Click-drag a text selection across a hovered block: the platform's own selection color
-      takes visual precedence, and releasing the drag leaves the editor in a normal, editable
-      state - the hover overlay never interferes with selection or typing
-- [ ] Type inside a hovered side, or accept a different block elsewhere in the file: the stale
-      hover clears (the next mouse move re-establishes it correctly against the edited document)
-- [ ] Repeat the above in both a light and a dark color scheme: the hover strengthening reads as
-      visibly stronger than the resting tint in both
-
-#### Cancelling must never discard a side (GitHub #63 — critical regression check)
-
-- [ ] Open the merge tool for `file.txt` and close it via the window's `x` button **without** touching anything: `file.txt` **stays conflicted** — content on disk still has its original conflict markers, and it still shows red (MERGED_WITH_CONFLICTS) in the Working Copy panel
-- [ ] Same, but click the **Cancel** button instead of `x`: same result — file stays fully conflicted
-- [ ] Resolve only *some* of the conflict's hunks in the center pane, then close via `x` (don't click Apply): `file.txt` **stays fully conflicted** on disk (no partial write, original markers intact) — not partially resolved, not resolved-by-discarding
-- [ ] Repeat all three checks above for each marker style (git, snapshot, diff)
-- [ ] Multi-file: with two conflicted files, cancel the merge tool for the first → the second file's merge tool **never opens** and remains conflicted untouched
-
-Native Commit tool window (jj-idea-ddcd; mixed jj + Git project, or jj-only with "Hide the standard
-Commit tool window" unchecked; **IntelliJ 2026.2+ only** — on 2025.3 and older the dialog is the one-shot flow whose Accept Yours/Theirs buttons work via `jj resolve` and whose cancel restores the file, so there is nothing to refuse):
-
-- [ ] Commit tool window → Merge Conflicts → **Resolve** → select `file.txt` → **Merge…**: an error dialog says the dialog can discard a side and points to Resolve Conflicts / Open Merge Tool; `file.txt` stays conflicted with its markers intact (`jj status`, file content)
-- [ ] Same dialog, **Resolve automatically** and **Accept Yours** / **Accept Theirs**: same error, file untouched
-- [ ] Each refusal also shows an info balloon "Use the Working Copy window to resolve conflicts" with an **Open Working Copy** button that activates the Working Copy tool window
-- [ ] Closing that dialog (`x`/Cancel) leaves the file conflicted
+- [ ] Commit tool window → Merge Conflicts → **Resolve** → select `file.txt` → **Merge…**, and likewise **Resolve automatically** and **Accept Yours** / **Accept Theirs**, show an error dialog saying the dialog can discard a side and pointing to Resolve Conflicts / Open Merge Tool, with `file.txt` still conflicted and its markers intact (`jj status`, file content). Each refusal also shows an info balloon "Use the Working Copy window to resolve conflicts" with an **Open Working Copy** button that activates that tool window. Closing the dialog (`x`/Cancel) leaves the file conflicted
 - [ ] Working Copy tool window → Merge Conflicts node → **Resolve** opens the first conflicted file at its first conflict with no exception (2026.2 read-lock regression)
 
-#### Accept Yours / Accept Theirs (in the merge tool)
+#### Editor notification banner (GitHub #56)
 
-- [ ] In the three-way merge tool, click **Accept Left** (yours): `file.txt` on disk contains "ours" content with no conflict markers
-- [ ] `file.txt` leaves conflicted state automatically, without pressing Refresh
-- [ ] **Accept Right** (theirs) analogously writes "theirs" content
+The banner is model-accurate: a live block count parsed from the editor document (not just `ChangeListManager`'s status), an **"Accept \<side label\>"** link per side using jj's own commit+role labels (GitHub #112), and a secondary **"Open Merge Tool"** link. The heading and side labels are kept short (a narrow editor split can't fit jj's full marker-header text plus three links on one line); the full side label and the "edit the markers directly" hint are tooltips.
 
-#### Log details pane (commit selected in log table)
+- [ ] Opening `file.txt` (2 conflict blocks) in the editor shows a warning-coloured banner at the top reading "2 conflicts remaining:" with an **"Accept \<side-1 label\>"** link, an **"Accept \<side-2 label\>"** link and an **"Open Merge Tool"** link; hovering the banner's text shows a tooltip explaining that hand-editing the markers and saving also works
+- [ ] Under `ui.conflict-marker-style = "git"` or `"diff"` with a rebase conflict, the accept links read jj's own commit+description labels (e.g. `Accept ulmlywnv "my change" (re…`), matching "Resolve Conflicts…"'s pane titles for the same file. A long jj label makes the link's text **truncate with an ellipsis** rather than overflowing the editor width (narrow the split to confirm the banner never wraps or gets clipped), and hovering it shows the **full** label. Under `snapshot` the links read **"Accept Side #1"** / **"Accept Side #2"**
+- [ ] Hand-editing one block's markers away (leaving one block) and saving updates the banner text within ~1 s, with no tab switch or Refresh, to "1 conflict remaining:" (singular). Hand-editing the last block's markers away makes the banner **disappear** on its own, before any jj snapshot
+- [ ] After undoing the hand-edits so the file is back to 2 blocks, clicking **"Accept \<side-1 label\>"** writes side #1's content to `file.txt` with no markers, `jj status` shows it resolved, and the banner disappears **without a manual Refresh**; clicking **"Accept \<side-2 label\>"** on a freshly conflicted file resolves to side #2's content. On FX-MD-CONFLICT, accepting the side that is a deletion **removes the file** from disk (`jj status` shows `D`), not an empty file
+- [ ] After any accept, a **"Resolve conflict completed."** balloon with an **Undo** link appears. Clicking Undo returns the markers to the file, the banner reappears with the original count and `jj op log` shows an `op revert`. After dismissing the balloon (before any other jj action), the VCS/Jujutsu **"Undo Resolve conflict"** action does the same, including restoring the file after accepting the deletion side of a modify/delete conflict
+- [ ] **"Open Merge Tool"** opens the same three-way merge tool as the other entry points, and cancelling out of it still **leaves conflict markers intact** (GitHub #63). Resolving `file.txt` via any accept link, the merge tool or any other entry point while it is open makes the banner **disappear automatically**, without switching tabs or reopening the file
+- [ ] No banner appears for a **non-conflicted** jj-tracked file, for a file with a **Git** conflict in a mixed jj + Git project, or for a conflicted file **outside** any jj repo (e.g. an unrelated Git-only root in a multi-root project)
 
-Use the same conflict setup above. The test repo has a conflicted commit that is **not** the working copy (e.g., run `jj new` to create an empty working copy on top of the conflicted change).
+#### In-editor conflict gutter
 
-- [ ] Selecting the **conflicted historical commit** in the log: conflicted file appears in the details panel with red (MERGED_WITH_CONFLICTS) status
-- [ ] Selecting the **conflicted historical commit**: "Resolve Conflicts… (edit this change first)" is **visible but disabled** in the details panel context menu (jj-idea-sm1s: resolution requires this commit to become the working copy first)
-- [ ] Selecting the **working copy commit** (empty, inherits conflict): "Resolve Conflicts…" **is visible and enabled** in the details panel context menu and opens the merge tool for the inherited conflicted files
+Each conflict block gets its own in-editor affordance alongside the banner: a background colour per side (`side1`/`base`/`side2`) covering exactly that side's lines, and one gutter icon per side for accepting it directly. It reuses the platform's `DiffColors.DIFF_DELETED`/`DIFF_INSERTED`/`DIFF_MODIFIED` keys, so colours match the built-in 3-way merge viewer. Regions and icons are driven by an incremental, debounced (~300 ms) rescan of the document text, independent of the banner's `ChangeListManager`-based status, so the two can briefly disagree (e.g. right after a manual marker edit, before the next jj snapshot).
 
-#### Conflict diff for a non-working-copy commit (GitHub #119, jj-idea-ct7e)
+- [ ] Opening `file.txt` (git marker style) tints each side's lines a distinct background colour; the marker lines (`<<<<<<<`/`|||||||`/`=======`/`>>>>>>>`) stay uncoloured, reading as separators. One gutter icon (right-aligned, so it doesn't collide with the diffbase gutter's line-status markers, see MT-DIFFBASE) appears on each side's own first line (side1's on side1's first line, base's on base's, side2's on side2's), not one icon on the opening `<<<<<<<` line. Hovering an icon shows a tooltip naming that side (`Accept <label> — right-click for more options`)
+- [ ] **Left-clicking** an icon shows a one-item popup (`Accept <label>`) and does **not** edit the document yet; clicking that entry replaces the block's markers with that side's content with no jj process running (`jj op log` unchanged until the file is saved), while dismissing the popup (click elsewhere, Escape) leaves the document **untouched**. Ctrl/Cmd+Z once restores content and gutter icon/highlighting, and Undo reads "Accept `<label>`" (each accept is its own undo unit)
+- [ ] **Right-clicking** any of a block's icons shows the full menu (Accept side #1 / side #2 / Both / Base), not the one-item popup; Base is present only for git/snapshot style. In `diff` marker style side1/side2 still get colours and icons but the derived base gets **neither** (its text is synthesized from scattered diff lines); `snapshot` behaves like git style, base included
+- [ ] Saving after accepting one block in a multi-block file leaves the *other* block's colour/icons unaffected (offsets shift correctly, no stale highlighting). Hand-deleting a block's closing `>>>>>>>` to merge two adjacent blocks updates colours/icons within ~300 ms, with no stale icons. Typing a stray `<<<<<<<` with no closer shows no icon/colour for it, and the IDE stays responsive (no full-document rescan per keystroke)
+- [ ] Splitting the editor on the conflicted file shows colours/icons independently in **both** panes (each pane gets its own copy). A diff viewer, a preview tab, a file with a **Git** conflict, and a conflicted file **outside** any jj repo show **no** jj gutter icons/colours (the plugin-wide `editorFactoryListener` must be a no-op outside a real main editor, see MT-DIFF, MT-DIFF-PREVIEW)
+- [ ] On FX-MD-CONFLICT, accepting a side on a block does **not** delete the file even if that side is the deletion: per-block accept only ever edits text, while whole-file deletion stays with the banner's Accept link and the merge tool
+- [ ] Hover feedback: hovering a side's own coloured text strengthens that side's background (visibly stronger than its resting tint) while the other two stay at rest; hovering a side's gutter icon strengthens the same side **and** shows a separate rounded highlight behind the icon (the IDE toolbar-button hover colour, not the side's tint) so the icon reads as the clickable element. Hovering a marker line or plain text outside any block, or moving the mouse off the editor (`mouseExited`), shows/clears all hover strengthening immediately
+- [ ] A click-drag selection across a hovered block shows the platform's selection colour with precedence, and releasing leaves the editor normal and editable. Typing inside a hovered side, or accepting a different block elsewhere, clears the stale hover (the next mouse move re-establishes it). The hover strengthening reads as stronger than the resting tint in both a light and a dark colour scheme
 
-Use FX-CONFLICT with `wc-position=sibling` (`scripts/fixtures/fx-conflict.sh /tmp/fx-conflict git sibling`)
-so `@` is `change-b`, a clean commit unrelated to the conflict on `change-a` — the position the
-report was filed from.
+#### Conflict gutter: marker dividers and DIFF-line tidy
 
-- [ ] Select `change-a` in the log; double-click `file.txt` in the details panel → a **three-pane**
-      diff opens showing change A's own conflict, titled with jj's commit labels where available
-      (not "Yours"/"Theirs", not an error balloon reading "Could not extract conflict data")
-- [ ] Left and right panes are **not** identical and match `jj file show -r change-a file.txt`'s
-      markers, not the (unrelated) working copy content
-- [ ] Re-run the fixture with `wc-position=conflicted` (`@` = `change-a` itself): same three panes,
-      unchanged from before this fix
-- [ ] From the `conflicted` state, run `jj new change-a` so `@` inherits the conflict as an empty
-      child, then open `change-a`'s diff from the log → still shows change A's own conflict
-- [ ] With `@` on `change-a` (`conflicted` mode), additionally give the working copy its own,
-      different conflict on the same path (e.g. `jj new`, rebase something else onto `@-` to
-      conflict `file.txt` again), then open `change-a`'s diff from the log → shows **change A's**
-      sides, not `@`'s
-- [ ] Working Copy panel: double-click a file conflicted in `@` itself → three panes as before
-      (this surface is unaffected — it was already correct)
-- [ ] Repeat the first bullet under all three `ui.conflict-marker-style` values (`git`, `snapshot`,
-      `diff`); under `snapshot` the panes fall back to plain **"Side #1"**/**"Side #2"** titles
-      (see the marker-style bullet under "Rebase conflict pane orientation and titles" above),
-      content still correct
-- [ ] Scroll a conflicted file's diff, let the log auto-refresh (~300ms debounce): the scroll
-      position is **not** reset (the diff-request cache identity this relies on is the same one
-      jj-idea-q6vn fixed for ordinary diffs)
-- [ ] "Resolve Conflicts…" on `change-a` from this state is still visible-but-disabled (unaffected
-      — resolution remains working-copy-only, see "Log row context menu" below)
+Repeat for each `ui.conflict-marker-style` (`git`, `snapshot`, `diff`), in light and dark themes:
 
-#### Log row context menu
+- [ ] With the caret **outside** the block, every run of marker lines (`<<<<<<<`, `|||||||`/`-------`, `=======`/`+++++++`, `%%%%%%%`+`\\\\`, `>>>>>>>`) is a full-width coloured rule labelled with the following side's label; the closing rule is unlabelled. Rule colours match their side's tint (side 1 / base / side 2) and are legible on both themes
+- [ ] Moving the caret **into** the block reveals its raw marker lines (other blocks stay folded) and moving it out restores the rules; typing or deleting inside a block never leaves stale or doubled rules. Per-side gutter icons still show and work (Accept side 1 / base / side 2 / both), including for a side or base that is **empty** (its icon must still be visible and clickable; if it vanishes, anchor it to the preceding divider)
+- [ ] `diff` style only: the `-`/`+` prefix characters in the `%%%%%%%` section are dimmed and `-` lines are dimmed + struck through; document text is unchanged (copy a line to confirm the prefix is still there) and Accept still produces the right result
 
-- [ ] Right-clicking the **working copy entry** when conflicts exist: "Resolve Conflicts…" appears in the context menu, enabled
-- [ ] Right-clicking the **working copy entry** when no conflicts exist: "Resolve Conflicts…" is **not visible** (hidden, not just disabled)
-- [ ] Right-clicking a **non-conflicted, non-working-copy entry**: "Resolve Conflicts…" is **not visible**
-- [ ] Right-clicking a **conflicted, non-working-copy entry** (jj-idea-sm1s — e.g. a merge commit, or a child that only *inherits* the conflict): "Resolve Conflicts… (edit this change first)" is **visible but disabled**, with a tooltip/description prompting the user to `jj edit` the change first
-- [ ] Invoking "Resolve Conflicts…" from the log row context menu opens the merge tool for all conflicted files, one after another
+#### Conflicts off the working copy
 
-#### Inherited conflicts (jj-idea-sm1s)
+Use the same conflict setup, with a conflicted commit that is **not** the working copy (e.g. `jj new` to create an empty working copy on top of the conflicted change).
 
-Extend the setup above: with the working copy on the conflicted commit, run `jj new` to create an empty child (the child now inherits the parent's unresolved conflict).
+- [ ] Selecting the **conflicted historical commit** in the log shows the conflicted file in the details panel with red (MERGED_WITH_CONFLICTS) status, and "Resolve Conflicts… (edit this change first)" is **visible but disabled** in the details panel context menu (resolution requires this commit to become the working copy first). Selecting the **working-copy commit** (empty, inheriting the conflict) shows "Resolve Conflicts…" **visible and enabled**, opening the merge tool for the inherited conflicted files
+- [ ] Log row context menu: on the **working copy entry** with conflicts, "Resolve Conflicts…" is enabled and opens the merge tool for all conflicted files one after another; with no conflicts it is **not visible** (hidden, not disabled). On a **non-conflicted, non-working-copy entry** it is not visible. On a **conflicted, non-working-copy entry** (e.g. a merge commit, or a child that only *inherits* the conflict) it reads "Resolve Conflicts… (edit this change first)", **visible but disabled**, with a tooltip prompting the user to `jj edit` the change first
+- [ ] Inherited conflicts: with the working copy on the conflicted commit, `jj new` creates an empty child that inherits the conflict. The conflicted parent shows the disabled "(edit this change first)" entry, and the child (working copy, empty diff of its own) shows "Resolve Conflicts…" **enabled** and resolves the inherited conflict correctly. `jj edit` back onto the conflicted parent makes it the working copy with the entry enabled, and the child shows the disabled hint instead (jj-idea-sm1s)
 
-- [ ] Selecting the **conflicted merge/parent commit** in the log: "Resolve Conflicts… (edit this change first)" is visible but disabled (it is no longer the working copy)
-- [ ] Selecting the **child commit** (working copy, inherits the conflict, empty diff of its own): "Resolve Conflicts…" is visible and **enabled**, and resolves the inherited conflict correctly
-- [ ] `jj edit` back onto the conflicted parent commit: it becomes the working copy and "Resolve Conflicts…" becomes enabled for it; the previously-child commit (now not the working copy) shows the disabled hint instead
+#### Conflict diff for a non-working-copy commit (GitHub #119)
+
+Use FX-CONFLICT with `wc-position=sibling` (`scripts/fixtures/fx-conflict.sh /tmp/fx-conflict git sibling`) so `@` is `change-b`, a clean commit unrelated to the conflict on `change-a`.
+
+- [ ] Selecting `change-a` in the log and double-clicking `file.txt` in the details panel opens a **three-pane** diff showing change A's own conflict, titled with jj's commit labels where available (not "Yours"/"Theirs", and not an error balloon reading "Could not extract conflict data"). The left and right panes are **not** identical and match `jj file show -r change-a file.txt`'s markers, not the (unrelated) working-copy content
+- [ ] Re-running the fixture with `wc-position=conflicted` (`@` = `change-a`) shows the same three panes. From there, `jj new change-a` (so `@` inherits the conflict as an empty child) and opening `change-a`'s diff from the log still shows change A's own conflict; giving the working copy its own, different conflict on the same path (e.g. `jj new`, rebase something else onto `@-` to conflict `file.txt` again) and opening `change-a`'s diff from the log shows **change A's** sides, not `@`'s
+- [ ] In the Working Copy panel, double-clicking a file conflicted in `@` itself shows three panes as usual. Under all three `ui.conflict-marker-style` values the first check holds; under `snapshot` the panes fall back to plain **"Side #1"**/**"Side #2"** titles with content still correct
+- [ ] Scrolling a conflicted file's diff and letting the log auto-refresh (~300 ms debounce) does **not** reset the scroll position. "Resolve Conflicts…" on `change-a` from this state is still visible-but-disabled (resolution remains working-copy-only)
 
 #### Multi-repo scoping
 
 In a project with two jj roots each having conflicts:
 
-- [ ] Right-clicking a conflicted file in root A's Working Copy panel → merge tool opens only for root A's conflicts
-- [ ] Right-clicking a conflicted file in root B's → merge tool opens only for root B's conflicts
-- [ ] Global action (VCS menu) → merge tool opens for conflicts from both roots, one after another
-
-#### Conflict gutter: marker dividers and DIFF-line tidy (jj-idea-6ja9 / jj-idea-8u0g)
-
-Repeat for each `ui.conflict-marker-style` (`git`, `snapshot`, `diff`), in light and dark themes:
-
-- [ ] With the caret **outside** the block, every run of marker lines (`<<<<<<<`, `|||||||`/`-------`, `=======`/`+++++++`, `%%%%%%%`+`\\\\`, `>>>>>>>`) is a full-width coloured rule, labelled with the following side's label; the closing rule is unlabelled
-- [ ] Rule colours match their side's tint (side 1 / base / side 2) and are legible on both themes
-- [ ] Moving the caret **into** the block reveals its raw marker lines (other blocks stay folded); moving it out restores the rules. Typing/deleting inside a block never leaves stale or doubled rules
-- [ ] Per-side gutter icons still show and work (Accept side 1 / base / side 2 / both), including a side or base that is **empty** (its icon must still be visible and clickable; if it vanishes, anchor it to the preceding divider)
-- [ ] `diff` style only: the `-`/`+` prefix characters in the `%%%%%%%` section are dimmed, and `-` lines are dimmed + struck through; document text is unchanged (copy a line to confirm the prefix is still there) and Accept still produces the right result
+- [ ] Right-clicking a conflicted file in root A's Working Copy panel opens the merge tool only for root A's conflicts, and likewise for root B. The global action (VCS menu) opens the merge tool for conflicts from both roots, one after another
 
 ### MT-IGNORE
 
@@ -3481,147 +1388,53 @@ Repeat for each `ui.conflict-marker-style` (`git`, `snapshot`, `diff`), in light
 
 **Code:** `vcs/ignore/GitignoreCache.kt`, `vcs/ignore/JujutsuIgnoreService.kt`, `vcs/ignore/JujutsuIgnoredFilesService.kt`, `vcs/ignore/JujutsuTrackedFilesService.kt`, `vcs/changes/JujutsuIgnoredFileProvider.kt`, `actions/file/TrackedToggleAction.kt`, `actions/file/trackUntrackAvailability.kt`
 
-**Setup**: open this project itself in `./gradlew runIde` — it has a `.gitignore` with `build/`, `.gradle/`, etc.
+**Setup**: open this project itself in `./gradlew runIde`; it has a `.gitignore` with `build/`, `.gradle/`, etc.
 
-#### Project Tool Window — ignored file coloring
+#### Ignored-file colouring and the Ignored Files node
 
-- [ ] `build/` and `.gradle/` show grayed-out (IGNORED) color in the Project tree, including
-      nested files (e.g. `build/classes/Main.class` — parent propagation); `src/` and tracked
-      source files are NOT grayed out
-
-→ automate: jj-idea-aah2 (.gitignore coloring/propagation checks above are file-classification
+→ automate: jj-idea-aah2 (.gitignore coloring/propagation checks below are file-classification
 logic, testable without rendering)
 
-#### Jujutsu menu on ignored, untracked files (jj-idea-otwq)
+- [ ] `build/` and `.gradle/` show grayed-out (IGNORED) colour in the Project tree, including nested files (e.g. `build/classes/Main.class`, parent propagation), while `src/` and tracked source files are NOT grayed out
+- [ ] Version Control → Local Changes shows an "Ignored Files" group with `build/` and its contents under it. Tracked modified files (e.g. one you just edited) do NOT appear under "Ignored Files"; they appear as changes and stay non-gray
+- [ ] Reactive update on `.gitignore` edit (order matters: jj auto-tracks files created before the matching gitignore rule exists, so adding a rule after a file is tracked won't untrack it, as with git): add `*.xyz` to `.gitignore` and save first, then create `test-ignored.xyz` in the repo root. It appears gray (IGNORED) in the Project tree immediately (jj did not auto-track it), and removing `*.xyz` from `.gitignore` and saving turns it the unversioned colour (green/teal). Delete the file when done. Ignored files also update after editing `.gitignore` (the async rescan triggers a refresh that picks up the new set)
 
-- [ ] Right-click an ignored untracked file (e.g. a file under `build/`) in the Project view → Jujutsu:
-      History, Restore, Compare with Branch, Squash/Split and Show Diff are visible but disabled
-      (the explanatory description is set on the action, but menus don't reliably surface it for
-      disabled items — don't fail the test if no text appears); Annotate is absent
-- [ ] Tracked toggle stays enabled; ticking it enables the items above on the next menu open
-- [ ] A tracked-but-ignored file (tracked via the toggle, then re-open the menu) has all items enabled
-- [ ] A mixed selection (one ordinary tracked file + one ignored untracked file) leaves items enabled
+#### Jujutsu menu on ignored, untracked files
 
-#### Local Changes — Ignored Files node
+- [ ] Right-clicking an ignored untracked file (e.g. under `build/`) in the Project view → Jujutsu shows History, Restore, Compare with Branch, Squash/Split and Show Diff visible but disabled (the explanatory description is set on the action, but menus don't reliably surface it for disabled items, so don't fail the test if no text appears), and Annotate absent. The Tracked toggle stays enabled, and ticking it enables the items above on the next menu open
+- [ ] A tracked-but-ignored file (tracked via the toggle, then re-open the menu) has all items enabled, and so does a mixed selection (one ordinary tracked file + one ignored untracked file)
 
-- [ ] Version Control → Local Changes shows an "Ignored Files" group
-- [ ] `build/` and its contents appear under "Ignored Files"
-- [ ] Tracked modified files (e.g. a file you just edited) do NOT appear under "Ignored Files"; they appear as changes
+#### Ignore-scan watchdog
 
-#### Reactive update on .gitignore edit
+The watchdog (5 s) aborts the in-progress full ignore scan instead of merely logging. This is mostly covered by `GitignoreScanTest.kt` (code-level scale test); the disable escape hatch remains manually verifiable:
 
-Note: order matters — jj auto-tracks files created before the matching gitignore rule exists,
-so adding a file to .gitignore after it's already tracked will not untrack it (same as git).
+- [ ] Settings / Version Control / Jujutsu → the per-repo "disable ignored-file scanning" checkbox works: enabling it and editing `.gitignore` leaves the Ignored Files node no longer updating. The global "disable ignored-file scanning (all repositories)" default and its interaction with the per-repo override are under MT-SETTINGS ("Escape hatches")
+- [ ] On a very large repo (if you have one), a slow scan shows the "ignore scan slow" notification once per repo per session, with working "disable" and "report" actions, and the IDE does not hang waiting for the scan to finish after the watchdog fires
 
-- [ ] Add `*.xyz` to `.gitignore` and save first
-- [ ] Then create a new file `test-ignored.xyz` in the repo root
-- [ ] It should appear gray (IGNORED color) in the Project tree immediately (jj did not auto-track it)
-- [ ] Remove `*.xyz` from `.gitignore` and save → `test-ignored.xyz` turns unversioned color (green/teal)
-- [ ] Delete `test-ignored.xyz` when done
-
-#### Tracked files not wrongly ignored
-
-- [ ] Edit a tracked file (e.g. `CHANGELOG.md`) — it should remain non-gray and appear in working copy changes
-- [ ] Even if `.gitignore` contained a pattern matching `CHANGELOG.md`, a tracked file would not be
-      grayed (not independently verifiable in the IDE — tracked files are never passed to the
-      ignore check in the first place; this is a code-level invariant, not a UI behavior to click through)
-
-#### Ignore-scan watchdog (jj-idea-la8w)
-
-The watchdog (5s) aborts the in-progress full ignore-scan instead of merely logging. This is
-mostly covered by `GitignoreScanTest.kt` (code-level scale test); the disable escape hatch
-remains manually verifiable:
-
-- [ ] Settings / Version Control / Jujutsu → per-repo "disable ignored-file scanning" checkbox
-      still works: enable it, edit `.gitignore`, confirm the Ignored Files node stops updating
-- [ ] If you have access to a very large repo: a slow scan should show the "ignore scan slow"
-      notification once per repo per session, with "disable" and "report" actions still
-      functioning; the IDE should not hang waiting for the scan to finish after the watchdog
-      fires
-- [ ] jj-idea-ixju: global "disable ignored-file scanning (all repositories)" default and its
-      interaction with the per-repo override — see the batch-2 checklist under MT-SETTINGS
-
-#### Large ignored-file set cap (jj-idea-cvqz)
+#### Large ignored-file set cap
 
 → automate: jj-idea-s0ab (the cap itself only needs a large synthetic ignored-file set,
 not a real >50k-entry repo)
 
-Ignored files are reported via `ChangelistBuilder.processIgnoredFile` inside the CLM refresh
-(same cycle as change detection). The async scan still runs off the refresh thread; `getChanges`
-reads the cached set. A `IGNORE_REPORT_CAP` (50,000 entries) limits the number of
-`processIgnoredFile` calls per refresh. If the cached set exceeds the cap, a one-shot
-"Jujutsu Ignored-File List Is Very Large" notification appears with a "disable scanning" action.
+Ignored files are reported via `ChangelistBuilder.processIgnoredFile` inside the CLM refresh (same cycle as change detection). The async scan runs off the refresh thread; `getChanges` reads the cached set. `IGNORE_REPORT_CAP` (50,000 entries) limits the `processIgnoredFile` calls per refresh. If the cached set exceeds the cap, a one-shot "Jujutsu Ignored-File List Is Very Large" notification appears with a "disable scanning" action.
 
-- [ ] Open a repo with ignored files — they appear under "Ignored Files" in Local Changes
-- [ ] Ignored files still update after editing `.gitignore` (the async rescan triggers a CLM
-      refresh, which calls `getChanges` again and picks up the updated set)
-- [ ] If you have access to a repo with >50,000 ignored top-level entries: the notification
-      fires once; "disable scanning" action disables the setting and the Ignored Files node
-      becomes empty
+- [ ] With a repo of >50,000 ignored top-level entries (if you have one), the notification fires once, and its "disable scanning" action disables the setting and empties the Ignored Files node
 
-#### Tracked toggle (jj-idea-i9ol, GitHub #42)
+#### Tracked toggle (GitHub #42)
 
-Right-click on selected files in Project view, editor, Working Copy panel, or a Commit view → a
-single **Tracked** checkbox item (wrapping `jj file track --include-ignored` / `jj file untrack`)
-appears when at least one selected file matches an ignore rule. Checked means jj currently tracks
-the file; unchecked means it doesn't; clicking flips it. Unlike an earlier build of this feature,
-there's no separate Track/Untrack pair and no text hint about which one might fail — tracked
-status is always determined reliably via `jj file list` (see
-`docs/jj-track-untrack-model.md`), never guessed. The item is hidden entirely on ordinary,
-non-ignored files (there's nothing meaningful to toggle there), on **any selection containing a
-folder** (no tri-state checkbox exists in IntelliJ's menu system, and folders are out of scope for
-this feature — see jj-idea-i9ol's design notes), and in the Commit details panel (historical,
-non-working-copy context — tracking only applies to the working copy).
+Right-clicking selected files in the Project view, editor, Working Copy panel or a Commit view shows a single **Tracked** checkbox item (wrapping `jj file track --include-ignored` / `jj file untrack`) when at least one selected file matches an ignore rule. Checked means jj currently tracks the file; unchecked means it doesn't; clicking flips it. Tracked status is always determined via `jj file list` (see `docs/jj-track-untrack-model.md`), never guessed. The item is hidden on ordinary, non-ignored files, on **any selection containing a folder** (IntelliJ's menus have no tri-state checkbox, and folders are out of scope), and in the Commit details panel (historical context; tracking only applies to the working copy).
 
-Tracked status is resolved via a small async cache (`JujutsuTrackedFilesService`) rather than a
-direct query, since `update()`/`isSelected()` run under a read action even on background threads
-and IntelliJ forbids blocking subprocess calls there. **The first time you right-click a
-previously-unseen file *without clicking the checkbox*, it may briefly show unchecked (a safe
-default) while the cache populates in the background (~300ms)** — right-clicking (or looking)
-again shortly after should show the accurate state. This is expected, not a bug. Once you actually
-**click** the checkbox, its state is written immediately and is authoritative from that point on —
-no such delay applies to a click.
+Tracked status is resolved via a small async cache (`JujutsuTrackedFilesService`), since `update()`/`isSelected()` run under a read action even on background threads and IntelliJ forbids blocking subprocess calls there. **The first time you right-click a previously-unseen file *without clicking the checkbox*, it may briefly show unchecked (a safe default) while the cache populates (~300 ms); right-clicking again shortly after shows the accurate state. This is expected, not a bug.** Once you **click** the checkbox, its state is written immediately and is authoritative from then on.
 
 → automate: jj-idea-me8m (tracked-toggle cache semantics below are async-cache state logic,
 testable without rendering)
 
-- [ ] Add a pattern to `.gitignore`, create a matching file that was never tracked. Right-click it
-      in Project view, Working Copy panel, and a Commit view → **Tracked** checkbox appears,
-      unchecked
-- [ ] Check it → the checkbox flips to **checked immediately and stays checked** (right-click the
-      same file again right after — still checked; this is the regression check for an earlier
-      build where the checkbox could silently revert because `isSelected()` re-read a
-      not-yet-updated cache). A brief progress indicator appears in the status bar while the
-      command runs, and a notification balloon confirms completion ("Track — 'foo.txt'"). The file
-      now actually appears in the working copy / `jj file list` (regression check: an even earlier
-      build's Track action silently no-op'd on ignored files because it was missing
-      `--include-ignored`); log refreshes
-- [ ] Uncheck it → checkbox flips to unchecked immediately; notification balloon reads
-      "Untrack — 'foo.txt'"; file becomes untracked again
-- [ ] Multi-select one already-tracked-and-ignored file plus one untracked-and-ignored file →
-      checkbox shows **unchecked** (mixed selection reads as "something left to track"); checking
-      it tracks only the untracked one (notification summarizes the count, e.g. "Track — 1 file"),
-      leaving the already-tracked one alone
-- [ ] Untrack (uncheck) a file, then immediately try unchecking an already-untracked one in the
-      same multi-select → the notification balloon's message includes jj's own
-      `Warning: No matching entries for paths: ...` text for the no-op member (regression check:
-      an earlier build silently swallowed this warning entirely)
-- [ ] Force a failure — e.g. manually remove a file from `.gitignore` so it's no longer ignored,
-      then try unchecking it anyway → a **non-blocking error notification** balloon appears (not a
-      modal dialog) showing jj's "not ignored" message, and the checkbox **reverts** to its true
-      (checked) state rather than staying on the failed change
-- [ ] Right-click a normal, non-ignored, tracked file (anywhere: Project view, editor, Working
-      Copy panel, Commit view) → **no Tracked checkbox appears at all**
-- [ ] Right-click a file in the **Commit details panel** (historical, non-working-copy context)
-      → no Tracked checkbox appears, even on an ignored file
-- [ ] Right-click a **directory** that itself matches an ignore rule (e.g. `build/`) → no Tracked
-      checkbox appears, in Project view and Working Copy panel alike. Also check a mixed selection
-      (one file + one directory) → checkbox likewise hidden (regression check: an earlier build
-      would have shown a permanently-inert checkbox for a directory selection)
-- [ ] Right-click an ignored file you've never interacted with before → confirm no
-      `Synchronous execution under ReadAction` (or similar) error appears in the IDE log
-      (Help → Show Log) — this was a real crash in an earlier build, caused by querying
-      `jj file list` directly inside the checkbox's `update()`/`isSelected()`
+- [ ] After adding a pattern to `.gitignore` and creating a matching never-tracked file, right-clicking it in the Project view, Working Copy panel and a Commit view shows the **Tracked** checkbox, unchecked. Checking it flips the checkbox to **checked immediately and it stays checked** (right-clicking the same file again right away is still checked, the cache must not revert it). A brief progress indicator appears in the status bar while the command runs, and a balloon confirms completion ("Track — 'foo.txt'"). The file now appears in the working copy / `jj file list` (Track must not no-op on ignored files, i.e. it passes `--include-ignored`), and the log refreshes
+- [ ] Unchecking it flips the checkbox to unchecked immediately, the balloon reads "Untrack — 'foo.txt'", and the file becomes untracked again
+- [ ] Multi-selecting one already-tracked-and-ignored file and one untracked-and-ignored file shows the checkbox **unchecked** (a mixed selection reads as "something left to track"); checking it tracks only the untracked one (the notification summarizes the count, e.g. "Track — 1 file") and leaves the tracked one alone. Unchecking an already-untracked file in the same multi-select as one being untracked puts jj's own `Warning: No matching entries for paths: ...` text in the notification (it must not be silently swallowed)
+- [ ] Forcing a failure (removing a file's pattern from `.gitignore` so it's no longer ignored, then unchecking it anyway) shows a **non-blocking error notification** (not a modal dialog) with jj's "not ignored" message, and the checkbox **reverts** to its true (checked) state instead of staying on the failed change
+- [ ] A normal, non-ignored, tracked file (anywhere: Project view, editor, Working Copy panel, Commit view), a file in the **Commit details panel** (even an ignored one), a **directory** matching an ignore rule (e.g. `build/`) in the Project view and Working Copy panel, and a mixed selection of one file + one directory all show **no Tracked checkbox**
+- [ ] Right-clicking an ignored file you've never interacted with before produces no `Synchronous execution under ReadAction` (or similar) error in the IDE log (Help → Show Log)
 
 ### MT-GIT
 
@@ -3631,143 +1444,61 @@ testable without rendering)
 
 #### Git Push Dialog
 
-Setup: have a local bookmark that has never been pushed to the remote.
+Setup: a local bookmark that has never been pushed to the remote.
 
-- [ ] Open push dialog (VCS menu → Push) → "Tracking bookmarks (default)" selected → OK → push completes (shows success notification)
-- [ ] Open push dialog → "Tracking bookmarks (default)" → if new bookmark exists, confirmation dialog appears asking whether to create remote bookmark → confirm → push succeeds
-- [ ] Open push dialog → "Specific bookmark" → select an untracked bookmark → OK → push succeeds
-- [ ] Open push dialog → "All bookmarks" → OK → pushes all bookmarks
-- [ ] Cancel push dialog → no push occurs
-- [ ] The scope radio group (Default / Specific bookmark / All bookmarks) has the correct
-  option selected by default when the dialog opens, the bookmark combo box enables only when
-  "Specific bookmark" is selected, and clicking between all three options multiple times before
-  OK always pushes according to the last-selected option (scope selection is hand-wired via
-  action listeners, not the platform's declarative binding, as of the 2026.2 platform-compat
-  work — jj-idea-gu9q)
-- [ ] (jj-idea-idm0) With a repository that has 2+ Git remotes: open the push dialog, switch the
-  **Remote** combo to a different remote — the bookmark combo must immediately show a real
-  bookmark (never blank), select "Specific bookmark" → OK → dialog closes and pushes to the
-  newly selected remote/bookmark. Repeat switching remotes several times before pressing OK.
-  Check Help → Show Log afterwards for any `NullPointerException` from `GitPushDialog` — there
-  must be none (previously the Push button appeared completely inert after a remote switch)
-- [ ] (jj-idea-spwt) Run on the **current** jj (0.44+) and on an older pinned jj (0.37/0.39, see contributing.md). Push a bookmark that is already on the remote after moving it to a diverging commit (`jj bookmark set main -r <sibling> --allow-backwards`) → the **force-push confirmation** appears and names the bookmark; cancel → nothing is pushed. Delete a pushed bookmark (`jj bookmark delete main`) and push it → the **deletion confirmation** appears. Same result on both jj versions
-#### Push Tag (jj-idea-k9oy, GitHub #124)
+- [ ] Push dialog (VCS menu → Push) with "Tracking bookmarks (default)" selected → OK pushes and shows a success notification; if a new bookmark exists, a confirmation dialog asks whether to create a remote bookmark, and confirming pushes successfully. "Specific bookmark" with an untracked bookmark → OK succeeds; "All bookmarks" → OK pushes all bookmarks; Cancel pushes nothing
+- [ ] The scope radio group (Default / Specific bookmark / All bookmarks) has the correct option selected when the dialog opens, the bookmark combo enables only when "Specific bookmark" is selected, and clicking between all three options several times before OK always pushes according to the last-selected option (scope selection is hand-wired via action listeners, not the platform's declarative binding)
+- [ ] With 2+ Git remotes, switching the **Remote** combo to a different remote (several times) always shows a real bookmark in the bookmark combo (never blank), and "Specific bookmark" → OK closes the dialog and pushes to the newly selected remote/bookmark. Help → Show Log shows no `NullPointerException` from `GitPushDialog` and the Push button is not inert after a remote switch
+- [ ] On the **current** jj (0.44+) and on an older pinned jj (0.37/0.39, see contributing.md): pushing a bookmark already on the remote after moving it to a diverging commit (`jj bookmark set main -r <sibling> --allow-backwards`) shows the **force-push confirmation** naming the bookmark (cancel pushes nothing), and pushing a deleted pushed bookmark (`jj bookmark delete main`) shows the **deletion confirmation**. The result is the same on both jj versions
+- [ ] Pushing a bookmark already up to date with the remote shows jj's own "Nothing changed." in the notification rather than a bare "Push complete"
+- [ ] Every bookmark tracked against the selected remote appears **exactly once** in the "Specific bookmark" dropdown, with no duplicate "(new)" entry
+- [ ] After `jj bookmark delete <name>` on a bookmark still tracked on the remote (a pending deletion), right-clicking the **commit** it used to sit on in the log (not the bookmark chip) → Push… → "Specific bookmark" lists `<name> (deleted)` in grey italic, even though the push was opened scoped to that revision. Selecting it → OK shows the "will be deleted from the remote" confirmation, and confirming pushes successfully and removes it from the remote (`jj bookmark list --all-remotes` shows it gone, not just `(deleted)` locally)
+
+#### Push Tag (GitHub #124)
 
 Setup: jj 0.44+; a repo with a Git remote (e.g. a bare repo) and a local tag (`jj tag set v1 -r @-`).
 
-- [ ] Right-click the `v1` tag chip in the log → **Push Tag 'v1' to origin...** appears next to **Delete Tag** → click it → a confirmation prompt names the tag and remote → **Yes** → a "Push" success notification appears and `git ls-remote --tags <remote>` lists `v1`
-- [ ] Choose **No** in the prompt → nothing is pushed
-- [ ] Move the tag (`jj tag set v1 -r @ --allow-move`), push it again from the chip → succeeds; push again with no changes → notification shows jj's "Nothing changed."
-- [ ] Right-click a tag in the **Bookmarks panel** → the same **Push Tag** item is present and works
-- [ ] Right-click a commit row that carries a tag → the **Tag** submenu offers **Push Tag** above **Delete Tag**
-- [ ] With 2+ remotes the item becomes a **Push Tag 'v1' to ▸** submenu with one entry per remote; with no remotes it is hidden
-- [ ] With jj older than 0.44 (Settings → Jujutsu → jj path) the item stays visible but disabled, reading "requires jj 0.44.0", and Settings → Feature Availability lists **Push Tag**
+- [ ] Right-clicking the `v1` tag chip in the log shows **Push Tag 'v1' to origin...** next to **Delete Tag**; clicking it shows a confirmation naming the tag and remote, and **Yes** produces a "Push" success notification with `git ls-remote --tags <remote>` listing `v1`. **No** pushes nothing
+- [ ] Moving the tag (`jj tag set v1 -r @ --allow-move`) and pushing again from the chip succeeds; pushing again with no changes shows jj's "Nothing changed."
+- [ ] The same **Push Tag** item is present and works when right-clicking a tag in the **Bookmarks panel**, and on a commit row that carries a tag (the **Tag** submenu offers **Push Tag** above **Delete Tag**)
+- [ ] With 2+ remotes the item becomes a **Push Tag 'v1' to ▸** submenu with one entry per remote; with no remotes it is hidden. With jj older than 0.44 (Settings → Jujutsu → jj path) it stays visible but disabled, reading "requires jj 0.44.0", and Settings → Feature Availability lists **Push Tag**
 
-- [ ] Push a bookmark that's already up to date with the remote → the notification shows jj's
-  own "Nothing changed." message rather than a bare "Push complete"
-- [ ] Every bookmark tracked against the selected remote appears **exactly once** in the
-  "Specific bookmark" dropdown — none of them also shows a duplicate "(new)" entry
-  (jj-idea-ehki — `GitPushDialog.currentBookmarks()`/`mergeBookmarks` used to dedupe by full
-  `Bookmark` equality, which never matched because `tracked` differs between the two source
-  lists)
-- [ ] (jj-idea-ehki) Delete a local bookmark that's still tracked on the remote
-  (`jj bookmark delete <name>`) so it's a pending deletion. Right-click the **commit** it used
-  to sit on in the log (not the bookmark chip) → Push… → "Specific bookmark" → the dropdown
-  must include `<name> (deleted)` in grey italic, even though the push was opened scoped to
-  that revision. Select it → OK → the "will be deleted from the remote" confirmation appears →
-  confirm → push succeeds and the bookmark disappears from the remote (`jj bookmark list
-  --all-remotes` shows it gone, not just `(deleted)` locally)
+#### `--change` push scope (GitHub #65)
 
-#### `--change` push scope (jj-idea-fmzr, GitHub #65; multi-select/toolbar jj-idea-ikof)
+A fourth scope, "Create bookmark for change \<id\>", runs `jj git push --change <rev>`, auto-generating a `push-<change-id>`-style remote bookmark for the target revision. The dialog resolves the target itself (no revision picker in the dialog). It is available from three entry points: the toolbar/VCS-menu Push button (`GitPushAction`), the log's right-click Push (`gitPushAction()`), and the per-bookmark Push submenu (which never offers this scope; it is always "Specific bookmark"). It reads the **log table's current selection** wherever one exists.
 
-A fourth scope, "Create bookmark for change \<id\>", runs `jj git push --change <rev>` —
-auto-generating a `push-<change-id>`-style remote bookmark for the target revision, per jj's own
-recommended workflow. The dialog resolves the target itself; there's no revision picker in the
-dialog. Available from three entry points — the toolbar/VCS-menu Push button (`GitPushAction`),
-the log's right-click Push (`gitPushAction()`), and the per-bookmark Push submenu (which never
-offers this scope — it's always "Specific bookmark") — and reads the **log table's current
-selection** wherever one exists.
-
-- [ ] Toolbar Push (VCS menu icon or log toolbar button) with **nothing selected in the log** (or
-  invoked from a context with no log at all) → the fourth radio names `@`'s own change id (or
-  `@-` if `@` is empty — see below) → OK → a new `push-<id>` bookmark appears on the remote
-  (`jj bookmark list --all-remotes`)
-- [ ] Select a **single commit** in the log, then click the toolbar Push button → the fourth
-  radio names that commit's own change id, not `@` — confirms the toolbar button now reads the
-  log selection (previously it always ignored it)
-- [ ] `jj commit` so `@` is empty, then toolbar Push with nothing selected → the fourth radio now
-  names `@-`'s change id instead
-- [ ] Right-click a **specific commit** in the log → Push… → the fourth radio names that
-  commit's own change id, regardless of where `@` currently is
-- [ ] **Multi-select** several commits in one repo, then either right-click → Push… or the
-  toolbar Push button → the fourth radio reads "Create bookmarks for N changes" (plural) → OK →
-  one `push-<id>` bookmark per selected commit appears on the remote, all in one confirmation
-- [ ] **Multi-repo project**: select commits spanning two different repos, then toolbar Push →
-  dialog opens normally, but the fourth radio is **absent** (not just disabled) — the other
-  three scopes work as usual via the dialog's own Repository selector
-- [ ] Still with that cross-repo selection: right-click → Push… (context menu) is **entirely
-  disabled** — unchanged from before this scope existed, since the context menu's Push has
-  always required a single repo
-- [ ] With a single-repo selection and the fourth radio chosen, switch the dialog's own
-  **Repository** combo to a different repo → the fourth radio disappears and the scope silently
-  reverts to "Tracking bookmarks (default)" — no crash, no stale target left selected
-- [ ] Push the same change twice via this scope → the second push does not create a second
-  `push-*` bookmark (confirm via `jj bookmark list --all-remotes` — same bookmark name both
-  times)
-- [ ] This scope's dry-run does **not** spuriously trigger the "will create a new remote
-  bookmark" confirmation that the default/tracking scope shows (jj only refuses new remote
-  bookmarks for that scope, not `--change`)
+- [ ] Toolbar Push (VCS menu icon or log toolbar button) with **nothing selected in the log** (or invoked from a context with no log) names `@`'s own change id on the fourth radio (or `@-` if `@` is empty, after `jj commit`); OK creates a new `push-<id>` bookmark on the remote (`jj bookmark list --all-remotes`). With a **single commit** selected in the log, the toolbar Push's fourth radio names that commit's change id, not `@`. Right-clicking a **specific commit** → Push… names that commit's change id regardless of where `@` is
+- [ ] **Multi-selecting** several commits in one repo and then using right-click → Push… or the toolbar Push button shows "Create bookmarks for N changes" (plural); OK creates one `push-<id>` bookmark per selected commit, all in one confirmation
+- [ ] **Multi-repo project**: with commits spanning two repos selected, toolbar Push opens the dialog normally but the fourth radio is **absent** (not just disabled), the other three scopes work via the dialog's Repository selector, and right-click → Push… (context menu) is **entirely disabled** (the context menu's Push always required a single repo)
+- [ ] With a single-repo selection and the fourth radio chosen, switching the dialog's **Repository** combo to a different repo removes the fourth radio and silently reverts the scope to "Tracking bookmarks (default)", with no crash and no stale target left selected
+- [ ] Pushing the same change twice via this scope does not create a second `push-*` bookmark (same name both times in `jj bookmark list --all-remotes`), and its dry-run does **not** spuriously show the "will create a new remote bookmark" confirmation the default scope shows (jj only refuses new remote bookmarks for that scope, not `--change`)
 
 #### Git Fetch Dialog
 
-Setup: a repository with 2+ remotes (the scope radio group only appears in this case).
+Setup: a repository with 2+ remotes (the scope radio group only appears then).
 
-- [ ] Open fetch dialog (VCS menu → Fetch) → "Specific remote" selected by default, remote combo
-  box enabled → OK → fetches from the selected remote
-- [ ] Switch to "All remotes" → remote combo box disables → OK → fetches from every remote
-- [ ] Switch back to "Specific remote" → combo box re-enables with the previously selected remote
-  → OK → fetches just that one
-- [ ] Cancel fetch dialog → no fetch occurs
-- [ ] (jj-idea-idm0) With 2+ repositories mapped, and the repository selector visible: switch the
-  **Repository** combo to a different repo — the remote combo must immediately show a real
-  remote for that repo (never blank) → OK → fetches from the newly selected repo/remote
+- [ ] The fetch dialog (VCS menu → Fetch) has "Specific remote" selected by default with the remote combo enabled, and OK fetches from the selected remote. "All remotes" disables the combo and OK fetches from every remote; switching back to "Specific remote" re-enables the combo with the previously selected remote, and OK fetches just that one. Cancel fetches nothing
+- [ ] With 2+ repositories mapped and the repository selector visible, switching the **Repository** combo to a different repo shows a real remote for that repo immediately (never blank), and OK fetches from the newly selected repo/remote
 
-#### New/untracked bookmark push (jj-idea-dt2k, GitHub #53)
+#### New/untracked bookmark push (GitHub #53)
 
-The plugin no longer uses `jj git push --allow-new` (removed in jj 0.42.0); it tracks the
-bookmark against the remote first, then pushes without any special flag. Verify on **both**
-jj < 0.42 (e.g. 0.37–0.41) and jj ≥ 0.42 (e.g. 0.43) — this was the #53 regression, previously
-failing on 0.42+ with `error: unexpected argument '--allow-new'`:
+The plugin no longer uses `jj git push --allow-new` (removed in jj 0.42.0); it tracks the bookmark against the remote first, then pushes without any special flag. Verify on **both** jj < 0.42 (e.g. 0.37–0.41) and jj ≥ 0.42 (e.g. 0.43); previously 0.42+ failed with `error: unexpected argument '--allow-new'`:
 
-- [ ] "Tracking bookmarks (default)" scope with a brand-new untracked bookmark at the working
-  copy → confirmation dialog lists the bookmark → confirm → push succeeds and the bookmark is
-  now tracked (`jj bookmark list` shows `@origin`)
-- [ ] "Specific bookmark" scope, selecting an untracked bookmark → same confirmation → confirm →
-  push succeeds
-- [ ] Cancel either confirmation dialog → no push occurs, bookmark remains untracked
+- [ ] "Tracking bookmarks (default)" scope with a brand-new untracked bookmark at the working copy shows a confirmation dialog listing the bookmark; confirming pushes successfully and the bookmark is now tracked (`jj bookmark list` shows `@origin`). "Specific bookmark" scope with an untracked bookmark gives the same confirmation and result. Cancelling either confirmation pushes nothing and leaves the bookmark untracked
 
-#### Manage Git Remotes (jj-idea-06tq.2)
+#### Manage Git Remotes
 
 **Code:** `actions/git/ManageRemotesDialog.kt` (+ `RemoteEditDialog`), `actions/git/ManageRemotesAction.kt`, `actions/git/RemoteValidation.kt`
 
-Setup: **early-access (preview) feature `manageRemotes`** - gated. Mint a code
-(`./gradlew previewCode --args="mint --features manageRemotes --for me"`), enter it under Settings → Version Control →
-Jujutsu → Preview features and tick **Manage Git remotes** (or start the IDE with
-`-Djjidea.preview.manageRemotes=true` in the run configuration's VM options). Have a colocated repo with one remote
-(`origin`) and a second bare repo to use as a new remote URL.
+Setup: **early-access (preview) feature `manageRemotes`**, gated. Mint a code (`./gradlew previewCode --args="mint --features manageRemotes --for me"`), enter it under Settings → Version Control → Jujutsu → Preview features and tick **Manage Git remotes** (or start the IDE with `-Djjidea.preview.manageRemotes=true` in the run configuration's VM options). Have a colocated repo with one remote (`origin`) and a second bare repo to use as a new remote URL.
 
-- [ ] Without the property / access code: **Manage Git Remotes...** is absent from the Jujutsu menu and from the per-repo Settings group
-
-- [ ] **VCS → Jujutsu → Manage Git Remotes...** opens a dialog titled with the repo name, listing `origin` with its URL; only a **Close** button; a hint says authentication uses the Git credential helper / SSH agent and changes cannot be undone
-- [ ] **Settings → Version Control → Jujutsu → Repository Settings → (repo) → Manage Git Remotes...** opens the same dialog for that repo
-- [ ] **+** → enter `upstream` and the bare repo's URL → OK → the row appears immediately; `jj git remote list` shows it; the Push and Fetch dialogs now offer `upstream` without reopening the project
-- [ ] **+** with name `origin` → inline error "already exists", OK disabled; with `bad name`, `a..b`, `-x` or blank → inline name error; blank URL or a URL starting with `-` → inline URL error; an scp-like URL (`git@host:a/b.git`) and a path with spaces are accepted
-- [ ] Select `upstream` → **Edit** → change only the URL → OK → URL updates in the table; change only the name → the row is renamed and its remote-tracking bookmarks (bookmarks panel, log chips) follow the new name; change both → both apply
-- [ ] Edit to a name that already exists → inline error (the rename is never attempted)
-- [ ] Select a remote → **-** → confirmation names the remote and URL and warns it cannot be undone → **Cancel** keeps it; **Remove** deletes it, and its `name@remote` bookmarks disappear from the log/bookmarks panel
-- [ ] Failure path: remove a remote externally (`jj git remote remove x` in a terminal) then **-** on its stale row → an error dialog shows jj's message verbatim
-- [ ] Multi-root project: the dialog has a **Repository:** drop-down at the top (absent for a single repo); the Settings button preselects that repo, the menu action preselects the first. Switching repos reloads the table for that repo (briefly empty, no stale rows from the previous repo); add/edit/remove after switching affect the newly selected repo only
-- [ ] No Undo balloon appears after any remote change (these are not undoable via `jj op revert`)
+- [ ] Without the property / access code, **Manage Git Remotes...** is absent from the Jujutsu menu and from the per-repo Settings group
+- [ ] **VCS → Jujutsu → Manage Git Remotes...** opens a dialog titled with the repo name, listing `origin` with its URL, with only a **Close** button and a hint that authentication uses the Git credential helper / SSH agent and that changes cannot be undone. **Settings → Version Control → Jujutsu → Repository Settings → (repo) → Manage Git Remotes...** opens the same dialog for that repo
+- [ ] **+** → `upstream` and the bare repo's URL → OK shows the row immediately; `jj git remote list` shows it, and the Push and Fetch dialogs offer `upstream` without reopening the project
+- [ ] **+** with name `origin` gives an inline "already exists" error with OK disabled; `bad name`, `a..b`, `-x` or blank gives an inline name error; a blank URL or one starting with `-` gives an inline URL error; an scp-like URL (`git@host:a/b.git`) and a path with spaces are accepted
+- [ ] **Edit** on `upstream`: changing only the URL updates it in the table; changing only the name renames the row and its remote-tracking bookmarks (bookmarks panel, log chips) follow the new name; changing both applies both; editing to a name that already exists gives an inline error (the rename is never attempted)
+- [ ] **-** on a selected remote shows a confirmation naming the remote and URL and warning it cannot be undone: **Cancel** keeps it and **Remove** deletes it, and its `name@remote` bookmarks disappear from the log/bookmarks panel. Removing a remote externally (`jj git remote remove x` in a terminal) and then **-** on its stale row shows an error dialog with jj's message verbatim
+- [ ] In a multi-root project the dialog has a **Repository:** drop-down at the top (absent for a single repo); the Settings button preselects that repo and the menu action preselects the first. Switching repos reloads the table (briefly empty, no stale rows), and add/edit/remove after switching affect only the newly selected repo. No Undo balloon appears after any remote change (these are not undoable via `jj op revert`)
 
 **Regression scope:** MT-GIT (push/fetch remote pickers refresh), MT-SETTINGS (new button in the per-repo group), MT-BOOKMARK (remote-aware chips update on remove/rename)
 
@@ -3778,673 +1509,242 @@ Jujutsu → Preview features and tick **Manage Git remotes** (or start the IDE w
 **Code:** `settings/JujutsuConfigurable.kt`, `settings/JujutsuSettings.kt`, `settings/JujutsuSettingsState.kt`, `settings/JujutsuApplicationSettings.kt`
 **Also re-run:** MT-DIFFBASE (its Diff Base group and per-repo override live in this same panel); MT-DND (drag and drop is no longer gated by the Preview features group)
 
-- [ ] (jj-idea-44db) With a pre-existing legacy `.idea/jujutsu.xml` (e.g. non-default log change
-      limit), open the project — the value carries over; change any setting, wait for save —
-      `.idea/jujutsu.xml` is deleted, `.idea/workspace.xml` contains `JujutsuSettings`, and
-      `jj st` no longer lists `jujutsu.xml`; value persists across restart
-- [ ] (jj-idea-ehwm.7) The **Log revset**, the custom **Diff Base** revset, and each repository's override fields for them are coloured and
-      complete functions / bookmarks / tags / aliases as you type. In the multi-line Log revset field Enter inserts a newline. Type an invalid
-      revset, click **Test**: the result line shows a short one-line error (e.g. "Failed to parse revset: Syntax error: expected … (column 17)"),
-      not jj's raw framed snippet and hint; the field gets a red outline (also for an error with no column, such as an
-      unknown revision), and the character at jj's column, if any, is underlined; editing the text clears both. A completion list that is
-      open when you click **Test** closes. The IDE log shows no `Please, install Cell.validationRequestor` warning when Settings opens. Apply/Reset still round-trip the values, and a per-repo field is only editable while its checkbox is on
-- [ ] JJ executable path can be configured, including via the file picker
-- [ ] Auto-refresh toggle, change ID format preference (short/long), and log change limit
-      each take effect as expected, and all settings persist across IDE restarts
-- [ ] (jj-idea-ye1x) In a **multi-repo** project, expand a repo's "Repository Settings" group and
-      turn on "Override diff base for this repository" with "Custom revset" selected — no
-      horizontal scrollbar appears on the settings panel
-- [ ] (jj-idea-i7fa) With a healthy, up-to-date jj configured, expand "Installation Help" —
-      wording reads as a neutral "up to date, update later with:" (not "if jj is not
-      installed…"), and the command rows show update commands (e.g. `brew upgrade jj`), not
-      install commands
-- [ ] (jj-idea-i7fa) With Settings still open, change the "JJ executable path:" field to an
-      older jj or a bogus path (e.g. `/bin/ls`) and click **Test**, without clicking Apply —
-      Installation Help's wording, gated-feature list, and command rows update in place to
-      preview the just-tested path immediately, before it's saved
-- [ ] (jj-idea-i7fa) Now click **Apply** on that same changed path — Installation Help still
-      reflects it (no flicker back to the previous path's wording), and other jj-availability
-      consumers (e.g. the Working Copy tool window) pick up the change too
-- [ ] (jj-idea-bslw, real fix in jj-idea-258c) Expand "Installation Help" — "Homebrew:"/"Cargo:"
-      (or whichever methods are detected) have a comfortable, clearly visible gap before their
-      command box, not sitting close to it. (jj-idea-bslw's first attempt — a Border on the
-      label — measured fine in a unit test but was invisible on screen: the DSL's grid absorbs a
-      component's own border into its layout math instead of pushing the next cell over.
-      jj-idea-258c's `.gap(RightGap.COLUMNS)` is the real inter-cell gap and is what to expect
-      here.)
-- [ ] Narrow the Settings window/pane as much as the IDE allows — nothing should need horizontal
-      scrolling to stay fully visible: the "JJ executable path:" row's field + Test button, and
-      Installation Help's command rows + Copy buttons
-
-#### Merge description template (jj-idea-b0p2)
-
-- [ ] **General** section: "Merge description:" defaults to `Merge branch '{source}' into {destination}`; changing it (e.g. `Merge {source} into {destination}`) changes the New Change... prefill for a two-bookmark merge
-- [ ] Clearing it or omitting `{source}`/`{destination}` shows an inline error on Apply
-
-#### Default push scope (jj-idea-fmzr, jj-idea-ikof)
-
-- [ ] **General** section: a "Default push scope:" combo lists all four Push dialog scopes
-      (Tracking bookmarks / Specific bookmark / All bookmarks / Create bookmark for change).
-      Defaults to "Tracking bookmarks (default)" on a fresh install.
-- [ ] Set it to "Create bookmark for change", click Apply, then open Push from **both** the log's
-      right-click menu and the toolbar/VCS-menu button — both open with the fourth radio already
-      selected (the toolbar button didn't honor this setting at all before jj-idea-ikof; confirm
-      it does now). Restart the IDE — the setting persists.
-- [ ] With the default set to "Create bookmark for change", right-click a **bookmark** →
-      Push… (the per-bookmark entry point, jj-idea-t29z) still opens on "Specific bookmark" —
-      this setting only affects the dialog's *unforced* default, not a caller that already
-      knows which bookmark it wants
-- [ ] With the default set to "Create bookmark for change" and a cross-repo log selection: open
-      toolbar Push → the fourth scope is unavailable (see MT-GIT), so the dialog falls back to
-      "Tracking bookmarks (default)" instead — no crash, no radio stuck on a hidden option
+#### General settings
 
 → automate: jj-idea-ajd0 (settings persistence and column width/visibility persistence,
 tracked in MT-LOG-TABLE, are state-serialization logic)
 
-#### Settings — batch-2 escape hatches (jj-idea-isnf, ixju)
+- [ ] The JJ executable path can be configured, including via the file picker. The auto-refresh toggle, change ID format preference (short/long) and log change limit each take effect as expected, and all settings persist across IDE restarts
+- [ ] The **Log revset**, the custom **Diff Base** revset, and each repository's override fields for them are coloured and complete functions / bookmarks / tags / aliases as you type; in the multi-line Log revset field Enter inserts a newline. Typing an invalid revset and clicking **Test** shows a short one-line error (e.g. "Failed to parse revset: Syntax error: expected … (column 17)"), not jj's raw framed snippet and hint; the field gets a red outline (also for an error with no column, such as an unknown revision) and the character at jj's column, if any, is underlined; editing the text clears both. A completion list open when you click **Test** closes. The IDE log shows no `Please, install Cell.validationRequestor` warning when Settings opens. Apply/Reset still round-trip the values, and a per-repo field is only editable while its checkbox is on
+- [ ] **Merge description:** defaults to `Merge branch '{source}' into {destination}`; changing it (e.g. `Merge {source} into {destination}`) changes the New Change... prefill for a two-bookmark merge, and clearing it or omitting `{source}`/`{destination}` shows an inline error on Apply
+- [ ] A **Support** group at the bottom of the panel has a "Sponsor this plugin on GitHub..." link that opens `https://github.com/sponsors/kkkev` in the default browser (the same URL as the in-product sponsor ask under MT-WORKINGCOPY)
 
-- [ ] **General** section: check "Disable ignored-file scanning (all repositories)" with no
-      per-repo override set, click Apply. Confirm scanning stops in every repo. In a repo with
-      its own override explicitly set to "off" (see Repository Settings below), confirm it still
-      scans despite the global checkbox.
-- [ ] **Log Settings** section: set "Context window" to 0, click Apply. Navigate to a revision
-      outside the loaded log (e.g. via file annotation, or jump to a bookmark outside the
-      current revset) — exactly one row (the target) appears, no ancestors/descendants. Set it
-      back to 10 and repeat — the ~19-revision window returns.
-- [ ] **Repository Settings** (multi-repo project): expand a repo's collapsible group. "Override
-      context window" checkbox + field lets that repo use a different window (e.g. 0) than the
-      project default — confirm only that repo's out-of-view navigation degenerates.
-      "Override ignored-file scanning default" checkbox + "Disable ignored-file scanning for this
-      repository" checkbox let a repo explicitly re-enable scanning even when the global default
-      (General section) is "disabled everywhere" — confirm the override wins in both directions.
+#### Default push scope
 
-#### Settings — Support section
+- [ ] The **General** section's "Default push scope:" combo lists all four Push dialog scopes (Tracking bookmarks / Specific bookmark / All bookmarks / Create bookmark for change) and defaults to "Tracking bookmarks (default)" on a fresh install
+- [ ] Setting it to "Create bookmark for change" and clicking Apply makes Push open with the fourth radio already selected from **both** the log's right-click menu and the toolbar/VCS-menu button, and the setting persists across an IDE restart. Right-clicking a **bookmark** → Push… (the per-bookmark entry point) still opens on "Specific bookmark" (the setting only affects the dialog's *unforced* default). With a cross-repo log selection, toolbar Push falls back to "Tracking bookmarks (default)" because the fourth scope is unavailable (see MT-GIT), with no crash and no radio stuck on a hidden option
 
-- [ ] Open **Settings → Version Control → Jujutsu**
-- [ ] A **Support** group appears at the bottom of the panel with a "Sponsor this plugin on GitHub..." link
-- [ ] Clicking the link opens `https://github.com/sponsors/kkkev` in the default browser
-  (jj-idea-z1ld: `SPONSORS_URL` is now defined once in `ui/services/SponsorAsk.kt` and
-  shared with the in-product sponsor ask under MT-WORKINGCOPY — both must point at the
-  same URL)
+#### Escape hatches (ignore scanning and context window)
 
-#### Settings panel width (jj-idea-bwdk)
+- [ ] **General** → "Disable ignored-file scanning (all repositories)", checked with no per-repo override and Applied, stops scanning in every repo; a repo whose own override is explicitly "off" (see Repository Settings below) still scans despite the global checkbox
+- [ ] **Log Settings** → "Context window" set to 0 and Applied: navigating to a revision outside the loaded log (e.g. via file annotation, or jumping to a bookmark outside the current revset) shows exactly one row (the target), with no ancestors/descendants. Setting it back to 10 and repeating returns the ~19-revision window
+- [ ] **Repository Settings** (multi-repo project), in a repo's collapsible group: the "Override context window" checkbox + field lets that repo use a different window (e.g. 0) than the project default, so only that repo's out-of-view navigation degenerates. The "Override ignored-file scanning default" checkbox + "Disable ignored-file scanning for this repository" checkbox let a repo explicitly re-enable scanning even when the global default is "disabled everywhere"; the override wins in both directions
 
-→ automate: `JujutsuConfigurablePanelTest` covers the panel's overall preferred width and a
-long validation message, both without any repository configured; the checks below cover what
-that test can't (a live dialog, and the per-repo group, which needs a real project).
+#### Installation Help
 
-- [ ] Open **Settings → Version Control → Jujutsu** at the dialog's default size — no horizontal
-      scrollbar anywhere in the panel; the **Test** button next to the executable path is fully
-      visible without scrolling
-- [ ] Widen and narrow the Settings dialog — the executable path and revset fields grow/shrink
-      with it; nothing gets clipped that wasn't already clipped before this change
-- [ ] Click **Test** with a bogus executable path (e.g. `/bin/ls`) — the error message wraps
-      over multiple lines instead of widening the panel
-- [ ] **Log Settings**: the "Revset expression:" box is a ~3-line multi-line field whose left
-      edge lines up with the "Changes to show:" and "Context window:" fields above it, and its
-      guidance text below lines up with that same left edge (not the row's label). Type an
-      expression longer than the box's width — it word-wraps inside the box instead of
-      scrolling horizontally; pressing Enter does not submit or otherwise misbehave
-- [ ] Enter a syntactically invalid revset (e.g. `zz(`) in **Log Settings** and click **Test** —
-      the raw `jj` error wraps instead of widening the panel
-- [ ] Expand **Installation Help** — every command row and its **Copy** button are fully visible
-- [ ] In a multi-repo project, expand a repo under **Repository Settings** — the "Override
-      revset expression" and "Override ignored-file scanning default" rows read correctly with
-      their field/checkbox stacked under the label, the Test button is fully visible, and Apply
-      still persists every override (identity, limit, revset, context window, ignore-scan)
+The settings-side upgrade prompts for old jj versions are under MT-WORKINGCOPY "Feature-gated upgrade prompt in Installation Help".
 
-#### Scoped user identity (jj-idea-i0e6, GitHub #89)
+- [ ] With a healthy, up-to-date jj configured, expanding "Installation Help" reads as a neutral "up to date, update later with:" (not "if jj is not installed…") and the command rows show update commands (e.g. `brew upgrade jj`), not install commands
+- [ ] With Settings still open, changing the "JJ executable path:" field to an older jj or a bogus path (e.g. `/bin/ls`) and clicking **Test**, without Apply, updates Installation Help's wording, gated-feature list and command rows in place to preview the just-tested path. Clicking **Apply** on that path keeps Installation Help reflecting it (no flicker back to the previous path's wording), and other jj-availability consumers (e.g. the Working Copy tool window) pick up the change too
+- [ ] "Homebrew:"/"Cargo:" (or whichever install methods are detected) have a comfortable, clearly visible gap before their command box, not sitting close to it. The gap comes from `.gap(RightGap.COLUMNS)`; a Border on the label looks fine in a unit test but is invisible on screen
+
+#### Settings panel width
+
+→ automate: `JujutsuConfigurablePanelTest` covers the panel's overall preferred width and a long validation message, both without any repository configured; the checks below cover what that test can't (a live dialog, and the per-repo group, which needs a real project).
+
+- [ ] At the dialog's default size there is no horizontal scrollbar anywhere in the panel, and the **Test** button next to the executable path is fully visible. Narrowing the Settings window/pane as far as the IDE allows never needs horizontal scrolling to keep the "JJ executable path:" row's field + Test button and Installation Help's command rows + Copy buttons fully visible. Widening and narrowing makes the executable path and revset fields grow and shrink with it
+- [ ] **Test** with a bogus executable path (e.g. `/bin/ls`) wraps the error message over multiple lines instead of widening the panel, and **Test** on an invalid revset (e.g. `zz(`) in **Log Settings** wraps the raw `jj` error likewise
+- [ ] **Log Settings**: the "Revset expression:" box is a ~3-line multi-line field whose left edge lines up with the "Changes to show:" and "Context window:" fields above it, with its guidance text below lined up with that same left edge (not the row's label). An expression longer than the box's width word-wraps inside it instead of scrolling horizontally, and pressing Enter does not submit or misbehave
+- [ ] In a **multi-repo** project, expanding a repo under **Repository Settings** (also with "Override diff base for this repository" on and "Custom revset" selected) shows no horizontal scrollbar; the "Override revset expression" and "Override ignored-file scanning default" rows read correctly with their field/checkbox stacked under the label, the Test button is fully visible, and Apply still persists every override (identity, limit, revset, context window, ignore-scan)
+
+#### Scoped user identity (GitHub #89)
 
 → automate: `CliExecutorConfigTest`, `ConfigResolveTest` cover the provenance parsing;
 `ScopedIdentityContractCliTest` covers the real-`jj` resolution and that the "Configure Jujutsu
-User" prompt stays quiet — the check below covers what only a live Settings dialog can show (the
+User" prompt stays quiet; the check below covers what only a live Settings dialog can show (the
 row's rendering and its interaction with the global fields and the override checkbox).
 
-This needs a real scoped `~/.config/jj/config.toml` (or an equivalent `--when.repositories` config
-file), which no automated test can supply — see contributing.md § Manual regression scope.
+This needs a real scoped `~/.config/jj/config.toml` (or an equivalent `--when.repositories` config file), which no automated test can supply.
 
-- [ ] Add a `[[--scope]]` block to your jj user config (`jj config edit --user`) with
-      `--when.repositories = ["<path to a repo open in the IDE>"]` setting a `user.name`/
-      `user.email` different from your normal `[user]` table
-- [ ] Open **Settings → Version Control → Jujutsu**, expand that repo's **Repository Settings**
-      group — an "In effect: <scoped name> \<scoped email>" line appears above "Override user
-      identity", with a second, greyed line naming the config file the scope came from
-- [ ] The panel's top-level **User Identity** fields still show your normal, unscoped name/email
-      — not the scoped one — and Apply only ever changes that unscoped value
-- [ ] Remove the scope block and reopen Settings — the row now shows your normal identity instead
-      (or disappears entirely if neither is set at all)
-- [ ] With **only** the scope supplying an identity (no `[user]` table, no per-repo override): no
-      "Configure Jujutsu User" notification appears for that repo on IDE startup
+- [ ] With a `[[--scope]]` block in your jj user config (`jj config edit --user`) whose `--when.repositories = ["<path to a repo open in the IDE>"]` sets a `user.name`/`user.email` different from your normal `[user]` table, Settings → Version Control → Jujutsu → that repo's **Repository Settings** group shows an "In effect: \<scoped name\> \<scoped email\>" line above "Override user identity", with a second, greyed line naming the config file the scope came from. The panel's top-level **User Identity** fields still show your normal, unscoped name/email, and Apply only ever changes that unscoped value
+- [ ] Removing the scope block and reopening Settings shows your normal identity in that row (or no row at all if neither is set). With **only** the scope supplying an identity (no `[user]` table, no per-repo override), no "Configure Jujutsu User" notification appears for that repo on IDE startup
 
-#### Preview features (jj-idea-vpvz, jj-idea-0x06)
+#### Preview features
 
-- [ ] The Preview features group is shown whenever a feature is gated (currently **Operations
-      tab**, jj-idea-aii0). Once nothing is gated again (all graduated), Settings has **no**
-      Preview features group and no Access code field, and the group's behaviour is covered by
-      `JujutsuConfigurablePanelTest` with a test-only feature. The steps below assume a gated
-      feature exists
+The Preview features group is shown whenever a feature is gated (currently **Operations tab** and **Manage Git remotes**). Once nothing is gated (all graduated), Settings has **no** Preview features group and no Access code field, and the group's behaviour is covered by `JujutsuConfigurablePanelTest` with a test-only feature. The steps below assume a gated feature exists. See MT-DND for drag and drop (no longer gated).
 
-- [ ] Open **Settings → Version Control → Jujutsu**: a **Preview features** group appears at the
-      bottom of the panel, below **Support**, with only an "Access code:" field and a one-line
-      explanation — no feature
-      names anywhere
-- [ ] Type or paste an invalid code (no Apply, no reopening): a red "Not a valid access code…"
-      line appears under the field as soon as the text changes; no feature list appears; nothing
-      crashes
-- [ ] Replace it with a valid legacy code: the line turns grey and reads "Code accepted. Choose the
-      features to enable below, then click Apply.", a checkbox for every preview feature appears
-      underneath, and a single shared comment (noting it's unfinished and that reopening the IDE
-      is needed for a toggle change to take effect) appears once below the whole list, not
-      repeated per checkbox — all without leaving Settings
-- [ ] Clear the field: the status line, checkboxes and shared comment all disappear immediately
-- [ ] Enter a valid, single-feature `JJP1-...` code (needs a build whose signing key resolves —
-      either `PREVIEW_CODE_KEY` set, or the local key at `~/.config/jj-idea/preview-code-key` that
-      `previewCode keygen`/`mint` use by default — e.g. minted for yourself via `./gradlew
-      previewCode --args="mint --features <featureId>"`): "Code accepted…" and only that one
-      feature's checkbox appears
-- [ ] Mint a `JJP1` code with `--expires` set to a future month, enter it — "Code accepted, valid
-      until …" appears above its checkbox(es)
-- [ ] Mint a `JJP1` code with `--expires` set to last month, enter it — a red "This code expired
-      on …" line appears instead of a feature list, and no checkboxes appear
-- [ ] On a build **without** the signing key (CI artifact from a non-release run, or a dev build
-      with no `PREVIEW_CODE_KEY` and no local key file), enter any `JJP1-…` code: a red "This build
-      of the plugin can't check codes that start with JJP1…" line appears — not "Not a valid
-      access code" — and a legacy code still works there
-- [ ] Install from the JetBrains Marketplace (not a GitHub zip): a valid `JJP1-…` code is accepted
-      (regression check for jj-idea-cxg5)
-- [ ] With a feature ticked and a code accepted, click Apply, reopen Settings — the checkbox is
-      still ticked; clear the code and Apply — the feature stays off after reopening the IDE
-
-→ see MT-DND below for the effect of the toggle on the log table
+- [ ] A **Preview features** group appears at the bottom of the panel, below **Support**, with only an "Access code:" field and a one-line explanation, with no feature names anywhere. An invalid code (no Apply, no reopening) shows a red "Not a valid access code…" line under the field as soon as the text changes, with no feature list and no crash
+- [ ] A valid legacy code turns the line grey with "Code accepted. Choose the features to enable below, then click Apply.", shows a checkbox for every preview feature, and shows a single shared comment (noting the feature is unfinished and that reopening the IDE is needed for a toggle change to take effect) once below the whole list, not per checkbox, all without leaving Settings. Clearing the field removes the status line, checkboxes and shared comment immediately
+- [ ] A valid, single-feature `JJP1-...` code (needs a build whose signing key resolves: `PREVIEW_CODE_KEY` set, or the local key at `~/.config/jj-idea/preview-code-key` that `previewCode keygen`/`mint` use by default, e.g. minted via `./gradlew previewCode --args="mint --features <featureId>"`) shows "Code accepted…" and only that feature's checkbox. A `JJP1` code minted with `--expires` in a future month shows "Code accepted, valid until …" above its checkbox(es); one minted with `--expires` last month shows a red "This code expired on …" line and no checkboxes
+- [ ] On a build **without** the signing key (CI artifact from a non-release run, or a dev build with no `PREVIEW_CODE_KEY` and no local key file), any `JJP1-…` code shows a red "This build of the plugin can't check codes that start with JJP1…" line (not "Not a valid access code"), while a legacy code still works there. Installed from the JetBrains Marketplace (not a GitHub zip), a valid `JJP1-…` code is accepted
+- [ ] With a feature ticked and a code accepted, Apply and reopening Settings keeps the checkbox ticked; clearing the code and Apply leaves the feature off after reopening the IDE
 
 ### MT-DND
 
-**Availability (graduated from preview, jj-idea-jxii)**
+**Drag and drop**
 
 **Code:** `ui/log/JujutsuLogTableDnD.kt`, `ui/common/JujutsuChangesTreeDnD.kt`, `ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`, `ui/components/IconAwareHtmlPaneDnD.kt`
 
-- [ ] With no access code entered and no `jjidea.preview.*` system property: open the Jujutsu log
-      and drag a commit row — the drag initiates (drag label, drop hint)
-- [ ] The same with no code in the bookmarks panel, the Working Copy changes tree and a bookmark
-      chip in the commit details panel
-- [ ] Settings has no Preview features group at all (nothing is in preview)
+Drag and drop is always on (not gated by the Preview features group). The log table's core drag infrastructure is under MT-LOG-TABLE "Drag and drop: core".
 
-#### Drag image (mirrors the Project view's file drag)
+#### Drag image
 
 **Code:** `ui/log/JujutsuLogTableDnD.kt` (`dragImage`)
 
-- [ ] Dragging a commit row shows a small semi-transparent label following the cursor with the
-      commit's id and description (or "N commits" for a multi-selection), the same way dragging a
-      file in the Project view shows its name/icon
-- [ ] The id in that label is styled the same way it is everywhere else in the log (bold unique
-      prefix, grey remainder, coloured offset suffix on a divergent change) — not plain unstyled
-      text
-- [ ] Dragging a bookmark chip shows its name with the bookmark's own icon; dragging a tag chip
-      shows its name with the tag icon
-- [ ] The label stays attached to the cursor for the whole drag, not just at the start
-- [ ] With the drag-scope icon group set to "Commit" (default), dragging a commit shows the label
-      with no extra icon - unchanged from before jj-idea-d3u5
-- [ ] Set the scope to the tree icon, then drag a commit → the label now starts with a small tree
-      icon before the id (a fixed badge, not a count - see "Rebase source scope" below); set it to
-      the branch icon → the label starts with a small branch icon instead
-- [ ] Dragging a bookmark/tag/`@` chip is unaffected by the scope selection - no badge appears on
-      those, regardless of which scope is selected
+- [ ] Dragging a commit row shows a small semi-transparent label following the cursor for the whole drag, with the commit's id and description (or "N commits" for a multi-selection), as dragging a file in the Project view shows its name/icon. The id is styled as everywhere else in the log (bold unique prefix, grey remainder, coloured offset suffix on a divergent change), not plain text
+- [ ] Dragging a bookmark chip shows its name with the bookmark's icon, and dragging a tag chip shows its name with the tag icon
+- [ ] With the drag-scope icon group set to "Commit" (default), the commit label has no extra icon. Setting the scope to the tree icon starts the label with a small tree icon before the id (a fixed badge, not a count), and the branch icon starts it with a small branch icon. Dragging a bookmark/tag/`@` chip is unaffected by the scope selection (no badge)
 
-#### Drop hint text next to the cursor (jj-idea-ymuu)
+#### Drop hint text next to the cursor
 
-Every drop target shows a small text bubble beside the cursor: the operation a drop would perform
-(allowed) or the reason it can't (rejected). Painted by the plugin itself, because the platform's
-own drop tooltip is off by default (`ide.dnd.textHints`) - so this is the only place a rejection's
-reason is ever visible. Applies to the log table and the Bookmarks panel; the changes tree and
-details panel are drag sources only.
+Every drop target shows a small text bubble beside the cursor: the operation a drop would perform (allowed) or the reason it can't (rejected). It is painted by the plugin itself, because the platform's own drop tooltip is off by default (`ide.dnd.textHints`), so this is the only place a rejection's reason is visible. It applies to the log table and the Bookmarks panel; the changes tree and details panel are drag sources only.
 
 **Code:** `ui/dnd/DropHint.kt`, `ui/dnd/RejectOverlay.kt`, `ui/log/JujutsuLogTableDnD.kt`,
 `ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`
 
-- [ ] In a multi-repo project, drag a commit onto a row from a **different** repo → red fill on the
-      row **and** a red bubble beside the cursor reading "Cannot drop across repositories" (or the
-      guard's actual wording); the bubble follows the cursor while you stay over the row
-- [ ] Drag onto an immutable commit → red bubble "&lt;id&gt; is immutable"; onto a descendant of the
-      dragged commit → the cycle reason
-- [ ] Drag onto a valid centre band → neutral (tooltip-coloured) bubble "Rebase &lt;id&gt; onto &lt;id&gt;";
-      top/bottom band → the "inserting after/before" wording. The bubble changes text as you move
-      between zones/rows, without leaving a stale one behind
-- [ ] Move to the far right and bottom edges of the log while dragging → the bubble stays fully
-      visible (clamped inside the window), never cut off
-- [ ] Change ids in the bubble are styled the way the log styles them: bold unique prefix, grey
-      remainder, and a coloured `/N` suffix on a divergent change - not plain unstyled text. Check
-      an allowed rebase ("Rebase **kk**mpztqr onto **mz**rsnvtu") and an immutable reject
-      ("**ab**cdefgh is immutable")
-- [ ] Bookmark and tag names in the bubble are icon chips coloured like the log's (bookmark icon +
-      bookmark colour, tag icon + tag colour), not plain text: drag a bookmark chip onto a commit
-      ("Move bookmark [chip] to **kk**…"), a tag chip likewise, and a local bookmark onto its
-      `@remote` chip ("Push [chip] to origin"). A deleted bookmark shows struck through and a
-      conflicted one shows the conflict icon, as in the log. Check the same wording in dark theme
-- [ ] Spacing around a chip: a normal gap between the chip's last letter and the following "to"
-      ("Move bookmark [chip] to kk") - the word must not butt against the name
-- [ ] Drag a bookmark with a **very long** name (~50 characters) onto a commit → the bubble shows
-      three lines - "Move bookmark", the whole name with its icon on a line of its own, then
-      "to kk" - with nothing clipped at the right edge and no word split mid-way ("t" / "o")
-- [ ] A bookmark with an **absurdly long** name (~150 characters, wider than the bubble) → shown
-      shortened in the middle with "…" so it fits on its line, never running past the bubble edge
-- [ ] Repeat the long-name check with a tag chip, and with the IDE at a non-100% UI scale
-      (Settings → Appearance → Zoom) - the layout must follow the scale, not the pixel count
-- [ ] Shrink the IDE window narrow and drag a `-s`/`-b` scope rebase (the longest label) → the
-      bubble wraps onto several lines instead of running off the window edge
-- [ ] Move the cursor so it passes **over** the bubble itself (e.g. near the right edge, where the
-      bubble is pushed left under the cursor) → the drag keeps working: the hovered row still
-      highlights and a drop there still lands
-- [ ] The bubble is drawn **above** the red fill and stays legible over it
-- [ ] Drag a commit onto itself → no fill and **no** bubble (deliberately silent)
-- [ ] Move off any row (empty space below the last row), leave the log for another panel, or
-      release/cancel with Esc → the bubble disappears every time; nothing lingers after the drop
-- [ ] Repeat the cross-repo and allowed cases on the **Bookmarks panel** (drag a commit onto a
-      bookmark of another repo; drag a bookmark onto a valid commit) → same bubble behaviour
-- [ ] Turn on Registry key `ide.dnd.textHints` (Help → Find Action → Registry) and drag again →
-      only **one** hint appears (the platform's), not two; turn it back off afterwards
-- [ ] Switch between light and dark themes → bubble and red fill are readable in both
+- [ ] In a multi-repo project, dragging a commit onto a row from a **different** repo shows a red fill on the row **and** a red bubble beside the cursor reading "Cannot drop across repositories" (or the guard's actual wording), following the cursor while you stay over the row. Dragging onto an immutable commit shows "&lt;id&gt; is immutable"; onto a descendant of the dragged commit shows the cycle reason
+- [ ] Dragging onto a valid centre band shows a neutral (tooltip-coloured) bubble "Rebase &lt;id&gt; onto &lt;id&gt;"; the top/bottom band shows the "inserting after/before" wording. The bubble changes text as you move between zones/rows without leaving a stale one behind
+- [ ] Change ids in the bubble are styled as the log styles them (bold unique prefix, grey remainder, a coloured `/N` suffix on a divergent change), e.g. an allowed rebase ("Rebase **kk**mpztqr onto **mz**rsnvtu") and an immutable reject ("**ab**cdefgh is immutable"). Bookmark and tag names are icon chips coloured like the log's (bookmark icon + colour, tag icon + colour): dragging a bookmark chip onto a commit ("Move bookmark [chip] to **kk**…"), a tag chip likewise, and a local bookmark onto its `@remote` chip ("Push [chip] to origin"). A deleted bookmark is struck through and a conflicted one shows the conflict icon, as in the log, in the dark theme too. There is a normal gap between the chip's last letter and the following "to"
+- [ ] Dragging a bookmark with a **very long** name (~50 characters) onto a commit shows three lines, "Move bookmark", the whole name with its icon on a line of its own, then "to kk", with nothing clipped at the right edge and no word split mid-way. A bookmark with an **absurdly long** name (~150 characters, wider than the bubble) is shortened in the middle with "…" so it fits and never runs past the bubble edge. The same holds for a tag chip and at a non-100% UI scale (Settings → Appearance → Zoom): the layout follows the scale, not the pixel count
+- [ ] The bubble stays fully visible at the far right and bottom edges of the log (clamped inside the window), and wraps onto several lines instead of running off the window edge when the IDE window is narrow and you drag a `-s`/`-b` scope rebase (the longest label)
+- [ ] Moving the cursor **over** the bubble itself (e.g. near the right edge, where it is pushed left under the cursor) keeps the drag working: the hovered row still highlights and a drop there still lands. The bubble is drawn **above** the red fill and stays legible over it
+- [ ] Dragging a commit onto itself shows no fill and **no** bubble (deliberately silent). Moving off any row (empty space below the last row), leaving the log for another panel, or releasing/cancelling with Esc makes the bubble disappear every time, with nothing lingering after the drop
+- [ ] The cross-repo and allowed cases on the **Bookmarks panel** (dragging a commit onto a bookmark of another repo; a bookmark onto a valid commit) give the same bubble behaviour. With Registry key `ide.dnd.textHints` on (Help → Find Action → Registry), only **one** hint appears (the platform's), not two; turn it back off afterwards. The bubble and red fill are readable in both light and dark themes
 
-#### Commit → commit rebase by drag (jj-idea-8fxs)
+#### Commit → commit rebase by drag
 
-The headline drag gesture: dropping a dragged commit row (or multi-selection) onto another row's
-centre band runs `jj rebase --onto`; the top/bottom bands run `-A`/`-B`. Applies immediately, no
-confirmation dialog, with an undo balloon on success. `RebaseSourceMode` defaults to `-r` (only the
-dragged commit(s) move); see "Rebase source scope" below for `-s`/`-b`.
+The headline drag gesture: dropping a dragged commit row (or multi-selection) onto another row's centre band runs `jj rebase --onto`; the top/bottom bands run `-A`/`-B`. It applies immediately with no confirmation dialog and an undo balloon on success. `RebaseSourceMode` defaults to `-r` (only the dragged commit(s) move); see "Rebase source scope" below for `-s`/`-b`.
 
 **Code:** `ui/dnd/DropPerformers.kt`, `ui/log/JujutsuLogTableDnD.kt`, `actions/change/executeRebase.kt`
 
-- [ ] Drag a mutable commit onto another's **centre** band → row outline, tooltip "Rebase &lt;id&gt;
-      onto &lt;id&gt;", release applies; confirm the new parent with `jj log` in a terminal
-- [ ] Drag onto the **top** band → thin band outline, tooltip "...inserting after..."; confirm with
-      `jj log` that it landed **visually above** the destination — the top/bottom ↔ `-A`/`-B`
-      mapping is deliberately non-identity (`ui/dnd/DropTarget.kt`) and was a shipped bug once
-- [ ] Drag onto the **bottom** band → lands visually below (`-B`)
-- [ ] Each successful drop shows an undo balloon; clicking its Undo link reverts the graph to its
-      prior shape. Dismiss a balloon on a separate drop and use the persistent Undo Last Operation
-      action instead — same effect
-- [ ] Drag a multi-row selection (Shift/Ctrl-click first) — all selected commits rebase together
-- [ ] Drag onto an immutable commit, or onto a descendant of the dragged commit (a cycle) — a
-      **filled** (not outlined) reject indicator on that row, reject cursor if it lands; drop does
-      nothing. Hover slowly and confirm the filled indicator is reliably visible every time you're
-      over that row - not just an occasional flicker (jj-idea-ymuu: the native reject cursor alone
-      was not reliable feedback; this filled indicator is the fix, painted the same reliable way as
-      the allowed-drop outline rather than depending on the cursor). The reason text beside the
-      cursor is checked in "Drop hint text" above
-- [ ] In a multi-root project, drag a commit from one repo's row onto a row from a different repo
-      in the same unified log — same filled reject indicator, same reliability check as above
-- [ ] Drag a commit onto itself, or onto another member of the same multi-selection — reject
-      cursor with **no** indicator at all (deliberately silent, not the same bug as above)
-- [ ] Regression: the existing **Rebase...** dialog action (context menu / toolbar) also now shows
-      an undo balloon on success — confirm the dialog itself is otherwise unchanged
+- [ ] Dragging a mutable commit onto another's **centre** band shows a row outline and the tooltip "Rebase &lt;id&gt; onto &lt;id&gt;", and release applies (confirm the new parent with `jj log` in a terminal). Dragging onto the **top** band shows a thin band outline and "...inserting after..." and lands **visually above** the destination; the **bottom** band lands visually below (`-B`). The top/bottom ↔ `-A`/`-B` mapping is deliberately non-identity (`ui/dnd/DropTarget.kt`) and was a shipped bug once
+- [ ] Each successful drop shows an undo balloon whose Undo link reverts the graph to its prior shape; dismissing a balloon on a separate drop and using the persistent Undo Last Operation action has the same effect. The existing **Rebase...** dialog action (context menu / toolbar) also shows an undo balloon on success
+- [ ] Dragging a multi-row selection (Shift/Ctrl-click first) rebases all selected commits together
+- [ ] Dragging onto an immutable commit, or onto a descendant of the dragged commit (a cycle), shows a **filled** (not outlined) reject indicator on that row and a reject cursor if it lands; the drop does nothing. Hovering slowly, the filled indicator is reliably visible every time you're over that row, not an occasional flicker (the native reject cursor alone is not reliable feedback). The reason text beside the cursor is checked in "Drop hint text" above. In a multi-root project, dragging a commit onto a row from a different repo in the unified log shows the same filled reject indicator
+- [ ] Dragging a commit onto itself, or onto another member of the same multi-selection, shows the reject cursor with **no** indicator at all (deliberately silent)
 
-#### Copy-modifier drag to duplicate (jj-idea-p6nb)
+#### Copy-modifier drag to duplicate
 
-Same three zones as the plain rebase gesture above, but held with the platform's copy modifier —
-**Option (⌥) on macOS**, matching the Project view's file drag; Ctrl on Windows/Linux. (Ctrl also
-copies on macOS, but it's already bound to the secondary-click/context-menu convention there, so
-prefer Option.) Runs `jj duplicate` instead of `jj rebase`; the original commit(s) stay exactly
-where they were.
+The same three zones as the plain rebase gesture, held with the platform's copy modifier: **Option (⌥) on macOS**, matching the Project view's file drag; Ctrl on Windows/Linux (Ctrl also copies on macOS but is bound to the secondary-click convention there, so prefer Option). It runs `jj duplicate` instead of `jj rebase`, and the original commit(s) stay exactly where they were.
 
 **Code:** `ui/dnd/DropPerformers.kt`, `actions/change/duplicateOntoAction.kt`
 
-- [ ] Hold the copy modifier and drag a commit onto another's **centre** band → tooltip
-      "Duplicate &lt;id&gt; onto &lt;id&gt;", release applies; `jj log` shows both the original,
-      untouched, and a new duplicate as a child of the destination
-- [ ] Same with the **top**/**bottom** bands — the duplicate lands in the insert-before/after slot,
-      same non-identity top/bottom ↔ `-A`/`-B` mapping as plain rebase
-- [ ] Drag a multi-row selection with the copy modifier held — all selected commits duplicate
-      together, originals untouched
-- [ ] Each successful duplicate shows an undo balloon; Undo removes the new commit(s) and leaves
-      the originals as they were
-- [ ] Duplicate a commit onto an **immutable** destination — still allowed (unlike rebase, `jj
-      duplicate` never rewrites the dragged commit, so the "cannot rewrite an immutable commit"
-      guard does not apply to a copy-modifier drag)
-- [ ] Releasing the copy modifier mid-drag switches the tooltip/operation back to "Rebase..." for
-      the same pointer position, and vice versa when it's pressed
-- [ ] Regression: the existing **Duplicate Onto...** dialog action (context menu / toolbar) also
-      now shows an undo balloon on success — confirm the dialog itself is otherwise unchanged
+- [ ] With the copy modifier held, dragging a commit onto another's **centre** band shows the tooltip "Duplicate &lt;id&gt; onto &lt;id&gt;", and release applies: `jj log` shows the original untouched and a new duplicate as a child of the destination. The **top**/**bottom** bands put the duplicate in the insert-before/after slot with the same non-identity mapping as plain rebase. A multi-row selection duplicates all selected commits together, originals untouched
+- [ ] Each successful duplicate shows an undo balloon; Undo removes the new commit(s) and leaves the originals as they were. The existing **Duplicate Onto...** dialog action also shows an undo balloon on success
+- [ ] Duplicating a commit onto an **immutable** destination is still allowed (`jj duplicate` never rewrites the dragged commit, so the "cannot rewrite an immutable commit" guard does not apply). Releasing the copy modifier mid-drag switches the tooltip/operation back to "Rebase..." for the same pointer position, and pressing it switches back
 
-#### Drag a bookmark or tag chip onto a commit to move it (jj-idea-ibth)
+#### Drag a bookmark or tag chip onto a commit to move it
 
 **Code:** `ui/dnd/DropOperation.kt`, `ui/dnd/DropPerformers.kt`, `ui/log/JujutsuLogTableDnD.kt`,
 `actions/bookmark/moveBookmarkAction.kt`, `actions/tag/setTagAction.kt`
 
-- [ ] Drag a bookmark chip from its row onto a different row's centre band → tooltip "Move
-      bookmark &lt;name&gt; to &lt;id&gt;", release applies immediately with an undo balloon;
-      confirm with `jj log` that the bookmark moved, and that the **selection follows the
-      bookmark to its new row**
-- [ ] Do the same for a tag chip → tooltip "Move tag &lt;name&gt; to &lt;id&gt;", same immediate
-      apply + undo balloon
-- [ ] Drag a bookmark forward onto a descendant — applies with no prompt (a plain forward move)
-- [ ] Drag a bookmark **backward** (onto an ancestor, or a row not reachable forward) — a "Move
-      Bookmark Backward?" confirm-and-retry prompt appears (the same one **Move Bookmark
-      Here...** shows for a backward move, reused verbatim, not reimplemented); confirming
-      applies the move with `-B`. Unlike the dialog's version of this prompt, the drag path
-      cannot pre-classify direction, so this appears for **any** deliberate backward/sideways
-      drag, not just a genuine race — the wording says so plainly and does not claim a dialog or
-      a race occurred
-- [ ] Move a bookmark forward, undo it (via the balloon or Undo Last Operation), then drag it
-      forward again to a genuinely different descendant of its (now-reverted) position — this
-      must apply cleanly with **no** backward-move prompt. If the prompt appears here, that's a
-      real bug (verified via raw `jj bookmark set` that jj itself does not misclassify this
-      sequence) — check with `jj log` first that the second target really is a descendant of the
-      bookmark's post-undo position before filing it
-- [ ] Drag a tag onto a revision where a differently-placed tag of the same name already exists —
-      the existing **Set Tag Here...** dialog's "tag already exists, move it?" prompt appears here
-      too; confirming applies with `--allow-move`
-- [ ] Drop a bookmark/tag chip back onto the **same row** it's already on (not onto another chip
-      on that row) — for a **non-conflicted** bookmark/tag, no indicator ever appears, drop is a
-      silent no-op
-- [ ] jj-idea-bico: for a **conflicted/divergent** bookmark or tag, each of its targets has its own
-      chip on its own row (build one with the "conflicted-bm" recipe in MT-BOOKMARK's
-      jj-idea-5r0g item, above). Drag either chip onto the row it's already on — unlike the
-      non-conflicted case above, this **is** an operation: tooltip "Resolve bookmark &lt;name&gt;
-      to &lt;id&gt;" (bookmarks) or "Move tag &lt;name&gt; to &lt;id&gt;" (tags), release applies
-      with an undo balloon, and `jj bookmark list`/`jj log` afterwards shows a single,
-      unconflicted target. Repeat onto the **other** chip's row after undoing — it must resolve
-      there too, not silently no-op
-- [ ] Drag a bookmark/tag chip near a row's **top/bottom edge band** — still resolves to that row's
-      centre (no gap-based operation for a chip drag), no indicator flicker as the pointer nears
-      the edge
-- [ ] Drag a bookmark/tag chip across repositories in a multi-root project — filled reject
-      indicator, same as a commit drag
-- [ ] Drag a **commit row** onto a **tag chip** (batch 4) → tooltip "Move tag &lt;name&gt; to
-      &lt;id&gt;", same immediate apply + undo balloon as dragging the tag chip itself - previously
-      this fell through to a plain rebase onto that row
+- [ ] Dragging a bookmark chip onto a different row's centre band shows the tooltip "Move bookmark &lt;name&gt; to &lt;id&gt;" and release applies immediately with an undo balloon; `jj log` shows the bookmark moved and the **selection follows the bookmark to its new row**. A tag chip shows "Move tag &lt;name&gt; to &lt;id&gt;" with the same immediate apply and undo balloon. A bookmark dragged forward onto a descendant applies with no prompt
+- [ ] Dragging a bookmark **backward** (onto an ancestor, or a row not reachable forward) shows a "Move Bookmark Backward?" confirm-and-retry prompt (the same one **Move Bookmark Here...** shows, reused verbatim), and confirming applies the move with `-B`. Unlike the dialog's version, the drag path cannot pre-classify direction, so this appears for **any** deliberate backward/sideways drag, and its wording says so plainly without claiming a dialog or a race occurred
+- [ ] Moving a bookmark forward, undoing it (balloon or Undo Last Operation), then dragging it forward again to a genuinely different descendant of its (now-reverted) position applies cleanly with **no** backward-move prompt. If the prompt appears, that is a real bug (raw `jj bookmark set` does not misclassify this sequence); check with `jj log` first that the second target really is a descendant of the post-undo position
+- [ ] Dragging a tag onto a revision where a differently-placed tag of the same name exists shows the **Set Tag Here...** dialog's "tag already exists, move it?" prompt, and confirming applies with `--allow-move`
+- [ ] Dropping a **non-conflicted** bookmark/tag chip back onto the **same row** it's already on (not onto another chip on that row) never shows an indicator and is a silent no-op. For a **conflicted/divergent** bookmark or tag, each of its targets has its own chip on its own row (build one with the divergent-bookmark recipe in MT-BOOKMARK "Move direction"), and dragging either chip onto the row it's already on **is** an operation: the tooltip reads "Resolve bookmark &lt;name&gt; to &lt;id&gt;" (bookmarks) or "Move tag &lt;name&gt; to &lt;id&gt;" (tags), release applies with an undo balloon, and `jj bookmark list`/`jj log` then show a single, unconflicted target. After undoing, repeating onto the **other** chip's row resolves there too, not a silent no-op
+- [ ] Dragging a chip near a row's **top/bottom edge band** still resolves to that row's centre (no gap-based operation for a chip drag), with no indicator flicker near the edge. Dragging a chip across repositories in a multi-root project shows the filled reject indicator, as for a commit drag
+- [ ] Dragging a **commit row** onto a **tag chip** shows the tooltip "Move tag &lt;name&gt; to &lt;id&gt;", with the same immediate apply and undo balloon as dragging the tag chip itself (not a plain rebase onto that row)
 
-#### Drag a local bookmark chip onto its remote chip to push (jj-idea-vdwh)
+#### Drag a local bookmark chip onto its remote chip to push
 
 **Code:** `ui/dnd/DropOperation.kt`, `ui/dnd/DropPerformers.kt`, `actions/bookmark/pushBookmarkAction.kt`
 
-- [ ] With a local bookmark ahead of a tracked `name@remote`, drag the local chip onto the remote
-      chip (same row or a different row) → tooltip "Push &lt;name&gt; to &lt;remote&gt;", release
-      opens **Git Push** pre-filled to "Specific bookmark" with that bookmark/remote already
-      selected — it never pushes without going through this dialog
-- [ ] Confirm the dialog's own force-push/deletion/untracked warnings still appear as usual before
-      the push runs
-- [ ] With the local bookmark already in sync with its remote (nothing ahead) — dragging local onto
-      `name@remote` shows no indicator; the degenerate "chips already coincide" case does nothing,
-      not a crash
-- [ ] Drag a **remote** chip (`name@origin`) onto the **local** chip (reverse direction) — no
-      indicator, not a push
-- [ ] With two remotes tracked, drag the local chip onto each remote's chip in turn — each opens
-      the dialog pre-filled to that specific remote
-- [ ] Cancel the pre-filled dialog — no push happens, no error
+- [ ] With a local bookmark ahead of a tracked `name@remote`, dragging the local chip onto the remote chip (same row or a different row) shows the tooltip "Push &lt;name&gt; to &lt;remote&gt;", and release opens **Git Push** pre-filled to "Specific bookmark" with that bookmark/remote selected; it never pushes without this dialog, and the dialog's own force-push/deletion/untracked warnings still appear. Cancelling the pre-filled dialog pushes nothing and shows no error
+- [ ] With the local bookmark already in sync with its remote, dragging local onto `name@remote` shows no indicator (the "chips already coincide" case does nothing, no crash). Dragging a **remote** chip (`name@origin`) onto the **local** chip (reverse direction) shows no indicator and is not a push. With two remotes tracked, dragging onto each remote's chip in turn opens the dialog pre-filled to that specific remote
 
-#### Files → commit squash, files → gap split (jj-idea-yvry, -b2oi)
+#### Files → commit squash, files → gap split
 
-Dragging a file selection out of a changes tree is the first drag source outside the log table
-itself — the changes tree only ever *sources* a `Files` payload; the log table stays the only drop
-target, same `CommitRow`/`Gap` hit-test as every other payload. Squash is dialog-gated (it merges
-content and abandons the emptied source); split is dialog-gated the same way (it rewrites the
-source's content).
+Dragging a file selection out of a changes tree is the first drag source outside the log table: the changes tree only ever *sources* a `Files` payload and the log table stays the only drop target, with the same `CommitRow`/`Gap` hit-test as every other payload. Squash and split are both dialog-gated (squash merges content and abandons the emptied source; split rewrites the source's content).
 
 **Code:** `ui/common/JujutsuChangesTreeDnD.kt`, `ui/dnd/DragGuards.kt` (`filesRejectionReason`),
 `ui/dnd/DropPerformers.kt`, `actions/filechange/SquashIntoFilesAction.kt`
 (`performFileSquashInto`), `actions/filechange/SplitFilesAction.kt` (`performFileSplit`)
 
-- [ ] Select one or more files in the **Working Copy** panel's changes tree,
-      drag onto another mutable commit's **centre** band — tooltip names the squash, release opens
-      **Squash Into** pre-filled with those files ticked and that commit as the fixed destination
-      (not a free picker); confirm with `jj log`/`jj status` after accepting
-- [ ] Same drag from a **commit's own changes tree** (select a historical, non-`@` commit in the
-      log, drag files out of its details-panel changes tree) onto a different commit — same
-      pre-filled Squash dialog
-- [ ] Select files belonging to more than one commit at once in the commit-details tree (select
-      multiple commits in the log first) — no drag initiates (no single owning change)
-- [ ] Drag files onto their **own** owning commit's centre band — no indicator, silent no-op, no
-      dialog opens
-- [ ] Drag files onto an **immutable** destination — filled reject indicator, "&lt;id&gt; is
-      immutable"
-- [ ] With the owning commit itself immutable, drag its files anywhere — filled reject indicator,
-      "Cannot rewrite an immutable commit", both for a commit-row and a gap target
-- [ ] Drag files onto the owning commit's own **top or bottom** band — tooltip names the split,
-      release opens **Split** pre-filled with those files ticked: **bottom** band opens in "new
-      parent" mode (`jj split -B` — the ticked files become a new commit inserted as the owning
-      change's parent), **top** band opens in the default "new child" mode; confirm the resulting
-      commit's position with `jj log`
-- [ ] Drag files into a gap on any **other** commit (not their own) — filled reject indicator
-      reading "Files can only be split out next to their own change"; no dialog opens
-- [ ] Cancel either pre-filled dialog — no command runs, no error
-- [ ] Drag files from the Working Copy panel while a *different* repo is bound in a multi-root
-      project (select files that belong to another repo, if the tree's grouping allows it) — no
-      drag initiates for the other repo's files (no single owning repo)
-- [ ] Confirm neither drag source disturbs the changes tree's existing behaviour: double-click to
-      diff, right-click context menu, and the diff preview still work normally on the same tree
+- [ ] Selecting one or more files in the **Working Copy** panel's changes tree and dragging onto another mutable commit's **centre** band shows a tooltip naming the squash, and release opens **Squash Into** pre-filled with those files ticked and that commit as the fixed destination (not a free picker); confirm with `jj log`/`jj status` after accepting. The same drag from a **commit's own changes tree** (a historical, non-`@` commit selected in the log, files dragged from its details-panel tree) onto a different commit opens the same pre-filled Squash dialog
+- [ ] Dragging files onto the owning commit's own **top or bottom** band shows a tooltip naming the split, and release opens **Split** pre-filled with those files ticked: the **bottom** band opens in "new parent" mode (`jj split -B`, the ticked files become a new commit inserted as the owning change's parent) and the **top** band in the default "new child" mode; confirm the resulting position with `jj log`. Dragging files into a gap on any **other** commit shows a filled reject indicator reading "Files can only be split out next to their own change", with no dialog
+- [ ] Dragging files onto their **own** owning commit's centre band shows no indicator and is a silent no-op with no dialog. Dragging onto an **immutable** destination shows a filled reject indicator "&lt;id&gt; is immutable". With the owning commit itself immutable, dragging its files anywhere (a commit row or a gap) shows a filled reject indicator "Cannot rewrite an immutable commit"
+- [ ] Cancelling either pre-filled dialog runs no command and shows no error
+- [ ] No drag initiates when files belong to more than one commit (several commits selected in the log, files selected across them in the commit-details tree: no single owning change), or when selecting files belonging to another repo while a different repo is bound in a multi-root project (no single owning repo)
+- [ ] Neither drag source disturbs the changes tree's existing behaviour: double-click to diff, the right-click context menu and the diff preview still work normally on the same tree
 
-#### Bookmarks panel as drag source and drop target (jj-idea-0rdm)
+#### Bookmarks panel as drag source and drop target
 
-The bookmarks panel becomes a second surface a bookmark/tag can be dragged from and to, in either
-direction with the log table. Identity is carried directly as repo + change id, not a hydrated log
-entry, so a bookmark whose change fell outside the loaded log window is still draggable/droppable -
-the case this bead exists for.
+The bookmarks panel is a second surface a bookmark/tag can be dragged from and to, in either direction with the log table. Identity is carried directly as repo + change id, not a hydrated log entry, so a bookmark whose change fell outside the loaded log window is still draggable and droppable.
 
 **Code:** `ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`, `ui/dnd/DropTarget.kt`,
 `ui/dnd/DragPayload.kt`
 
-- [ ] Drag a local bookmark node from the panel onto a log commit row's centre band → tooltip names
-      the move, release applies with an undo balloon, same as dragging the log's own chip
-- [ ] Scroll or filter the log so a bookmark's change is **not currently loaded**, then drag that
-      bookmark from the panel onto a commit that *is* visible → the move still works
-- [ ] Drag a log commit row onto a bookmark node in the panel → same operation, reversed
-- [ ] Drag a log commit row onto a **tag** node in the panel → moves the tag there
-- [ ] Drag a tag node from the panel onto a log commit row → moves the tag there
-- [ ] A bookmark node with no target commit (deleted, or a pending-delete row) neither drags nor
-      accepts a drop - confirm with a bookmark you've just deleted but not yet refreshed away
-- [ ] In a multi-root project, drag a commit from one repo's log row onto another repo's bookmark
-      node in the panel (or vice versa) → filled reject indicator on the panel node, same
-      reliability check as the log table's own cross-repo case (hover slowly, confirm it doesn't
-      flicker away)
-- [ ] Drag a bookmark/tag node onto itself, or drop it back on the row it already sits on → no
-      indicator, silent no-op
-- [ ] jj-idea-bico: build a conflicted bookmark with the "conflicted-bm" recipe above
-      (MT-BOOKMARK's jj-idea-5r0g item), then in the panel drag its **single node** onto
-      `<rev-a>`'s log row and, separately (undo in between), onto `<rev-b>`'s row — **both** must
-      show the "Resolve bookmark conflicted-bm to &lt;id&gt;" tooltip and apply; neither direction
-      is allowed to silently no-op the way a single-target bookmark's self-drop does above.
-      Confirm with `jj bookmark list` that the conflict is actually gone afterwards
-- [ ] Dragging a bookmark/tag node shows the same small cursor-following chip label the log table's
-      own chip drag shows
+- [ ] Dragging a local bookmark node from the panel onto a log commit row's centre band shows a tooltip naming the move, and release applies with an undo balloon, as dragging the log's own chip does. This works even after scrolling or filtering the log so the bookmark's change is **not currently loaded**, dragging onto a commit that *is* visible. Dragging a bookmark/tag node shows the same small cursor-following chip label as the log table's own chip drag
+- [ ] Dragging a log commit row onto a bookmark node in the panel is the same operation, reversed. Dragging a log commit row onto a **tag** node, or a tag node onto a log commit row, moves the tag there
+- [ ] A bookmark node with no target commit (deleted, or a pending-delete row) neither drags nor accepts a drop (try one you've just deleted but not yet refreshed away). Dragging a bookmark/tag node onto itself, or back onto the row it already sits on, shows no indicator and is a silent no-op
+- [ ] In a multi-root project, dragging a commit from one repo's log row onto another repo's bookmark node in the panel (or vice versa) shows a filled reject indicator on the panel node, with the same hover-slowly reliability check as the log table's cross-repo case
+- [ ] With a conflicted bookmark (the divergent-bookmark recipe in MT-BOOKMARK "Move direction"), dragging its **single node** in the panel onto `<rev-a>`'s log row and, separately (undo in between), onto `<rev-b>`'s row **both** show the "Resolve bookmark conflicted-bm to &lt;id&gt;" tooltip and apply (neither is allowed to silently no-op like a single-target bookmark's self-drop); `jj bookmark list` shows the conflict gone afterwards
+- [ ] Push within the panel: with a local bookmark ahead of a tracked remote, dragging the local node onto its `name@remote` node shows a tooltip naming the push, and release opens **Git Push** pre-filled to that bookmark/remote (never pushing without the dialog), even when the remote bookmark's commit isn't loaded in the log at all
 
-#### Push by dragging local onto remote, within the panel (jj-idea-3xab)
+#### Bookmark/tag chip drag source in the commit details panel
 
-Complements jj-idea-vdwh for when the remote bookmark isn't visible as a log chip.
-
-**Code:** `ui/log/bookmarks/JujutsuBookmarksPanelDnD.kt`, `ui/dnd/DropOperation.kt`,
-`actions/bookmark/pushBookmarkAction.kt`
-
-- [ ] With a local bookmark ahead of a tracked remote, drag the local node in the panel onto its
-      `name@remote` node → tooltip names the push, release opens **Git Push** pre-filled to that
-      bookmark/remote — it never pushes without going through the dialog
-- [ ] This works even when the remote bookmark's commit isn't loaded in the log at all
-
-#### Bookmark/tag chip drag source in the commit details panel (jj-idea-4ji7)
-
-A bookmark or tag chip rendered in the metadata pane (bottom of the commit details panel) becomes
-draggable the same way a log or panel chip is - dragging from plain description/metadata text is
-unaffected.
+A bookmark or tag chip in the metadata pane (bottom of the commit details panel) is draggable like a log or panel chip; dragging from plain description/metadata text is unaffected.
 
 **Code:** `ui/components/IconAwareHtmlPaneDnD.kt`, `ui/components/IconAwareHtmlPane.kt`
 
-- [ ] Select a commit with a bookmark, drag its chip out of the details pane's metadata section
-      onto another commit in the log → moves the bookmark, same as any other chip drag
-- [ ] Same for a tag chip
-- [ ] Click-and-drag across plain description/metadata text in the same pane (not starting on a
-      chip) → normal text selection still works, unaffected
-- [ ] Start a drag on a chip, release, then drag across plain text elsewhere in the pane → normal
-      text selection works for that second gesture (confirms the suppression doesn't stick)
-- [ ] Right-click on a chip in this pane still shows its usual ref context menu (Move/Push/Delete/
-      etc.) - unaffected by the new drag source
+- [ ] Selecting a commit with a bookmark and dragging its chip out of the details pane's metadata section onto another commit in the log moves the bookmark, as any other chip drag; the same works for a tag chip
+- [ ] Click-dragging across plain description/metadata text in the same pane (not starting on a chip) still selects text normally, and that holds for a second gesture after starting and releasing a chip drag (the suppression doesn't stick). Right-clicking a chip in this pane still shows its usual ref context menu (Move/Push/Delete/etc.)
 
-#### Drag the `@` marker: edit or new-on-top by zone (jj-idea-pk2c, redesigned by jj-idea-d3u5)
+#### Drag the `@` marker: edit or new-on-top by zone
 
-The working-copy `@` marker becomes a drag source using the same zone vocabulary as the
-commit-rebase gesture, not a modal dialog: drop **on** a commit's centre band to `jj edit` it
-(rejected outright if immutable - no dialog); drop in the band **just above** a commit to run
-`jj new` with that commit as parent, creating a new change on top of it - **always allowed**,
-even for an immutable target, since `jj new` never rewrites its parent. The bottom band has no
-operation for `@`.
+The working-copy `@` marker is a drag source using the same zone vocabulary as the commit-rebase gesture, not a modal dialog. Dropping **on** a commit's centre band runs `jj edit` (rejected outright if immutable, with no dialog); dropping in the band **just above** a commit runs `jj new` with that commit as parent, creating a new change on top of it, and is **always allowed**, even for an immutable target, since `jj new` never rewrites its parent. The bottom band has no operation for `@`.
 
 **Code:** `ui/log/LogClickTarget.kt` (`WorkingCopyClick`), `ui/log/JujutsuLogTableRenderers.kt`
 (`appendWorkingCopyMarker`), `ui/dnd/DropOperation.kt` (`EditWorkingCopy`, `NewChangeOnTop`),
 `ui/dnd/DragGuards.kt` (the `WorkingCopyRef`+`CommitRow`+immutable check),
 `ui/statusbar/JujutsuWorkingCopySwitcher.kt` (`editWorkingCopy`, `newChangeOnTop`)
 
-- [ ] Drag the `@` marker (next to the current working-copy row) onto a different **mutable**
-      commit's centre band → tooltip "Edit &lt;id&gt;", release runs `jj edit` immediately with an
-      undo balloon; confirm with `jj log` that `@` moved
-- [ ] Drag `@` onto an **immutable** commit's centre → filled reject indicator, "&lt;id&gt; is
-      immutable" - no dialog appears at all, drop does nothing
-- [ ] Drag `@` into the band **just above** any commit - mutable or **immutable** - → tooltip "New
-      change on top of &lt;id&gt;", release creates a new child immediately with an undo balloon
-      and moves `@` there; confirm with `jj log`. The immutable case is the one most worth
-      checking carefully: there must be **no** reject indicator and **no** dialog here
-- [ ] Drag `@` into the band **below** a commit → no indicator, not an operation
-- [ ] Drag `@` onto the row it's already on (any zone) → no indicator, silent no-op (self-drop)
-- [ ] In a multi-root project, drag `@` from one repo's row onto a row from a different repo → same
-      filled reject indicator as a commit drag
-- [ ] Dragging `@` shows a small cursor-following chip labelled "@" in the usual working-copy color
-- [ ] Regression: the status-bar **Switch Working Copy** popup (click path, not drag) still works
-      exactly as before - it still asks its "Edit / New on Top / Cancel" dialog (a click has no
-      zone to read the operation from) and still shows an undo balloon on success
+- [ ] Dragging the `@` marker (next to the current working-copy row) onto a different **mutable** commit's centre band shows the tooltip "Edit &lt;id&gt;", and release runs `jj edit` immediately with an undo balloon (confirm with `jj log` that `@` moved). Dragging `@` onto an **immutable** commit's centre shows a filled reject indicator "&lt;id&gt; is immutable" with no dialog at all, and the drop does nothing
+- [ ] Dragging `@` into the band **just above** any commit, mutable or **immutable**, shows the tooltip "New change on top of &lt;id&gt;", and release creates a new child immediately with an undo balloon and moves `@` there (confirm with `jj log`). The immutable case is the one most worth checking carefully: there must be **no** reject indicator and **no** dialog. Dragging `@` into the band **below** a commit shows no indicator (not an operation)
+- [ ] Dragging `@` onto the row it's already on (any zone) shows no indicator and is a silent no-op. In a multi-root project, dragging `@` from one repo's row onto a row from a different repo shows the same filled reject indicator as a commit drag. Dragging `@` shows a small cursor-following chip labelled "@" in the usual working-copy colour
+- [ ] The status-bar **Switch Working Copy** popup (click path, not drag) still asks its "Edit / New on Top / Cancel" dialog (a click has no zone to read the operation from) and still shows an undo balloon on success
 
-#### Rebase source scope: `-r`/`-s`/`-b` (jj-idea-j8ij, redesigned by jj-idea-d3u5)
+#### Rebase source scope: `-r`/`-s`/`-b`
 
-Three **mutually-exclusive icon toggle buttons** in the toolbar (only visible with the Drag and
-Drop preview feature on, next to the View Options button - a commit-dot icon, a tree icon, and a
-branch icon) pick whether a commit-onto-commit drag rebases just the dragged commit(s) (`-r`, the
-default), the dragged commit(s) plus everything descended from them (`-s`), or the entire branch
-containing them (`-b`). Exactly one is pressed/highlighted at a time - clicking a different one
-presses it and un-presses the others, the same way a diff viewer's unified/side-by-side toggle
-works. The setting is project-level and sticky across drags, so the drop tooltip and drag chip
-both name the resolved scope every time - this is deliberate anti-footgun UX, not decoration:
-confirm it rather than skipping past it. While dragging under `-s`/`-b`, the rows that would
-actually move are tinted live in the log, the same green `RebasePreviewPanel`'s dialog preview
-uses.
+Three **mutually-exclusive icon toggle buttons** in the toolbar, next to the View Options button (a commit-dot icon, a tree icon and a branch icon), pick whether a commit-onto-commit drag rebases just the dragged commit(s) (`-r`, the default), the dragged commit(s) plus everything descended from them (`-s`), or the entire branch containing them (`-b`). Exactly one is pressed at a time; clicking a different one presses it and un-presses the others, as a diff viewer's unified/side-by-side toggle works. The setting is project-level and sticky across drags, so the drop tooltip and drag chip both name the resolved scope every time (deliberate anti-footgun UX, so confirm it rather than skipping past it). While dragging under `-s`/`-b`, the rows that would actually move are tinted live in the log, the same green `RebasePreviewPanel`'s dialog preview uses.
 
 **Code:** `ui/common/CommitTablePanel.kt` (`DragScopeAction`), `settings/JujutsuSettingsState.kt`
 (`dragRebaseSourceMode`), `ui/dnd/DragGuards.kt` (`DragContext.movedIds`), `ui/dnd/DropOperation.kt`
 (`sourceScopeLabel`), `ui/dnd/DropPerformers.kt` (`toRebaseSpec`), `ui/log/JujutsuLogTableDnD.kt`
 (`applyDragHighlight`)
 
-- [ ] Toolbar shows three icon buttons next to View Options (commit dot / tree / branch), with the
-      commit-dot one pressed/highlighted by default; hovering each shows a tooltip naming its scope
-- [ ] Click the tree icon → it becomes pressed, the commit-dot icon un-presses - exactly one is
-      ever pressed at a time
-- [ ] With the tree icon selected, start dragging a commit that has children (don't drop yet) → its
-      descendant rows tint green, live, before you release; the dragged commit's own row tints too.
-      Releasing or cancelling the drag (Esc, or dropping off-target) removes the tint
-- [ ] Complete that drag → tooltip read "Rebase &lt;id&gt; and its N descendant(s) onto &lt;id&gt;"
-      (singular for exactly one descendant) before release; confirm with `jj log` that the children
-      moved too, not just the dragged commit
-- [ ] Same commit, but it's a **leaf** (no descendants) - tooltip reads exactly like the plain `-r`
-      case (no "and its 0 descendants" wording), and **no** tint appears during the drag either
-- [ ] Click the branch icon → it presses, the tree icon un-presses; drag a commit → tooltip reads
-      "Rebase the branch containing &lt;id&gt; onto &lt;id&gt;" (no count), the whole branch tints
-      live during the drag; confirm with `jj log` that the whole branch moved
-- [ ] With the tree or branch icon selected, drag a **mutable** commit whose descendants/branch
-      include an **immutable** commit elsewhere → filled reject indicator, "Cannot rewrite an
-      immutable commit" - even though the commit under the cursor itself is mutable. This is the
-      guard fix this bead shipped alongside the gesture; if it's missing, that's a real bug
-- [ ] Click the commit-dot icon again and confirm the previous immutable-descendant case no longer
-      rejects (only the dragged commit's own immutability matters again), and no live tint appears
-      for a plain drag
-- [ ] With the tree or branch icon selected, hold the **copy modifier** and drag a commit → still
-      duplicates only that one commit (tooltip has no scope wording, no live tint either);
-      `jj duplicate` has no `-s`/`-b` axis, so the selector is inert for a copy-modifier drag -
-      confirm with `jj log` that descendants were *not* duplicated
-- [ ] Change the selection, close and reopen the project (or restart the IDE) → the choice persisted
+- [ ] The toolbar shows three icon buttons next to View Options (commit dot / tree / branch), the commit-dot one pressed by default, each with a tooltip naming its scope. Clicking the tree icon presses it and un-presses the commit-dot icon (exactly one pressed at a time)
+- [ ] With the tree icon selected, starting to drag a commit that has children (without dropping) tints its descendant rows green live, before you release, and the dragged commit's own row too; releasing or cancelling (Esc, or dropping off-target) removes the tint. Completing the drag shows the tooltip "Rebase &lt;id&gt; and its N descendant(s) onto &lt;id&gt;" (singular for exactly one descendant) before release, and `jj log` shows the children moved too. A **leaf** commit (no descendants) reads exactly like the plain `-r` case (no "and its 0 descendants" wording) and shows **no** tint
+- [ ] With the branch icon, dragging a commit shows the tooltip "Rebase the branch containing &lt;id&gt; onto &lt;id&gt;" (no count) and tints the whole branch live; `jj log` shows the whole branch moved
+- [ ] With the tree or branch icon selected, dragging a **mutable** commit whose descendants/branch include an **immutable** commit elsewhere shows a filled reject indicator "Cannot rewrite an immutable commit", even though the commit under the cursor is mutable (if it's missing, that's a real bug). Clicking the commit-dot icon again, the same case no longer rejects (only the dragged commit's own immutability matters) and no live tint appears for a plain drag
+- [ ] With the tree or branch icon selected, holding the **copy modifier** and dragging a commit still duplicates only that one commit (the tooltip has no scope wording and no live tint appears): `jj duplicate` has no `-s`/`-b` axis, so the selector is inert for a copy-modifier drag (confirm with `jj log` that descendants were *not* duplicated)
+- [ ] The scope choice persists after closing and reopening the project (or restarting the IDE)
 
 ### MT-TASKS
 
-**IntelliJ Tasks integration (`vcs.taskHandler`, jj-idea-n3u0, GitHub #102)**
+**IntelliJ Tasks integration (`vcs.taskHandler`, GitHub #102)**
 
 **Code:** `vcs/JujutsuTaskHandler.kt`, `META-INF/plugin.xml` (`vcs.taskHandler`)
 **Also re-run:** MT-WORKINGCOPY (switching moves `@`); MT-BOOKMARK (task bookmarks appear in the widget and panel)
 
-Requires the bundled Tasks plugin (Tools → Tasks & Contexts). Use a repo with a pushed/immutable
-`main` bookmark and a mutable change on top.
+Requires the bundled Tasks plugin (Tools → Tasks & Contexts). Use a repo with a pushed/immutable `main` bookmark and a mutable change on top.
 
-- [ ] Tools → Tasks & Contexts → Open Task… → create a local task "PROJ-1 test": the dialog offers
-      **Create branch**, **From:** lists bookmarks, and the suggested name is a valid bookmark
-- [ ] Commit the dialog with Create branch: `jj log` shows a bookmark with that name on a new
-      change that is `@`, described with the task's commit message
-- [ ] Same, when `@` was already empty and undescribed: no extra empty change is left behind
-- [ ] A name with a space or `@` is rejected by the dialog
-- [ ] Create a second task, then Switch to the first (Tools → Tasks & Contexts): `@` returns to
-      the first task's newest change; uncommitted edits in the second task are still there when
-      you switch back (no shelving needed)
-- [ ] A task whose bookmark is on an immutable change (e.g. `main`): switching to it creates a new
-      change on top instead of editing
-- [ ] **Use branch** with an existing bookmark switches `@` to it
-- [ ] Close Task (Tools → Tasks & Contexts → Close Task…): the **Commit changes** box is Tasks' own
-      and is expected to show "Jujutsu tracks changes automatically" if ticked - nothing to commit
-- [ ] Close Task with **Merge branch** ticked: a dialog offers *Rebase onto \<original\>*, *Merge* and
-      *Just Switch Back* (plus "Remember my choice")
-- [ ] Rebase: do two changes of work past the task bookmark first. After closing, the bookmark is on the
-      newest of them (not left behind), the whole stack sits on the original bookmark, and a mutable
-      original bookmark has fast-forwarded to it; `@` is on that stack
-- [ ] Rebase onto an immutable original (e.g. `main`): `main` does not move; `@` is a new change on `main`
-- [ ] Merge: a "Merge \<task\>" change with both as parents, a fresh empty `@` on top, mutable original
-      bookmark on the merge change
-- [ ] Just Switch Back: nothing is rewritten and no bookmark moves; the task bookmark is always kept
-- [ ] "Remember my choice" ticked: the next close skips the dialog (reset by clearing
-      `jj.tasks.closeMode` in `options/other.xml` of the IDE config)
-- [ ] Cancelling the dialog leaves the repo untouched
-- [ ] Switch task, then check the Undo balloon reverts the switch
-- [ ] Multi-root project: the task applies to every jj root that has the bookmark
-- [ ] Project with no jj root: the branch options are hidden in the Open Task dialog
+- [ ] Tools → Tasks & Contexts → Open Task… → creating a local task "PROJ-1 test" shows a dialog offering **Create branch**, a **From:** list of bookmarks and a suggested name that is a valid bookmark. A name with a space or `@` is rejected. Committing the dialog with Create branch shows in `jj log` a bookmark with that name on a new change that is `@`, described with the task's commit message; when `@` was already empty and undescribed, no extra empty change is left behind
+- [ ] Creating a second task and switching to the first (Tools → Tasks & Contexts) returns `@` to the first task's newest change, and uncommitted edits in the second task are still there when you switch back (no shelving needed). A task whose bookmark is on an immutable change (e.g. `main`) creates a new change on top instead of editing. **Use branch** with an existing bookmark switches `@` to it. The Undo balloon after a switch reverts the switch
+- [ ] Close Task (Tools → Tasks & Contexts → Close Task…): the **Commit changes** box is Tasks' own and shows "Jujutsu tracks changes automatically" if ticked (nothing to commit). With **Merge branch** ticked, a dialog offers *Rebase onto \<original\>*, *Merge* and *Just Switch Back* (plus "Remember my choice"), and Cancel leaves the repo untouched
+- [ ] Rebase (after doing two changes of work past the task bookmark): the bookmark ends on the newest of them (not left behind), the whole stack sits on the original bookmark, a mutable original bookmark has fast-forwarded to it, and `@` is on that stack. Rebasing onto an immutable original (e.g. `main`) leaves `main` where it is, with `@` a new change on `main`
+- [ ] Merge produces a "Merge \<task\>" change with both as parents, a fresh empty `@` on top, and the mutable original bookmark on the merge change. Just Switch Back rewrites nothing and moves no bookmark (the task bookmark is always kept)
+- [ ] "Remember my choice" ticked makes the next close skip the dialog (reset by clearing `jj.tasks.closeMode` in `options/other.xml` of the IDE config)
+- [ ] In a multi-root project the task applies to every jj root that has the bookmark; in a project with no jj root the branch options are hidden in the Open Task dialog
 
 ### MT-OPLOG
 
-**Operations tab (`jj op log` browser, jj-idea-aii0) - preview feature `OPERATION_LOG`**
+**Operations tab (`jj op log` browser) - preview feature `OPERATION_LOG`**
 
 **Code:** `ui/oplog/*`, `ui/log/JujutsuRootFilterComponent.kt`, `actions/undo/ShowOperationLogAction.kt`, `jj/cli/CliExecutor.kt` (`opRestoreArgs`), `preview/PreviewFeature.kt`
 **Also re-run:** MT-CROSS (the roots filter component is shared with the log); MT-WORKINGCOPY (revert/restore invalidate repo state and the working copy); MT-LOG-REFRESH (the tab refreshes on the same funnel); MT-CTXMENU (VCS → Jujutsu submenu entry); MT-SETTINGS (Preview features group)
 
-Precondition: the feature is gated. Either enable it with `-Djjidea.preview.operationLog=true`
-(runIde / VM options) or enter an access code granting **Operations tab** under Settings →
-Version Control → Jujutsu → Preview features, tick it, Apply, and reopen the IDE. Use a repo with
-a few changes and a dirty working copy.
+Precondition: the feature is gated. Either enable it with `-Djjidea.preview.operationLog=true` (runIde / VM options) or enter an access code granting **Operations tab** under Settings → Version Control → Jujutsu → Preview features, tick it, Apply, and reopen the IDE. Use a repo with a few changes and a dirty working copy.
 
-- [ ] **Gating:** with no access code and no property, VCS → Jujutsu has **no** "Show Operation Log"
-      entry (hidden, not greyed out), Find Action does not offer it, and the "+" in the VCS tool
-      window tab strip still opens a new log tab directly with a single click (no menu)
-- [ ] With the feature enabled, the tab strip's "+" becomes a small menu offering **Open New Jujutsu
-      Log Tab** and **Show Operation Log**; both work
-- [ ] With the feature enabled, VCS → Jujutsu → **Show Operation Log** opens an **Operations** tab in
-      the VCS tool window; running it again re-selects the same tab rather than opening a second
-- [ ] Rows are newest first with Description, Command and Time columns (Time last, like the log);
-      the bottom row is the "(repository created)" root operation. Time reads "Today 14:05" /
-      "Yesterday 09:12" / a locale date exactly like the log's Date column, with the full absolute
-      time in its tooltip
-- [ ] **Snapshot toggle:** "snapshot working copy" rows are hidden by default; the toolbar
-      **Show Snapshot Operations** toggle reveals them, and the selected row stays selected
-- [ ] **Terminal operation appears:** run `jj describe -m "from terminal"` in a terminal; after the
-      repo refreshes (focus the IDE) the tab shows the new top row with its command; with the head
-      unchanged, Refresh does not reset the scroll position or selection
-- [ ] **Revert (primary):** select an older, non-root row, press **Revert This Operation** (toolbar and
-      right-click). Only that operation's effect is undone; later operations' effects remain; a new
-      row appears at the top; the log and Working Copy panel update
-- [ ] Revert and Restore are **disabled with a tooltip reason** on the root row and with nothing
-      selected; Restore is also disabled on the top (current) row
-- [ ] **Restore (secondary):** right-click shows Restore in its own section below a separator, labelled
-      "Restore Repository to This Point...". Choosing it shows a confirmation naming the operation
-      and how many later operations are discarded; **Cancel** changes nothing
-- [ ] Confirming Restore resets the repo to that point (`jj log` matches the state after that
-      operation), the tab gains a new top row, and the log/Working Copy panel refresh
-- [ ] Revert and Restore never raise an undo balloon
-- [ ] **Multi-root (jj-idea-qz9d):** with two jj roots, a **Repository** chip (same as the log's) appears
-      at the right of the toolbar; with one root there is none. The tab opens showing only the repo it
-      was opened from
-- [ ] Cycling roots in the chip (include / exclude / unset) and **Select All** behaves like the log's; with
-      both repos shown, rows interleave by time, each with a repo-coloured square, and the repo name
-      shows in the Description tooltip. With one repo shown there are no squares
-- [ ] Revert and Restore act on the **row's own repo**; Restore's confirmation counts only that repo's
-      later operations
-- [ ] The log's own root filter is unchanged (see MT-CROSS)
-- [ ] Close the tab and reopen it: the list is rebuilt, no errors in idea.log
-- [ ] Disable the plugin dynamically (Settings → Plugins) with the tab open: the tab disappears
+- [ ] **Gating:** with no access code and no property, VCS → Jujutsu has **no** "Show Operation Log" entry (hidden, not greyed out), Find Action does not offer it, and the "+" in the VCS tool window tab strip opens a new log tab directly with a single click (no menu). With the feature enabled, the "+" becomes a small menu offering **Open New Jujutsu Log Tab** and **Show Operation Log**, both working
+- [ ] VCS → Jujutsu → **Show Operation Log** opens an **Operations** tab in the VCS tool window, and running it again re-selects the same tab rather than opening a second. Closing the tab and reopening it rebuilds the list with no errors in `idea.log`; disabling the plugin dynamically (Settings → Plugins) with the tab open makes the tab disappear
+- [ ] Rows are newest first with Description, Command and Time columns (Time last, like the log); the bottom row is the "(repository created)" root operation. Time reads "Today 14:05" / "Yesterday 09:12" / a locale date exactly like the log's Date column, with the full absolute time in its tooltip
+- [ ] **Snapshot toggle:** "snapshot working copy" rows are hidden by default; the toolbar **Show Snapshot Operations** toggle reveals them and the selected row stays selected. **Terminal operation appears:** running `jj describe -m "from terminal"` in a terminal and focusing the IDE shows the new top row with its command after the repo refreshes; with the head unchanged, Refresh does not reset the scroll position or selection
+- [ ] **Revert (primary):** selecting an older, non-root row and pressing **Revert This Operation** (toolbar and right-click) undoes only that operation's effect, leaves later operations' effects in place, adds a new row at the top and updates the log and Working Copy panel
+- [ ] Revert and Restore are **disabled with a tooltip reason** on the root row and with nothing selected; Restore is also disabled on the top (current) row
+- [ ] **Restore (secondary):** right-click shows Restore in its own section below a separator, labelled "Restore Repository to This Point...". Choosing it shows a confirmation naming the operation and how many later operations are discarded, and **Cancel** changes nothing. Confirming resets the repo to that point (`jj log` matches the state after that operation), adds a new top row, and refreshes the log/Working Copy panel. Revert and Restore never raise an undo balloon
+- [ ] **Multi-root:** with two jj roots, a **Repository** chip (same as the log's) appears at the right of the toolbar, absent with one root, and the tab opens showing only the repo it was opened from. Cycling roots in the chip (include / exclude / unset) and **Select All** behave like the log's; with both repos shown, rows interleave by time, each with a repo-coloured square and the repo name in the Description tooltip, and with one repo shown there are no squares. Revert and Restore act on the **row's own repo**, and Restore's confirmation counts only that repo's later operations. The log's own root filter is unchanged (see MT-CROSS)
 
 ### MT-CROSS
 
@@ -4454,47 +1754,19 @@ a few changes and a dirty working copy.
 
 #### Multi-Repository (if applicable)
 
-- [ ] Root filter appears for multi-root projects and hides for single-root projects
-- [ ] Root gutter column shows repo names
-- [ ] Tri-state root filter (jj-idea-qcks, GitHub #96): open the Root filter popup — a
-      "Select All" header, then one outlined coloured square per root. Click a root once:
-      icon fills, popup stays open, log shows only that root. Click again: icon shows an
-      outlined-and-struck-through square, log shows every root *except* it. Click again:
-      back to outline, log shows everything
-- [ ] Include one root and exclude another — only the included root shows (included wins).
-      Cycle the included root back to unset — the excluded root stays hidden, everything
-      else shows
-- [ ] With a root excluded, click "Select All": every root fills and the exclusion clears;
-      click "Select None": all icons return to outline and every row shows
-- [ ] Restart the IDE — the include/exclude selection persists. Then remove the
-      `excludedRootPaths` element from `.idea/jujutsu.xml` by hand and restart — loads
-      cleanly with no exclusions (old settings files without the field)
-- [ ] With an include active, map an additional repo (**Settings → Version Control**) — it
-      stays hidden. Clear the filter, exclude one root instead, map another repo — it shows
-- [ ] Entries from different roots sort by timestamp
-- [ ] Reference filter and graph repo scoping: see MT-LOG-FILTER's "Multi-repo scoping" subsection
-      (jj-idea-1ra9) — no cross-repo ancestry or graph lines, even when repos' root commits share
-      a change id
+- [ ] The Root filter appears for multi-root projects and hides for single-root projects, and the root gutter column shows repo names. Entries from different roots sort by timestamp. Reference filter and graph repo scoping are under MT-LOG-FILTER's "Multi-repo scoping" subsection (no cross-repo ancestry or graph lines, even when repos' root commits share a change id)
+- [ ] Tri-state root filter (GitHub #96): the Root filter popup shows a "Select All" header, then one outlined coloured square per root. Clicking a root once fills its icon, keeps the popup open and shows only that root in the log; clicking again shows an outlined-and-struck-through square and every root *except* it; clicking again returns to outline and shows everything
+- [ ] Including one root and excluding another shows only the included root (included wins); cycling the included root back to unset leaves the excluded root hidden and shows everything else. With a root excluded, "Select All" fills every root and clears the exclusion, and "Select None" returns all icons to outline and shows every row. The include/exclude selection persists across an IDE restart
+- [ ] With an include active, mapping an additional repo (**Settings → Version Control**) leaves it hidden. After clearing the filter and excluding one root instead, a newly mapped repo shows
 
 #### Visual Consistency
 
-- [ ] Light and dark themes both render correctly: icons at correct size, row striping,
-      hover highlighting, distinct selected-row highlighting, disabled actions grayed out
+- [ ] Light and dark themes both render correctly: icons at correct size, row striping, hover highlighting, distinct selected-row highlighting, disabled actions grayed out
 
 #### Edge Cases
 
-- [ ] Empty repository shows an appropriate message; large repository (100+ commits) loads
-      without hanging; rapid filtering doesn't cause errors
-- [ ] Very long descriptions truncate with ellipsis; non-ASCII characters display correctly
+- [ ] An empty repository shows an appropriate message; a large repository (100+ commits) loads without hanging; rapid filtering doesn't cause errors. Very long descriptions truncate with an ellipsis and non-ASCII characters display correctly
 
 #### Error Handling
 
-- [ ] Invalid JJ path, non-JJ repository, network errors, and concurrent operations each
-      show a helpful/user-friendly message rather than corrupting state or crashing
-- [ ] Backend without `remote_bookmarks()` revset support (jj-idea-2wpq, GitHub #35; can't be
-  reproduced with stock jj — requires a non-standard backend, e.g. Google-internal
-  Piper/p4base-backed jj) loads the log and working copy successfully, minus the
-  pushed-ancestor decoration (the "Open File in remote" action stays hidden) — instead of
-  failing the whole load. A one-time WARN is logged on first detection; subsequent
-  refreshes/loads for that repo don't re-probe or repeat the warning for the rest of the
-  session
+- [ ] Invalid JJ path, non-JJ repository, network errors and concurrent operations each show a helpful, user-friendly message rather than corrupting state or crashing
