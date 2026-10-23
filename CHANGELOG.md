@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.2] - 2026-10-23
+
 ### Added
 - **Inline hunk checkboxes in Split and Squash Into…**: the file preview now shows the file's full change with a checkbox in the gutter of every hunk. Tick the hunks that should move to the new commit (or into the destination) directly, without opening **Pick Hunks…**. The file's checkbox in the list goes half-checked for a partial selection, and a summary under the file name says how many hunks move. **Pick Hunks…** is still there for line-level edits. ([#101](https://github.com/kkkev/jj-idea/issues/101))
 - **Squash preview**: the Squash Into… dialogs (Squash Into…, Squash Into Here from…, Squash into Parent…) now show the log graph as it will look after the squash. The destination is highlighted, and the source row disappears (or stays, if it will keep a remainder or you keep emptied sources), with its children re-parented, so you can see the result before clicking OK.
@@ -1054,7 +1056,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.9.2...HEAD
+[0.9.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.0
 [0.8.19]: https://github.com/kkkev/jj-idea/releases/tag/v0.8.19
