@@ -17,6 +17,7 @@ import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Revset
 import `in`.kkkev.jjidea.ui.components.RevsetTextField
+import `in`.kkkev.jjidea.ui.components.addToRevsetHistory
 import `in`.kkkev.jjidea.util.runInBackground
 import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
@@ -142,7 +143,7 @@ class JujutsuRevsetFilterComponent(
         private val searchField = RevsetTextField(
             project,
             { repos().toList() },
-            "jujutsu.log.scope.history",
+            SCOPE_HISTORY_KEY,
             placeholder = JujutsuBundle.message("log.filter.revset.placeholder"),
             initialText = currentRevset,
             popupAnchor = { this }
@@ -248,6 +249,7 @@ class JujutsuRevsetFilterComponent(
             popup?.cancel()
             SaveRevsetAliasDialog(targetRepos, text, baseFor) { name ->
                 generation++
+                addToRevsetHistory(SCOPE_HISTORY_KEY, name)
                 currentRevset = name
                 tableModel.setScope(name)
                 setErrorText(null)
@@ -265,6 +267,7 @@ class JujutsuRevsetFilterComponent(
     }
 
     private companion object {
+        const val SCOPE_HISTORY_KEY = "jujutsu.log.scope.history"
         const val SCOPE_FIELD_COLUMNS = 70
         const val REVSET_DOCS = "https://docs.jj-vcs.dev/latest/revsets/"
     }

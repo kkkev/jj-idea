@@ -121,4 +121,30 @@ class LogSearchFieldTest {
 
         chip.getCharSequence(false).toString() shouldBe "::@"
     }
+
+    @Test
+    fun `a submitted search is stored with its switches and restoring them sets the toggles`() {
+        val key = "test.log.search.modes"
+        com.intellij.ide.util.PropertiesComponent.getInstance().unsetValue(key)
+        val field = LogSearchField("Filter", historyKey = key, revsetModeAvailable = true, project = project.get())
+        field.useRegex = true
+        field.matchWholeWords = true
+        field.text = "fo+"
+        field.submit()
+        field.revsetMode = true
+        field.text = "mine()"
+        field.submit()
+
+        readRevsetHistoryEntries(key) shouldBe listOf(HistoryEntry("mine()", "v"), HistoryEntry("fo+", "rw"))
+
+        field.restoreModes("rw")
+        field.revsetMode shouldBe false
+        field.useRegex shouldBe true
+        field.matchCase shouldBe false
+        field.matchWholeWords shouldBe true
+        field.encodeModes() shouldBe "rw"
+        field.restoreModes("v")
+        field.revsetMode shouldBe true
+        field.useRegex shouldBe false
+    }
 }

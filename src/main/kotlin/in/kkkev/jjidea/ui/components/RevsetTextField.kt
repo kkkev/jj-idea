@@ -26,6 +26,7 @@ import com.intellij.openapi.ui.popup.util.BaseListPopupStep
 import com.intellij.ui.components.JBLabel
 import com.intellij.util.textCompletion.TextFieldWithCompletion
 import com.intellij.util.ui.JBUI
+import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.cli.RevsetAlias
 import `in`.kkkev.jjidea.jj.cli.listRevsetAliases
@@ -44,21 +45,47 @@ import java.awt.event.MouseEvent
 import javax.swing.JComponent
 import javax.swing.JPanel
 
+/**
+ * One drop-down row: choosing it puts [text] in the field; [label] is what the row shows (first line only).
+ * [modes] are the owner's switches (e.g. regex / revset) the entry was run with, or null if not recorded.
+ */
+data class HistoryItem(val text: String, val label: String = text, val modes: String? = null)
+
 /** A titled group of history entries in the drop-down; [title] null means no header. */
-data class HistorySection(val title: String?, val items: List<String>)
+data class HistorySection(val title: String?, val items: List<HistoryItem>)
+
+/** A [HistorySection] row flattened for the popup list; [first] marks the row that carries the section header. */
+internal data class HistoryRow(val item: HistoryItem, val sectionTitle: String?, val first: Boolean)
 
 /** Largest history the platform's `SearchTextField` keeps; this field reads and writes the same format. */
 internal const val REVSET_HISTORY_SIZE = 5
 
-/** Most-recent-first history stored under [key], newline-joined as `SearchTextField` does, so existing history carries over. */
-internal fun readRevsetHistory(key: String): List<String> =
-    PropertiesComponent.getInstance().getValue(key).orEmpty().split('\n').filter { it.isNotEmpty() }
+/** Separates an entry's text from its [HistoryEntry.modes] in storage; entries from before modes have no separator. */
+private const val MODES_SEPARATOR = '\u001f'
 
-internal fun addToRevsetHistory(key: String, text: String) {
+/** A stored history entry: the [text] and the owner's switches it was run with (null: not recorded). */
+data class HistoryEntry(val text: String, val modes: String? = null)
+
+private fun decodeEntry(line: String): HistoryEntry {
+    val at = line.lastIndexOf(MODES_SEPARATOR)
+    return if (at < 0) HistoryEntry(line) else HistoryEntry(line.substring(0, at), line.substring(at + 1))
+}
+
+private fun HistoryEntry.encode() = if (modes == null) text else "$text$MODES_SEPARATOR$modes"
+
+/** Most-recent-first entries stored under [key], newline-joined as `SearchTextField` does, so existing history carries over. */
+internal fun readRevsetHistoryEntries(key: String): List<HistoryEntry> =
+    PropertiesComponent.getInstance().getValue(key).orEmpty().split('\n').filter { it.isNotEmpty() }.map(::decodeEntry)
+
+internal fun readRevsetHistory(key: String): List<String> = readRevsetHistoryEntries(key).map { it.text }
+
+/** Adds [text] run with [modes] at the front; the same text with different modes is a separate entry. */
+internal fun addToRevsetHistory(key: String, text: String, modes: String? = null) {
     val trimmed = text.trim()
     if (trimmed.isNotEmpty()) {
-        val updated = (listOf(trimmed) + readRevsetHistory(key).filter { it != trimmed }).take(REVSET_HISTORY_SIZE)
-        PropertiesComponent.getInstance().setValue(key, updated.joinToString("\n"))
+        val entry = HistoryEntry(trimmed, modes)
+        val updated = (listOf(entry) + readRevsetHistoryEntries(key).filter { it != entry }).take(REVSET_HISTORY_SIZE)
+        PropertiesComponent.getInstance().setValue(key, updated.joinToString("\n") { it.encode() })
     }
 }
 
@@ -83,13 +110,28 @@ class RevsetTextField(
     /** Called on Escape when no completion popup is showing; the editor otherwise swallows the key. */
     var onEscape: (() -> Unit)? = null
 
-    /** The history sections shown by the drop-down; callers may add sections (e.g. saved aliases). */
+    /** The owner's current switches, stored with each history entry (null: this field has none). */
+    var historyModes: () -> String? = { null }
+
+    /** Called with an entry's stored switches before its text is put in the field, so the owner can restore them. */
+    var onHistoryModes: ((String) -> Unit)? = null
+
+    /** Describes stored switches for a row label (empty: none worth showing). */
+    var describeModes: (String) -> String = { "" }
+
+    /** The history sections shown by the drop-down: recent revsets, then saved aliases (jj-idea-ehwm.8/.9). */
     var historySections: () -> List<HistorySection> = {
-        listOfNotNull(historyKey?.let { HistorySection(null, readRevsetHistory(it)) })
+        listOfNotNull(
+            historyKey?.let { key -> HistorySection(null, readRevsetHistoryEntries(key).map(::historyItem)) },
+            aliasSection()
+        )
     }
 
     @Volatile
     private var aliases: List<RevsetAlias> = emptyList()
+
+    @Volatile
+    private var aliasesRequested = false
 
     /** Toggles highlighting and completion together; off renders plain text. */
     var highlightingEnabled = true
@@ -208,8 +250,14 @@ class RevsetTextField(
     /** The component that takes keyboard focus. */
     val focusTarget: JComponent get() = editorField.focusTarget
 
+    private fun historyItem(entry: HistoryEntry): HistoryItem {
+        val described = entry.modes?.let(describeModes).orEmpty()
+        val label = if (described.isEmpty()) entry.text else "${entry.text}   [$described]"
+        return HistoryItem(entry.text, label, entry.modes)
+    }
+
     fun addCurrentTextToHistory() {
-        historyKey?.let { addToRevsetHistory(it, text) }
+        historyKey?.let { addToRevsetHistory(it, text, historyModes()) }
     }
 
     /**
@@ -293,6 +341,7 @@ class RevsetTextField(
 
     /** One `jj config list` per repo per focus gain, off the EDT; never per keystroke. */
     private fun refreshAliases() {
+        aliasesRequested = true
         val snapshot = repos()
         runInBackground {
             val loaded = snapshot.flatMap { listRevsetAliases(it.commandExecutor) }.distinct()
@@ -300,21 +349,37 @@ class RevsetTextField(
         }
     }
 
+    /** Symbol aliases by name, repo-defined ones marked; function aliases need arguments so are left out. */
+    private fun aliasSection(): HistorySection? {
+        val items = aliases.filter { !it.isFunction }
+            .groupBy { it.name }
+            .map { (name, defs) ->
+                val repoOnly = defs.all { it.isRepoLevel }
+                HistoryItem(name, if (repoOnly) JujutsuBundle.message("revset.history.alias.repo", name) else name)
+            }
+            .sortedBy { it.text }
+        return items.takeIf { it.isNotEmpty() }?.let {
+            HistorySection(JujutsuBundle.message("revset.history.aliases"), it)
+        }
+    }
+
+    internal fun historyRows(): List<HistoryRow> = historySections().filter { it.items.isNotEmpty() }
+        .flatMap { s -> s.items.mapIndexed { i, item -> HistoryRow(item, s.title, i == 0) } }
+
     private fun showHistory() {
-        val sections = historySections().filter { it.items.isNotEmpty() }
-        if (sections.isNotEmpty()) {
-            val entries = sections.flatMap { s -> s.items.mapIndexed { i, item -> Triple(item, s.title, i == 0) } }
-            val step = object : BaseListPopupStep<Triple<String, String?, Boolean>>(null, entries) {
-                override fun getTextFor(value: Triple<String, String?, Boolean>) = value.first.lineSequence().first()
+        // Aliases load on focus; if this is opened before any focus, start the (single) load for next time.
+        if (!aliasesRequested) refreshAliases()
+        val rows = historyRows()
+        if (rows.isNotEmpty()) {
+            val step = object : BaseListPopupStep<HistoryRow>(null, rows) {
+                override fun getTextFor(value: HistoryRow) = value.item.label.lineSequence().first()
 
-                override fun getSeparatorAbove(value: Triple<String, String?, Boolean>) =
-                    if (value.third && value.second != null) ListSeparator(value.second!!) else null
+                override fun getSeparatorAbove(value: HistoryRow) =
+                    if (value.first && value.sectionTitle != null) ListSeparator(value.sectionTitle) else null
 
-                override fun onChosen(
-                    selectedValue: Triple<String, String?, Boolean>,
-                    finalChoice: Boolean
-                ): PopupStep<*>? {
-                    text = selectedValue.first
+                override fun onChosen(selectedValue: HistoryRow, finalChoice: Boolean): PopupStep<*>? {
+                    selectedValue.item.modes?.let { onHistoryModes?.invoke(it) }
+                    text = selectedValue.item.text
                     editorField.requestFocusInWindow()
                     return FINAL_CHOICE
                 }

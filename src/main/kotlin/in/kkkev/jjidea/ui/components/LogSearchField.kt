@@ -87,7 +87,45 @@ class LogSearchField(
         onSubmit { submit() }
     }
 
-    private fun submit() {
+    init {
+        (input as? RevsetInput)?.revsetField?.apply {
+            historyModes = ::encodeModes
+            onHistoryModes = ::restoreModes
+            describeModes = ::describeModes
+        }
+    }
+
+    // History stores the switches with each search: v = revset mode, else r / c / w for regex / match case / words.
+    internal fun encodeModes(): String = if (revsetMode) {
+        "v"
+    } else {
+        listOfNotNull(
+            'r'.takeIf {
+                useRegex
+            },
+            'c'.takeIf { matchCase },
+            'w'.takeIf { matchWholeWords }
+        ).joinToString("")
+    }
+
+    internal fun restoreModes(modes: String) {
+        useRegex = 'r' in modes
+        matchCase = 'c' in modes
+        matchWholeWords = 'w' in modes
+        revsetMode = 'v' in modes
+    }
+
+    private fun describeModes(modes: String): String = modes.mapNotNull {
+        when (it) {
+            'v' -> JujutsuBundle.message("log.filter.revset.mode")
+            'r' -> JujutsuBundle.message("log.filter.regex")
+            'c' -> JujutsuBundle.message("log.filter.matchcase")
+            'w' -> JujutsuBundle.message("log.filter.words")
+            else -> null
+        }
+    }.joinToString(", ")
+
+    internal fun submit() {
         val trimmed = input.text.trim()
         if (trimmed.isNotEmpty()) {
             input.addCurrentTextToHistory()

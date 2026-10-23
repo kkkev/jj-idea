@@ -146,6 +146,60 @@ class RevsetTextFieldTest {
     }
 
     @Test
+    fun `history rows list recent revsets first, then saved symbol aliases with repo ones marked`() {
+        val key = "test.revset.history.rows"
+        PropertiesComponent.getInstance().setValue(key, "b\na")
+        val us = "\u001f"
+        val executor = mockk<CommandExecutor>()
+        every { executor.configListSources("revset-aliases") } returns
+            CommandExecutor.CommandResult.Success.Irreversible(
+                "revset-aliases.zeta${us}user\nrevset-aliases.alpha${us}repo\nrevset-aliases.\"f(x)\"${us}user\n",
+                "",
+                READ_ONLY
+            )
+        val repo = mockk<JujutsuRepository> { every { commandExecutor } returns executor }
+        val field = RevsetTextField(project.get(), { listOf(repo) }, key).also { created += it }
+        field.editorField.addNotify()
+        field.editorField.getEditor(true)
+        field.editorField.focusGained(FocusEvent(field.editorField, FocusEvent.FOCUS_GAINED))
+        verify(timeout = 5000) { executor.configListSources("revset-aliases") }
+        // The alias list is applied on the EDT after the background query returns.
+        com.intellij.testFramework.PlatformTestUtil.waitWithEventsDispatching("aliases not loaded", {
+            field.historyRows().size == 4
+        }, 5)
+
+        val rows = field.historyRows()
+
+        rows.map { it.item.text } shouldContainExactly listOf("b", "a", "alpha", "zeta")
+        rows.map { it.item.label } shouldContainExactly listOf("b", "a", "alpha  (repo)", "zeta")
+        rows.filter { it.first }.map { it.sectionTitle } shouldContainExactly listOf(null, "Saved aliases")
+    }
+
+    @Test
+    fun `history keeps modes per entry, tells the same text with other modes apart, and reads old entries`() {
+        val key = "test.revset.history.modes"
+        PropertiesComponent.getInstance().setValue(key, "old")
+
+        addToRevsetHistory(key, "foo", "r")
+        addToRevsetHistory(key, "foo", "")
+        addToRevsetHistory(key, "foo", "r")
+
+        readRevsetHistoryEntries(key) shouldContainExactly
+            listOf(HistoryEntry("foo", "r"), HistoryEntry("foo", ""), HistoryEntry("old", null))
+        readRevsetHistory(key) shouldContainExactly listOf("foo", "foo", "old")
+    }
+
+    @Test
+    fun `choosing a row with modes hands them to the owner first`() {
+        val key = "test.revset.history.choose"
+        addToRevsetHistory(key, "mine()", "v")
+        val field = field(key)
+        field.describeModes = { "Revset" }
+
+        field.historyRows().single().item shouldBe HistoryItem("mine()", "mine()   [Revset]", "v")
+    }
+
+    @Test
     fun `text change listeners fire`() {
         val field = field()
         var changes = 0
@@ -159,8 +213,8 @@ class RevsetTextFieldTest {
     @Test
     fun `focusing runs one alias query per repo and typing runs none`() {
         val executor = mockk<CommandExecutor>()
-        every { executor.configList("revset-aliases") } returns
-            CommandExecutor.CommandResult.Success.Irreversible("revset-aliases.mywork = \"mine()\"", "", READ_ONLY)
+        every { executor.configListSources("revset-aliases") } returns
+            CommandExecutor.CommandResult.Success.Irreversible("revset-aliases.mywork\u001fuser\n", "", READ_ONLY)
         val repo = mockk<JujutsuRepository> { every { commandExecutor } returns executor }
         val field = RevsetTextField(project.get(), { listOf(repo, repo) }).also { created += it }
         field.editorField.addNotify()
@@ -168,11 +222,12 @@ class RevsetTextFieldTest {
 
         // EditorTextField forwards its content component's focus events to its own listeners.
         field.editorField.focusGained(FocusEvent(field.editorField, FocusEvent.FOCUS_GAINED))
-        verify(exactly = 2, timeout = 5000) { executor.configList("revset-aliases") }
+        verify(exactly = 2, timeout = 5000) { executor.configListSources("revset-aliases") }
 
         "heads(ancestors(mine()))".forEachIndexed { i, _ -> field.text = "heads(ancestors(mine()))".take(i + 1) }
 
-        verify(exactly = 2) { executor.configList(any(), any()) }
+        verify(exactly = 2) { executor.configListSources(any()) }
+        verify(exactly = 0) { executor.configList(any(), any()) }
     }
 
     @Test

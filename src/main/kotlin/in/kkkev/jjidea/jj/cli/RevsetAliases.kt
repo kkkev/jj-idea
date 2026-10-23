@@ -58,7 +58,16 @@ fun saveRevsetAlias(
 ): CommandResult = executor.configSetUser(scope, "$ALIAS_KEY_PREFIX$name", tomlBasicString(expression))
 
 /** A configured revset alias. A function alias `f(x, y)` has [params] = `[x, y]`; a symbol alias has none. */
-data class RevsetAlias(val name: String, val isFunction: Boolean = false, val params: List<String> = emptyList())
+data class RevsetAlias(
+    val name: String,
+    val isFunction: Boolean = false,
+    val params: List<String> = emptyList(),
+    /** Config source jj reports (`user`, `repo`, `workspace`, `default`...); null when unknown. */
+    val source: String? = null
+) {
+    /** Defined for this repository or workspace rather than for the user. */
+    val isRepoLevel get() = source == "repo" || source == "workspace"
+}
 
 private val ALIAS_LINE = Regex("""^revset-aliases\.(?:"((?:[^"\\]|\\.)*)"|([^\s=]+))\s*=""")
 private val FUNCTION_ALIAS = Regex("""^([A-Za-z_][A-Za-z0-9_]*)\((.*)\)$""")
@@ -68,24 +77,31 @@ private val FUNCTION_ALIAS = Regex("""^([A-Za-z_][A-Za-z0-9_]*)\((.*)\)$""")
  * function aliases have a quoted key, `revset-aliases."f(x)" = ...`. Lines that are neither are skipped.
  */
 fun parseRevsetAliases(output: String): List<RevsetAlias> = output.lineSequence()
-    .mapNotNull { ALIAS_LINE.find(it)?.let { m -> m.groupValues[1].ifEmpty { m.groupValues[2] } } }
-    .map { key ->
-        FUNCTION_ALIAS.matchEntire(key)?.let { m ->
-            RevsetAlias(
-                m.groupValues[1],
-                true,
-                m.groupValues[2].split(',').map {
-                    it.trim()
-                }.filter { it.isNotEmpty() }
-            )
-        } ?: RevsetAlias(key)
+    .mapNotNull { ALIAS_LINE.find(it)?.let { m -> aliasFromKey(m.groupValues[1].ifEmpty { m.groupValues[2] }, null) } }
+    .distinctBy { it.name to it.isFunction }
+    .toList()
+
+private val SOURCE_LINE = Regex("""^revset-aliases\.(?:"((?:[^"\\]|\\.)*)"|([^\s\u001f]+))\u001f(.*)$""")
+
+/** Parses `name<US>source` lines (see [CommandExecutor.configListSources]); the first entry for a name wins. */
+fun parseRevsetAliasSources(output: String): List<RevsetAlias> = output.lineSequence()
+    .mapNotNull {
+        SOURCE_LINE.find(it)?.let { m ->
+            aliasFromKey(m.groupValues[1].ifEmpty { m.groupValues[2] }, m.groupValues[3].ifEmpty { null })
+        }
     }
     .distinctBy { it.name to it.isFunction }
     .toList()
 
-/** The configured revset aliases, user and repo. One `jj config list` process; empty if it fails. */
+private fun aliasFromKey(key: String, source: String?): RevsetAlias =
+    FUNCTION_ALIAS.matchEntire(key)?.let { m ->
+        val params = m.groupValues[2].split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        RevsetAlias(m.groupValues[1], true, params, source)
+    } ?: RevsetAlias(key, source = source)
+
+/** The configured revset aliases, user and repo, with their source. One `jj config list` process; empty if it fails. */
 fun listRevsetAliases(executor: CommandExecutor): List<RevsetAlias> =
-    when (val result = executor.configList("revset-aliases")) {
-        is CommandResult.Success -> parseRevsetAliases(result.stdout)
+    when (val result = executor.configListSources("revset-aliases")) {
+        is CommandResult.Success -> parseRevsetAliasSources(result.stdout)
         else -> emptyList()
     }

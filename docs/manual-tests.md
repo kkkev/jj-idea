@@ -945,6 +945,20 @@ column where jj reports a syntax error. jj remains the only validator.
 - [ ] Type a bad revset that only fails because of the Settings log revset (valid on its own): the message shows, there is no underline
 - [ ] Click the history icon at the left of the field: the last applied scopes (up to 5, most recent first) are listed; choosing one fills the
       field. History written before this change (the same entries) is still there after upgrading
+- [ ] Apply two different valid scopes, reopen the Scope popup, click the history icon: both are listed, most recent first. An invalid
+      scope (Enter with an error) is **not** added. Re-applying an older one moves it to the top; after 6 distinct scopes only 5 remain
+- [ ] The history is shared: open a second log tab and its Scope popup lists the same scopes; restart the IDE and they are still there
+- [ ] Save a revset as an alias (**Save as alias…**): the alias name is added to the scope history
+- [ ] With revset aliases configured (one in user config, one in the repo's `.jj/repo/config.toml`, one function alias `f(x)`), the history
+      drop-down shows the recent revsets, then a **Saved aliases** header and the symbol aliases sorted by name; the repo one is labelled
+      `(repo)`, the function alias is absent. Choosing an alias puts just its name in the field. The same drop-down appears in the search box
+      in revset mode (and its recent revsets are that box's own history). Add an alias in a terminal, click out and back into the field:
+      it appears. With no aliases configured there is no header
+- [ ] Search box history keeps switches: search `fo+` with **Regex** and **Words** on (Enter), then `mine()` with **Revset** on (Enter).
+      Turn every switch off, open the history: the rows read `mine()   [Revset]` and `fo+   [Regex, Words]`. Choosing the second turns Regex
+      and Words on and Revset off; choosing the first turns Revset on. A plain search with no switches restores them all to off. Entries
+      from before this change show no `[...]` and leave the switches as they are
+- [ ] The Settings revset fields, the Set Diff Base → Custom revset dialog and the pickers have no history icon (unchanged)
 - [ ] The × at the right of the field clears the text
 - [ ] Search box: with revset mode **off**, typing `foo(` shows plain text — no colours, no completion list. Turn revset mode on: the same
       text is coloured and completion appears. Turn it off again: plain

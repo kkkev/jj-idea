@@ -659,6 +659,12 @@ interface CommandExecutor {
     fun configListDetailed(key: String, scope: ConfigScope? = null): CommandResult
 
     /**
+     * `config list` for [key] rendering each entry as `name<US>source` (US = unit separator), so a caller
+     * can tell user from repo entries in one process. Blank stdout if nothing is set.
+     */
+    fun configListSources(key: String): CommandResult
+
+    /**
      * Set a jj config value at user level.
      * @param scope Scope at which to set the config value
      * @param key Config key (e.g., "user.name", "user.email")

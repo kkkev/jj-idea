@@ -200,6 +200,11 @@ internal const val CONFIG_PROVENANCE_DELIMITER = "\u001f"
 private const val CONFIG_PROVENANCE_TEMPLATE =
     "value ++ \"$CONFIG_PROVENANCE_DELIMITER\" ++ source ++ \"$CONFIG_PROVENANCE_DELIMITER\" ++ path ++ \"\\n\""
 
+internal fun configListSourcesArgs(key: String) = JjInvocation(
+    READ_ONLY,
+    listOf("config", "list", key, "-T", "name ++ \"$CONFIG_PROVENANCE_DELIMITER\" ++ source ++ \"\\n\"")
+)
+
 internal fun configListDetailedArgs(key: String, scope: CommandExecutor.ConfigScope?) = JjInvocation(
     READ_ONLY,
     buildList { addAllIfNotNull("config", "list", scope?.param, key, "-T", CONFIG_PROVENANCE_TEMPLATE) }
@@ -1090,6 +1095,9 @@ class CliExecutor(
 
     override fun configListDetailed(key: String, scope: CommandExecutor.ConfigScope?) =
         execute(root, configListDetailedArgs(key, scope), warnOnFailure = false)
+
+    override fun configListSources(key: String) =
+        execute(root, configListSourcesArgs(key), warnOnFailure = false)
 
     override fun configSetUser(scope: CommandExecutor.ConfigScope, key: String, value: String) =
         execute(root, configSetUserArgs(scope, key, value))
