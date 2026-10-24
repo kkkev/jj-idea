@@ -118,9 +118,15 @@ class PagedLogWindow(val baseRevset: Revset, val pageSize: Int = PAGE_ROWS) {
     }
 
     /**
+     * True if [id] is a parent of a loaded row that has not loaded yet (it is in [frontier]), so
+     * paging further will reach it. O(1); what the stub chase (jj-idea-ytvh) asks per visible stub.
+     */
+    fun isPending(id: ChangeId): Boolean = id in frontier
+
+    /**
      * Ids among [entries] whose own parent(s) are not yet loaded (in [frontier]) — the set a
-     * renderer must not treat as "this is a true root," and the set the loader's eager
-     * prefetch policy exists to resolve before the user scrolls to them. See the design doc's
+     * renderer must not treat as "this is a true root." Whole-window scan; the viewport-driven
+     * stub chase uses [isPending] on just the visible stubs instead. See the design doc's
      * "When to load more" / "Graph rendering at page/window boundaries."
      */
     fun idsWithUnresolvedParent(): Set<ChangeId> =

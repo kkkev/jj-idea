@@ -403,6 +403,7 @@ class UnifiedJujutsuLogDataLoader(
     internal fun applyFilter(state: LogFilterState, onComplete: (Map<JujutsuRepository, String>) -> Unit = {}) {
         val generation = filterGeneration.incrementAndGet()
         filterState = state.takeIf { it.isActive }
+        filterMembership.clear()
         val repos = repositories()
         val settings = JujutsuSettings.getInstance(project)
         runInBackground {
@@ -1003,6 +1004,85 @@ class UnifiedJujutsuLogDataLoader(
         val workMs = (System.nanoTime() - start) / 1_000_000
         log.debug("log trickle: loaded $rows rows in $workMs ms")
         return TricklePolicy.delayAfter(workMs)
+    }
+
+    // jj-idea-ytvh: the stub chase. Besides the scroll trigger, a visible row whose parent is not
+    // loaded yet drives paging until the parent arrives. One page per call; the panel re-checks its
+    // viewport after each page lands, so the chase stops by itself once the stub is gone, scrolls out
+    // of view, or the filter changes. Bounded by [chaseRowCap] (the heap ceiling, same as the trickle).
+    private val chaseInFlight = AtomicBoolean(false)
+
+    // Whether a parent matches the active filter, so paging its cursor can ever reach it. Cleared by
+    // applyFilter; a parent the filter excludes costs one query and is then never chased.
+    private val filterMembership = ConcurrentHashMap<ChangeKey, Boolean>()
+
+    /** [TricklePolicy.ROW_CAP]; a var only so tests can reach it without a 10,000-row fake. */
+    @Volatile
+    internal var chaseRowCap = TricklePolicy.ROW_CAP
+
+    override fun loadUntilLoaded(parents: Collection<ChangeKey>) {
+        if (closed || parents.isEmpty() || !chaseInFlight.compareAndSet(false, true)) return
+        val idsByRepo = parents.groupBy({ it.repo }, { it.revision }).mapValues { (_, revisions) ->
+            revisions.filterIsInstance<ChangeId>().toSet()
+        }
+        runInBackground {
+            try {
+                if (filterState != null) chaseFilterStubs(idsByRepo) else chaseBaseStubs(idsByRepo)
+            } finally {
+                chaseInFlight.set(false)
+            }
+        }
+    }
+
+    /** [loadUntilLoaded] without a filter: one page for each repo whose frontier holds a wanted parent. */
+    internal fun chaseBaseStubs(idsByRepo: Map<JujutsuRepository, Set<ChangeId>>) {
+        val delta = mutableListOf<LogEntry>()
+        for ((repo, ids) in idsByRepo) {
+            val lock = lockFor(repo)
+            if (!lock.tryLock()) continue
+            try {
+                val window = pagedWindowByRepo[repo] ?: continue
+                if (window.isExhausted || ids.none(window::isPending)) continue
+                if (pagedWindowByRepo.values.sumOf { it.loadedCount } >= chaseRowCap) continue
+                loadMoreOneRepoLocked(repo)?.let { delta += it }
+            } finally {
+                lock.unlock()
+            }
+        }
+        if (delta.isNotEmpty()) mergeAndNotify(delta)
+    }
+
+    /**
+     * [loadUntilLoaded] with a filter: a wanted parent is only worth paging for if it matches the
+     * filter ([filterMembership], one `getChangeIds` per new parent), since the cursor never yields
+     * a non-match.
+     */
+    internal fun chaseFilterStubs(idsByRepo: Map<JujutsuRepository, Set<ChangeId>>) {
+        val generation = filterGeneration.get()
+        var loaded = false
+        for ((repo, ids) in idsByRepo) {
+            val cursor = filterCursorByRepo[repo] ?: continue
+            val lock = lockFor(repo)
+            if (!lock.tryLock()) continue
+            try {
+                if (cursor.isExhausted) continue
+                if (filterEntriesByRepo.values.sumOf { it.size } >= chaseRowCap) continue
+                val unknown = ids.filter { !filterMembership.containsKey(ChangeKey(repo, it)) }
+                if (unknown.isNotEmpty()) {
+                    val terms = unknown.joinToString(" | ") { "present(${it.full})" }
+                    val matched = repo.logService
+                        .getChangeIds(Expression("(${cursor.revset}) & ($terms)"), quiet = true)
+                        .getOrNull()?.toSet() ?: continue
+                    if (generation != filterGeneration.get()) continue
+                    unknown.forEach { filterMembership[ChangeKey(repo, it)] = it in matched }
+                }
+                if (ids.none { filterMembership[ChangeKey(repo, it)] == true }) continue
+                if (loadMoreFilterOneLocked(repo)) loaded = true
+            } finally {
+                lock.unlock()
+            }
+        }
+        if (loaded) mergeAndNotify()
     }
 
     /** Stops the idle trickle. Called when the owning panel is disposed. */

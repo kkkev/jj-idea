@@ -958,6 +958,9 @@ class JujutsuLogTable(
         for (row in rows) repaintRow(row)
     }
 
+    /** Called after every [updateGraph] - the stub chase re-checks the viewport against the new stubs. */
+    var onGraphUpdated: () -> Unit = {}
+
     fun updateGraph(nodes: Map<ChangeKey, GraphNode>) {
         graphNodes = nodes
         hoveredEdge = null
@@ -972,6 +975,7 @@ class JujutsuLogTable(
         )
         setGraphRenderer(graphRenderer!!)
         repaint()
+        onGraphUpdated()
     }
 
     /**

@@ -1,5 +1,6 @@
 package `in`.kkkev.jjidea.ui.common
 
+import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.ui.log.PagedLogWindow
 
 /**
@@ -26,6 +27,13 @@ interface DataLoader {
      * of the visible viewport. No-op for loaders that don't page.
      */
     fun loadMore() {}
+
+    /**
+     * Keep paging until [parents] - parents of visible rows that are drawn as a faint "not loaded"
+     * stub (jj-idea-ytvh) - have loaded. One call advances at most one page; the caller re-checks
+     * the viewport after each page lands and calls again. No-op for loaders that don't page.
+     */
+    fun loadUntilLoaded(parents: Collection<ChangeKey>) {}
 
     /**
      * How many rows from the bottom of the loaded table scrolling should trigger [loadMore]: about

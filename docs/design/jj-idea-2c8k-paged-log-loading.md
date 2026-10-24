@@ -373,6 +373,27 @@ or never-fetched ancestor gets a wiggly line to the actual nearest visible commi
 nowhere"). Both are covered by the cross-bead plan referenced from this bead's plan file and (once
 written) `docs/design/jj-idea-hlu3-xi58-elided-ancestor-rendering.md`.
 
+### Auto-loading a visible stub's parent (jj-idea-ytvh)
+
+A row in the viewport whose parent has not loaded draws the faint `NOT_LOADED` stub, and the scroll
+trigger alone would leave it until the user scrolled near the bottom. The panel now also checks the
+visible rows after every viewport change and every graph update (`CommitTablePanel.chaseVisibleStubs`,
+`stubParentsToLoad`) and calls `DataLoader.loadUntilLoaded` with the `NOT_LOADED` parents it finds.
+Each call advances at most one page; the next graph update re-checks, so the chase ends by itself when
+the stub resolves, scrolls out of view, or a filter change replaces the rows. `HIDDEN` stubs are never
+chased - a filtered-out parent cannot load.
+
+It pages rather than fetching the parent directly: a lone fetched row would sit below unloaded history
+and break the `shown == revset \ ancestors(frontier)` invariant. Pages grow with `PageSizePolicy`, so a
+parent thousands of rows back is a handful of calls. Bounds: the parent must be in the window's
+`frontier` (`PagedLogWindow.isPending`), the window not exhausted, and the loaded rows under
+`UnifiedJujutsuLogDataLoader.chaseRowCap` (= `TricklePolicy.ROW_CAP`, the heap ceiling).
+
+With a filter, the cursor only yields matches, so a parent is first checked once with
+`getChangeIds("(filter) & present(parent)")` and the answer cached until the filter changes; a parent
+the filter excludes is never chased. Cost: O(visible rows) per event on the EDT; per stub
+ceil(distance / page size) `getLog` calls (`PagedLogStubChaseTest` pins one call per page).
+
 ### Filtering/searching to an id that isn't loaded
 
 `LogCache.loadContext`/`UnifiedJujutsuLogDataLoader.loadExpanding` already fetch a bounded

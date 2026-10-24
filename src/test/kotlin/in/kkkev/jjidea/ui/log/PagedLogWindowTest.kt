@@ -97,10 +97,13 @@ class PagedLogWindowTest {
         window.recordPage(listOf(entry("A", "P_A"), entry("C")))
 
         window.idsWithUnresolvedParent().map { it.full } shouldContainExactly listOf("A")
+        window.isPending(ChangeId("P_A", "P_A")) shouldBe true
+        window.isPending(ChangeId("A", "A")) shouldBe false
 
         // Once P_A loads, A is no longer pending.
         window.recordPage(listOf(entry("P_A")))
         window.idsWithUnresolvedParent() shouldBe emptySet()
+        window.isPending(ChangeId("P_A", "P_A")) shouldBe false
     }
 
     @Test

@@ -232,7 +232,25 @@ abstract class CommitTablePanel<D>(
             if (lastVisibleRow >= logTable.rowCount - dataLoader.loadMoreDistance) {
                 dataLoader.loadMore()
             }
+            chaseVisibleStubs(scrollPane)
         }
+        // A new graph means new stubs, and in filter mode it lands after the rows (and the viewport event).
+        logTable.onGraphUpdated = { SwingUtilities.invokeLater { chaseVisibleStubs(scrollPane) } }
+    }
+
+    /**
+     * jj-idea-ytvh: asks the loader to keep paging while a visible row draws a "parent not loaded" stub.
+     * Re-fires from the viewport listener and after each graph update, so it advances one page at a
+     * time and stops once the stub resolves, scrolls out of view or the filter changes.
+     */
+    private fun chaseVisibleStubs(scrollPane: JScrollPane) {
+        val viewport = scrollPane.viewport
+        val first = logTable.rowAtPoint(Point(0, viewport.viewPosition.y))
+        val last = logTable.rowAtPoint(Point(0, viewport.viewPosition.y + viewport.extentSize.height - 1))
+        if (first < 0) return
+        val rows = first..(if (last < 0) logTable.rowCount - 1 else last)
+        val parents = stubParentsToLoad(rows, logTable.logModel::getEntry, logTable.graphNodes)
+        if (parents.isNotEmpty()) dataLoader.loadUntilLoaded(parents)
     }
 
     private fun createToolbar() = JPanel(BorderLayout()).apply {
