@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **File history Show Diff compared a revision with the wrong commit**: in the platform file history tab, Show Diff on a single revision compared it with the row below it. Because file history lists commits from every branch interleaved, that row is often not its parent, so a revision showed changes it never made. It now compares with the revision's real parent (the auto-merged parents for a merge). Selecting two revisions still compares those two.
+
 ## [0.9.3] - 2026-10-26
 
 ### Fixed

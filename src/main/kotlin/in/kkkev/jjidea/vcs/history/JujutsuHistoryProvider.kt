@@ -96,7 +96,7 @@ class JujutsuHistoryProvider(private val project: Project) : VcsHistoryProvider 
 
     override fun getHelpId(): String? = null
 
-    override fun getHistoryDiffHandler() = null
+    override fun getHistoryDiffHandler() = JujutsuDiffFromHistoryHandler()
 
     override fun canShowHistoryFor(virtualFile: VirtualFile) = true
 }

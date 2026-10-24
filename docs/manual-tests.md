@@ -1198,6 +1198,7 @@ Setup: in a scratch repo, `echo v1 > f; jj describe -m A; echo v2 > f` (the chan
 - [ ] Opening a file from the File History panel (right-click a file → "Show File History", pick an older revision, open the file) enables "Annotate", which produces a blame gutter for that revision's content
 - [ ] Opening a `.png`'s platform history tab across a few commits and showing the diff between two revisions renders an image diff, not text
 - [ ] In a file's platform history tab (editor's Jujutsu submenu → "Show History"), the Date, Author and Committer columns are populated for every revision, and clicking the "Commit Time" column header twice orders rows chronologically (oldest→newest, then newest→oldest), not alphabetically by committer name
+- [ ] Show Diff on a single history row diffs it against its **real parent**, not the row below it (jj-idea-d0bp). In `../jj-test/jj-only`, history of `test-file-1.txt`: Show Diff on `caed470d` shows only `this is change cl/X` and `v2` added (parent `kzxrvruo`), none of the rows below; on the conflicted merge `4f745109` it diffs against the auto-merged parents. Selecting two rows and Show Diff still diffs those two rows against each other
 - [ ] Deleting a tracked file (`rm`) and right-clicking it alone in the Working Copy panel's changed-files tree offers **Show File History** and opens history for it (GitHub #122; see MT-WORKINGCOPY "Restore dialog")
 
 ### MT-DIFF-PREVIEW
