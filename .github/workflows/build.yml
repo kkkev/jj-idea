@@ -17,9 +17,15 @@ on:
           - patch
           - minor
           - major
+      skip_ci_check:
+        description: 'Release even if the commit has no green push CI run (release runs do not repeat compat/verify)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  actions: read   # release runs look up the commit's push-triggered CI run
 
 jobs:
   changelog-check:
@@ -85,7 +91,12 @@ jobs:
   # releases have broken plugin-visible behavior without any binary-incompatible signature
   # change (jj-idea-qfgl / GitHub #55), so this only catches compile- and test-time
   # breaks; it does not replace a manual runIde smoke test against a new platform version.
+  #
+  # Release runs (workflow_dispatch with a bump, or a v* tag) skip this and the checks in `build`:
+  # they would repeat what the push of the same commit already ran. The release job instead
+  # requires that push run to have succeeded ("Require green CI for this commit").
   compat:
+    if: ${{ inputs.bump == '' && !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
 
     strategy:
@@ -106,7 +117,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Compile and unit test against ${{ matrix.platform }}
         run: ./gradlew compileKotlin test -PplatformVersion=${{ matrix.platform }}
@@ -131,46 +142,14 @@ jobs:
           path: build/reports/tests/
           retention-days: 14
 
-  verify:
-    # Runs the IntelliJ Plugin Verifier CLI against every IDE listed in the
-    # pluginVerification block (build.gradle.kts), including the sinceBuild floor. Only
-    # failureLevel-listed problem categories (compatibility, missing dependencies, invalid
-    # plugin) fail this job — internal/experimental API usage is deliberately excluded, see
-    # the comment on that block.
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Cache Plugin Verifier IDEs
-        uses: actions/cache@v4
-        with:
-          path: ~/.pluginVerifier/ides
-          key: plugin-verifier-ides-${{ hashFiles('build.gradle.kts') }}
-
-      - name: Verify plugin
-        run: ./gradlew verifyPlugin
-
-      - name: Upload verifier reports
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: plugin-verifier-reports
-          path: build/reports/pluginVerifier/
-          retention-days: 14
-
+  # Builds the plugin once. Non-release runs also lint and run the Plugin Verifier on the same
+  # build (previously a separate `verify` job that compiled and built everything again). Release
+  # runs skip those (already green on the push) and go on to release and publish.
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      published: ${{ steps.version.outputs.is_release == 'true' && steps.publish_token.outputs.present == 'true' }}
 
     steps:
       - name: Checkout code
@@ -185,7 +164,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Calculate version
         id: version
@@ -237,6 +216,41 @@ jobs:
           echo "is_release=${IS_RELEASE}" >> $GITHUB_OUTPUT
           echo "Calculated version: ${VERSION} (release: ${IS_RELEASE})"
 
+      - name: Require green CI for this commit
+        if: steps.version.outputs.is_release == 'true' && !inputs.skip_ci_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          # Release runs skip compat/verify. Instead require that this commit's push-triggered run
+          # passed (waiting for it if still running). The release bot's own commits never get a
+          # push run, so walk back over them.
+          SHA=$GITHUB_SHA
+          while [ "$(git log -1 --format=%an "$SHA")" = "github-actions[bot]" ]; do
+            SHA=$(git rev-parse "$SHA^")
+          done
+          for attempt in $(seq 1 60); do
+            RUN=$(gh run list --workflow build.yml --event push --commit "$SHA" --limit 1 \
+              --json status,conclusion,url -q '.[0] // empty | "\(.status) \(.conclusion) \(.url)"')
+            if [ -z "$RUN" ]; then
+              echo "::error::No push CI run found for ${SHA}. Push it and let CI finish, or re-run with skip_ci_check."
+              exit 1
+            fi
+            read -r STATUS CONCLUSION URL <<< "$RUN"
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "CI for ${SHA} passed: ${URL}"
+                exit 0
+              fi
+              echo "::error::CI for ${SHA} ended '${CONCLUSION}': ${URL}"
+              exit 1
+            fi
+            echo "CI for ${SHA} is ${STATUS} (${URL}); waiting (attempt ${attempt}/60)..."
+            sleep 30
+          done
+          echo "::error::Timed out waiting for CI on ${SHA}."
+          exit 1
+
       - name: Update version in build.gradle.kts
         run: |
           sed -i 's/^version = .*/version = "${{ steps.version.outputs.version }}"/' build.gradle.kts
@@ -259,15 +273,31 @@ jobs:
             ./gradlew buildPlugin
           fi
 
-      - name: Lint
-        run: ./gradlew ktlintCheck
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: plugin-artifact
           path: build/distributions/*.zip
           retention-days: 30
+
+      - name: Lint
+        if: steps.version.outputs.is_release != 'true'
+        run: ./gradlew ktlintCheck
+
+      # Plugin Verifier against every IDE in the pluginVerification block (build.gradle.kts),
+      # including the sinceBuild floor, then checkVerifierBaseline for internal-API usage.
+      # Reuses the plugin built above; IDE downloads come from the Gradle cache.
+      - name: Verify plugin
+        if: steps.version.outputs.is_release != 'true'
+        run: ./gradlew verifyPlugin
+
+      - name: Upload verifier reports
+        if: failure() && steps.version.outputs.is_release != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-verifier-reports
+          path: build/reports/pluginVerifier/
+          retention-days: 14
 
       - name: Extract changelog for release
         if: steps.version.outputs.is_release == 'true'
@@ -433,7 +463,20 @@ jobs:
         id: publish_token
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        run: echo "present=$([ -n "$PUBLISH_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          IS_RELEASE: ${{ steps.version.outputs.is_release }}
+          IS_UPSTREAM: ${{ github.repository == 'kkkev/jj-idea' }}
+        run: |
+          if [ -n "$PUBLISH_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            # A release that quietly skips Marketplace is the same invisible miss as 0.9.2's
+            # skipped approval check. Forks (no Marketplace listing) still release to GitHub only.
+            if [ "$IS_RELEASE" = "true" ] && [ "$IS_UPSTREAM" = "true" ]; then
+              echo "::error::PUBLISH_TOKEN secret is not set; this release would skip the JetBrains Marketplace publish and its approval check."
+              exit 1
+            fi
+          fi
 
       - name: Publish to JetBrains Marketplace
         if: steps.version.outputs.is_release == 'true' && steps.publish_token.outputs.present == 'true'
@@ -461,29 +504,30 @@ jobs:
           echo "::error::preview/code-key.bin missing from the plugin that publishPlugin uploaded - JJP1 codes would be rejected on Marketplace installs."
           exit 1
 
-      # publishPlugin succeeding only means the upload was accepted — Marketplace then runs its
-      # own automated compatibility check (its own plugin-verifier run against its full IDE
-      # matrix) asynchronously, which can reject the upload for reasons our verifyPlugin task
-      # doesn't check for (e.g. OVERRIDE_ONLY_API_USAGES wasn't in our failureLevel until this was
-      # added). 0.8.11 was rejected this way and nobody noticed until the next release attempt,
-      # because a successful publishPlugin looks identical in the Actions log either way. Poll the
-      # public Marketplace API and fail the job if the just-released version hasn't shown up as
-      # listed+approved within a generous window, so a rejection is visible in this run instead of
-      # discovered "yet again" later. 30576 is this plugin's numeric Marketplace ID (see
-      # https://plugins.jetbrains.com/plugin/30576), distinct from its xmlId (in.kkkev.jj-idea).
-      - name: Verify JetBrains Marketplace approval
-        if: steps.version.outputs.is_release == 'true' && steps.publish_token.outputs.present == 'true'
+  # publishPlugin succeeding only means the upload was accepted — Marketplace then runs its own
+  # automated compatibility check asynchronously (observed 12–40 min) and can still reject it
+  # for reasons our verifyPlugin doesn't check (0.8.11, 0.9.2). Poll the public Marketplace API
+  # and fail this job if the just-released version doesn't show up listed+approved. A separate,
+  # dependency-free job so the release itself isn't held open by the wait. 30576 is this
+  # plugin's numeric Marketplace ID (https://plugins.jetbrains.com/plugin/30576), distinct from
+  # its xmlId (in.kkkev.jj-idea).
+  marketplace-approval:
+    needs: build
+    if: ${{ needs.build.outputs.published == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Wait for JetBrains Marketplace approval
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          MAX_ATTEMPTS=25
-          SLEEP_SECONDS=120
+          MAX_ATTEMPTS=70
+          SLEEP_SECONDS=60
           for attempt in $(seq 1 "$MAX_ATTEMPTS"); do
             echo "Checking Marketplace listing for $VERSION (attempt $attempt/$MAX_ATTEMPTS)..."
             # Response is a bare JSON array of version objects; the approval field is "approve",
-            # not "approved". Write to a file rather than capturing in a shell variable — command
-            # substitution has been observed to mangle the payload (the changelog notes embedded
-            # in each entry are large HTML blobs).
+            # not "approved". Write to a file rather than a shell variable: the changelog notes
+            # embedded in each entry are large HTML blobs that command substitution has mangled.
             if curl -sf "https://plugins.jetbrains.com/api/plugins/30576/updates?page=1&size=5" -o /tmp/marketplace-updates.json; then
               MATCH=$(jq -r --arg v "$VERSION" \
                 '.[]? | select(.version == $v and .approve == true and .listed == true) | .version' \
@@ -496,6 +540,6 @@ jobs:
             sleep "$SLEEP_SECONDS"
           done
           echo "::error::$VERSION was not listed/approved on JetBrains Marketplace after $((MAX_ATTEMPTS * SLEEP_SECONDS / 60)) minutes."
-          echo "::error::The upload succeeded but Marketplace's own compatibility check may have rejected it (as happened with 0.8.11)."
+          echo "::error::The upload succeeded but Marketplace's own compatibility check may have rejected it (as with 0.8.11 and 0.9.2)."
           echo "::error::Check https://plugins.jetbrains.com/plugin/30576 and the JetBrains Hub developer dashboard/email for the specific violation."
           exit 1

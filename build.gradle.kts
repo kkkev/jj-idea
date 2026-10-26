@@ -60,6 +60,10 @@ plugins {
 group = "in.kkkev"
 version = "0.2.0-SNAPSHOT"
 
+// scripts/pre-push.sh builds the older-platform legs (-PplatformVersion=2025.x) into their own
+// directories so they don't invalidate the main build/ outputs. Unset for normal builds.
+providers.gradleProperty("buildDirName").orNull?.let { layout.buildDirectory = layout.projectDirectory.dir(it) }
+
 repositories {
     mavenCentral()
 
@@ -242,29 +246,27 @@ intellijPlatform {
     }
 
     pluginVerification {
-        // IJPGP's default failureLevel includes INTERNAL_API_USAGES, which would fail the build
-        // on this plugin's deliberate use of internal APIs that are the documented 2026.2
-        // replacement for calls deprecated on the newest platform (see the compileTarget comment
-        // on the `kotlin` block below, and contributing.md's Platform API compatibility section).
-        // Binary-compatibility breaks stay fatal — that's the actual runtime risk an internal API
-        // poses on an older IDE, and the thing this check exists to catch.
+        // Everything the JetBrains Marketplace's own automated verifier rejects an upload for has
+        // to fail here too, or the gap repeats on the next release. Marketplace has rejected
+        // uploads for: OVERRIDE_ONLY_API_USAGES (0.8.11, a direct AnAction.actionPerformed call)
+        // and INTERNAL_API_USAGES (0.8.11 as well, and 0.9.2 for a single
+        // ProgressManager.getInstanceOrNull()). Treating internal-API usage as "advisory" was
+        // wrong, and cost an urgent patch release.
         //
-        // OVERRIDE_ONLY_API_USAGES is included even though it's not a binary-compatibility risk:
-        // 0.8.11 shipped a direct call to AnAction.actionPerformed() (an @ApiStatus.OverrideOnly
-        // method meant to be called only by the platform's own action-invocation machinery, with
-        // its update-before-invoke/callback wrapping) and it was rejected by the JetBrains
-        // Marketplace's own automated check, which our verifyPlugin run hadn't been catching. The
-        // Marketplace enforces its own failure levels on every upload regardless of what this
-        // project excludes, so anything it treats as fatal needs to fail here too, or the gap
-        // just repeats on the next unrelated release. INTERNAL_API_USAGES could face the same
-        // Marketplace-vs-local mismatch in principle, but the one specific exemption above is
-        // still deliberate and narrow enough to keep as-is; regular (non-exempted) internal-API
-        // usage should be avoided in review even though it isn't a local build failure.
+        // INTERNAL_API_USAGES is deliberately NOT in failureLevel below: IJPGP's failureLevel is
+        // all-or-nothing, so including it would also fail on the few internal usages Marketplace
+        // has accepted (see config/plugin-verifier/internal-api-baseline.txt). Instead, the
+        // `checkVerifierBaseline` task (finalizer of verifyPlugin) fails on any internal usage
+        // that is not in that baseline. Adding a baseline line needs a written reason.
+        //
+        // COMPATIBILITY_PROBLEMS remain fatal and are never to be suppressed: that's the actual
+        // runtime risk (NoSuchMethodError) on an older IDE.
         failureLevel = listOf(
             VerifyPluginTask.FailureLevel.COMPATIBILITY_PROBLEMS,
             VerifyPluginTask.FailureLevel.MISSING_DEPENDENCIES,
             VerifyPluginTask.FailureLevel.INVALID_PLUGIN,
-            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES
+            VerifyPluginTask.FailureLevel.OVERRIDE_ONLY_API_USAGES,
+            VerifyPluginTask.FailureLevel.NON_EXTENDABLE_API_USAGES
         )
         ides {
             // Explicit versions rather than recommended(): recommended() is unbounded because
@@ -512,6 +514,46 @@ tasks.register<JavaExec>("previewCode") {
     javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) })
     standardInput = System.`in`
 }
+
+// Fails verifyPlugin on any internal-API usage that isn't in the reviewed baseline. See the comment
+// on pluginVerification above for why this isn't just INTERNAL_API_USAGES in failureLevel.
+val checkVerifierBaseline = tasks.register("checkVerifierBaseline") {
+    group = "verification"
+    description = "Fails on Plugin Verifier internal API usages missing from internal-api-baseline.txt"
+    val baselineFile = layout.projectDirectory.file("config/plugin-verifier/internal-api-baseline.txt")
+    val reportsDir = layout.buildDirectory.dir("reports/pluginVerifier")
+    doLast {
+        val reports = reportsDir.get().asFile
+        val files = reports.walkTopDown().filter { it.name == "internal-api-usages.txt" }.toList()
+        val baseline = baselineFile.asFile.readLines()
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+            .toSet()
+        // usage description -> IDE builds it appeared on
+        val found = sortedMapOf<String, MutableSet<String>>()
+        files.forEach { f ->
+            val ide = f.relativeTo(reports).path.substringBefore('/')
+            f.readLines().filter { it.isNotBlank() }.forEach { found.getOrPut(it) { sortedSetOf() }.add(ide) }
+        }
+        val unexpected = found.filterKeys { it !in baseline }
+        val stale = baseline - found.keys
+        if (stale.isNotEmpty()) {
+            logger.warn("${stale.size} baseline line(s) matched nothing; prune them from ${baselineFile.asFile.name}")
+        }
+        if (unexpected.isNotEmpty()) {
+            throw GradleException(
+                "Plugin Verifier found ${unexpected.size} internal API usage(s) not in the baseline. " +
+                    "JetBrains Marketplace rejects these (0.8.11, 0.9.2). Use the public API, or add the " +
+                    "exact line to config/plugin-verifier/internal-api-baseline.txt with a reason " +
+                    "if Marketplace is known to accept it:\n" +
+                    unexpected.entries.joinToString("\n") { (usage, ides) -> "  [${ides.joinToString()}] $usage" }
+            )
+        }
+        logger.lifecycle(
+            "Internal API usages: ${found.size} found, all baselined (${files.size} IDE report(s) checked)."
+        )
+    }
+}
+tasks.named("verifyPlugin") { finalizedBy(checkVerifierBaseline) }
 
 // Convenience task that runs both tests and linting
 tasks.named("check") {

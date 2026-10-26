@@ -28,14 +28,15 @@ rules that supplement it.
   checklist items in place rather than appending a new subsection per bead — see
   contributing.md § Keeping `docs/manual-tests.md` small.
 - Follow contributing.md's End of Task Checklist before declaring work done.
-- **When the user says "finish"**, run in order: `./gradlew check` → update `CHANGELOG.md`
+- **When the user says "finish"**, run in order: `scripts/pre-push.sh` → update `CHANGELOG.md`
   (add a user-facing entry under `[Unreleased]`) → if this finish is cutting a GitHub
   Release, add a short sponsor line to the release body → `jj describe` (write a commit
   message for the working-copy change) → `bd export -o .beads/issues.jsonl` →
-  `jj bookmark set master` → then stop and ask for permission before any `jj git push`.
+  `jj bookmark set master` → then stop and ask for permission before pushing (`jj ship` re-runs the gate and pushes
+  both remotes; never `jj git push` directly).
 - **Before pushing a stack of multiple new commits (not just the tip), verify CI health on
   GitHub for each one that was already pushed independently, not just the final state.**
-  `./gradlew check` passing once at the end of a session does not prove every commit in
+  `scripts/pre-push.sh` passing once at the end of a session does not prove every commit in
   between is independently green — only that the tip is. If commits were pushed
   incrementally without re-running `./gradlew check --no-build-cache` before each push,
   check `gh run list --branch master --limit <n>` for each pushed SHA before assuming the

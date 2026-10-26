@@ -529,25 +529,30 @@ The compile target (`gradle.properties`'s `platformVersion`) is the newest suppo
 against the newest platform surfaces that platform's deprecation warnings, but a deprecation's
 documented replacement is sometimes `@ApiStatus.Internal` on older builds still within
 `sinceBuild` — the replacement API simply wasn't made public yet on the floor. When that
-happens, **take the documented replacement anyway** and accept the resulting JetBrains
-Marketplace/Plugin Verifier internal-API-usage warning; do not revert to the deprecated call
-just to silence it. Marketplace treats internal-API usage as advisory, not a publish blocker.
+happens, **take the documented replacement anyway**, unless it is `@ApiStatus.Internal` on a build still
+within `sinceBuild`: JetBrains Marketplace **rejects uploads with internal-API usages** (0.8.11,
+and 0.9.2 for a single `ProgressManager.getInstanceOrNull()`), so the release never goes live.
+Prefer a public equivalent; if there isn't one and Marketplace is known to accept it (it
+approved 0.9.1 with the `ToolWindowFactory` ones), add the exact verifier line to
+`config/plugin-verifier/internal-api-baseline.txt` with a written reason.
 
-The real risk an internal API carries is that its *signature*, not just its visibility, can
+The other risk an internal API carries is that its *signature*, not just its visibility, can
 differ between IDE versions — surfacing as a `NoSuchMethodError` at runtime on a user's older
 IDE rather than a build failure. `pluginVerification` in `build.gradle.kts` guards against
-exactly that: it pins every supported IDE from `sinceBuild` up (currently 2025.1–2026.2) and
-sets `failureLevel` to only `COMPATIBILITY_PROBLEMS`, `MISSING_DEPENDENCIES`, and
-`INVALID_PLUGIN` — genuine breaks — leaving `INTERNAL_API_USAGES` (IJPGP's default failure
-level includes it) non-fatal. Never add `INTERNAL_API_USAGES` back to `failureLevel` and never
-suppress a `COMPATIBILITY_PROBLEMS` finding — a compatibility problem on any pinned IDE means the
-code will not run there. CI runs this as the `verify` job (`.github/workflows/build.yml`); run
-`./gradlew verifyPlugin` locally before believing a deprecation fix is safe on the floor.
+both: it pins every supported IDE from `sinceBuild` up (currently 2025.1–2026.2),
+`failureLevel` covers `COMPATIBILITY_PROBLEMS`, `MISSING_DEPENDENCIES`, `INVALID_PLUGIN`,
+`OVERRIDE_ONLY_API_USAGES` and `NON_EXTENDABLE_API_USAGES`, and the `checkVerifierBaseline`
+task (a finalizer of `verifyPlugin`) fails on any internal-API usage that is not in the
+baseline. Never suppress a `COMPATIBILITY_PROBLEMS` finding — a compatibility problem on any
+pinned IDE means the code will not run there. Add each new minor platform release to the `ides`
+list as it ships. CI runs this in the `build` job (`.github/workflows/build.yml`) on every non-release run.
+
 `verifyPlugin` only checks the packaged plugin's bytecode, not whether sources compile against
 the floor — a platform-API shape change (e.g. a Java interface becoming Kotlin) can break
-`compileKotlin`/`compileTestKotlin` without tripping it. Before pushing a change that touches
-platform APIs, also run the floor compat leg locally: `./gradlew compileKotlin test platformTest
--PplatformVersion=2025.1`.
+`compileKotlin`/`compileTestKotlin` without tripping it. **`scripts/pre-push.sh` runs both**:
+`./gradlew check verifyPlugin`, then main and test compilation against 2025.1 and 2025.2 (into
+separate `build-compat-*/` directories). It does not run tests on the older platforms; CI's
+compat matrix does. Run it, or `jj ship`, before every push to `master`.
 
 ## Performance & Scale
 
@@ -635,7 +640,9 @@ Two remotes: `origin` (primary, GitLab) and `github` (public). GitHub Actions
 automatically creates tags and advances `master` on `github` in the background, so
 always fetch from it before pushing.
 
-Standard push sequence:
+Standard push sequence (`jj ship` runs the gate and pushes `master`; one-time setup:
+`jj config set --repo aliases.ship '["util", "exec", "--", "scripts/ship.sh"]'`):
+0. `scripts/pre-push.sh` — the local gate (see Platform API compatibility); `jj ship` does this.
 1. `bd export -o .beads/issues.jsonl` — jj bypasses git hooks, so beads must be exported
    manually before pushing.
 2. `jj git push --remote origin`
@@ -656,6 +663,16 @@ gh workflow run "Build and Release" --repo kkkev/jj-idea -f bump=patch
 `bump` is `patch`/`minor`/`major` (empty = snapshot build, the default on every push).
 The workflow bumps the version, moves `[Unreleased]` changelog content to the new
 version section, creates the GitHub release, and publishes to the JetBrains Marketplace.
+(The "Patch Release" workflow, `.github/workflows/patch-release.yml`, is a one-click
+`bump=patch` wrapper.)
+
+A release run does **not** repeat the checks that CI already ran when the commit was pushed
+(`compat` matrix, Plugin Verifier, lint, changelog check). It instead requires that commit's
+push-triggered run to have succeeded, waiting for it if it's still running, so **let CI go
+green on `master` before releasing**. `skip_ci_check` overrides that. The release job itself
+takes a few minutes; the separate `marketplace-approval` job then polls the Marketplace API
+until the version is listed and approved (typically 10–40 min) and goes red if it never is —
+a green `build` job does not mean the Marketplace accepted the upload.
 
 **Released sections are frozen.** Once `X.Y.Z` is tagged, new entries go under
 `[Unreleased]` only — never under the now-released `## [X.Y.Z]` heading. `check` fails
@@ -699,7 +716,8 @@ When making changes that affect users (features, fixes, behavior changes):
 
 ## End of Task Checklist
 
-1. **Verify quality**: `./gradlew check`. Fix failures before proceeding.
+1. **Verify quality**: `scripts/pre-push.sh` (`./gradlew check` plus `verifyPlugin` and the
+   2025.1/2025.2 compile legs). Fix failures before proceeding.
 2. **Update beads**: close completed issues (`bd close <id1> <id2> ...`, with a comment
    if non-trivial); file new issues (`bug`/`task`/`feature`) for anything left unresolved.
 3. **Manual verification**: state the exact `./gradlew runIde` smoke steps for any
