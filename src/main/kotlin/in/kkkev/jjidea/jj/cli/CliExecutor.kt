@@ -2,6 +2,7 @@ package `in`.kkkev.jjidea.jj.cli
 
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.*
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
@@ -763,8 +764,9 @@ internal fun contextCancelled(): Boolean = try {
  * already happened in the repo. Runs [block] directly when there is no application (plain unit tests).
  */
 private fun <T> nonCancellable(block: () -> T): T {
-    val progressManager = ProgressManager.getInstanceOrNull() ?: return block()
-    return progressManager.computeInNonCancelableSection<T, Exception>(block)
+    // ProgressManager.getInstanceOrNull() is @ApiStatus.Internal; check for the application ourselves.
+    if (ApplicationManager.getApplication() == null) return block()
+    return ProgressManager.getInstance().computeInNonCancelableSection<T, Exception>(block)
 }
 
 /** Rethrows the caller's own cancellation exception after a jj process was killed for it. */

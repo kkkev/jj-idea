@@ -1,0 +1,40 @@
+name: Patch Release
+
+# One-click patch release. The release logic itself (version bump, build, GitHub Release,
+# Marketplace publish + approval check, CHANGELOG/updatePlugins.xml commit-back) lives in
+# build.yml's workflow_dispatch path; this just refuses to start without release notes and
+# dispatches it with bump=patch against the chosen branch.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch to release from'
+        required: false
+        default: master
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Require release notes under [Unreleased]
+        run: |
+          NOTES=$(awk '/^## \[Unreleased\]/{f=1;next} f&&/^## \[/{exit} f&&/^\[.+\]:/{exit} f' CHANGELOG.md | tr -d '[:space:]')
+          if [ -z "$NOTES" ]; then
+            echo "::error::CHANGELOG.md has no entries under [Unreleased]; nothing to release."
+            exit 1
+          fi
+
+      - name: Dispatch Build and Release with bump=patch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run build.yml --repo "$GITHUB_REPOSITORY" --ref "${{ inputs.ref }}" -f bump=patch

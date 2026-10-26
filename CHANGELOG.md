@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Release rejected by the JetBrains Marketplace compatibility check**: 0.9.2 never reached the Marketplace because the plugin called an internal platform API (`ProgressManager.getInstanceOrNull()`) while shielding a running jj command from cancellation. It now uses the public API. Everything in 0.9.2 ships in this release.
+
 ### Changed
 - **The log keeps loading until a visible "parent not loaded" line resolves**: when a row on screen draws a faint stub because its parent hasn't loaded yet (common in a filtered log, where a recent match's parent match can be on a later page), the log now pages in the background until that parent arrives, then stops, instead of waiting for you to scroll. It stops at 10,000 loaded rows, so a parent further back than that still needs a click on the line to load it. A parent that a filter excludes is never chased.
 

@@ -424,8 +424,19 @@ jobs:
       # Publish to JetBrains Marketplace on releases
       # Requires PUBLISH_TOKEN secret from JetBrains Hub (hub.jetbrains.com → Profile → Tokens)
       # Optional: CERTIFICATE_CHAIN, PRIVATE_KEY, PRIVATE_KEY_PASSWORD for plugin signing
+      # `env.X` in a step's `if:` only sees job/workflow-level env, never another step's `env:`.
+      # The publish token used to be set only on the publish step, so every `env.PUBLISH_TOKEN`
+      # condition on the steps below evaluated false and they were silently skipped — which is
+      # how the 0.9.2 Marketplace rejection went unnoticed. Expose "is a token configured" as a
+      # step output instead, without widening the secret's scope.
+      - name: Check Marketplace publish token
+        id: publish_token
+        env:
+          PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
+        run: echo "present=$([ -n "$PUBLISH_TOKEN" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Publish to JetBrains Marketplace
-        if: steps.version.outputs.is_release == 'true' && env.PUBLISH_TOKEN != ''
+        if: steps.version.outputs.is_release == 'true' && steps.publish_token.outputs.present == 'true'
         env:
           PUBLISH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
           CERTIFICATE_CHAIN: ${{ secrets.CERTIFICATE_CHAIN }}
@@ -439,7 +450,7 @@ jobs:
         run: ./gradlew publishPlugin -PrequirePreviewCodeKey
 
       - name: Verify published plugin still contains the preview code key
-        if: steps.version.outputs.is_release == 'true' && env.PUBLISH_TOKEN != ''
+        if: steps.version.outputs.is_release == 'true' && steps.publish_token.outputs.present == 'true'
         run: |
           # publishPlugin rebuilt build/distributions/*.zip; check what it actually uploaded.
           mkdir -p /tmp/published-check
@@ -461,7 +472,7 @@ jobs:
       # discovered "yet again" later. 30576 is this plugin's numeric Marketplace ID (see
       # https://plugins.jetbrains.com/plugin/30576), distinct from its xmlId (in.kkkev.jj-idea).
       - name: Verify JetBrains Marketplace approval
-        if: steps.version.outputs.is_release == 'true' && env.PUBLISH_TOKEN != ''
+        if: steps.version.outputs.is_release == 'true' && steps.publish_token.outputs.present == 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
