@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2026-10-26
+
 ### Fixed
 - **Release rejected by the JetBrains Marketplace compatibility check**: 0.9.2 never reached the Marketplace because the plugin called an internal platform API (`ProgressManager.getInstanceOrNull()`) while shielding a running jj command from cancellation. It now uses the public API. Everything in 0.9.2 ships in this release.
 
@@ -1062,7 +1064,8 @@ numerous improvements made during the 0.1.x development cycle.
 - Refactored log tab management
 - Change hashes from change IDs to commit IDs for platform compatibility
 
-[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/kkkev/jj-idea/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.3
 [0.9.2]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.2
 [0.9.1]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.1
 [0.9.0]: https://github.com/kkkev/jj-idea/releases/tag/v0.9.0
