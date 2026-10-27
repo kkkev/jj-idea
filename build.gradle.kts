@@ -333,6 +333,19 @@ val ijpgpJavaLauncher = ijpgpTestTask.javaLauncher
 val ijpgpSystemProperties = ijpgpTestTask.systemProperties.toMap()
 val ijpgpJvmArgProviders = ijpgpTestTask.jvmArgumentProviders.toList()
 
+// Plain (non-IJPGP) test JVMs get no sandbox properties, so any platform class they load
+// (PathManager, Logger, ...) defaults its system and log dirs to <IDE home>/system, and the IDE
+// home is the copy Gradle extracted into its transform cache. Gradle treats that as an immutable
+// workspace: every run added system/testlog/idea.log there, the next cold daemon found it
+// "modified" and re-extracted the whole IDE (~5 min via hdiutil), and two builds doing that at
+// once collided. Keep those dirs in the build directory instead.
+fun Test.keepIdeaDirsOutOfIdeHome() {
+    val dirs = layout.buildDirectory.get().asFile.resolve("idea-test-dirs/$name")
+    systemProperty("idea.system.path", dirs.resolve("system").path)
+    systemProperty("idea.log.path", dirs.resolve("log").path)
+    systemProperty("idea.config.path", dirs.resolve("config").path)
+}
+
 // Unit tests: stripped-down classpath without IJPGP bootstrap.
 // Uses manual classpath and clears jvmArgumentProviders to avoid coroutines agent crash.
 tasks.test {
@@ -349,6 +362,7 @@ tasks.test {
     // Clear whatever IJPGP configured directly on the shared, default test task object before
     // this block runs (this task is meant to be fully independent of IJPGP's platform bootstrap).
     systemProperties.clear()
+    keepIdeaDirsOutOfIdeHome()
 
     // Exclude specifically test-framework-junit5 (added by IJPGP's testFramework(JUnit5)
     // declaration): it registers a LauncherSessionListener service provider that JUnit5's
@@ -433,6 +447,7 @@ tasks.register<Test>("platformTest") {
 // Contract tests: run real jj commands to verify CLI output matches plugin's parsers.
 // Same stripped-down classpath as unit tests (no IJPGP). Not included in check — requires jj installed.
 tasks.register<Test>("contractTest") {
+    keepIdeaDirsOutOfIdeHome()
     useJUnitPlatform { includeTags("contract") }
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = configurations["testCompileClasspath"] +
@@ -467,6 +482,7 @@ tasks.register<Test>("contractTest") {
 // Stub tests: run stub contract tests in isolation (no jj required).
 // Same stripped-down classpath as unit tests.
 tasks.register<Test>("stubTest") {
+    keepIdeaDirsOutOfIdeHome()
     useJUnitPlatform { includeTags("stub") }
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = configurations["testCompileClasspath"] +
