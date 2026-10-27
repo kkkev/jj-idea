@@ -67,6 +67,30 @@ internal fun opRevertArgs(id: OperationId, what: Set<CommandExecutor.OpRevertSco
  */
 internal fun opRestoreArgs(id: OperationId) = JjInvocation(IRREVERSIBLE, "op", "restore", id.toString())
 
+/**
+ * [IRREVERSIBLE]: undo and redo are each other's reverse, so offering an undo balloon on top of an
+ * undo would invite balloon recursion - the user has the Redo action instead.
+ */
+internal fun undoArgs() = JjInvocation(IRREVERSIBLE, "undo")
+
+internal fun redoArgs() = JjInvocation(IRREVERSIBLE, "redo")
+
+/**
+ * Working-copy files matching [fileset] that differ between [target]'s view and now, as summary lines
+ * (`A` = present now, absent after restoring). `--ignore-working-copy`: a pure read.
+ */
+internal fun filesChangedByRestoringArgs(target: OperationId, fileset: String) = JjInvocation(
+    READ_ONLY,
+    "diff",
+    "--from",
+    "at_operation($target, @)",
+    "--to",
+    "@",
+    "--summary",
+    fileset,
+    "--ignore-working-copy"
+)
+
 internal fun statusArgs() = JjInvocation(READ_ONLY, "status")
 
 internal fun diffArgs(filePath: String) = JjInvocation(READ_ONLY, "diff", filePath.toFileset())
@@ -821,6 +845,13 @@ class CliExecutor(
         execute(root, opRevertArgs(id, what))
 
     override fun opRestore(id: OperationId) = execute(root, opRestoreArgs(id))
+
+    override fun undo() = execute(root, undoArgs())
+
+    override fun redo() = execute(root, redoArgs())
+
+    override fun filesChangedByRestoring(target: OperationId, fileset: String) =
+        execute(root, filesChangedByRestoringArgs(target, fileset))
 
     override fun status() = execute(root, statusArgs())
 

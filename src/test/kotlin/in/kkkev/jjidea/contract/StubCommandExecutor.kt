@@ -153,6 +153,13 @@ class StubCommandExecutor(private val stub: JjStub) : CommandExecutor {
 
     override fun opRestore(id: OperationId): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
 
+    override fun undo(): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
+    override fun redo(): CommandExecutor.CommandResult = TODO("Not needed for integration tests")
+
+    override fun filesChangedByRestoring(target: OperationId, fileset: String): CommandExecutor.CommandResult =
+        TODO("Not needed for integration tests")
+
     override fun opRevert(
         id: OperationId,
         what: Set<CommandExecutor.OpRevertScope>

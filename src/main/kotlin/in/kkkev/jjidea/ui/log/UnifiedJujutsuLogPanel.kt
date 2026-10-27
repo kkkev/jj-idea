@@ -1,6 +1,7 @@
 package `in`.kkkev.jjidea.ui.log
 
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.Logger
@@ -418,7 +419,11 @@ class UnifiedJujutsuLogPanel(project: Project, val config: LogWindowConfig) :
         ManagedActions["Jujutsu.NewChange"],
         ManagedActions["Jujutsu.EditChange"],
         ManagedActions["Jujutsu.RebaseChangeToolbar"],
-        ManagedActions["Jujutsu.DescribeChangeToolbar"]
+        ManagedActions["Jujutsu.DescribeChangeToolbar"],
+        // jj-idea-x30x: hidden (with the separator collapsing) unless the Operations preview is on.
+        Separator.create(),
+        ManagedActions["Jujutsu.Undo"],
+        ManagedActions["Jujutsu.Redo"]
     )
 
     /**

@@ -45,6 +45,31 @@ class CliExecutorOpTest {
     }
 
     @Test
+    fun `undo and redo are bare irreversible commands`() {
+        undoArgs().args shouldBe listOf("undo")
+        redoArgs().args shouldBe listOf("redo")
+        undoArgs().reversibility shouldBe Reversibility.IRREVERSIBLE
+        redoArgs().reversibility shouldBe Reversibility.IRREVERSIBLE
+    }
+
+    @Test
+    fun `filesChangedByRestoring is a read-only diff from the target's working copy to now`() {
+        val result = filesChangedByRestoringArgs(OperationId("prev"), "root-glob:\"**/.idea/vcs.xml\"")
+
+        result.reversibility shouldBe Reversibility.READ_ONLY
+        result.args shouldBe listOf(
+            "diff",
+            "--from",
+            "at_operation(prev, @)",
+            "--to",
+            "@",
+            "--summary",
+            "root-glob:\"**/.idea/vcs.xml\"",
+            "--ignore-working-copy"
+        )
+    }
+
+    @Test
     fun `op revert with both scopes emits --what twice`() {
         val result = opRevertArgs(
             OperationId("abc123"),

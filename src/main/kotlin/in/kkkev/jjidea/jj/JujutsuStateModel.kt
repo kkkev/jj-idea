@@ -48,7 +48,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * VFS (.jj created/deleted) ───────────┴─→ initialisedRepositories.invalidate()
  *                                                  │
  *                                                  ├─→ watchOpHeads()
- *                                                  ├─→ references / workingCopies / closestBookmarks / gitRemotes
+ *                                                  ├─→ references / workingCopies / closestBookmarks / undoRedoPlans / gitRemotes
  *                                                  │      .invalidate()
  *                                                  ├─→ logRefresh.notify()
  *                                                  └─→ JujutsuUiEnabler (connects separately)
@@ -216,6 +216,21 @@ class JujutsuStateModel(private val project: Project) : Disposable {
     }
 
     /**
+     * What the next Undo / Redo would do in each repo (jj-idea-x30x), so the actions can name the
+     * operation in `update()` without a subprocess. One `jj op log -n50` per repo per invalidation,
+     * via [invalidateRepositoryState].
+     */
+    internal val undoRedoPlans = notifiableState<Map<JujutsuRepository, UndoRedoPlans>>(
+        project,
+        "Jujutsu Undo/Redo Plans",
+        emptyMap()
+    ) {
+        initialisedRepositories.immediateValue.values.associateWith { repo ->
+            loadUndoRedoPlans(repo.commandExecutor)
+        }
+    }
+
+    /**
      * Working copy log entries - one for each repo.
      */
     val workingCopies: NotifiableState<Map<String, LogEntry>> = notifiableState(
@@ -354,6 +369,7 @@ class JujutsuStateModel(private val project: Project) : Disposable {
         workingCopies.invalidate()
         closestBookmarks.invalidate()
         danglingHeads.invalidate()
+        undoRedoPlans.invalidate()
     }
 
     /**

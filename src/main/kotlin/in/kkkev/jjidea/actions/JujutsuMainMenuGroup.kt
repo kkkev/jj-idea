@@ -8,7 +8,7 @@ import `in`.kkkev.jjidea.vcs.isJujutsu
 /**
  * "Jujutsu" submenu in the VCS main menu (`VcsGlobalGroup`, anchored after `Vcs.Specific` —
  * matching `Git.Menu`'s own placement exactly, so "Jujutsu" sits in the same section as "Git"),
- * gathering the plugin's product-specific operations (`Jujutsu.UndoLastOperation`,
+ * gathering the plugin's product-specific operations (`Jujutsu.Undo`/`Jujutsu.Redo`,
  * `Jujutsu.SetDiffBase`, plugin.xml) instead of leaving them as loose top-level items.
  *
  * `Jujutsu.Init` is deliberately *not* one of this group's children — same as `Git.Init` isn't a

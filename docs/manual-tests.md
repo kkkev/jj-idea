@@ -41,7 +41,7 @@ The short pass to run before every release, before deciding whether the full sec
 - [ ] Squash Into: pick a destination, see the result preview, tick/untick a file, squash (MT-SQUASH)
 - [ ] Split a change with a file ticked, and open Pick Hunks… on a two-hunk file and apply a partial pick (MT-SPLIT)
 - [ ] Drag a commit onto another to rebase, drag a bookmark chip onto a commit to move it, and drag the `@` marker to edit a commit (MT-DND)
-- [ ] The Operations tab (if enabled): revert an operation and check the log updates (MT-OPLOG)
+- [ ] The Operations tab (if enabled): revert an operation and check the log updates (MT-OPLOG); then Undo and Redo the latest operation from VCS → Jujutsu (MT-UNDO)
 
 **Bookmarks and remotes**
 - [ ] Bookmark widget: Create Bookmark Here…, Advance, Rename…, Delete; the Bookmarks panel tree shows Local/remote/Tags and "Filter Log to Bookmark" narrows the log (MT-BOOKMARK)
@@ -594,10 +594,10 @@ See docs/design/jj-idea-2c8k-paged-log-loading.md for the mechanism and its vali
 Stage 1 of the undo roadmap (docs/design/undo-support-roadmap.md). Wired to **Abandon**, **Duplicate Onto**, **Move Bookmark**, **Rebase** (drag-and-drop), **Set Tag** and **Restore** / **Restore to This**; the rest of jj-idea-t0iy's rollout is still pending.
 
 - [ ] Create a change, `jj new`, then **edit a file so the working copy is dirty** (exercises the snapshot-op exclusion) → right-click → **Abandon** → confirm. The change disappears **and** a Jujutsu balloon appears with an inline **Undo** link. Clicking **Undo** brings the change back, refreshes the working-copy files and expires the balloon. Repeat with a **clean** working copy (no snapshot op written): identical behaviour
-- [ ] Abandon again and **dismiss the balloon without clicking Undo**: the **VCS** main menu has an entry reading **"Undo Abandon"** that brings the change back. Invoking it a second time (nothing left to undo) shows it disabled, reading "Undo Last Jujutsu Operation" (visible, not hidden; hover shows why)
+- [ ] Abandon again and **dismiss the balloon without clicking Undo**: the **VCS → Jujutsu** menu's **Undo** now names the abandon (`Undo 'abandon commit …'`) and brings the change back (the old "Undo Abandon" menu entry is gone; see MT-UNDO)
 - [ ] While a balloon is showing, run `jj new` in a terminal in the same repo, *then* click the balloon's Undo: it undoes the abandon specifically, not the terminal command. `jj op log` shows a **new** "revert" operation added, not an earlier one removed
 - [ ] With Settings → Version Control → Jujutsu → JJ executable path pointing at a pinned older jj (`scripts/jj-install-version.sh 0.37.0`, then `~/.local/bin/jj-0.37`), the first three checks above still work (the mechanism holds at `JjVersion.MINIMUM`)
-- [ ] Settings → Keymap → search "Jujutsu" → **Undo Last Jujutsu Operation** shows that name, not the raw action id `Jujutsu.UndoLastOperation`
+- [ ] Settings → Keymap → search "Jujutsu" → **Undo Last Jujutsu Operation** shows that name, not the raw action id `Jujutsu.UndoLastOperation` (it is keymap-only now, no longer in any menu)
 - [ ] Modify a file, right-click → **Restore…**, tick it in the dialog, confirm: a balloon reading "Restore" with an inline **Undo** appears, and clicking it brings the discarded content back and refreshes the working-copy tree. **Restore to This…** from a historical commit's changed files (see MT-LOG-DETAILS) shows a balloon reading "Restore to This"
 - [ ] The Restore and Drop dialogs' summary lines ("N files will be restored" / "Changes to N files will be dropped") count the pre-ticked files immediately on open, not only after toggling a checkbox (GitHub #148)
 
@@ -1736,7 +1736,7 @@ Requires the bundled Tasks plugin (Tools → Tasks & Contexts). Use a repo with 
 **Operations tab (`jj op log` browser) - preview feature `OPERATION_LOG`**
 
 **Code:** `ui/oplog/*`, `ui/log/JujutsuRootFilterComponent.kt`, `actions/undo/ShowOperationLogAction.kt`, `jj/cli/CliExecutor.kt` (`opRestoreArgs`), `preview/PreviewFeature.kt`
-**Also re-run:** MT-CROSS (the roots filter component is shared with the log); MT-WORKINGCOPY (revert/restore invalidate repo state and the working copy); MT-LOG-REFRESH (the tab refreshes on the same funnel); MT-CTXMENU (VCS → Jujutsu submenu entry); MT-SETTINGS (Preview features group)
+**Also re-run:** MT-UNDO (Undo/Redo live on this tab's toolbar); MT-CROSS (the roots filter component is shared with the log); MT-WORKINGCOPY (revert/restore invalidate repo state and the working copy); MT-LOG-REFRESH (the tab refreshes on the same funnel); MT-CTXMENU (VCS → Jujutsu submenu entry); MT-SETTINGS (Preview features group)
 
 Precondition: the feature is gated. Either enable it with `-Djjidea.preview.operationLog=true` (runIde / VM options) or enter an access code granting **Operations tab** under Settings → Version Control → Jujutsu → Preview features, tick it, Apply, and reopen the IDE. Use a repo with a few changes and a dirty working copy.
 
@@ -1748,6 +1748,28 @@ Precondition: the feature is gated. Either enable it with `-Djjidea.preview.oper
 - [ ] Revert and Restore are **disabled with a tooltip reason** on the root row and with nothing selected; Restore is also disabled on the top (current) row
 - [ ] **Restore (secondary):** right-click shows Restore in its own section below a separator, labelled "Restore Repository to This Point...". Choosing it shows a confirmation naming the operation and how many later operations are discarded, and **Cancel** changes nothing. Confirming resets the repo to that point (`jj log` matches the state after that operation), adds a new top row, and refreshes the log/Working Copy panel. Revert and Restore never raise an undo balloon
 - [ ] **Multi-root:** with two jj roots, a **Repository** chip (same as the log's) appears at the right of the toolbar, absent with one root, and the tab opens showing only the repo it was opened from. Cycling roots in the chip (include / exclude / unset) and **Select All** behave like the log's; with both repos shown, rows interleave by time, each with a repo-coloured square and the repo name in the Description tooltip, and with one repo shown there are no squares. Revert and Restore act on the **row's own repo**, and Restore's confirmation counts only that repo's later operations. The log's own root filter is unchanged (see MT-CROSS)
+
+### MT-UNDO
+
+**Undo / Redo of the latest operation (`jj undo` / `jj redo`) - generally available (the Operations tab toolbar copy is still preview-gated)**
+
+**Code:** `actions/undo/UndoRedoActions.kt`, `actions/undo/UndoRedoRunner.kt`, `jj/cli/UndoTarget.kt`, `jj/UndoRedoPlans.kt`, `jj/JujutsuStateModel.kt` (`undoRedoPlans`), `ui/oplog/JujutsuOperationLogPanel.kt` (toolbar), `ui/log/UnifiedJujutsuLogPanel.kt` (`primaryActions`), `jj/cli/CliExecutor.kt` (`undoArgs`/`redoArgs`)
+**Also re-run:** MT-OPLOG (shares the tab's toolbar and the preview gate); MT-WORKINGCOPY (undo/redo invalidate repo state and rewrite files on disk); MT-LOG-REFRESH (the action text follows the same refresh funnel); MT-CTXMENU (VCS → Jujutsu submenu entries)
+
+Precondition: none for the menu and log toolbar; enable the Operations preview as in MT-OPLOG only for the tab-toolbar and multi-repo steps. Use a repo with a few changes and a **clean** working copy unless a step says otherwise. Do not bind anything to Cmd+Z - these actions deliberately have no default shortcut.
+
+- [ ] **Placement:** with the preview **off**, VCS → Jujutsu lists **Undo** and **Redo** (and no longer "Undo Last Jujutsu Operation") and the log toolbar shows both after a separator. With the preview **on**, the Operations tab toolbar also shows them ahead of the Revert section
+- [ ] **Names the operation:** run `jj describe -m "from terminal"` in a terminal and focus the IDE. VCS → Jujutsu now reads **Undo 'describe commit <8 hex>'** (the hash is shortened, never 40 characters) and Redo is disabled with the reason "Nothing to redo"
+- [ ] **Undo and Redo:** choosing Undo shows a confirmation naming the operation and its time and saying files on disk are restored; **Cancel** changes nothing. Confirming restores the previous description, updates the log and Working Copy panel, and the menu now reads **Redo 'describe commit …'**. Redo restores "from terminal"
+- [ ] **Chained:** make three changes, then Undo twice: each Undo names the next-older operation, never the same one twice, and the log walks back one step each time. Redo twice walks forward in the opposite order. After one more terminal operation Redo goes back to "Nothing to redo"
+- [ ] **Don't ask again:** tick it in the confirmation and confirm. Further Undo/Redo run without a dialog, and Settings → Version Control → Jujutsu → General → **Confirm before Undo and Redo** is now unticked. Re-ticking it brings the dialog back (use this to re-test the race). Cancelling with the box ticked does **not** remember it
+- [ ] **Snapshot at the head:** in a repo whose `.gitignore` covers `.idea`, create a plain file (e.g. `notes.txt`) and let the IDE refresh so `jj op log` shows a `snapshot working copy` row on top. Undo reads **Undo Working-Copy Changes** (not the name of the operation beneath it) and runs **without any prompt**; `notes.txt` is gone and Redo reads **Redo Working-Copy Changes**. Undo again names the real operation beneath. Redo (twice) restores both, and `notes.txt` is back. With a snapshot sitting on top of an *undo*, Redo is disabled with the reason "ends the redo chain"
+- [ ] **VCS mapping warning:** in a repo that does **not** ignore `.idea` (open a fresh `jj git init` folder in the IDE), the first snapshot records `.idea/vcs.xml`. Undo shows **Undo May Disable the Jujutsu Plugin**, naming the matched path (`.idea/vcs.xml`, or `<subdir>/.idea/vcs.xml`) and giving both recoveries (terminal `jj redo`; Settings > Version Control > Directories), even with "Don't ask again" ticked or "Confirm before Undo and Redo" unticked; **Cancel** changes nothing. After any *later* snapshot that records only other files (e.g. edit `.idea/workspace.xml`), Undo shows **no** warning. **Undo Anyway** removes the file and the plugin goes inactive; `jj redo` in a terminal (repeat until `.idea/vcs.xml` exists) then reopening the project, or re-mapping in Settings, brings it back. `idea.log` has an `UndoRedoRunner` line per click saying whether the VCS mapping would be removed
+- [ ] **Race:** with a confirmation open, create or edit a file from another editor/terminal, then confirm. A warning says the repository changed after you confirmed and nothing was undone; the file is still on disk. (The much smaller window between the final re-check and `jj undo` can only be hit by code, not by hand; if it ever is, the notification says the changes were removed from disk and how to restore them from the Operations tab.)
+- [ ] **Terminal operations are included:** Undo after `jj new` run in a terminal undoes that `jj new` (the confirmation says terminal operations are covered). The Operations tab shows the new `undo: restore to operation …` row at the top
+- [ ] **Multi-repo:** with two jj roots, Undo from a log row's context acts on that row's repo; from the VCS menu with no selection it is disabled with "Select a repository to undo in"; in the Operations tab it acts on the selected row's repo, or the only repo shown
+- [ ] **Keymap:** Settings → Keymap lists `Jujutsu.Undo` and `Jujutsu.Redo`, unassigned by default; assigning a chord works. The editor's Cmd+Z / Shift+Cmd+Z are unaffected
+- [ ] `idea.log` shows no errors from any of the above, and no extra `jj op log` calls appear per keystroke or per menu open (the text is cached per operation change)
 
 ### MT-CROSS
 

@@ -714,6 +714,26 @@ interface CommandExecutor {
     fun opRestore(id: OperationId): CommandResult
 
     /**
+     * `jj undo`. Undoes the repository's head operation, or - when the head is itself an undo -
+     * keeps walking back through the log. Unlike [opRevert] this acts on "whatever is at the head",
+     * so callers must name that operation first (see [in.kkkev.jjidea.jj.cli.resolveUndo]) and
+     * must not call it with a snapshot at the head: jj snapshots a dirty working copy first, then
+     * undoes only that snapshot.
+     */
+    fun undo(): CommandResult
+
+    /**
+     * What restoring the repository to [target]'s view would do to the working-copy files matching
+     * [fileset], as `jj diff --summary` lines from [target]'s working-copy commit to the current one -
+     * so an `A path` line is a file that exists now but would be removed from disk. One read-only
+     * call, empty output when nothing matching changes.
+     */
+    fun filesChangedByRestoring(target: OperationId, fileset: String): CommandResult
+
+    /** `jj redo`. The counterpart of [undo]: reinstates the most recently undone operation. */
+    fun redo(): CommandResult
+
+    /**
      * An executor that resolves [CommandResult.Success.Reversible.operation] for commands whose
      * [in.kkkev.jjidea.jj.cli.Reversibility] is `REVERSIBLE`, by injecting a per-invocation token
      * and matching it back against the operation log - see

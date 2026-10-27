@@ -16,6 +16,8 @@ import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.table.JBTable
 import com.intellij.util.ui.JBUI
 import `in`.kkkev.jjidea.JujutsuBundle
+import `in`.kkkev.jjidea.actions.undo.RedoAction
+import `in`.kkkev.jjidea.actions.undo.UndoAction
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.OperationEntry
 import `in`.kkkev.jjidea.jj.OperationId
@@ -142,6 +144,12 @@ internal class JujutsuOperationLogPanel(private val project: Project, initialRep
                     applyFilter()
                 }
             })
+            add(Separator.getInstance())
+            // jj-idea-x30x: repository-wide Undo/Redo of the head operation, ahead of the per-row actions.
+            // Acts on the selected row's repository, else the only repository being shown.
+            val shownRepo = { selected()?.repo ?: perRepo.keys.singleOrNull() }
+            add(UndoAction(shownRepo))
+            add(RedoAction(shownRepo))
             add(Separator.getInstance())
             add(buildRowActions())
         }

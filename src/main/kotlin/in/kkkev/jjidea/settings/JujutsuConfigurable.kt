@@ -244,6 +244,14 @@ class JujutsuConfigurable(
                         maxLineLength = NARROW_COMMENT_WIDTH
                     )
             }
+            row {
+                checkBox(JujutsuBundle.message("settings.general.confirm.undo.redo"))
+                    .bindSelected(appSettings.state::confirmUndoRedo)
+                    .comment(
+                        JujutsuBundle.message("settings.general.confirm.undo.redo.comment"),
+                        maxLineLength = NARROW_COMMENT_WIDTH
+                    )
+            }
             row(JujutsuBundle.message("settings.general.default.push.scope.label")) {
                 comboBox(GitPushDialog.PushScope.entries.toList())
                     .applyToComponent {

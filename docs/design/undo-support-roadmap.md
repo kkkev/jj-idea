@@ -193,6 +193,73 @@ operations *this plugin issued*. What remains here is genuinely additional:
 - Repeated undo/redo (`jj undo`/`jj redo` chain naturally; `Jujutsu.UndoLastOperation` does
   not, since it only ever knows about one recorded operation per repo).
 
+#### Stage 2 findings (jj-idea-x30x spike; jj 0.37, 0.39, 0.44, 0.45 behave identically)
+
+**Undo/redo ops name their restore point.** Their description is
+`undo: restore to operation <full id>` / `redo: restore to operation <full id>`. From the op
+log alone (no extra subprocess) the next undo/redo is therefore derivable:
+
+- `jj undo` after a normal op undoes that op (restores its parent). After an *undo* it keeps
+  walking back: it undoes the op that undo restored *to*. After a *redo* it undoes what the redo
+  reinstated. To name an undo/redo op, follow `restore to` links to the first normal op.
+- `jj redo` after an undo restores that undo op's parent; after a redo it continues only while
+  the redo's own restore point was itself an undo; after any normal op it fails with
+  "Nothing to redo".
+- Implemented as the pure `resolveUndo`/`resolveRedo` (`jj/cli/UndoTarget.kt`) and pinned
+  against real jj by `UndoRedoContractCliTest`, which asserts the repository state after each
+  step equals the state at the operation the plan predicted - not just matching ids.
+
+**The snapshot trap (this corrects the bead's original design).** The bead proposed skipping
+snapshot ops when choosing the label. That is wrong. `jj undo` snapshots a dirty working copy
+*first*; that snapshot becomes the head, and `jj undo` then undoes *only the snapshot*. The
+user's last real operation survives. Undoing a snapshot also *removes its content from disk*:
+`jj undo` with an unsnapshotted new file deletes the file (it stays recoverable from the
+snapshot op), and a snapshot that is already the head behaves the same when undone. Because
+such content is re-snapshotted by the next jj command, clicking again never gets further. A
+head that is a snapshot does not mean the working copy is dirty *now*: IDEA writing
+`.idea/workspace.xml` into an unignored repo leaves a snapshot at the head with a clean working copy. Observed
+with: describe A, new B, edit a file, `jj undo` -> ops `snapshot working copy`, then
+`undo: restore to <B's op>`.
+
+`jj op revert <B's op>` does not escape it either: the snapshot rewrote the working-copy
+commit (B becomes B' containing the edits), so reverting "create B" finds nothing left to
+remove. With uncommitted edits, "the last operation" really is the edits, and undoing those is
+a rollback of files, not an operation undo.
+
+So a snapshot at the head is not blocked (an earlier version of this design did, wrongly - see
+below); it is a legitimate undo target and is *named as such*. `resolveUndo` returns it as a
+`Named` plan, the label reads "Undo Working-Copy Changes", and the confirmation says the files it
+recorded are removed from disk and that Redo brings them back. Verified on jj 0.37-0.45: undo the
+snapshot (files vanish), further undos walk back through the real operations, and the same number
+of redos restores everything including the files. A snapshot on top of an *undo* does end the redo
+chain (`jj redo` reports "Nothing to redo"), so only Redo reports
+`UndoRedoPlan.Reason.WORKING_COPY_CHANGED` there.
+
+**Why "removes files from disk" is not always benign.** In a repo that does not ignore `.idea`,
+the snapshot IDEA triggers on first open records `.idea/vcs.xml`. Undoing it deletes the file;
+the IDE then stops treating the project as a jj repository and this plugin - and with it the
+Redo button - switches itself off. So phase 1 asks jj what restoring would do to that file: one
+read-only `jj diff --summary` from the restore target's working copy
+(`at_operation(<target>, @)`) to now, restricted to `root-glob:"**/.idea/vcs.xml"`, so cost does
+not depend on how many files are involved. An `A` line means the file exists now and would be gone,
+and only then does a dedicated warning replace the (otherwise skipped) prompt: it names the matched
+path, cannot be silenced by "Don't ask again", and gives both recoveries - `jj redo` from a terminal
+until the file is back (restores everything exactly, so do it before the IDE writes anything new), or
+Settings > Version Control > Directories to re-map the project (quicker, but other removed files
+stay removed). Asking about the *effect* rather than "does this snapshot mention vcs.xml" matters:
+an earlier version checked the snapshot's own diff, treated a failed check as a hit, and warned on
+every snapshot. A failed check is now logged and treated as no hit. Undoing a plain snapshot (no
+`vcs.xml`) shows no prompt at all: the label names it and Redo reverses it.
+
+At click time the action takes a fresh snapshot, re-reads the log and re-resolves, so the
+confirmation names what will actually happen; the run phase re-snapshots and re-reads the log
+*immediately* before `jj undo` and refuses if the head moved since the plan (the confirmation can
+be open a long time), shrinking the race window from "as long as the dialog" to milliseconds.
+`classifyUndoRedoOutcome` then compares the head before and after to detect that remaining window
+(`SNAPSHOT_ONLY`) and reports it truthfully: those edits were removed from disk and Redo brings
+them back. A per-invocation token (as Stage 1 uses) was considered for the same attribution but is
+unnecessary: everything newer than the head recorded at click time is exactly what this click wrote.
+
 ### Stage 3 — Operation log UI (the `ROADMAP.md:10` item proper)
 
 Parse `jj op log` into an `OperationEntry` (id, description, timestamp, user, tags,

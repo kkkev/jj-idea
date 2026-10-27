@@ -176,8 +176,15 @@
 
     <!-- Stage 1 of the undo roadmap (jj-idea-v9zp): persistent "Undo <last action>" entry that
          survives a dismissed undo balloon. Presentation names the operation - see
-         UndoLastOperationAction's KDoc. -->
+         UndoLastOperationAction's KDoc. No longer in the VCS menu (Jujutsu.Undo supersedes it there);
+         still registered so it stays keymap-assignable, and the balloon's Undo link shares its code path. -->
     <action id="Jujutsu.UndoLastOperation" class="in.kkkev.jjidea.actions.undo.UndoLastOperationAction"/>
+
+    <!-- Stage 2 (jj-idea-x30x): jj undo / jj redo, naming the operation they act on. Not preview-gated.
+         Deliberately NO keyboard-shortcut: not bound to the editor's Cmd+Z (docs/design/undo-support-roadmap.md,
+         "On Cmd+Z"); assignable in Settings > Keymap. -->
+    <action id="Jujutsu.Undo" class="in.kkkev.jjidea.actions.undo.UndoAction"/>
+    <action id="Jujutsu.Redo" class="in.kkkev.jjidea.actions.undo.RedoAction"/>
 
     <!-- Stage 3 (jj-idea-aii0): the Operations tab. Preview-gated (PreviewFeature.OPERATION_LOG) -
          the action hides itself unless the feature is enabled. -->
@@ -215,7 +222,8 @@
     <group id="Jujutsu.MainMenuGroup" text="Jujutsu" class="in.kkkev.jjidea.actions.JujutsuMainMenuGroup"
            popup="true">
       <reference ref="Jujutsu.OpenLogTab"/>
-      <reference ref="Jujutsu.UndoLastOperation"/>
+      <reference ref="Jujutsu.Undo"/>
+      <reference ref="Jujutsu.Redo"/>
       <reference ref="Jujutsu.ShowOperationLog"/>
       <reference ref="Jujutsu.SetDiffBase"/>
       <reference ref="Jujutsu.ManageRemotes"/>

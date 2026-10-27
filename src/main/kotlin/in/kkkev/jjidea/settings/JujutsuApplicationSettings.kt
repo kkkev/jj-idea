@@ -39,6 +39,8 @@ data class JujutsuApplicationSettingsState(
     // jj-idea-ixju: global default for disableIgnoredFileScanning, applied to any repository
     // that doesn't set its own per-repo override (see JujutsuSettings.disableIgnoredFileScanning).
     var disableIgnoredFileScanning: Boolean = false,
+    // jj-idea-x30x: ask before Undo/Redo. The confirmation's "Don't ask again" clears it; Settings sets it again.
+    var confirmUndoRedo: Boolean = true,
     // jj-idea-z1ld: epoch millis of the first time a jj project was opened on this machine.
     // 0 means "not yet recorded"; used to gate the sponsor ask on sustained use.
     var firstRunEpochMillis: Long = 0,
