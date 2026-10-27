@@ -643,17 +643,20 @@ class JujutsuBookmarksPanel(
      * per-bookmark actions (delete/forget/rename/advance/push/track/navigate/filter), and
      * [JujutsuDataKeys.LOG_ENTRY]/[JujutsuDataKeys.LOG_ENTRIES] so the log's own registered change
      * actions (`Jujutsu.NewChange`/`EditChange`/`RebaseChangeToolbar`) work unmodified from this
-     * panel, exactly as they do from the log table.
+     * panel, exactly as they do from the log table. When the selection doesn't resolve to entries (target outside
+     * the loaded window, hidden, or not a ref row) the keys are published as explicit nulls: otherwise the data
+     * context would fall through to the enclosing log table's selection and the change actions would act on that
+     * instead of the bookmark's change (jj-idea-2cuy).
      */
     override fun uiDataSnapshot(sink: DataSink) {
         val targets = selectedBookmarkTargets()
         targets.singleOrNull()?.let { sink[JujutsuDataKeys.BOOKMARK_TARGET] = it }
         targets.takeIf { it.isNotEmpty() }?.let { sink[JujutsuDataKeys.BOOKMARK_TARGETS] = it }
 
-        selectedLogEntries()?.let { entries ->
-            entries.singleOrNull()?.let { sink[JujutsuDataKeys.LOG_ENTRY] = it }
-            sink[JujutsuDataKeys.LOG_ENTRIES] = entries
-        }
+        val entries = selectedLogEntries()
+        val single = entries?.singleOrNull()
+        if (single != null) sink[JujutsuDataKeys.LOG_ENTRY] = single else sink.setNull(JujutsuDataKeys.LOG_ENTRY)
+        if (entries != null) sink[JujutsuDataKeys.LOG_ENTRIES] = entries else sink.setNull(JujutsuDataKeys.LOG_ENTRIES)
     }
 
     /**
@@ -663,7 +666,8 @@ class JujutsuBookmarksPanel(
      * hint, matching `JujutsuLogContextMenuActions`) and read the live
      * selection [uiDataSnapshot] just published - they self-disable when [entries] is empty, with
      * no extra guard needed here. A hidden target gets none of them (jj-idea-wiz0): they write by change id, and
-     * with no entry published here the data context falls through to the log table's own selection. The fixed-target "…From These"/Duplicate factories have no such
+     * a hidden target's id would hit the visible commit sharing it. ([uiDataSnapshot] blocks the fall-through to the
+     * log table's selection regardless, jj-idea-2cuy.) The fixed-target "…From These"/Duplicate factories have no such
      * data-context enablement, so they're only added once [entries] actually resolved to
      * something to act on.
      */

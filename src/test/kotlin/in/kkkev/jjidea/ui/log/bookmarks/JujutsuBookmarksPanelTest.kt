@@ -2,6 +2,8 @@ package `in`.kkkev.jjidea.ui.log.bookmarks
 
 import com.intellij.ide.DataManager
 import com.intellij.ide.impl.HeadlessDataManager
+import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
@@ -30,6 +32,8 @@ import io.mockk.mockk
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import java.awt.BorderLayout
+import javax.swing.JPanel
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
@@ -212,6 +216,76 @@ class JujutsuBookmarksPanelTest {
                 JujutsuDataKeys.BookmarkTarget(repo, bookmark, id)
             JujutsuDataKeys.LOG_ENTRIES.getData(dataContext) shouldBe null
             JujutsuDataKeys.LOG_ENTRY.getData(dataContext) shouldBe null
+        } finally {
+            Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    // jj-idea-2cuy: unpublished keys fall through to the enclosing log panel's table selection; the panel must block it.
+
+    private class FakeLogParent(private val logSelection: LogEntry) : JPanel(BorderLayout()), UiDataProvider {
+        override fun uiDataSnapshot(sink: DataSink) {
+            sink[JujutsuDataKeys.LOG_ENTRY] = logSelection
+            sink[JujutsuDataKeys.LOG_ENTRIES] = listOf(logSelection)
+        }
+    }
+
+    private fun otherLogEntry(repo: JujutsuRepository) =
+        LogEntry(repo, ChangeId("cccccccc", "c"), CommitId("3333333333333333333333333333333333"), "c")
+
+    @Test
+    fun `uiDataSnapshot does not fall through to an enclosing log selection when a bookmark's change is unresolved`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val logSelection = otherLogEntry(repo)
+        val id = ChangeId("aaaaaaaa", "a")
+
+        val fallbackDisposable = Disposer.newDisposable()
+        val panel = JujutsuBookmarksPanel(project.get(), loadEntries = { _, _ -> emptyList() })
+        val parent = FakeLogParent(logSelection).also { it.add(panel) }
+        try {
+            HeadlessDataManager.fallbackToProductionDataManager(fallbackDisposable)
+            // Sanity: the parent's selection is visible from a sibling-less child, so the null below is meaningful.
+            JujutsuDataKeys.LOG_ENTRY.getData(DataManager.getInstance().getDataContext(parent)) shouldBe logSelection
+
+            selectLeaves(
+                panel,
+                BookmarkNode.Local(repo, BookmarkItem(Bookmark("main"), id), "main", onWorkingCopy = false)
+            )
+            panel.awaitHydration()
+
+            val dataContext = DataManager.getInstance().getDataContext(panel.tree)
+            JujutsuDataKeys.LOG_ENTRY.getData(dataContext) shouldBe null
+            JujutsuDataKeys.LOG_ENTRIES.getData(dataContext) shouldBe null
+        } finally {
+            Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `uiDataSnapshot publishes the bookmark's own entry over an enclosing log selection`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val logSelection = otherLogEntry(repo)
+        val id = ChangeId("aaaaaaaa", "a")
+        val entry = LogEntry(repo, id, CommitId("1111111111111111111111111111111111"), "a")
+
+        val fallbackDisposable = Disposer.newDisposable()
+        val panel = JujutsuBookmarksPanel(
+            project.get(),
+            entryLookup = { key -> entry.takeIf { key == ChangeKey(repo, id) } }
+        )
+        FakeLogParent(logSelection).add(panel)
+        try {
+            HeadlessDataManager.fallbackToProductionDataManager(fallbackDisposable)
+            selectLeaves(
+                panel,
+                BookmarkNode.Local(repo, BookmarkItem(Bookmark("main"), id), "main", onWorkingCopy = false)
+            )
+
+            val dataContext = DataManager.getInstance().getDataContext(panel.tree)
+            JujutsuDataKeys.LOG_ENTRY.getData(dataContext) shouldBe entry
+            JujutsuDataKeys.LOG_ENTRIES.getData(dataContext) shouldBe listOf(entry)
         } finally {
             Disposer.dispose(fallbackDisposable)
             Disposer.dispose(panel)

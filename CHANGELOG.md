@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- **Bookmarks panel change actions could act on the log's selection**: right-clicking (or using a shortcut on) a bookmark, tag or unbookmarked-head row whose change wasn't loaded in the log yet ran New Change, Edit, Rebase or Duplicate against whatever was selected in the log, such as `@`. They are now disabled until the row's change is resolved, then act on that change.
 - **File history Show Diff compared a revision with the wrong commit**: in the platform file history tab, Show Diff on a single revision compared it with the row below it. Because file history lists commits from every branch interleaved, that row is often not its parent, so a revision showed changes it never made. It now compares with the revision's real parent (the auto-merged parents for a merge). Selecting two revisions still compares those two.
 
 ## [0.9.3] - 2026-10-26
