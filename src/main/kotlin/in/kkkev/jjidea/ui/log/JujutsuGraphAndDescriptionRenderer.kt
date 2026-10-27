@@ -324,7 +324,15 @@ class JujutsuGraphAndDescriptionRenderer(
             edgeIndex(model).stubEdgeAt(row)?.let { (stubLane, stubEdge) ->
                 val stubX = laneX(stubLane, startX, laneWidth)
                 val state = stubEdge.state ?: return@let
-                drawElidedParentStub(g2d, colorForLane(stubLane), stubX, commitY, state, isHoveredEdge(stubEdge))
+                drawElidedParentStub(
+                    g2d,
+                    colorForLane(stubLane),
+                    commitX,
+                    stubX,
+                    commitY,
+                    state,
+                    isHoveredEdge(stubEdge)
+                )
             }
             drawCommitCircle(g2d, node, commitX, commitY)
         }
@@ -420,19 +428,22 @@ class JujutsuGraphAndDescriptionRenderer(
          * elision in `jj log` (jj-idea-2c8k); a faded straight line for [ParentState.NOT_LOADED]
          * - "the line continues, we just haven't drawn the rest" rather than a deliberate skip
          * (jj-idea-xi58). [stubX] is [node]'s own lane unless a mixed merge needed a free lane
-         * of its own ([GraphNode.stubLane], jj-idea-1pgy). [thickened] applies the long-edge hover
+         * of its own ([GraphNode.stubLane], jj-idea-1pgy); then a short diagonal joins the commit
+         * circle to the stub's top so it doesn't float unattached (jj-idea-rw9d, see [stubGeometry]).
+         * [thickened] applies the long-edge hover
          * stroke (jj-idea-sc8m) when this stub is the one currently hovered.
          */
         private fun drawElidedParentStub(
             g2d: Graphics2D,
             color: Color,
+            commitX: Int,
             stubX: Int,
             commitY: Int,
             state: ParentState,
             thickened: Boolean
         ) {
-            val commitRadius = COMMIT_RADIUS.get()
-            val startY = commitY + commitRadius
+            val geometry = stubGeometry(commitX, commitY, stubX, height, COMMIT_RADIUS.get())
+            val startY = geometry.stubTopY
             val originalStroke = g2d.stroke
             if (thickened) g2d.stroke = BasicStroke(EDGE_HOVER_STROKE_WIDTH.getFloat())
 
@@ -440,6 +451,7 @@ class JujutsuGraphAndDescriptionRenderer(
                 val composite = g2d.composite
                 g2d.composite = AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.4f)
                 g2d.color = color
+                geometry.connector?.let { g2d.drawLine(it.fromX, it.fromY, it.toX, it.toY) }
                 g2d.drawLine(stubX, startY, stubX, height)
                 g2d.composite = composite
                 g2d.stroke = originalStroke
@@ -459,6 +471,7 @@ class JujutsuGraphAndDescriptionRenderer(
             }
 
             g2d.color = color
+            geometry.connector?.let { g2d.drawLine(it.fromX, it.fromY, it.toX, it.toY) }
             g2d.draw(path)
             g2d.stroke = originalStroke
         }
@@ -543,4 +556,24 @@ class JujutsuGraphAndDescriptionRenderer(
         override fun getPreferredSize() =
             Dimension(table.columnModel.getColumn(column).width, ROW_HEIGHT.get())
     }
+}
+
+/** A straight line segment in cell-local pixels. */
+internal data class StubSegment(val fromX: Int, val fromY: Int, val toX: Int, val toY: Int)
+
+/**
+ * Where an unresolved-parent stub is painted: [stubTopY] is the y its vertical starts at, and
+ * [connector] the diagonal joining the commit circle to it (null when the stub shares the commit's own lane).
+ */
+internal data class StubGeometry(val connector: StubSegment?, val stubTopY: Int)
+
+/**
+ * Pure geometry for one row's unresolved-parent stub (jj-idea-rw9d). In the commit's own lane the stub simply
+ * starts below the circle. In a separate [GraphNode.stubLane] (mixed merge, jj-idea-1pgy) a diagonal runs from the
+ * circle's centre to the lane at the row's lower half, and the stub continues from there - otherwise it would float.
+ */
+internal fun stubGeometry(commitX: Int, commitY: Int, stubX: Int, rowHeight: Int, commitRadius: Int): StubGeometry {
+    if (stubX == commitX) return StubGeometry(null, commitY + commitRadius)
+    val elbowY = (commitY + rowHeight) / 2
+    return StubGeometry(StubSegment(commitX, commitY, stubX, elbowY), elbowY)
 }

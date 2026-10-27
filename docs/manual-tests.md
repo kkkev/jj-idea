@@ -251,7 +251,7 @@ Use FX-STRESS with Settings → Version Control → Jujutsu → Log Limit set to
 
 - [ ] Tree lines never cross over unrelated commits or share a lane
 - [ ] A commit whose parent is beyond the log limit (not loaded at all) shows a **faded straight line** down from its circle instead of a connector. A commit whose parent is loaded but hidden by the active filter shows a **wiggly line** instead, but only when that hidden parent has no visible ancestor at all; otherwise it is joined to its nearest visible ancestor by a full-length wavy edge (see below)
-- [ ] A merge with one loaded parent and one unresolved parent shows its real connector plus a stub in its own lane. Clearing the filter restores the graph immediately, without a manual Refresh
+- [ ] A merge with one loaded parent and one unresolved parent shows its real connector plus a stub in its own lane, joined to the commit circle by a short diagonal (faded when not loaded, wiggly when hidden). Clearing the filter restores the graph immediately, without a manual Refresh
 
 #### Elided edges in a filtered log (GitHub #131)
 

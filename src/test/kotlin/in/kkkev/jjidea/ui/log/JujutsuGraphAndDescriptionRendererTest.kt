@@ -15,7 +15,8 @@ import org.junit.jupiter.api.Test
  * parent key alongside the state to record the stub as a navigable edge. The actual paint routine
  * (a [java.awt.geom.Path2D] wave / faded line, [JujutsuGraphAndDescriptionRenderer]) is not
  * covered here - same limitation the design doc already notes for this renderer's other paint
- * code, since it needs a real [java.awt.Graphics2D].
+ * code, since it needs a real [java.awt.Graphics2D]. The stub's connector geometry (jj-idea-rw9d) is pure and
+ * covered by [stubGeometry] tests below; it is independent of [ParentState], so they cover both variants.
  */
 class JujutsuGraphAndDescriptionRendererTest {
     private val repo = mockk<JujutsuRepository>()
@@ -66,5 +67,24 @@ class JujutsuGraphAndDescriptionRendererTest {
                 )
             )
         ) shouldBe (parentKey("b") to ParentState.NOT_LOADED)
+    }
+
+    @Test
+    fun `stub in the commit's own lane has no connector`() {
+        stubGeometry(commitX = 20, commitY = 11, stubX = 20, rowHeight = 22, commitRadius = 4) shouldBe
+            StubGeometry(null, 15)
+    }
+
+    @Test
+    fun `stub in a separate lane is joined to the commit circle`() {
+        val geometry = stubGeometry(commitX = 20, commitY = 11, stubX = 36, rowHeight = 22, commitRadius = 4)
+        geometry.connector shouldBe StubSegment(20, 11, 36, geometry.stubTopY)
+        (geometry.stubTopY > 11 && geometry.stubTopY < 22) shouldBe true
+    }
+
+    @Test
+    fun `stub in a lane left of the commit is joined to the commit circle`() {
+        val geometry = stubGeometry(commitX = 36, commitY = 11, stubX = 20, rowHeight = 22, commitRadius = 4)
+        geometry.connector shouldBe StubSegment(36, 11, 20, geometry.stubTopY)
     }
 }
