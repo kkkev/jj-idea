@@ -552,7 +552,7 @@ the floor — a platform-API shape change (e.g. a Java interface becoming Kotlin
 `compileKotlin`/`compileTestKotlin` without tripping it. **`scripts/pre-push.sh` runs both**:
 `./gradlew check verifyPlugin`, then main and test compilation against 2025.1 and 2025.2 (into
 separate `build-compat-*/` directories). It does not run tests on the older platforms; CI's
-compat matrix does. Run it, or `jj ship`, before every push to `master`.
+compat matrix does. Run it (`jj verify`, in the background) before every push to `master`.
 
 ## Performance & Scale
 
@@ -640,9 +640,21 @@ Two remotes: `origin` (primary, GitLab) and `github` (public). GitHub Actions
 automatically creates tags and advances `master` on `github` in the background, so
 always fetch from it before pushing.
 
-Standard push sequence (`jj ship` runs the gate and pushes `master`; one-time setup:
-`jj config set --repo aliases.ship '["util", "exec", "--", "scripts/ship.sh"]'`):
-0. `scripts/pre-push.sh` — the local gate (see Platform API compatibility); `jj ship` does this.
+Standard push sequence. The pre-push gate (`scripts/pre-push.sh`, ~10–15 min) runs
+**ahead of time and in the background** so it doesn't hold up the push:
+- `jj verify [REV]` runs the gate on REV's content (default `@`, or `@-` if `@` is empty) in a
+  separate `<repo>-verify` workspace, created on first use, and raises a notification when it
+  finishes. It records a pass/fail stamp keyed by the tree, so re-describing or rebasing
+  without changing files keeps it valid. Use `--wait` to run in the foreground.
+- `jj ship` pushes `master` to `github` and `origin`, but only if `master`'s tree has a pass
+  stamp, which makes it instant. Otherwise it refuses: run `jj verify master`, or `jj ship --now`
+  to run the gate synchronously first. Extra arguments (e.g. `--dry-run`) go to `jj git push`.
+- One-time setup per clone:
+  `jj config set --repo aliases.ship '["util", "exec", "--", "scripts/ship.sh"]'` and
+  `jj config set --repo aliases.verify '["util", "exec", "--", "scripts/verify.sh"]'`.
+
+Manual equivalent:
+0. `scripts/pre-push.sh` — the gate itself.
 1. `bd export -o .beads/issues.jsonl` — jj bypasses git hooks, so beads must be exported
    manually before pushing.
 2. `jj git push --remote origin`

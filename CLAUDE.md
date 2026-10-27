@@ -28,12 +28,14 @@ rules that supplement it.
   checklist items in place rather than appending a new subsection per bead — see
   contributing.md § Keeping `docs/manual-tests.md` small.
 - Follow contributing.md's End of Task Checklist before declaring work done.
-- **When the user says "finish"**, run in order: `scripts/pre-push.sh` → update `CHANGELOG.md`
+- **When the user says "finish"**, run in order: update `CHANGELOG.md`
   (add a user-facing entry under `[Unreleased]`) → if this finish is cutting a GitHub
   Release, add a short sponsor line to the release body → `jj describe` (write a commit
   message for the working-copy change) → `bd export -o .beads/issues.jsonl` →
-  `jj bookmark set master` → then stop and ask for permission before pushing (`jj ship` re-runs the gate and pushes
-  both remotes; never `jj git push` directly).
+  `jj bookmark set master` → `jj verify master --wait` (the pre-push gate; instant if `jj verify`
+  already passed for this tree, ignoring `.beads/`) → then stop and ask for permission before
+  pushing (`jj ship` pushes both remotes only if `master`'s tree passed the gate; never
+  `jj git push` directly).
 - **Before pushing a stack of multiple new commits (not just the tip), verify CI health on
   GitHub for each one that was already pushed independently, not just the final state.**
   `scripts/pre-push.sh` passing once at the end of a session does not prove every commit in
