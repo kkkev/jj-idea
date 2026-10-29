@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Copy Bookmark Name / Copy Tag Name / Copy Folder Path**: right-click a bookmark or tag chip (in the log, the "+N more" popup or the details panel), or a row in the Bookmarks panel, to copy its name to the clipboard. On a remote bookmark it copies the full `name@remote`; on a `/`-grouped folder in the Bookmarks panel it copies the folder path. In the Bookmarks panel, Cmd/Ctrl+C also copies the selected rows' names, one per line.
+
 ### Fixed
 - **Log graph: unloaded-parent line floated free of its merge commit**: when a merge commit had one parent on screen and another not loaded yet (or hidden by a filter), the faint line for the missing parent sat in its own column with nothing joining it to the commit's dot. A short diagonal now connects them.
 - **Bookmarks panel change actions could act on the log's selection**: right-clicking (or using a shortcut on) a bookmark, tag or unbookmarked-head row whose change wasn't loaded in the log yet ran New Change, Edit, Rebase or Duplicate against whatever was selected in the log, such as `@`. They are now disabled until the row's change is resolved, then act on that change.

@@ -103,6 +103,18 @@ class ClickActionGroupDefaultActionTest {
         children.first().shouldBeInstanceOfDefaultClickAction()
     }
 
+    private fun copyNameTexts(target: LogClickTarget) =
+        JujutsuLogContextMenuActions.clickActionGroup(project, target).nonSeparatorChildren()
+            .mapNotNull { it.templateText }
+            .filter { it.startsWith("Copy ") }
+
+    @Test
+    fun `local bookmark, remote bookmark and tag chip menus offer Copy Bookmark Name or Copy Tag Name`() {
+        copyNameTexts(BookmarkClick(entry(), Bookmark("main"))) shouldBe listOf("Copy Bookmark Name")
+        copyNameTexts(BookmarkClick(entry(), Bookmark("main@origin"))) shouldBe listOf("Copy Bookmark Name")
+        copyNameTexts(TagClick(entry(), Tag("v1"))) shouldBe listOf("Copy Tag Name")
+    }
+
     private fun Any.shouldBeInstanceOfDefaultClickAction() {
         (this is DefaultClickAction) shouldBe true
     }

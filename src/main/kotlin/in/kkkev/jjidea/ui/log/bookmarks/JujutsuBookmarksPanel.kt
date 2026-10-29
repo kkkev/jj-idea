@@ -3,18 +3,24 @@ package `in`.kkkev.jjidea.ui.log.bookmarks
 import com.intellij.icons.AllIcons
 import com.intellij.ide.ActivityTracker
 import com.intellij.ide.BrowserUtil
+import com.intellij.ide.CopyProvider
 import com.intellij.ide.DefaultTreeExpander
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.ActionGroup
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.ActionToolbar
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.DataSink
 import com.intellij.openapi.actionSystem.DefaultActionGroup
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.Separator
 import com.intellij.openapi.actionSystem.UiDataProvider
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vcs.IssueNavigationConfiguration
 import com.intellij.ui.*
@@ -25,9 +31,11 @@ import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.JujutsuDataKeys
 import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.RefNameKind
 import `in`.kkkev.jjidea.actions.bookmark.*
 import `in`.kkkev.jjidea.actions.change.duplicateChangeAction
 import `in`.kkkev.jjidea.actions.change.newChangeFromAction
+import `in`.kkkev.jjidea.actions.copyRefNameAction
 import `in`.kkkev.jjidea.actions.invokeEnterBoundAction
 import `in`.kkkev.jjidea.actions.tag.deleteTagAction
 import `in`.kkkev.jjidea.actions.tag.pushTagAction
@@ -53,6 +61,7 @@ import `in`.kkkev.jjidea.util.runLater
 import java.awt.BorderLayout
 import java.awt.Component
 import java.awt.Cursor
+import java.awt.datatransfer.StringSelection
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.net.URI
@@ -500,6 +509,37 @@ class JujutsuBookmarksPanel(
         }
     }
 
+    /** Text a node contributes to Cmd/Ctrl+C: its ref name or folder path; `null` for group nodes. */
+    private fun BookmarkNode.copyText(): String? = when (this) {
+        is BookmarkNode.Local -> item.bookmark.name.name
+        is BookmarkNode.Remote -> item.bookmark.name.name
+        is BookmarkNode.Tag -> item.tag.name
+        is BookmarkNode.Prefix -> fullPath.trimEnd('/')
+        else -> null
+    }
+
+    /**
+     * The menu's copy entry, showing the platform Copy shortcut: Cmd/Ctrl+C is bound to `$Copy`, which reaches
+     * [copyProvider] via [uiDataSnapshot], not to this entry, so the menu would otherwise not advertise it.
+     */
+    private fun copyNameAction(name: String?, kind: RefNameKind) = copyRefNameAction(name, kind).apply {
+        copyShortcutFrom(ActionManager.getInstance().getAction(IdeActions.ACTION_COPY))
+    }
+
+    /** Cmd/Ctrl+C on the tree copies the selected names, one per line. */
+    private val copyProvider = object : CopyProvider {
+        override fun getActionUpdateThread() = ActionUpdateThread.EDT
+
+        override fun isCopyEnabled(dataContext: DataContext) = selectedLeaves().any { it.copyText() != null }
+
+        override fun isCopyVisible(dataContext: DataContext) = true
+
+        override fun performCopy(dataContext: DataContext) {
+            val text = selectedLeaves().mapNotNull { it.copyText() }.joinToString("\n")
+            if (text.isNotEmpty()) CopyPasteManager.getInstance().setContents(StringSelection(text))
+        }
+    }
+
     /** The selected tree paths' [BookmarkNode] leaves — the only kinds a selection can meaningfully act on. */
     private fun selectedLeaves(): List<BookmarkNode> =
         tree.selectionPaths
@@ -653,6 +693,8 @@ class JujutsuBookmarksPanel(
         targets.singleOrNull()?.let { sink[JujutsuDataKeys.BOOKMARK_TARGET] = it }
         targets.takeIf { it.isNotEmpty() }?.let { sink[JujutsuDataKeys.BOOKMARK_TARGETS] = it }
 
+        sink[PlatformDataKeys.COPY_PROVIDER] = copyProvider
+
         val entries = selectedLogEntries()
         val single = entries?.singleOrNull()
         if (single != null) sink[JujutsuDataKeys.LOG_ENTRY] = single else sink.setNull(JujutsuDataKeys.LOG_ENTRY)
@@ -686,6 +728,8 @@ class JujutsuBookmarksPanel(
             val entries = selectedLogEntries().orEmpty()
             BackgroundActionGroup(
                 *buildList {
+                    add(copyNameAction(node.item.bookmark.name.name, RefNameKind.BOOKMARK))
+                    add(Separator.create())
                     if (!node.onWorkingCopy) add(moveBookmarkToChangeAction(node.repo, node.item.bookmark))
                     ManagedActions["Jujutsu.Bookmark.Advance"]?.let { add(it) }
                     ManagedActions["Jujutsu.Bookmark.Rename"]?.let { add(it) }
@@ -710,6 +754,8 @@ class JujutsuBookmarksPanel(
             val entries = selectedLogEntries().orEmpty()
             BackgroundActionGroup(
                 *buildList {
+                    add(copyNameAction(node.item.bookmark.name.name, RefNameKind.BOOKMARK))
+                    add(Separator.create())
                     ManagedActions["Jujutsu.Bookmark.ToggleTrack"]?.let { add(it) }
                     add(Separator.create())
                     ManagedActions["Jujutsu.Bookmark.Filter"]?.let { add(it) }
@@ -723,6 +769,8 @@ class JujutsuBookmarksPanel(
             val entries = selectedLogEntries().orEmpty()
             BackgroundActionGroup(
                 *buildList {
+                    add(copyNameAction(node.item.tag.name, RefNameKind.TAG))
+                    add(Separator.create())
                     add(pushTagAction(node.repo, node.item.tag))
                     add(deleteTagAction(node.repo, node.item.tag))
                     add(Separator.create())
@@ -759,7 +807,9 @@ class JujutsuBookmarksPanel(
             )
         }
 
-        is BookmarkNode.RepoGroup, is BookmarkNode.Category, is BookmarkNode.Prefix -> null
+        is BookmarkNode.Prefix -> BackgroundActionGroup(copyNameAction(node.copyText(), RefNameKind.FOLDER))
+
+        is BookmarkNode.RepoGroup, is BookmarkNode.Category -> null
     }
 
     override fun dispose() {

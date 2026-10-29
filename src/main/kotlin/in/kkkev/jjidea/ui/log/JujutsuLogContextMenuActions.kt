@@ -11,10 +11,12 @@ import com.intellij.vcs.log.VcsUser
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
 import `in`.kkkev.jjidea.actions.ManagedActions
+import `in`.kkkev.jjidea.actions.RefNameKind
 import `in`.kkkev.jjidea.actions.add
 import `in`.kkkev.jjidea.actions.addPopup
 import `in`.kkkev.jjidea.actions.bookmark.*
 import `in`.kkkev.jjidea.actions.change.*
+import `in`.kkkev.jjidea.actions.copyRefNameAction
 import `in`.kkkev.jjidea.actions.git.gitFetchAction
 import `in`.kkkev.jjidea.actions.git.gitPushAction
 import `in`.kkkev.jjidea.actions.git.openInRemoteGroup
@@ -179,6 +181,7 @@ object JujutsuLogContextMenuActions {
                 is BookmarkClick -> {
                     val name = target.bookmark.name.name
                     add(FilterToReferenceAction(project, name))
+                    add(copyRefNameAction(name, RefNameKind.BOOKMARK))
                     addSeparator()
                     val bookmark = target.bookmark
                     val actions = if (bookmark.isRemote) {
@@ -196,6 +199,7 @@ object JujutsuLogContextMenuActions {
 
                 is TagClick -> {
                     add(FilterToReferenceAction(project, target.tag.name))
+                    add(copyRefNameAction(target.tag.name, RefNameKind.TAG))
                     addSeparator()
                     add(pushTagAction(target.repo, target.tag))
                     add(deleteTagAction(target.repo, target.tag))

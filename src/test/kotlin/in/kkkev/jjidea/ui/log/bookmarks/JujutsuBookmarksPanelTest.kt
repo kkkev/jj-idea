@@ -2,8 +2,12 @@ package `in`.kkkev.jjidea.ui.log.bookmarks
 
 import com.intellij.ide.DataManager
 import com.intellij.ide.impl.HeadlessDataManager
+import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.openapi.actionSystem.DataSink
+import com.intellij.openapi.actionSystem.IdeActions
+import com.intellij.openapi.actionSystem.PlatformDataKeys
 import com.intellij.openapi.actionSystem.UiDataProvider
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.junit5.RunInEdt
 import com.intellij.testFramework.junit5.TestApplication
@@ -20,6 +24,7 @@ import `in`.kkkev.jjidea.jj.ChangeKey
 import `in`.kkkev.jjidea.jj.CommitId
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.LogEntry
+import `in`.kkkev.jjidea.jj.TagItem
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.settings.JujutsuSettings
 import `in`.kkkev.jjidea.util.drainBackgroundLoads
@@ -33,10 +38,12 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import java.awt.BorderLayout
+import java.awt.datatransfer.DataFlavor
 import javax.swing.JPanel
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
+import `in`.kkkev.jjidea.jj.Tag as JjTag
 
 /**
  * Platform-wiring tests for [JujutsuBookmarksPanel] (jj-idea-b2ae): construction on a repo-less
@@ -303,6 +310,70 @@ class JujutsuBookmarksPanelTest {
 
     private fun locals(repo: JujutsuRepository, ids: List<ChangeId>) = ids.mapIndexed { i, id ->
         BookmarkNode.Local(repo, BookmarkItem(Bookmark("b$i"), id), "b$i", onWorkingCopy = false)
+    }
+
+    @Test
+    fun `Cmd+C copies the selected leaf names one per line`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val id = ChangeId("aaaaaaaa", "a")
+        val fallbackDisposable = Disposer.newDisposable()
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            HeadlessDataManager.fallbackToProductionDataManager(fallbackDisposable)
+            selectLeaves(
+                panel,
+                BookmarkNode.Local(repo, BookmarkItem(Bookmark("main"), id), "main", onWorkingCopy = false),
+                BookmarkNode.Tag(repo, TagItem(JjTag("v1"), id), "v1")
+            )
+            val dataContext = DataManager.getInstance().getDataContext(panel.tree)
+            val provider = PlatformDataKeys.COPY_PROVIDER.getData(dataContext)!!
+
+            provider.isCopyEnabled(dataContext) shouldBe true
+            provider.performCopy(dataContext)
+
+            CopyPasteManager.getInstance().getContents<String>(DataFlavor.stringFlavor) shouldBe "main\nv1"
+        } finally {
+            Disposer.dispose(fallbackDisposable)
+            Disposer.dispose(panel)
+        }
+    }
+
+    @Test
+    fun `leaf and folder nodes offer Copy Name but group nodes do not`() {
+        val repo = mockk<JujutsuRepository> { every { displayName } returns "repo" }
+        val id = ChangeId("aaaaaaaa", "a")
+        val panel = JujutsuBookmarksPanel(project.get())
+        try {
+            fun copyTexts(node: BookmarkNode) = panel.actionGroupFor(node)?.getChildren(null)
+                ?.mapNotNull { it.templateText }?.filter { it.startsWith("Copy ") }
+
+            copyTexts(
+                BookmarkNode.Local(repo, BookmarkItem(Bookmark("main"), id), "main", onWorkingCopy = false)
+            ) shouldBe
+                listOf("Copy Bookmark Name")
+            copyTexts(BookmarkNode.Remote(repo, BookmarkItem(Bookmark("main@origin"), id), "main@origin")) shouldBe
+                listOf("Copy Bookmark Name")
+            copyTexts(BookmarkNode.Tag(repo, TagItem(JjTag("v1"), id), "v1")) shouldBe listOf("Copy Tag Name")
+            copyTexts(
+                BookmarkNode.Prefix(
+                    repo,
+                    "ui",
+                    RefKind.BOOKMARK,
+                    emptyList(),
+                    groupLabel = "Local",
+                    fullPath = "feature/ui"
+                )
+            ) shouldBe listOf("Copy Folder Path")
+            // Cmd/Ctrl+C is bound to the platform Copy action, so the menu entry must advertise that shortcut.
+            val copyShortcuts = ActionManager.getInstance().getAction(IdeActions.ACTION_COPY).shortcutSet.shortcuts
+            copyShortcuts.isNotEmpty() shouldBe true
+            panel.actionGroupFor(BookmarkNode.Tag(repo, TagItem(JjTag("v1"), id), "v1"))!!.getChildren(null)
+                .first { it.templateText == "Copy Tag Name" }.shortcutSet.shortcuts.toList() shouldBe
+                copyShortcuts.toList()
+            panel.actionGroupFor(BookmarkNode.Category(repo, "Local", RefKind.BOOKMARK, emptyList())) shouldBe null
+        } finally {
+            Disposer.dispose(panel)
+        }
     }
 
     @Test
