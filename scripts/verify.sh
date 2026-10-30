@@ -6,7 +6,9 @@
 #
 #   jj config set --repo aliases.verify '["util", "exec", "--", "scripts/verify.sh"]'
 #
-# The gate runs in $JJ_VERIFY_DIR (default: ../<repo>-verify), created on first use. It never
+# The gate runs in $JJ_VERIFY_DIR (default: ../<this checkout>-verify), created on first use, as a
+# jj workspace named verify-<this workspace's name> (e.g. verify-lane2). Workspace names are
+# shared by every checkout of the repo, so each lane needs its own verify workspace name. It never
 # holds your edits, only a copy of REV, so it is safe to keep warm between runs. Don't start
 # its first run at the same moment as the first Gradle build in another workspace: both
 # initialise the shared IntelliJ platform layout index and can truncate it.
@@ -38,11 +40,14 @@ esac
 
 VERIFY_DIR=${JJ_VERIFY_DIR:-"$(cd .. && pwd)/$(basename "$PWD")-verify"}
 COMMIT=$(jj log -r "$REV" --no-graph -T commit_id)
+# Workspace names are repo-global, so derive one from this lane's own workspace name.
+LANE=$(jj log -r @ --no-graph -T 'working_copies' | awk '{print $1}' | sed 's/@$//')
+VERIFY_NAME="verify-${LANE:-$(basename "$PWD")}"
 
 run_gate() {
     echo "$$ $(date +%s)" > "$STAMP_DIR/$TREE.running"
     if [ ! -d "$VERIFY_DIR" ]; then
-        jj workspace add --name verify "$VERIFY_DIR"
+        jj workspace add --name "$VERIFY_NAME" "$VERIFY_DIR"
     fi
     cd "$VERIFY_DIR"
     # This workspace only ever holds a throwaway copy of REV, so there are no edits for
@@ -74,7 +79,7 @@ if $WAIT; then
     exit "${PIPESTATUS[0]}"
 fi
 # Background: a new session so it outlives this shell. The subshell re-enters run_gate.
-nohup bash -c "$(declare -f run_gate); STAMP_DIR='$STAMP_DIR' TREE='$TREE' COMMIT='$COMMIT' VERIFY_DIR='$VERIFY_DIR' run_gate" \
+nohup bash -c "$(declare -f run_gate); STAMP_DIR='$STAMP_DIR' TREE='$TREE' COMMIT='$COMMIT' VERIFY_DIR='$VERIFY_DIR' VERIFY_NAME='$VERIFY_NAME' run_gate" \
     > "$LOG" 2>&1 < /dev/null &
 disown
 echo "Verifying tree ${TREE:0:12} in the background (workspace: $VERIFY_DIR)."

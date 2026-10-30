@@ -643,7 +643,8 @@ always fetch from it before pushing.
 Standard push sequence. The pre-push gate (`scripts/pre-push.sh`, ~10–15 min) runs
 **ahead of time and in the background** so it doesn't hold up the push:
 - `jj verify [REV]` runs the gate on REV's content (default `@`, or `@-` if `@` is empty) in a
-  separate `<repo>-verify` workspace, created on first use, and raises a notification when it
+  separate lane-specific workspace (`verify-<lane>`, e.g. `verify-lane2`, in `<checkout>-verify`),
+  created on first use, and raises a notification when it
   finishes. It records a pass/fail stamp keyed by the tree, so re-describing or rebasing
   without changing files keeps it valid. Use `--wait` to run in the foreground.
 - `jj ship` pushes `master` to `github` and `origin`, but only if `master`'s tree has a pass
