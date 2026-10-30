@@ -5,6 +5,7 @@ import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.Separator
 import `in`.kkkev.jjidea.actions.BackgroundActionGroup
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.BookmarkGroup
 import `in`.kkkev.jjidea.jj.BookmarkItem
 import `in`.kkkev.jjidea.jj.ClosestBookmarks
@@ -51,7 +52,8 @@ fun bookmarkActionGroup(
         val items: List<AnAction> = repos.map { repo ->
             val repoGroups = bookmarksByRepo[repo].orEmpty().map { it.bookmark }.grouped()
             val wcEntry = wcEntries.firstOrNull { it.repo == repo }
-            DefaultActionGroup(repo.displayName, true).apply {
+            DefaultActionGroup(null as String?, true).apply {
+                templatePresentation.setPlainText(repo.displayName)
                 templatePresentation.icon = RepositoryIcons[repo]
                 repoActionGroup(repo, wcEntry, repoGroups, wcBookmarkNames, repoByBookmark, closestByRepo[repo])
                     .forEach(::add)
@@ -84,7 +86,8 @@ private fun repoActionGroup(
 }
 
 private fun bookmarkSubGroup(group: BookmarkGroup, repo: JujutsuRepository, onWc: Boolean) =
-    DefaultActionGroup(group.localName, true).apply {
+    DefaultActionGroup(null as String?, true).apply {
+        templatePresentation.setPlainText(group.localName)
         group.local?.let { local ->
             localBookmarkActions(
                 repo,

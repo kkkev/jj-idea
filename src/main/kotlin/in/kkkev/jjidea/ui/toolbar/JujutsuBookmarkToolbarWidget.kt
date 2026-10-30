@@ -9,6 +9,7 @@ import com.intellij.openapi.wm.impl.ExpandableComboAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkActionGroup
 import `in`.kkkev.jjidea.actions.bookmark.bookmarkWidgetText
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.stateModel
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
 import `in`.kkkev.jjidea.vcs.isJujutsu
@@ -61,7 +62,7 @@ class JujutsuBookmarkToolbarWidget : ExpandableComboAction(), DumbAware {
 
         e.presentation.isEnabledAndVisible = true
         e.presentation.icon = JujutsuIcons.Bookmark
-        e.presentation.text = text
+        e.presentation.setPlainText(text)
     }
 
     override fun createPopup(event: AnActionEvent): JBPopup? {

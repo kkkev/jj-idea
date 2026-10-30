@@ -15,6 +15,11 @@ abstract class EmptyAndDumbAwareAction<T : Any>(val target: List<T>, messageKey:
     JujutsuBundle.message("$messageKey.tooltip"),
     icon
 ) {
+    init {
+        // The target's name is user-supplied; keep '_'/'&' from being parsed as mnemonics (GitHub #156)
+        templatePresentation.setPlainText(JujutsuBundle.message(messageKey, *(target as List<Any>).toTypedArray()))
+    }
+
     override fun update(e: AnActionEvent) {
         e.presentation.isEnabled = !target.isEmpty()
     }
@@ -66,8 +71,9 @@ abstract class NullAwareAction<T : Any>(
 
     private fun storeTarget(e: AnActionEvent): T? {
         target = extractTarget(e)
-        templatePresentation.text = target?.let { JujutsuBundle.message(messageKey, it) }
-            ?: JujutsuBundle.message("$messageKey.tooltip")
+        templatePresentation.setPlainText(
+            target?.let { JujutsuBundle.message(messageKey, it) } ?: JujutsuBundle.message("$messageKey.tooltip")
+        )
         return target
     }
 

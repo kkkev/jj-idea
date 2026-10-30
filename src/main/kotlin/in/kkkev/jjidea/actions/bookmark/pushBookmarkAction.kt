@@ -13,6 +13,7 @@ import `in`.kkkev.jjidea.actions.git.GitPushDialog
 import `in`.kkkev.jjidea.actions.git.applyRemoteVisibility
 import `in`.kkkev.jjidea.actions.git.checkAndPush
 import `in`.kkkev.jjidea.actions.git.noRemoteNotification
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.Remote
@@ -172,11 +173,13 @@ private fun pushAllRemotesAction(
     override fun update(e: AnActionEvent) {
         val anyEnabled = perRemote.any { (_, remoteBookmark) -> pushAvailability(bookmark, remoteBookmark).enabled }
         e.presentation.isEnabled = anyEnabled
-        e.presentation.text = if (anyEnabled) {
-            JujutsuBundle.message("action.bookmark.push.all", bookmark.name)
-        } else {
-            JujutsuBundle.message("action.bookmark.push.all.disabled.upToDate", bookmark.name)
-        }
+        e.presentation.setPlainText(
+            if (anyEnabled) {
+                JujutsuBundle.message("action.bookmark.push.all", bookmark.name)
+            } else {
+                JujutsuBundle.message("action.bookmark.push.all.disabled.upToDate", bookmark.name)
+            }
+        )
     }
 
     override fun actionPerformed(e: AnActionEvent) = performPushToAllRemotes(repo, bookmark, perRemote)
@@ -200,17 +203,19 @@ class PushBookmarkToAllRemotesAction : DumbAwareAction(
         val target = e.bookmarkTarget
         if (target == null) {
             e.presentation.isEnabled = false
-            e.presentation.text = JujutsuBundle.message("action.bookmark.push.all.generic")
+            e.presentation.setPlainText(JujutsuBundle.message("action.bookmark.push.all.generic"))
             return
         }
         val anyEnabled = perRemoteBookmarks(target.repo, target.bookmark)
             .any { (_, remoteBookmark) -> pushAvailability(target.bookmark, remoteBookmark).enabled }
         e.presentation.isEnabled = anyEnabled
-        e.presentation.text = if (anyEnabled) {
-            JujutsuBundle.message("action.bookmark.push.all", target.bookmark.name)
-        } else {
-            JujutsuBundle.message("action.bookmark.push.all.disabled.upToDate", target.bookmark.name)
-        }
+        e.presentation.setPlainText(
+            if (anyEnabled) {
+                JujutsuBundle.message("action.bookmark.push.all", target.bookmark.name)
+            } else {
+                JujutsuBundle.message("action.bookmark.push.all.disabled.upToDate", target.bookmark.name)
+            }
+        )
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -236,12 +241,14 @@ private fun pushToRemoteAction(
         e.presentation.isEnabled = availability.enabled
         // A disabled item's tooltip can go unseen in a menu, so the reason is also appended to
         // the visible text - same pattern as advanceBookmarkAction.
-        e.presentation.text = when (availability) {
-            PushAvailability.UP_TO_DATE ->
-                JujutsuBundle.message("action.bookmark.push.to.disabled.upToDate", bookmark.name, remote.name)
+        e.presentation.setPlainText(
+            when (availability) {
+                PushAvailability.UP_TO_DATE ->
+                    JujutsuBundle.message("action.bookmark.push.to.disabled.upToDate", bookmark.name, remote.name)
 
-            PushAvailability.ENABLED -> JujutsuBundle.message("action.bookmark.push.to", bookmark.name, remote.name)
-        }
+                PushAvailability.ENABLED -> JujutsuBundle.message("action.bookmark.push.to", bookmark.name, remote.name)
+            }
+        )
     }
 
     override fun actionPerformed(e: AnActionEvent) = openPushDialogFor(repo, bookmark, remote)

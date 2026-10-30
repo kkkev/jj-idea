@@ -4,6 +4,7 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.ListActionGroup
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.stateModel
 
 /**
@@ -65,6 +66,10 @@ class JujutsuAuthorFilterComponent(private val tableModel: JujutsuLogTableModel,
     }
 
     private inner class ToggleAuthorAction(private val author: String) : ToggleAction(author) {
+        init {
+            templatePresentation.setPlainText(author)
+        }
+
         override fun isSelected(e: AnActionEvent): Boolean = selectedAuthors.contains(author)
 
         override fun setSelected(e: AnActionEvent, state: Boolean) {

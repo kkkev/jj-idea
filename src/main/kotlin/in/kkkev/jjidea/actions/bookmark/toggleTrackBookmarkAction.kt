@@ -6,6 +6,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmarkTarget
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.createCommand
@@ -53,11 +54,13 @@ class ToggleTrackBookmarkAction : DumbAwareAction(
         e.presentation.isEnabled = bookmark != null
         val untracked = bookmark?.tracked == false
         e.presentation.icon = if (untracked) JujutsuIcons.BookmarkTrackedAction else JujutsuIcons.BookmarkAction
-        e.presentation.text = when {
-            bookmark == null -> JujutsuBundle.message("action.bookmark.toggletrack.generic")
-            bookmark.tracked -> JujutsuBundle.message("action.bookmark.untrack", bookmark.name)
-            else -> JujutsuBundle.message("action.bookmark.track", bookmark.name)
-        }
+        e.presentation.setPlainText(
+            when {
+                bookmark == null -> JujutsuBundle.message("action.bookmark.toggletrack.generic")
+                bookmark.tracked -> JujutsuBundle.message("action.bookmark.untrack", bookmark.name)
+                else -> JujutsuBundle.message("action.bookmark.track", bookmark.name)
+            }
+        )
         e.presentation.description = when {
             bookmark == null -> null
             bookmark.tracked -> JujutsuBundle.message("action.bookmark.untrack.tooltip", bookmark.name)

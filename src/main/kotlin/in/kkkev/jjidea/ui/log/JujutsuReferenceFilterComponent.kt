@@ -15,6 +15,7 @@ import com.intellij.ui.RowIcon
 import com.intellij.util.ui.EmptyIcon
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.ListActionGroup
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.common.JujutsuColors
 import `in`.kkkev.jjidea.ui.common.JujutsuIcons
@@ -277,6 +278,7 @@ class JujutsuReferenceFilterComponent(
         val ref get() = SelectedRef(reference, type)
 
         init {
+            templatePresentation.setPlainText(reference)
             // Single-select: clicking an entry should apply it and close the popup immediately,
             // not keep it open the way multi-select toggles (e.g. JujutsuRootFilterComponent) do.
             templatePresentation.keepPopupOnPerform = KeepPopupOnPerform.Never

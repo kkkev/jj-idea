@@ -9,6 +9,7 @@ import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmarkTarget
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.*
 import `in`.kkkev.jjidea.ui.services.JujutsuNotifications
 
@@ -42,24 +43,26 @@ internal fun applySingleAdvancePresentation(presentation: Presentation, repo: Ju
     // A disabled menu item's tooltip is easy to miss (some platforms/menu styles never show it),
     // so the reason is also appended to the visible text itself — same pattern as
     // action.resolve.conflicts.needsEdit.
-    presentation.text = when (availability) {
-        SingleAdvanceAvailability.UNSUPPORTED_VERSION -> JujutsuBundle.message(
-            "action.bookmark.advance.disabled.version",
-            bookmark.name,
-            JjFeature.BOOKMARK_ADVANCE.minVersion
-        )
+    presentation.setPlainText(
+        when (availability) {
+            SingleAdvanceAvailability.UNSUPPORTED_VERSION -> JujutsuBundle.message(
+                "action.bookmark.advance.disabled.version",
+                bookmark.name,
+                JjFeature.BOOKMARK_ADVANCE.minVersion
+            )
 
-        SingleAdvanceAvailability.NOT_APPLICABLE -> {
-            val key = if (bookmark.deleted) {
-                "action.bookmark.advance.disabled.deleted"
-            } else {
-                "action.bookmark.advance.disabled.remote"
+            SingleAdvanceAvailability.NOT_APPLICABLE -> {
+                val key = if (bookmark.deleted) {
+                    "action.bookmark.advance.disabled.deleted"
+                } else {
+                    "action.bookmark.advance.disabled.remote"
+                }
+                JujutsuBundle.message(key, bookmark.name)
             }
-            JujutsuBundle.message(key, bookmark.name)
-        }
 
-        SingleAdvanceAvailability.ENABLED -> JujutsuBundle.message("action.bookmark.advance", bookmark.name)
-    }
+            SingleAdvanceAvailability.ENABLED -> JujutsuBundle.message("action.bookmark.advance", bookmark.name)
+        }
+    )
     presentation.description = when (availability) {
         SingleAdvanceAvailability.UNSUPPORTED_VERSION ->
             JjFeature.BOOKMARK_ADVANCE.disabledReasonIn(repo.project)
@@ -104,7 +107,7 @@ class AdvanceBookmarkAction : DumbAwareAction(
         val target = e.bookmarkTarget
         if (target == null) {
             e.presentation.isEnabled = false
-            e.presentation.text = JujutsuBundle.message("action.bookmark.advance.generic")
+            e.presentation.setPlainText(JujutsuBundle.message("action.bookmark.advance.generic"))
             return
         }
         applySingleAdvancePresentation(e.presentation, target.repo, target.bookmark)
@@ -205,17 +208,19 @@ fun advanceClosestBookmarkAction(
             e.presentation.isEnabled = availability.enabled
             // See advanceBookmarkAction: a disabled item's tooltip can go unseen, so the reason is
             // also appended to the visible text.
-            e.presentation.text = when (availability) {
-                ClosestAdvanceAvailability.UNSUPPORTED_VERSION -> JujutsuBundle.message(
-                    "action.bookmark.advance.closest.disabled.version",
-                    JjFeature.BOOKMARK_ADVANCE.minVersion
-                )
+            e.presentation.setPlainText(
+                when (availability) {
+                    ClosestAdvanceAvailability.UNSUPPORTED_VERSION -> JujutsuBundle.message(
+                        "action.bookmark.advance.closest.disabled.version",
+                        JjFeature.BOOKMARK_ADVANCE.minVersion
+                    )
 
-                ClosestAdvanceAvailability.NO_BOOKMARK ->
-                    JujutsuBundle.message("action.bookmark.advance.closest.disabled.none.suffix")
+                    ClosestAdvanceAvailability.NO_BOOKMARK ->
+                        JujutsuBundle.message("action.bookmark.advance.closest.disabled.none.suffix")
 
-                else -> JujutsuBundle.message("action.bookmark.advance.closest")
-            }
+                    else -> JujutsuBundle.message("action.bookmark.advance.closest")
+                }
+            )
             e.presentation.description = when (availability) {
                 ClosestAdvanceAvailability.UNSUPPORTED_VERSION ->
                     currentRepo?.let { JjFeature.BOOKMARK_ADVANCE.disabledReasonIn(it.project) }

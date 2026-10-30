@@ -8,6 +8,7 @@ import com.intellij.openapi.ui.Messages
 import `in`.kkkev.jjidea.JujutsuBundle
 import `in`.kkkev.jjidea.actions.bookmarkTarget
 import `in`.kkkev.jjidea.actions.nullAndDumbAwareAction
+import `in`.kkkev.jjidea.actions.setPlainText
 import `in`.kkkev.jjidea.jj.Bookmark
 import `in`.kkkev.jjidea.jj.JujutsuRepository
 import `in`.kkkev.jjidea.jj.createCommand
@@ -58,8 +59,10 @@ class ForgetBookmarkAction : DumbAwareAction(
     override fun update(e: AnActionEvent) {
         val bookmark = e.bookmarkTarget?.bookmark
         e.presentation.isEnabled = bookmark != null
-        e.presentation.text = bookmark?.let { JujutsuBundle.message("action.bookmark.forget", it.name) }
-            ?: JujutsuBundle.message("action.bookmark.forget.generic")
+        e.presentation.setPlainText(
+            bookmark?.let { JujutsuBundle.message("action.bookmark.forget", it.name) }
+                ?: JujutsuBundle.message("action.bookmark.forget.generic")
+        )
         e.presentation.description = bookmark?.let { JujutsuBundle.message("action.bookmark.forget.tooltip", it.name) }
     }
 
